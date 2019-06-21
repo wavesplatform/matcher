@@ -21,7 +21,7 @@ object ExtensionPackaging extends AutoPlugin {
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = UniversalDeployPlugin && CommonSettings && JDebPackaging
+  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
@@ -51,8 +51,8 @@ object ExtensionPackaging extends AutoPlugin {
         } else Seq.empty
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
-      nodePackageName := (LocalProject("node") / Linux / packageName).value,
-      debianPackageDependencies := Seq((LocalProject("node") / Debian / packageName).value),
+      nodePackageName := s"waves${network.value.packageSuffix}",
+      debianPackageDependencies := Seq(nodePackageName.value),
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -65,7 +65,7 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       )
-    ) ++ nameFix ++ inScope(Global)(nameFix)
+    ) ++ nameFix ++ inScope(Global)(Seq(Global / name := (ThisProject / name).value) ++ nameFix)
 
   private def nameFix = Seq(
     packageName := s"${name.value}${network.value.packageSuffix}",

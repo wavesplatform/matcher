@@ -1,10 +1,15 @@
-import WavesDockerKeys._
+import java.io.File
+
 import sbt.plugins.JvmPlugin
-import sbt.{AutoPlugin, Def, Plugins, inTask}
+import sbt.{AutoPlugin, Def, Plugins, inTask, taskKey}
 import sbtdocker.DockerPlugin
 import sbtdocker.DockerPlugin.autoImport._
 
 object WavesExtensionDockerPlugin extends AutoPlugin {
+
+  object autoImport extends WavesExtensionDockerKeys
+  import autoImport._
+
   override def requires: Plugins = JvmPlugin && DockerPlugin
 
   override def projectSettings: Seq[Def.Setting[_]] =
@@ -22,4 +27,11 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
       ))
+}
+
+trait WavesExtensionDockerKeys {
+  val additionalFiles    = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
+  val exposedPorts       = taskKey[Set[Int]]("Exposed ports")
+  val buildNodeContainer = taskKey[Unit]("Builds a NODE container")
+  val baseImage          = taskKey[String]("A base image for this container")
 }

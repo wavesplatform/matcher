@@ -5,8 +5,9 @@ import cats.data.Validated.Valid
 import cats.implicits._
 import com.wavesplatform.matcher.model.OrderBook.TickSize
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps
+import future.com.wavesplatform.settings.nonEmptyListReader
+import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
+import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
@@ -50,11 +51,10 @@ object RawMatchingRules {
     ) mapN RawMatchingRules.apply getValueOrThrowErrors
   }
 
-  implicit val rawMatchingRulesNelReader: ValueReader[NonEmptyList[RawMatchingRules]] = {
-    com.wavesplatform.settings.nonEmptyListReader[RawMatchingRules].map { xs =>
+  implicit val rawMatchingRulesNelReader: ValueReader[NonEmptyList[RawMatchingRules]] =
+    nonEmptyListReader[RawMatchingRules].map { xs =>
       val isStrictOrder = xs.tail.zip(xs.toList).forall { case (next, prev) => next.startOffset > prev.startOffset }
       if (isStrictOrder) { if (xs.head.startOffset != 0) RawMatchingRules(0, false) :: xs else xs } else
         throw new IllegalArgumentException(s"Rules should be ordered by offset, but they are: ${xs.map(_.startOffset).toList.mkString(", ")}")
     }
-  }
 }

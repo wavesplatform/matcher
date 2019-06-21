@@ -10,6 +10,7 @@ import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, Fix
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import future.com.wavesplatform.transaction.assets.exchange.Implicits._
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -381,11 +382,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin
 
     getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3: WAVES, BTC, ETH), ETH (incorrect assets count, expected 2 but got 1: ETH)"
+      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3), ETH (incorrect assets count, expected 2 but got 1)"
     )
 
     getSettingByConfig(configStr(incorrectAssets)) should produce(
-      "Invalid setting allowed-asset-pairs value: requirement failed: Wrong char ';' in Base58 string ';;;')"
+      "Invalid setting allowed-asset-pairs value: WAVES-;;; (requirement failed: Wrong char ';' in Base58 string ';;;')"
     )
 
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2

@@ -8,7 +8,7 @@ libraryDependencies ++= Dependencies.dex
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "DEX",
-  packageDescription := "Decentralized EXchange for Waves network"
+  packageDescription := s"Decentralized EXchange for Waves network. Compatible with ${nodeVersion.value} node version"
 )
 
 packageSettings

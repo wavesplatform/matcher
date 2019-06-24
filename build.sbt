@@ -83,6 +83,7 @@ inScope(Global)(
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
     network := NodeNetwork(sys.props.get("network")),
+    nodeVersion := (node / version).value,
     buildNodeContainer := (`node-it` / Docker / docker).value
   ))
 

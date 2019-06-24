@@ -2,13 +2,13 @@ package com.wavesplatform.dex.model
 
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset
@@ -20,9 +20,8 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
 
   private def calculateMatcherFee(buy: Order, sell: Order, executedAmount: Long, executedPrice: Long): (Long, Long) = {
 
-    def calcFee(o: Order, executedAmount: Long, totalAmount: Long): Long = {
-      val p = BigInt(executedAmount) * o.matcherFee / totalAmount
-      p.toLong
+    def calcFee(orderFee: Long, executedAmount: Long, totalAmount: Long): Long = {
+      (BigInt(executedAmount) * orderFee / totalAmount).toLong
     }
 
     def getActualBuySellAmounts(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
@@ -43,17 +42,17 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
         val (buyAmountTotal, sellAmountTotal)       = getActualBuySellAmounts(assetType, buy.amount, buy.price, sell.amount, sell.price)
 
         (
-          Math.min(buy.matcherFee, calcFee(buy, buyAmountExecuted, buyAmountTotal)),
-          Math.min(sell.matcherFee, calcFee(sell, sellAmountExecuted, sellAmountTotal))
+          Math.min(buy.matcherFee, calcFee(buy.matcherFee, buyAmountExecuted, buyAmountTotal)),
+          Math.min(sell.matcherFee, calcFee(sell.matcherFee, sellAmountExecuted, sellAmountTotal))
         )
 
-      case _ => calcFee(buy, executedAmount, buy.amount) -> calcFee(sell, executedAmount, sell.amount)
+      case _ => calcFee(buy.matcherFee, executedAmount, buy.amount) -> calcFee(sell.matcherFee, executedAmount, sell.amount)
     }
   }
 
-  def createTransaction(submitted: LimitOrder, counter: LimitOrder, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
+  def createTransaction(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
 
-    val executedAmount    = LimitOrder.executedAmount(submitted, counter)
+    val executedAmount    = AcceptedOrder.executedAmount(submitted, counter)
     val price             = counter.price
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount, price)
@@ -78,7 +77,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction]
+  type CreateTransaction = (AcceptedOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction]
 
   /**
     * This function is used for the following purposes:

@@ -106,7 +106,9 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     RawMatchingRules(
       startOffset = matchingRules.startOffset,
       tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back.")
+        log.error(
+          s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back."
+        )
         0.00000001
       }.merge
     )
@@ -148,7 +150,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
   private val rateCache                                          = RateCache(db)
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
@@ -165,9 +167,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = assetDecimalsCache.get(asset)
-  }
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
     val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
@@ -282,18 +282,22 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           context.spendableBalanceChanged,
           settings,
           (address, startSchedules) =>
-            Props(new AddressActor(
-              address,
-              context.utx.spendableBalance(address, _),
-              5.seconds,
-              context.time,
-              orderDb,
-              id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
-              matcherQueue.storeEvent,
-              startSchedules
-            )),
+            Props(
+              new AddressActor(
+                address,
+                context.utx.spendableBalance(address, _),
+                5.seconds,
+                context.time,
+                orderDb,
+                id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
+                matcherQueue.storeEvent,
+                orderBookCache.get,
+                startSchedules
+              )
+          ),
           historyRouter
-        )),
+        )
+      ),
       "addresses"
     )
 

@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.server.PathMatcher.{Matched, Unmatched}

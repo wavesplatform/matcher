@@ -1,18 +1,18 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.WatchDistributedCompletionActor
-import com.wavesplatform.matcher.api.OrderBookUnavailable
-import com.wavesplatform.matcher.db.AssetPairsDB
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.util.WorkingStash
+import com.wavesplatform.dex.WatchDistributedCompletionActor
+import com.wavesplatform.dex.api.OrderBookUnavailable
+import com.wavesplatform.dex.db.AssetPairsDB
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

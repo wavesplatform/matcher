@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import com.wavesplatform.NoShrink
 import com.wavesplatform.common.state.ByteStr

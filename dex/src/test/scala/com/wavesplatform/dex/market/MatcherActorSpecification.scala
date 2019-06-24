@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -6,16 +6,16 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB}
-import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
-import com.wavesplatform.matcher.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
-import com.wavesplatform.matcher.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
-import com.wavesplatform.matcher.model.{Events, ExchangeTransactionCreator, OrderBook}
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.matcher.settings.MatchingRules
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
+import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
+import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
+import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
+import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.settings.MatchingRules
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset

@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import cats.implicits._
 import cats.kernel.Monoid
@@ -9,13 +9,13 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
-import com.wavesplatform.matcher.RateCache
-import com.wavesplatform.matcher.error._
-import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.model.MatcherModel.Normalization
-import com.wavesplatform.matcher.settings.OrderFeeSettings._
-import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
-import com.wavesplatform.matcher.smart.MatcherScriptRunner
+import com.wavesplatform.dex.RateCache
+import com.wavesplatform.dex.error._
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.model.MatcherModel.Normalization
+import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
@@ -44,9 +44,9 @@ object OrderValidator {
 
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
-  private[matcher] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[matcher] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[matcher] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
+  private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): Result[Order] =
     Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => MatcherError.OrderInvalidSignature(order.id(), x.toString))
@@ -123,7 +123,7 @@ object OrderValidator {
     }
   }
 
-  private[matcher] def checkOrderVersion(version: Byte, blockchain: Blockchain): Result[Unit] = version match {
+  private[dex] def checkOrderVersion(version: Byte, blockchain: Blockchain): Result[Unit] = version match {
     case 1 => success
     case 2 =>
       if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) success
@@ -194,7 +194,7 @@ object OrderValidator {
     cond(negativeBalances.isEmpty, order, MatcherError.BalanceNotEnough(requiredForOrder, available))
   }
 
-  private[matcher] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
+  private[dex] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
     orderFeeSettings match {
       case _: DynamicSettings               => rateCache.getAllRates.keySet
       case FixedSettings(defaultAssetId, _) => Set(defaultAssetId)
@@ -218,7 +218,7 @@ object OrderValidator {
     * @param rateCache        assets rates (asset cost in Waves)
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
-  private[matcher] def getMinValidFeeForSettings(order: Order,
+  private[dex] def getMinValidFeeForSettings(order: Order,
                                                  orderFeeSettings: OrderFeeSettings,
                                                  matchPrice: Long,
                                                  rateCache: RateCache,

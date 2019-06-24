@@ -1,8 +1,8 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.matcher.util.Codecs.ByteBufferExt
+import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 case class OrderInfo[+S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair)

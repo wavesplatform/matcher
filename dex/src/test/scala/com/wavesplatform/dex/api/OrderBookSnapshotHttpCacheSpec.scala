@@ -1,10 +1,10 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.model._
+import com.wavesplatform.dex.model._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NTPTime, TransactionGenBase}

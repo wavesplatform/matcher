@@ -1,7 +1,7 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.db.RateDB
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.db.RateDB
 import com.wavesplatform.{NoShrink, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, WordSpecLike}

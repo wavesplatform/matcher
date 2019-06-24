@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.Waves

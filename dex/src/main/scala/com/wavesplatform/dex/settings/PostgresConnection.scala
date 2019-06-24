@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}

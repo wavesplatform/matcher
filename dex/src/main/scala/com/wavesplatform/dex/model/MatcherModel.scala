@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves

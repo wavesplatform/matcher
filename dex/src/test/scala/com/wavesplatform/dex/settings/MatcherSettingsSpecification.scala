@@ -1,12 +1,12 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -20,7 +20,7 @@ import scala.util.Try
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
-    Try(conf.as[MatcherSettings]("waves.matcher")).toEither.leftMap(_.getMessage)
+    Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)
 
   val correctOrderFeeStr: String =
     s"""
@@ -148,7 +148,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     val config = configWithSettings()
 
-    val settings = config.as[MatcherSettings]("waves.matcher")
+    val settings = config.as[MatcherSettings]("waves.dex")
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)

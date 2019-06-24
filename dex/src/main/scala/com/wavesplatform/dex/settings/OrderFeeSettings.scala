@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import cats.data.Validated.Valid
 import cats.implicits._
-import com.wavesplatform.matcher.settings.AssetType.AssetType
-import com.wavesplatform.matcher.settings.FeeMode.FeeMode
+import com.wavesplatform.dex.settings.AssetType.AssetType
+import com.wavesplatform.dex.settings.FeeMode.FeeMode
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr

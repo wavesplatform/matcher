@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.nio.ByteBuffer
 
@@ -6,9 +6,9 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
-import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
-import com.wavesplatform.matcher.model.{OrderBook, OrderInfo}
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
+import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 

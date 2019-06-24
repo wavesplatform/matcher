@@ -1,8 +1,8 @@
-package com.wavesplatform.matcher.db
+package com.wavesplatform.dex.db
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.model.{OrderInfo, OrderStatus}
+import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 object EmptyOrderDB extends OrderDB {

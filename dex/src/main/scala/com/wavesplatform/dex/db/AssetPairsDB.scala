@@ -1,7 +1,7 @@
-package com.wavesplatform.matcher.db
+package com.wavesplatform.dex.db
 
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.matcher.MatcherKeys
+import com.wavesplatform.dex.MatcherKeys
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.iq80.leveldb.DB
 

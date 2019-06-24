@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
 
@@ -6,14 +6,14 @@ import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.api.NotImplemented
-import com.wavesplatform.matcher.db.OrderDB
-import com.wavesplatform.matcher.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
-import com.wavesplatform.matcher.queue.QueueEvent
+import com.wavesplatform.dex.Matcher.StoreEvent
+import com.wavesplatform.dex.api.NotImplemented
+import com.wavesplatform.dex.db.OrderDB
+import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
+import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -164,7 +164,7 @@ class AddressActor(
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
     store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(MatcherError.CanNotPersistEvent))
   private def storePlaced(order: Order): Future[Resp] = {
-    import com.wavesplatform.matcher.error._
+    import com.wavesplatform.dex.error._
     store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected(MatcherError.CanNotPersistEvent))
   }
 

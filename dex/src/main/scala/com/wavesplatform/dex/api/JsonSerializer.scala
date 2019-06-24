@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer
 import com.fasterxml.jackson.databind.module.SimpleModule

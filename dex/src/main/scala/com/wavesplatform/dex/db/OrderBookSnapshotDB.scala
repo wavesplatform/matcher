@@ -1,13 +1,13 @@
-package com.wavesplatform.matcher.db
+package com.wavesplatform.dex.db
 
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
 import com.wavesplatform.database.{DBExt, Key}
-import com.wavesplatform.matcher.MatcherKeys
-import com.wavesplatform.matcher.model.OrderBook.Snapshot
-import com.wavesplatform.matcher.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.model.OrderBook.Snapshot
+import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.iq80.leveldb.DB
 

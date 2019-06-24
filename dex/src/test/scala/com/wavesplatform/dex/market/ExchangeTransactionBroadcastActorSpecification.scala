@@ -1,13 +1,13 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.matcher.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
+import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs

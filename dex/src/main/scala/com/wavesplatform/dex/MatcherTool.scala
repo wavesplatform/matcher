@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.io.File
 import java.util.{HashMap => JHashMap}
@@ -17,10 +17,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB}
-import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.market.{MatcherActor, OrderBookActor}
+import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
@@ -86,7 +86,7 @@ object MatcherTool extends ScorexLogging {
 
     val userConfig                = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
     val actualConfig              = loadConfig(userConfig)
-    val settings: MatcherSettings = actualConfig.as[MatcherSettings]("waves.matcher")
+    val settings: MatcherSettings = actualConfig.as[MatcherSettings]("waves.dex")
     val db                        = openDB(settings.dataDir)
 
     AddressScheme.current = new AddressScheme {

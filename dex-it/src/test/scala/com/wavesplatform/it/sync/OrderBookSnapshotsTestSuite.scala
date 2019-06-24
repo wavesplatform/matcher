@@ -5,8 +5,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.matcher.model.OrderStatus
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.dex.model.OrderStatus
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
 
 class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   private def interval        = 50L
-  private def configOverrides = ConfigFactory.parseString(s"""waves.matcher {
+  private def configOverrides = ConfigFactory.parseString(s"""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = $interval
       |}""".stripMargin)

@@ -1,14 +1,14 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
-import com.wavesplatform.matcher.settings.AssetType.AssetType
-import com.wavesplatform.matcher.settings.OrderFeeSettings.PercentSettings
-import com.wavesplatform.matcher.settings.{AssetType, MatcherSettings}
+import com.wavesplatform.dex.model.ExchangeTransactionCreator._
+import com.wavesplatform.dex.settings.AssetType.AssetType
+import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
+import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset

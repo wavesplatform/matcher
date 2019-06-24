@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import net.ceedubs.ficus.readers.NameMapper
 

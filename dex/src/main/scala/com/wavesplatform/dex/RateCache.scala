@@ -1,8 +1,8 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.matcher.db.RateDB
+import com.wavesplatform.dex.db.RateDB
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair

@@ -1,12 +1,12 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.OrderBook.{Level, TickSize}
-import com.wavesplatform.matcher.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.OrderBook.{Level, TickSize}
+import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

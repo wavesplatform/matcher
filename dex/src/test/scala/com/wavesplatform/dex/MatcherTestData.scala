@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.util.concurrent.atomic.AtomicLong
 
@@ -7,11 +7,11 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder}
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.OrderFeeSettings._
-import com.wavesplatform.matcher.settings.{AssetType, MatcherSettings}
+import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder}
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.OrderFeeSettings._
+import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -81,7 +81,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |  }
       |}""".stripMargin))
 
-  val matcherSettings = config.as[MatcherSettings]("waves.matcher")
+  val matcherSettings = config.as[MatcherSettings]("waves.dex")
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample

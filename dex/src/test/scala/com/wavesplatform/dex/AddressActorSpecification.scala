@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -8,10 +8,10 @@ import cats.kernel.Monoid
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
-import com.wavesplatform.matcher.db.EmptyOrderDB
-import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.AddressActor.{BalanceUpdated, PlaceOrder}
+import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.model.LimitOrder
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}

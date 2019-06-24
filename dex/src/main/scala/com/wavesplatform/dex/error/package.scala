@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 package object error {
   implicit class ErrorInterpolator(private val sc: StringContext) {

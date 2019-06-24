@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.queue
+package com.wavesplatform.dex.queue
 
 import java.util.concurrent.Executors
 import java.util.{Timer, TimerTask}
 
-import com.wavesplatform.matcher.LocalQueueStore
-import com.wavesplatform.matcher.queue.LocalMatcherQueue._
-import com.wavesplatform.matcher.queue.MatcherQueue.{IgnoreProducer, Producer}
+import com.wavesplatform.dex.LocalQueueStore
+import com.wavesplatform.dex.queue.LocalMatcherQueue._
+import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration.FiniteDuration

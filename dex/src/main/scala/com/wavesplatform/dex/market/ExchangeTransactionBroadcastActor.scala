@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
-import com.wavesplatform.matcher.market.ExchangeTransactionBroadcastActor._
-import com.wavesplatform.matcher.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.matcher.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
+import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
+import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 

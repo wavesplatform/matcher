@@ -192,5 +192,5 @@ object MatcherTickerTestSuite {
     priceAsset = UsdId
   )
 
-  private val updatedMatcherConfig = parseString(s"""waves.matcher.price-assets = ["${UsdId.id.toString}", "WAVES"]""".stripMargin)
+  private val updatedMatcherConfig = parseString(s"""waves.dex.price-assets = ["${UsdId.id.toString}", "WAVES"]""".stripMargin)
 }

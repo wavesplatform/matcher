@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import akka.actor.ActorSystem
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}

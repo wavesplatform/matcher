@@ -1,8 +1,8 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.db.OrderDB
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.{NoShrink, WithDB}
 import org.scalacheck.Gen

@@ -46,7 +46,7 @@ abstract class MatcherSuiteBase
 object MatcherSuiteBase {
   private def baseConfig(seed: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
     ConfigFactory.parseString(s"""
-         |waves.matcher.events-queue {
+         |waves.dex.events-queue {
          |  type = kafka
          |  kafka {
          |    servers = "$kafkaServer"

@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import java.util.concurrent.ScheduledFuture
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
-import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
-import com.wavesplatform.matcher.model.{OrderBook, OrderBookResult}
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache.Settings
+import com.wavesplatform.dex.model.{OrderBook, OrderBookResult}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon

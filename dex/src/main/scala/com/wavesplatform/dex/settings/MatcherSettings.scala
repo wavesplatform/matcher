@@ -1,18 +1,18 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.matcher.model.OrderValidator
-import com.wavesplatform.matcher.settings.DeviationsSettings._
-import com.wavesplatform.matcher.settings.EventsQueueSettings.eventsQueueSettingsReader
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{OrderFeeSettings, _}
-import com.wavesplatform.matcher.settings.OrderHistorySettings._
-import com.wavesplatform.matcher.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
-import com.wavesplatform.matcher.settings.PostgresConnection._
-import com.wavesplatform.matcher.settings.RawMatchingRules.rawMatchingRulesNelReader
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.model.OrderValidator
+import com.wavesplatform.dex.settings.DeviationsSettings._
+import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
+import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
+import com.wavesplatform.dex.settings.OrderHistorySettings._
+import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
+import com.wavesplatform.dex.settings.PostgresConnection._
+import com.wavesplatform.dex.settings.RawMatchingRules.rawMatchingRulesNelReader
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._

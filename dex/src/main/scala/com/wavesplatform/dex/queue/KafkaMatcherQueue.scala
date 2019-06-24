@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.queue
+package com.wavesplatform.dex.queue
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
@@ -8,9 +8,9 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
-import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
-import com.wavesplatform.matcher.queue.MatcherQueue.{IgnoreProducer, Producer}
-import com.wavesplatform.matcher.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
+import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
+import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition

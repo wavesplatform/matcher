@@ -1,7 +1,7 @@
-package com.wavesplatform.matcher.history
+package com.wavesplatform.dex.history
 
 import akka.actor.{Actor, Cancellable}
-import com.wavesplatform.matcher.history.HistoryRouter.{HistoryMsg, StopAccumulate}
+import com.wavesplatform.dex.history.HistoryRouter.{HistoryMsg, StopAccumulate}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

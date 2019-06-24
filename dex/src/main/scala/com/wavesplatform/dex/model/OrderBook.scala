@@ -1,13 +1,13 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.utils.Serialize.ByteBufferOps
-import com.wavesplatform.matcher.model.Events._
-import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.OrderBook.LastTrade
+import com.wavesplatform.dex.model.Events._
+import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

@@ -1,6 +1,6 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
-import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
+import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.SortedSet

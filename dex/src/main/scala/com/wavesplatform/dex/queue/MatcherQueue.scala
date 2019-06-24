@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.queue
+package com.wavesplatform.dex.queue
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

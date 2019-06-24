@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, Props, Terminated}
 

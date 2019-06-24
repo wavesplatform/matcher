@@ -11,11 +11,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
-import com.wavesplatform.matcher.history.DBRecords.{EventRecord, OrderRecord}
-import com.wavesplatform.matcher.model.MatcherModel.Denormalization
-import com.wavesplatform.matcher.model.OrderValidator
-import com.wavesplatform.matcher.settings.PostgresConnection._
-import com.wavesplatform.matcher.settings.{OrderHistorySettings, PostgresConnection}
+import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.model.OrderValidator
+import com.wavesplatform.dex.settings.PostgresConnection._
+import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
@@ -99,7 +99,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   def getOrdersHistoryCfgString(batchLingerMs: Long): String =
     s"""
-       |waves.matcher {
+       |waves.dex {
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
        |  order-history {
        |    enabled = yes
@@ -176,7 +176,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       )
       .toSet
 
-  import com.wavesplatform.matcher.history.HistoryRouter._
+  import com.wavesplatform.dex.history.HistoryRouter._
 
   val (amount, price)            = (1000L, PriceConstant)
   val denormalizedAmount: Double = Denormalization.denormalizeAmountAndFee(amount, Decimals)

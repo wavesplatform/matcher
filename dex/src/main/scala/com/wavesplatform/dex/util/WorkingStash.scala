@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.util
+package com.wavesplatform.dex.util
 
 import akka.actor.{Actor, ActorContext, ActorRef}
 

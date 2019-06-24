@@ -1,6 +1,6 @@
-package com.wavesplatform.matcher.db
+package com.wavesplatform.dex.db
 
-import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NoShrink, WithDB}

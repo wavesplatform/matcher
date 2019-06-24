@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.matcher._
-import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
+import com.wavesplatform.dex._
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import org.iq80.leveldb.DB
 

@@ -1,21 +1,21 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, ActorRef, Props}
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import cats.data.NonEmptyList
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.api._
-import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
-import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
-import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
-import com.wavesplatform.matcher.model.OrderBook.LastTrade
-import com.wavesplatform.matcher.model._
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules}
-import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.util.WorkingStash
+import com.wavesplatform.dex.api._
+import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
+import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
+import com.wavesplatform.dex.model.OrderBook.LastTrade
+import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules}
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}

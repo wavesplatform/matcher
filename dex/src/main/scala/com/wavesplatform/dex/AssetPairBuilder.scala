@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import cats.syntax.either._
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.AssetPairBuilder.AssetSide
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.dex.AssetPairBuilder.AssetSide
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset

@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.implicits._

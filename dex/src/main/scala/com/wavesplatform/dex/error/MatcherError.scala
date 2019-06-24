@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.error
+package com.wavesplatform.dex.error
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.matcher.error.MatcherError._
-import com.wavesplatform.matcher.model.MatcherModel.Denormalization
-import com.wavesplatform.matcher.settings.{DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.error.MatcherError._
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr

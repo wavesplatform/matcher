@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.model.OrderBookResult
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.model.OrderBookResult
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._

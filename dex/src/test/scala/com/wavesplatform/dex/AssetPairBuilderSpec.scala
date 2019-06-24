@@ -1,10 +1,10 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain}
@@ -39,7 +39,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     )
 
   private val blacklistedAssets = Set(Asset3)
-  private val priceAssets       = ConfigFactory.parseString(s"""waves.matcher {
+  private val priceAssets       = ConfigFactory.parseString(s"""waves.dex {
        |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
        |  blacklisted-names   = ["name$$"]
        |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
@@ -47,7 +47,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
        |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
        |}""".stripMargin)
 
-  private val settings   = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
+  private val settings   = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
   private val blockchain = stub[Blockchain]
 
   private val builder = new AssetPairBuilder(settings, blockchain, blacklistedAssets)

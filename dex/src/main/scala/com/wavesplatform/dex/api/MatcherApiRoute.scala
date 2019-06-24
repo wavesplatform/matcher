@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
@@ -12,17 +12,17 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.matcher.AddressActor.GetOrderStatus
-import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
-import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.error.MatcherError.OrderRestrictionsNotFound
-import com.wavesplatform.matcher.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
-import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model._
-import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher, RateCache}
+import com.wavesplatform.dex.AddressActor.GetOrderStatus
+import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
+import com.wavesplatform.dex.Matcher.StoreEvent
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.MatcherError.OrderRestrictionsNotFound
+import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -355,7 +355,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
@@ -380,7 +380,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
     ))
   def cancelAll: Route = (path("orderbook" / "cancel") & post) {
@@ -405,7 +405,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>

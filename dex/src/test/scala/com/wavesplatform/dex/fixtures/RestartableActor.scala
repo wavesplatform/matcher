@@ -1,7 +1,7 @@
-package com.wavesplatform.matcher.fixtures
+package com.wavesplatform.dex.fixtures
 
 import akka.actor.Actor
-import com.wavesplatform.matcher.fixtures.RestartableActor.{RestartActor, RestartActorException}
+import com.wavesplatform.dex.fixtures.RestartableActor.{RestartActor, RestartActorException}
 
 trait RestartableActor extends Actor {
   override def unhandled(message: Any): Unit = {

@@ -1,12 +1,12 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import java.io.NotSerializableException
 
 import akka.serialization._
-import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
-import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
-import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.dex.market.MatcherActor.OrderBookCreated
+import com.wavesplatform.dex.market.OrderBookActor.Snapshot
+import com.wavesplatform.dex.market.{MatcherActor, OrderBookActor}
+import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import kamon.Kamon

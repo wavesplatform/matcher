@@ -1,12 +1,12 @@
-package com.wavesplatform.matcher.db
+package com.wavesplatform.dex.db
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.matcher.MatcherKeys
-import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
-import com.wavesplatform.matcher.model.{OrderInfo, OrderStatus}
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
+import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB

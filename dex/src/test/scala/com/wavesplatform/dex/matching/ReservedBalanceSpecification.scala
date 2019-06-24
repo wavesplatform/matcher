@@ -1,14 +1,14 @@
-package com.wavesplatform.matcher.matching
+package com.wavesplatform.dex.matching
 
 import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.matcher.db.TestOrderDB
-import com.wavesplatform.matcher.market.MatcherSpecLike
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
-import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData, _}
+import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.market.MatcherSpecLike
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
+import com.wavesplatform.dex.model.{LimitOrder, OrderHistoryStub}
+import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData, _}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}

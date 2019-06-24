@@ -1,6 +1,6 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
-import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}

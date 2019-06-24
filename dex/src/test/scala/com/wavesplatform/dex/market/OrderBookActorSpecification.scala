@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -7,18 +7,18 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.api.AlreadyProcessed
-import com.wavesplatform.matcher.db.OrderBookSnapshotDB
-import com.wavesplatform.matcher.fixtures.RestartableActor
-import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
-import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
-import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
-import com.wavesplatform.matcher.model.OrderBook.TickSize
-import com.wavesplatform.matcher.model._
-import com.wavesplatform.matcher.queue.QueueEvent.Canceled
-import com.wavesplatform.matcher.settings.MatchingRules
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.api.AlreadyProcessed
+import com.wavesplatform.dex.db.OrderBookSnapshotDB
+import com.wavesplatform.dex.fixtures.RestartableActor
+import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
+import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
+import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled}
+import com.wavesplatform.dex.model.OrderBook.TickSize
+import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.settings.MatchingRules
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.util
+package com.wavesplatform.dex.util
 
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.model.OrderStatus
+import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 

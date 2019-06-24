@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 case class MatcherState(offset: QueueEventWithMeta.Offset,

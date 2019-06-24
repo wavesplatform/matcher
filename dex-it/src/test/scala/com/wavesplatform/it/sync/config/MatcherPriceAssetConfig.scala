@@ -8,8 +8,8 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
-import com.wavesplatform.matcher.AssetPairBuilder
-import com.wavesplatform.matcher.market.MatcherActor
+import com.wavesplatform.dex.AssetPairBuilder
+import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -162,7 +162,7 @@ object MatcherPriceAssetConfig {
   val orderLimit = 10
 
   val ForbiddenAssetId     = "FdbnAsset"
-  val updatedMatcherConfig = parseString(s"""waves.matcher {
+  val updatedMatcherConfig = parseString(s"""waves.dex {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit

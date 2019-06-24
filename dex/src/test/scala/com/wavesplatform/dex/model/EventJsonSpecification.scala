@@ -1,9 +1,9 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.wavesplatform.NoShrink
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
-import com.wavesplatform.matcher.model.EventSerializers._
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.market.MatcherActor.OrderBookCreated
+import com.wavesplatform.dex.model.EventSerializers._
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}

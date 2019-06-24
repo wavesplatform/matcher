@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.dex
 
 import java.io.File
 import java.util.concurrent._
@@ -15,16 +15,16 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db._
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.matcher.Matcher.Status
-import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
-import com.wavesplatform.matcher.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
-import com.wavesplatform.matcher.history.HistoryRouter
-import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market._
-import com.wavesplatform.matcher.model.MatcherModel.Normalization
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
-import com.wavesplatform.matcher.queue._
-import com.wavesplatform.matcher.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.Matcher.Status
+import com.wavesplatform.dex.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
+import com.wavesplatform.dex.history.HistoryRouter
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.market._
+import com.wavesplatform.dex.model.MatcherModel.Normalization
+import com.wavesplatform.dex.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.dex.queue._
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -38,7 +38,7 @@ import scala.util.{Failure, Success}
 
 class Matcher(context: Context) extends Extension with ScorexLogging {
 
-  private val settings = context.settings.config.as[MatcherSettings]("waves.matcher")
+  private val settings = context.settings.config.as[MatcherSettings]("waves.dex")
 
   private val matcherKeyPair = (for {
     address <- Address.fromString(settings.account)

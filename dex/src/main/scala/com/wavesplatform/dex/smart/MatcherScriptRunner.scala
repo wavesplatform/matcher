@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.smart
+package com.wavesplatform.dex.smart
 
 import cats.Eval
 import cats.implicits._

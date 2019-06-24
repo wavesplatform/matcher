@@ -1,10 +1,10 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.data.Validated.Valid
 import cats.implicits._
-import com.wavesplatform.matcher.model.OrderBook.TickSize
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.dex.model.OrderBook.TickSize
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import future.com.wavesplatform.settings.nonEmptyListReader
 import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps

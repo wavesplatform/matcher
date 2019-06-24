@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.queue
+package com.wavesplatform.dex.queue
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestSize

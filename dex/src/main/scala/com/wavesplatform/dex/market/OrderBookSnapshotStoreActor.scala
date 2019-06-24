@@ -1,10 +1,10 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
-import com.wavesplatform.matcher.db.OrderBookSnapshotDB
-import com.wavesplatform.matcher.market.OrderBookSnapshotStoreActor._
-import com.wavesplatform.matcher.model.OrderBook.Snapshot
-import com.wavesplatform.matcher.queue.QueueEventWithMeta.Offset
+import com.wavesplatform.dex.db.OrderBookSnapshotDB
+import com.wavesplatform.dex.market.OrderBookSnapshotStoreActor._
+import com.wavesplatform.dex.model.OrderBook.Snapshot
+import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDB) extends Actor {

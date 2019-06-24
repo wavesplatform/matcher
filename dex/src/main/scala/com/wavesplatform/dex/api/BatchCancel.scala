@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 

@@ -11,8 +11,8 @@ import com.wavesplatform.dexgen.Worker._
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util._
-import com.wavesplatform.matcher.AssetPairBuilder
-import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.dex.AssetPairBuilder
+import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

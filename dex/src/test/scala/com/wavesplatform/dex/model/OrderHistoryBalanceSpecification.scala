@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
@@ -7,8 +7,8 @@ import akka.util.Timeout
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.matcher.{AddressActor, MatcherTestData}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.{AddressActor, MatcherTestData}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

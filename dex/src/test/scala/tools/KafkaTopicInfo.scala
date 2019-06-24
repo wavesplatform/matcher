@@ -11,8 +11,8 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.matcher.queue.KafkaMatcherQueue.eventDeserializer
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.KafkaMatcherQueue.eventDeserializer
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer

@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.matcher.AddressActor
-import com.wavesplatform.matcher.db.TestOrderDB
+import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.AddressActor
+import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.utils.Time
 
 import scala.collection.mutable

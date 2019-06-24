@@ -1,8 +1,8 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.model.Events.OrderExecuted
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalatest.{FreeSpec, Matchers}

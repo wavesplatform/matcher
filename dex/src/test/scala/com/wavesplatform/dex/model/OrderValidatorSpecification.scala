@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -11,12 +11,12 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.model.MatcherModel.{Denormalization, Normalization}
-import com.wavesplatform.matcher.model.OrderValidator.Result
-import com.wavesplatform.matcher.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.matcher.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
-import com.wavesplatform.matcher.{MatcherTestData, RateCache}
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
+import com.wavesplatform.dex.model.OrderValidator.Result
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.{MatcherTestData, RateCache}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}

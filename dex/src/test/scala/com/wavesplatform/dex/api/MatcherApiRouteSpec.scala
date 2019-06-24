@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
@@ -11,9 +11,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.matcher._
-import com.wavesplatform.matcher.error.MatcherError
-import com.wavesplatform.matcher.settings.MatcherSettings
+import com.wavesplatform.dex._
+import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{RequestGen, WithDB, crypto}
@@ -25,7 +25,7 @@ import scala.concurrent.Future
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with PathMockFactory with Eventually with WithDB {
 
-  private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.matcher")
+  private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes)
 
   routePath("/balance/reserved/{publicKey}") - {

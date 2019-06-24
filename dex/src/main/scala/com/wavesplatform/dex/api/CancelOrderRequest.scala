@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.api
+package com.wavesplatform.dex.api
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKey

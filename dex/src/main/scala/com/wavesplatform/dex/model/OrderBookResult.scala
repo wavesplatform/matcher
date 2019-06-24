@@ -1,10 +1,10 @@
-package com.wavesplatform.matcher.model
+package com.wavesplatform.dex.model
 
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
-import com.wavesplatform.matcher.api.JsonSerializer
+import com.wavesplatform.dex.api.JsonSerializer
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 @JsonSerialize(using = classOf[OrderBookResult.Serializer])

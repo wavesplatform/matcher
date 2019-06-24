@@ -21,7 +21,7 @@ import com.wavesplatform.it.api.{
 }
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransactionV2

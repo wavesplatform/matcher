@@ -159,7 +159,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 object RestOrderLimitTestSuite {
   val reducedLimit                            = 8
   val configWithReducedRestOrderLimit: Config = parseString(s"""
-                                                       |waves.matcher {
+                                                       |waves.dex {
                                                        |  rest-order-limit=$reducedLimit
                                                        |}
     """.stripMargin)

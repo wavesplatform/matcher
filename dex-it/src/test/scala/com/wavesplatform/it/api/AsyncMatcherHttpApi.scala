@@ -12,8 +12,8 @@ import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
-import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.matcher.queue.QueueEventWithMeta
+import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
@@ -47,7 +47,7 @@ object AsyncMatcherHttpApi extends Assertions {
 
   implicit class MatcherAsyncHttpApi(matcherNode: Node) extends NodeAsyncHttpApi(matcherNode) {
 
-    def matcherApiEndpoint: URL = new URL(s"http://localhost:${matcherNode.nodeExternalPort(matcherNode.config.getInt("waves.matcher.port"))}")
+    def matcherApiEndpoint: URL = new URL(s"http://localhost:${matcherNode.nodeExternalPort(matcherNode.config.getInt("waves.dex.port"))}")
 
     def matcherGet(path: String,
                    f: RequestBuilder => RequestBuilder = identity,

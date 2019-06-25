@@ -248,6 +248,6 @@ object OrdersFromScriptedAssetTestSuite {
                                                           |    ${BlockchainFeatures.SmartAssets.id} = 0,
                                                           |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
                                                           |  }
-                                                          |  matcher.price-assets = ["$AllowAssetId", "$DenyAssetId", "$UnscriptedAssetId"]
+                                                          |  dex.price-assets = ["$AllowAssetId", "$DenyAssetId", "$UnscriptedAssetId"]
                                                           |}""".stripMargin)
 }

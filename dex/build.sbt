@@ -1,14 +1,14 @@
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging)
+enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.matcher
+libraryDependencies ++= Dependencies.dex
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "DEX",
-  packageDescription := "Decentralized EXchange for Waves network"
+  packageDescription := s"Decentralized EXchange for Waves network. Compatible with ${nodeVersion.value} node version"
 )
 
 packageSettings

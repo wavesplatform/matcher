@@ -1,4 +1,4 @@
-import CommonSettings.autoImport.network
+import CommonSettings.autoImport.{network, nodeVersion}
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
@@ -7,7 +7,7 @@ import com.typesafe.sbt.packager.debian.DebianPlugin.Names.Postinst
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.Debian
 import com.typesafe.sbt.packager.debian.JDebPackaging
 import com.typesafe.sbt.packager.linux.LinuxPackageMapping
-import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{Linux, defaultLinuxInstallLocation, linuxPackageMappings}
+import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{defaultLinuxInstallLocation, linuxPackageMappings}
 import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
@@ -21,11 +21,10 @@ object ExtensionPackaging extends AutoPlugin {
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = UniversalDeployPlugin && CommonSettings && JDebPackaging
+  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
-      packageName := s"${name.value}${network.value.packageSuffix}",
       packageDoc / publishArtifact := false,
       packageSrc / publishArtifact := false,
       Universal / javaOptions := Nil,
@@ -51,8 +50,8 @@ object ExtensionPackaging extends AutoPlugin {
         } else Seq.empty
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
-      nodePackageName := (LocalProject("node") / Linux / packageName).value,
-      debianPackageDependencies := Seq((LocalProject("node") / Debian / packageName).value),
+      nodePackageName := s"waves${network.value.packageSuffix}",
+      debianPackageDependencies := Seq(nodePackageName.value),
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -65,11 +64,11 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       )
-    ) ++ nameFix ++ inScope(Global)(nameFix)
+    ) ++ nameFix ++ inScope(Global)(Seq(Global / name := (ThisProject / name).value) ++ nameFix)
 
   private def nameFix = Seq(
-    packageName := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := s"${name.value}${network.value.packageSuffix}"
+    packageName := s"${name.value}${network.value.packageSuffix}_${nodeVersion.value}",
+    normalizedName := s"${packageName.value}"
   )
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings

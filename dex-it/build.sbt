@@ -1,11 +1,11 @@
-import WavesDockerKeys._
+import WavesExtensionDockerPlugin.autoImport._
 
 enablePlugins(WavesExtensionDockerPlugin, ItTestPlugin)
 
 description := "DEX integration tests"
 libraryDependencies ++= Dependencies.itTest
 
-docker := docker.dependsOn(LocalProject("node-it") / docker).value
+docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/dex-it")),

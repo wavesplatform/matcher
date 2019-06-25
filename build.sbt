@@ -1,63 +1,13 @@
-/* IDEA notes
- * May require to delete .idea and re-import with all checkboxes
- * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
- * To work with worksheets, make sure:
-   1. You've selected the appropriate project
-   2. You've checked "Make project before run"
- */
-
+import CommonSettings.autoImport.network
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
-import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
-lazy val common = crossProject(JSPlatform, JVMPlatform)
-  .withoutSuffixFor(JVMPlatform)
-  .disablePlugins(ProtocPlugin)
-  .settings(
-    libraryDependencies ++= Dependencies.common.value,
-    coverageExcludedPackages := ""
-  )
+def nodeVersionTag: String = "DEX-265-delete-dex" //"v0.17.4"
 
-lazy val commonJS  = common.js
-lazy val commonJVM = common.jvm
+lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
-lazy val lang =
-  crossProject(JSPlatform, JVMPlatform)
-    .withoutSuffixFor(JVMPlatform)
-    .disablePlugins(ProtocPlugin)
-    .dependsOn(common % "compile;test->test")
-    .settings(
-      version := "1.0.0",
-      coverageExcludedPackages := ".*",
-      test in assembly := {},
-      libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
-      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases")
-      // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
-    )
-
-lazy val langJS  = lang.js
-lazy val langJVM = lang.jvm
-
-lazy val node = project
-  .dependsOn(
-    commonJVM % "compile;test->test",
-    langJVM   % "compile;test->test"
-  )
-
-lazy val `grpc-server` = project
-  .dependsOn(node % "compile;test->test;runtime->provided")
-
-lazy val `node-it` = project.dependsOn(node)
-
-lazy val `node-generator` = project.dependsOn(node, `node-it` % "compile->test")
-
-lazy val benchmark = project
-  .dependsOn(
-    node    % "compile;test->test",
-    langJVM % "compile;test->test"
-  )
+lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
 lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
 
@@ -80,7 +30,6 @@ lazy val it = project
       .sequential(
         root / packageAll,
         `dex-it` / Docker / docker,
-        `node-it` / Test / test,
         `dex-it` / Test / test
       )
       .value
@@ -88,14 +37,6 @@ lazy val it = project
 
 lazy val root = (project in file("."))
   .aggregate(
-    commonJS,
-    commonJVM,
-    langJS,
-    langJVM,
-    node,
-    `node-it`,
-    `node-generator`,
-    benchmark,
     dex,
     `dex-it`,
     `dex-generator`
@@ -107,8 +48,8 @@ inScope(Global)(
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
-    scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
-    licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+    scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/dex"), "git@github.com:wavesplatform/dex.git", None)),
+    licenses := Seq(("MIT", url("https://github.com/wavesplatform/dex/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
@@ -144,7 +85,9 @@ inScope(Global)(
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
-    network := Network(sys.props.get("network"))
+    network := NodeNetwork(sys.props.get("network")),
+    nodeVersion := (node / version).value,
+    buildNodeContainer := (`node-it` / Docker / docker).value
   ))
 
 // ThisBuild options
@@ -165,11 +108,8 @@ packageAll := Def
   .sequential(
     root / cleanAll,
     Def.task {
-      (node /  assembly).value
-      (node / Debian / packageBin).value
-      (dex / Universal / packageZipTarball).value
-      (dex / Debian / packageBin).value
-    (`grpc-server` /Universal / packageZipTarball).value
+      val a = (dex / Universal / packageZipTarball).value
+      val b = (dex / Debian / packageBin).value
     }
   )
   .value
@@ -179,10 +119,8 @@ checkPRRaw := {
   try {
     cleanAll.value // Hack to run clean before all tasks
   } finally {
-    test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
-    (commonJS / Compile / fastOptJS).value
-    (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
+    (dex / Test / test).value
+    (`dex-generator` / Test / compile).value
   }
 }
 

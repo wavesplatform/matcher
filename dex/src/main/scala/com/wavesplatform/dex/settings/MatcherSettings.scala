@@ -47,6 +47,7 @@ case class MatcherSettings(account: String,
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
+                           processConsumedTimeout: FiniteDuration,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
@@ -95,8 +96,9 @@ object MatcherSettings {
 
     val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
 
-    val eventsQueue         = config.as[EventsQueueSettings](s"events-queue")
-    val recoverOrderHistory = !new File(dataDirectory).exists()
+    val eventsQueue            = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout = config.as[FiniteDuration]("process-consumed-timeout")
+    val recoverOrderHistory    = !new File(dataDirectory).exists()
 
     val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
     require(limitEventsDuringRecovery.forall(_ >= snapshotsInterval), "limit-events-during-recovery should be >= snapshotsInterval")
@@ -137,6 +139,7 @@ object MatcherSettings {
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,
       eventsQueue,
+      processConsumedTimeout,
       orderFee,
       deviation,
       orderRestrictions,

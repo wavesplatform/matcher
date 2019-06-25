@@ -12,7 +12,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.util.WorkingStash
+import com.wavesplatform.dex.util.{ActorNameParser, WorkingStash}
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -165,10 +165,7 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
 
     case Terminated(ref) =>
-      val name = ref.path.name
-      val xs   = name.split('-')
-      val pair = if (xs.length == 2) AssetPair.createAssetPair(xs.head, xs(1)).toOption else None
-
+      val pair = ActorNameParser.orderBookPair(ref.path.name).toOption
       pair.foreach { p =>
         orderBooks.getAndUpdate { obs =>
           obs.get(p) match {
@@ -190,7 +187,7 @@ class MatcherActor(settings: MatcherSettings,
     case PingAll(xs) =>
       val workers = xs.flatMap(pair => context.child(pair.key))
       val s       = sender()
-      context.actorOf(Props(new WatchDistributedCompletionActor(workers, s, Ping, Pong)))
+      context.actorOf(Props(new WatchDistributedCompletionActor(workers, s, Ping, Pong, settings.processConsumedTimeout)))
   }
 
   private def collectOrderBooks(restOrderBooksNumber: Long,

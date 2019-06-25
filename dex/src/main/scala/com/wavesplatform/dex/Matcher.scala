@@ -176,6 +176,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     "order-book-snapshot-store"
   )
 
+  private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
+
   lazy val matcher: ActorRef = context.actorSystem.actorOf(
     MatcherActor.props(
       settings,
@@ -198,10 +200,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
                   eventWithMeta.event.assetPair
                 }(collection.breakOut)
 
-                // All actor are local and have unbounded queues, so it's okay
-                val timeout = new Timeout(10.seconds)
                 self
-                  .ask(MatcherActor.PingAll(assetPairs))(timeout)
+                  .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
                   .recover {
                     case NonFatal(e) => log.error("PingAll is timed out!", e)
                   }

@@ -73,7 +73,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val configStr =
       s"""waves {
       |  directory = /waves
-      |  matcher {
+      |  dex {
       |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
       |    bind-address = 127.0.0.1
       |    port = 6886

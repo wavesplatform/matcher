@@ -67,7 +67,7 @@ object ExtensionPackaging extends AutoPlugin {
     ) ++ nameFix ++ inScope(Global)(Seq(Global / name := (ThisProject / name).value) ++ nameFix)
 
   private def nameFix = Seq(
-    packageName := s"${name.value}${network.value.packageSuffix}-${version.value}_${nodeVersion.value}",
+    packageName := s"${name.value}${network.value.packageSuffix}_${nodeVersion.value}",
     normalizedName := s"${packageName.value}"
   )
 

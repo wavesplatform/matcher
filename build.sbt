@@ -1,18 +1,9 @@
-/* IDEA notes
- * Use git clone git@github.com:wavesplatform/dex.git dex-backend
- * May require to delete .idea and re-import with all checkboxes
- * Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726
- * To work with worksheets, make sure:
-   1. You've selected the appropriate project
-   2. You've checked "Make project before run"
- */
-
 import CommonSettings.autoImport.network
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-def nodeVersionTag: String = "v0.17.4"
+def nodeVersionTag: String = "DEX-265-delete-dex" //"v0.17.4"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
@@ -31,6 +22,18 @@ lazy val `dex-generator` = project.dependsOn(
   `node-it` % "compile->test", // Without this IDEA doesn't find classes
   `dex-it`  % "compile->test"
 )
+
+lazy val it = project
+  .settings(
+    description := "Hack for near future to support builds in TeamCity for old and new branches both",
+    Test / test := Def
+      .sequential(
+        root / packageAll,
+        `dex-it` / Docker / docker,
+        `dex-it` / Test / test
+      )
+      .value
+  )
 
 lazy val root = (project in file("."))
   .aggregate(

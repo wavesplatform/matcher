@@ -22,7 +22,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private val matcherConfig = ConfigFactory.parseString(
     s"""waves {
-       |  matcher {
+       |  dex {
        |    price-assets = ["${Asset1.id()}", "${Asset2.id()}"]
        |    rest-order-limit = 100
        |    events-queue {
@@ -120,7 +120,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
   private def request(order: Order): Future[(String, String)] =
     for {
       _ <- node.placeOrder(order).recover {
-        case e: UnexpectedStatusCodeException if e.statusCode == 503 => // Acceptable
+        case e: UnexpectedStatusCodeException if e.statusCode == 503 || e.responseBody.contains("has already been placed") => // Acceptable
       }
       status <- node.orderStatus(order.idStr(), order.assetPair, waitForStatus = false)
     } yield (order.idStr(), status.status)

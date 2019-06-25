@@ -26,7 +26,7 @@ import scala.concurrent.Future
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with PathMockFactory with Eventually with WithDB {
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
-  private val matcherKeyPair = KeyPair("matcher".getBytes)
+  private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
 
   routePath("/balance/reserved/{publicKey}") - {
     val publicKey = matcherKeyPair.publicKey

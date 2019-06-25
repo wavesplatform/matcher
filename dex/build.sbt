@@ -1,6 +1,6 @@
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging)
+enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex

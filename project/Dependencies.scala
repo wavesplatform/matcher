@@ -12,7 +12,7 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %% s"cats-$module"  % version)
+  private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %% s"cats-$module" % version)
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
@@ -22,7 +22,7 @@ object Dependencies {
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
+  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect", "1.2.0")
   private val catsCore   = catsModule("core")
@@ -94,7 +94,8 @@ object Dependencies {
     akkaModule("actor"),
     akkaModule("persistence-query"),
     akkaHttp,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0"
+    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0",
+    janino
   ) ++ Seq(
     akkaModule("testkit"),
     akkaModule("persistence-tck"),

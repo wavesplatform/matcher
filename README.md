@@ -159,6 +159,7 @@ sbt "dex/run /path/to/configuration"
     * Main class: `com.wavesplatform.Application`
     * Program arguments: `/path/to/configuration`
     * Use classpath of module: `dex`
+    * Check `Include dependencies with "Provided" scope`
 
 4. Click on `OK`
 5. Run this configuration

@@ -11,20 +11,20 @@ import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db._
-import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.dex.Matcher.Status
-import com.wavesplatform.dex.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model.MatcherModel.Normalization
-import com.wavesplatform.dex.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.dex.model.{AssetDecimalsCache, ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -66,12 +66,16 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
-  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
-    settings.orderBookSnapshotHttpCache,
-    context.time,
-    p => Option(orderBookCache.get(p))
-  )
+  private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val assetDecimalsCache = new AssetDecimalsCache(context.blockchain)
+
+  private val orderBooksSnapshotCache =
+    new OrderBookSnapshotHttpCache(
+      settings.orderBookSnapshotHttpCache,
+      context.time,
+      assetDecimalsCache.get,
+      p => Option(orderBookCache.get(p))
+    )
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
@@ -137,33 +141,44 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
-    MatcherApiRoute(
-      pairBuilder,
-      matcherPublicKey,
-      matcher,
-      addressActors,
-      matcherQueue.storeEvent,
-      p => Option(orderBooks.get()).flatMap(_.get(p)),
-      p => Option(marketStatuses.get(p)),
-      validateOrder,
-      orderBooksSnapshotCache,
-      settings,
-      () => status.get(),
-      db,
-      context.time,
-      () => matcherQueue.lastProcessedOffset,
-      () => matcherQueue.lastEventOffset,
-      ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-      Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption,
-      rateCache,
-      settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
+  lazy val matcherApiRoutes: Seq[ApiRoute] = {
+    val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+    Seq(
+      MatcherApiRoute(
+        pairBuilder,
+        matcherPublicKey,
+        matcher,
+        addressActors,
+        matcherQueue.storeEvent,
+        p => Option(orderBooks.get()).flatMap(_.get(p)),
+        p => Option(marketStatuses.get(p)),
+        validateOrder,
+        orderBooksSnapshotCache,
+        settings,
+        () => status.get(),
+        db,
+        context.time,
+        () => matcherQueue.lastProcessedOffset,
+        () => matcherQueue.lastEventOffset,
+        ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
+        keyHash,
+        rateCache,
+        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
+      ),
+      MatcherApiRouteV1(
+        pairBuilder,
+        orderBooksSnapshotCache,
+        () => status.get(),
+        keyHash
+      )
     )
-  )
+  }
 
-  lazy val matcherApiTypes: Set[Class[_]] = Set(
-    classOf[MatcherApiRoute]
-  )
+  lazy val matcherApiTypes: Set[Class[_]] =
+    Set(
+      classOf[MatcherApiRoute],
+      classOf[MatcherApiRouteV1],
+    )
 
   private val snapshotsRestore = Promise[Unit]()
 

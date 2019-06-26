@@ -6,7 +6,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsObject, JsValue, Json}
 
@@ -58,6 +57,10 @@ object MatcherModel {
       denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
     }
   }
+
+  sealed trait DecimalsFormat
+  final case object Denormalized extends DecimalsFormat
+  final case object Normalized   extends DecimalsFormat
 }
 
 case class LevelAgg(amount: Long, price: Long)
@@ -76,7 +79,7 @@ sealed trait LimitOrder {
 
   def spentAsset: Asset = order.getSpendAssetId
   def rcvAsset: Asset   = order.getReceiveAssetId
-  val feeAsset: Asset   = Waves
+  val feeAsset: Asset   = order.matcherFeeAssetId
 
   def requiredBalance: Map[Asset, Long] = Monoid.combine(
     Map(spentAsset -> rawSpendAmount),

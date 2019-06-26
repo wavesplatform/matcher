@@ -3,7 +3,7 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-def nodeVersionTag: String = "DEX-265-delete-dex" //"v0.17.4"
+def nodeVersionTag: String = "5468da2b49078a82d1208fadd1523deed251feb1"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 

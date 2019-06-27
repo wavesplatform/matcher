@@ -74,9 +74,9 @@ sbt checkPR
 
 ### IntelliJ IDEA
 
-1. Open tab "sbt shell"
-2. Run `dex-it/docker` before run any test
-3. Check the "use sbt" flag before run a test
+1. _Once_. Check the `use sbt` flag in `Run/Debug Configurations` > `Templates` > `ScalaTest` before run a test
+2. Open tab "sbt shell"
+3. Run `dex-it/docker` before run any test
 4. Run a test
 
 ## 5. Building packages
@@ -157,12 +157,14 @@ sbt "dex/run /path/to/configuration"
 3. Specify:
 
     * Main class: `com.wavesplatform.Application`
-    * Program arguments: `/path/to/configuration`
+    * Program arguments: `_local/mainnet.sample.conf`
     * Use classpath of module: `dex`
     * Check `Include dependencies with "Provided" scope`
 
 4. Click on `OK`
 5. Run this configuration
+
+All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
 ## 9. Known issues
 

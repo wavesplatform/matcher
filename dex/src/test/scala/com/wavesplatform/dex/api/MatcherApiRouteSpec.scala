@@ -9,11 +9,11 @@ import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{RequestGen, WithDB, crypto}
@@ -25,8 +25,9 @@ import scala.concurrent.Future
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with PathMockFactory with Eventually with WithDB {
 
-  private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
-  private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
+  private val settings                       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
+  private val matcherKeyPair                 = KeyPair("matcher".getBytes("utf-8"))
+  private def getAssetDecimals(asset: Asset) = 8
 
   routePath("/balance/reserved/{publicKey}") - {
     val publicKey = matcherKeyPair.publicKey
@@ -83,7 +84,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       orderBook = _ => None,
       getMarketStatus = _ => None,
       orderValidator = _ => Left(MatcherError.FeatureNotImplemented),
-      orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, _ => None),
+      orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, getAssetDecimals, _ => None),
       matcherSettings = settings,
       matcherStatus = () => Matcher.Status.Working,
       db = db,

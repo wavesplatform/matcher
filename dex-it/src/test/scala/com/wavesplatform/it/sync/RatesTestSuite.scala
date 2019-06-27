@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -11,6 +12,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
 
 class RatesTestSuite extends MatcherSuiteBase {
 
@@ -36,23 +38,44 @@ class RatesTestSuite extends MatcherSuiteBase {
     )
   }
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_)).foreach(tx => node.waitForTransaction(tx.id))
-  }
-
   val defaultRateMap: Map[Asset, Double] = Map(Waves -> 1d)
 
   val wctRate        = 0.2
   val wctRateUpdated = 0.5
 
-  val wctStr = WctId.toString
+  val wctStr   = WctId.toString
   val wctAsset = IssuedAsset(WctId)
 
-  val btcStr = BtcId.toString
+  val btcStr   = BtcId.toString
   val btcAsset = IssuedAsset(BtcId)
 
+  val usdStr = UsdId.toString
+
   val (amount, price) = (1000L, PriceConstant)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    val txIds = Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
+    txIds.foreach(node.waitForTransaction(_))
+
+    val transferTxId = node
+      .broadcastRequest(
+        TransferTransactionV2
+          .selfSigned(
+            assetId = btcAsset,
+            sender = bob,
+            recipient = alice.toAddress,
+            amount = matcherFee * 5,
+            timestamp = System.currentTimeMillis(),
+            feeAssetId = Waves,
+            feeAmount = 300000,
+            attachment = Array.emptyByteArray
+          )
+          .explicitGet()
+          .json())
+      .id
+    node.waitForTransaction(transferTxId)
+  }
 
   def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, matcherFeeAssetId = btcAsset)
 

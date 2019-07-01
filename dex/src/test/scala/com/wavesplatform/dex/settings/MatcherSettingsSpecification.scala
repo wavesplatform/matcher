@@ -128,6 +128,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |        }
       |      }
       |    }
+      |    process-consumed-timeout = 663s
       |    $orderFeeStr
       |    $deviationsStr
       |    $allowedAssetPairsStr
@@ -178,6 +179,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         KafkaMatcherQueue.ProducerSettings(enable = false, 200)
       )
     )
+    settings.processConsumedTimeout shouldBe 663.seconds
 
     settings.orderFee match {
       case DynamicSettings(baseFee) =>

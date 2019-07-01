@@ -73,12 +73,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val placeTimer = timer.refine("action" -> "place")
 
   override lazy val route: Route = pathPrefix("matcher") {
-    matcherStatusBarrier {
-      getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ orderRestrictionsInfo ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-        getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings ~ getRates ~ upsertRate ~ deleteRate ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
-    }
+    getMatcherPublicKey ~ orderRestrictionsInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
+      getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
+      matcherStatusBarrier {
+        getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+          getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+          historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+          upsertRate ~ deleteRate
+      }
   }
 
   private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
@@ -420,7 +422,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         StatusCodes.OK -> orders.map {
           case (id, oi) =>
             Json.obj(
-              "id" -> id.toString,
+              "id"        -> id.toString,
               "type"      -> oi.side.toString,
               "amount"    -> oi.amount,
               "price"     -> oi.price,
@@ -641,7 +643,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
-        StatusCodes.OK -> response.offsets.valuesIterator.collect { case Some(x) => x }.min
+        val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
+        val min = if (defined.isEmpty) -1L else defined.min
+        StatusCodes.OK -> min
       }
     }
   }

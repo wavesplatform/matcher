@@ -1,0 +1,7 @@
+*
+!.gitignore
+!mainnet.sample.conf
+!runtime/
+!runtime/mainnet/
+!runtime/mainnet/wallet/
+!runtime/mainnet/wallet/wallet.dat

@@ -10,6 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -86,10 +87,10 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   private def normalizeTickSize(assetPair: AssetPair, tickSize: Double): Long =
-    Normalization.normalizePrice(tickSize, context.blockchain, assetPair).max(1)
+    Normalization.normalizePrice(tickSize, assetPair, context.blockchain).max(1)
 
   private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Double =
-    Denormalization.denormalizePrice(normalizedTickSize, context.blockchain, assetPair)
+    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
 
   private def convert(assetPair: AssetPair, rawMatchingRules: RawMatchingRules): MatchingRules =
     MatchingRules(
@@ -111,12 +112,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      newMatchingRules => rawMatchingRules.put(assetPair, convert(assetPair, newMatchingRules)),
+      newMatchingRules => rawMatchingRules.put(assetPair, newMatchingRules),
+      convert(assetPair, _),
       settings,
       transactionCreator.createTransaction,
       context.time, {
-        val xs = settings.matchingRules.get(assetPair).map(_.map(convert(assetPair, _))).getOrElse(MatchingRules.DefaultNel)
-        if (xs.head.startOffset == 0) xs else MatchingRules.Default :: xs
+        lazy val default = convert(assetPair, MatchingRules.Default)
+        val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
+        if (xs.head.startOffset == 0) xs else default :: xs
       }
     )
 

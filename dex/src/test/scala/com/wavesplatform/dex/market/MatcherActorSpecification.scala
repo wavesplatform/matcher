@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
+import cats.data.NonEmptyList
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
@@ -12,10 +13,8 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarket
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
-import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.dex.settings.MatchingRules
-import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.{MatchingRules, RawMatchingRules}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -440,17 +439,20 @@ class MatcherActorSpecification
         doNothingOnRecovery,
         ob,
         (assetPair, matcher) =>
-          OrderBookActor.props(matcher,
-                               addressActor,
-                               snapshotStoreActor,
-                               assetPair,
-                               _ => {},
-                               _ => {},
-                               _ => {},
-                               matcherSettings,
-                               txFactory,
-                               ntpTime,
-                               MatchingRules.DefaultNel),
+          OrderBookActor.props(
+            matcher,
+            addressActor,
+            snapshotStoreActor,
+            assetPair,
+            _ => {},
+            _ => {},
+            _ => {},
+            _ => MatchingRules.Default,
+            matcherSettings,
+            txFactory,
+            ntpTime,
+            NonEmptyList.one(RawMatchingRules(0, 0.00000001))
+        ),
         blockchain.assetDescription
       )
     )

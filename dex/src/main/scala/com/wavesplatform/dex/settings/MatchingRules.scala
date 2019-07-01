@@ -16,7 +16,13 @@ object MatchingRules {
   val Default                                 = MatchingRules(0L, 1)
   val DefaultNel: NonEmptyList[MatchingRules] = NonEmptyList.one(Default)
 
-  def skipOutdated(currOffset: QueueEventWithMeta.Offset, rules: NonEmptyList[MatchingRules]): NonEmptyList[MatchingRules] =
+}
+
+case class RawMatchingRules(startOffset: Long, tickSize: Double)
+
+object RawMatchingRules {
+
+  def skipOutdated(currOffset: QueueEventWithMeta.Offset, rules: NonEmptyList[RawMatchingRules]): NonEmptyList[RawMatchingRules] =
     if (currOffset > rules.head.startOffset)
       rules.tail match {
         case x :: xs =>
@@ -25,11 +31,6 @@ object MatchingRules {
           else rules
         case _ => rules
       } else rules
-}
-
-case class RawMatchingRules(startOffset: Long, tickSize: Double)
-
-object RawMatchingRules {
 
   private implicit val rawMatchingRulesReader: ValueReader[RawMatchingRules] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)

@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, ActorRef, Props}
+import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
-import cats.data.NonEmptyList
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.api._
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
@@ -14,7 +14,6 @@ import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules}
-import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
@@ -29,6 +28,7 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
+                     updateMatchingRules: MatchingRules => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
                      var matchingRules: NonEmptyList[MatchingRules])
@@ -79,7 +79,11 @@ class OrderBookActor(owner: ActorRef,
 
   private def working: Receive = {
     case request: QueueEventWithMeta =>
-      matchingRules = MatchingRules.skipOutdated(request.offset, matchingRules)
+      matchingRules = {
+        val r = MatchingRules.skipOutdated(request.offset, matchingRules)
+        if (matchingRules.head != r.head) updateMatchingRules(r.head)
+        r
+      }
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
         case _ =>
@@ -141,7 +145,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp, actualRules.tickSize) match {
+    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp) match {
       case Some(cancelEvent) =>
         processEvents(List(cancelEvent))
       case None =>
@@ -150,7 +154,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.tickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.normalizedTickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -183,6 +187,7 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
+            updateMatchingRules: MatchingRules => Unit,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
@@ -195,6 +200,7 @@ object OrderBookActor {
         assetPair,
         updateSnapshot,
         updateMarketStatus,
+        updateMatchingRules,
         createTransaction,
         time,
         matchingRules

@@ -16,12 +16,11 @@ import com.wavesplatform.dex.AddressActor.GetOrderStatus
 import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.error.MatcherError.OrderRestrictionsNotFound
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
@@ -49,6 +48,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
+                           tickSize: AssetPair => Double,
                            orderValidator: Order => Either[MatcherError, Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
@@ -73,7 +73,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val placeTimer = timer.refine("action" -> "place")
 
   override lazy val route: Route = pathPrefix("matcher") {
-    getMatcherPublicKey ~ orderRestrictionsInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
+    getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
         getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
@@ -266,13 +266,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     ))
-  def orderRestrictionsInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
+  def orderBookInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      matcherSettings.orderRestrictions
-        .get(pair)
-        .fold { complete(InfoNotFound(OrderRestrictionsNotFound(pair))) } { restrictions =>
-          complete(StatusCodes.OK -> restrictions.getJson.value)
-        }
+      val restrictions = matcherSettings.orderRestrictions.getOrElse(pair, OrderRestrictionsSettings.Default)
+      complete(
+        StatusCodes.OK -> Json.obj(
+          "restrictions" -> restrictions.getJson.value,
+          "matchingRules" -> Json.obj(
+            "tickSize" -> tickSize(pair)
+          )
+        ))
     }
   }
 

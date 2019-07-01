@@ -436,10 +436,21 @@ class MatcherActorSpecification
     TestActorRef(
       new MatcherActor(
         matcherSettings,
-        apdb,  doNothingOnRecovery,
-          ob,
-          (assetPair, matcher) =>
-            OrderBookActor.props(matcher, addressActor, snapshotStoreActor, assetPair, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime, MatchingRules.DefaultNel),
+        apdb,
+        doNothingOnRecovery,
+        ob,
+        (assetPair, matcher) =>
+          OrderBookActor.props(matcher,
+                               addressActor,
+                               snapshotStoreActor,
+                               assetPair,
+                               _ => {},
+                               _ => {},
+                               _ => {},
+                               matcherSettings,
+                               txFactory,
+                               ntpTime,
+                               MatchingRules.DefaultNel),
         blockchain.assetDescription
       )
     )

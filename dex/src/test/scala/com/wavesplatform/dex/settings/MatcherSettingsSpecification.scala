@@ -463,18 +463,18 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
               stepAmount = 0.001,
               minAmount = 0.001,
               maxAmount = 1000000,
-              stepPrice = OrderRestrictionsSettings.stepPriceDefault,
-              minPrice = OrderRestrictionsSettings.minPriceDefault,
-              maxPrice = OrderRestrictionsSettings.maxPriceDefault
+              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+              minPrice = OrderRestrictionsSettings.Default.minPrice,
+              maxPrice = OrderRestrictionsSettings.Default.maxPrice
             ),
           AssetPair.createAssetPair("ETH", "USD").get ->
             OrderRestrictionsSettings(
               stepAmount = 0.01,
               minAmount = 0.05,
               maxAmount = 20000,
-              stepPrice = OrderRestrictionsSettings.stepPriceDefault,
-              minPrice = OrderRestrictionsSettings.minPriceDefault,
-              maxPrice = OrderRestrictionsSettings.maxPriceDefault
+              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+              minPrice = OrderRestrictionsSettings.Default.minPrice,
+              maxPrice = OrderRestrictionsSettings.Default.maxPrice
             )
         )
     }
@@ -500,12 +500,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
         |    {
         |      start-offset = 100
-        |      merge-prices = yes
         |      tick-size    = 0.002
         |    },
         |    {
         |      start-offset = 500
-        |      merge-prices = no
+        |      tick-size    = 0.001
         |    }
         |  ]
         |}
@@ -516,12 +515,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
         |    {
         |      start-offset = $firstRuleOffset
-        |      merge-prices = yes
         |      tick-size    = 0.002
         |    },
         |    {
         |      start-offset = $secondRuleOffset
-        |      merge-prices = no
+        |      tick-size    = 0.001
         |    }
         |  ]
         |}
@@ -535,10 +533,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
           NonEmptyList[RawMatchingRules](
-            RawMatchingRules(0, false),
+            RawMatchingRules(100L, 0.002),
             List(
-              RawMatchingRules(100L, mergePrices = true, 0.002),
-              RawMatchingRules(500L, mergePrices = false)
+              RawMatchingRules(500L, 0.001)
             )
           )
       )

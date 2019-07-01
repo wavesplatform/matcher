@@ -41,8 +41,8 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
       broadcast(ready)
-      log.debug(
-        s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
+      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent")
+      if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
 
       scheduleSend()
       context.become(watching(next ++ ready, Vector.empty))

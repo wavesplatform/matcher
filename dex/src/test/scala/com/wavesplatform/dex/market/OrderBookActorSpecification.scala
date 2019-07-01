@@ -15,7 +15,6 @@ import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled}
-import com.wavesplatform.dex.model.OrderBook.TickSize
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
 import com.wavesplatform.dex.settings.MatchingRules
@@ -49,8 +48,8 @@ class OrderBookActorSpecification
       f(pair, actor, probe)
     }
 
-  private def obcTestWithTickSize(tickSize: TickSize)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
-    obcTestWithPrepare((_, _) => (), NonEmptyList(MatchingRules(0L, tickSize), List.empty)) { (pair, actor, probe) =>
+  private def obcTestWithTickSize(normalizedTickSize: Long)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+    obcTestWithPrepare((_, _) => (), NonEmptyList(MatchingRules(0L, normalizedTickSize), List.empty)) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
@@ -81,6 +80,7 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
+        _ => (),
         txFactory,
         ntpTime,
         matchingRules
@@ -282,7 +282,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
     }
 
-    "cancel order in merge small prices mode" in obcTestWithTickSize(TickSize.Enabled(100)) { (pair, orderBook, tp) =>
+    "cancel order in merge small prices mode" in obcTestWithTickSize(100) { (pair, orderBook, tp) =>
       val buyOrder = buy(pair, 100000000, 0.0000041)
 
       orderBook ! wrap(1, buyOrder)
@@ -295,8 +295,8 @@ class OrderBookActorSpecification
     val switchRulesTest = NonEmptyList(
       MatchingRules.Default,
       List(
-        MatchingRules(4, OrderBook.TickSize.Enabled(100)),
-        MatchingRules(10, OrderBook.TickSize.Enabled(300))
+        MatchingRules(4, 100),
+        MatchingRules(10, 300)
       )
     )
 
@@ -326,9 +326,9 @@ class OrderBookActorSpecification
     }
 
     val disableRulesTest = NonEmptyList(
-      MatchingRules(0, OrderBook.TickSize.Enabled(100)),
+      MatchingRules(0, 100),
       List(
-        MatchingRules(3, OrderBook.TickSize.Disabled)
+        MatchingRules(3, MatchingRules.Default.normalizedTickSize)
       )
     )
 
@@ -357,7 +357,7 @@ class OrderBookActorSpecification
       MatchingRules.Default,
       List(
         MatchingRules.Default,
-        MatchingRules(1, OrderBook.TickSize.Enabled(100))
+        MatchingRules(1, 100)
       )
     )
 

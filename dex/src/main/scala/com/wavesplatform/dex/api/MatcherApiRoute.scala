@@ -20,7 +20,7 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarket
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
 import com.wavesplatform.dex.{AddressActor, AssetPairBuilder, Matcher, RateCache}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
@@ -268,16 +268,17 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderBookInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      val restrictions = matcherSettings.orderRestrictions.getOrElse(pair, OrderRestrictionsSettings.Default)
-      complete(
-        StatusCodes.OK -> Json.obj(
-          "restrictions" -> restrictions.getJson.value,
-          "matchingRules" -> Json.obj(
-            "tickSize" -> tickSize(pair)
-          )
-        ))
+      complete(StatusCodes.OK -> orderBookInfoJson(pair))
     }
   }
+
+  private def orderBookInfoJson(pair: AssetPair): JsObject =
+    Json.obj(
+      "restrictions" -> matcherSettings.orderRestrictions.getOrElse(pair, OrderRestrictionsSettings.Default).getJson.value,
+      "matchingRules" -> Json.obj(
+        "tickSize" -> formatValue(tickSize(pair))
+      )
+    )
 
   @Path("/orderbook")
   @ApiOperation(value = "Place order",
@@ -314,17 +315,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
       StatusCodes.OK -> Json.obj(
         "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-        "markets" -> JsArray(markets.map(m =>
-          Json.obj(
-            "amountAsset"     -> m.pair.amountAssetStr,
-            "amountAssetName" -> m.amountAssetName,
-            "amountAssetInfo" -> m.amountAssetInfo,
-            "priceAsset"      -> m.pair.priceAssetStr,
-            "priceAssetName"  -> m.priceAssetName,
-            "priceAssetInfo"  -> m.priceAssetinfo,
-            "created"         -> m.created,
-            "restrictions"    -> matcherSettings.orderRestrictions.get(m.pair).map(_.getJson.value)
-        )))
+        "markets" -> JsArray(markets.map { m =>
+          Json
+            .obj(
+              "amountAsset"     -> m.pair.amountAssetStr,
+              "amountAssetName" -> m.amountAssetName,
+              "amountAssetInfo" -> m.amountAssetInfo,
+              "priceAsset"      -> m.pair.priceAssetStr,
+              "priceAssetName"  -> m.priceAssetName,
+              "priceAssetInfo"  -> m.priceAssetinfo,
+              "created"         -> m.created
+            )
+            .deepMerge(orderBookInfoJson(m.pair))
+        })
       )
     })
   }
@@ -647,7 +650,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
         val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
-        val min = if (defined.isEmpty) -1L else defined.min
+        val min     = if (defined.isEmpty) -1L else defined.min
         StatusCodes.OK -> min
       }
     }

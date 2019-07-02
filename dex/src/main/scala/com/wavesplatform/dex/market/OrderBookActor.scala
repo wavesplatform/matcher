@@ -122,6 +122,9 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def processEvents(events: Iterable[Event]): Unit = {
+    updateMarketStatus(MarketStatus(orderBook))
+    updateSnapshot(orderBook.aggregatedSnapshot)
+
     events.foreach { e =>
       e match {
         case Events.OrderAdded(order, _) =>
@@ -141,9 +144,6 @@ class OrderBookActor(owner: ActorRef,
 
       addressActor ! e
     }
-
-    updateMarketStatus(MarketStatus(orderBook))
-    updateSnapshot(orderBook.aggregatedSnapshot)
   }
 
   private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =

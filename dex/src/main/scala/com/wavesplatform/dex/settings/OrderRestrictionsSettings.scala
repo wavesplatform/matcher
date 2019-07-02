@@ -16,8 +16,6 @@ case class OrderRestrictionsSettings(stepAmount: Double,
                                      minPrice: Double,
                                      maxPrice: Double) {
 
-  import OrderRestrictionsSettings._
-
   def getJson: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "stepAmount" -> formatValue(stepAmount),
@@ -40,8 +38,6 @@ object OrderRestrictionsSettings {
     minPrice = 0.00000001,
     maxPrice = 1000000
   )
-
-  def formatValue(value: Double): String = new java.text.DecimalFormat("#.########").format(value)
 
   implicit val orderRestrictionsSettingsReader: ValueReader[OrderRestrictionsSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)

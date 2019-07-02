@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, ActorRef, Props}
+import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
-import cats.data.NonEmptyList
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.api._
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
@@ -13,8 +13,7 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules}
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
@@ -29,9 +28,11 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
+                     updateMatchingRules: RawMatchingRules => Unit,
+                     normalize: RawMatchingRules => MatchingRules,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var matchingRules: NonEmptyList[MatchingRules])
+                     var matchingRules: NonEmptyList[RawMatchingRules])
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -46,7 +47,12 @@ class OrderBookActor(owner: ActorRef,
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
-  private def actualRules: MatchingRules = matchingRules.head
+  private var actualRules: MatchingRules = normalize(matchingRules.head)
+  private def update(updated: NonEmptyList[RawMatchingRules]): Unit = if (matchingRules.head != updated.head) {
+    matchingRules = updated
+    updateMatchingRules(matchingRules.head)
+    actualRules = normalize(matchingRules.head)
+  }
 
   override def receive: Receive = recovering
 
@@ -63,7 +69,7 @@ class OrderBookActor(owner: ActorRef,
       })
 
       lastProcessedOffset.foreach { x =>
-        matchingRules = MatchingRules.skipOutdated(x, matchingRules)
+        update(RawMatchingRules.skipOutdated(x, matchingRules))
       }
 
       updateMarketStatus(MarketStatus(orderBook))
@@ -79,7 +85,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def working: Receive = {
     case request: QueueEventWithMeta =>
-      matchingRules = MatchingRules.skipOutdated(request.offset, matchingRules)
+      update(RawMatchingRules.skipOutdated(request.offset, matchingRules))
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
         case _ =>
@@ -116,6 +122,9 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def processEvents(events: Iterable[Event]): Unit = {
+    updateMarketStatus(MarketStatus(orderBook))
+    updateSnapshot(orderBook.aggregatedSnapshot)
+
     events.foreach { e =>
       e match {
         case Events.OrderAdded(order, _) =>
@@ -135,13 +144,10 @@ class OrderBookActor(owner: ActorRef,
 
       addressActor ! e
     }
-
-    updateMarketStatus(MarketStatus(orderBook))
-    updateSnapshot(orderBook.aggregatedSnapshot)
   }
 
   private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp, actualRules.tickSize) match {
+    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp) match {
       case Some(cancelEvent) =>
         processEvents(List(cancelEvent))
       case None =>
@@ -150,7 +156,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.tickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.normalizedTickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -183,10 +189,12 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
+            updateMatchingRules: RawMatchingRules => Unit,
+            normalize: RawMatchingRules => MatchingRules,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            matchingRules: NonEmptyList[MatchingRules]): Props =
+            matchingRules: NonEmptyList[RawMatchingRules]): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -195,6 +203,8 @@ object OrderBookActor {
         assetPair,
         updateSnapshot,
         updateMarketStatus,
+        updateMatchingRules,
+        normalize,
         createTransaction,
         time,
         matchingRules

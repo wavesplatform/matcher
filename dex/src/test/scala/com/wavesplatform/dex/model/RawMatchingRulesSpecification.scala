@@ -3,13 +3,12 @@ package com.wavesplatform.dex.model
 import cats.data.NonEmptyList
 import com.wavesplatform.NoShrink
 import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.model.OrderBook.TickSize
-import com.wavesplatform.dex.settings.MatchingRules
-import org.scalacheck.{Arbitrary, Gen}
+import com.wavesplatform.dex.settings.RawMatchingRules
+import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MatchingRulesSpecification extends PropSpec with PropertyChecks with Matchers with MatcherTestData with NoShrink {
+class RawMatchingRulesSpecification extends PropSpec with PropertyChecks with Matchers with MatcherTestData with NoShrink {
   property("skipOutdated: rules.head.startOffset <= currentOffset < rules(1).startOffset") {
     val g = for {
       currOffset <- currOffsetGen
@@ -18,7 +17,7 @@ class MatchingRulesSpecification extends PropSpec with PropertyChecks with Match
 
     forAll(g) {
       case (currOffset, rules) =>
-        val updatedRules = MatchingRules.skipOutdated(currOffset, rules)
+        val updatedRules = RawMatchingRules.skipOutdated(currOffset, rules)
         updatedRules.toList match {
           case first :: Nil =>
             withClue(s"first.startOffset=${first.startOffset}, currOffset=$currOffset") {
@@ -38,22 +37,18 @@ class MatchingRulesSpecification extends PropSpec with PropertyChecks with Match
 
   private val currOffsetGen = Gen.choose(0L, Long.MaxValue)
 
-  private def nextRulesGen(prevRules: MatchingRules): Gen[Option[MatchingRules]] =
+  private def nextRulesGen(prevRules: RawMatchingRules): Gen[Option[RawMatchingRules]] =
     if (prevRules.startOffset == Long.MaxValue) Gen.const(None)
     else
       for {
         startOffset <- Gen.choose(prevRules.startOffset + 1, Long.MaxValue)
-        disabled    <- Arbitrary.arbBool.arbitrary
-        tickSize    <- if (disabled) Gen.const(TickSize.Disabled) else Gen.choose(1, Long.MaxValue).map(TickSize.Enabled)
-      } yield Some(MatchingRules(startOffset, tickSize))
+        tickSize    <- Gen.choose(1, Double.MaxValue)
+      } yield Some(RawMatchingRules(startOffset, tickSize))
 
-  private val firstRuleGen: Gen[MatchingRules] = for {
-    disabled <- Arbitrary.arbBool.arbitrary
-    tickSize <- if (disabled) Gen.const(TickSize.Disabled) else Gen.choose(1, Long.MaxValue).map(TickSize.Enabled)
-  } yield MatchingRules(0L, tickSize)
+  private val firstRuleGen: Gen[RawMatchingRules] = Gen.choose(1, Double.MaxValue).map(RawMatchingRules(0L, _))
 
-  private def rulesChainGen(maxNumber: Int): Gen[NonEmptyList[MatchingRules]] = {
-    def loop(rest: Int, acc: Gen[NonEmptyList[MatchingRules]]): Gen[NonEmptyList[MatchingRules]] =
+  private def rulesChainGen(maxNumber: Int): Gen[NonEmptyList[RawMatchingRules]] = {
+    def loop(rest: Int, acc: Gen[NonEmptyList[RawMatchingRules]]): Gen[NonEmptyList[RawMatchingRules]] =
       if (rest == 0) acc
       else
         for {

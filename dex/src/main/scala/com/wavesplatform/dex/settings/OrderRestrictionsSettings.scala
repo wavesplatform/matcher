@@ -16,8 +16,6 @@ case class OrderRestrictionsSettings(stepAmount: Double,
                                      minPrice: Double,
                                      maxPrice: Double) {
 
-  import OrderRestrictionsSettings._
-
   def getJson: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "stepAmount" -> formatValue(stepAmount),
@@ -32,11 +30,14 @@ case class OrderRestrictionsSettings(stepAmount: Double,
 
 object OrderRestrictionsSettings {
 
-  val stepAmountDefault, stepPriceDefault, minAmountDefault, minPriceDefault = 0.00000001
-  val maxAmountDefault                                                       = 1000000000
-  val maxPriceDefault                                                        = 1000000
-
-  def formatValue(value: Double): String = new java.text.DecimalFormat("#.########").format(value)
+  val Default = OrderRestrictionsSettings(
+    stepAmount = 0.00000001,
+    minAmount = 0.00000001,
+    maxAmount = 1000000000,
+    stepPrice = 0.00000001,
+    minPrice = 0.00000001,
+    maxPrice = 1000000
+  )
 
   implicit val orderRestrictionsSettingsReader: ValueReader[OrderRestrictionsSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
@@ -60,8 +61,8 @@ object OrderRestrictionsSettings {
     }
 
     (
-      validateSizeMinMax(s"$path.step-amount", s"$path.min-amount", s"$path.max-amount", stepAmountDefault, minAmountDefault, maxAmountDefault),
-      validateSizeMinMax(s"$path.step-price", s"$path.min-price", s"$path.max-price", stepPriceDefault, minPriceDefault, maxPriceDefault),
+      validateSizeMinMax(s"$path.step-amount", s"$path.min-amount", s"$path.max-amount", Default.stepAmount, Default.minAmount, Default.maxAmount),
+      validateSizeMinMax(s"$path.step-price", s"$path.min-price", s"$path.max-price", Default.stepPrice, Default.minPrice, Default.maxPrice),
     ) mapN {
       case ((stepAmount, minAmount, maxAmount), (stepPrice, minPrice, maxPrice)) =>
         OrderRestrictionsSettings(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice)

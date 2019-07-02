@@ -40,11 +40,11 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
 
   private def validateAssetId(asset: Asset, side: AssetSide): Result[Asset] =
     asset.fold[Result[Asset]](Right(Waves)) { asset =>
-      blockchain.assetDescription(asset).fold[Result[Asset]](Left(MatcherError.AssetNotFound(asset))) { desc =>
+      blockchain.assetDescription(asset).fold[Result[Asset]](Left(error.AssetNotFound(asset))) { desc =>
         if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc)) Left(side match {
-          case AssetSide.Unknown => MatcherError.AssetBlacklisted(asset)
-          case AssetSide.Amount => MatcherError.AmountAssetBlacklisted(asset)
-          case AssetSide.Price => MatcherError.PriceAssetBlacklisted(asset)
+          case AssetSide.Unknown => error.AssetBlacklisted(asset)
+          case AssetSide.Amount => error.AmountAssetBlacklisted(asset)
+          case AssetSide.Price => error.PriceAssetBlacklisted(asset)
         })
         else Right(asset)
       }
@@ -53,11 +53,11 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
   def validateAssetPair(pair: AssetPair): Result[AssetPair] =
     validate.measure {
       if (settings.allowedAssetPairs.contains(pair)) pair.asRight
-      else if (settings.whiteListOnly) Left(MatcherError.AssetPairIsNotAllowed(pair))
+      else if (settings.whiteListOnly) Left(error.AssetPairIsNotAllowed(pair))
       else
         for {
-          _ <- cond(pair.amountAsset != pair.priceAsset, (), MatcherError.AssetPairSameAssets(pair.amountAsset))
-          _ <- cond(isCorrectlyOrdered(pair), pair, MatcherError.AssetPairReversed(pair))
+          _ <- cond(pair.amountAsset != pair.priceAsset, (), error.AssetPairSameAssets(pair.amountAsset))
+          _ <- cond(isCorrectlyOrdered(pair), pair, error.AssetPairReversed(pair))
           _ <- validateAssetId(pair.priceAsset, AssetSide.Price)
           _ <- validateAssetId(pair.amountAsset, AssetSide.Amount)
         } yield pair
@@ -65,8 +65,8 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
 
   def createAssetPair(a1: String, a2: String): Result[AssetPair] =
     create.measure(for {
-      a1 <- AssetPair.extractAssetId(a1).toEither.left.map(_ => MatcherError.InvalidAsset(a1))
-      a2 <- AssetPair.extractAssetId(a2).toEither.left.map(_ => MatcherError.InvalidAsset(a2))
+      a1 <- AssetPair.extractAssetId(a1).toEither.left.map(_ => error.InvalidAsset(a1))
+      a2 <- AssetPair.extractAssetId(a2).toEither.left.map(_ => error.InvalidAsset(a2))
       p  <- validateAssetPair(AssetPair(a1, a2))
     } yield p)
 }

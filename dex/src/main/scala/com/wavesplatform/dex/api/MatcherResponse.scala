@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.OrderBookResult
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -58,10 +59,10 @@ case class BatchCancelCompleted(orders: Map[Order.Id, WrappedMatcherResponse])
 
 case class OrderRejected(error: MatcherError)        extends WrappedMatcherResponse(C.BadRequest, error)
 case class OrderCancelRejected(error: MatcherError)  extends WrappedMatcherResponse(C.BadRequest, error)
-case object CancelRequestInvalidSignature            extends WrappedMatcherResponse(C.BadRequest, MatcherError.CancelRequestInvalidSignature)
+case object CancelRequestInvalidSignature            extends WrappedMatcherResponse(C.BadRequest, error.CancelRequestInvalidSignature)
 case class NotImplemented(error: MatcherError)       extends WrappedMatcherResponse(C.NotImplemented, error)
-case object OperationTimedOut                        extends WrappedMatcherResponse(C.InternalServerError, MatcherError.OperationTimedOut)
+case object OperationTimedOut                        extends WrappedMatcherResponse(C.InternalServerError, error.OperationTimedOut)
 case class OrderBookUnavailable(error: MatcherError) extends WrappedMatcherResponse(C.ServiceUnavailable, error)
-case object DuringStart                              extends WrappedMatcherResponse(C.ServiceUnavailable, MatcherError.MatcherIsStarting)
-case object DuringShutdown                           extends WrappedMatcherResponse(C.ServiceUnavailable, MatcherError.MatcherIsStopping)
+case object DuringStart                              extends WrappedMatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
+case object DuringShutdown                           extends WrappedMatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
 case class InfoNotFound(error: MatcherError)         extends WrappedMatcherResponse(C.NotFound, error)

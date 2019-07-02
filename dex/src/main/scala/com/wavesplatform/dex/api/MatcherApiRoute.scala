@@ -21,7 +21,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
-import com.wavesplatform.dex.{AddressActor, AssetPairBuilder, Matcher, RateCache}
+import com.wavesplatform.dex._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -92,13 +92,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(MatcherError.OrderBookBroken(p)))
+    case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
     case None    => forceCheckOrderBook(p)
   }
 
   private def forceCheckOrderBook(p: AssetPair): Directive0 = onComplete(matcher ? ForceStartOrderBook(p)).flatMap {
     case Success(_) => pass
-    case _          => complete(OrderBookUnavailable(MatcherError.OrderBookBroken(p)))
+    case _          => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
   }
 
   private def withAssetPair(p: AssetPair,
@@ -336,7 +336,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete((timestamp, orderId) match {
       case (Some(ts), None)  => askAddressActor[MatcherResponse](sender, AddressActor.CancelAllOrders(assetPair, ts))
       case (None, Some(oid)) => askAddressActor[MatcherResponse](sender, AddressActor.CancelOrder(oid))
-      case _                 => OrderCancelRejected(MatcherError.CancelRequestIsIncomplete)
+      case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
     })
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
@@ -418,7 +418,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
     json[CancelOrderRequest] { req =>
-      req.orderId.fold[MatcherResponse](NotImplemented(MatcherError.FeatureNotImplemented))(OrderDeleted)
+      req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
     }
   }
 
@@ -516,7 +516,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
     DBUtils.order(db, orderId) match {
       case Some(order) => handleCancelRequest(None, order.sender, Some(orderId), None)
-      case None        => complete(OrderCancelRejected(MatcherError.OrderNotFound(orderId)))
+      case None        => complete(OrderCancelRejected(error.OrderNotFound(orderId)))
     }
   }
 
@@ -613,10 +613,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     orderBook(pair) match {
       case Some(Right(_)) =>
         complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
-          case None => NotImplemented(MatcherError.FeatureDisabled)
+          case None => NotImplemented(error.FeatureDisabled)
           case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
         })
-      case _ => complete(OrderBookUnavailable(MatcherError.OrderBookBroken(pair)))
+      case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
     }
   }
 

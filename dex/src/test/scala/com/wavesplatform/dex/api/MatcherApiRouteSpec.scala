@@ -10,7 +10,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -84,7 +83,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       orderBook = _ => None,
       getMarketStatus = _ => None,
       tickSize = _ => 0.1,
-      orderValidator = _ => Left(MatcherError.FeatureNotImplemented),
+      orderValidator = _ => Left(error.FeatureNotImplemented),
       orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, getAssetDecimals, _ => None),
       matcherSettings = settings,
       matcherStatus = () => Matcher.Status.Working,

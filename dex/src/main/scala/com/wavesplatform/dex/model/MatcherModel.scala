@@ -3,6 +3,7 @@ package com.wavesplatform.dex.model
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
@@ -15,17 +16,16 @@ object MatcherModel {
 
   type Price = Long
 
-  def getAssetDecimals(asset: Asset, blockchain: Blockchain): Int = {
-    asset.fold(8) { issuedAsset =>
+  def getAssetDecimals(asset: Asset, blockchain: Blockchain): Either[MatcherError, Int] =
+    asset.fold[Either[MatcherError, Int]](Right(8)) { issuedAsset =>
       blockchain
         .assetDescription(issuedAsset)
+        .toRight[MatcherError](MatcherError.AssetNotFound(issuedAsset))
         .map(_.decimals)
-        .getOrElse(throw new Exception("Can not get asset decimals since asset not found!"))
     }
-  }
 
-  def getPairDecimals(pair: AssetPair, blockchain: Blockchain): (Int, Int) =
-    getAssetDecimals(pair.amountAsset, blockchain) -> getAssetDecimals(pair.priceAsset, blockchain)
+  def getPairDecimals(pair: AssetPair, blockchain: Blockchain): Either[MatcherError, (Int, Int)] =
+    (getAssetDecimals(pair.amountAsset, blockchain), getAssetDecimals(pair.priceAsset, blockchain)).tupled
 
   object Normalization {
 
@@ -34,9 +34,6 @@ object MatcherModel {
 
     def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long =
       (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
-
-    def normalizePrice(value: Double, pair: AssetPair, blockchain: Blockchain): Long =
-      normalizePrice(value, pair, getPairDecimals(pair, blockchain))
 
     def normalizePrice(value: Double, pair: AssetPair, decimals: (Int, Int)): Long = {
       val (amountAssetDecimals, priceAssetDecimals) = decimals
@@ -49,14 +46,14 @@ object MatcherModel {
     def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
 
-    def denormalizeAmountAndFee(value: Price, pair: AssetPair, blockchain: Blockchain): Double =
-      denormalizeAmountAndFee(value, getAssetDecimals(pair.amountAsset, blockchain))
+    def denormalizeAmountAndFee(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
+      getAssetDecimals(pair.amountAsset, blockchain).map(denormalizeAmountAndFee(value, _))
 
     def denormalizePrice(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
 
-    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Double =
-      denormalizePrice(value, pair, getPairDecimals(pair, blockchain))
+    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
+      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
 
     def denormalizePrice(value: Price, pair: AssetPair, decimals: (Int, Int)): Double = {
       val (amountAssetDecimals, priceAssetDecimals) = decimals

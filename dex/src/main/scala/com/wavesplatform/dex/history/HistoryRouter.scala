@@ -104,8 +104,11 @@ object HistoryRouter {
 
 class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double = Denormalization.denormalizeAmountAndFee(value, pair, blockchain)
-  private def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePrice(value, pair, blockchain)
+  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double =
+    Denormalization.denormalizeAmountAndFee(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+
+  private def denormalizePrice(value: Long, pair: AssetPair): Double =
+    Denormalization.denormalizePrice(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
 

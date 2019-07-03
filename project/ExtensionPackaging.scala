@@ -1,4 +1,4 @@
-import CommonSettings.autoImport.{network, nodeVersion}
+import CommonSettings.autoImport.network
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
@@ -67,7 +67,7 @@ object ExtensionPackaging extends AutoPlugin {
     ) ++ nameFix ++ inScope(Global)(Seq(Global / name := (ThisProject / name).value) ++ nameFix)
 
   private def nameFix = Seq(
-    packageName := s"${name.value}${network.value.packageSuffix}_${nodeVersion.value}",
+    packageName := s"${name.value}${network.value.packageSuffix}",
     normalizedName := s"${packageName.value}"
   )
 

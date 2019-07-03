@@ -18,11 +18,12 @@ import com.wavesplatform.db._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
-import com.wavesplatform.dex.model.{AssetDecimalsCache, ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.extensions.{Context, Extension}
@@ -86,23 +87,33 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def normalizeTickSize(assetPair: AssetPair, tickSize: Double): Long =
-    Normalization.normalizePrice(tickSize, assetPair, context.blockchain).max(1)
-
-  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Double =
-    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
-
-  private def convert(assetPair: AssetPair, rawMatchingRules: RawMatchingRules): MatchingRules =
+  private def normalize(assetPair: AssetPair)(rawMatchingRules: RawMatchingRules): MatchingRules =
     MatchingRules(
       rawMatchingRules.startOffset,
-      normalizedTickSize = normalizeTickSize(assetPair, rawMatchingRules.tickSize)
+      normalizedTickSize = Normalization.normalizePrice(
+        rawMatchingRules.tickSize,
+        assetPair,
+        MatcherModel.getPairDecimals(assetPair, context.blockchain).getOrElse((8, 8))
+      )
     )
+
+  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
+    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
 
   private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
     RawMatchingRules(
-      matchingRules.startOffset,
-      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize)
+      startOffset = matchingRules.startOffset,
+      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
+        log.error(s"Can't convert matching rules for $assetPair: ${e.message.text}. Usually this happens when the blockchain was rolled back.")
+        0.00000001
+      }.merge
     )
+
+  private def matchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRules] = {
+    lazy val default = convert(assetPair, MatchingRules.Default)
+    val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
+    if (xs.head.startOffset == 0) xs else default :: xs
+  }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
     OrderBookActor.props(
@@ -113,14 +124,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
       newMatchingRules => rawMatchingRules.put(assetPair, newMatchingRules),
-      convert(assetPair, _),
+      normalize(assetPair),
       settings,
       transactionCreator.createTransaction,
-      context.time, {
-        lazy val default = convert(assetPair, MatchingRules.Default)
-        val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
-        if (xs.head.startOffset == 0) xs else default :: xs
-      }
+      context.time,
+      matchingRules(assetPair)
     )
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
@@ -166,9 +174,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
-        p => {
-          lazy val default = convert(p, MatchingRules.Default)
-          rawMatchingRules.computeIfAbsent(p, _ => default).tickSize
+        assetPair => {
+          lazy val default = RawMatchingRules(
+            startOffset = 0,
+            tickSize = denormalizeTickSize(assetPair, 1).left.map(_ => 0.00000001).merge
+          )
+
+          rawMatchingRules.computeIfAbsent(assetPair, _ => default).tickSize
         },
         validateOrder,
         orderBooksSnapshotCache,

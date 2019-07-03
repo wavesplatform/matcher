@@ -48,7 +48,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
           .validateAssetPair(p.reverse)
           .fold(
             _ => complete(formatError(e)),
-            _ => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+            _ => redirect(s"/api/v1/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
           )
       case Left(e) => complete(formatError(e))
     }

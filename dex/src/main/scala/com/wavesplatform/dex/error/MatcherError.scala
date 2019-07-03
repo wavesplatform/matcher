@@ -2,14 +2,12 @@ package com.wavesplatform.dex.error
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.dex.doc.{Documentation, Documented}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.MatcherError.formatBalance
-import com.wavesplatform.dex.error.MatcherError._
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings, formatValue}
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.dex.util.SealedTraitMembers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -117,10 +115,10 @@ case class OrderCommonValidationFailed(details: String)
     extends MatcherError(order, commonEntity, commonClass, e"The order is invalid: ${'details -> details}")
 
 case class InvalidAsset(theAsset: String)
-      extends MatcherError(asset, commonEntity, broken, e"The asset '${'assetId -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string")
+    extends MatcherError(asset, commonEntity, broken, e"The asset '${'assetId -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string")
 
 case class AssetBlacklisted(theAsset: IssuedAsset)
-      extends MatcherError(asset, commonEntity, blacklisted, e"The asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
+    extends MatcherError(asset, commonEntity, blacklisted, e"The asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
 
 case class AmountAssetBlacklisted(theAsset: IssuedAsset)
     extends MatcherError(asset, amount, blacklisted, e"The amount asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
@@ -250,12 +248,12 @@ case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSetti
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
-      extends MatcherError(
-        order,
-        assetPair,
-        duplicate,
-        e"The amount and price assets must be different, but they are: ${'assetId -> assetIdStr(theAsset)}"
-      )
+    extends MatcherError(
+      order,
+      assetPair,
+      duplicate,
+      e"The amount and price assets must be different, but they are: ${'assetId -> assetIdStr(theAsset)}"
+    )
 
 case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
     extends MatcherError(
@@ -364,5 +362,7 @@ object Class {
 object MatcherError {
   def formatBalance(b: Map[Asset, Long]): String = b.map { case (k, v) => s"${assetIdStr(k)}:$v" } mkString ("{", ", ", "}")
 
-  val MemberNames: Set[String] = SealedTraitMembers.of[MatcherError]()
+  implicit val doc: Documented[MatcherError] = x => s"| name=${x.getClass.getSimpleName}, code=${x.code} |"
+
+  object documentation extends Documentation[MatcherError]
 }

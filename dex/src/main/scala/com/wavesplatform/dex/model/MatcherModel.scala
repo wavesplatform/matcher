@@ -3,6 +3,7 @@ package com.wavesplatform.dex.model
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.state.{Blockchain, Portfolio}
@@ -20,7 +21,7 @@ object MatcherModel {
     asset.fold[Either[MatcherError, Int]](Right(8)) { issuedAsset =>
       blockchain
         .assetDescription(issuedAsset)
-        .toRight[MatcherError](MatcherError.AssetNotFound(issuedAsset))
+        .toRight[MatcherError](error.AssetNotFound(issuedAsset))
         .map(_.decimals)
     }
 

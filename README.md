@@ -144,7 +144,7 @@ waves.extensions = [
   # ... here may be other extensions
 ]
  
-waves.matcher {
+waves.dex {
   account = "3Q5GKPLkxXcEwGv6d57v8aksTjh1igHNNDd" # This account must be known at the Node, e.g. created through POST /addresses
   # bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
 }

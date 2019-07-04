@@ -54,7 +54,7 @@ object OrderValidator {
   private def verifyOrderByAccountScript(blockchain: Blockchain, address: Address, order: Order): Result[Order] =
     blockchain.accountScript(address).fold(verifySignature(order)) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
-        error.ScriptedAccountTradingUnsupported.asLeft
+        error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.OrderVersionUnsupportedWithScriptedAccount(address).asLeft
       else
         try MatcherScriptRunner(script, order, isTokenScript = false) match {
@@ -70,7 +70,7 @@ object OrderValidator {
   private def verifySmartToken(blockchain: Blockchain, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
     blockchain.assetScript(asset).fold(success) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
-        error.ScriptedAssetTradingUnsupported(asset).asLeft
+        error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
       else
         try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id) match {
           case (_, Left(execError)) => error.AssetScriptReturnedError(asset, execError).asLeft
@@ -131,7 +131,7 @@ object OrderValidator {
     case 3 =>
       if (blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)) success
       else Left(error.OrderVersionUnsupported(version, BlockchainFeatures.OrderV3))
-    case _ => Left(error.UnknownOrderVersion(version))
+    case _ => Left(error.UnsupportedOrderVersion(version))
   }
 
   def blockchainAware(blockchain: Blockchain,

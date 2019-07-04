@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.doc
+package com.wavesplatform.dex.meta
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr

@@ -4,10 +4,9 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
-import com.wavesplatform.dex.error.MatcherError.formatBalance
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings, formatValue}
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
@@ -18,7 +17,7 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
   import message._
 
   def this(obj: Entity, part: Entity, klass: Class, message: MatcherErrorMessage) = this(
-    10000 * obj.code + 100 * part.code + klass.code,
+    (obj.code << 20) + (part.code << 8) + klass.code, // 32 bits = (12 for object) + (12 for part) + (8 for class)
     message
   )
 
@@ -26,17 +25,16 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
     "error"    -> code,
     "message"  -> text,
     "template" -> template,
-    "params"   -> args
+    "params"   -> params
   )
 
   override def toString: String = s"${getClass.getCanonicalName}(error=$code, message=$text)"
 }
 
-case class MatcherErrorMessage(text: String, template: String, args: Map[String, String])
+case class MatcherErrorMessage(text: String, template: String, params: JsObject)
 
 case object MatcherIsStarting     extends MatcherError(commonEntity, commonEntity, starting, e"System is starting")
 case object MatcherIsStopping     extends MatcherError(commonEntity, commonEntity, stopping, e"System is shutting down")
-case object OperationTimedOut     extends MatcherError(commonEntity, commonEntity, timedOut, e"Operation is timed out, please try later")
 case object FeatureNotImplemented extends MatcherError(commonEntity, feature, unsupported, e"This feature is not implemented")
 case object FeatureDisabled       extends MatcherError(commonEntity, feature, disabled, e"This feature is disabled, contact with the administrator")
 
@@ -59,7 +57,7 @@ case class OrderBookStopped(assetPair: AssetPair)
                          e"The order book for ${'assetPair -> assetPair} is stopped, please contact with the administrator")
 
 case object CanNotPersistEvent
-    extends MatcherError(commonEntity, commonEntity, broken, e"Can not persist event, please retry later or contact with the administrator")
+    extends MatcherError(commonEntity, producer, broken, e"Can not persist event, please retry later or contact with the administrator")
 
 case object CancelRequestIsIncomplete extends MatcherError(request, commonEntity, unexpected, e"Either timestamp or orderId must be specified")
 
@@ -133,7 +131,7 @@ case class BalanceNotEnough(required: Map[Asset, Long], actual: Map[Asset, Long]
       account,
       balance,
       notEnough,
-      e"Not enough tradable balance. The order requires ${'required -> formatBalance(required)}, but only ${'actual -> formatBalance(actual)} is available"
+      e"Not enough tradable balance. The order requires ${'required -> required}, but only ${'actual -> actual} is available"
     )
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
@@ -153,7 +151,7 @@ case class OrderVersionUnsupported(version: Byte, requiredFeature: BlockchainFea
       e"The order of version ${'version -> version} isn't yet supported, see the activation status of '${'featureName -> requiredFeature.description}'"
     )
 
-case object CancelRequestInvalidSignature extends MatcherError(request, signature, commonClass, e"The cancel request has an invalid signature")
+case object RequestInvalidSignature extends MatcherError(request, signature, commonClass, e"The request has an invalid signature")
 
 case class AccountFeatureUnsupported(x: BlockchainFeature)
     extends MatcherError(
@@ -163,11 +161,13 @@ case class AccountFeatureUnsupported(x: BlockchainFeature)
       e"An account's feature isn't yet supported, see the activation status of '${'featureName -> x.description}'"
     )
 
-case class OrderVersionUnsupportedWithScriptedAccount(address: Address)
-    extends MatcherError(order,
-                         version,
-                         unsupported,
-                         e"The account ${'address -> address} shouldn't be scripted or an order should have the version >= 2")
+case class AccountNotSupportOrderVersion(address: Address, requiredVersion: Byte, givenVersion: Byte)
+    extends MatcherError(
+      account,
+      order,
+      unsupported,
+      e"The account ${'address -> address} requires the version >= ${'requiredVersion -> requiredVersion}, but given ${'givenVersion -> givenVersion}"
+    )
 
 case class AccountScriptReturnedError(address: Address, scriptMessage: String)
     extends MatcherError(account,
@@ -259,24 +259,24 @@ case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
       e"Trading is not allowed for the pair: ${'amountAssetId -> assetIdStr(orderAssetPair.amountAsset)} - ${'priceAssetId -> assetIdStr(orderAssetPair.priceAsset)}"
     )
 
-case class AssetPairReversed(theAssetPair: AssetPair)
+case class OrderAssetPairReversed(theAssetPair: AssetPair)
     extends MatcherError(order, assetPair, unsupported, e"The ${'assetPair -> theAssetPair} asset pair should be reversed")
 
-case class OrderVersionIsNotAllowed(version: Byte, allowedVersions: Set[Byte])
+case class OrderVersionIsNotAllowed(theVersion: Byte, allowedVersions: Set[Byte])
     extends MatcherError(
       order,
-      commonEntity,
+      version,
       denied,
-      e"The orders of version ${'version -> version} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toSeq.sorted
+      e"The orders of version ${'version -> theVersion} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toSeq.sorted
         .mkString(", ")}"
     )
 
-case class UnsupportedOrderVersion(version: Byte)
+case class UnsupportedOrderVersion(theVersion: Byte)
     extends MatcherError(
       order,
-      commonEntity,
+      version,
       unsupported,
-      e"The orders of version ${'version -> version} is not supported. Supported order versions can be obtained via /matcher/settings GET method"
+      e"The orders of version ${'version -> theVersion} is not supported. Supported order versions can be obtained via /matcher/settings GET method"
     )
 
 case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings, amountAssetDecimals: Int)
@@ -290,7 +290,7 @@ case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings
     )
 
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
-  extends MatcherError(order, price, unexpected, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
+    extends MatcherError(order, price, unexpected, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
 
 case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
     extends MatcherError(
@@ -300,14 +300,6 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings,
       e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> formatValue(Denormalization
         .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
         prcSettings.maxPrice)}, min price = ${'minPrice                                                                                      -> formatValue(prcSettings.minPrice)}, step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"
-    )
-
-case class OrderRestrictionsNotFound(assetPair: AssetPair)
-    extends MatcherError(
-      commonEntity,
-      commonEntity,
-      notFound,
-      e"Order restrictions for the asset pair ${'assetPair -> assetPair} not found"
     )
 
 sealed abstract class Entity(val code: Int)
@@ -335,6 +327,8 @@ object Entity {
   object price      extends Entity(16)
   object fee        extends Entity(17)
   object expiration extends Entity(18)
+
+  object producer extends Entity(100)
 }
 
 sealed abstract class Class(val code: Int)
@@ -356,8 +350,4 @@ object Class {
   object stopping     extends Class(14)
   object outOfBound   extends Class(15)
   object disabled     extends Class(16)
-}
-
-object MatcherError {
-  def formatBalance(b: Map[Asset, Long]): String = b.map { case (k, v) => s"${assetIdStr(k)}:$v" } mkString ("{", ", ", "}")
 }

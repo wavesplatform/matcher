@@ -56,7 +56,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "trading is deprecated" in {
       assertBadRequestAndResponse(
         node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes),
-        "The trading on scripted account isn't yet supported"
+        "An account's feature isn't yet supported"
       )
     }
 

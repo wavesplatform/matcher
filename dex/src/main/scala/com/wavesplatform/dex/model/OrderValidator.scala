@@ -55,7 +55,7 @@ object OrderValidator {
     blockchain.accountScript(address).fold(verifySignature(order)) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
-      else if (order.version <= 1) error.OrderVersionUnsupportedWithScriptedAccount(address).asLeft
+      else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
       else
         try MatcherScriptRunner(script, order, isTokenScript = false) match {
           case (_, Left(execError)) => error.AccountScriptReturnedError(address, execError).asLeft

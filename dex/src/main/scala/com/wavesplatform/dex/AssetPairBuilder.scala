@@ -57,7 +57,7 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
       else
         for {
           _ <- cond(pair.amountAsset != pair.priceAsset, (), error.AssetPairSameAssets(pair.amountAsset))
-          _ <- cond(isCorrectlyOrdered(pair), pair, error.AssetPairReversed(pair))
+          _ <- cond(isCorrectlyOrdered(pair), pair, error.OrderAssetPairReversed(pair))
           _ <- validateAssetId(pair.priceAsset, AssetSide.Price)
           _ <- validateAssetId(pair.amountAsset, AssetSide.Amount)
         } yield pair

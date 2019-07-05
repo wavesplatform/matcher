@@ -60,8 +60,8 @@ package object error {
     def e[T](arg: (Symbol, T))(implicit extractor: ErrorInterpolatorExtractor[(Symbol, T)]): MatcherErrorMessage = {
       val name = extractor.names(arg)
       MatcherErrorMessage(
-        s"${sc.parts.head}$name${sc.parts.last}".trim,
-        s"${sc.parts.head}${extractor.toString(arg)}${sc.parts.last}".trim,
+        normalize(s"${sc.parts.head}$name${sc.parts.last}"),
+        normalize(s"${sc.parts.head}${extractor.toString(arg)}${sc.parts.last}"),
         Json.obj(name -> extractor.toJson(arg))
       )
     }
@@ -82,10 +82,12 @@ package object error {
       }
 
       MatcherErrorMessage(
-        (message + sc.parts.last).trim,
-        (template + sc.parts.last).trim,
+        normalize(message + sc.parts.last),
+        normalize(template + sc.parts.last),
         params
       )
     }
+
+    def normalize(x: String): String = x.stripMargin('|').replaceAll("\n", " ").trim
   }
 }

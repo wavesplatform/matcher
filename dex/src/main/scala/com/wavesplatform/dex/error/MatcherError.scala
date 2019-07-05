@@ -99,7 +99,9 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
       order,
       expiration,
       notEnough,
-      e"""The expiration should be at least ${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)}, but it is ${'given -> givenExpiration}"""
+      e"""The expiration should be at least
+                   |${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)},
+                   |but it is ${'given -> givenExpiration}"""
     )
 
 case class OrderCommonValidationFailed(details: String)
@@ -134,11 +136,15 @@ case class BalanceNotEnough(required: Map[Asset, Long], actual: Map[Asset, Long]
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
     extends MatcherError(account, order, limitReached, e"The limit of ${'limit -> maxActiveOrders} active orders has been reached")
 
-case class OrderDuplicate(id: Order.Id) extends MatcherError(account, order, duplicate, e"The order ${'id         -> id} has already been placed")
-case class OrderNotFound(id: Order.Id)  extends MatcherError(order, commonEntity, notFound, e"The order ${'id     -> id} not found")
-case class OrderCanceled(id: Order.Id)  extends MatcherError(order, commonEntity, canceled, e"The order ${'id     -> id} is canceled")
-case class OrderFull(id: Order.Id)      extends MatcherError(order, commonEntity, limitReached, e"The order ${'id -> id} is filled")
-case class OrderFinalized(id: Order.Id) extends MatcherError(order, commonEntity, immutable, e"The order ${'id    -> id} is finalized")
+case class OrderDuplicate(id: Order.Id) extends MatcherError(account, order, duplicate, e"The order ${'id -> id} has already been placed")
+
+case class OrderNotFound(id: Order.Id) extends MatcherError(order, commonEntity, notFound, e"The order ${'id -> id} not found")
+
+case class OrderCanceled(id: Order.Id) extends MatcherError(order, commonEntity, canceled, e"The order ${'id -> id} is canceled")
+
+case class OrderFull(id: Order.Id) extends MatcherError(order, commonEntity, limitReached, e"The order ${'id -> id} is filled")
+
+case class OrderFinalized(id: Order.Id) extends MatcherError(order, commonEntity, immutable, e"The order ${'id -> id} is finalized")
 
 case class OrderVersionUnsupported(version: Byte, requiredFeature: BlockchainFeature)
     extends MatcherError(
@@ -180,7 +186,8 @@ case class AccountScriptUnexpectResult(address: Address, returnedObject: String)
       account,
       script,
       unexpected,
-      e"The account's script of ${'address -> address} is broken, please contact with the owner. The returned object is '${'invalidObject -> returnedObject}'"
+      e"""The account's script of ${'address -> address} is broken, please contact with the owner.
+                   |The returned object is '${'invalidObject -> returnedObject}'"""
     )
 
 case class AccountScriptException(address: Address, errorName: String, errorText: String)
@@ -188,7 +195,8 @@ case class AccountScriptException(address: Address, errorName: String, errorText
       account,
       script,
       broken,
-      e"The account's script of ${'address -> address} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
+      e"""The account's script of ${'address -> address} is broken, please contact with the owner.
+                   |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
     )
 
 case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
@@ -221,7 +229,8 @@ case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorT
       asset,
       script,
       broken,
-      e"The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
+      e"""The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner.
+                   |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
     )
 
 case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSettings)
@@ -229,7 +238,10 @@ case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSett
       order,
       price,
       outOfBound,
-      e"The order's price ${'price -> orderPrice} is out of deviation bounds (max-price-deviation-profit: ${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%, max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%, in relation to the best-bid/ask)"
+      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max-price-deviation-profit:
+                   |${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%,
+                   |max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%,
+                   |in relation to the best-bid/ask)"""
     )
 
 case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsSettings)
@@ -237,7 +249,8 @@ case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsS
       order,
       fee,
       outOfBound,
-      e"The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"
+      e"""The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds
+                   |(max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -275,9 +288,13 @@ case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings
       order,
       amount,
       denied,
-      e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> formatValue(Denormalization
-        .denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}) does not meet matcher requirements: max amount = ${'maxAmount -> formatValue(
-        amtSettings.maxAmount)}, min amount = ${'minAmount                                                                         -> formatValue(amtSettings.minAmount)}, step amount = ${'stepAmount -> formatValue(amtSettings.stepAmount)}"
+      e"""The order's amount
+                   |${'amount -> formatValue(Denormalization.denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}
+                   |${'assetPair -> ord.assetPair}
+                   |does not meet matcher requirements:
+                   |max amount = ${'maxAmount -> formatValue(amtSettings.maxAmount)},
+                   |min amount = ${'minAmount -> formatValue(amtSettings.minAmount)},
+                   |step amount = ${'stepAmount -> formatValue(amtSettings.stepAmount)}"""
     )
 
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
@@ -288,9 +305,13 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings,
       order,
       price,
       denied,
-      e"The order's price ${'price                                                           -> formatValue(Denormalization
-        .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))} ${'assetPair -> ord.assetPair} does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
-        prcSettings.maxPrice)}, min price = ${'minPrice                                      -> formatValue(prcSettings.minPrice)}, step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"
+      e"""The order's price
+                   |${'price -> formatValue(Denormalization.denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}
+                   |${'assetPair -> ord.assetPair}
+                   |does not meet matcher requirements:
+                   |max price = ${'maxPrice -> formatValue(prcSettings.maxPrice)},
+                   |min price = ${'minPrice -> formatValue(prcSettings.minPrice)},
+                   |step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"""
     )
 
 sealed abstract class Entity(val code: Int)

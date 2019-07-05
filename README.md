@@ -174,7 +174,17 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
-## 9. Known issues
+## 9. Useful commands
+
+In SBT.
+
+### Generate documentation
+
+```
+sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /path/to/output/docs/dir"
+```
+
+## 10. Known issues
 
 ### IntelliJ IDEA
 

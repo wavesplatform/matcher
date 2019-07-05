@@ -3,6 +3,7 @@ package com.wavesplatform.dex.error
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
+import com.wavesplatform.dex.error.Implicits.ErrorInterpolator
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings, formatValue}
 import com.wavesplatform.features.BlockchainFeature
@@ -19,12 +20,16 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
     message
   )
 
-  def json: JsObject = Json.obj(
-    "error"    -> code,
-    "message"  -> text,
-    "template" -> template,
-    "params"   -> params
-  )
+  def json: JsObject = {
+    val wrappedParams = if (params == JsObject.empty) params else Json.obj("params" -> params)
+    Json
+      .obj(
+        "error"    -> code,
+        "message"  -> text,
+        "template" -> template
+      )
+      .deepMerge(wrappedParams)
+  }
 
   override def toString: String = s"${getClass.getCanonicalName}(error=$code, message=$text)"
 }
@@ -204,7 +209,8 @@ case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
       feature,
       asset,
       unsupported,
-      e"An asset's feature isn't yet supported for '${'assetId -> theAsset}', see the activation status of '${'featureName -> x.description}'"
+      e"""An asset's feature isn't yet supported for '${'assetId -> theAsset}',
+                   |see the activation status of '${'featureName -> x.description}'"""
     )
 
 case class AssetScriptReturnedError(theAsset: IssuedAsset, scriptMessage: String)
@@ -221,7 +227,8 @@ case class AssetScriptUnexpectResult(theAsset: IssuedAsset, returnedObject: Stri
       asset,
       script,
       unexpected,
-      e"The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner. The returned object is '${'invalidObject -> returnedObject}'"
+      e"""The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner.
+                   |The returned object is '${'invalidObject -> returnedObject}'"""
     )
 
 case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorText: String)
@@ -272,7 +279,8 @@ case class OrderVersionIsNotAllowed(theVersion: Byte, allowedVersions: Set[Byte]
       order,
       version,
       denied,
-      e"The orders of version ${'version -> theVersion} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"
+      e"""The orders of version ${'version -> theVersion} are not allowed by matcher.
+                   |Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"""
     )
 
 case class UnsupportedOrderVersion(theVersion: Byte)
@@ -280,7 +288,8 @@ case class UnsupportedOrderVersion(theVersion: Byte)
       order,
       version,
       unsupported,
-      e"The orders of version ${'version -> theVersion} is not supported. Supported order versions can be obtained via /matcher/settings GET method"
+      e"""The orders of version ${'version -> theVersion} is not supported.
+                   |Supported order versions can be obtained via /matcher/settings GET method"""
     )
 
 case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings, amountAssetDecimals: Int)

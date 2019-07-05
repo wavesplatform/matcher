@@ -1,93 +1,44 @@
 package com.wavesplatform.dex
 
+import cats.Show
+import cats.Show.{show, fromToString => autoShow}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
-import shapeless._
-import com.wavesplatform.dex.error.ErrorInterpolatorExtractor.{mk, mkCol, mkJsString}
-import com.wavesplatform.dex.settings.DeviationsSettings
-import com.wavesplatform.features.BlockchainFeature
-import shapeless.ops.hlist.{Mapper, ToList}
 
 package object error {
-  implicit val byteExtractor               = mk[Byte](_.toString, x => JsNumber(x.toInt))
-  implicit val intExtractor                = mk[Int](_.toString, JsNumber(_))
-  implicit val longExtractor               = mk[Long](_.toString, JsNumber(_))
-  implicit val doubleExtractor             = mk[Double](_.toString, JsNumber(_))
-  implicit val stringExtractor             = mkJsString[String](identity)
-  implicit val byteStrExtractor            = mkJsString[ByteStr](_.base58)
-  implicit val assetExtractor              = mkJsString[Asset](AssetPair.assetIdStr)
-  implicit val assetPairExtractor          = mk[AssetPair](_.key, _.json)
-  implicit val publicKeyExtractor          = mkJsString[PublicKey](_.base58)
-  implicit val addressExtractor            = mkJsString[Address](_.stringRepr)
-  implicit val blockchainFeatureExtractor  = mkJsString[BlockchainFeature](_.description)
-  implicit val deviationsSettingsExtractor = mkJsString[DeviationsSettings](_.toString) // todo
+  implicit val byteWrites              = Writes.IntWrites.contramap[Byte](_.toInt)
+  implicit val byteStrWrites           = Writes.StringWrites.contramap[ByteStr](_.base58)
+  implicit val assetWrites             = Writes.StringWrites.contramap[Asset](AssetPair.assetIdStr)
+  implicit val assetPairWrites         = Writes[AssetPair](_.json)
+  implicit val publicKeyWrites         = Writes.StringWrites.contramap[PublicKey](_.base58)
+  implicit val addressWrites           = Writes.StringWrites.contramap[Address](_.stringRepr)
+  implicit val blockchainFeatureWrites = Writes.StringWrites.contramap[BlockchainFeature](_.description)
 
-  implicit def setExtractor[T](implicit itemExtractor: ErrorInterpolatorExtractor[T]): ErrorInterpolatorExtractor[Set[T]]   = mkCol[Set, T](_.toList)
-  implicit def listExtractor[T](implicit itemExtractor: ErrorInterpolatorExtractor[T]): ErrorInterpolatorExtractor[List[T]] = mkCol[List, T](_.toList)
+  implicit val byteShow              = autoShow[Byte]
+  implicit val intShow               = autoShow[Int]
+  implicit val longShow              = autoShow[Long]
+  implicit val doubleShow            = autoShow[Double]
+  implicit val stringShow            = show[String](identity)
+  implicit val byteStrShow           = show[ByteStr](_.base58)
+  implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
+  implicit val issuedAssetShow       = show[IssuedAsset](AssetPair.assetIdStr)
+  implicit val assetPairShow         = show[AssetPair](_.key)
+  implicit val publicKeyShow         = show[PublicKey](_.base58)
+  implicit val addressShow           = show[Address](_.stringRepr)
+  implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
 
-  implicit def mapExtractor[K, V](implicit kExtractor: ErrorInterpolatorExtractor[K],
-                                  vExtractor: ErrorInterpolatorExtractor[V]): ErrorInterpolatorExtractor[Map[K, V]] =
-    new ErrorInterpolatorExtractor[Map[K, V]] {
-      override def names(input: Map[K, V]): String = ""
-      override def toString(input: Map[K, V]): String = {
-        val xs = input.map {
-          case (k, v) =>
-            s"${kExtractor.toString(k)}: ${vExtractor.toString(v)}"
-        }
-        s"{${xs.mkString(", ")}}"
-      }
-      override def toJson(input: Map[K, V]): JsValue =
-        JsObject(input.map {
-          case (k, v) => kExtractor.toString(k) -> vExtractor.toJson(v)
-        })
-    }
+  private def showCol[C[_], T](f: C[T] => List[T])(implicit itemShow: Show[T]): Show[C[T]] =
+    (input: C[T]) => s"{${f(input).map(itemShow.show).mkString(", ")}}"
+  implicit def setShow[T](implicit itemShow: Show[T]): Show[Set[T]]   = showCol[Set, T](_.toList)
+  implicit def listShow[T](implicit itemShow: Show[T]): Show[List[T]] = showCol[List, T](_.toList)
 
-  object ErrorInterpolatorMapper extends Poly1 {
-    implicit def mapAt[T](implicit p: ErrorInterpolatorExtractor[T]): Case.Aux[T, (String, String, JsValue)] = at[T] { x =>
-      (p.names(x), p.toString(x), p.toJson(x))
-    }
-  }
-
-  implicit class ErrorInterpolator(sc: StringContext) {
-    def e(): MatcherErrorMessage = {
-      val x = sc.parts.head.trim
-      MatcherErrorMessage(x, x, JsObject.empty)
-    }
-
-    def e[T](arg: (Symbol, T))(implicit extractor: ErrorInterpolatorExtractor[(Symbol, T)]): MatcherErrorMessage = {
-      val name = extractor.names(arg)
-      MatcherErrorMessage(
-        normalize(s"${sc.parts.head}$name${sc.parts.last}"),
-        normalize(s"${sc.parts.head}${extractor.toString(arg)}${sc.parts.last}"),
-        Json.obj(name -> extractor.toJson(arg))
-      )
-    }
-
-    def e[T, H <: HList, L <: HList](args: T)(implicit
-                                              gen: Generic.Aux[T, H],
-                                              mapper: Mapper.Aux[ErrorInterpolatorMapper.type, H, L],
-                                              toList: ToList[L, Id[_]]): MatcherErrorMessage = {
-      val parts = sc.parts.init
-
-      val (nameArgs, strArgs, jsonArgs) = toList(mapper(gen.to(args))).asInstanceOf[List[(String, String, JsValue)]].unzip3
-      val (message, template, params) = parts.zipWithIndex.foldLeft(("", "", JsObject.empty)) {
-        case ((m, t, p), (x, i)) =>
-          val name = nameArgs(i)
-          val str  = strArgs(i)
-          val json = jsonArgs(i)
-          (s"$m$x$str", s"$t$x{{$name}}", p + (name -> json))
-      }
-
-      MatcherErrorMessage(
-        normalize(message + sc.parts.last),
-        normalize(template + sc.parts.last),
-        params
-      )
-    }
-
-    def normalize(x: String): String = x.stripMargin('|').replaceAll("\n", " ").trim
+  implicit def mapShow[K, V](implicit kShow: Show[K], vShow: Show[V]): Show[Map[K, V]] = { input =>
+    val xs = input.map { case (k, v) => s"${kShow.show(k)}: ${vShow.show(v)}" }
+    s"{${xs.mkString(", ")}}"
   }
 }

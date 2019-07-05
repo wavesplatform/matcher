@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.error
 
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
@@ -9,7 +8,6 @@ import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSett
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json.{JsObject, Json}
 
@@ -38,11 +36,11 @@ case object MatcherIsStopping     extends MatcherError(commonEntity, commonEntit
 case object FeatureNotImplemented extends MatcherError(commonEntity, feature, unsupported, e"This feature is not implemented")
 case object FeatureDisabled       extends MatcherError(commonEntity, feature, disabled, e"This feature is disabled, contact with the administrator")
 
-case class OrderBookBroken(assetPair: AssetPair)
+case class OrderBookBroken(theAssetPair: AssetPair)
     extends MatcherError(orderBook,
                          commonEntity,
                          broken,
-                         e"The order book for ${'assetPair -> assetPair} is unavailable, please contact with the administrator")
+                         e"The order book for ${'assetPair -> theAssetPair} is unavailable, please contact with the administrator")
 
 case class OrderBookUnexpectedState(assetPair: AssetPair)
     extends MatcherError(orderBook,
@@ -66,7 +64,7 @@ case class UnexpectedMatcherPublicKey(required: PublicKey, given: PublicKey)
       commonEntity,
       pubKey,
       unexpected,
-      e"The required matcher public key for this DEX is ${'required -> Base58.encode(required)}, but given ${'given -> Base58.encode(given)}"
+      e"The required matcher public key for this DEX is ${'required -> required}, but given ${'given -> given}"
     )
 
 case class UnexpectedSender(required: Address, given: Address)
@@ -80,7 +78,7 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      e"Required one of the following: ${'required -> required.map(assetIdStr).mkString(", ")} as asset fee, but given ${'given -> assetIdStr(given)}"
+      e"Required one of the following fee asset: ${'required -> required}, but given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
@@ -88,11 +86,10 @@ case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
       order,
       fee,
       notEnough,
-      e"Required ${'required -> required} ${'assetId -> assetIdStr(theAsset)} as fee for this order, but given ${'given -> given} ${'assetId -> assetIdStr(theAsset)}"
+      e"Required ${'required -> required} ${'assetId -> theAsset} -> fee for this order, but given ${'given -> given} ${'assetId -> theAsset}"
     )
 
-case class AssetNotFound(theAsset: IssuedAsset)
-    extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> assetIdStr(theAsset)} not found")
+case class AssetNotFound(theAsset: IssuedAsset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> theAsset} not found")
 
 case class CanNotCreateExchangeTransaction(details: String)
     extends MatcherError(exchangeTx, order, commonClass, e"Can't verify the order by an exchange transaction: ${'details -> details}")
@@ -102,7 +99,7 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
       order,
       expiration,
       notEnough,
-      e"The expiration should be at least ${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)}, but it is ${'given -> givenExpiration}"
+      e"""The expiration should be at least ${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)}, but it is ${'given -> givenExpiration}"""
     )
 
 case class OrderCommonValidationFailed(details: String)
@@ -112,16 +109,16 @@ case class InvalidAsset(theAsset: String)
     extends MatcherError(asset, commonEntity, broken, e"The asset '${'assetId -> theAsset}' is wrong. It should be 'WAVES' or a Base58 string")
 
 case class AssetBlacklisted(theAsset: IssuedAsset)
-    extends MatcherError(asset, commonEntity, blacklisted, e"The asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
+    extends MatcherError(asset, commonEntity, blacklisted, e"The asset ${'assetId -> theAsset} is blacklisted")
 
 case class AmountAssetBlacklisted(theAsset: IssuedAsset)
-    extends MatcherError(asset, amount, blacklisted, e"The amount asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
+    extends MatcherError(asset, amount, blacklisted, e"The amount asset ${'assetId -> theAsset} is blacklisted")
 
 case class PriceAssetBlacklisted(theAsset: IssuedAsset)
-    extends MatcherError(asset, price, blacklisted, e"The price asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
+    extends MatcherError(asset, price, blacklisted, e"The price asset ${'assetId -> theAsset} is blacklisted")
 
 case class FeeAssetBlacklisted(theAsset: IssuedAsset)
-    extends MatcherError(asset, fee, blacklisted, e"The fee asset ${'assetId -> assetIdStr(theAsset)} is blacklisted")
+    extends MatcherError(asset, fee, blacklisted, e"The fee asset ${'assetId -> theAsset} is blacklisted")
 
 case class AddressIsBlacklisted(address: Address)
     extends MatcherError(account, commonEntity, blacklisted, e"The account ${'address -> address} is blacklisted")
@@ -148,7 +145,7 @@ case class OrderVersionUnsupported(version: Byte, requiredFeature: BlockchainFea
       feature,
       order,
       unsupported,
-      e"The order of version ${'version -> version} isn't yet supported, see the activation status of '${'featureName -> requiredFeature.description}'"
+      e"The order of version ${'version -> version} isn't yet supported, see the activation status of '${'featureName -> requiredFeature}'"
     )
 
 case object RequestInvalidSignature extends MatcherError(request, signature, commonClass, e"The request has an invalid signature")
@@ -158,7 +155,7 @@ case class AccountFeatureUnsupported(x: BlockchainFeature)
       feature,
       account,
       unsupported,
-      e"An account's feature isn't yet supported, see the activation status of '${'featureName -> x.description}'"
+      e"An account's feature isn't yet supported, see the activation status of '${'featureName -> x}'"
     )
 
 case class AccountNotSupportOrderVersion(address: Address, requiredVersion: Byte, givenVersion: Byte)
@@ -199,24 +196,24 @@ case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
       feature,
       asset,
       unsupported,
-      e"An asset's feature isn't yet supported for '${'assetId -> assetIdStr(theAsset)}', see the activation status of '${'featureName -> x.description}'"
+      e"An asset's feature isn't yet supported for '${'assetId -> theAsset}', see the activation status of '${'featureName -> x.description}'"
     )
 
 case class AssetScriptReturnedError(theAsset: IssuedAsset, scriptMessage: String)
     extends MatcherError(asset,
                          script,
                          commonClass,
-                         e"The asset's script of ${'assetId -> assetIdStr(theAsset)} returned the error: ${'scriptError -> scriptMessage}")
+                         e"The asset's script of ${'assetId -> theAsset} returned the error: ${'scriptError -> scriptMessage}")
 
 case class AssetScriptDeniedOrder(theAsset: IssuedAsset)
-    extends MatcherError(asset, script, denied, e"The asset's script of ${'assetId -> assetIdStr(theAsset)} rejected the order")
+    extends MatcherError(asset, script, denied, e"The asset's script of ${'assetId -> theAsset} rejected the order")
 
 case class AssetScriptUnexpectResult(theAsset: IssuedAsset, returnedObject: String)
     extends MatcherError(
       asset,
       script,
       unexpected,
-      e"The asset's script of ${'assetId -> assetIdStr(theAsset)} is broken, please contact with the owner. The returned object is '${'invalidObject -> returnedObject}'"
+      e"The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner. The returned object is '${'invalidObject -> returnedObject}'"
     )
 
 case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorText: String)
@@ -224,23 +221,23 @@ case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorT
       asset,
       script,
       broken,
-      e"The asset's script of ${'assetId -> assetIdStr(theAsset)} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
+      e"The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
     )
 
-case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
+case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       price,
       outOfBound,
-      e"The order's price ${'price -> ord.price} is out of deviation bounds (max-price-deviation-profit: ${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%, max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%, in relation to the best-bid/ask)"
+      e"The order's price ${'price -> orderPrice} is out of deviation bounds (max-price-deviation-profit: ${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%, max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%, in relation to the best-bid/ask)"
     )
 
-case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
+case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       fee,
       outOfBound,
-      e"The order's matcher fee ${'matcherFee -> ord.matcherFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"
+      e"The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -248,16 +245,11 @@ case class AssetPairSameAssets(theAsset: Asset)
       order,
       assetPair,
       duplicate,
-      e"The amount and price assets must be different, but they are: ${'assetId -> assetIdStr(theAsset)}"
+      e"The amount and price assets must be different, but they are: ${'assetId -> theAsset}"
     )
 
-case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
-    extends MatcherError(
-      order,
-      assetPair,
-      denied,
-      e"Trading is not allowed for the pair: ${'amountAssetId -> assetIdStr(orderAssetPair.amountAsset)} - ${'priceAssetId -> assetIdStr(orderAssetPair.priceAsset)}"
-    )
+case class AssetPairIsNotAllowed(theAssetPair: AssetPair)
+    extends MatcherError(order, assetPair, denied, e"Trading is not allowed for the ${'assetPair -> theAssetPair} asset pair")
 
 case class OrderAssetPairReversed(theAssetPair: AssetPair)
     extends MatcherError(order, assetPair, unsupported, e"The ${'assetPair -> theAssetPair} asset pair should be reversed")
@@ -267,8 +259,7 @@ case class OrderVersionIsNotAllowed(theVersion: Byte, allowedVersions: Set[Byte]
       order,
       version,
       denied,
-      e"The orders of version ${'version -> theVersion} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toSeq.sorted
-        .mkString(", ")}"
+      e"The orders of version ${'version -> theVersion} are not allowed by matcher. Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"
     )
 
 case class UnsupportedOrderVersion(theVersion: Byte)
@@ -297,9 +288,9 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings,
       order,
       price,
       denied,
-      e"The order's price (${'assetPair -> ord.assetPair}, ${'price -> formatValue(Denormalization
-        .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}) does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
-        prcSettings.maxPrice)}, min price = ${'minPrice                                                                                      -> formatValue(prcSettings.minPrice)}, step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"
+      e"The order's price ${'price                                                           -> formatValue(Denormalization
+        .denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))} ${'assetPair -> ord.assetPair} does not meet matcher requirements: max price = ${'maxPrice -> formatValue(
+        prcSettings.maxPrice)}, min price = ${'minPrice                                      -> formatValue(prcSettings.minPrice)}, step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"
     )
 
 sealed abstract class Entity(val code: Int)

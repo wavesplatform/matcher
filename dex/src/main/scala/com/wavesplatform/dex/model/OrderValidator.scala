@@ -303,7 +303,7 @@ object OrderValidator {
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
     }
 
-    lift(order).ensure(error.DeviantOrderPrice(order, deviationSettings)) { _ =>
+    lift(order).ensure(error.DeviantOrderPrice(order.price, deviationSettings)) { _ =>
       if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
       else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
     }
@@ -341,7 +341,7 @@ object OrderValidator {
       }
     }
 
-    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
+    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order.matcherFee, deviationSettings))
   }
 
   def marketAware(orderFeeSettings: OrderFeeSettings,

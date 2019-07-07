@@ -53,7 +53,7 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
   def validateAssetPair(pair: AssetPair): Result[AssetPair] =
     validate.measure {
       if (settings.allowedAssetPairs.contains(pair)) pair.asRight
-      else if (settings.whiteListOnly) Left(error.AssetPairIsNotAllowed(pair))
+      else if (settings.whiteListOnly) Left(error.AssetPairIsDenied(pair))
       else
         for {
           _ <- cond(pair.amountAsset != pair.priceAsset, (), error.AssetPairSameAssets(pair.amountAsset))

@@ -375,7 +375,7 @@ class OrderValidatorSpecification
       "it's version is not allowed by matcher" in forAll(orderWithFeeSettingsGenerator) {
         case (order, _, orderFeeSettings) =>
           if (order.version > 1) {
-            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) should produce("OrderVersionIsNotAllowed")
+            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) should produce("OrderVersionDenied")
             validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
           } else {
             validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) shouldBe 'right

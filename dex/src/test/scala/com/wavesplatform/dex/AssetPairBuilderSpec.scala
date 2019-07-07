@@ -113,7 +113,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
       "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
         val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), blockchain, blacklistedAssets)
         val assetPair = AssetPair(Waves, WUSD)
-        builder.validateAssetPair(assetPair) should produce("AssetPairIsNotAllowed")
+        builder.validateAssetPair(assetPair) should produce("AssetPairIsDenied")
       }
     }
   }

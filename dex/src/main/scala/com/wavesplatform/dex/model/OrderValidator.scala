@@ -268,7 +268,7 @@ object OrderValidator {
       _ <- lift(order)
         .ensure(error.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
-        .ensure(error.OrderVersionIsNotAllowed(order.version, matcherSettings.allowedOrderVersions)) { o =>
+        .ensure(error.OrderVersionDenied(order.version, matcherSettings.allowedOrderVersions)) { o =>
           matcherSettings.allowedOrderVersions(o.version)
         }
       _ <- validateBlacklistedAsset(order.matcherFeeAssetId, error.FeeAssetBlacklisted)

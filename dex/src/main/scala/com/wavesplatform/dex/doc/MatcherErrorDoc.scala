@@ -40,13 +40,13 @@ object MatcherErrorDoc {
                 val part  = entitiesMap(partCode)
                 val klass = classesMap(classCode)
 
-                s"""/#### $name
-                    /<a id="error-$name"></a>
+                s"""/<a id="error-$name"></a>
+                    /#### $name
                     /
                     /* Code: ${x.code}
-                    /* Object: _${obj}_ == $objCode == `${x.code} >> 20 & 0xFFF`
-                    /* Part: _${part}_ == $partCode == `${x.code} >> 8 & 0xFFF`
-                    /* Class: _${klass}_ == $classCode == `${x.code} & 0xFF`
+                    /* Object: _${obj}_ == ($objCode == `${x.code}) >> 20 & 0x7FF`
+                    /* Part: _${part}_ == ($partCode == `${x.code}) >> 8 & 0xFFF`
+                    /* Class: _${klass}_ == ($classCode == `${x.code}) & 0xFF`
                     /
                     /##### Sample
                     /
@@ -98,8 +98,8 @@ object MatcherErrorDoc {
         /$detailedErrors""".stripMargin('/')
   }
 
-  private def getObjectCode(errorCode: Int): Int = errorCode >> 20 & 0xFFF
-  private def getPartCode(errorCode: Int): Int   = errorCode >> 8 & 0xFFF
+  private def getObjectCode(errorCode: Int): Int = (errorCode >> 20) & 0x7FF
+  private def getPartCode(errorCode: Int): Int   = (errorCode >> 8) & 0xFFF
   private def getClassCode(errorCode: Int): Int  = errorCode & 0xFF
 
   private def toMarkdownTable(xs: Seq[(Int, String)]): String =

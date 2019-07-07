@@ -91,7 +91,7 @@ case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
       order,
       fee,
       notEnough,
-      e"Required ${'required -> required} ${'assetId -> theAsset} -> fee for this order, but given ${'given -> given} ${'assetId -> theAsset}"
+      e"Required ${'required -> required} ${'assetId -> theAsset} as fee for this order, but given ${'given -> given} ${'assetId -> theAsset}"
     )
 
 case class AssetNotFound(theAsset: IssuedAsset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> theAsset} not found")
@@ -174,7 +174,7 @@ case class AccountNotSupportOrderVersion(address: Address, requiredVersion: Byte
       account,
       order,
       unsupported,
-      e"The account ${'address -> address} requires the version >= ${'requiredVersion -> requiredVersion}, but given ${'givenVersion -> givenVersion}"
+      e"The account ${'address -> address} requires the version >= ${'required -> requiredVersion}, but given ${'given -> givenVersion}"
     )
 
 case class AccountScriptReturnedError(address: Address, scriptMessage: String)
@@ -245,9 +245,9 @@ case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSett
       order,
       price,
       outOfBound,
-      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max-price-deviation-profit:
-                   |${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%,
-                   |max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%,
+      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max-profit:
+                   |${'maxProfit -> deviationSettings.maxPriceProfit}%,
+                   |max-loss: ${'maxLoss -> deviationSettings.maxPriceLoss}%,
                    |in relation to the best-bid/ask)"""
     )
 
@@ -257,7 +257,7 @@ case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsS
       fee,
       outOfBound,
       e"""The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds
-                   |(max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"""
+                   |(max-deviation: ${'maxDeviation -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -268,18 +268,18 @@ case class AssetPairSameAssets(theAsset: Asset)
       e"The amount and price assets must be different, but they are: ${'assetId -> theAsset}"
     )
 
-case class AssetPairIsNotAllowed(theAssetPair: AssetPair)
-    extends MatcherError(order, assetPair, denied, e"Trading is not allowed for the ${'assetPair -> theAssetPair} asset pair")
+case class AssetPairIsDenied(theAssetPair: AssetPair)
+    extends MatcherError(order, assetPair, denied, e"Trading is denied for the ${'assetPair -> theAssetPair} asset pair")
 
 case class OrderAssetPairReversed(theAssetPair: AssetPair)
     extends MatcherError(order, assetPair, unsupported, e"The ${'assetPair -> theAssetPair} asset pair should be reversed")
 
-case class OrderVersionIsNotAllowed(theVersion: Byte, allowedVersions: Set[Byte])
+case class OrderVersionDenied(theVersion: Byte, allowedVersions: Set[Byte])
     extends MatcherError(
       order,
       version,
       denied,
-      e"""The orders of version ${'version -> theVersion} are not allowed by matcher.
+      e"""The orders of version ${'version -> theVersion} are denied by matcher.
                    |Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"""
     )
 
@@ -299,11 +299,11 @@ case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings
       denied,
       e"""The order's amount
                    |${'amount -> formatValue(Denormalization.denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}
-                   |${'assetPair -> ord.assetPair}
+                   |${'assetId -> ord.assetPair.amountAsset}
                    |does not meet matcher requirements:
-                   |max amount = ${'maxAmount -> formatValue(amtSettings.maxAmount)},
-                   |min amount = ${'minAmount -> formatValue(amtSettings.minAmount)},
-                   |step amount = ${'stepAmount -> formatValue(amtSettings.stepAmount)}"""
+                   |max amount = ${'max -> formatValue(amtSettings.maxAmount)},
+                   |min amount = ${'min -> formatValue(amtSettings.minAmount)},
+                   |step amount = ${'step -> formatValue(amtSettings.stepAmount)}"""
     )
 
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
@@ -316,11 +316,11 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings,
       denied,
       e"""The order's price
                    |${'price -> formatValue(Denormalization.denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}
-                   |${'assetPair -> ord.assetPair}
+                   |${'assetId -> ord.assetPair.priceAsset}
                    |does not meet matcher requirements:
-                   |max price = ${'maxPrice -> formatValue(prcSettings.maxPrice)},
-                   |min price = ${'minPrice -> formatValue(prcSettings.minPrice)},
-                   |step price = ${'stepPrice -> formatValue(prcSettings.stepPrice)}"""
+                   |max price = ${'max -> formatValue(prcSettings.maxPrice)},
+                   |min price = ${'min -> formatValue(prcSettings.minPrice)},
+                   |step price = ${'step -> formatValue(prcSettings.stepPrice)}"""
     )
 
 sealed abstract class Entity(val code: Int)

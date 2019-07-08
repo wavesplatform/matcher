@@ -10,28 +10,15 @@ import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
 sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) {
-  import message._
-
   def this(obj: Entity, part: Entity, klass: Class, message: MatcherErrorMessage) = this(
     (obj.code << 20) + (part.code << 8) + klass.code, // 32 bits = (12 for object) + (12 for part) + (8 for class)
     message
   )
 
-  def json: JsObject = {
-    val wrappedParams = if (params == JsObject.empty) params else Json.obj("params" -> params)
-    Json
-      .obj(
-        "error"    -> code,
-        "message"  -> text,
-        "template" -> template
-      )
-      .deepMerge(wrappedParams)
-  }
-
-  override def toString: String = s"${getClass.getCanonicalName}(error=$code, message=$text)"
+  override def toString: String = s"${getClass.getCanonicalName}(error=$code, message=${message.text})"
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)

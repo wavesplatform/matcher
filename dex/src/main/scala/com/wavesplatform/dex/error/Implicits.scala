@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.error
 
-import cats.Show
-import cats.Show.{show, fromToString => autoShow}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeature
@@ -11,6 +9,28 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json.{JsObject, JsValue, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}
+
+trait Context
+
+trait ContextShow[-T] {
+  def show(input: T)(context: Context): String
+}
+
+object ContextShow {
+  def apply[T](implicit r: ContextShow[T]): ContextShow[T] = r
+
+  def auto[T]: ContextShow[T] = show(_.toString)
+
+  def show[T](f: T => String): ContextShow[T] = new ContextShow[T] {
+    override def show(input: T)(context: Context): String = f(input)
+  }
+}
+
+trait ContextWrites[-T] {
+  def writes(input: T)(context: Context): JsValue
+}
+
+import ContextShow.{show, auto => autoShow}
 
 object Implicits {
   // Here, because we doesn't want to leak this implicits outside the error package
@@ -27,16 +47,20 @@ object Implicits {
   implicit val publicKeyShow         = show[PublicKey](_.base58)
   implicit val addressShow           = show[Address](_.stringRepr)
   implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
-  implicit val balanceShow = Show.show[Map[Asset, Long]] { input =>
-    val xs = input.map { case (k, v) => s"${Show[Long].show(v)} ${Show[Asset].show(k)}" }
-    s"${xs.mkString(" and ")}"
+  implicit val balanceShow = new ContextShow[Map[Asset, Long]] {
+    override def show(input: Map[Asset, Long])(context: Context): String = {
+      val xs = input.map { case (k, v) => s"${ContextShow[Long].show(v)(context)} ${ContextShow[Asset].show(k)(context)}" }
+      s"${xs.mkString(" and ")}"
+    }
   }
 
-  implicit def setShow[T](implicit itemShow: Show[T]): Show[Set[T]] =
-    (input: Set[T]) => s"${input.map(itemShow.show).mkString(", ")}"
+  implicit def setShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[Set[T]] {
+    override def show(input: Set[T])(context: Context): String = s"${input.map(itemShow.show(_)(context)).mkString(", ")}"
+  }
 
-  implicit def listShow[T](implicit itemShow: Show[T]): Show[List[T]] =
-    (input: List[T]) => s"${input.map(itemShow.show).mkString(", ")}"
+  implicit def listShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[List[T]] {
+    override def show(input: List[T])(context: Context): String = s"${input.map(itemShow.show(_)(context)).mkString(", ")}"
+  }
 
   implicit val byteWrites              = Writes.IntWrites.contramap[Byte](_.toInt)
   implicit val byteStrWrites           = Writes.StringWrites.contramap[ByteStr](_.base58)
@@ -47,9 +71,11 @@ object Implicits {
   implicit val blockchainFeatureWrites = Writes.StringWrites.contramap[BlockchainFeature](_.description)
   implicit val balanceWrites           = mapWrites[Asset, Long]
 
-  implicit def mapWrites[K, V](implicit kShow: Show[K], vWrites: Writes[V]): Writes[Map[K, V]] = { input =>
-    val xs = input.map { case (k, v) => kShow.show(k) -> vWrites.writes(v) }
-    JsObject(xs)
+  implicit def mapWrites[K, V](implicit kShow: ContextShow[K], vWrites: ContextWrites[V]) = new ContextWrites[Map[K, V]] {
+    override def writes(input: Map[K, V])(context: Context): JsValue = {
+      val xs = input.map { case (k, v) => kShow.show(k)(context) -> vWrites.writes(v)(context) }
+      JsObject(xs)
+    }
   }
 
   implicit class ErrorInterpolator(sc: StringContext) {
@@ -84,9 +110,10 @@ object Implicits {
   }
 
   object FormatArg extends Poly1 {
-    implicit def mapAt[T](implicit show: Show[T], json: Writes[T]): Case.Aux[(Symbol, T), (String, String, JsValue)] =
+    // TODO
+    implicit def mapAt[T](implicit show: ContextShow[T], json: ContextWrites[T]): Case.Aux[(Symbol, T), (String, Context => String, Context => JsValue)] =
       at[(Symbol, T)] {
-        case (name, x) => (name.name, show.show(x), json.writes(x))
+        case (name, x) => (name.name, show.show(x)(_), json.writes(x)(_))
       }
   }
 }

@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http._
@@ -68,6 +68,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import PathMatchers._
 
   private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
+
+  private implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
+    HttpResponse(
+      x.statusCode,
+      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(x.content))
+    )
+  }
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")

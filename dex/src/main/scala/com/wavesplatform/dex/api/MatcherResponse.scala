@@ -1,8 +1,6 @@
 package com.wavesplatform.dex.api
 
-import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
-import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
@@ -13,15 +11,6 @@ import play.api.libs.json._
 
 sealed abstract class MatcherResponse(val statusCode: StatusCode) {
   def content: String
-}
-
-object MatcherResponse {
-  implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
-    HttpResponse(
-      x.statusCode,
-      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(x.content))
-    )
-  }
 }
 
 sealed abstract class WrappedMatcherResponse(code: StatusCode, val json: JsObject) extends MatcherResponse(code) {

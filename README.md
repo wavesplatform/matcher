@@ -39,12 +39,20 @@ brew cask install java sbt@1
 1. Please follow the SBT installation instructions depending on your operating system ([Mac](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Mac.html), [Windows](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Windows.html), [Linux](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Linux.html)).
 2. The recommended settings for SBT can be provided through the `SBT_OPTS` environment variable:
 
-    * During each SBT run: `SBT_OPTS="-Xmx2048M -XX:MaxMetaspaceExpansion=0 -XX:MetaspaceSize=256m"`
-    * Or once in _~/.bash_profile_: `export SBT_OPTS="-Xmx2048M -XX:MaxMetaspaceExpansion=0 -XX:MetaspaceSize=256m"`. 
-      Restart the terminal after this change.
+    Options are: `-Xmx2048M -Xss256m -XX:MetaspaceSize=256m -XX:MaxMetaspaceExpansion=0`
+
+    * During each SBT run: `SBT_OPTS="<paste options here>" `
+    * Or once in _~/.bash_profile_: `export SBT_OPTS="<paste options here>"`. 
+      Restart the terminal after this change;
+    * Or for IntelliJ IDEA `VM Parameters` in `Preferences...` > `Build, Execution, Deployment` > `Build Tools` > `sbt`. 
 
 3. If you want to run tests from terminal, it's recommended to provide `SBT_THREAD_NUMBER=4` in a same way.
    You can increase or decrease number of parallel running tests by changing this environment variable.
+
+About options:
+* `-Xmx` to limit memory consumption by SBT;
+* `-Xss` to allow compiler use a huge stack. Requred for `shapeless`;
+* `-XX:MaxMetaspaceExpansion` to force garbage 
 
 ## 2. Obtaining Source Codes
 
@@ -136,7 +144,7 @@ waves.extensions = [
   # ... here may be other extensions
 ]
  
-waves.matcher {
+waves.dex {
   account = "3Q5GKPLkxXcEwGv6d57v8aksTjh1igHNNDd" # This account must be known at the Node, e.g. created through POST /addresses
   # bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
 }
@@ -166,7 +174,17 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
-## 9. Known issues
+## 9. Useful commands
+
+In SBT.
+
+### Generate documentation
+
+```
+sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /path/to/output/docs/dir"
+```
+
+## 10. Known issues
 
 ### IntelliJ IDEA
 

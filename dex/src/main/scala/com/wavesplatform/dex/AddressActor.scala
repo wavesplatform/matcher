@@ -10,7 +10,6 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.dex.queue.QueueEvent
@@ -106,9 +105,9 @@ class AddressActor(
           case Some(lo) => storeCanceled(lo.order.assetPair, lo.order.id())
           case None =>
             val reason = orderDB.status(id) match {
-              case OrderStatus.NotFound     => MatcherError.OrderNotFound(id)
-              case OrderStatus.Cancelled(_) => MatcherError.OrderCanceled(id)
-              case OrderStatus.Filled(_)    => MatcherError.OrderFull(id)
+              case OrderStatus.NotFound     => error.OrderNotFound(id)
+              case OrderStatus.Cancelled(_) => error.OrderCanceled(id)
+              case OrderStatus.Filled(_)    => error.OrderFull(id)
             }
 
             Future.successful(api.OrderCancelRejected(reason))
@@ -144,16 +143,16 @@ class AddressActor(
       }
   }
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], error: Resp): Future[Resp] = {
+  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
     val promisedResponse = Promise[api.WrappedMatcherResponse]
     eventCache += id -> promisedResponse
     storeEvent(event).transformWith {
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
-        Future.successful(error)
+        Future.successful(storeError)
       case Success(r) =>
         r match {
-          case None => Future.successful(NotImplemented(MatcherError.FeatureDisabled))
+          case None => Future.successful(NotImplemented(error.FeatureDisabled))
           case Some(x) =>
             log.info(s"Stored $x")
             promisedResponse.future
@@ -162,10 +161,9 @@ class AddressActor(
   }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
-    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(MatcherError.CanNotPersistEvent))
+    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent))
   private def storePlaced(order: Order): Future[Resp] = {
-    import com.wavesplatform.dex.error._
-    store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected(MatcherError.CanNotPersistEvent))
+    store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected(error.CanNotPersistEvent))
   }
 
   private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
@@ -246,7 +244,7 @@ class AddressActor(
   private def handleOrderTerminated(lo: LimitOrder, status: OrderStatus.Final): Unit = {
     log.trace(s"Order ${lo.order.id()} terminated: $status")
     orderDB.saveOrder(lo.order)
-    pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCancelRejected(MatcherError.OrderFinalized(lo.order.id()))))
+    pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCancelRejected(error.OrderFinalized(lo.order.id()))))
     expiration.remove(lo.order.id()).foreach(_.cancel())
     activeOrders.remove(lo.order.id())
     orderDB.saveOrderInfo(

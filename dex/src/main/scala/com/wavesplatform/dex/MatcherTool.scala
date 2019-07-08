@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
-import java.io.File
+import java.io.{File, PrintWriter}
+import java.nio.file.{Files, Paths}
 import java.util.{HashMap => JHashMap}
 
 import akka.actor.ActorSystem
@@ -18,6 +19,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -95,6 +97,16 @@ object MatcherTool extends ScorexLogging {
 
     val start = System.currentTimeMillis()
     args(1) match {
+      case "gen-docs" =>
+        val outDir  = args(2)
+        val outPath = Paths.get(outDir)
+        Files.createDirectories(outPath)
+        val errors = new PrintWriter(outPath.resolve("errors.md").toFile)
+        try {
+          errors.write(MatcherErrorDoc.mkMarkdown)
+        } finally {
+          errors.close()
+        }
       case "stats" => collectStats(db)
       case "ob" =>
         val pair   = AssetPair.createAssetPair(args(2), args(3)).get

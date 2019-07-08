@@ -4,15 +4,14 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
-import com.wavesplatform.dex.WatchDistributedCompletionActor
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
-import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.{ActorNameParser, WorkingStash}
+import com.wavesplatform.dex.{WatchDistributedCompletionActor, error}
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -98,18 +97,18 @@ class MatcherActor(settings: MatcherSettings,
     val s = sender()
     orderBook(assetPair) match {
       case Some(Right(ob)) => f(s, ob)
-      case Some(Left(_))   => s ! OrderBookUnavailable(MatcherError.OrderBookBroken(assetPair))
+      case Some(Left(_))   => s ! OrderBookUnavailable(error.OrderBookBroken(assetPair))
       case None =>
         if (context.child(OrderBookActor.name(assetPair)).nonEmpty) {
           log.error(s"OrderBook for $assetPair is stopped, but it is not observed in orderBook")
-          s ! OrderBookUnavailable(MatcherError.OrderBookUnexpectedState(assetPair))
+          s ! OrderBookUnavailable(error.OrderBookUnexpectedState(assetPair))
         } else if (autoCreate) {
           val ob = createOrderBook(assetPair)
           assetPairsDB.add(assetPair)
           f(s, ob)
         } else {
           log.warn(s"OrderBook for $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
-          s ! OrderBookUnavailable(MatcherError.OrderBookStopped(assetPair))
+          s ! OrderBookUnavailable(error.OrderBookStopped(assetPair))
         }
     }
   }

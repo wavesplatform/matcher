@@ -3,7 +3,7 @@ package com.wavesplatform.dex.error
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
-import com.wavesplatform.dex.error.Implicits.ErrorInterpolator
+import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings, formatValue}
 import com.wavesplatform.features.BlockchainFeature
@@ -83,7 +83,7 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      e"Required one of the following fee asset: ${'required -> required}, but given ${'given -> given}"
+      e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
@@ -135,7 +135,7 @@ case class BalanceNotEnough(required: Map[Asset, Long], actual: Map[Asset, Long]
       account,
       balance,
       notEnough,
-      e"Not enough tradable balance. The order requires ${'required -> required}, but only ${'actual -> actual} is available"
+      e"Not enough tradable balance. The order requires ${'required -> required}, but available are ${'actual -> actual}"
     )
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
@@ -192,7 +192,7 @@ case class AccountScriptUnexpectResult(address: Address, returnedObject: String)
       script,
       unexpected,
       e"""The account's script of ${'address -> address} is broken, please contact with the owner.
-                   |The returned object is '${'invalidObject -> returnedObject}'"""
+                   |The returned object is '${'returnedObject -> returnedObject}'"""
     )
 
 case class AccountScriptException(address: Address, errorName: String, errorText: String)
@@ -228,7 +228,7 @@ case class AssetScriptUnexpectResult(theAsset: IssuedAsset, returnedObject: Stri
       script,
       unexpected,
       e"""The asset's script of ${'assetId -> theAsset} is broken, please contact with the owner.
-                   |The returned object is '${'invalidObject -> returnedObject}'"""
+                   |The returned object is '${'returnedObject -> returnedObject}'"""
     )
 
 case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorText: String)
@@ -245,10 +245,10 @@ case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSett
       order,
       price,
       outOfBound,
-      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max-profit:
-                   |${'maxProfit -> deviationSettings.maxPriceProfit}%,
-                   |max-loss: ${'maxLoss -> deviationSettings.maxPriceLoss}%,
-                   |in relation to the best-bid/ask)"""
+      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max profit:
+                   |${'maxProfit -> formatValue(deviationSettings.maxPriceProfit)}% and
+                   |max loss: ${'maxLoss -> formatValue(deviationSettings.maxPriceLoss)}%
+                   |in relation to the best bid/ask)"""
     )
 
 case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsSettings)
@@ -257,7 +257,7 @@ case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsS
       fee,
       outOfBound,
       e"""The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds
-                   |(max-deviation: ${'maxDeviation -> deviationSettings.maxFeeDeviation}%, in relation to the best-bid/ask)"""
+                   |(max deviation: ${'maxDeviation -> formatValue(deviationSettings.maxFeeDeviation)}% in relation to the best bid/ask)"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)

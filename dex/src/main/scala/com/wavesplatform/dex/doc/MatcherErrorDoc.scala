@@ -36,17 +36,11 @@ object MatcherErrorDoc {
           val obj = entitiesMap(objCode)
           val body = xs
             .map {
-              case (x, _, partCode, classCode, name) =>
-                val part  = entitiesMap(partCode)
-                val klass = classesMap(classCode)
-
+              case (x, _, _, _, name) =>
                 s"""/<a id="error-$name"></a>
                     /#### $name
                     /
-                    /* Code: ${x.code}
-                    /* Object: _${obj}_ == ($objCode == `${x.code}) >> 20 & 0x7FF`
-                    /* Part: _${part}_ == ($partCode == `${x.code}) >> 8 & 0xFFF`
-                    /* Class: _${klass}_ == ($classCode == `${x.code}) & 0xFF`
+                    /Code: ${x.code}
                     /
                     /##### Sample
                     /

@@ -6,6 +6,7 @@ import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._
@@ -13,12 +14,15 @@ import play.api.libs.json._
 sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherResponseContent) {
   def this(code: StatusCode, error: MatcherError) = this(code, MatcherResponseContent.Error(error))
   def this(code: StatusCode, error: JsObject) = this(code, MatcherResponseContent.Js(error))
+
+  def status: String = getSimpleName(this)
 }
 
 object MatcherResponse {
   def toResponseMarshaller(implicit context: ErrorFormatterContext): ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
     def content(x: MatcherResponse): JsValue =
       backwardCompatibleWrapper(
+        x.status,
         x.statusCode,
         x.content match {
           case MatcherResponseContent.Js(r)        => r
@@ -33,14 +37,14 @@ object MatcherResponse {
     )
   }
 
-  private def backwardCompatibleWrapper(code: StatusCode, json: JsObject): JsValue =
+  private def backwardCompatibleWrapper(status: String, code: StatusCode, json: JsObject): JsValue =
     Json
       .obj(
         "success" -> (code match {
           case _: C.Success => true
           case _            => false
         }),
-        "status" -> getClass.getSimpleName.replace("$", "")
+        "status" -> status
       )
       .deepMerge(code match {
         case _: C.Success => JsObject.empty

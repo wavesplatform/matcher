@@ -118,7 +118,7 @@ class RatesTestSuite extends MatcherSuiteBase {
       getOrder,
       400,
       "OrderRejected",
-      Some(s"Required ${(matcherFee * 1.1).toLong} $btcStr as fee for this order, but given $matcherFee $btcStr")
+      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
     )
 
     // return previous rate for btc
@@ -139,7 +139,7 @@ class RatesTestSuite extends MatcherSuiteBase {
       getOrder,
       400,
       "OrderRejected",
-      Some(s"Required ${(matcherFee * 1.1).toLong} $btcStr as fee for this order, but given $matcherFee $btcStr")
+      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
     )
 
     // restart matcher
@@ -150,7 +150,7 @@ class RatesTestSuite extends MatcherSuiteBase {
       getOrder,
       400,
       "OrderRejected",
-      Some(s"Required ${(matcherFee * 1.1).toLong} $btcStr as fee for this order, but given $matcherFee $btcStr")
+      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
     )
   }
 }

@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http._
@@ -15,13 +15,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.AddressActor.GetOrderStatus
 import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
+import com.wavesplatform.dex._
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
-import com.wavesplatform.dex._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -69,12 +69,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
 
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
-    HttpResponse(
-      x.statusCode,
-      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(x.content))
-    )
+  private val ctx = new com.wavesplatform.dex.error.ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Option[Int] = ???
   }
+
+  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller(ctx)
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
@@ -124,12 +123,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       case Left(e) => complete(formatError(e))
     }
 
-  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = StatusCodes.NotFound -> e.json
+  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = InfoNotFound(e)
 
   private def withAsset(a: Asset): Directive1[Asset] = {
     assetPairBuilder.validateAssetId(a) match {
       case Right(_) => provide(a)
-      case Left(e)  => complete(StatusCodes.NotFound -> e.json)
+      case Left(e)  => complete(InfoNotFound(e))
     }
   }
 

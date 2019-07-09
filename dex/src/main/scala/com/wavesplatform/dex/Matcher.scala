@@ -100,11 +100,12 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
     Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
 
+  // @TODO ???
   private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
     RawMatchingRules(
       startOffset = matchingRules.startOffset,
       tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(s"Can't convert matching rules for $assetPair: ${e.message.text}. Usually this happens when the blockchain was rolled back.")
+        log.error(s"Can't convert matching rules for $assetPair: ${e.mkMessage(???).text}. Usually this happens when the blockchain was rolled back.")
         0.00000001
       }.merge
     )

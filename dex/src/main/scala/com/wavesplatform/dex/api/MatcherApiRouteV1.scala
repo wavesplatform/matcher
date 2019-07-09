@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.api
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import com.wavesplatform.api.http._
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
@@ -23,6 +24,12 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
 
   import PathMatchers._
 
+  private val ctx = new com.wavesplatform.dex.error.ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Option[Int] = ???
+  }
+
+  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller(ctx)
+
   override lazy val route: Route = pathPrefix("api" / "v1") {
     matcherStatusBarrier {
       getOrderBook
@@ -35,7 +42,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     case Matcher.Status.Stopping => complete(DuringShutdown)
   }
 
-  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = StatusCodes.NotFound -> e.json
+  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = InfoNotFound(e)
 
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean,

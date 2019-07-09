@@ -144,7 +144,7 @@ class AddressActor(
   }
 
   private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
-    val promisedResponse = Promise[api.WrappedMatcherResponse]
+    val promisedResponse = Promise[Resp]
     eventCache += id -> promisedResponse
     storeEvent(event).transformWith {
       case Failure(e) =>
@@ -162,9 +162,8 @@ class AddressActor(
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
     store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent))
-  private def storePlaced(order: Order): Future[Resp] = {
+  private def storePlaced(order: Order): Future[Resp] =
     store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected(error.CanNotPersistEvent))
-  }
 
   private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
     log.trace(s"Confirming placement for ${order.id()}")
@@ -304,7 +303,7 @@ class AddressActor(
 object AddressActor {
   private val ExpirationThreshold = 50.millis
 
-  private type Resp = api.WrappedMatcherResponse
+  private type Resp = api.MatcherResponse
 
   private def activeStatus(lo: LimitOrder): OrderStatus =
     if (lo.amount == lo.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(lo.order.amount - lo.amount)

@@ -3,10 +3,12 @@ package com.wavesplatform.dex.error
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.error.ContextShow.{show, auto => autoShow}
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.settings.formatValue
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import play.api.libs.json.{JsObject, JsValue, Writes}
+import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}
 
@@ -16,19 +18,36 @@ object Implicits {
   implicit val byteShow              = autoShow[Byte]
   implicit val intShow               = autoShow[Int]
   implicit val longShow              = autoShow[Long]
-  implicit val doubleShow            = autoShow[Double]
   implicit val stringShow            = show[String](identity)
+  implicit val doubleShow            = stringShow.contramap[Double](formatValue)
   implicit val byteStrShow           = show[ByteStr](_.base58)
   implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
   implicit val assetPairShow         = show[AssetPair](_.key)
   implicit val publicKeyShow         = show[PublicKey](_.base58)
   implicit val addressShow           = show[Address](_.stringRepr)
   implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
-  implicit val balanceShow = new ContextShow[Map[Asset, Long]] {
-    override def show(input: Map[Asset, Long])(context: ErrorFormatterContext): String = {
-      val xs = input.map { case (k, v) => s"${ContextShow[Long].show(v)(context)} ${ContextShow[Asset].show(k)(context)}" }
-      s"${xs.mkString(" and ")}"
+
+  implicit val amountShow = new ContextShow[Amount] {
+    override def show(input: Amount)(context: ErrorFormatterContext): String = {
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset).getOrElse(8))
+      s"${formatValue(denormalizedV)} ${assetShow.show(input.asset)(context)}"
     }
+  }
+
+  implicit val priceShow = new ContextShow[Price] {
+    override def show(input: Price)(context: ErrorFormatterContext): String =
+      formatValue(
+        Denormalization
+          .denormalizePrice(
+            input.volume,
+            context.assetDecimals(input.assetPair.amountAsset).getOrElse(8),
+            context.assetDecimals(input.assetPair.priceAsset).getOrElse(8)
+          ))
+  }
+
+  implicit val balanceShow = new ContextShow[Map[Asset, Long]] {
+    override def show(input: Map[Asset, Long])(context: ErrorFormatterContext): String =
+      input.map(Function.tupled(Amount.apply)).map(amountShow.show(_)(context)).mkString(" and ")
   }
 
   implicit def setShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[Set[T]] {
@@ -43,6 +62,7 @@ object Implicits {
   implicit val intWrites               = ContextWrites.auto[Int]
   implicit val byteWrites              = intWrites.contramap[Byte](_.toInt)
   implicit val longWrites              = ContextWrites.auto[Long]
+  implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](formatValue)
   implicit val strWrites               = ContextWrites.auto[String]
   implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.base58)
   implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
@@ -50,7 +70,39 @@ object Implicits {
   implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.base58)
   implicit val addressWrites           = strWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = strWrites.contramap[BlockchainFeature](_.description)
-  implicit val balanceWrites           = mapWrites[Asset, Long]
+
+  implicit val amountWrites = new ContextWrites[Amount] {
+    override def writes(input: Amount)(context: ErrorFormatterContext): JsValue = {
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset).getOrElse(8))
+      Json.obj(
+        "volume"  -> doubleWrites.writes(denormalizedV)(context),
+        "assetId" -> assetWrites.writes(input.asset)(context)
+      )
+    }
+  }
+
+  implicit val balanceWrites = new ContextWrites[Map[Asset, Long]] {
+    override def writes(input: Map[Asset, Long])(context: ErrorFormatterContext): JsValue = {
+      val xs = input.map {
+        case (k, v) =>
+          val denormalizedV = Denormalization.denormalizeAmountAndFee(v, context.assetDecimals(k).getOrElse(8))
+          assetShow.show(k)(context) -> doubleWrites.writes(denormalizedV)(context)
+      }
+      JsObject(xs)
+    }
+  }
+
+  implicit val priceWrites = new ContextWrites[Price] {
+    override def writes(input: Price)(context: ErrorFormatterContext): JsValue =
+      doubleWrites.writes(
+        Denormalization
+          .denormalizePrice(
+            input.volume,
+            context.assetDecimals(input.assetPair.amountAsset).getOrElse(8),
+            context.assetDecimals(input.assetPair.priceAsset).getOrElse(8)
+          )
+      )(context)
+  }
 
   // @TODO Make collection writes
   implicit def setWrites[T](implicit itemWrites: ContextWrites[T]) = new ContextWrites[Set[T]] {
@@ -64,13 +116,6 @@ object Implicits {
     override def writes(input: List[T])(context: ErrorFormatterContext): JsValue = {
       val xs = input.map(itemWrites.writes(_)(context))
       implicitly[Writes[List[JsValue]]].writes(xs)
-    }
-  }
-
-  implicit def mapWrites[K, V](implicit kShow: ContextShow[K], vWrites: ContextWrites[V]): ContextWrites[Map[K, V]] = new ContextWrites[Map[K, V]] {
-    override def writes(input: Map[K, V])(context: ErrorFormatterContext): JsValue = {
-      val xs = input.map { case (k, v) => kShow.show(k)(context) -> vWrites.writes(v)(context) }
-      JsObject(xs)
     }
   }
 

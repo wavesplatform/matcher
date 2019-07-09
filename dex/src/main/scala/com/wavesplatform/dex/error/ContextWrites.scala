@@ -7,6 +7,8 @@ trait ContextWrites[-T] {
 }
 
 object ContextWrites {
+  def apply[T](implicit r: ContextShow[T]): ContextShow[T] = r
+
   def auto[T](implicit w: Writes[T]): ContextWrites[T] = new ContextWrites[T] {
     override def writes(input: T)(context: ErrorFormatterContext): JsValue = w.writes(input)
   }

@@ -9,7 +9,13 @@ object ContextShow {
 
   def auto[T]: ContextShow[T] = show(_.toString)
 
-  def show[T](f: T => String): ContextShow[T] = new ContextShow[T] {
-    override def show(input: T)(context: ErrorFormatterContext): String = f(input)
+  def show[T](f: T => String): ContextShow[T] = contextShow((x, _) => f(x))
+
+  def contextShow[T](f: (T, ErrorFormatterContext) => String): ContextShow[T] = new ContextShow[T] {
+    override def show(input: T)(context: ErrorFormatterContext): String = f(input, context)
+  }
+
+  implicit final class Ops[A](val self: ContextShow[A]) extends AnyVal {
+    def contramap[B](f: B => A): ContextShow[B] = contextShow[B]((b, context) => self.show(f(b))(context))
   }
 }

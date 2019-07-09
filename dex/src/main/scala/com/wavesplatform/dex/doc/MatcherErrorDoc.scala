@@ -13,7 +13,7 @@ object MatcherErrorDoc {
 
   def mkMarkdown: String = {
     val context = new com.wavesplatform.dex.error.ErrorFormatterContext {
-      override def assetDecimals(asset: Asset): Option[Int] = ???
+      override def assetDecimals(asset: Asset): Option[Int] = Some(8)
     }
 
     val entities = entitySamples.run

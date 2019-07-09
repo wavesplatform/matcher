@@ -4,8 +4,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
-import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings, formatValue}
+import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -37,6 +36,9 @@ object MatcherError {
     }
   }
 }
+
+private[error] case class Amount(asset: Asset, volume: Long)
+private[error] case class Price(assetPair: AssetPair, volume: Long)
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
 
@@ -95,7 +97,7 @@ case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
       order,
       fee,
       notEnough,
-      e"Required ${'required -> required} ${'assetId -> theAsset} as fee for this order, but given ${'given -> given} ${'assetId -> theAsset}"
+      e"Required ${'required -> Amount(theAsset, required)} as fee for this order, but given ${'given -> Amount(theAsset, given)}"
     )
 
 case class AssetNotFound(theAsset: IssuedAsset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> theAsset} not found")
@@ -109,8 +111,8 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
       expiration,
       notEnough,
       e"""The expiration should be at least
-                   |${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)},
-                   |but it is ${'given -> givenExpiration}"""
+                     |${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)},
+                     |but it is ${'given -> givenExpiration}"""
     )
 
 case class OrderCommonValidationFailed(details: String)
@@ -196,7 +198,7 @@ case class AccountScriptUnexpectResult(address: Address, returnedObject: String)
       script,
       unexpected,
       e"""The account's script of ${'address -> address} is broken, please contact with the owner.
-                   |The returned object is '${'returnedObject -> returnedObject}'"""
+                     |The returned object is '${'returnedObject -> returnedObject}'"""
     )
 
 case class AccountScriptException(address: Address, errorName: String, errorText: String)
@@ -205,7 +207,7 @@ case class AccountScriptException(address: Address, errorName: String, errorText
       script,
       broken,
       e"""The account's script of ${'address -> address} is broken, please contact with the owner.
-                   |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
+                     |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
     )
 
 case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
@@ -214,7 +216,7 @@ case class AssetFeatureUnsupported(x: BlockchainFeature, theAsset: IssuedAsset)
       asset,
       unsupported,
       e"""An asset's feature isn't yet supported for '${'assetId -> theAsset}',
-                   |see the activation status of '${'featureName -> x.description}'"""
+                     |see the activation status of '${'featureName -> x.description}'"""
     )
 
 case class AssetScriptReturnedError(theAsset: IssuedAsset, scriptMessage: String)
@@ -244,24 +246,24 @@ case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorT
                    |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
     )
 
-case class DeviantOrderPrice(orderPrice: Long, deviationSettings: DeviationsSettings)
+case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       price,
       outOfBound,
-      e"""The order's price ${'price -> orderPrice} is out of deviation bounds (max profit:
-                   |${'maxProfit -> formatValue(deviationSettings.maxPriceProfit)}% and
-                   |max loss: ${'maxLoss -> formatValue(deviationSettings.maxPriceLoss)}%
-                   |in relation to the best bid/ask)"""
+      e"""The order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds
+                     |(max profit: ${'maxProfit -> deviationSettings.maxPriceProfit}% and
+                     |max loss: ${'maxLoss -> deviationSettings.maxPriceLoss}%
+                     |in relation to the best bid/ask)"""
     )
 
-case class DeviantOrderMatcherFee(orderFee: Long, deviationSettings: DeviationsSettings)
+case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       fee,
       outOfBound,
-      e"""The order's matcher fee ${'matcherFee -> orderFee} is out of deviation bounds
-                   |(max deviation: ${'maxDeviation -> formatValue(deviationSettings.maxFeeDeviation)}% in relation to the best bid/ask)"""
+      e"""The order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds
+                     |(max deviation: ${'maxDeviation -> deviationSettings.maxFeeDeviation}% in relation to the best bid/ask)"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -284,7 +286,7 @@ case class OrderVersionDenied(theVersion: Byte, allowedVersions: Set[Byte])
       version,
       denied,
       e"""The orders of version ${'version -> theVersion} are denied by matcher.
-                   |Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"""
+                     |Allowed order versions are: ${'allowedOrderVersions -> allowedVersions.toList.sorted}"""
     )
 
 case class UnsupportedOrderVersion(theVersion: Byte)
@@ -293,38 +295,36 @@ case class UnsupportedOrderVersion(theVersion: Byte)
       version,
       unsupported,
       e"""The orders of version ${'version -> theVersion} is not supported.
-                   |Supported order versions can be obtained via /matcher/settings GET method"""
+                     |Supported order versions can be obtained via /matcher/settings GET method"""
     )
 
-case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings, amountAssetDecimals: Int)
+case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings)
     extends MatcherError(
       order,
       amount,
       denied,
       e"""The order's amount
-                   |${'amount -> formatValue(Denormalization.denormalizeAmountAndFee(ord.amount, amountAssetDecimals))}
-                   |${'assetId -> ord.assetPair.amountAsset}
-                   |does not meet matcher requirements:
-                   |max amount = ${'max -> formatValue(amtSettings.maxAmount)},
-                   |min amount = ${'min -> formatValue(amtSettings.minAmount)},
-                   |step amount = ${'step -> formatValue(amtSettings.stepAmount)}"""
+                     |${'amount -> Amount(ord.assetPair.amountAsset, ord.amount)}
+                     |does not meet matcher requirements:
+                     |max amount = ${'max -> amtSettings.maxAmount},
+                     |min amount = ${'min -> amtSettings.minAmount},
+                     |step amount = ${'step -> amtSettings.stepAmount}"""
     )
 
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
     extends MatcherError(order, price, unexpected, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
 
-case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings, amountAssetDecimals: Int, priceAssetDecimals: Int)
+case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
     extends MatcherError(
       order,
       price,
       denied,
       e"""The order's price
-                   |${'price -> formatValue(Denormalization.denormalizePrice(ord.price, amountAssetDecimals, priceAssetDecimals))}
-                   |${'assetId -> ord.assetPair.priceAsset}
+                   |${'price -> Price(ord.assetPair, ord.price)}
                    |does not meet matcher requirements:
-                   |max price = ${'max -> formatValue(prcSettings.maxPrice)},
-                   |min price = ${'min -> formatValue(prcSettings.minPrice)},
-                   |step price = ${'step -> formatValue(prcSettings.stepPrice)}"""
+                   |max price = ${'max -> prcSettings.maxPrice},
+                   |min price = ${'min -> prcSettings.minPrice},
+                   |step price = ${'step -> prcSettings.stepPrice}"""
     )
 
 sealed abstract class Entity(val code: Int)

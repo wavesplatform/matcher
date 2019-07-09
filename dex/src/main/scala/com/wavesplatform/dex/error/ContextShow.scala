@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.error
 
+import cats.Contravariant
+
 trait ContextShow[-T] {
   def show(input: T)(context: ErrorFormatterContext): String
 }
@@ -15,7 +17,7 @@ object ContextShow {
     override def show(input: T)(context: ErrorFormatterContext): String = f(input, context)
   }
 
-  implicit final class Ops[A](val self: ContextShow[A]) extends AnyVal {
-    def contramap[B](f: B => A): ContextShow[B] = contextShow[B]((b, context) => self.show(f(b))(context))
+  implicit val contravariant = new Contravariant[ContextShow] {
+    override def contramap[A, B](fa: ContextShow[A])(f: B => A): ContextShow[B] = ContextShow.contextShow[B]((b, context) => fa.show(f(b))(context))
   }
 }

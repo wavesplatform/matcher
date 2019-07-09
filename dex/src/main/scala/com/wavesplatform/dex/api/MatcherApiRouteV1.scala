@@ -37,12 +37,10 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     case Matcher.Status.Stopping => complete(DuringShutdown)
   }
 
-  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = InfoNotFound(e)
-
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = defaultFormatError): Directive1[AssetPair] =
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound(_)): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>

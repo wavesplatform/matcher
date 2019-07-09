@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.error
 
+import cats.syntax.contravariant._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.error.ContextShow.{show, auto => autoShow}
@@ -19,7 +20,7 @@ object Implicits {
   implicit val intShow               = autoShow[Int]
   implicit val longShow              = autoShow[Long]
   implicit val stringShow            = show[String](identity)
-  implicit val doubleShow            = stringShow.contramap[Double](formatValue)
+  implicit val doubleShow            = stringShow.contramap[Double]((x: Double) => formatValue(x))
   implicit val byteStrShow           = show[ByteStr](_.base58)
   implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
   implicit val assetPairShow         = show[AssetPair](_.key)
@@ -66,7 +67,7 @@ object Implicits {
   implicit val strWrites               = ContextWrites.auto[String]
   implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.base58)
   implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
-  implicit val assetPairWrites         = ContextWrites.writes[AssetPair]((x, _) => x.json)
+  implicit val assetPairWrites         = ContextWrites.contextWrites[AssetPair]((x, _) => x.json)
   implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.base58)
   implicit val addressWrites           = strWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = strWrites.contramap[BlockchainFeature](_.description)
@@ -104,7 +105,6 @@ object Implicits {
       )(context)
   }
 
-  // @TODO Make collection writes
   implicit def setWrites[T](implicit itemWrites: ContextWrites[T]) = new ContextWrites[Set[T]] {
     override def writes(input: Set[T])(context: ErrorFormatterContext): JsValue = {
       val xs = input.map(itemWrites.writes(_)(context))

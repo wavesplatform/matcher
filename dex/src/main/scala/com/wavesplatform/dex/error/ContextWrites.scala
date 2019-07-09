@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.error
 
+import cats.Contravariant
 import play.api.libs.json.{JsValue, Writes}
 
 trait ContextWrites[-T] {
@@ -13,11 +14,12 @@ object ContextWrites {
     override def writes(input: T)(context: ErrorFormatterContext): JsValue = w.writes(input)
   }
 
-  def writes[T](f: (T, ErrorFormatterContext) => JsValue): ContextWrites[T] = new ContextWrites[T] {
+  def contextWrites[T](f: (T, ErrorFormatterContext) => JsValue): ContextWrites[T] = new ContextWrites[T] {
     override def writes(input: T)(context: ErrorFormatterContext): JsValue = f(input, context)
   }
 
-  implicit final class Ops[A](val self: ContextWrites[A]) extends AnyVal {
-    def contramap[B](f: B => A): ContextWrites[B] = ContextWrites.writes[B]((b, context) => self.writes(f(b))(context))
+  implicit val contravariant = new Contravariant[ContextWrites] {
+    override def contramap[A, B](fa: ContextWrites[A])(f: B => A): ContextWrites[B] =
+      ContextWrites.contextWrites[B]((b, context) => fa.writes(f(b))(context))
   }
 }

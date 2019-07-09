@@ -16,7 +16,7 @@ import com.wavesplatform.dex.AddressActor.GetOrderStatus
 import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -60,20 +60,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Set[Byte])
+                           validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
   import PathMatchers._
 
-  private implicit val timeout: Timeout = matcherSettings.actorResponseTimeout
-
-  private val ctx = new com.wavesplatform.dex.error.ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Option[Int] = ???
-  }
-
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller(ctx)
+  private implicit val timeout: Timeout                           = matcherSettings.actorResponseTimeout
+  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")

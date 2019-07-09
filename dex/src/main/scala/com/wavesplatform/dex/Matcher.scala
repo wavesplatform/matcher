@@ -18,7 +18,7 @@ import com.wavesplatform.db._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -28,6 +28,7 @@ import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.VolumeAndFee
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
@@ -100,12 +101,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
     Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
 
-  // @TODO ???
   private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
     RawMatchingRules(
       startOffset = matchingRules.startOffset,
       tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(s"Can't convert matching rules for $assetPair: ${e.mkMessage(???).text}. Usually this happens when the blockchain was rolled back.")
+        log.error(s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back.")
         0.00000001
       }.merge
     )
@@ -164,8 +164,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
+  private implicit val errorContext = new ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Int = assetDecimalsCache.get(asset)
+  }
+
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
     val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+
     Seq(
       MatcherApiRoute(
         pairBuilder,

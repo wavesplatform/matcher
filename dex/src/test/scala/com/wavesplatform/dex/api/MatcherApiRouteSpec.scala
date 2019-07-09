@@ -74,6 +74,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       TestActor.NoAutoPilot
     }
 
+    implicit val context = new com.wavesplatform.dex.error.ErrorFormatterContext {
+      override def assetDecimals(asset: Asset): Int = 8
+    }
+
     val route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(settings, blockchain, Set.empty),
       matcherPublicKey = matcherKeyPair.publicKey,

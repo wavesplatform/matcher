@@ -15,7 +15,7 @@ sealed abstract class MatcherResponse(val statusCode: StatusCode) {
 }
 
 object MatcherResponse {
-  def toResponseMarshaller(context: ErrorFormatterContext): ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
+  def toResponseMarshaller(implicit context: ErrorFormatterContext): ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
     def content(x: MatcherResponse): JsValue =
       backwardCompatibleWrapper(
         x.statusCode,

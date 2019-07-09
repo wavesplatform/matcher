@@ -29,7 +29,7 @@ object Implicits {
 
   implicit val amountShow = new ContextShow[Amount] {
     override def show(input: Amount)(context: ErrorFormatterContext): String = {
-      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset).getOrElse(8))
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset))
       s"${formatValue(denormalizedV)} ${assetShow.show(input.asset)(context)}"
     }
   }
@@ -40,8 +40,8 @@ object Implicits {
         Denormalization
           .denormalizePrice(
             input.volume,
-            context.assetDecimals(input.assetPair.amountAsset).getOrElse(8),
-            context.assetDecimals(input.assetPair.priceAsset).getOrElse(8)
+            context.assetDecimals(input.assetPair.amountAsset),
+            context.assetDecimals(input.assetPair.priceAsset)
           ))
   }
 
@@ -73,7 +73,7 @@ object Implicits {
 
   implicit val amountWrites = new ContextWrites[Amount] {
     override def writes(input: Amount)(context: ErrorFormatterContext): JsValue = {
-      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset).getOrElse(8))
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset))
       Json.obj(
         "volume"  -> doubleWrites.writes(denormalizedV)(context),
         "assetId" -> assetWrites.writes(input.asset)(context)
@@ -85,7 +85,7 @@ object Implicits {
     override def writes(input: Map[Asset, Long])(context: ErrorFormatterContext): JsValue = {
       val xs = input.map {
         case (k, v) =>
-          val denormalizedV = Denormalization.denormalizeAmountAndFee(v, context.assetDecimals(k).getOrElse(8))
+          val denormalizedV = Denormalization.denormalizeAmountAndFee(v, context.assetDecimals(k))
           assetShow.show(k)(context) -> doubleWrites.writes(denormalizedV)(context)
       }
       JsObject(xs)
@@ -98,8 +98,8 @@ object Implicits {
         Denormalization
           .denormalizePrice(
             input.volume,
-            context.assetDecimals(input.assetPair.amountAsset).getOrElse(8),
-            context.assetDecimals(input.assetPair.priceAsset).getOrElse(8)
+            context.assetDecimals(input.assetPair.amountAsset),
+            context.assetDecimals(input.assetPair.priceAsset)
           )
       )(context)
   }

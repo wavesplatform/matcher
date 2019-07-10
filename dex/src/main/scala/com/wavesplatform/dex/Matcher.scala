@@ -12,10 +12,11 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService}
+import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db._
 import com.wavesplatform.dex.Matcher.Status
+import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.MatcherError
@@ -330,7 +331,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
     log.info(s"Starting matcher on: ${settings.bindAddress}:${settings.port} ...")
 
-    val combinedRoute = CompositeHttpService(matcherApiTypes, matcherApiRoutes, context.settings.restAPISettings).compositeRoute
+    val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, context.settings.restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.bindAddress, settings.port), 5.seconds)
 
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")

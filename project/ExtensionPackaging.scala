@@ -1,4 +1,4 @@
-import CommonSettings.autoImport.network
+import CommonSettings.autoImport.{network, nodeVersion}
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
@@ -51,7 +51,10 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := s"waves${network.value.packageSuffix}",
-      debianPackageDependencies := Seq(nodePackageName.value),
+      debianPackageDependencies := Seq(
+        s"${nodePackageName.value} (>= ${nodeVersion.value})",
+        s"${nodePackageName.value} (<= ${mostSupportedVersion(nodeVersion.value)})"
+      ),
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -70,6 +73,9 @@ object ExtensionPackaging extends AutoPlugin {
     packageName := s"${name.value}${network.value.packageSuffix}",
     normalizedName := s"${packageName.value}"
   )
+
+  // 1.0.1 -> 1.0.999
+  private def mostSupportedVersion(leastSupportedVersion: String): String = leastSupportedVersion.replaceFirst("\\.[^.]+$", ".999")
 
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
   private def getUniversalFolderMappings(pkg: String, installLocation: String, mappings: Seq[(File, String)]): Seq[LinuxPackageMapping] = {

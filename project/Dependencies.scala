@@ -94,7 +94,7 @@ object Dependencies {
     akkaModule("actor"),
     akkaModule("persistence-query"),
     akkaHttp,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
     janino
   ) ++ Seq(
     akkaModule("testkit"),

@@ -76,4 +76,5 @@ case class NotImplemented(error: MatcherError)       extends MatcherResponse(C.N
 case class OrderBookUnavailable(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
 case object DuringStart                              extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
 case object DuringShutdown                           extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
+case object TimedOut                                 extends MatcherResponse(C.RequestTimeout, error.RequestTimeout)
 case class InfoNotFound(error: MatcherError)         extends MatcherResponse(C.NotFound, error)

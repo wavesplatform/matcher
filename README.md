@@ -195,6 +195,27 @@ sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /pat
 
 2. The root directory name must not be "dex" (or other module name): https://youtrack.jetbrains.com/issue/SCL-15210
 
+## 11. Production recommendations
+
+Recommended sections for your logback.xml
+
+```xml
+<logger name="com.wavesplatform.network" level="OFF"/>
+<logger name="com.wavesplatform.api.http" level="OFF"/>
+<logger name="com.wavesplatform.mining.MinerImpl" level="DEBUG"/>
+<logger name="com.wavesplatform.utx.UtxPoolImpl" level="TRACE"/>
+<logger name="com.wavesplatform.matcher.market.OrderBookActor" level="INFO"/>
+<logger name="com.wavesplatform.matcher.market.MatcherActor" level="TRACE"/>
+<logger name="com.wavesplatform.transaction.smart" level="OFF"/>
+
+<logger name="scorex.api.http" level="OFF"/>
+<logger name="io.netty" level="INFO"/>
+<logger name="io.swagger" level="INFO"/>
+<logger name="org.asynchttpclient" level="INFO"/>
+<logger name="org.apache.kafka" level="INFO"/>
+<logger name="kamon.influxdb.CustomInfluxDBReporter" level="INFO"/>
+```
+
 # Acknowledgement
 
 [<img src="https://www.yourkit.com/images/yklogo.png">](http://www.yourkit.com/java/profiler/index.jsp)  

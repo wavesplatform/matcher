@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import akka.pattern.ask
+import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
@@ -37,7 +37,7 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -141,12 +141,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
     }
 
+  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] =
+    askMapAddressActor[MatcherResponse](sender, msg)(x => x)
+
   @inline
-  private def askAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command): Future[A] = {
+  private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command)(
+      f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
     (addressActor ? Env(sender, msg))
       .mapTo[A]
-      .andThen {
-        case Failure(e) => log.warn(s"Error processing $msg", e)
+      .map(f)
+      .recover {
+        case e: AskTimeoutException =>
+          log.error(s"Error processing $msg", e)
+          TimedOut
       }
   }
 
@@ -300,8 +307,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(placeTimer.measureFuture(orderValidator(order) match {
-            case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-            case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+            case Right(_)    => placeTimer.measureFuture(askAddressActor(order.sender, AddressActor.PlaceOrder(order)))
+            case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
           }))
         }
       }
@@ -333,8 +340,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
     complete((timestamp, orderId) match {
-      case (Some(ts), None)  => askAddressActor[MatcherResponse](sender, AddressActor.CancelAllOrders(assetPair, ts))
-      case (None, Some(oid)) => askAddressActor[MatcherResponse](sender, AddressActor.CancelOrder(oid))
+      case (Some(ts), None)  => askAddressActor(sender, AddressActor.CancelAllOrders(assetPair, ts))
+      case (None, Some(oid)) => askAddressActor(sender, AddressActor.CancelOrder(oid))
       case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
     })
 
@@ -422,26 +429,26 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrders(pair, activeOnly))
-      .map(orders =>
-        StatusCodes.OK -> orders.map {
-          case (id, oi) =>
-            Json.obj(
-              "id"        -> id.toString,
-              "type"      -> oi.side.toString,
-              "amount"    -> oi.amount,
-              "price"     -> oi.price,
-              "timestamp" -> oi.timestamp,
-              "filled" -> (oi.status match {
-                case OrderStatus.Filled(f)          => f
-                case OrderStatus.PartiallyFilled(f) => f
-                case OrderStatus.Cancelled(f)       => f
-                case _                              => 0L
-              }),
-              "status"    -> oi.status.name,
-              "assetPair" -> oi.assetPair.json
-            )
-      })
+    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrders(pair, activeOnly)) { orders =>
+      StatusCodes.OK -> orders.map {
+        case (id, oi) =>
+          Json.obj(
+            "id"        -> id.toString,
+            "type"      -> oi.side.toString,
+            "amount"    -> oi.amount,
+            "price"     -> oi.price,
+            "timestamp" -> oi.timestamp,
+            "filled" -> (oi.status match {
+              case OrderStatus.Filled(f)          => f
+              case OrderStatus.PartiallyFilled(f) => f
+              case OrderStatus.Cancelled(f)       => f
+              case _                              => 0L
+            }),
+            "status"    -> oi.status.name,
+            "assetPair" -> oi.assetPair.json
+          )
+      }
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
@@ -550,8 +557,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askAddressActor[Map[Asset, Long]](address, AddressActor.GetTradableBalance(pair))
-          .map(stringifyAssetIds)
+        askMapAddressActor[Map[Asset, Long]](address, AddressActor.GetTradableBalance(pair))(stringifyAssetIds)
       }
     }
   }
@@ -571,8 +577,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askAddressActor[Map[Asset, Long]](publicKey, AddressActor.GetReservedBalance)
-          .map(stringifyAssetIds)
+        askMapAddressActor[Map[Asset, Long]](publicKey, AddressActor.GetReservedBalance)(stringifyAssetIds)
       }
     }
   }
@@ -588,11 +593,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
-        val r = DBUtils.order(db, orderId) match {
-          case Some(order) => askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
-          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status))
+        DBUtils.order(db, orderId) match {
+          case Some(order) => askMapAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))(_.json)
+          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status).json)
         }
-        r.map(_.json)
       }
     }
   }

@@ -436,14 +436,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             "id"        -> id.toString,
             "type"      -> oi.side.toString,
             "amount"    -> oi.amount,
+            "fee"       -> oi.matcherFee,
             "price"     -> oi.price,
             "timestamp" -> oi.timestamp,
-            "filled" -> (oi.status match {
-              case OrderStatus.Filled(f)          => f
-              case OrderStatus.PartiallyFilled(f) => f
-              case OrderStatus.Cancelled(f)       => f
-              case _                              => 0L
-            }),
+            "filled"    -> oi.status.filledAmount,
+            "filledFee" -> oi.status.filledFee,
+            "feeAsset"  -> oi.matcherFeeAssetId,
             "status"    -> oi.status.name,
             "assetPair" -> oi.assetPair.json
           )

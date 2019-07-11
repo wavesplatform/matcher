@@ -106,8 +106,8 @@ class AddressActor(
           case None =>
             val reason = orderDB.status(id) match {
               case OrderStatus.NotFound     => error.OrderNotFound(id)
-              case OrderStatus.Cancelled(_) => error.OrderCanceled(id)
-              case OrderStatus.Filled(_)    => error.OrderFull(id)
+              case _: OrderStatus.Cancelled => error.OrderCanceled(id)
+              case _: OrderStatus.Filled    => error.OrderFull(id)
             }
 
             Future.successful(api.OrderCancelRejected(reason))
@@ -175,12 +175,23 @@ class AddressActor(
       sender() ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case GetOrders(maybePair, onlyActive) =>
       log.trace(s"Loading ${if (onlyActive) "active" else "all"} ${maybePair.fold("")(_.toString + " ")}orders")
-      val matchingActiveOrders = (for {
-        lo <- activeOrders.values
-        if maybePair.forall(_ == lo.order.assetPair)
-      } yield
-        lo.order
-          .id() -> OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, activeStatus(lo), lo.order.assetPair)).toSeq.sorted
+      val matchingActiveOrders = {
+        for {
+          lo <- activeOrders.values
+          if maybePair.forall(_ == lo.order.assetPair)
+        } yield
+          lo.order.id() -> OrderInfo(
+            2,
+            lo.order.orderType,
+            lo.order.amount,
+            lo.order.price,
+            lo.order.matcherFee,
+            lo.order.matcherFeeAssetId,
+            lo.order.timestamp,
+            activeStatus(lo),
+            lo.order.assetPair
+          )
+      }.toSeq.sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")
 
@@ -236,7 +247,8 @@ class AddressActor(
     } else {
       confirmPlacement(remaining.order)
       val actualFilledAmount = remaining.order.amount - remaining.amount
-      handleOrderTerminated(remaining, OrderStatus.Filled(actualFilledAmount))
+      val actualFilledFee    = remaining.order.matcherFee - remaining.fee
+      handleOrderTerminated(remaining, OrderStatus.Filled(actualFilledAmount, actualFilledFee))
     }
   }
 
@@ -249,7 +261,17 @@ class AddressActor(
     orderDB.saveOrderInfo(
       lo.order.id(),
       owner,
-      OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, status, lo.order.assetPair)
+      OrderInfo(
+        2,
+        lo.order.orderType,
+        lo.order.amount,
+        lo.order.price,
+        lo.order.matcherFee,
+        lo.order.matcherFeeAssetId,
+        lo.order.timestamp,
+        status,
+        lo.order.assetPair
+      )
     )
   }
 
@@ -306,7 +328,7 @@ object AddressActor {
   private type Resp = api.MatcherResponse
 
   private def activeStatus(lo: LimitOrder): OrderStatus =
-    if (lo.amount == lo.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(lo.order.amount - lo.amount)
+    if (lo.amount == lo.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(lo.order.amount - lo.amount, lo.order.matcherFee - lo.fee)
 
   sealed trait Command
 

@@ -15,7 +15,8 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
   private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo[OrderStatus.Final])] =
     for {
       filledAmount <- Gen.choose(0, o.amount)
-      status       <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
+      filledFee    <- Gen.choose(0, o.matcherFee)
+      status       <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
     } yield o -> o.toInfo(status)
 
   private def finalizedOrderSeqGen(orderCount: Int): Gen[(KeyPair, AssetPair, Seq[(Order, OrderInfo[OrderStatus.Final])])] =
@@ -55,13 +56,14 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
       val dualFinalizedOrderInfoGen: Gen[(Order, OrderInfo[OrderStatus.Final], OrderInfo[OrderStatus.Final])] = for {
         (o, _)       <- orderGenerator
         filledAmount <- Gen.choose(0, o.amount)
-        s1           <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
-        s2           <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
+        filledFee    <- Gen.choose(0, o.matcherFee)
+        s1           <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
+        s2           <- Gen.oneOf(OrderStatus.Filled(o.amount, o.matcherFee), OrderStatus.Cancelled(filledAmount, filledFee))
       } yield
         (
           o,
-          OrderInfo(o.orderType, o.amount, o.price, o.timestamp, s1, o.assetPair),
-          OrderInfo(o.orderType, o.amount, o.price, o.timestamp, s2, o.assetPair),
+          OrderInfo(2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s1, o.assetPair),
+          OrderInfo(2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s2, o.assetPair),
         )
 
       forAll(dualFinalizedOrderInfoGen) {
@@ -111,6 +113,7 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
 
 object OrderDBSpec {
   private implicit class OrderExt(val o: Order) extends AnyVal {
-    def toInfo[A <: OrderStatus](status: A) = OrderInfo[A](o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
+    def toInfo[A <: OrderStatus](status: A) =
+      OrderInfo[A](2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, status, o.assetPair)
   }
 }

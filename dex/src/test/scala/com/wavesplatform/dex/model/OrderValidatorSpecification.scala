@@ -6,6 +6,7 @@ import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -48,6 +49,10 @@ class OrderValidatorSpecification
 
   private val defaultPortfolio     = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
   private val defaultAssetDecimals = 8
+
+  private implicit val errorContext = new ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Int = 8
+  }
 
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in asa() { v =>
@@ -112,7 +117,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed) should produce("amount should be > 0")
+        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson(errorContext)) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
@@ -144,7 +149,7 @@ class OrderValidatorSpecification
                 10 * Constants.UnitsInWave,
                 price,
                 matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
-              )) should produce("Invalid price")
+              )) should produce("PriceLastDecimalsMustBeZero")
           }
       }
 
@@ -397,8 +402,9 @@ class OrderValidatorSpecification
 
         forAll(preconditions) {
           case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize) =>
-            def normalizeAmount(value: Double): Long = Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
-            def normalizePrice(value: Double): Long  = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+            def normalizeAmount(value: Double): Long =
+              Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
+            def normalizePrice(value: Double): Long = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
             def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals)
             def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
@@ -511,7 +517,7 @@ class OrderValidatorSpecification
       val o      = newBuyOrder(pk, version = 2)
       val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
-      ov(o) should produce("height is inaccessible when running script on matcher")
+      ov(o).left.map(_.toJson(errorContext)) should produce("height is inaccessible when running script on matcher")
     }
 
     "validate order with smart token" when {
@@ -598,7 +604,7 @@ class OrderValidatorSpecification
         val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
         (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
-        ov(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
+        ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("height is inaccessible when running script on matcher")
       }
     }
   }

@@ -1,14 +1,15 @@
 package com.wavesplatform.dex.error
 
-import cats.Show
-import cats.Show.{show, fromToString => autoShow}
+import cats.syntax.contravariant._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.error.ContextShow.{show, auto => autoShow}
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.settings.formatValue
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import play.api.libs.json.{JsObject, JsValue, Writes}
+import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}
 
@@ -18,38 +19,104 @@ object Implicits {
   implicit val byteShow              = autoShow[Byte]
   implicit val intShow               = autoShow[Int]
   implicit val longShow              = autoShow[Long]
-  implicit val doubleShow            = autoShow[Double]
   implicit val stringShow            = show[String](identity)
+  implicit val doubleShow            = stringShow.contramap[Double]((x: Double) => formatValue(x))
   implicit val byteStrShow           = show[ByteStr](_.base58)
   implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
-  implicit val issuedAssetShow       = show[IssuedAsset](AssetPair.assetIdStr)
   implicit val assetPairShow         = show[AssetPair](_.key)
   implicit val publicKeyShow         = show[PublicKey](_.base58)
   implicit val addressShow           = show[Address](_.stringRepr)
   implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
-  implicit val balanceShow = Show.show[Map[Asset, Long]] { input =>
-    val xs = input.map { case (k, v) => s"${Show[Long].show(v)} ${Show[Asset].show(k)}" }
-    s"${xs.mkString(" and ")}"
+
+  implicit val amountShow = new ContextShow[Amount] {
+    override def show(input: Amount)(context: ErrorFormatterContext): String = {
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset))
+      s"${formatValue(denormalizedV)} ${assetShow.show(input.asset)(context)}"
+    }
   }
 
-  implicit def setShow[T](implicit itemShow: Show[T]): Show[Set[T]] =
-    (input: Set[T]) => s"${input.map(itemShow.show).mkString(", ")}"
+  implicit val priceShow = new ContextShow[Price] {
+    override def show(input: Price)(context: ErrorFormatterContext): String =
+      formatValue(
+        Denormalization
+          .denormalizePrice(
+            input.volume,
+            context.assetDecimals(input.assetPair.amountAsset),
+            context.assetDecimals(input.assetPair.priceAsset)
+          ))
+  }
 
-  implicit def listShow[T](implicit itemShow: Show[T]): Show[List[T]] =
-    (input: List[T]) => s"${input.map(itemShow.show).mkString(", ")}"
+  implicit val balanceShow = new ContextShow[Map[Asset, Long]] {
+    override def show(input: Map[Asset, Long])(context: ErrorFormatterContext): String =
+      input.map(Function.tupled(Amount.apply)).map(amountShow.show(_)(context)).mkString(" and ")
+  }
 
-  implicit val byteWrites              = Writes.IntWrites.contramap[Byte](_.toInt)
-  implicit val byteStrWrites           = Writes.StringWrites.contramap[ByteStr](_.base58)
-  implicit val assetWrites             = Writes.StringWrites.contramap[Asset](AssetPair.assetIdStr)
-  implicit val assetPairWrites         = Writes[AssetPair](_.json)
-  implicit val publicKeyWrites         = Writes.StringWrites.contramap[PublicKey](_.base58)
-  implicit val addressWrites           = Writes.StringWrites.contramap[Address](_.stringRepr)
-  implicit val blockchainFeatureWrites = Writes.StringWrites.contramap[BlockchainFeature](_.description)
-  implicit val balanceWrites           = mapWrites[Asset, Long]
+  implicit def setShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[Set[T]] {
+    override def show(input: Set[T])(context: ErrorFormatterContext): String = s"${input.map(itemShow.show(_)(context)).mkString(", ")}"
+  }
 
-  implicit def mapWrites[K, V](implicit kShow: Show[K], vWrites: Writes[V]): Writes[Map[K, V]] = { input =>
-    val xs = input.map { case (k, v) => kShow.show(k) -> vWrites.writes(v) }
-    JsObject(xs)
+  implicit def listShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[List[T]] {
+    override def show(input: List[T])(context: ErrorFormatterContext): String = s"${input.map(itemShow.show(_)(context)).mkString(", ")}"
+  }
+
+  implicit val booleanWrites           = ContextWrites.auto[Boolean]
+  implicit val intWrites               = ContextWrites.auto[Int]
+  implicit val byteWrites              = intWrites.contramap[Byte](_.toInt)
+  implicit val longWrites              = ContextWrites.auto[Long]
+  implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](formatValue)
+  implicit val strWrites               = ContextWrites.auto[String]
+  implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.base58)
+  implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
+  implicit val assetPairWrites         = ContextWrites.contextWrites[AssetPair]((x, _) => x.json)
+  implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.base58)
+  implicit val addressWrites           = strWrites.contramap[Address](_.stringRepr)
+  implicit val blockchainFeatureWrites = strWrites.contramap[BlockchainFeature](_.description)
+
+  implicit val amountWrites = new ContextWrites[Amount] {
+    override def writes(input: Amount)(context: ErrorFormatterContext): JsValue = {
+      val denormalizedV = Denormalization.denormalizeAmountAndFee(input.volume, context.assetDecimals(input.asset))
+      Json.obj(
+        "volume"  -> doubleWrites.writes(denormalizedV)(context),
+        "assetId" -> assetWrites.writes(input.asset)(context)
+      )
+    }
+  }
+
+  implicit val balanceWrites = new ContextWrites[Map[Asset, Long]] {
+    override def writes(input: Map[Asset, Long])(context: ErrorFormatterContext): JsValue = {
+      val xs = input.map {
+        case (k, v) =>
+          val denormalizedV = Denormalization.denormalizeAmountAndFee(v, context.assetDecimals(k))
+          assetShow.show(k)(context) -> doubleWrites.writes(denormalizedV)(context)
+      }
+      JsObject(xs)
+    }
+  }
+
+  implicit val priceWrites = new ContextWrites[Price] {
+    override def writes(input: Price)(context: ErrorFormatterContext): JsValue =
+      doubleWrites.writes(
+        Denormalization
+          .denormalizePrice(
+            input.volume,
+            context.assetDecimals(input.assetPair.amountAsset),
+            context.assetDecimals(input.assetPair.priceAsset)
+          )
+      )(context)
+  }
+
+  implicit def setWrites[T](implicit itemWrites: ContextWrites[T]) = new ContextWrites[Set[T]] {
+    override def writes(input: Set[T])(context: ErrorFormatterContext): JsValue = {
+      val xs = input.map(itemWrites.writes(_)(context))
+      implicitly[Writes[Set[JsValue]]].writes(xs)
+    }
+  }
+
+  implicit def listWrites[T](implicit itemWrites: ContextWrites[T]) = new ContextWrites[List[T]] {
+    override def writes(input: List[T])(context: ErrorFormatterContext): JsValue = {
+      val xs = input.map(itemWrites.writes(_)(context))
+      implicitly[Writes[List[JsValue]]].writes(xs)
+    }
   }
 
   implicit class ErrorInterpolator(sc: StringContext) {
@@ -58,23 +125,27 @@ object Implicits {
           implicit
           formatArgs: Mapper.Aux[FormatArg.type, H, L],
           toList: ToList[L, Id[_]]
-      ): MatcherErrorMessage = {
+      ): ErrorFormatterContext => MatcherErrorMessage = {
+        val (nameArgs, strArgsFn, jsonArgsFn) = toList(formatArgs(args))
+          .asInstanceOf[List[(String, ErrorFormatterContext => String, ErrorFormatterContext => JsValue)]]
+          .unzip3
+
         val parts = sc.parts.init
 
-        val (nameArgs, strArgs, jsonArgs) = toList(formatArgs(args)).asInstanceOf[List[(String, String, JsValue)]].unzip3
-        val (message, template, params) = parts.zipWithIndex.foldLeft(("", "", JsObject.empty)) {
-          case ((m, t, p), (x, i)) =>
-            val name = nameArgs(i)
-            val str  = strArgs(i)
-            val json = jsonArgs(i)
-            (s"$m$x$str", s"$t$x{{$name}}", p + (name -> json))
+        { context =>
+          val (message, template, params) = parts.zipWithIndex.foldLeft(("", "", JsObject.empty)) {
+            case ((m, t, p), (x, i)) =>
+              val name = nameArgs(i)
+              val str  = strArgsFn(i)(context)
+              val json = jsonArgsFn(i)(context)
+              (s"$m$x$str", s"$t$x{{$name}}", p + (name -> json))
+          }
+          MatcherErrorMessage(
+            normalize(message + sc.parts.last),
+            normalize(template + sc.parts.last),
+            params
+          )
         }
-
-        MatcherErrorMessage(
-          normalize(message + sc.parts.last),
-          normalize(template + sc.parts.last),
-          params
-        )
       }
     }
 
@@ -84,7 +155,9 @@ object Implicits {
   }
 
   object FormatArg extends Poly1 {
-    implicit def mapAt[T](implicit show: Show[T], json: Writes[T]): Case.Aux[(Symbol, T), (String, String, JsValue)] =
+    implicit def mapAt[T](
+        implicit show: ContextShow[T],
+        json: ContextWrites[T]): Case.Aux[(Symbol, T), (String, ErrorFormatterContext => String, ErrorFormatterContext => JsValue)] =
       at[(Symbol, T)] {
         case (name, x) => (name.name, show.show(x), json.writes(x))
       }

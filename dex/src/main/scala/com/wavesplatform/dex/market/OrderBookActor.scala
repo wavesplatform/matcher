@@ -94,7 +94,6 @@ class OrderBookActor(owner: ActorRef,
             case x: QueueEvent.Placed   => onAddOrder(request, x.order)
             case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
-              sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq.empty, Seq.empty))
               updateSnapshot(OrderBook.AggregatedSnapshot())
               processEvents(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart

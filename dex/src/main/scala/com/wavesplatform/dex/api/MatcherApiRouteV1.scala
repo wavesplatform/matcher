@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.api
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import com.wavesplatform.api.http._
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -17,11 +17,13 @@ import javax.ws.rs.Path
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              orderBookSnapshot: OrderBookSnapshotHttpCache,
                              matcherStatus: () => Matcher.Status,
-                             apiKeyHash: Option[Array[Byte]])
+                             apiKeyHash: Option[Array[Byte]])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with ScorexLogging {
 
   import PathMatchers._
+
+  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
     matcherStatusBarrier {
@@ -35,12 +37,10 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     case Matcher.Status.Stopping => complete(DuringShutdown)
   }
 
-  private def defaultFormatError(e: MatcherError): ToResponseMarshallable = StatusCodes.NotFound -> e.json
-
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = defaultFormatError): Directive1[AssetPair] =
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound(_)): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>

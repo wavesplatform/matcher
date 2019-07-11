@@ -59,7 +59,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           price,
           invalidFee,
           2,
-          expectedMessage = Some("Required 700000 WAVES as fee for this order, but given 699999 WAVES")
+          expectedMessage = Some("Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
         )
 
         val counter = node.placeOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, 2).message.id
@@ -99,7 +99,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
             price,
             invalidFee,
             2,
-            expectedMessage = Some("Required 1500000 WAVES as fee for this order, but given 1499999 WAVES")
+            expectedMessage = Some("Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES")
           )
 
           val counter = node.placeOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, 2).message.id

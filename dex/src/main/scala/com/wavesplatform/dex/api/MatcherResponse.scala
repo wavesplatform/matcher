@@ -5,63 +5,75 @@ import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.model.OrderBookResult
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._
 
-sealed abstract class MatcherResponse(val statusCode: StatusCode) {
-  def content: String
+sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherResponseContent) {
+  def this(code: StatusCode, error: MatcherError) = this(code, MatcherResponseContent.Error(error))
+  def this(code: StatusCode, error: JsObject) = this(code, MatcherResponseContent.Js(error))
+
+  def status: String = getSimpleName(this)
 }
 
 object MatcherResponse {
-  implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
+  def toResponseMarshaller(implicit context: ErrorFormatterContext): ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
+    def content(x: MatcherResponse): JsValue =
+      backwardCompatibleWrapper(
+        x.status,
+        x.statusCode,
+        x.content match {
+          case MatcherResponseContent.Js(r)        => r
+          case MatcherResponseContent.Error(error) => error.toJson(context)
+          case MatcherResponseContent.Multiple(xs) => Json.obj("message" -> Json.arr(xs.map(content)))
+        }
+      )
+
     HttpResponse(
       x.statusCode,
-      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(x.content))
+      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(Json.stringify(content(x))))
     )
   }
-}
 
-sealed abstract class WrappedMatcherResponse(code: StatusCode, val json: JsObject) extends MatcherResponse(code) {
-  def this(code: StatusCode, error: MatcherError) = this(code, error.json)
-
-  override val content: String = Json.stringify(
+  private def backwardCompatibleWrapper(status: String, code: StatusCode, json: JsObject): JsValue =
     Json
       .obj(
         "success" -> (code match {
           case _: C.Success => true
           case _            => false
         }),
-        "status" -> getClass.getSimpleName.replace("$", "")
+        "status" -> status
       )
       .deepMerge(code match {
         case _: C.Success => JsObject.empty
-        case _            => Json.obj("result" -> JsNull) // For backward compatibility
+        case _            => Json.obj("result" -> JsNull) // For a backward compatibility
       })
       .deepMerge(json)
-  )
 }
 
-case class SimpleResponse(code: StatusCode, message: String) extends WrappedMatcherResponse(code, Json.obj("message"       -> message))
-case object AlreadyProcessed                                 extends WrappedMatcherResponse(C.Accepted, Json.obj("message" -> "This event has been already processed"))
-case class OrderAccepted(order: Order)                       extends WrappedMatcherResponse(C.OK, Json.obj("message"       -> order.json()))
-case class OrderCanceled(orderId: ByteStr)                   extends WrappedMatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
-case class OrderDeleted(orderId: ByteStr)                    extends WrappedMatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
-
-case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK) {
-  override def content: String = OrderBookResult.toJson(orderBookResult)
+sealed trait MatcherResponseContent
+object MatcherResponseContent {
+  case class Js(content: JsObject)                    extends MatcherResponseContent
+  case class Error(content: MatcherError)             extends MatcherResponseContent
+  case class Multiple(content: List[MatcherResponse]) extends MatcherResponseContent
 }
 
-case class BatchCancelCompleted(orders: Map[Order.Id, WrappedMatcherResponse])
-    extends WrappedMatcherResponse(C.OK, Json.obj("message" -> Json.arr(orders.values.map(_.json))))
+case class SimpleResponse(code: StatusCode, message: String) extends MatcherResponse(code, Json.obj("message"       -> message))
+case object AlreadyProcessed                                 extends MatcherResponse(C.Accepted, Json.obj("message" -> "This event has been already processed"))
+case class OrderAccepted(order: Order)                       extends MatcherResponse(C.OK, Json.obj("message"       -> order.json()))
+case class OrderCanceled(orderId: ByteStr)                   extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
+case class OrderDeleted(orderId: ByteStr)                    extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
 
-case class OrderRejected(error: MatcherError)        extends WrappedMatcherResponse(C.BadRequest, error)
-case class OrderCancelRejected(error: MatcherError)  extends WrappedMatcherResponse(C.BadRequest, error)
-case object CancelRequestInvalidSignature            extends WrappedMatcherResponse(C.BadRequest, error.RequestInvalidSignature)
-case class NotImplemented(error: MatcherError)       extends WrappedMatcherResponse(C.NotImplemented, error)
-case class OrderBookUnavailable(error: MatcherError) extends WrappedMatcherResponse(C.ServiceUnavailable, error)
-case object DuringStart                              extends WrappedMatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
-case object DuringShutdown                           extends WrappedMatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
-case class InfoNotFound(error: MatcherError)         extends WrappedMatcherResponse(C.NotFound, error)
+case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
+    extends MatcherResponse(C.OK, MatcherResponseContent.Multiple(orders.values.toList))
+
+case class OrderRejected(error: MatcherError)        extends MatcherResponse(C.BadRequest, error)
+case class OrderCancelRejected(error: MatcherError)  extends MatcherResponse(C.BadRequest, error)
+case object CancelRequestInvalidSignature            extends MatcherResponse(C.BadRequest, error.RequestInvalidSignature)
+case class NotImplemented(error: MatcherError)       extends MatcherResponse(C.NotImplemented, error)
+case class OrderBookUnavailable(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
+case object DuringStart                              extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
+case object DuringShutdown                           extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
+case class InfoNotFound(error: MatcherError)         extends MatcherResponse(C.NotFound, error)

@@ -112,11 +112,11 @@ object OrderValidator {
       def normalizePrice(prc: Double): Long  = Normalization.normalizePrice(prc, amountAssetDecimals, priceAssetDecimals)
 
       lift(order)
-        .ensure(error.OrderInvalidAmount(order, restrictions, amountAssetDecimals)) { o =>
+        .ensure(error.OrderInvalidAmount(order, restrictions)) { o =>
           normalizeAmount(restrictions.minAmount) <= o.amount && o.amount <= normalizeAmount(restrictions.maxAmount) &&
           o.amount % normalizeAmount(restrictions.stepAmount).max(1) == 0
         }
-        .ensure(error.OrderInvalidPrice(order, restrictions, amountAssetDecimals, priceAssetDecimals)) { o =>
+        .ensure(error.OrderInvalidPrice(order, restrictions)) { o =>
           normalizePrice(restrictions.minPrice) <= o.price && o.price <= normalizePrice(restrictions.maxPrice) &&
           o.price % normalizePrice(restrictions.stepPrice).max(1) == 0
         }
@@ -303,7 +303,7 @@ object OrderValidator {
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
     }
 
-    lift(order).ensure(error.DeviantOrderPrice(order.price, deviationSettings)) { _ =>
+    lift(order).ensure(error.DeviantOrderPrice(order, deviationSettings)) { _ =>
       if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
       else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
     }
@@ -341,7 +341,7 @@ object OrderValidator {
       }
     }
 
-    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order.matcherFee, deviationSettings))
+    Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
   }
 
   def marketAware(orderFeeSettings: OrderFeeSettings,

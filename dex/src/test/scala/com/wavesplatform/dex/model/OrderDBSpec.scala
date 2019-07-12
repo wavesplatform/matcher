@@ -62,8 +62,8 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
       } yield
         (
           o,
-          OrderInfo(2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s1, o.assetPair),
-          OrderInfo(2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s2, o.assetPair),
+          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s1, o.assetPair),
+          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s2, o.assetPair),
         )
 
       forAll(dualFinalizedOrderInfoGen) {
@@ -114,6 +114,6 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
 object OrderDBSpec {
   private implicit class OrderExt(val o: Order) extends AnyVal {
     def toInfo[A <: OrderStatus](status: A) =
-      OrderInfo[A](2, o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, status, o.assetPair)
+      OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, status, o.assetPair)
   }
 }

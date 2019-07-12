@@ -180,8 +180,7 @@ class AddressActor(
           lo <- activeOrders.values
           if maybePair.forall(_ == lo.order.assetPair)
         } yield
-          lo.order.id() -> OrderInfo(
-            2,
+          lo.order.id() -> OrderInfo.v2(
             lo.order.orderType,
             lo.order.amount,
             lo.order.price,
@@ -261,8 +260,7 @@ class AddressActor(
     orderDB.saveOrderInfo(
       lo.order.id(),
       owner,
-      OrderInfo(
-        2,
+      OrderInfo.v2(
         lo.order.orderType,
         lo.order.amount,
         lo.order.price,

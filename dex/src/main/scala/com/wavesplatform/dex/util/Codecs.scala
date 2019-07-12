@@ -37,7 +37,7 @@ object Codecs {
     }
 
     def getFinalOrderStatus(orderInfoVersion: Byte, totalAmount: Long, totalFee: Long): OrderStatus.Final = {
-      def fee(filledAmount: Long) = if (orderInfoVersion <= 1) (BigDecimal(filledAmount) / totalAmount * totalFee).toLongExact else b.getLong
+      def fee(filledAmount: Long) = if (orderInfoVersion <= 1) (BigInt(filledAmount) * totalFee / totalAmount).toLong else b.getLong
 
       b.get match {
         case 0 =>

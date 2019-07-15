@@ -135,3 +135,6 @@ def checkPR: Command = Command.command("checkPR") { state =>
 }
 
 commands += checkPR
+
+// IDE settings
+ideExcludedDirectories := Seq((root / baseDirectory).value / "_local")

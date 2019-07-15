@@ -14,6 +14,29 @@ val packageSettings = Seq(
 packageSettings
 inScope(Global)(packageSettings)
 
+lazy val versionSourceTask = Def.task {
+  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "dex" / "Version.scala"
+  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+  val (major, minor, patch) = version.value match {
+    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+    case x                            => throw new IllegalStateException(s"Can't parse version: $x")
+  }
+
+  IO.write(
+    versionFile,
+    s"""package com.wavesplatform.dex
+       |
+       |object Version {
+       |  val VersionString = "${version.value}"
+       |  val VersionTuple = ($major, $minor, $patch)
+       |}
+       |""".stripMargin
+  )
+  Seq(versionFile)
+}
+
+inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
+
 Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postrm)(
   Postrm ->
     s"""#!/bin/sh

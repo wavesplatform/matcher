@@ -14,7 +14,8 @@ import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
 
-  type Price = Long
+  type Price  = Long
+  type Amount = Long
 
   def getAssetDecimals(asset: Asset, blockchain: Blockchain): Either[MatcherError, Int] =
     asset.fold[Either[MatcherError, Int]](Right(8)) { issuedAsset =>
@@ -27,15 +28,21 @@ object MatcherModel {
   def getPairDecimals(pair: AssetPair, blockchain: Blockchain): Either[MatcherError, (Int, Int)] =
     (getAssetDecimals(pair.amountAsset, blockchain), getAssetDecimals(pair.priceAsset, blockchain)).tupled
 
+  sealed trait DecimalsFormat
+  final case object Denormalized extends DecimalsFormat
+  final case object Normalized   extends DecimalsFormat
+
+  def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
+
   object Normalization {
 
-    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Long =
+    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Amount =
       (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
 
-    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long =
+    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
       (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
 
-    def normalizePrice(value: Double, pair: AssetPair, decimals: (Int, Int)): Long = {
+    def normalizePrice(value: Double, pair: AssetPair, decimals: (Int, Int)): Price = {
       val (amountAssetDecimals, priceAssetDecimals) = decimals
       normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
     }
@@ -43,29 +50,29 @@ object MatcherModel {
 
   object Denormalization {
 
-    def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
+    def denormalizeAmountAndFee(value: Amount, amountAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
 
-    def denormalizeAmountAndFee(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
+    def denormalizeAmountAndFee(value: Amount, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
       getAssetDecimals(pair.amountAsset, blockchain).map(denormalizeAmountAndFee(value, _))
 
-    def denormalizePrice(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+    def denormalizeAmountAndFeeWithDefault(value: Amount, pair: AssetPair, blockchain: Blockchain): Double =
+      denormalizeAmountAndFee(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
 
-    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
-      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
+    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
 
     def denormalizePrice(value: Price, pair: AssetPair, decimals: (Int, Int)): Double = {
       val (amountAssetDecimals, priceAssetDecimals) = decimals
       denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
     }
+
+    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
+      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
+
+    def denormalizePriceWithDefault(value: Price, pair: AssetPair, blockchain: Blockchain): Double =
+      denormalizePrice(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
   }
-
-  sealed trait DecimalsFormat
-  final case object Denormalized extends DecimalsFormat
-  final case object Normalized   extends DecimalsFormat
-
-  def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
 }
 
 case class LevelAgg(amount: Long, price: Long)

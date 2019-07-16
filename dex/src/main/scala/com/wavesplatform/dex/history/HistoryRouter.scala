@@ -5,9 +5,10 @@ import java.time.{Instant, LocalDateTime, ZoneOffset}
 import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord, Record}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
-import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.model.OrderStatus.Filled
+import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -48,6 +49,7 @@ object HistoryRouter {
           senderPublicKey = order.senderPublicKey.toString,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,
+          feeAssetId = AssetPair.assetIdStr(order.matcherFeeAssetId),
           side = if (acceptedOrder.isBuyOrder) buySide else sellSide,
           price = denormalizePrice(order.price, order.assetPair),
           amount = denormalizeAmountAndFee(order.amount, order.assetPair),
@@ -71,8 +73,11 @@ object HistoryRouter {
         case e @ OrderExecuted(submitted, counter, timestamp) =>
           val assetPair = submitted.order.assetPair
 
-          Set(submitted -> e.submittedRemainingAmount, counter -> e.counterRemainingAmount) map {
-            case (acceptedOrder, remainingAmount) =>
+          Set(
+            (submitted, e.submittedRemainingAmount, e.submittedExecutedFee, e.submittedRemainingFee),
+            (counter, e.counterRemainingAmount, e.counterExecutedFee, e.counterRemainingFee)
+          ) map {
+            case (acceptedOrder, remainingAmount, executedFee, remainingFee) =>
               EventRecord(
                 orderId = acceptedOrder.order.id().toString,
                 eventType = eventTrade,
@@ -80,20 +85,25 @@ object HistoryRouter {
                 price = denormalizePrice(acceptedOrder.order.price, assetPair),
                 filled = denormalizeAmountAndFee(e.executedAmount, assetPair),
                 totalFilled = denormalizeAmountAndFee(acceptedOrder.order.amount - remainingAmount, assetPair),
+                feeFilled = denormalizeAmountAndFee(executedFee, assetPair),
+                feeTotalFilled = denormalizeAmountAndFee(acceptedOrder.order.matcherFee - remainingFee, assetPair),
                 status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled
               )
           }
 
-        case OrderCanceled(submitted, _, timestamp) =>
+        case OrderCanceled(submitted, isSystemCancel, timestamp) =>
+          val assetPair = submitted.order.assetPair
           Set(
             EventRecord(
               orderId = submitted.order.id().toString,
               eventType = eventCancel,
               timestamp = toLocalDateTime(timestamp),
-              price = denormalizePrice(submitted.order.price, submitted.order.assetPair),
+              price = denormalizePrice(submitted.order.price, assetPair),
               filled = 0,
-              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, submitted.order.assetPair),
-              status = statusCancelled // FIXME DEX-339
+              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair),
+              feeFilled = 0,
+              feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, assetPair),
+              status = OrderStatus.finalStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
             )
           )
       }
@@ -106,10 +116,10 @@ object HistoryRouter {
 class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
   private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizeAmountAndFee(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+    Denormalization.denormalizeAmountAndFeeWithDefault(value, pair, blockchain)
 
   private def denormalizePrice(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizePrice(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+    Denormalization.denormalizePriceWithDefault(value, pair, blockchain)
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
 

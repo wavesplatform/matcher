@@ -1,3 +1,5 @@
+import java.nio.file.{Files, Path}
+
 import CommonSettings.autoImport.network
 import sbt.Keys._
 import sbt._
@@ -105,14 +107,39 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 lazy val cleanAll = taskKey[Unit]("Clean all projects")
 cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
 
+lazy val releaseDirectory = settingKey[Path]("Directory for release artifacts")
+releaseDirectory := ((root / target).value / "release").toPath
+
+lazy val genDocs = taskKey[Unit]("Generates the documentation")
+genDocs := Def.taskDyn {
+  val configFile = (root / baseDirectory).value / "_local" / "mainnet.sample.conf" // Actually doesn't matter for this task
+  streams.value.log.info(s"${configFile.getAbsolutePath} gen-docs ${releaseDirectory.value}")
+  (dex / Compile / runMain).toTask(s" com.wavesplatform.dex.MatcherTool ${configFile.getAbsolutePath} gen-docs ${releaseDirectory.value}")
+}.value
+
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def
   .sequential(
     root / cleanAll,
     Def.task {
-      val a = (dex / Universal / packageZipTarball).value
-      val b = (dex / Debian / packageBin).value
-    }
+      Files.createDirectories(releaseDirectory.value)
+    },
+    Def.task {
+      val artifacts = Seq(
+        (dex / Universal / packageZipTarball).value,
+        (dex / Debian / packageBin).value
+      )
+
+      val destDir = releaseDirectory.value
+      ReleaseHelpers.writeHashesFile(destDir.resolve("checksums.md").toFile, artifacts)
+
+      artifacts
+        .map(_.toPath)
+        .foreach { source =>
+          Files.move(source, destDir.resolve(source.getFileName))
+        }
+    },
+    genDocs
   )
   .value
 

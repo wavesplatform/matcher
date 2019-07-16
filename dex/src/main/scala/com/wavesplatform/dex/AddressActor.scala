@@ -116,7 +116,6 @@ class AddressActor(owner: Address,
           activeOrders.get(id) match {
             case Some(ao) if ao.isLimit => storeCanceled(ao.order.assetPair, ao.order.id())
             case Some(_)                => Future.successful { api.OrderCancelRejected(error.MarketOrderCancel(id)) }
-            case Some(_)                => Future.successful { api.OrderCancelRejected(error.MarketOrderCancel(id)) }
             case None =>
               val reason = orderDB.status(id) match {
                 case OrderStatus.NotFound     => error.OrderNotFound(id)

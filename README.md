@@ -44,7 +44,8 @@ brew cask install java sbt@1
     * During each SBT run: `SBT_OPTS="<paste options here>" `
     * Or once in _~/.bash_profile_: `export SBT_OPTS="<paste options here>"`. 
       Restart the terminal after this change;
-    * Or for IntelliJ IDEA `VM Parameters` in `Preferences...` > `Build, Execution, Deployment` > `Build Tools` > `sbt`. 
+    * Or for IntelliJ IDEA `VM Parameters` in `Preferences...` > `Build, Execution, Deployment` > `Build Tools` > `sbt`.
+      Note, there is an additional field for max heap size (the `-Xmx` argument) in IDEA. 
 
 3. If you want to run tests from terminal, it's recommended to provide `SBT_THREAD_NUMBER=4` in a same way.
    You can increase or decrease number of parallel running tests by changing this environment variable.
@@ -186,6 +187,28 @@ sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /pat
 
 ## 10. Known issues
 
+### Common
+
+1. The compilation may fail on master with strange errors like:
+
+   > Symbol '...' is missing from the classpath
+   > ClassNotFound
+
+   if during the previous run the process was killed (by you or system).
+   You need to delete all `target` directories on both projects: `waves` and `dex`:
+
+   1. In the cloned DEX directory: `find . -type d -name target | xargs -I{} rm -rf {}`
+   2. In the NODE directory:
+
+      During the SBT start you see something like this:
+      > Loading project definition from /Users/vsuharnikov/.sbt/1.0/staging/f431ce12d422de688eee/waves/project
+
+      This is the cloned NODE directory (except the `project` part). To remove `target` directories, run:
+
+      ```
+      find /Users/vsuharnikov/.sbt/1.0/staging/f431ce12d422de688eee/waves -type d -name target | xargs -I{} rm -rf {}
+      ```
+
 ### IntelliJ IDEA
 
 1. Worksheets may not work: https://youtrack.jetbrains.com/issue/SCL-6726 . Also make sure:
@@ -215,6 +238,54 @@ Recommended sections for your logback.xml
 <logger name="org.apache.kafka" level="INFO"/>
 <logger name="kamon.influxdb.CustomInfluxDBReporter" level="INFO"/>
 ```
+
+## 12. Contributor notes
+
+### Branches
+
+* `master` is a developers' branch;
+* `DEX-XXX` is a feature or a bug fix branch;
+* `version-XXX` is a stable branch for bug fixes;
+
+A new release is tagged to the commit in a `master` branch. If there is a bug:
+1. The `version-XXX` branch is created from this tag;
+2. The fix is committed to this branch;
+2. When all fixes are done, a new tag is created; 
+
+### Publishing a new release
+
+1. Building artifacts:
+
+  1. Switch to the right branch. For example, this is the first release for a new version: 
+
+      ```bash
+      git checkout master && git pull origin master
+      ```
+
+  2. Create a new tag and push it to the remote repository. For example, the version is `v1.0.0`:
+
+      ```bash
+      git tag v1.0.0 && git push origin v1.0.0
+      ```
+
+  3. Prepare a release with SBT: `sbt "release"` . There will files in `target/release`:
+
+     * A draft for release notes in the Markdown format: `release-notes.md`;
+     * Other documentation in the Markdown format (`md`-files);
+     * Artifacts with `deb`, `tgz` and other extensions;
+
+2. Publishing a release on GitHub:
+
+  1. Open the project [page](https://github.com/wavesplatform/dex) and click on _Releases_.
+  2. Click on _Draft a new release_.
+
+     1. Choose the pushed tag;
+     2. Write a header, for example "Version 1.0.0";
+     3. Paste the draft `release-notes.md` and edit it;
+     4. Attach built artifacts.
+
+  3. Click on publish.
+  4. Update the errors' documentation in Wiki.
 
 # Acknowledgement
 

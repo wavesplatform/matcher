@@ -1,13 +1,8 @@
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
-
 import CommonSettings.autoImport.network
-import Hashes.mk
-import org.apache.commons.codec.binary.Hex
+import ReleasePlugin.autoImport._
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
-import sbt.io.Using
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
@@ -103,134 +98,30 @@ git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
 // root project settings
+enablePlugins(ReleasePlugin)
+
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList map { p =>
-  p: ProjectReference
-}
-
-lazy val cleanAll = taskKey[Unit]("Clean all projects")
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)
 cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
-
-lazy val releaseDirectory = settingKey[Path]("Directory for release artifacts")
-releaseDirectory := ((root / target).value / "release").toPath
-
-lazy val genDocs = taskKey[Unit]("Generates the documentation")
-genDocs := Def.taskDyn {
-  val configFile = (root / baseDirectory).value / "_local" / "mainnet.sample.conf" // Actually doesn't matter for this task
-  streams.value.log.info(s"${configFile.getAbsolutePath} gen-docs ${releaseDirectory.value}")
-  (dex / Compile / runMain).toTask(s" com.wavesplatform.dex.MatcherTool ${configFile.getAbsolutePath} gen-docs ${releaseDirectory.value}")
-}.value
-
-lazy val release = taskKey[Unit]("Packages artifacts and writes a documentation to the releaseDirectory")
-release := Def
-  .sequential(
-    root / cleanAll,
-    Def.task { Files.createDirectories(releaseDirectory.value) },
-    Def.task { Command.process("packageAllForNetworks", state.value) },
-    genDocs,
-    writeReleaseNotes
-  )
-  .value
-
-lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := Def
-  .sequential(
-    Def.task {
-      val artifacts = Seq(
-        (dex / Universal / packageZipTarball).value,
-        (dex / Debian / packageBin).value
-      )
-
-      val destDir = releaseDirectory.value
-      artifacts
-        .map(_.toPath)
-        .foreach { source =>
-          Files.move(source, destDir.resolve(source.getFileName))
-        }
-    }
-  )
-  .value
-
-lazy val artifactExtensions = settingKey[Seq[String]]("Used to search artifacts")
-artifactExtensions := List("deb", "tgz")
-
-lazy val writeReleaseNotes = taskKey[Unit](s"""1. Collects commits between last two tags
-     |2. Writes a draft of a release to the releaseDirectory
-     |3. Adds checksums for artifacts in the releaseDirectory""".stripMargin)
-writeReleaseNotes := {
-  val runner           = git.runner.value
-  val log              = streams.value.log
-  val cwd              = (root / baseDirectory).value
-  val destDir          = (root / releaseDirectory).value
-  val releaseNotesFile = destDir.resolve("release-notes.md").toFile
-  val artifactsFilter  = artifactExtensions.value.foldLeft[FileFilter](NothingFilter)((r, x) => r || GlobFilter(s"*.$x"))
-
-  val tags = runner("tag", "--sort", "version:refname")(cwd, sbt.Logger.Null).replaceAll("\r", "").split("\n")
-  val changesContent = if (tags.length <= 1) {
-    log.warn(s"Expected at least two tags, but there is ${tags.length}")
-    ""
-  } else {
-    val lastTag = tags.last
-    val prevTag = tags(tags.length - 2)
-    log.info(s"Looking for commits between $prevTag and $lastTag")
-
-    runner("log", "--pretty=%an%n%B%n", s"$prevTag..$lastTag")(cwd, sbt.Logger.Null).replaceAll("\r", "").replaceAll("\n{3,}", "\n").trim
-  }
-
-  val artifacts = IO.listFiles(destDir.toFile, artifactsFilter)
-  log.info(s"Found artifacts: ${artifacts.map(_.getName).mkString(", ")}")
-
-  val hashes = artifacts.map { file =>
-    val xs = Using.fileInputStream(file)(mk("SHA-256", _))
-    file.toPath.getFileName.toString -> Hex.encodeHexString(xs)
-  }
-
-  val sortedHashes = hashes.sortBy { case (fileName, _) => (fileName.length, fileName) }
-  val hashesContent =
-    s"""## SHA256 Checksums
-       |
-       |```
-       |${sortedHashes.map { case (fileName, hash) => s"$hash $fileName" }.mkString("\n")}
-       |```
-       |""".stripMargin
-
-  val content = s"""$changesContent
-                   |
-                   |$hashesContent""".stripMargin
-
-  log.info(s"Write release notes to $releaseNotesFile")
-  IO.write(releaseNotesFile, content, StandardCharsets.UTF_8)
-}
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := {
+  // try/finally is a hack to run clean before all tasks
   try {
-    cleanAll.value // Hack to run clean before all tasks
+    cleanAll.value
   } finally {
     (dex / Test / test).value
     (`dex-generator` / Test / compile).value
   }
 }
 
-def checkPR: Command = Command.command("checkPR") { state =>
+commands += Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
     .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }
-
-def packageAllForNetworks: Command = Command.command("packageAllForNetworks") { state =>
-  val testNetState = Project
-    .extract(state)
-    .appendWithoutSession(Seq(Global / network := Testnet), state)
-
-  Project.extract(state).runTask(root / packageAll, state)
-  Project.extract(testNetState).runTask(root / packageAll, testNetState)
-  state
-}
-
-commands ++= Seq(checkPR, packageAllForNetworks)
 
 // IDE settings
 ideExcludedDirectories := Seq((root / baseDirectory).value / "_local")

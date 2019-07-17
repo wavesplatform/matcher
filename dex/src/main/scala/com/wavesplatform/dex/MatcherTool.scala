@@ -15,21 +15,25 @@ import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.market.{MatcherActor, OrderBookActor}
-import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
+import com.wavesplatform.dex.model.{LimitOrder, OrderBook, OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.ScorexLogging
 import net.ceedubs.ficus.Ficus._
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, ReadOptions}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
@@ -83,6 +87,112 @@ object MatcherTool extends ScorexLogging {
     db.readWrite(rw => keysToDelete.result().foreach(rw.delete(_, "matcher-legacy-entries")))
   }
 
+  private def migrateOrderInfo(readOnlyBlockchainDb: ReadOnlyDB, db: DB, matcherAccount: String, useFast: Boolean, from: Int): Unit = {
+    log.info(s"Starting OrderInfo migration from $from, algorithm: ${if (useFast) "fast" else "correct"}")
+    val readOnlyDB = new ReadOnlyDB(db, new ReadOptions())
+
+    val scriptedMemo = mutable.Map.empty[Asset, Boolean]
+    def isAssetScripted(asset: Asset): Boolean =
+      scriptedMemo.getOrElseUpdate(
+        asset,
+        asset.fold(false) { assetId =>
+          readOnlyBlockchainDb.get(Keys.assetScriptHistory(assetId)).headOption.exists { height =>
+            readOnlyBlockchainDb.get(Keys.assetScriptPresent(assetId)(height)).isDefined
+          }
+        }
+      )
+
+    val matcherAccountAddress = Address.fromString(matcherAccount).explicitGet()
+    val isMatcherScripted = {
+      for {
+        id     <- readOnlyBlockchainDb.get(Keys.addressId(matcherAccountAddress))
+        height <- readOnlyBlockchainDb.get(Keys.addressScriptHistory(id)).headOption
+      } yield readOnlyBlockchainDb.get(Keys.addressScript(id)(height)).isDefined
+    }.getOrElse(false)
+
+    val defaultFee   = 300000L
+    val scriptRunFee = 400000L
+    val baseFee      = defaultFee + (if (isMatcherScripted) scriptRunFee else 0L)
+
+    def getBlockchainTotalFee(assetPair: AssetPair): (Asset, Long) = {
+      val a = if (isAssetScripted(assetPair.amountAsset)) scriptRunFee else 0L
+      val p = if (isAssetScripted(assetPair.priceAsset)) scriptRunFee else 0L
+      (Waves, baseFee + a + p)
+    }
+
+    def getDexTotalFee(orderId: Order.Id): Option[(Asset, Long)] =
+      readOnlyDB.get(MatcherKeys.order(orderId)).map(x => (x.matcherFeeAssetId, x.matcherFee))
+
+    val getTotalFee: (AssetPair, Order.Id) => (Asset, Long) =
+      if (useFast) { (assetPair, _) =>
+        getBlockchainTotalFee(assetPair)
+      } else { (assetPair, orderId) =>
+        getDexTotalFee(orderId).getOrElse(getBlockchainTotalFee(assetPair))
+      }
+
+    val iter = readOnlyDB.iterateOverStream(Shorts.toByteArray(2))
+    val orderInfos =
+      iter.zipWithIndex
+        .drop(from)
+        .map { case (entry, idx) => (parseOrderInfo(entry), idx) }
+        .filterNot { case ((_, finalInfo), _) => finalInfo.version > 1 }
+
+    val batchSize = 2000
+    val batch     = new mutable.ArrayBuffer[(Order.Id, FinalOrderInfo)](batchSize)
+
+    def forceWrite(): Unit = {
+      val wb = db.createWriteBatch()
+      batch.foreach {
+        case (id, orderInfo) =>
+          val key = MatcherKeys.orderInfo(id)
+          wb.put(key.keyBytes, key.encode(Some(orderInfo)))
+      }
+      db.write(wb)
+      batch.clear()
+    }
+
+    def update(id: Order.Id, orderInfo: FinalOrderInfo): Unit = {
+      batch.append((id, orderInfo))
+      if (batch.size >= batchSize) forceWrite()
+    }
+
+    orderInfos.foreach {
+      case ((id, finalInfo), idx) =>
+        val (feeAssetId, totalFee) = getTotalFee(finalInfo.assetPair, id)
+        if (totalFee != defaultFee) {
+          val filledFee = (BigInt(finalInfo.status.filledAmount) * totalFee / finalInfo.amount).toLong
+          val updatedStatus = finalInfo.status match {
+            case x: OrderStatus.Cancelled => OrderStatus.Cancelled(x.filledAmount, filledFee)
+            case x: OrderStatus.Filled    => OrderStatus.Filled(x.filledAmount, filledFee)
+            case OrderStatus.NotFound     => finalInfo.status // Impossible
+          }
+
+          val updatedOrderInfo = OrderInfo.v2(
+            side = finalInfo.side,
+            amount = finalInfo.amount,
+            price = finalInfo.price,
+            matcherFee = totalFee,
+            matcherFeeAssetId = feeAssetId,
+            timestamp = finalInfo.timestamp,
+            status = updatedStatus,
+            assetPair = finalInfo.assetPair
+          )
+
+          update(id, updatedOrderInfo)
+        }
+
+        if (idx % 100000 == 0) log.info(s"Current index: $idx")
+    }
+
+    iter.close()
+  }
+
+  private def parseOrderInfo(entry: DBEntry): (Order.Id, OrderInfo.FinalOrderInfo) = {
+    val orderId = ByteStr(entry.getKey.drop(2))
+    val oi      = MatcherKeys.orderInfo(orderId).parse(entry.getValue)
+    orderId -> oi.getOrElse(throw new RuntimeException(s"Can't parse order info for $orderId, bytes: ${entry.getValue.mkString(",")}"))
+  }
+
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
@@ -90,6 +200,7 @@ object MatcherTool extends ScorexLogging {
     val actualConfig              = loadConfig(userConfig)
     val settings: MatcherSettings = actualConfig.as[MatcherSettings]("waves.dex")
     val db                        = openDB(settings.dataDir)
+    val blockchainDb              = openDB(actualConfig.getString("waves.db.directory"))
 
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = Base58.tryDecodeWithLimit(settings.account).get(1)
@@ -181,6 +292,10 @@ object MatcherTool extends ScorexLogging {
         orderInfoKey.parse(db.get(orderInfoKey.keyBytes)).foreach { oi =>
           log.info(s"Order info: $oi")
         }
+      case "oi-migrate" =>
+        val useFast = if (args.length < 3) false else args(2).toBoolean
+        val offset  = if (args.length < 4) 0 else args(3).toInt
+        migrateOrderInfo(new ReadOnlyDB(blockchainDb, new ReadOptions()), db, settings.account, useFast, offset)
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
         deleteLegacyEntries(db)
@@ -345,6 +460,7 @@ object MatcherTool extends ScorexLogging {
 
     log.info(s"Completed in ${(System.currentTimeMillis() - start) / 1000}s")
     db.close()
+    blockchainDb.close()
   }
 
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)

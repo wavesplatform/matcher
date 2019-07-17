@@ -186,8 +186,8 @@ class OrderHistoryBalanceSpecification
 
     withClue("executed exactly") {
       exec.executedAmount shouldBe counter.amount
-      orderStatus(counter.id()) shouldBe OrderStatus.Filled(exec.executedAmount)
-      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount)
+      orderStatus(counter.id()) shouldBe OrderStatus.Filled(exec.executedAmount, exec.counterExecutedFee)
+      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount, exec.submittedExecutedFee)
     }
 
     withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
@@ -239,7 +239,7 @@ class OrderHistoryBalanceSpecification
 
       exec.counterRemainingFee shouldBe 150001L
 
-      orderStatus(counter.id()) shouldBe OrderStatus.PartiallyFilled(exec.executedAmount)
+      orderStatus(counter.id()) shouldBe OrderStatus.PartiallyFilled(exec.executedAmount, exec.counterExecutedFee)
     }
 
     withClue(s"submitted.order.id=${counter.idStr()}") {
@@ -247,7 +247,7 @@ class OrderHistoryBalanceSpecification
       exec.submittedRemainingAmount shouldBe submitted.amount - exec.executedAmount
 
       exec.submittedRemainingFee shouldBe 3781L
-      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount)
+      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount, exec.submittedExecutedFee)
     }
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
@@ -290,14 +290,14 @@ class OrderHistoryBalanceSpecification
       exec.counterRemainingAmount shouldBe 0L
       exec.counterRemainingFee shouldBe 0L
 
-      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000)
+      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000, 2000)
     }
 
     withClue(s"submitted: ${submitted.idStr()}") {
       exec.submittedRemainingAmount shouldBe 20000000L
       exec.submittedRemainingFee shouldBe 167L
 
-      orderStatus(submitted.id()) shouldBe OrderStatus.PartiallyFilled(100000000)
+      orderStatus(submitted.id()) shouldBe OrderStatus.PartiallyFilled(100000000, 833)
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
@@ -335,18 +335,18 @@ class OrderHistoryBalanceSpecification
     val exec1 = OrderExecuted(LimitOrder(submitted1), LimitOrder(counter))
     oh.process(exec1)
 
-    orderStatus(counter.id()) shouldBe OrderStatus.PartiallyFilled(50000000)
-    orderStatus(submitted1.id()) shouldBe OrderStatus.Filled(50000000)
+    orderStatus(counter.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 150000)
+    orderStatus(submitted1.id()) shouldBe OrderStatus.Filled(50000000, 300001)
 
     val exec2 = OrderExecuted(LimitOrder(submitted2), exec1.counterRemaining)
     oh.processAll(exec2, OrderAdded(exec2.submittedRemaining, ntpTime.getTimestamp()))
 
     withClue(s"counter: ${counter.idStr()}") {
-      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000)
+      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000, 300000)
     }
 
-    orderStatus(submitted1.id()) shouldBe OrderStatus.Filled(50000000)
-    orderStatus(submitted2.id()) shouldBe OrderStatus.PartiallyFilled(50000000)
+    orderStatus(submitted1.id()) shouldBe OrderStatus.Filled(50000000, 300001)
+    orderStatus(submitted2.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 187500)
 
     openVolume(counter.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
     openVolume(counter.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L
@@ -454,7 +454,7 @@ class OrderHistoryBalanceSpecification
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
     oh.processAll(exec1, OrderAdded(exec1.submittedRemaining, ntpTime.getTimestamp()), OrderExecuted(exec1.submittedRemaining, LimitOrder(counter2)))
 
-    orderStatus(submitted.id()) shouldBe OrderStatus.Filled(350)
+    orderStatus(submitted.id()) shouldBe OrderStatus.Filled(350, 299999)
   }
 
   property("Partially with own order") {
@@ -469,7 +469,7 @@ class OrderHistoryBalanceSpecification
     withClue(s"counter: ${counter.idStr()}") {
       exec.counterRemainingAmount shouldBe 0L
       exec.counterRemainingFee shouldBe 0L
-      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000)
+      orderStatus(counter.id()) shouldBe OrderStatus.Filled(100000000, 300000)
     }
 
     withClue(s"submitted: ${submitted.idStr()}") {
@@ -493,7 +493,7 @@ class OrderHistoryBalanceSpecification
 
     oh.processAll(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()), OrderCanceled(LimitOrder(ord1), unmatchable = false, ntpTime.getTimestamp()))
 
-    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0)
+    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
     openVolume(ord1.senderPublicKey, WctBtc.amountAsset) shouldBe 0L
     openVolume(ord1.senderPublicKey, WctBtc.priceAsset) shouldBe 0L
@@ -515,7 +515,7 @@ class OrderHistoryBalanceSpecification
     oh.process(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()))
     oh.process(OrderCanceled(LimitOrder(ord1), unmatchable = false, ntpTime.getTimestamp()))
 
-    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0)
+    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
     openVolume(ord1.senderPublicKey, WctBtc.amountAsset) shouldBe 0L
     openVolume(ord1.senderPublicKey, WctBtc.priceAsset) shouldBe 0L
@@ -532,8 +532,8 @@ class OrderHistoryBalanceSpecification
       exec1,
       OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), unmatchable = false, ntpTime.getTimestamp()))
 
-    orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000)
-    orderStatus(submitted.id()) shouldBe OrderStatus.Filled(1000000000)
+    orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000, 142857)
+    orderStatus(submitted.id()) shouldBe OrderStatus.Filled(1000000000, 300000)
 
     openVolume(counter.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L
     openVolume(counter.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
@@ -827,8 +827,8 @@ class OrderHistoryBalanceSpecification
 
     withClue("executed exactly") {
       exec.executedAmount shouldBe counter.amount
-      orderStatus(counter.id()) shouldBe OrderStatus.Filled(exec.executedAmount)
-      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount)
+      orderStatus(counter.id()) shouldBe OrderStatus.Filled(exec.executedAmount, exec.counterExecutedFee)
+      orderStatus(submitted.id()) shouldBe OrderStatus.Filled(exec.executedAmount, exec.submittedExecutedFee)
     }
 
     withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
@@ -863,7 +863,7 @@ class OrderHistoryBalanceSpecification
     val cancel = OrderCanceled(LimitOrder(ord1), unmatchable = false, ntpTime.getTimestamp())
     oh.processAll(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()), cancel, cancel)
 
-    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0)
+    orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
     openVolume(ord1.senderPublicKey, WctBtc.amountAsset) shouldBe 0L
     openVolume(ord1.senderPublicKey, WctBtc.priceAsset) shouldBe 0L

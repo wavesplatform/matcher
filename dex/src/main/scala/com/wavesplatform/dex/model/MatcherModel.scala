@@ -142,6 +142,9 @@ object LimitOrder {
 sealed trait OrderStatus {
   def name: String
   def json: JsValue
+
+  def filledAmount: Long
+  def filledFee: Long
 }
 
 object OrderStatus {
@@ -150,27 +153,34 @@ object OrderStatus {
   case object Accepted extends OrderStatus {
     val name           = "Accepted"
     def json: JsObject = Json.obj("status" -> name)
+
+    override def filledAmount: Long = 0
+    override def filledFee: Long = 0
   }
   case object NotFound extends Final {
     val name           = "NotFound"
     def json: JsObject = Json.obj("status" -> name, "message" -> "The limit order is not found")
+
+    override def filledAmount: Long = 0
+    override def filledFee: Long = 0
   }
-  case class PartiallyFilled(filled: Long) extends OrderStatus {
+  case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
     val name           = "PartiallyFilled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
+    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
   }
-  case class Filled(filled: Long) extends Final {
+  case class Filled(filledAmount: Long, filledFee: Long) extends Final {
     val name           = "Filled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
+    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
   }
-  case class Cancelled(filled: Long) extends Final {
+  case class Cancelled(filledAmount: Long, filledFee: Long) extends Final {
     val name           = "Cancelled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
+    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
   }
 
   def finalStatus(lo: LimitOrder, unmatchable: Boolean): Final = {
     val filledAmount = lo.order.amount - lo.amount
-    if (unmatchable && filledAmount > 0) Filled(filledAmount) else Cancelled(filledAmount)
+    val filledMatcherFee = lo.order.matcherFee - lo.fee
+    if (unmatchable && filledAmount > 0) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }
 }
 

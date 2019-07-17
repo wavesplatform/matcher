@@ -31,7 +31,7 @@ lazy val it = project
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
     Test / test := Def
       .sequential(
-        root / packageAll,
+        root / Compile / packageAll,
         `dex-it` / Docker / docker,
         `dex-it` / Test / test
       )
@@ -101,14 +101,22 @@ git.uncommittedSignifier := Some("DIRTY")
 enablePlugins(ReleasePlugin)
 
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)
-cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
+  node,
+  `node-it`
+)
+
+Compile / cleanAll := {
+  val xs = allProjects
+  streams.value.log.info(s"Cleaning ${xs.mkString(", ")}")
+  clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))).value
+}
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := {
   // try/finally is a hack to run clean before all tasks
   try {
-    cleanAll.value
+    (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
     (`dex-generator` / Test / compile).value

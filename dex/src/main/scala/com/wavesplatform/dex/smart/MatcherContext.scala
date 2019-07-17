@@ -4,22 +4,24 @@ import cats.Eval
 import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.lang.{ExecutionError, Global}
 import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.StdLibVersion.VersionDic
 import com.wavesplatform.lang.directives.values._
-import StdLibVersion.VersionDic
 import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LONG, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{ordType, orderObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.OrdType
+import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.{ExecutionError, Global}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
 
+// Used only for order validation
 object MatcherContext {
 
   def build(version: StdLibVersion, nByte: Byte, in: Eval[Order], proofsEnabled: Boolean): EvaluationContext = {
@@ -34,8 +36,10 @@ object MatcherContext {
 
     val orderType: CASETYPEREF = buildOrderType(proofsEnabled)
     val matcherTypes           = Seq(addressType, orderType, assetPairType)
+    val thisVal                = in.map(order => Bindings.senderObject(Recipient.Address(order.senderPublicKey.toAddress.bytes)))
 
     val vars: Map[String, ((FINAL, String), LazyVal)] = Seq[(String, FINAL, String, LazyVal)](
+      ("this", addressType, "Script address", LazyVal(EitherT.right(thisVal))),
       ("tx", orderType, "Processing order", LazyVal(EitherT(inputEntityCoeval))),
       ("height", LONG, "undefined height placeholder", inaccessibleVal("height")),
       ("lastBlock", blockInfo, "undefined lastBlock placeholder", inaccessibleVal("lastBlock")),

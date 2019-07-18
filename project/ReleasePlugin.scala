@@ -35,15 +35,6 @@ object ReleasePlugin extends AutoPlugin {
             Compile / writeReleaseNotes
           )
           .value,
-        commands += Command.command("packageAllForNetworks") { state =>
-          val testNetState = Project
-            .extract(state)
-            .appendWithoutSession(Seq(Global / network := Testnet), state)
-
-          Project.extract(state).runTask(Compile / packageAll, state)
-          Project.extract(testNetState).runTask(Compile / packageAll, testNetState)
-          state
-        },
         packageAll := Def
           .sequential(
             Compile / createDirectories,
@@ -78,16 +69,27 @@ object ReleasePlugin extends AutoPlugin {
           val artifactsFilter  = (Compile / artifactExtensions).value.foldLeft[FileFilter](NothingFilter)((r, x) => r || GlobFilter(s"*.$x"))
 
           val tags = runner("tag", "--sort", "version:refname")(cwd, sbt.Logger.Null).replaceAll("\r", "").split("\n")
-          val changesContent = if (tags.length <= 1) {
-            log.warn(s"Expected at least two tags, but there is ${tags.length}")
-            ""
+          val (prevTag, lastTag) = if (tags.length <= 1) {
+            log.warn(s"Expected at least two tags, but there is ${tags.length}: ${tags.mkString(", ")}.")
+            (tags.headOption.getOrElse("HEAD"), "HEAD")
           } else {
             val lastTag = tags.last
             val prevTag = tags(tags.length - 2)
-            log.info(s"Looking for commits between $prevTag and $lastTag")
 
-            runner("log", "--pretty=%an%n%B%n", s"$prevTag..$lastTag")(cwd, sbt.Logger.Null).replaceAll("\r", "").replaceAll("\n{3,}", "\n").trim
+            val lastTagCommitId = runner("rev-parse", "--short", lastTag)(cwd, sbt.Logger.Null)
+            val lastCommitId    = runner("rev-parse", "--short", "HEAD")(cwd, sbt.Logger.Null)
+            if (lastTagCommitId != lastCommitId)
+              log.warn(s"Dirty release! The last tag ($lastTag) commit id is: $lastTagCommitId, last commit id is: $lastCommitId")
+
+            (prevTag, lastTag)
           }
+
+          log.info(s"Looking for commits between $prevTag and $lastTag")
+          val changesContent =
+            runner("log", "--pretty=%an%n%B%n", s"$prevTag..$lastTag")(cwd, sbt.Logger.Null)
+              .replaceAll("\r", "")
+              .replaceAll("\n{3,}", "\n")
+              .trim
 
           val artifacts = IO.listFiles(destDir.toFile, artifactsFilter)
           log.info(s"Found artifacts: ${artifacts.map(_.getName).mkString(", ")}")
@@ -97,7 +99,11 @@ object ReleasePlugin extends AutoPlugin {
             file.toPath.getFileName.toString -> Hex.encodeHexString(xs)
           }
 
-          val sortedHashes = hashes.sortBy { case (fileName, _) => (fileName.length, fileName) }
+          // takeWhile to sort network builds
+          val sortedHashes = hashes
+            .filter { case (fileName, _) => !fileName.contains("devnet") }
+            .sortBy { case (fileName, _) => (fileName.takeWhile(x => !x.isDigit).length, fileName) }
+
           val hashesContent =
             s"""## SHA256 Checksums
                |
@@ -107,15 +113,27 @@ object ReleasePlugin extends AutoPlugin {
                |""".stripMargin
 
           val content = s"""$changesContent
-                           |
-                           |$hashesContent""".stripMargin
+                                  |
+                                  |$hashesContent""".stripMargin
 
           log.info(s"Write release notes to $releaseNotesFile")
           IO.write(releaseNotesFile, content, StandardCharsets.UTF_8)
         },
         createDirectories := Files.createDirectories((Compile / releaseDirectory).value),
         cleanAll := List.empty
-      ))
+      )) ++ Seq(
+      commands += Command.command("packageAllForNetworks") { state =>
+        NodeNetwork.All.foreach { x =>
+          val updatedNetworkState = Project
+            .extract(state)
+            .appendWithoutSession(Seq(Global / network := x), state)
+
+          Project.extract(updatedNetworkState).runTask(Compile / packageAll, updatedNetworkState)
+        }
+
+        state
+      }
+    )
 }
 
 trait ReleasePluginKeys {

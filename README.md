@@ -282,7 +282,7 @@ A new release is tagged to the commit in a `master` branch. If there is a bug:
      1. Choose the pushed tag;
      2. Write a header, for example "Version 1.0.0";
      3. Paste the draft `release-notes.md` and edit it;
-     4. Attach built artifacts.
+     4. Attach built artifacts (except `devnet` artifacts).
 
   3. Click on publish.
   4. Update the errors' documentation in Wiki.

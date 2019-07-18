@@ -48,8 +48,10 @@ object MatcherContext {
     ).map { case (name, retType, desc, value) => (name, ((retType, desc), value)) }(collection.breakOut)
 
     def inaccessibleFunction(internalName: Short, name: String): BaseFunction = {
-      val msg = s"Function $name is inaccessible when running script on matcher"
-      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) { case _ => msg.asLeft }
+      def msg(args: String = "") = s"Function $name$args is inaccessible when running script on matcher"
+      NativeFunction(name, 1, internalName, UNIT, msg(), Seq.empty: _*) {
+        case args => msg(args.map(_.toStr().replaceAll("([\t\n])+", "")).mkString("(", ", ", ")")).asLeft
+      }
     }
 
     def inaccessibleUserFunction(name: String): BaseFunction = {

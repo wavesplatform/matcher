@@ -23,7 +23,7 @@ object MatcherScriptRunner {
       val ctx = MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
-        Eval.later(???) /*order not used in global context where @Verifier annotation is used */,
+        Eval.later(order),
         proofsEnabled = true
       )
       val evalContract = ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(order))

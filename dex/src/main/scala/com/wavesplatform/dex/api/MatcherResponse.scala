@@ -71,7 +71,7 @@ case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
 
 case class OrderRejected(error: MatcherError)        extends MatcherResponse(C.BadRequest, error)
 case class OrderCancelRejected(error: MatcherError)  extends MatcherResponse(C.BadRequest, error)
-case object CancelRequestInvalidSignature            extends MatcherResponse(C.BadRequest, error.RequestInvalidSignature)
+case object InvalidSignature                         extends MatcherResponse(C.BadRequest, error.RequestInvalidSignature)
 case class NotImplemented(error: MatcherError)       extends MatcherResponse(C.NotImplemented, error)
 case class OrderBookUnavailable(error: MatcherError) extends MatcherResponse(C.ServiceUnavailable, error)
 case object DuringStart                              extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)

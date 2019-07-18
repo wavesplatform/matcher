@@ -128,7 +128,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
       entity(as[CancelOrderRequest]) { req =>
-        if (req.isSignatureValid()) f(req) else complete(CancelRequestInvalidSignature)
+        if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 

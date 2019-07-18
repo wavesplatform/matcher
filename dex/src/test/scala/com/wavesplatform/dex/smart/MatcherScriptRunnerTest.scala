@@ -5,11 +5,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.error.ProduceError.produce
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType, OrderV1}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{FreeSpecLike, Matchers}
+
+import scala.util.Try
 
 class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
   private val sampleOrder = OrderV1(
@@ -24,12 +28,38 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
     matcherFee = 30000L
   )
 
-  "Can run dApp script" in {
-    val (_, r) = MatcherScriptRunner(dAppScript, sampleOrder, isTokenScript = false)
-    r should produce("getInteger.+ is inaccessible when running script on matcher".r)
+  private def run(script: Script): Either[String, (Log, Either[String, Terms.EVALUATED])] = Try(MatcherScriptRunner(dAppScriptBlockchain, sampleOrder)).toEither.left.map(_.toString)
+
+  "dApp sunny day" in {
+    run(dAppScriptSunny).explicitGet()._2.explicitGet() shouldBe Terms.FALSE
   }
 
-  private def dAppScript: Script =
+  "Blockchain functions are disabled in dApp" in {
+    run(dAppScriptBlockchain) should produce("""An access to the blockchain.accountData is denied on DEX""".r)
+  }
+
+  private def dAppScriptSunny: Script =
+    ScriptCompiler
+      .compile(
+        s"""|{-# STDLIB_VERSION 3 #-}
+            |{-# CONTENT_TYPE DAPP #-}
+            |{-# SCRIPT_TYPE ACCOUNT #-}
+            |
+            |let addr = addressFromPublicKey(base58'H1kGVNdJwV7N5dF73YWs1R8uet6g5bCvTHmTnYy1hSnr')
+            |
+            |@Verifier(x)
+            |func verifier() = {
+            |    match(x) {
+            |      case o:Order => o.sender == addr
+            |      case _ => false
+            |    }
+            |}
+            |""".stripMargin
+      )
+      .explicitGet()
+      ._1
+
+  private def dAppScriptBlockchain: Script =
     ScriptCompiler
       .compile(
         s"""|{-# STDLIB_VERSION 3 #-}

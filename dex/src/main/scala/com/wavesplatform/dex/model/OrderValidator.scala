@@ -57,7 +57,7 @@ object OrderValidator extends ScorexLogging {
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
       else
-        try MatcherScriptRunner(script, order, isTokenScript = false) match {
+        try MatcherScriptRunner(script, order) match {
           case (_, Left(execError)) => error.AccountScriptReturnedError(address, execError).asLeft
           case (_, Right(FALSE))    => error.AccountScriptDeniedOrder(address).asLeft
           case (_, Right(TRUE))     => lift(order)

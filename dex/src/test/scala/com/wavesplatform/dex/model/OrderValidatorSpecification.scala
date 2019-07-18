@@ -517,7 +517,7 @@ class OrderValidatorSpecification
       val o      = newBuyOrder(pk, version = 2)
       val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
-      ov(o).left.map(_.toJson(errorContext)) should produce("height is inaccessible when running script on matcher")
+      ov(o).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
     }
 
     "validate order with smart token" when {
@@ -604,7 +604,7 @@ class OrderValidatorSpecification
         val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
         (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
-        ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("height is inaccessible when running script on matcher")
+        ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
       }
     }
   }

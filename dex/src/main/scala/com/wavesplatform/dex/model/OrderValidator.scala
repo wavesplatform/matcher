@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import shapeless.Coproduct
 
@@ -33,7 +33,7 @@ import scala.Either.cond
 import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 
-object OrderValidator {
+object OrderValidator extends ScorexLogging {
 
   type Result[T] = Either[MatcherError, T]
 
@@ -57,13 +57,15 @@ object OrderValidator {
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
       else
-        try MatcherScriptRunner(script, order, isTokenScript = false) match {
+        try MatcherScriptRunner(script, order) match {
           case (_, Left(execError)) => error.AccountScriptReturnedError(address, execError).asLeft
           case (_, Right(FALSE))    => error.AccountScriptDeniedOrder(address).asLeft
           case (_, Right(TRUE))     => lift(order)
           case (_, Right(x))        => error.AccountScriptUnexpectResult(address, x.toString).asLeft
         } catch {
-          case NonFatal(e) => error.AccountScriptException(address, e.getClass.getCanonicalName, e.getMessage).asLeft
+          case NonFatal(e) =>
+            log.trace(error.formatStackTrace(e))
+            error.AccountScriptException(address, e.getClass.getCanonicalName, e.getMessage).asLeft
         }
     }
 
@@ -219,10 +221,10 @@ object OrderValidator {
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
   private[dex] def getMinValidFeeForSettings(order: Order,
-                                                 orderFeeSettings: OrderFeeSettings,
-                                                 matchPrice: Long,
-                                                 rateCache: RateCache,
-                                                 multiplier: Double = 1): Long = {
+                                             orderFeeSettings: OrderFeeSettings,
+                                             matchPrice: Long,
+                                             rateCache: RateCache,
+                                             multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
       case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)

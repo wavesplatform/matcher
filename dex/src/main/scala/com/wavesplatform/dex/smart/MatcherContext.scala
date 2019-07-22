@@ -1,94 +1,125 @@
 package com.wavesplatform.dex.smart
 
 import cats.Eval
-import cats.data.EitherT
-import cats.implicits._
-import cats.kernel.Monoid
-import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.StdLibVersion.VersionDic
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LONG, UNIT}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{ordType, orderObject}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.lang.{ExecutionError, Global}
+import com.wavesplatform.lang.{ExecutionError, ValidationError}
+import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  AssetDescription,
+  AssetDistribution,
+  AssetDistributionPage,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  InvokeScriptResult,
+  LeaseBalance,
+  Portfolio,
+  TransactionId,
+  VolumeAndFee
+}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.RealTransactionWrapper
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.utils.CloseableIterator
+import monix.eval.Coeval
+import shapeless.Coproduct
+
+import scala.util.control.NoStackTrace
 
 // Used only for order validation
 object MatcherContext {
 
-  def build(version: StdLibVersion, nByte: Byte, in: Eval[Order], proofsEnabled: Boolean): EvaluationContext = {
-    val baseContext = Monoid.combine(PureContext.build(Global, version), CryptoContext.build(Global, version)).evaluationContext
-
-    val inputEntityCoeval: Eval[Either[ExecutionError, CaseObj]] =
-      Eval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled, version))))
-
-    def constVal[T <: EVALUATED](x: T): LazyVal = LazyVal(EitherT(Eval.now[Either[ExecutionError, T]](Right(x))))
-    def inaccessibleVal(name: String): LazyVal =
-      LazyVal(EitherT(Eval.now[Either[ExecutionError, Nothing]](Left(s"$name is inaccessible when running script on matcher"))))
-
-    val orderType: CASETYPEREF = buildOrderType(proofsEnabled)
-    val matcherTypes           = Seq(addressType, orderType, assetPairType)
-    val thisVal                = in.map(order => Bindings.senderObject(Recipient.Address(order.senderPublicKey.toAddress.bytes)))
-
-    val vars: Map[String, ((FINAL, String), LazyVal)] = Seq[(String, FINAL, String, LazyVal)](
-      ("this", addressType, "Script address", LazyVal(EitherT.right(thisVal))),
-      ("tx", orderType, "Processing order", LazyVal(EitherT(inputEntityCoeval))),
-      ("height", LONG, "undefined height placeholder", inaccessibleVal("height")),
-      ("lastBlock", blockInfo, "undefined lastBlock placeholder", inaccessibleVal("lastBlock")),
-      ("Sell", ordTypeType, "Sell OrderType", constVal(ordType(OrdType.Sell))),
-      ("Buy", ordTypeType, "Buy OrderType", constVal(ordType(OrdType.Buy)))
-    ).map { case (name, retType, desc, value) => (name, ((retType, desc), value)) }(collection.breakOut)
-
-    def inaccessibleFunction(internalName: Short, name: String): BaseFunction = {
-      val msg = s"Function $name is inaccessible when running script on matcher"
-      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) { case _ => msg.asLeft }
-    }
-
-    def inaccessibleUserFunction(name: String): BaseFunction = {
-      val msg = s"Function $name is inaccessible when running script on matcher"
-      NativeFunction(
-        name,
-        DirectiveDictionary[StdLibVersion].all.map(_ -> 1L).toMap,
-        FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
-        _ => msg.asLeft,
-        msg,
-        Array.empty
+  def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] = {
+    val in: Coeval[Order] = Coeval.delay(inE.value)
+    BlockchainContext
+      .build(
+        version,
+        nByte,
+        in.map(o => Coproduct[BlockchainContext.In](o)),
+        Coeval.raiseError(new Denied("height")),
+        deniedBlockchain,
+        isTokenContext = false,
+        isContract = isDApp,
+        in.map(_.senderPublicKey.toAddress.bytes)
       )
-    }
+  }
 
-    val nativeFunctions = Array(
-      DATA_LONG_FROM_STATE    -> "getInteger",
-      DATA_BOOLEAN_FROM_STATE -> "getBoolean",
-      DATA_BYTES_FROM_STATE   -> "getBinary",
-      DATA_STRING_FROM_STATE  -> "getString",
-      GETTRANSACTIONBYID      -> "transactionById",
-      ADDRESSFROMRECIPIENT    -> "addressFromRecipient",
-      ACCOUNTASSETBALANCE     -> "assetBalance",
-      GETASSETINFOBYID        -> "assetInfo",
-      TRANSFERTRANSACTIONBYID -> "transferTransactionById",
-      TRANSACTIONHEIGHTBYID   -> "transactionHeightById",
-      BLOCKINFOBYHEIGHT       -> "blockInfoByHeight"
-    ).map(Function.tupled(inaccessibleFunction))
+  private class Denied(methodName: String) extends SecurityException(s"An access to the blockchain.$methodName is denied on DEX") with NoStackTrace
+  private def kill(methodName: String) = throw new Denied(methodName)
 
-    val userFunctions = Array(
-      "getIntegerValue",
-      "getBooleanValue",
-      "getBinaryValue",
-      "getStringValue",
-      "wavesBalance"
-    ).map(inaccessibleUserFunction)
+  private val deniedBlockchain = new Blockchain {
+    override def settings: BlockchainSettings                                     = kill("settings")
+    override def height: Int                                                      = kill("height")
+    override def score: BigInt                                                    = kill("score")
+    override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]      = kill("blockHeaderAndSize")
+    override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = kill("blockHeaderAndSize")
+    override def lastBlock: Option[Block]                                         = kill("lastBlock")
+    override def carryFee: Long                                                   = kill("carryFee")
+    override def blockBytes(height: Int): Option[Array[Byte]]                     = kill("blockBytes")
+    override def blockBytes(blockId: ByteStr): Option[Array[Byte]]                = kill("blockBytes")
+    override def heightOf(blockId: ByteStr): Option[Int]                          = kill("heightOf")
 
-    val matcherContext = CTX(matcherTypes, vars, nativeFunctions ++ userFunctions).evaluationContext
+    /** Returns the most recent block IDs, starting from the most recent  one */
+    override def lastBlockIds(howMany: Int): Seq[ByteStr] = kill("lastBlockIds")
 
-    baseContext |+| matcherContext
+    /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
+    override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = kill("blockIdsAfter")
+    override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader]            = kill("parentHeader")
+    override def totalFee(height: Int): Option[Long]                                         = kill("totalFee")
+
+    /** Features related */
+    override def approvedFeatures: Map[Short, Int]                                                               = kill("approvedFeatures")
+    override def activatedFeatures: Map[Short, Int]                                                              = kill("activatedFeatures")
+    override def featureVotes(height: Int): Map[Short, Int]                                                      = kill("featureVotes")
+    override def portfolio(a: Address): Portfolio                                                                = kill("portfolio")
+    override def transactionInfo(id: ByteStr): Option[(Int, Transaction)]                                        = kill("transactionInfo")
+    override def transactionHeight(id: ByteStr): Option[Int]                                                     = kill("transactionHeight")
+    override def nftList(address: Address, from: Option[Asset.IssuedAsset]): CloseableIterator[IssueTransaction] = kill("nftList")
+    override def addressTransactions(address: Address,
+                                     types: Set[TransactionParser],
+                                     fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = kill("addressTransactions")
+    override def containsTransaction(tx: Transaction): Boolean                                          = kill("containsTransaction")
+    override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                      = kill("assetDescription")
+    override def resolveAlias(a: Alias): Either[ValidationError, Address]                               = kill("resolveAlias")
+    override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]                                   = kill("leaseDetails")
+    override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee                                     = kill("filledVolumeAndFee")
+
+    /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+    override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = kill("balanceSnapshots")
+    override def accountScript(address: Address): Option[Script]                                  = kill("accountScript")
+    override def hasScript(address: Address): Boolean                                             = kill("hasScript")
+    override def assetScript(id: Asset.IssuedAsset): Option[Script]                               = kill("assetScript")
+    override def hasAssetScript(id: Asset.IssuedAsset): Boolean                                   = kill("hasAssetScript")
+    override def accountDataKeys(address: Address): Seq[String]                                   = kill("accountDataKeys")
+    override def accountData(acc: Address, key: String): Option[DataEntry[_]]                     = kill("accountData")
+    override def accountData(acc: Address): AccountDataInfo                                       = kill("accountData")
+    override def leaseBalance(address: Address): LeaseBalance                                     = kill("leaseBalance")
+    override def balance(address: Address, mayBeAssetId: Asset): Long                             = kill("balance")
+    override def assetDistribution(asset: Asset.IssuedAsset): AssetDistribution                   = kill("assetDistribution")
+    override def assetDistributionAtHeight(asset: Asset.IssuedAsset,
+                                           height: Int,
+                                           count: Int,
+                                           fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
+      kill("assetDistributionAtHeight")
+    override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = kill("wavesDistribution")
+    override def allActiveLeases: CloseableIterator[LeaseTransaction]                        = kill("allActiveLeases")
+
+    /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+      *
+      * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
+    override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = kill("collectLposPortfolios")
+    override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
   }
 
 }

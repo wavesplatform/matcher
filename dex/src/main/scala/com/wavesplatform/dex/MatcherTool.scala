@@ -36,6 +36,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success, Try}
 
 object MatcherTool extends ScorexLogging {
   private def collectStats(db: DB): Unit = {
@@ -135,62 +136,82 @@ object MatcherTool extends ScorexLogging {
       iter.zipWithIndex
         .drop(from)
         .map { case (entry, idx) => (parseOrderInfo(entry), idx) }
-        .filterNot { case ((_, finalInfo), _) => finalInfo.version > 1 }
+        .filter {
+          case ((_, Success(finalInfo)), _) => finalInfo.version <= 1
+          case ((_, Failure(_)), _)         => true // to remove
+        }
 
-    val batchSize = 2000
-    val batch     = new mutable.ArrayBuffer[(Order.Id, FinalOrderInfo)](batchSize)
+    val maxMaxBatchSize = 2000
+    var freeBatchSpace  = maxMaxBatchSize
+    var currBatch       = db.createWriteBatch()
 
     def forceWrite(): Unit = {
-      val wb = db.createWriteBatch()
-      batch.foreach {
-        case (id, orderInfo) =>
-          val key = MatcherKeys.orderInfo(id)
-          wb.put(key.keyBytes, key.encode(Some(orderInfo)))
-      }
-      db.write(wb)
-      batch.clear()
+      db.write(currBatch)
+      currBatch = db.createWriteBatch()
+      freeBatchSpace = maxMaxBatchSize
     }
 
     def update(id: Order.Id, orderInfo: FinalOrderInfo): Unit = {
-      batch.append((id, orderInfo))
-      if (batch.size >= batchSize) forceWrite()
+      val key = MatcherKeys.orderInfo(id)
+      currBatch.put(key.keyBytes, key.encode(Some(orderInfo)))
+
+      freeBatchSpace -= 1
+      if (freeBatchSpace <= 0) forceWrite()
+    }
+
+    def delete(id: Order.Id): Unit = {
+      currBatch.delete(MatcherKeys.orderInfo(id).keyBytes)
+      currBatch.delete(MatcherKeys.order(id).keyBytes)
+
+      freeBatchSpace -= 2
+      if (freeBatchSpace <= 0) forceWrite()
     }
 
     orderInfos.foreach {
-      case ((id, finalInfo), idx) =>
-        val (feeAssetId, totalFee) = getTotalFee(finalInfo.assetPair, id)
-        if (totalFee != defaultFee) {
-          val filledFee = (BigInt(finalInfo.status.filledAmount) * totalFee / finalInfo.amount).toLong
-          val updatedStatus = finalInfo.status match {
-            case x: OrderStatus.Cancelled => OrderStatus.Cancelled(x.filledAmount, filledFee)
-            case x: OrderStatus.Filled    => OrderStatus.Filled(x.filledAmount, filledFee)
-            case OrderStatus.NotFound     => finalInfo.status // Impossible
-          }
+      case ((id, info), idx) =>
+        info match {
+          case Failure(e) =>
+            log.warn(s"Can't parse the $id order: ${e.getMessage}, will remove it")
+            delete(id)
 
-          val updatedOrderInfo = OrderInfo.v2(
-            side = finalInfo.side,
-            amount = finalInfo.amount,
-            price = finalInfo.price,
-            matcherFee = totalFee,
-            matcherFeeAssetId = feeAssetId,
-            timestamp = finalInfo.timestamp,
-            status = updatedStatus,
-            assetPair = finalInfo.assetPair
-          )
+          case Success(finalInfo) =>
+            val (feeAssetId, totalFee) = getTotalFee(finalInfo.assetPair, id)
+            if (totalFee != defaultFee) {
+              val filledFee = (BigInt(finalInfo.status.filledAmount) * totalFee / finalInfo.amount).toLong
+              val updatedStatus = finalInfo.status match {
+                case x: OrderStatus.Cancelled => OrderStatus.Cancelled(x.filledAmount, filledFee)
+                case x: OrderStatus.Filled    => OrderStatus.Filled(x.filledAmount, filledFee)
+                case OrderStatus.NotFound     => finalInfo.status // Impossible
+              }
 
-          update(id, updatedOrderInfo)
+              val updatedOrderInfo = OrderInfo.v2(
+                side = finalInfo.side,
+                amount = finalInfo.amount,
+                price = finalInfo.price,
+                matcherFee = totalFee,
+                matcherFeeAssetId = feeAssetId,
+                timestamp = finalInfo.timestamp,
+                status = updatedStatus,
+                assetPair = finalInfo.assetPair
+              )
+
+              update(id, updatedOrderInfo)
+            }
         }
 
         if (idx % 100000 == 0) log.info(s"Current index: $idx")
     }
 
+    forceWrite()
     iter.close()
   }
 
-  private def parseOrderInfo(entry: DBEntry): (Order.Id, OrderInfo.FinalOrderInfo) = {
+  private def parseOrderInfo(entry: DBEntry): (Order.Id, Try[OrderInfo.FinalOrderInfo]) = {
     val orderId = ByteStr(entry.getKey.drop(2))
-    val oi      = MatcherKeys.orderInfo(orderId).parse(entry.getValue)
-    orderId -> oi.getOrElse(throw new RuntimeException(s"Can't parse order info for $orderId, bytes: ${entry.getValue.mkString(",")}"))
+    orderId -> Try {
+      val oi = MatcherKeys.orderInfo(orderId).parse(entry.getValue)
+      oi.getOrElse(throw new RuntimeException(s"Can't parse order info for $orderId, bytes: ${entry.getValue.mkString(",")}"))
+    }
   }
 
   def main(args: Array[String]): Unit = {

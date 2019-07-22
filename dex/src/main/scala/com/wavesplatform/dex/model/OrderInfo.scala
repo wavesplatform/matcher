@@ -90,7 +90,7 @@ object OrderInfo {
     // DON'T WRITE BYTES "oi.matcherFeeAssetId.byteRepr" to the buffer. It works another way :(
     ByteBuffer
       .allocate(51 + oi.matcherFeeAssetId.byteRepr.length + oi.assetPair.bytes.length)
-      .put(oi.version)
+      .put(2: Byte)
       .put(oi.side.bytes)
       .putLong(oi.amount)
       .putLong(oi.price)

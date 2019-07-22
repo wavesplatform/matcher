@@ -7,13 +7,13 @@ import com.wavesplatform.dex.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
-class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blacklistedAssets: Set[IssuedAsset]) {
+class AssetPairBuilder(settings: MatcherSettings, assetDescription: Asset => Option[AssetDescription], blacklistedAssets: Set[IssuedAsset]) {
   import Either.cond
   import Ordered._
 
@@ -40,11 +40,11 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain, blackl
 
   private def validateAssetId(asset: Asset, side: AssetSide): Result[Asset] =
     asset.fold[Result[Asset]](Right(Waves)) { asset =>
-      blockchain.assetDescription(asset).fold[Result[Asset]](Left(error.AssetNotFound(asset))) { desc =>
+      assetDescription(asset).fold[Result[Asset]](Left(error.AssetNotFound(asset))) { desc =>
         if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc)) Left(side match {
           case AssetSide.Unknown => error.AssetBlacklisted(asset)
-          case AssetSide.Amount => error.AmountAssetBlacklisted(asset)
-          case AssetSide.Price => error.PriceAssetBlacklisted(asset)
+          case AssetSide.Amount  => error.AmountAssetBlacklisted(asset)
+          case AssetSide.Price   => error.PriceAssetBlacklisted(asset)
         })
         else Right(asset)
       }

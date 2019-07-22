@@ -10,24 +10,20 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.smart.MatcherScriptRunner
 import com.wavesplatform.dex.{RateCache, error}
+import com.wavesplatform.extensions.WavesBlockchainContext
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
-import shapeless.Coproduct
 
 import scala.Either.cond
 import scala.math.BigDecimal.RoundingMode
@@ -45,52 +41,54 @@ object OrderValidator extends ScorexLogging {
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
-  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
+
+  private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
+
+  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): Result[Order] =
     Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => error.OrderInvalidSignature(order.id(), x.toString))
 
-  private def verifyOrderByAccountScript(blockchain: Blockchain, address: Address, order: Order): Result[Order] =
-    blockchain.accountScript(address).fold(verifySignature(order)) { script =>
-      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
+  private def verifyOrderByAccountScript(blockchain: WavesBlockchainContext, address: Address, order: Order): Result[Order] =
+    if (blockchain.hasScript(address)) {
+      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id))
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
       else
-        try MatcherScriptRunner(script, order) match {
-          case (_, Left(execError)) => error.AccountScriptReturnedError(address, execError).asLeft
-          case (_, Right(FALSE))    => error.AccountScriptDeniedOrder(address).asLeft
-          case (_, Right(TRUE))     => lift(order)
-          case (_, Right(x))        => error.AccountScriptUnexpectResult(address, x.toString).asLeft
+        try blockchain.runScript(address, order) match {
+          case Left(execError) => error.AccountScriptReturnedError(address, execError).asLeft
+          case Right(FALSE)    => error.AccountScriptDeniedOrder(address).asLeft
+          case Right(TRUE)     => lift(order)
+          case Right(x)        => error.AccountScriptUnexpectResult(address, x.toString).asLeft
         } catch {
           case NonFatal(e) =>
             log.trace(error.formatStackTrace(e))
             error.AccountScriptException(address, e.getClass.getCanonicalName, e.getMessage).asLeft
         }
-    }
+    } else verifySignature(order)
 
-  private def verifySmartToken(blockchain: Blockchain, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
-    blockchain.assetScript(asset).fold(success) { script =>
-      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
+  private def verifySmartToken(blockchain: WavesBlockchainContext, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
+    if (blockchain.hasScript(asset)) {
+      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets.id))
         error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
       else
-        try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id) match {
-          case (_, Left(execError)) => error.AssetScriptReturnedError(asset, execError).asLeft
-          case (_, Right(FALSE))    => error.AssetScriptDeniedOrder(asset).asLeft
-          case (_, Right(TRUE))     => success
-          case (_, Right(x))        => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
+        try blockchain.runScript(asset, tx) match {
+          case Left(execError) => error.AssetScriptReturnedError(asset, execError).asLeft
+          case Right(FALSE)    => error.AssetScriptDeniedOrder(asset).asLeft
+          case Right(TRUE)     => success
+          case Right(x)        => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
         } catch {
           case NonFatal(e) =>
             error.AssetScriptException(asset, e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")).asLeft
         }
-    }
+    } else ().asRight
 
-  private def decimals(blockchain: Blockchain, assetId: Asset): Result[Int] =
+  private def decimals(blockchain: WavesBlockchainContext, assetId: Asset): Result[Int] =
     assetId.fold(lift(8)) { aid =>
       blockchain.assetDescription(aid).map(_.decimals).toRight(error.AssetNotFound(aid))
     }
 
-  private def validateDecimals(blockchain: Blockchain, o: Order): Result[(Int, Int)] =
+  private def validateDecimals(blockchain: WavesBlockchainContext, o: Order): Result[(Int, Int)] =
     for {
       pd <- decimals(blockchain, o.assetPair.priceAsset)
       ad <- decimals(blockchain, o.assetPair.amountAsset)
@@ -125,18 +123,18 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  private[dex] def checkOrderVersion(version: Byte, blockchain: Blockchain): Result[Unit] = version match {
+  private[dex] def checkOrderVersion(version: Byte, blockchain: WavesBlockchainContext): Result[Unit] = version match {
     case 1 => success
     case 2 =>
-      if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) success
+      if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)) success
       else Left(error.OrderVersionUnsupported(version, BlockchainFeatures.SmartAccountTrading))
     case 3 =>
-      if (blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)) success
+      if (blockchain.isFeatureActivated(BlockchainFeatures.OrderV3.id)) success
       else Left(error.OrderVersionUnsupported(version, BlockchainFeatures.OrderV3))
     case _ => Left(error.UnsupportedOrderVersion(version))
   }
 
-  def blockchainAware(blockchain: Blockchain,
+  def blockchainAware(blockchain: WavesBlockchainContext,
                       transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
                       matcherAddress: Address,
                       time: Time,

@@ -25,8 +25,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
 case class MatcherSettings(account: String,
-                           bindAddress: String,
-                           port: Int,
+                           ntpServer: String,
+                           restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
@@ -58,6 +58,8 @@ case class MatcherSettings(account: String,
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings])
+
+case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
 
 object MatcherSettings {
 

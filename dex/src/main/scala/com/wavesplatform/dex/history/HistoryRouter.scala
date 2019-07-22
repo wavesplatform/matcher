@@ -9,14 +9,14 @@ import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, Ord
 import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 
 object HistoryRouter {
 
-  def props(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings): Props =
-    Props(new HistoryRouter(blockchain, postgresConnection, orderHistorySettings))
+  def props(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings): Props =
+    Props(new HistoryRouter(assetDecimals, postgresConnection, orderHistorySettings))
 
   val eventTrade, buySide   = 0: Byte
   val eventCancel, sellSide = 1: Byte
@@ -102,13 +102,10 @@ object HistoryRouter {
   final case object StopAccumulate
 }
 
-class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
+class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizeAmountAndFee(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
-
-  private def denormalizePrice(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizePrice(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double = Denormalization.denormalizeAmountAndFee(value, pair, assetDecimals)
+  private def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePrice(value, pair, assetDecimals)
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
 

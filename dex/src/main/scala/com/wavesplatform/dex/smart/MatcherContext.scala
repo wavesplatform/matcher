@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.smart
 
 import cats.Eval
-import cats.data.EitherT
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -12,7 +11,21 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetDistribution, AssetDistributionPage, BalanceSnapshot, Blockchain, DataEntry, Height, InvokeScriptResult, LeaseBalance, Portfolio, TransactionId, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  AssetDescription,
+  AssetDistribution,
+  AssetDistributionPage,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  InvokeScriptResult,
+  LeaseBalance,
+  Portfolio,
+  TransactionId,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -22,30 +35,28 @@ import com.wavesplatform.utils.CloseableIterator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Try
 import scala.util.control.NoStackTrace
 
 // Used only for order validation
 object MatcherContext {
 
-  def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] =
-    Try {
-      val in: Coeval[Order] = Coeval.delay(inE.value)
-      BlockchainContext
-        .build(
-          version,
-          nByte,
-          in.map(o => Coproduct[BlockchainContext.In](o)),
-          Coeval.raiseError(new Denied("height")),
-          deniedBlockchain,
-          isTokenContext = false,
-          isContract = isDApp,
-          in.map(_.senderPublicKey.toAddress.bytes)
-        )
-    }.toEither.left.map(_.getMessage).flatMap(identity)
+  def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] = {
+    val in: Coeval[Order] = Coeval.delay(inE.value)
+    BlockchainContext
+      .build(
+        version,
+        nByte,
+        in.map(o => Coproduct[BlockchainContext.In](o)),
+        Coeval.raiseError(new Denied("height")),
+        deniedBlockchain,
+        isTokenContext = false,
+        isContract = isDApp,
+        in.map(_.senderPublicKey.toAddress.bytes)
+      )
+  }
 
-  private class Denied(x: String) extends RuntimeException(s"An access to the blockchain.$x is denied on DEX") with NoStackTrace
-  private def kill(x: String) = throw new Denied(x)
+  private class Denied(methodName: String) extends SecurityException(s"An access to the blockchain.$methodName is denied on DEX") with NoStackTrace
+  private def kill(methodName: String) = throw new Denied(methodName)
 
   private val deniedBlockchain = new Blockchain {
     override def settings: BlockchainSettings                                     = kill("settings")

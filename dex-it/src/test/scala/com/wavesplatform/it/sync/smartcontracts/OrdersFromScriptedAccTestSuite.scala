@@ -72,7 +72,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       setContract(Some("true && (height > 0)"), bob)
       assertBadRequestAndResponse(
         node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
-        "height is inaccessible when running script on matcher"
+        "An access to the blockchain.height is denied on DEX"
       )
     }
 

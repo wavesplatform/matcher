@@ -1,4 +1,5 @@
 import CommonSettings.autoImport.network
+import ReleasePlugin.autoImport._
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -30,7 +31,7 @@ lazy val it = project
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
     Test / test := Def
       .sequential(
-        root / packageAll,
+        root / Compile / packageAll,
         `dex-it` / Docker / docker,
         `dex-it` / Test / test
       )
@@ -97,44 +98,38 @@ git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
 // root project settings
+enablePlugins(ReleasePlugin)
+
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList map { p =>
-  p: ProjectReference
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
+  node,
+  `node-it`
+)
+
+Compile / cleanAll := {
+  val xs = allProjects
+  streams.value.log.info(s"Cleaning ${xs.mkString(", ")}")
+  clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))).value
 }
-
-lazy val cleanAll = taskKey[Unit]("Clean all projects")
-cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
-
-lazy val packageAll = taskKey[Unit]("Package all artifacts")
-packageAll := Def
-  .sequential(
-    root / cleanAll,
-    Def.task {
-      val a = (dex / Universal / packageZipTarball).value
-      val b = (dex / Debian / packageBin).value
-    }
-  )
-  .value
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := {
+  // try/finally is a hack to run clean before all tasks
   try {
-    cleanAll.value // Hack to run clean before all tasks
+    (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
     (`dex-generator` / Test / compile).value
   }
 }
 
-def checkPR: Command = Command.command("checkPR") { state =>
+commands += Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
     .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }
-
-commands += checkPR
 
 // IDE settings
 ideExcludedDirectories := Seq((root / baseDirectory).value / "_local")

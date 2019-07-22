@@ -9,6 +9,8 @@ object NodeNetwork {
     case Some(Devnet.suffix) => Devnet
     case _ => Mainnet
   }
+  
+  val All: List[NodeNetwork] = List(Mainnet, Testnet, Devnet)
 }
 
 object Mainnet extends NodeNetwork("mainnet")

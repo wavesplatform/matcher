@@ -224,7 +224,7 @@ object MatcherTool extends ScorexLogging {
     val blockchainDb              = openDB(actualConfig.getString("waves.db.directory"))
 
     AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = Base58.tryDecodeWithLimit(settings.account).get(1)
+      override val chainId: Byte = settings.addressSchemeCharacter.toByte
     }
 
     val start = System.currentTimeMillis()
@@ -316,7 +316,7 @@ object MatcherTool extends ScorexLogging {
       case "oi-migrate" =>
         val useFast = if (args.length < 3) false else args(2).toBoolean
         val offset  = if (args.length < 4) 0 else args(3).toInt
-        migrateOrderInfo(new ReadOnlyDB(blockchainDb, new ReadOptions()), db, settings.account, useFast, offset)
+        migrateOrderInfo(new ReadOnlyDB(blockchainDb, new ReadOptions()), db, settings.accountStorage, useFast, offset)
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
         deleteLegacyEntries(db)

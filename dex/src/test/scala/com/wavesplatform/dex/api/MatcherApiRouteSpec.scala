@@ -13,7 +13,6 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{RequestGen, WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
@@ -63,7 +62,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   }
 
   private def test[T](f: Route => T): T = {
-    val blockchain   = stub[Blockchain]
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
@@ -79,7 +77,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
     }
 
     val route = MatcherApiRoute(
-      assetPairBuilder = new AssetPairBuilder(settings, blockchain, Set.empty),
+      assetPairBuilder = new AssetPairBuilder(settings, _ => None, Set.empty),
       matcherPublicKey = matcherKeyPair.publicKey,
       matcher = ActorRef.noSender,
       addressActor = addressActor.ref,

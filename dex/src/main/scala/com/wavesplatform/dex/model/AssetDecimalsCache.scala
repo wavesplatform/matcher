@@ -4,10 +4,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 
-class AssetDecimalsCache(assetDescription: Asset => Option[AssetDescription]) extends ScorexLogging {
+class AssetDecimalsCache(assetDescription: IssuedAsset => Option[AssetDescription]) extends ScorexLogging {
 
   private val WavesDecimals      = 8
   private val assetDecimalsCache = new ConcurrentHashMap[Asset, Int](1000, 0.9f, 10)

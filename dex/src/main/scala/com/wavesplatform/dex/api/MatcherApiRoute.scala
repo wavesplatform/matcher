@@ -57,7 +57,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: Long,
+                           matcherAccountFee: () => Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
@@ -169,7 +169,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets"   -> matcherSettings.priceAssets,
-        "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+        "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee(), rateCache.getJson).value,
         "orderVersions" -> validatedAllowedOrderVersions.toSeq.sorted
       )
     )

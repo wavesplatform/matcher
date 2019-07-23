@@ -150,7 +150,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val config = configWithSettings()
 
     val settings = config.as[MatcherSettings]("waves.dex")
-    settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
+    settings.accountStorage should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)
     settings.exchangeTxBaseFee should be(300000)

@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
-class AssetPairBuilder(settings: MatcherSettings, assetDescription: Asset => Option[AssetDescription], blacklistedAssets: Set[IssuedAsset]) {
+class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset => Option[AssetDescription], blacklistedAssets: Set[IssuedAsset]) {
   import Either.cond
   import Ordered._
 

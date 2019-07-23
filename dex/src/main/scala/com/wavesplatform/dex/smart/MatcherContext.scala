@@ -38,6 +38,7 @@ import shapeless.Coproduct
 import scala.util.control.NoStackTrace
 
 // Used only for order validation
+// @TODO move to extension
 object MatcherContext {
 
   def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] = {

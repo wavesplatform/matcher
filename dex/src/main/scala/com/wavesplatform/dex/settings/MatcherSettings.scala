@@ -5,6 +5,7 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.db.AccountStorage.AccountStorageSettings
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
@@ -24,7 +25,8 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(account: String,
+case class MatcherSettings(addressSchemeCharacter: Char,
+                           accountStorage: AccountStorageSettings,
                            ntpServer: String,
                            restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
@@ -119,6 +121,7 @@ object MatcherSettings {
     val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
+      ???,
       account,
       bindAddress,
       port,

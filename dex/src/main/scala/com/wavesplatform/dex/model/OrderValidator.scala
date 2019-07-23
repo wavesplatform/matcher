@@ -10,8 +10,8 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.waves.WavesBlockchainContext
 import com.wavesplatform.dex.{RateCache, error}
-import com.wavesplatform.extensions.WavesBlockchainContext
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
@@ -163,7 +163,7 @@ object OrderValidator extends ScorexLogging {
       case DynamicSettings(baseFee) =>
         val mof =
           multiplyFeeByDouble(
-            ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee),
+            ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript),
             rateCache.getRate(order.matcherFeeAssetId).get
           )
         Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))

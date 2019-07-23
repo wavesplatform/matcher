@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.TransactionNotAllowedByAssetScript
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
@@ -207,7 +207,7 @@ object OrdersFromScriptedAssetTestSuite {
   }
 
   private val AllowAsset    = mkAllowAsset(0)
-  private val AllowAssetId = AllowAsset.id().toString
+  private val AllowAssetId  = AllowAsset.id().toString
   private val AllowAsset2   = mkAllowAsset(1)
   private val AllowAsset2Id = AllowAsset2.id().toString
   private val AllowAsset3   = mkAllowAsset(1)

@@ -50,7 +50,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         mkGet(route)(Base58.encode(publicKey), ts, ";;") ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "invalid signature"
+          message.value shouldEqual "The request has an invalid signature"
         }
       }
 

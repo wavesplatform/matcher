@@ -22,20 +22,15 @@ class OrderV3TestSuite extends MatcherSuiteBase with NTPTime {
     val price         = 100000000L
 
     "try to place not allowed orderV3" in {
-      try {
-        val orderv3 = node.prepareOrder(
-          sender = alice,
-          pair = wavesUsdPair,
-          OrderType.BUY,
-          amount = 3,
-          price = price,
-          version = 3,
-        )
-        node.placeOrder(orderv3)
-        throw new Exception("Expected exception wasn't thrown")
-      } catch {
-        case ex: Throwable => ex.getMessage should include("The orders of version 3 are denied by matcher")
-      }
+      val orderv3 = node.prepareOrder(
+        sender = alice,
+        pair = wavesUsdPair,
+        OrderType.BUY,
+        amount = 3,
+        price = price,
+        version = 3,
+      )
+      assertBadRequestAndResponse(node.placeOrder(orderv3), "The orders of version 3 are denied by matcher")
     }
 
     "matching orderV1 and orderV3" in {

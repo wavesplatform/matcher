@@ -343,11 +343,11 @@ object AsyncMatcherHttpApi extends Assertions {
       orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
     )
 
-    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int): Future[RatesResponse] = {
+    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int, apiKey: String): Future[RatesResponse] = {
       put(
         s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}",
         (rb: RequestBuilder) =>
-          rb.withApiKey(matcherNode.apiKey)
+          rb.withApiKey(apiKey)
             .setHeader("Content-type", "application/json;charset=utf-8")
             .setBody(stringify(toJson(rate))),
         expectedStatusCode
@@ -356,9 +356,9 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def getRates(): Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
 
-    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[RatesResponse] = {
+    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200, apiKey: String): Future[RatesResponse] = {
       retrying(
-        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
+        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(apiKey).build(),
         statusCode = expectedStatusCode
       ).as[RatesResponse]
     }

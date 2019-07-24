@@ -254,12 +254,12 @@ object SyncMatcherHttpApi extends Assertions {
                      waitTime: Duration = RequestAwaitTime * 5): MatcherState =
       sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
 
-    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode): RatesResponse =
-      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue), waitTime)
+    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue, apiKey), waitTime)
 
     def getRates: Map[Asset, Double] = sync(async(m).getRates())
 
-    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
-      sync(async(m).deleteRate(asset, expectedStatusCode.intValue))
+    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).deleteRate(asset, expectedStatusCode.intValue, apiKey))
   }
 }

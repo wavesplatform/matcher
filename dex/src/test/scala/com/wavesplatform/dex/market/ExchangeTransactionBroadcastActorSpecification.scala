@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
@@ -99,7 +100,7 @@ class ExchangeTransactionBroadcastActorSpecification
   }
 
   private def defaultActor(time: Time,
-                           isConfirmed: ExchangeTransaction => Boolean,
+                           isConfirmed: ByteStr => Boolean,
                            broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
     new ExchangeTransactionBroadcastActor(
       settings = ExchangeTransactionBroadcastSettings(

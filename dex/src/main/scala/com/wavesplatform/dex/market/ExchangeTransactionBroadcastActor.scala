@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
@@ -10,7 +11,7 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSettings,
                                         time: Time,
                                         isValid: ExchangeTransaction => Boolean,
-                                        isConfirmed: ExchangeTransaction => Boolean,
+                                        isConfirmed: ByteStr => Boolean,
                                         broadcast: Seq[ExchangeTransaction] => Unit)
     extends Actor
     with ScorexLogging {
@@ -37,7 +38,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
       val nowMs    = time.getTimestamp()
       val expireMs = nowMs - settings.maxPendingTime.toMillis
 
-      val (confirmed, unconfirmed) = toCheck.partition(isConfirmed)
+      val (confirmed, unconfirmed) = toCheck.partition(tx => isConfirmed(tx.id()))
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
       broadcast(ready)
@@ -59,7 +60,7 @@ object ExchangeTransactionBroadcastActor {
   def props(settings: ExchangeTransactionBroadcastSettings,
             time: Time,
             isValid: ExchangeTransaction => Boolean,
-            isConfirmed: ExchangeTransaction => Boolean,
+            isConfirmed: ByteStr => Boolean,
             broadcast: Seq[ExchangeTransaction] => Unit): Props =
     Props(new ExchangeTransactionBroadcastActor(settings, time, isValid, isConfirmed, broadcast))
 }

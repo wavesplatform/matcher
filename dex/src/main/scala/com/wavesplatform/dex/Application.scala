@@ -51,7 +51,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 //      private val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext(true).build
 //      private val transactions = TransactionsApiGrpc.blockingStub(channel)
 
-      override def hasTx(tx: Transaction): Boolean = ??? //{
+      override def wasForged(id: ByteStr): Boolean = ??? //{
 //        transactions.getTransactions(TransactionsRequest())
 //      }
 

@@ -344,7 +344,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
           settings.exchangeTransactionBroadcast,
           time,
           context.putToUtx,
-          context.hasTx,
+          context.wasForged,
           txs => txs.foreach(context.broadcastTx)
         ),
       "exchange-transaction-broadcast"

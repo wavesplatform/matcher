@@ -15,10 +15,10 @@ import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB}
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
@@ -88,7 +88,7 @@ object MatcherTool extends ScorexLogging {
     db.readWrite(rw => keysToDelete.result().foreach(rw.delete(_, "matcher-legacy-entries")))
   }
 
-  private def migrateOrderInfo(readOnlyBlockchainDb: ReadOnlyDB, db: DB, matcherAccount: String, useFast: Boolean, from: Int): Unit = {
+  private def migrateOrderInfo(readOnlyBlockchainDb: ReadOnlyDB, db: DB, matcherAccountAddress: Address, useFast: Boolean, from: Int): Unit = {
     log.info(s"Starting OrderInfo migration from $from, algorithm: ${if (useFast) "fast" else "correct"}")
     val readOnlyDB = new ReadOnlyDB(db, new ReadOptions())
 
@@ -103,7 +103,6 @@ object MatcherTool extends ScorexLogging {
         }
       )
 
-    val matcherAccountAddress = Address.fromString(matcherAccount).explicitGet()
     val isMatcherScripted = {
       for {
         id     <- readOnlyBlockchainDb.get(Keys.addressId(matcherAccountAddress))
@@ -314,9 +313,10 @@ object MatcherTool extends ScorexLogging {
           log.info(s"Order info: $oi")
         }
       case "oi-migrate" =>
-        val useFast = if (args.length < 3) false else args(2).toBoolean
-        val offset  = if (args.length < 4) 0 else args(3).toInt
-        migrateOrderInfo(new ReadOnlyDB(blockchainDb, new ReadOptions()), db, settings.accountStorage, useFast, offset)
+        val useFast        = if (args.length < 3) false else args(2).toBoolean
+        val offset         = if (args.length < 4) 0 else args(3).toInt
+        val accountStorage = AccountStorage.load(settings.accountStorage).explicitGet()
+        migrateOrderInfo(new ReadOnlyDB(blockchainDb, new ReadOptions()), db, accountStorage.keyPair.toAddress, useFast, offset)
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
         deleteLegacyEntries(db)

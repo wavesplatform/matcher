@@ -34,7 +34,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
-import monix.execution.Scheduler
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
@@ -46,8 +45,6 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
     with ScorexLogging {
 
   import actorSystem.dispatcher
-
-  private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
   private val time = new NTP(settings.ntpServer)
 

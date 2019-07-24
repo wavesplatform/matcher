@@ -76,7 +76,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       override def assetDecimals(asset: Asset): Int = 8
     }
 
-    val route = MatcherApiRoute(
+    val route: Route = ???/* MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(settings, _ => None, Set.empty),
       matcherPublicKey = matcherKeyPair.publicKey,
       matcher = ActorRef.noSender,
@@ -97,7 +97,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       apiKeyHash = None,
       rateCache = RateCache.inMem,
       validatedAllowedOrderVersions = Set(1, 2, 3)
-    ).route
+    ).route*/
 
     f(route)
   }

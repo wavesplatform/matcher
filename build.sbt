@@ -10,15 +10,26 @@ def nodeVersionTag: String = "v1.0.1"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
+// @TODO Remove in future, after: https://github.com/wavesplatform/Waves/pull/2426
+lazy val `grpc-server` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "grpc-server")
+
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
-lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val dex = project.dependsOn(
+  node % "compile;test->test;runtime->provided",
+  `grpc-server`
+)
 
 lazy val `dex-it` = project
   .dependsOn(
     dex,
+    `grpc-server`,
     `node-it` % "compile;test->test"
   )
+  .settings(inTask(docker)(Seq(
+    exposedPorts += 6870,
+    additionalFiles += (`grpc-server` / Universal / stage).value
+  )))
 
 lazy val `dex-generator` = project.dependsOn(
   dex,
@@ -90,7 +101,7 @@ inScope(Global)(
     },
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value
+    buildNodeContainer := (`node-it` / Docker / docker).value // grpc-server
   ))
 
 // ThisBuild options
@@ -103,7 +114,8 @@ enablePlugins(ReleasePlugin)
 // https://stackoverflow.com/a/48592704/4050580
 def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
   node,
-  `node-it`
+  `node-it`,
+  `grpc-server`
 )
 
 Compile / cleanAll := {

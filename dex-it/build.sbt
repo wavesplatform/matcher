@@ -9,7 +9,7 @@ docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/dex-it")),
-    exposedPorts := Set(6886),
+    exposedPorts += 6886,
     additionalFiles ++= Seq(
       (LocalProject("dex") / Universal / stage).value,
       (Test / resourceDirectory).value / "template.conf",

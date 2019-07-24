@@ -36,7 +36,7 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+  private val txFactory: ExchangeTransactionCreator = ??? // = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
@@ -82,7 +82,7 @@ class OrderBookActorSpecification
         p => Option(md.get(p)),
         _ => (),
         raw => MatchingRules(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact),
-        txFactory,
+        txFactory.createTransaction,
         ntpTime,
         matchingRules
       ) with RestartableActor)

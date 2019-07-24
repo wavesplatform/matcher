@@ -1,3 +1,5 @@
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
 
 enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
@@ -30,7 +32,8 @@ lazy val versionSourceTask = Def.task {
        |  val VersionString = "${version.value}"
        |  val VersionTuple = ($major, $minor, $patch)
        |}
-       |""".stripMargin
+       |""".stripMargin,
+    charset = StandardCharsets.UTF_8
   )
   Seq(versionFile)
 }

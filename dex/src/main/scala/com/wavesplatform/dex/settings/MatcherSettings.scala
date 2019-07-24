@@ -72,10 +72,6 @@ object MatcherSettings {
 
     import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
 
-    val account     = config.as[String]("account")
-    val bindAddress = config.as[String]("bind-address")
-    val port        = config.as[Int]("port")
-
     val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
       errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
@@ -121,10 +117,10 @@ object MatcherSettings {
     val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
-      ???,
-      account,
-      bindAddress,
-      port,
+      config.as[String]("address-scheme-character").headOption.getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!")),
+      config.as[AccountStorageSettings]("account-storage"),
+      config.as[String]("ntp-server"),
+      config.as[RestAPISettings]("rest-api"),
       exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,

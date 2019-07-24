@@ -10,6 +10,7 @@ import akka.stream.ActorMaterializer
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.waves.WavesBlockchainContext
@@ -22,13 +23,13 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter, UtilApp}
 import com.wavesplatform.utx.UtxPool
+import io.grpc.ManagedChannelBuilder
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await
@@ -46,9 +47,13 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private var matcher: Matcher = _
 
   def run(): Unit = {
-
     val extensionContext = new WavesBlockchainContext {
-      override def hasTx(tx: Transaction): Boolean = ???
+//      private val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext(true).build
+//      private val transactions = TransactionsApiGrpc.blockingStub(channel)
+
+      override def hasTx(tx: Transaction): Boolean = ??? //{
+//        transactions.getTransactions(TransactionsRequest())
+//      }
 
       override def broadcastTx(tx: Transaction): Unit = ???
 
@@ -106,7 +111,7 @@ object Application {
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
 
-    val settings = config.as[MatcherSettings]("waves.dex")
+    val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme {

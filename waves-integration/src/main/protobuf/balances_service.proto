@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package waves.dex.grpc.integration;
+option java_package = "com.wavesplatform.dex.grpc.integration.services";
+
+import "transaction.proto";
+import "google/protobuf/empty.proto";
+
+service BalancesService {
+    rpc GetBalanceChanges (stream BalanceChangesRequest) returns (stream BalanceChangesResponse);
+    rpc GetCurrentObservableBalances (google.protobuf.Empty) returns (CurrentObservableBalancesResponse);
+}
+
+message BalanceChangesRequest {
+    bytes address = 1;
+    waves.AssetId asset = 2;
+}
+
+message BalanceChangesResponse {
+    bytes address = 1;
+    waves.AssetId asset = 2;
+    int64 balance = 3;
+}
+
+message CurrentObservableBalancesResponse {
+    message AssetsSet {
+        repeated waves.AssetId assets = 1;
+    }
+    map<string, AssetsSet> observableBalancesMap = 1;
+}

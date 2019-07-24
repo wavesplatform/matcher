@@ -21,10 +21,10 @@ object Implicits {
   implicit val longShow              = autoShow[Long]
   implicit val stringShow            = show[String](identity)
   implicit val doubleShow            = stringShow.contramap[Double]((x: Double) => formatValue(x))
-  implicit val byteStrShow           = show[ByteStr](_.base58)
+  implicit val byteStrShow           = show[ByteStr](_.toString)
   implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
   implicit val assetPairShow         = show[AssetPair](_.key)
-  implicit val publicKeyShow         = show[PublicKey](_.base58)
+  implicit val publicKeyShow         = show[PublicKey](_.toString)
   implicit val addressShow           = show[Address](_.stringRepr)
   implicit val blockchainFeatureShow = show[BlockchainFeature](_.description)
 
@@ -65,10 +65,10 @@ object Implicits {
   implicit val longWrites              = ContextWrites.auto[Long]
   implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](formatValue)
   implicit val strWrites               = ContextWrites.auto[String]
-  implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.base58)
+  implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.toString)
   implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
   implicit val assetPairWrites         = ContextWrites.contextWrites[AssetPair]((x, _) => x.json)
-  implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.base58)
+  implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.toString)
   implicit val addressWrites           = strWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = strWrites.contramap[BlockchainFeature](_.description)
 

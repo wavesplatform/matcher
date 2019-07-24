@@ -72,7 +72,7 @@ object OrderValidator {
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
       else
-        try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id) match {
+        try ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = true, asset.id) match {
           case (_, Left(execError)) => error.AssetScriptReturnedError(asset, execError).asLeft
           case (_, Right(FALSE))    => error.AssetScriptDeniedOrder(asset).asLeft
           case (_, Right(TRUE))     => success
@@ -215,14 +215,14 @@ object OrderValidator {
     * @param order            placed order
     * @param orderFeeSettings matcher settings for the fee of orders
     * @param matchPrice       price at which order is executed
-    * @param rateCache        assets rates (asset cost in Waves)
+    * @param rateCache        assets rates (cost of Waves in asset)
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
   private[dex] def getMinValidFeeForSettings(order: Order,
-                                                 orderFeeSettings: OrderFeeSettings,
-                                                 matchPrice: Long,
-                                                 rateCache: RateCache,
-                                                 multiplier: Double = 1): Long = {
+                                             orderFeeSettings: OrderFeeSettings,
+                                             matchPrice: Long,
+                                             rateCache: RateCache,
+                                             multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
       case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)

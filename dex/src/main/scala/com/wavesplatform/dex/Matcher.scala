@@ -327,8 +327,10 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   override def start(): Unit = {
+
     val journalDir  = new File(settings.journalDataDir)
     val snapshotDir = new File(settings.snapshotsDataDir)
+
     journalDir.mkdirs()
     snapshotDir.mkdirs()
 

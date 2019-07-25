@@ -132,7 +132,6 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     createTables(s"localhost:$getPostgresContainerHostPort")
 
     Seq(IssueUsdTx, IssueWctTx, IssueEthTx).map(_.json()).map(node.broadcastRequest(_)).foreach(tx => node.waitForTransaction(tx.id))
-
     node.upsertRate(ethAsset, 1.0, expectedStatusCode = Created)
   }
 

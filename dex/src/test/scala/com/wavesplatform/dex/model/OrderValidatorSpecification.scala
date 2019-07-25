@@ -405,9 +405,8 @@ class OrderValidatorSpecification
 
         forAll(preconditions) {
           case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize) =>
-            def normalizeAmount(value: Double): Long =
-              Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
-            def normalizePrice(value: Double): Long = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+            def normalizeAmount(value: Double): Long = Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
+            def normalizePrice(value: Double): Long  = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
             def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals)
             def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)

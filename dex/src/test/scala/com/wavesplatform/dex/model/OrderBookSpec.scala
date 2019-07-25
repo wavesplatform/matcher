@@ -21,16 +21,16 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {
-    val ord1 = buy(pair, 1583290045643L, 34118)
-    val ord2 = buy(pair, 170484969L, 34120)
-    val ord3 = buy(pair, 44521418496L, 34000)
+    val ord1 = LimitOrder(buy(pair, 1583290045643L, 34118))
+    val ord2 = LimitOrder(buy(pair, 170484969L, 34120))
+    val ord3 = LimitOrder(buy(pair, 44521418496L, 34000))
 
     val ob = OrderBook.empty
     ob.add(ord1, ntpNow)
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
 
-    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(LimitOrder(ord2), LimitOrder(ord1), LimitOrder(ord3))
+    ob.allOrders.toSeq.map(_._2) shouldEqual Seq(ord2, ord1, ord3)
   }
 
   "place several buy orders at the same price" in {}
@@ -39,19 +39,19 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val ob                 = OrderBook.empty
     val normalizedTickSize = toNormalized(100L)
 
-    val buyOrd1 = buy(pair, 1583290045643L, 34100)
-    val buyOrd2 = buy(pair, 170484969L, 34120)
-    val buyOrd3 = buy(pair, 44521418496L, 34210)
-    val buyOrd4 = buy(pair, 44521418495L, 34303)
-    val buyOrd5 = buy(pair, 44521418494L, 34357)
-    val buyOrd6 = buy(pair, 44521418493L, 34389)
+    val buyOrd1 = LimitOrder(buy(pair, 1583290045643L, 34100))
+    val buyOrd2 = LimitOrder(buy(pair, 170484969L, 34120))
+    val buyOrd3 = LimitOrder(buy(pair, 44521418496L, 34210))
+    val buyOrd4 = LimitOrder(buy(pair, 44521418495L, 34303))
+    val buyOrd5 = LimitOrder(buy(pair, 44521418494L, 34357))
+    val buyOrd6 = LimitOrder(buy(pair, 44521418493L, 34389))
 
-    val sellOrd1 = sell(pair, 2583290045643L, 44100)
-    val sellOrd2 = sell(pair, 270484969L, 44120)
-    val sellOrd3 = sell(pair, 54521418496L, 44210)
-    val sellOrd4 = sell(pair, 54521418495L, 44303)
-    val sellOrd5 = sell(pair, 54521418494L, 44357)
-    val sellOrd6 = sell(pair, 54521418493L, 44389)
+    val sellOrd1 = LimitOrder(sell(pair, 2583290045643L, 44100))
+    val sellOrd2 = LimitOrder(sell(pair, 270484969L, 44120))
+    val sellOrd3 = LimitOrder(sell(pair, 54521418496L, 44210))
+    val sellOrd4 = LimitOrder(sell(pair, 54521418495L, 44303))
+    val sellOrd5 = LimitOrder(sell(pair, 54521418494L, 44357))
+    val sellOrd6 = LimitOrder(sell(pair, 54521418493L, 44389))
 
     ob.add(buyOrd1, ntpNow, normalizedTickSize)
     ob.add(buyOrd2, ntpNow, normalizedTickSize)
@@ -75,7 +75,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         34300 -> Vector(buyOrd4, buyOrd5, buyOrd6),
         34200 -> Vector(buyOrd3),
         34100 -> Vector(buyOrd1, buyOrd2),
-      ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
+      ).map { case (price, orders) => toNormalized(price) -> orders }: _*
     )
 
     ob.getAsks shouldBe mutable.TreeMap[Price, Level](
@@ -84,7 +84,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         44200 -> Vector(sellOrd2),
         44300 -> Vector(sellOrd3),
         44400 -> Vector(sellOrd4, sellOrd5, sellOrd6),
-      ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
+      ).map { case (price, orders) => toNormalized(price) -> orders }: _*
     )
   }
 
@@ -102,42 +102,37 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         val normalizedTickSize = toNormalized(100L)
         val ob                 = OrderBook.empty
 
-        val sellOrder = sell(pair, 54521418493L, 44389)
+        val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
         ob.add(sellOrder, ntpNow, normalizedTickSize)
         ob.add(sellOrder, ntpNow, normalizedTickSize)
 
         ob.getAsks.size shouldBe 1
-
-        val sellLimitOrder = LimitOrder(sellOrder)
-        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellOrder, sellOrder)
       }
 
       "MatchingRules.Default.normalizedTickSize" in {
         val ob = OrderBook.empty
 
-        val sellOrder = sell(pair, 54521418493L, 44389)
+        val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
         ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
         ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
 
         ob.getAsks.size shouldBe 1
-
-        val sellLimitOrder = LimitOrder(sellOrder)
-        ob.getAsks.head._2.toList shouldBe List(sellLimitOrder, sellLimitOrder)
+        ob.getAsks.head._2.toList shouldBe List(sellOrder, sellOrder)
       }
     }
 
     "with different levels" in {
       val ob = OrderBook.empty
 
-      val sellOrder = sell(pair, 54521418493L, 44389)
+      val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
       ob.add(sellOrder, ntpNow, toNormalized(100L))
       ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
 
       ob.getAsks.size shouldBe 2
 
-      val sellLimitOrder = LimitOrder(sellOrder)
-      ob.getAsks.head._2.head shouldBe sellLimitOrder
-      ob.getAsks.last._2.head shouldBe sellLimitOrder
+      ob.getAsks.head._2.head shouldBe sellOrder
+      ob.getAsks.last._2.head shouldBe sellOrder
     }
   }
 
@@ -146,13 +141,13 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
     val ob = OrderBook.empty
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
+    ob.add(LimitOrder(ord1), ntpNow)
+    ob.add(LimitOrder(ord2), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
 
     val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
-    ob.add(ord3, ntpNow)
+    ob.add(LimitOrder(ord3), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
@@ -164,17 +159,17 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val ord4 = buy(pair, 22 * Order.PriceConstant, 115)
 
     val ob = OrderBook.empty
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
-    ob.add(ord3, ntpNow)
-    ob.add(ord4, ntpNow)
+    ob.add(LimitOrder(ord1), ntpNow)
+    ob.add(LimitOrder(ord2), ntpNow)
+    ob.add(LimitOrder(ord3), ntpNow)
+    ob.add(LimitOrder(ord4), ntpNow)
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
     ob.allOrders.map(_._2) shouldEqual Seq(
       SellLimitOrder(
         restAmount,
-        ord3.matcherFee - LimitOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
+        ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
         ord3
       ))
   }
@@ -186,9 +181,9 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
     val ob = OrderBook.empty
 
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
-    ob.add(ord3, ntpNow)
+    ob.add(LimitOrder(ord1), ntpNow)
+    ob.add(LimitOrder(ord2), ntpNow)
+    ob.add(LimitOrder(ord3), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
@@ -200,16 +195,16 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
     val ob = OrderBook.empty
 
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
-    ob.add(ord3, ntpNow)
+    ob.add(LimitOrder(ord1), ntpNow)
+    ob.add(LimitOrder(ord2), ntpNow)
+    ob.add(LimitOrder(ord3), ntpNow)
 
     val corrected1 = Order.correctAmount(ord2.amount, ord2.price)
     val leftovers1 = ord3.amount - corrected1
     val corrected2 = Order.correctAmount(leftovers1, ord1.price)
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
-    val restFee = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
+    val restFee = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
     ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
@@ -221,12 +216,12 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
     val ob = OrderBook.empty
 
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
-    ob.add(ord3, ntpNow)
+    ob.add(LimitOrder(ord1), ntpNow)
+    ob.add(LimitOrder(ord2), ntpNow)
+    ob.add(LimitOrder(ord3), ntpNow)
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
-    val restFee    = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
+    val restFee    = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
     ob.allOrders.toSeq.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
@@ -236,12 +231,12 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val s = rawSell(p, 30000000000L, 280)
 
     val ob = OrderBook.empty
-    ob.add(s, ntpNow)
-    ob.add(b, ntpNow)
+    ob.add(LimitOrder(s), ntpNow)
+    ob.add(LimitOrder(b), ntpNow)
 
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
-    val restFee     = s.matcherFee - LimitOrder.partialFee(s.matcherFee, s.amount, restSAmount)
+    val restFee     = s.matcherFee - AcceptedOrder.partialFee(s.matcherFee, s.amount, restSAmount)
     ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
   }
 
@@ -319,6 +314,4 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
   } yield Snapshot(bids, asks, lastTrade)
 
   private val sideSnapshotSerGen: Gen[SideSnapshot] = Gen.oneOf(asksGen, bidsGen)
-
-  private def toNormalized(value: Long): Long = value * Order.PriceConstant
 }

@@ -7,6 +7,7 @@ object DBRecords {
   sealed trait Record
 
   case class OrderRecord(id: String,
+                         tpe: Byte,
                          senderAddress: String,
                          senderPublicKey: String,
                          amountAssetId: String,

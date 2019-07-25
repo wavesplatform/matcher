@@ -43,11 +43,12 @@ class OrderBookActor(owner: ActorRef,
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
   private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
 
-  private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
+  private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair"    -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
-  private var orderBook   = OrderBook.empty
 
+  private var orderBook                  = OrderBook.empty
   private var actualRules: MatchingRules = normalize(matchingRules.head)
+
   private def update(updated: NonEmptyList[RawMatchingRules]): Unit = if (matchingRules.head != updated.head) {
     matchingRules = updated
     updateMatchingRules(matchingRules.head)
@@ -91,8 +92,9 @@ class OrderBookActor(owner: ActorRef,
         case _ =>
           lastProcessedOffset = Some(request.offset)
           request.event match {
-            case x: QueueEvent.Placed   => onAddOrder(request, x.order)
-            case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
+            case QueueEvent.Placed(limitOrder)        => onAddOrder(request, limitOrder)
+            case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
+            case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               updateSnapshot(OrderBook.AggregatedSnapshot())
               processEvents(orderBook.cancelAll(request.timestamp))
@@ -104,8 +106,7 @@ class OrderBookActor(owner: ActorRef,
 
     case MatcherActor.Ping => sender() ! MatcherActor.Pong
 
-    case ForceStartOrderBook(p) if p == assetPair =>
-      sender() ! OrderBookCreated(assetPair)
+    case ForceStartOrderBook(p) if p == assetPair => sender() ! OrderBookCreated(assetPair)
 
     case OrderBookSnapshotStoreActor.Response.Updated(offset) =>
       log.info(s"Snapshot has been saved at offset $offset")
@@ -126,8 +127,8 @@ class OrderBookActor(owner: ActorRef,
 
     events.foreach { e =>
       e match {
-        case Events.OrderAdded(order, _) =>
-          log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
+        case Events.OrderAdded(order, _)                    => log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
+        case Events.OrderCanceled(order, isSystemCancel, _) => log.info(s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)")
         case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
           createTransaction(submitted, counter, timestamp) match {
@@ -137,25 +138,22 @@ class OrderBookActor(owner: ActorRef,
                    |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                    |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
           }
-        case Events.OrderCanceled(order, unmatchable, _) =>
-          log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
       }
 
       addressActor ! e
     }
   }
 
-  private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp) match {
-      case Some(cancelEvent) =>
-        processEvents(List(cancelEvent))
-      case None =>
-        log.warn(s"Error applying $event: order not found")
-    })
+  private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit = cancelTimer.measure {
+    orderBook.cancel(orderIdToCancel, event.timestamp) match {
+      case Some(cancelEvent) => processEvents(List(cancelEvent))
+      case None              => log.warn(s"Error applying $event: order not found")
+    }
+  }
 
-  private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
+  private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.normalizedTickSize))
+    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, actualRules.normalizedTickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -207,7 +205,8 @@ object OrderBookActor {
         createTransaction,
         time,
         matchingRules
-      ))
+      )
+    )
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

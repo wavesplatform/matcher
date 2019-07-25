@@ -95,7 +95,9 @@ object Dependencies {
     akkaModule("persistence-query"),
     akkaHttp,
     "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
-    janino
+    janino,
+    "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   ) ++ Seq(
     akkaModule("testkit"),
     akkaModule("persistence-tck"),

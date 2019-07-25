@@ -1,14 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsByIdRequest}
 import com.wavesplatform.dex.waves.WavesBlockchainGrpcContext
-import com.wavesplatform.it.{Docker, MatcherSuiteBase}
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.IssueEthTx
-import io.grpc.ManagedChannelBuilder
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.{Docker, MatcherSuiteBase}
 
 class GrpcTestSuite extends MatcherSuiteBase {
 
@@ -16,7 +13,7 @@ class GrpcTestSuite extends MatcherSuiteBase {
     ConfigFactory.parseString("""|
       |waves {
       |  network.node-name = node02
-      |  extensions = [ "com.wavesplatform.api.grpc.GRPCServerExtension" ]
+      |  extensions = [ "com.wavesplatform.dex.GrpcServerExtension" ]
       |
       |  grpc {
       |    host = 0.0.0.0
@@ -33,15 +30,24 @@ class GrpcTestSuite extends MatcherSuiteBase {
     port = dockerNode.nodeExternalPort(6870)
   )
 
-  "wasForged" in {
-    node.signedBroadcast(IssueEthTx.json())
+  "wasForged" - {
     val id = IssueEthTx.id()
-    node.waitForTransaction(id.toString)
 
-    val addr = IssueEthTx.sender.toAddress.bytes.arr
-    println(s"addr: length=${addr.length}, content=${addr.mkString(", ")}| base64=${IssueEthTx.sender.toAddress.bytes.base64Raw}")
-    println(s"id: length=${id.length}, content=${id.arr.mkString(", ")}| base64=${id.base64}")
-    context.wasForged(id) shouldBe true
+    "false for unknown tx" in {
+      context.wasForged(id) shouldBe false
+    }
+
+    "true for forged tx" in {
+      node.signedBroadcast(IssueEthTx.json())
+
+      node.waitForTransaction(id.toString)
+      context.wasForged(id) shouldBe true
+    }
+  }
+
+  "broadcastTx - sunny day" in {
+    context.broadcastTx(IssueWctTx)
+    node.waitForTransaction(IssueWctTx.id().toString)
   }
 
 }

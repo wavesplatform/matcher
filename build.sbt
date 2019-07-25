@@ -26,10 +26,12 @@ lazy val `dex-it` = project
     `grpc-server`,
     `node-it` % "compile;test->test"
   )
-  .settings(inTask(docker)(Seq(
-    exposedPorts += 6870,
-    additionalFiles += (`grpc-server` / Universal / stage).value
-  )))
+  .settings(
+    inTask(docker)(
+      Seq(
+        exposedPorts += 6870,
+        additionalFiles += (`grpc-server` / Universal / stage).value
+      )))
 
 lazy val `dex-generator` = project.dependsOn(
   dex,
@@ -50,6 +52,7 @@ lazy val it = project
   )
 
 lazy val root = (project in file("."))
+  .settings(name := "dex-root")
   .aggregate(
     dex,
     `dex-it`,

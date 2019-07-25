@@ -13,9 +13,11 @@ Seq(
   "se.marcuslonnberg" % "sbt-docker"             % "1.4.1",
   "com.typesafe.sbt"  % "sbt-git"                % "0.9.3",
   "com.lucidchart"    % "sbt-scalafmt"           % "1.15",
-  "org.jetbrains"     % "sbt-ide-settings"       % "1.0.0"
+  "org.jetbrains"     % "sbt-ide-settings"       % "1.0.0",
+  "com.thesamet"      % "sbt-protoc"             % "0.99.19"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
+  "org.vafer"            % "jdeb"            % "1.5" artifacts Artifact("jdeb", "jar", "jar"),
+  "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4"
 )

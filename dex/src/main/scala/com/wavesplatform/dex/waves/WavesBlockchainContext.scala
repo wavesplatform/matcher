@@ -2,8 +2,8 @@ package com.wavesplatform.dex.waves
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.api.grpc.{TransactionsByIdRequest, VanillaTransactionConversions, WavesBlockchainApiGrpc}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, VolumeAndFee}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -35,24 +35,18 @@ trait WavesBlockchainContext {
 }
 
 class WavesBlockchainGrpcContext(matcherAddress: Address, channel: ManagedChannel) extends WavesBlockchainContext {
-  private val transactions = TransactionsApiGrpc.blockingStub(channel)
+  private val waves = WavesBlockchainApiGrpc.blockingStub(channel)
 
   // sender is mandatory!
-  override def wasForged(id: ByteStr): Boolean = {
-    val request = TransactionsRequest(
-      sender = ByteString.copyFrom(matcherAddress.bytes.arr), //ByteString.copyFrom(matcherAddress.bytes.arr),
-      transactionIds = Seq(ByteString.copyFrom(id.arr))
-      //            sender = ByteString.copyFrom(id.arr),
-      //          transactionIds = Seq(ByteString.copyFrom(matcherAddress.bytes.arr))
-    )
-    println(s"request:\n${request.toProtoString}")
-    transactions
-      .getTransactions(
-        request)
-      .nonEmpty
-  }
+  override def wasForged(id: ByteStr): Boolean =
+    waves
+      .getStatuses(TransactionsByIdRequest(Seq(ByteString.copyFrom(id.arr))))
+      .toIterable
+      .headOption
+      .exists(_.status.isConfirmed)
 
-  override def broadcastTx(tx: Transaction): Unit                                                 = ???
+  override def broadcastTx(tx: Transaction): Unit = waves.broadcast(tx.toPB)
+
   override def isFeatureActivated(id: Short): Boolean                                             = ???
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription]                     = ???
   override def hasScript(asset: IssuedAsset): Boolean                                             = ???

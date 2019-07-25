@@ -1,0 +1,85 @@
+syntax = "proto3";
+package waves.dex.grpc;
+option java_package = "com.wavesplatform.dex.api.grpc";
+
+import "transaction.proto";
+
+service WavesBlockchainApi {
+    rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
+
+    rpc Broadcast (waves.SignedTransaction) returns (BroadcastResponse);
+
+    rpc IsFeatureActivated (IsFeatureActivatedRequest) returns (IsFeatureActivatedResponse);
+
+    rpc AssetDescription (AssetIdRequest) returns (AssetDescriptionResponse);
+
+    rpc HasScript (AssetIdRequest) returns (HasScriptResponse);
+
+    rpc RunAssetScript (RunAssetScriptRequest) returns (RunAssetScriptResponse);
+
+    //    def hasScript(address: Address): Boolean
+    //    def runScript(address: Address, input: Order): Either[String, Terms.EVALUATED]
+    //
+    //    def spendableBalanceChanged: Observable[(Address, Asset)]
+    //    def spendableBalance(address: Address, asset: Asset): Long
+    //
+    //    def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
+    //    def putToUtx(tx: Transaction): Boolean
+}
+
+message TransactionStatus {
+    enum Status {
+        NOT_EXISTS = 0;
+        UNCONFIRMED = 1;
+        CONFIRMED = 2;
+    }
+
+    bytes id = 1;
+    Status status = 2;
+    int64 height = 3;
+}
+
+message TransactionsByIdRequest {
+    repeated bytes transaction_ids = 1;
+}
+
+message AssetIdRequest {
+    bytes assetId = 1;
+}
+
+message BroadcastResponse {
+}
+
+message IsFeatureActivatedRequest {
+    int32 id = 1;
+}
+
+message IsFeatureActivatedResponse {
+    bool isActivated = 1;
+}
+
+message AssetDescriptionResponse {
+    bytes name = 1;
+    int32 decimals = 2;
+    bool hasScript = 3;
+}
+
+message HasScriptResponse {
+    bool has = 1;
+}
+
+message RunAssetScriptRequest {
+    bytes assetId = 1;
+    waves.SignedTransaction transaction = 2;
+}
+
+message RunAssetScriptResponse {
+    oneof result {
+        string error = 1;
+        ScriptEvaluated success = 2;
+    }
+}
+
+message ScriptEvaluated {
+
+}

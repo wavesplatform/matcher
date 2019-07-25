@@ -1,5 +1,7 @@
 syntax = "proto3";
+
 package waves.dex.grpc;
+
 option java_package = "com.wavesplatform.dex.api.grpc";
 
 import "transaction.proto";
@@ -7,25 +9,52 @@ import "transaction.proto";
 service WavesBlockchainApi {
     rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
 
-    rpc Broadcast (waves.SignedTransaction) returns (BroadcastResponse);
+    rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);
 
     rpc IsFeatureActivated (IsFeatureActivatedRequest) returns (IsFeatureActivatedResponse);
 
     rpc AssetDescription (AssetIdRequest) returns (AssetDescriptionResponse);
 
-    rpc HasScript (AssetIdRequest) returns (HasScriptResponse);
+    rpc HasAssetScript (AssetIdRequest) returns (HasScriptResponse);
 
-    rpc RunAssetScript (RunAssetScriptRequest) returns (RunAssetScriptResponse);
+    rpc RunAssetScript (RunAssetScriptRequest) returns (RunScriptResponse);
 
-    //    def hasScript(address: Address): Boolean
-    //    def runScript(address: Address, input: Order): Either[String, Terms.EVALUATED]
-    //
-    //    def spendableBalanceChanged: Observable[(Address, Asset)]
-    //    def spendableBalance(address: Address, asset: Asset): Long
-    //
-    //    def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
-    //    def putToUtx(tx: Transaction): Boolean
+    rpc HasAddressScript (HasAddressScriptRequest) returns (HasScriptResponse);
+
+    rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
+
+    rpc SpendableAssetBalance (SpendableAssetBalanceRequest) returns (SpendableAssetBalanceResponse);
+
+    rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 }
+
+// Common requests
+
+message TransactionsByIdRequest {
+    repeated bytes transaction_ids = 1;
+}
+
+message AssetIdRequest {
+    bytes assetId = 1;
+}
+
+// Common responses
+
+message HasScriptResponse {
+    bool has = 1;
+}
+
+message RunScriptResponse {
+    oneof result {
+        string error = 1;
+        ScriptEvaluated success = 2;
+    }
+}
+
+message ScriptEvaluated {
+}
+
+// Specific requests and responses
 
 message TransactionStatus {
     enum Status {
@@ -39,19 +68,16 @@ message TransactionStatus {
     int64 height = 3;
 }
 
-message TransactionsByIdRequest {
-    repeated bytes transaction_ids = 1;
-}
-
-message AssetIdRequest {
-    bytes assetId = 1;
+message BroadcastRequest {
+    repeated waves.SignedTransaction transactions = 1;
 }
 
 message BroadcastResponse {
+    repeated bytes validTransactionIds = 1;
 }
 
 message IsFeatureActivatedRequest {
-    int32 id = 1;
+    int32 featureId = 1;
 }
 
 message IsFeatureActivatedResponse {
@@ -64,22 +90,33 @@ message AssetDescriptionResponse {
     bool hasScript = 3;
 }
 
-message HasScriptResponse {
-    bool has = 1;
-}
-
 message RunAssetScriptRequest {
     bytes assetId = 1;
     waves.SignedTransaction transaction = 2;
 }
 
-message RunAssetScriptResponse {
-    oneof result {
-        string error = 1;
-        ScriptEvaluated success = 2;
-    }
+message RunAddressScriptRequest {
+    bytes address = 1;
+    waves.SignedTransaction transaction = 2;
 }
 
-message ScriptEvaluated {
+message HasAddressScriptRequest {
+    bytes address = 1;
+}
 
+message SpendableAssetBalanceRequest {
+    bytes address = 1;
+    bytes assetId = 2;
+}
+
+message SpendableAssetBalanceResponse {
+    int64 balance = 1;
+}
+
+message ForgedOrderRequest {
+    bytes orderId = 1;
+}
+
+message ForgedOrderResponse {
+    bool isForged = 1;
 }

@@ -10,9 +10,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 
 class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSettings,
                                         time: Time,
-                                        isValid: ExchangeTransaction => Boolean,
                                         isConfirmed: ByteStr => Boolean,
-                                        broadcast: Seq[ExchangeTransaction] => Unit)
+                                        broadcast: Seq[ExchangeTransaction] => Set[ByteStr])
     extends Actor
     with ScorexLogging {
 
@@ -24,15 +23,12 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
   }
 
   private val default: Receive = {
-    case ExchangeTransactionCreated(tx) => if (isValid(tx)) broadcast(List(tx))
+    case ExchangeTransactionCreated(tx) => broadcast(List(tx))
   }
 
   private def watching(toCheck: Vector[ExchangeTransaction], next: Vector[ExchangeTransaction]): Receive = {
     case ExchangeTransactionCreated(tx) =>
-      if (isValid(tx)) {
-        broadcast(List(tx))
-        context.become(watching(toCheck, next :+ tx))
-      }
+      if (broadcast(List(tx)).nonEmpty) context.become(watching(toCheck, next :+ tx))
 
     case Send =>
       val nowMs    = time.getTimestamp()
@@ -41,17 +37,23 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
       val (confirmed, unconfirmed) = toCheck.partition(tx => isConfirmed(tx.id()))
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
-      broadcast(ready)
-      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent")
-      if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
+      val (validTxs, invalidTxs) = {
+        val validTxIds = broadcast(ready)
+        ready.partition(tx => validTxIds.contains(tx.id()))
+      }
+
+      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${validTxs.size} successful")
+      if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${format(expired)}; became invalid: ${format(invalidTxs)}")
 
       scheduleSend()
-      context.become(watching(next ++ ready, Vector.empty))
+      context.become(watching(next ++ validTxs, Vector.empty))
   }
 
   override val receive: Receive = if (settings.broadcastUntilConfirmed) watching(toCheck = Vector.empty, next = Vector.empty) else default
 
   private def scheduleSend(): Unit = context.system.scheduler.scheduleOnce(settings.interval, self, Send)
+
+  private def format(txs: Iterable[ExchangeTransaction]): String = txs.map(_.id().toString).mkString(", ")
 }
 
 object ExchangeTransactionBroadcastActor {
@@ -59,8 +61,7 @@ object ExchangeTransactionBroadcastActor {
 
   def props(settings: ExchangeTransactionBroadcastSettings,
             time: Time,
-            isValid: ExchangeTransaction => Boolean,
             isConfirmed: ByteStr => Boolean,
-            broadcast: Seq[ExchangeTransaction] => Unit): Props =
-    Props(new ExchangeTransactionBroadcastActor(settings, time, isValid, isConfirmed, broadcast))
+            broadcast: Seq[ExchangeTransaction] => Set[ByteStr]): Props =
+    Props(new ExchangeTransactionBroadcastActor(settings, time, isConfirmed, broadcast))
 }

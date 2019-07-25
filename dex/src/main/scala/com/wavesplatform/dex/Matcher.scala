@@ -29,7 +29,6 @@ import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
 import com.wavesplatform.dex.waves.WavesBlockchainContext
 import com.wavesplatform.extensions.Extension
-import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -279,16 +278,17 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
           context.spendableBalanceChanged,
           settings,
           (address, startSchedules) =>
-            Props(new AddressActor(
-              address,
-              context.spendableBalance(address, _),
-              5.seconds,
-              time,
-              orderDb,
-              id => context.filledVolumeAndFee(id) != VolumeAndFee.empty,
-              matcherQueue.storeEvent,
-              startSchedules
-            )),
+            Props(
+              new AddressActor(
+                address,
+                context.spendableBalance(address, _),
+                5.seconds,
+                time,
+                orderDb,
+                context.forgedOrder,
+                matcherQueue.storeEvent,
+                startSchedules
+              )),
           historyRouter
         )),
       "addresses"
@@ -343,9 +343,8 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
         .props(
           settings.exchangeTransactionBroadcast,
           time,
-          context.putToUtx,
           context.wasForged,
-          txs => txs.foreach(context.broadcastTx)
+          context.broadcastTx
         ),
       "exchange-transaction-broadcast"
     )

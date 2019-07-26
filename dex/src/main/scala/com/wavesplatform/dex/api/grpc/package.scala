@@ -3,14 +3,50 @@ package com.wavesplatform.dex.api
 import java.util.concurrent.atomic.AtomicReference
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.grpc.GRPCErrors
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, VanillaTransaction}
+import com.wavesplatform.protobuf.transaction.{
+  AssetAmount,
+  BurnTransactionData,
+  CreateAliasTransactionData,
+  ExchangeTransactionData,
+  GenesisTransactionData,
+  InvokeScriptTransactionData,
+  IssueTransactionData,
+  LeaseCancelTransactionData,
+  LeaseTransactionData,
+  PBAmounts,
+  PBOrders,
+  PBRecipients,
+  PBSignedTransaction,
+  PBTransaction,
+  PBTransactions,
+  PaymentTransactionData,
+  Recipient,
+  ReissueTransactionData,
+  SetAssetScriptTransactionData,
+  SetScriptTransactionData,
+  SponsorFeeTransactionData,
+  TransferTransactionData,
+  VanillaAssetId,
+  VanillaTransaction
+}
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.protobuf.transaction.PBTransactions.{createVanilla, createVanillaUnsafe, toVanillaDataEntry}
+import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.{Asset, Proofs, TxValidationError}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 import scala.concurrent.Future
 
@@ -120,6 +156,65 @@ package object grpc {
 
   implicit class PBSignedTransactionConversions(tx: PBSignedTransaction) {
     def toVanilla = PBTransactions.vanilla(tx).explicitGet()
+  }
+
+  implicit class PBExchangeTransactionConversions(tx: ExchangeTransaction) {
+    def toVanilla: Either[ValidationError, exchange.ExchangeTransaction] =
+      for {
+        fee <- tx.fee.toRight(GenericError("Fee must be specified"))
+        r <- {
+          val proofs = Proofs(tx.proofs.map(to))
+          tx.version match {
+            case 1 =>
+              exchange.ExchangeTransactionV1.create(
+                tx.orders.head.toVanilla.asInstanceOf[exchange.OrderV1], // todo
+                tx.orders.last.toVanilla.asInstanceOf[exchange.OrderV1],
+                tx.amount,
+                tx.price,
+                tx.buyMatcherFee,
+                tx.sellMatcherFee,
+                fee.amount,
+                tx.timestamp,
+                proofs.toSignature
+              )
+            case 2 =>
+              exchange.ExchangeTransactionV2.create(
+                tx.orders.head.toVanilla,
+                tx.orders.last.toVanilla,
+                tx.amount,
+                tx.price,
+                tx.buyMatcherFee,
+                tx.sellMatcherFee,
+                fee.amount,
+                tx.timestamp,
+                proofs
+              )
+            case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v") // ??
+          }
+        }
+      } yield r
+  }
+
+  implicit class PBOrderConversions(order: Order) {
+    def toVanilla: exchange.Order =
+      exchange.Order(
+        PublicKey(to(order.senderPublicKey)),
+        PublicKey(to(order.matcherPublicKey)),
+        exchange.AssetPair(Asset.fromProtoId(order.getAssetPair.getAmountAssetId), Asset.fromProtoId(order.getAssetPair.getPriceAssetId)),
+        order.orderSide match {
+          case Order.Side.BUY             => exchange.OrderType.BUY
+          case Order.Side.SELL            => exchange.OrderType.SELL
+          case Order.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
+        },
+        order.amount,
+        order.price,
+        order.timestamp,
+        order.expiration,
+        order.getMatcherFee.amount,
+        order.proofs.map(_.toByteArray: ByteStr),
+        order.version.toByte,
+        IssuedAsset(to(order.matcherFeeAssetId))
+      )
   }
 
   implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit toThrowable: E => Throwable) {

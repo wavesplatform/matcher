@@ -2,22 +2,31 @@ package com.wavesplatform.dex.api.grpc
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
+import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.error
+import com.wavesplatform.dex.smart.MatcherScriptRunner
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
+import shapeless.Coproduct
 
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcastTransaction: VanillaTransaction => Unit)(implicit sc: Scheduler)
-    extends WavesBlockchainApiGrpc.WavesBlockchainApi {
+    extends WavesBlockchainApiGrpc.WavesBlockchainApi
+    with ScorexLogging {
 
   override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = {
     val result = Observable(request.transactionIds: _*).map { txId =>
@@ -73,14 +82,64 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     HasScriptResponse(has = blockchain.hasAssetScript(IssuedAsset(to(request.assetId))))
   }
 
-  override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = ???
+  override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = {
+    import RunScriptResponse._
+
+    for {
+      r <- Future {
+        val asset = IssuedAsset(to(request.assetId))
+        blockchain.assetScript(asset) match {
+          case None => Result.Empty
+          case Some(script) =>
+            val tx = request.transaction.map(_.toVanilla).getOrElse(throw new IllegalArgumentException("Expected a transaction"))
+            try {
+              ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2 match {
+                case Left(execError) => Result.ScriptError(execError)
+                case Right(FALSE)    => Result.Denied(Empty())
+                case Right(TRUE)     => Result.Empty
+                case Right(x)        => Result.UnexpectedResult(x.toString)
+              }
+            } catch {
+              case NonFatal(e) =>
+                log.trace(error.formatStackTrace(e))
+                Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
+            }
+        }
+      }
+    } yield RunScriptResponse(r)
+  }
 
   override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] =
     Address.fromBytes(to(request.address)).toFuture.map { addr =>
       HasScriptResponse(has = blockchain.hasScript(addr))
     }
 
-  override def runAddressScript(request: RunAddressScriptRequest): Future[RunScriptResponse] = ???
+  override def runAddressScript(request: RunAddressScriptRequest): Future[RunScriptResponse] = {
+    import RunScriptResponse._
+
+    for {
+      address <- Address.fromBytes(to(request.address)).toFuture
+      r <- Future {
+        blockchain.accountScript(address) match {
+          case None => Result.Empty
+          case Some(script) =>
+            val order = request.order.map(_.toVanilla).getOrElse(throw new IllegalArgumentException("Expected an order"))
+            try {
+              MatcherScriptRunner(script, order)._2 match {
+                case Left(execError) => Result.ScriptError(execError)
+                case Right(FALSE)    => Result.Denied(Empty())
+                case Right(TRUE)     => Result.Empty
+                case Right(x)        => Result.UnexpectedResult(x.toString)
+              }
+            } catch {
+              case NonFatal(e) =>
+                log.trace(error.formatStackTrace(e))
+                Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
+            }
+        }
+      }
+    } yield RunScriptResponse(r)
+  }
 
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] =
     for {

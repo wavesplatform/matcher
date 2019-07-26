@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import com.wavesplatform.utils.CloseableIterator
 import monix.eval.Coeval
@@ -121,6 +122,8 @@ object MatcherContext {
       * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
     override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = kill("collectLposPortfolios")
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
+
+    override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = kill("transferById")
   }
 
 }

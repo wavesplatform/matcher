@@ -18,6 +18,7 @@ import com.wavesplatform.db._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
+import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.history.HistoryRouter
@@ -144,7 +145,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
   private val rateCache                                          = RateCache(db)
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
       _ <- OrderValidator.timeAware(time)(o)
@@ -161,9 +162,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = assetDecimalsCache.get(asset)
-  }
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
     val keyHash = Base58.tryDecode(settings.restApi.apiKeyHash).toOption
@@ -287,10 +286,11 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
                 orderDb,
                 context.forgedOrder,
                 matcherQueue.storeEvent,
-                startSchedules
+                orderBookCache.get,startSchedules
               )),
           historyRouter
-        )),
+        )
+      ),
       "addresses"
     )
 

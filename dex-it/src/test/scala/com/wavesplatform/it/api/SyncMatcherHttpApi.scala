@@ -2,10 +2,10 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
@@ -83,6 +83,9 @@ object SyncMatcherHttpApi extends Assertions {
 
     def placeOrder(order: Order): MatcherResponse =
       sync(async(m).placeOrder(order))
+
+    def placeMarketOrder(order: Order): MatcherResponse =
+      sync(async(m).placeMarketOrder(order))
 
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,

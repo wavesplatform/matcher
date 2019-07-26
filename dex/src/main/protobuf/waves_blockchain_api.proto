@@ -36,7 +36,7 @@ message TransactionsByIdRequest {
 }
 
 message AssetIdRequest {
-    bytes assetId = 1;
+    bytes asset_id = 1;
 }
 
 // Common responses
@@ -46,13 +46,14 @@ message HasScriptResponse {
 }
 
 message RunScriptResponse {
+    // empty if there is no script or the script returned TRUE
     oneof result {
-        string error = 1;
-        ScriptEvaluated success = 2;
+        string wrong_input = 1;
+        string script_error = 2;
+        string unexpected_result = 3;
+        Exception exception = 4;
+        google.protobuf.Empty denied = 5;
     }
-}
-
-message ScriptEvaluated {
 }
 
 // Specific requests and responses
@@ -74,19 +75,19 @@ message BroadcastRequest {
 }
 
 message BroadcastResponse {
-    bool isValid = 1;
+    bool is_valid = 1;
 }
 
 message IsFeatureActivatedRequest {
-    int32 featureId = 1;
+    int32 feature_id = 1;
 }
 
 message IsFeatureActivatedResponse {
-    bool isActivated = 1;
+    bool is_activated = 1;
 }
 
 message AssetDescriptionResponse {
-    oneof maybeDescription {
+    oneof maybe_description {
         AssetDescription description = 1;
     }
 }
@@ -94,17 +95,17 @@ message AssetDescriptionResponse {
 message AssetDescription {
     bytes name = 1;
     int32 decimals = 2;
-    bool hasScript = 3;
+    bool has_script = 3;
 }
 
 message RunAssetScriptRequest {
-    bytes assetId = 1;
-    waves.SignedTransaction transaction = 2;
+    bytes asset_id = 1;
+    ExchangeTransaction transaction = 2;
 }
 
 message RunAddressScriptRequest {
     bytes address = 1;
-    waves.SignedTransaction transaction = 2;
+    Order order = 2;
 }
 
 message HasAddressScriptRequest {
@@ -113,7 +114,7 @@ message HasAddressScriptRequest {
 
 message SpendableAssetBalanceRequest {
     bytes address = 1;
-    waves.AssetId assetId = 2;
+    waves.AssetId asset_id = 2;
 }
 
 message SpendableAssetBalanceResponse {
@@ -121,9 +122,58 @@ message SpendableAssetBalanceResponse {
 }
 
 message ForgedOrderRequest {
-    bytes orderId = 1;
+    bytes order_id = 1;
 }
 
 message ForgedOrderResponse {
-    bool isForged = 1;
+    bool is_forged = 1;
+}
+
+// Other entities
+
+message Exception {
+    string name = 1;
+    string message = 2;
+}
+
+message Order {
+    enum Side {
+        BUY = 0;
+        SELL = 1;
+    };
+
+    message AssetPair {
+        waves.AssetId amount_asset_id = 1;
+        waves.AssetId price_asset_id = 2;
+    };
+
+    int32 chain_id = 1;
+    bytes sender_public_key = 2;
+    bytes matcher_public_key = 3;
+    AssetPair asset_pair = 4;
+    Side order_side = 5;
+    int64 amount = 6;
+    int64 price = 7;
+    int64 timestamp = 8;
+    int64 expiration = 9;
+    waves.Amount matcher_fee = 10;
+    int32 version = 11;
+    repeated bytes proofs = 12;
+    bytes matcher_fee_asset_id = 13;
+}
+
+// todo compatibility with node
+message ExchangeTransaction {
+    int32 chain_id = 1;
+    bytes sender_public_key = 2;
+    waves.Amount fee = 3;
+    int64 timestamp = 4;
+    int32 version = 5;
+    repeated bytes proofs = 6;
+    int64 amount = 7;
+    int64 price = 8;
+    int64 buy_matcher_fee = 9;
+    int64 sell_matcher_fee = 10;
+    repeated Order orders = 11;
+    int32 taker = 12;
 }

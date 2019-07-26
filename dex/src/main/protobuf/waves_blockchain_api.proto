@@ -5,6 +5,7 @@ package waves.dex.grpc;
 option java_package = "com.wavesplatform.dex.api.grpc";
 
 import "transaction.proto";
+import "google/protobuf/empty.proto";
 
 service WavesBlockchainApi {
     rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
@@ -69,11 +70,11 @@ message TransactionStatus {
 }
 
 message BroadcastRequest {
-    repeated waves.SignedTransaction transactions = 1;
+    waves.SignedTransaction transaction = 1;
 }
 
 message BroadcastResponse {
-    repeated bytes validTransactionIds = 1;
+    bool isValid = 1;
 }
 
 message IsFeatureActivatedRequest {
@@ -85,6 +86,12 @@ message IsFeatureActivatedResponse {
 }
 
 message AssetDescriptionResponse {
+    oneof maybeDescription {
+        AssetDescription description = 1;
+    }
+}
+
+message AssetDescription {
     bytes name = 1;
     int32 decimals = 2;
     bool hasScript = 3;
@@ -106,7 +113,7 @@ message HasAddressScriptRequest {
 
 message SpendableAssetBalanceRequest {
     bytes address = 1;
-    bytes assetId = 2;
+    waves.AssetId assetId = 2;
 }
 
 message SpendableAssetBalanceResponse {

@@ -1,14 +1,17 @@
 package com.wavesplatform.dex.api.grpc
 
+import cats.syntax.either._
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, VanillaTransaction}
+import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
-import cats.instances.list._
-import cats.syntax.traverse._
-
 import monix.reactive.Observable
 
 import scala.concurrent.Future
@@ -30,34 +33,63 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     responseObserver.completeWith(result)
   }
 
-  override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] = {
-    val r: List[Either[ValidationError, BroadcastResponse]] = request.transactions.map { tx =>
-      val vanillaTx = tx.toVanilla
-      utx
-        .putIfNew(vanillaTx)
-        .map { _ =>
-          broadcastTransaction(vanillaTx)
-          BroadcastResponse.defaultInstance
-        }
-        .resultE
-    }(collection.breakOut)
+  override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] =
+    request.transaction
+      .map(_.toVanilla)
+      .fold[Either[ValidationError, BroadcastResponse]](GenericError("Expected a transaction").asLeft) { tx =>
+        utx
+          .putIfNew(tx)
+          .map { _ =>
+            broadcastTransaction(tx)
+            BroadcastResponse(isValid = true)
+          }
+          .resultE
+          .leftFlatMap(_ => BroadcastResponse().asRight)
+      }
+      .toFuture
 
-    r.sequence.toFuture
+  override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
+    IsFeatureActivatedResponse(isActivated = blockchain.activatedFeatures.contains(request.featureId.toShort))
   }
 
-  override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = ???
+  override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {
+    import AssetDescriptionResponse._
 
-  override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = ???
+    val desc = blockchain.assetDescription(IssuedAsset(request.assetId.toByteArray))
+    val gRpcDesc = desc.fold[MaybeDescription](MaybeDescription.Empty) { desc =>
+      MaybeDescription.Description(
+        AssetDescription(
+          name = ByteString.copyFrom(desc.name),
+          decimals = desc.decimals,
+          hasScript = desc.script.nonEmpty
+        )
+      )
+    }
 
-  override def hasAssetScript(request: AssetIdRequest): Future[HasScriptResponse] = ???
+    AssetDescriptionResponse(gRpcDesc)
+  }
+
+  override def hasAssetScript(request: AssetIdRequest): Future[HasScriptResponse] = Future {
+    HasScriptResponse(has = blockchain.hasAssetScript(IssuedAsset(to(request.assetId))))
+  }
 
   override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = ???
 
-  override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] = ???
+  override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] =
+    Address.fromBytes(to(request.address)).toFuture.map { addr =>
+      HasScriptResponse(has = blockchain.hasScript(addr))
+    }
 
   override def runAddressScript(request: RunAddressScriptRequest): Future[RunScriptResponse] = ???
 
-  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = ???
+  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] =
+    for {
+      addr    <- Address.fromBytes(to(request.address)).toFuture
+      assetId <- Future { request.assetId.fold[Asset](Waves)(issued => IssuedAsset(to(issued.getIssuedAsset))) }
+    } yield SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
 
-  override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = ???
+  override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
+    val seen = blockchain.filledVolumeAndFee(to(request.orderId)).volume > 0
+    ForgedOrderResponse(isForged = seen)
+  }
 }

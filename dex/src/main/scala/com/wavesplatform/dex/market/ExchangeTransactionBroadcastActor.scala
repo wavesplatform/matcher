@@ -11,7 +11,7 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSettings,
                                         time: Time,
                                         isConfirmed: ByteStr => Boolean,
-                                        broadcast: Seq[ExchangeTransaction] => Set[ByteStr])
+                                        broadcast: ExchangeTransaction => Boolean)
     extends Actor
     with ScorexLogging {
 
@@ -23,12 +23,12 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
   }
 
   private val default: Receive = {
-    case ExchangeTransactionCreated(tx) => broadcast(List(tx))
+    case ExchangeTransactionCreated(tx) => broadcast(tx)
   }
 
   private def watching(toCheck: Vector[ExchangeTransaction], next: Vector[ExchangeTransaction]): Receive = {
     case ExchangeTransactionCreated(tx) =>
-      if (broadcast(List(tx)).nonEmpty) context.become(watching(toCheck, next :+ tx))
+      if (broadcast(tx)) context.become(watching(toCheck, next :+ tx))
 
     case Send =>
       val nowMs    = time.getTimestamp()
@@ -36,11 +36,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
       val (confirmed, unconfirmed) = toCheck.partition(tx => isConfirmed(tx.id()))
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
-
-      val (validTxs, invalidTxs) = {
-        val validTxIds = broadcast(ready)
-        ready.partition(tx => validTxIds.contains(tx.id()))
-      }
+      val (validTxs, invalidTxs)   = ready.partition(broadcast)
 
       log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${validTxs.size} successful")
       if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${format(expired)}; became invalid: ${format(invalidTxs)}")
@@ -62,6 +58,6 @@ object ExchangeTransactionBroadcastActor {
   def props(settings: ExchangeTransactionBroadcastSettings,
             time: Time,
             isConfirmed: ByteStr => Boolean,
-            broadcast: Seq[ExchangeTransaction] => Set[ByteStr]): Props =
+            broadcast: ExchangeTransaction => Boolean): Props =
     Props(new ExchangeTransactionBroadcastActor(settings, time, isConfirmed, broadcast))
 }

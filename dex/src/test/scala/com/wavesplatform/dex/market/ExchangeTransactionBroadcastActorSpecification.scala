@@ -38,7 +38,10 @@ class ExchangeTransactionBroadcastActorSpecification
   "ExchangeTransactionBroadcastActor" should {
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      defaultActor(ntpTime, isConfirmed = _ => false, broadcast = broadcasted = _)
+      defaultActor(ntpTime, isConfirmed = _ => false, broadcast = tx => {
+        broadcasted = List(tx)
+        true
+      })
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -49,7 +52,10 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "broadcast a transaction in next period if it wasn't confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => false, broadcast = broadcasted = _)
+      val actor       = defaultActor(ntpTime, isConfirmed = _ => false, broadcast = tx => {
+        broadcasted = List(tx)
+        true
+      })
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -68,7 +74,10 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "doesn't broadcast a transaction if it was confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = broadcasted = _)
+      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = tx => {
+        broadcasted = List(tx)
+        true
+      })
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -84,7 +93,10 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "doesn't broadcast an expired transaction" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = broadcasted = _)
+      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = tx => {
+        broadcasted = List(tx)
+        true
+      })
 
       val event = sampleEvent(500.millis)
       system.eventStream.publish(event)
@@ -101,7 +113,7 @@ class ExchangeTransactionBroadcastActorSpecification
 
   private def defaultActor(time: Time,
                            isConfirmed: ByteStr => Boolean,
-                           broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
+                           broadcast: ExchangeTransaction => Boolean): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
     new ExchangeTransactionBroadcastActor(
       settings = ExchangeTransactionBroadcastSettings(
         broadcastUntilConfirmed = true,
@@ -110,7 +122,6 @@ class ExchangeTransactionBroadcastActorSpecification
       ),
       time = time,
       _ => true,
-      isConfirmed = isConfirmed,
       broadcast = broadcast
     )
   )

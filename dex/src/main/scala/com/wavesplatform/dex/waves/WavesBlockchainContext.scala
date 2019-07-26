@@ -3,7 +3,8 @@ package com.wavesplatform.dex.waves
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.api.grpc.{TransactionsByIdRequest, WavesBlockchainApiGrpc}
+import com.wavesplatform.dex.api.grpc.VanillaTransactionConversions
+import com.wavesplatform.dex.api.grpc.{BroadcastRequest, TransactionsByIdRequest, WavesBlockchainApiGrpc}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -15,7 +16,7 @@ import monix.reactive.Observable
 trait WavesBlockchainContext {
   // TODO multiple ids
   def wasForged(id: ByteStr): Boolean
-  def broadcastTx(txs: Seq[Transaction]): Set[ByteStr]
+  def broadcastTx(txs: Transaction): Boolean
 
   def isFeatureActivated(id: Short): Boolean
 
@@ -44,7 +45,7 @@ class WavesBlockchainGrpcContext(matcherAddress: Address, channel: ManagedChanne
       .headOption
       .exists(_.status.isConfirmed)
 
-  override def broadcastTx(txs: Seq[Transaction]): Map[ByteStr, Boolean] = waves.broadcast(tx.toPB)
+  override def broadcastTx(tx: Transaction): Boolean = waves.broadcast(BroadcastRequest(transaction = Some(tx.toPB))).isValid
 
   override def isFeatureActivated(id: Short): Boolean                                             = ???
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription]                     = ???

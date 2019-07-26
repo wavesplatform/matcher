@@ -55,7 +55,10 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 //        transactions.getTransactions(TransactionsRequest())
 //      }
 
-      override def broadcastTx(tx: Transaction): Unit = ???
+
+      override def broadcastTx(txs: Transaction): Boolean = ???
+
+      override def forgedOrder(orderId: ByteStr): Boolean = ???
 
       override def isFeatureActivated(id: Short): Boolean = ???
 
@@ -73,9 +76,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
       override def spendableBalance(address: Address, asset: Asset): Long = ???
 
-      override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = ???
 
-      override def putToUtx(tx: Transaction): Boolean = ???
     }
 
     matcher = new Matcher(settings, extensionContext)

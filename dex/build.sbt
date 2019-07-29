@@ -38,10 +38,12 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
-inConfig(Compile)(Seq(
-  sourceGenerators += versionSourceTask,
-  PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
-))
+inConfig(Compile)(
+  Seq(
+    sourceGenerators += versionSourceTask,
+    PB.deleteTargetDirectory := false,
+    PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
+  ))
 
 Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postrm)(
   Postrm ->

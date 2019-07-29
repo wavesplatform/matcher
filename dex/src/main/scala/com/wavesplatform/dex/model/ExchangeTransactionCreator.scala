@@ -7,9 +7,6 @@ import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset

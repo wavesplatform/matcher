@@ -20,7 +20,7 @@ import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -286,7 +286,8 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
                 orderDb,
                 context.forgedOrder,
                 matcherQueue.storeEvent,
-                orderBookCache.get,startSchedules
+                orderBookCache.get,
+                startSchedules
               )),
           historyRouter
         )

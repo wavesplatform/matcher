@@ -2,51 +2,21 @@ package com.wavesplatform.dex.api
 
 import java.util.concurrent.atomic.AtomicReference
 
+import cats.syntax.either._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.grpc.GRPCErrors
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.{
-  AssetAmount,
-  BurnTransactionData,
-  CreateAliasTransactionData,
-  ExchangeTransactionData,
-  GenesisTransactionData,
-  InvokeScriptTransactionData,
-  IssueTransactionData,
-  LeaseCancelTransactionData,
-  LeaseTransactionData,
-  PBAmounts,
-  PBOrders,
-  PBRecipients,
-  PBSignedTransaction,
-  PBTransaction,
-  PBTransactions,
-  PaymentTransactionData,
-  Recipient,
-  ReissueTransactionData,
-  SetAssetScriptTransactionData,
-  SetScriptTransactionData,
-  SponsorFeeTransactionData,
-  TransferTransactionData,
-  VanillaAssetId,
-  VanillaTransaction
-}
-import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
-import monix.execution.{Cancelable, Scheduler}
-import monix.reactive.Observable
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.protobuf.transaction.PBTransactions.{createVanilla, createVanillaUnsafe, toVanillaDataEntry}
-import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{Asset, Proofs, TxValidationError}
+import com.wavesplatform.protobuf.transaction.{Amount, AssetId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{Asset, Proofs}
+import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
+import monix.execution.{Cancelable, Scheduler}
+import monix.reactive.Observable
 
 import scala.concurrent.Future
 
@@ -150,41 +120,54 @@ package object grpc {
     }
   }
 
-  implicit class VanillaTransactionConversions(tx: VanillaTransaction) {
-    def toPB = PBTransactions.protobuf(tx)
+  implicit class VanillaTransactionConversions(tx: exchange.ExchangeTransaction) {
+    def toPB: ExchangeTransaction = ExchangeTransaction(
+      chainId = tx.chainByte.getOrElse(AddressScheme.current.chainId).toInt,
+      senderPublicKey = ByteString.copyFrom(tx.sender.bytes.arr),
+      fee = Some(Amount(assetId = None, amount = tx.fee)),
+      timestamp = tx.timestamp,
+      version = tx.version,
+      data = ExchangeTransaction.Data.Exchange(
+        ExchangeTransactionData(
+          amount = tx.amount,
+          price = tx.price,
+          buyMatcherFee = tx.buyMatcherFee,
+          sellMatcherFee = tx.sellMatcherFee,
+          orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
+        ))
+    )
   }
 
-  implicit class PBSignedTransactionConversions(tx: PBSignedTransaction) {
-    def toVanilla = PBTransactions.vanilla(tx).explicitGet()
-  }
-
-  implicit class PBExchangeTransactionConversions(tx: ExchangeTransaction) {
+  implicit class PBExchangeTransactionConversions(self: SignedExchangeTransaction) {
     def toVanilla: Either[ValidationError, exchange.ExchangeTransaction] =
       for {
-        fee <- tx.fee.toRight(GenericError("Fee must be specified"))
+        tx <- self.transaction.fold[Either[ValidationError, ExchangeTransaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
+        data <- tx.data.exchange
+          .fold[Either[ValidationError, ExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
+        fee <- tx.fee.toRight(GenericError("The fee must be specified"))
         r <- {
-          val proofs = Proofs(tx.proofs.map(to))
+          val proofs = Proofs(self.proofs.map(to))
           tx.version match {
             case 1 =>
               exchange.ExchangeTransactionV1.create(
-                tx.orders.head.toVanilla.asInstanceOf[exchange.OrderV1], // todo
-                tx.orders.last.toVanilla.asInstanceOf[exchange.OrderV1],
-                tx.amount,
-                tx.price,
-                tx.buyMatcherFee,
-                tx.sellMatcherFee,
+                data.orders.head.toVanilla.asInstanceOf[exchange.OrderV1], // todo
+                data.orders.last.toVanilla.asInstanceOf[exchange.OrderV1],
+                data.amount,
+                data.price,
+                data.buyMatcherFee,
+                data.sellMatcherFee,
                 fee.amount,
                 tx.timestamp,
                 proofs.toSignature
               )
             case 2 =>
               exchange.ExchangeTransactionV2.create(
-                tx.orders.head.toVanilla,
-                tx.orders.last.toVanilla,
-                tx.amount,
-                tx.price,
-                tx.buyMatcherFee,
-                tx.sellMatcherFee,
+                data.orders.head.toVanilla,
+                data.orders.last.toVanilla,
+                data.amount,
+                data.price,
+                data.buyMatcherFee,
+                data.sellMatcherFee,
                 fee.amount,
                 tx.timestamp,
                 proofs
@@ -193,6 +176,33 @@ package object grpc {
           }
         }
       } yield r
+  }
+
+  implicit class VanillaAssetId(self: Asset) {
+    def toPB: AssetId = self match {
+      case Asset.IssuedAsset(assetId) => AssetId().withIssuedAsset(to(assetId))
+      case Asset.Waves                => AssetId().withWaves(com.google.protobuf.empty.Empty())
+    }
+  }
+
+  implicit class VanillaOrderConversions(order: exchange.Order) {
+    def toPB: Order = Order(
+      chainId = 0,
+      ByteString.copyFrom(order.senderPublicKey),
+      ByteString.copyFrom(order.matcherPublicKey),
+      Some(Order.AssetPair(Some(order.assetPair.amountAsset.protoId), Some(order.assetPair.priceAsset.protoId))),
+      order.orderType match {
+        case exchange.OrderType.BUY  => Order.Side.BUY
+        case exchange.OrderType.SELL => Order.Side.SELL
+      },
+      order.amount,
+      order.price,
+      order.timestamp,
+      order.expiration,
+      Some(Amount(Some(order.matcherFeeAssetId.toPB), order.matcherFee)),
+      order.version,
+      order.proofs.map(to)
+    )
   }
 
   implicit class PBOrderConversions(order: Order) {

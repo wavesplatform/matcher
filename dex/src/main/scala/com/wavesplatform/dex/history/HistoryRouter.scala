@@ -115,8 +115,8 @@ object HistoryRouter {
 
 class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double = Denormalization.denormalizeAmountAndFeeWithDefault(value, pair, assetDecimals)
-  private def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePriceWithDefault(value, pair, assetDecimals)
+  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double = Denormalization.denormalizeAmountAndFee(value, pair, assetDecimals)
+  private def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePrice(value, pair, assetDecimals)
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
 

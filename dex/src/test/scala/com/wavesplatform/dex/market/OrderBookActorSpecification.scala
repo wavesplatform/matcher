@@ -22,7 +22,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 

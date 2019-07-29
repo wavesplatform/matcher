@@ -10,20 +10,17 @@ import akka.stream.ActorMaterializer
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.waves.WavesBlockchainContext
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
-import com.wavesplatform.state.{AssetDescription, VolumeAndFee}
+import com.wavesplatform.state.AssetDescription
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter, UtilApp}
 import com.wavesplatform.utx.UtxPool
-import io.grpc.ManagedChannelBuilder
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
@@ -55,8 +52,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 //        transactions.getTransactions(TransactionsRequest())
 //      }
 
-
-      override def broadcastTx(txs: Transaction): Boolean = ???
+      override def broadcastTx(txs: ExchangeTransaction): Boolean = ???
 
       override def forgedOrder(orderId: ByteStr): Boolean = ???
 
@@ -66,17 +62,15 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
       override def hasScript(asset: IssuedAsset): Boolean = ???
 
-      override def runScript(asset: IssuedAsset, input: Transaction): Either[String, Terms.EVALUATED] = ???
+      override def runScript(asset: IssuedAsset, input: ExchangeTransaction): WavesBlockchainContext.RunScriptResult = ???
 
       override def hasScript(address: Address): Boolean = ???
 
-      override def runScript(address: Address, input: Order): Either[String, Terms.EVALUATED] = ???
+      override def runScript(address: Address, input: Order): WavesBlockchainContext.RunScriptResult = ???
 
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
 
       override def spendableBalance(address: Address, asset: Asset): Long = ???
-
-
     }
 
     matcher = new Matcher(settings, extensionContext)

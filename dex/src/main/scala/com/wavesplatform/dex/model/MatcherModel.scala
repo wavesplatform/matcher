@@ -46,9 +46,6 @@ object MatcherModel {
     def denormalizeAmountAndFee(value: Amount, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
       denormalizeAmountAndFee(value, getAssetDecimals(pair.amountAsset))
 
-    def denormalizeAmountAndFeeWithDefault(value: Amount, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
-      denormalizeAmountAndFee(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
-
     def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
 
@@ -57,11 +54,8 @@ object MatcherModel {
       denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
     }
 
-    def denormalizePrice(value: Price, pair: AssetPair, getAssetDecimals: Asset => Int): Either[MatcherError, Double] =
-      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
-
-    def denormalizePriceWithDefault(value: Price, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
-      denormalizePrice(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
+    def denormalizePrice(value: Price, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
+      denormalizePrice(value, pair, getPairDecimals(pair, getAssetDecimals))
   }
 }
 

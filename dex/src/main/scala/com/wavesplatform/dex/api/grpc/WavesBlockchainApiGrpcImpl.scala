@@ -44,9 +44,10 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
 
   override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] =
     request.transaction
-      .map(_.toVanilla)
-      .fold[Either[ValidationError, BroadcastResponse]](GenericError("Expected a transaction").asLeft) { tx =>
-        utx
+      .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
+      .flatMap(_.toVanilla)
+      .flatMap { tx =>
+        val r = utx
           .putIfNew(tx)
           .map { _ =>
             broadcastTransaction(tx)
@@ -54,6 +55,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
           }
           .resultE
           .leftFlatMap(_ => BroadcastResponse().asRight)
+        r
       }
       .toFuture
 
@@ -91,7 +93,11 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
         blockchain.assetScript(asset) match {
           case None => Result.Empty
           case Some(script) =>
-            val tx = request.transaction.map(_.toVanilla).getOrElse(throw new IllegalArgumentException("Expected a transaction"))
+            val tx = request.transaction
+              .getOrElse(throw new IllegalArgumentException("Expected a transaction"))
+              .toVanilla
+              .getOrElse(throw new IllegalArgumentException("Can't parse the transaction"))
+
             try {
               ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2 match {
                 case Left(execError) => Result.ScriptError(execError)

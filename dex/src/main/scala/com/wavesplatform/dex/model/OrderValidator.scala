@@ -12,9 +12,9 @@ import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.waves.WavesBlockchainContext
+import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -28,7 +28,6 @@ import kamon.Kamon
 import scala.Either.cond
 import scala.annotation.tailrec
 import scala.math.BigDecimal.RoundingMode
-import scala.util.control.NonFatal
 
 object OrderValidator extends ScorexLogging {
 
@@ -47,24 +46,26 @@ object OrderValidator extends ScorexLogging {
 
   private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
-  private def verifySignature(order: Order): Result[Order] =
-    Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => error.OrderInvalidSignature(order.id(), x.toString))
+  private def verifySignature(order: Order): Result[Unit] =
+    Verifier
+      .verifyAsEllipticCurveSignature(order)
+      .bimap(
+        e => error.OrderInvalidSignature(order.id(), e.toString),
+        _ => ()
+      )
 
-  private def verifyOrderByAccountScript(blockchain: WavesBlockchainContext, address: Address, order: Order): Result[Order] =
+  private def verifyOrderByAccountScript(blockchain: WavesBlockchainContext, address: Address, order: Order): Result[Unit] =
     if (blockchain.hasScript(address)) {
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id))
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
       else
-        try blockchain.runScript(address, order) match {
-          case Left(execError) => error.AccountScriptReturnedError(address, execError).asLeft
-          case Right(FALSE)    => error.AccountScriptDeniedOrder(address).asLeft
-          case Right(TRUE)     => lift(order)
-          case Right(x)        => error.AccountScriptUnexpectResult(address, x.toString).asLeft
-        } catch {
-          case NonFatal(e) =>
-            log.trace(error.formatStackTrace(e))
-            error.AccountScriptException(address, e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")).asLeft
+        blockchain.runScript(address, order) match {
+          case RunScriptResult.ScriptError(execError)   => error.AccountScriptReturnedError(address, execError).asLeft
+          case RunScriptResult.Denied                   => error.AccountScriptDeniedOrder(address).asLeft
+          case RunScriptResult.Allowed                  => success
+          case RunScriptResult.UnexpectedResult(x)      => error.AccountScriptUnexpectResult(address, x).asLeft
+          case RunScriptResult.Exception(name, message) => error.AccountScriptException(address, name, message).asLeft
         }
     } else verifySignature(order)
 
@@ -73,15 +74,12 @@ object OrderValidator extends ScorexLogging {
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets.id))
         error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
       else
-        try blockchain.runScript(asset, tx) match {
-          case Left(execError) => error.AssetScriptReturnedError(asset, execError).asLeft
-          case Right(FALSE)    => error.AssetScriptDeniedOrder(asset).asLeft
-          case Right(TRUE)     => success
-          case Right(x)        => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
-        } catch {
-          case NonFatal(e) =>
-            log.trace(error.formatStackTrace(e))
-            error.AssetScriptException(asset, e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")).asLeft
+        blockchain.runScript(asset, tx) match {
+          case RunScriptResult.ScriptError(execError)   => error.AssetScriptReturnedError(asset, execError).asLeft
+          case RunScriptResult.Denied                   => error.AssetScriptDeniedOrder(asset).asLeft
+          case RunScriptResult.Allowed                  => success
+          case RunScriptResult.UnexpectedResult(x)      => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
+          case RunScriptResult.Exception(name, message) => error.AssetScriptException(asset, name, message).asLeft
         }
     } else ().asRight
 

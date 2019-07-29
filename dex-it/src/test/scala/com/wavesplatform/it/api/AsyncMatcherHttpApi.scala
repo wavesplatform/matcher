@@ -239,19 +239,11 @@ object AsyncMatcherHttpApi extends Assertions {
                      timeToLive: Duration = 30.days - 1.seconds,
                      matcherFeeAssetId: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val unsigned =
-        Order(
-          sender,
-          MatcherPriceAssetConfig.matcher,
-          pair, orderType,
-          amount,
-          price,
-          timestamp,
-          timeToLiveTimestamp,
-          fee,
-          Proofs.empty,
-          version,
+      val unsigned = version match {
+        case 3 => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version,
           matcherFeeAssetId)
+        case _ => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+      }
       Order.sign(unsigned, sender)
     }
 

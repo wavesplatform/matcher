@@ -103,8 +103,9 @@ object SyncMatcherHttpApi extends Assertions {
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
-                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
+                        waitTime: Duration = OrderRequestAwaitTime,
+                        retryInterval: FiniteDuration = 1.second): MatcherStatusResponse =
+      sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus, retryInterval), waitTime)
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,
                                  orderId: String,
@@ -165,8 +166,9 @@ object SyncMatcherHttpApi extends Assertions {
                                      fee: Long = 300000L,
                                      version: Byte = 1,
                                      timeToLive: Duration = 30.days - 1.seconds,
-                                     expectedMessage: Option[String] = None): Boolean =
-      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive),
+                                     expectedMessage: Option[String] = None,
+                                     matcherFeeAssetId: Asset = Waves): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, matcherFeeAssetId),
                                     400,
                                     "OrderRejected",
                                     expectedMessage)

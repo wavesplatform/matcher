@@ -7,6 +7,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
+import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
@@ -255,6 +257,9 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def placeOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
+
+    def placeMarketOrder(order: Order): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
 
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,

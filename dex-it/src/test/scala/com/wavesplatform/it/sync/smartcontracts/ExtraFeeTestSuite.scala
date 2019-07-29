@@ -159,8 +159,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       node.upsertRate(IssuedAsset(feeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
       node.upsertRate(IssuedAsset(BtcId), feeAssetRate, expectedStatusCode = StatusCodes.Created)
 
-      val expectedWavesFee = tradeFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
-      val expectedFee = 550L// 2 x "smart asset" and 1 x "matcher script"
+      val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
+      val expectedFee = 550L// 1 x "smart asset" and 1 x "matcher script"
       val counter = node.placeOrder(
         node.prepareOrder(
           sender = bob,

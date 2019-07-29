@@ -6,11 +6,11 @@ import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
 import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{KeyPair, PublicKey, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.AddressActor.{BalanceUpdated, PlaceOrder}
+import com.wavesplatform.dex.AddressActor.{BalanceUpdated, PlaceLimitOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
-import com.wavesplatform.dex.model.LimitOrder
+import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -80,8 +80,8 @@ class AddressActorSpecification
         val initPortfolio = sellToken1Portfolio
         updatePortfolio(initPortfolio, false)
 
-        ref ! PlaceOrder(sellTokenOrder1)
-        eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder1))
+        ref ! PlaceLimitOrder(sellTokenOrder1)
+        eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty), true)
         eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -95,8 +95,8 @@ class AddressActorSpecification
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio, false)
 
-          ref ! PlaceOrder(sellWavesOrder)
-          eventsProbe.expectMsg(QueueEvent.Placed(sellWavesOrder))
+          ref ! PlaceLimitOrder(sellWavesOrder)
+          eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellWavesOrder)))
 
           updatePortfolio(initPortfolio.copy(balance = restWaves), true)
           eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
@@ -111,8 +111,8 @@ class AddressActorSpecification
           val initPortfolio = sellWavesPortfolio
           updatePortfolio(initPortfolio, false)
 
-          ref ! PlaceOrder(sellWavesOrder)
-          eventsProbe.expectMsg(QueueEvent.Placed(sellWavesOrder))
+          ref ! PlaceLimitOrder(sellWavesOrder)
+          eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellWavesOrder)))
 
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))), true)
           eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
@@ -124,11 +124,11 @@ class AddressActorSpecification
       val initPortfolio = Monoid.combine(sellToken1Portfolio, sellToken2Portfolio)
       updatePortfolio(initPortfolio, false)
 
-      ref ! PlaceOrder(sellTokenOrder1)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder1))
+      ref ! PlaceLimitOrder(sellTokenOrder1)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
 
-      ref ! PlaceOrder(sellTokenOrder2)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder2))
+      ref ! PlaceLimitOrder(sellTokenOrder2)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
 
       updatePortfolio(sellToken1Portfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
@@ -141,11 +141,11 @@ class AddressActorSpecification
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio, false)
 
-      ref ! PlaceOrder(sellTokenOrder1)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder1))
+      ref ! PlaceLimitOrder(sellTokenOrder1)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
 
-      ref ! PlaceOrder(sellTokenOrder2)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder2))
+      ref ! PlaceLimitOrder(sellTokenOrder2)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -156,14 +156,14 @@ class AddressActorSpecification
       val initPortfolio = Monoid.combineAll(Seq(sellToken1Portfolio, sellToken2Portfolio, sellWavesPortfolio))
       updatePortfolio(initPortfolio, false)
 
-      ref ! PlaceOrder(sellTokenOrder1)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder1))
+      ref ! PlaceLimitOrder(sellTokenOrder1)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
 
-      ref ! PlaceOrder(sellWavesOrder)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellWavesOrder))
+      ref ! PlaceLimitOrder(sellWavesOrder)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellWavesOrder)))
 
-      ref ! PlaceOrder(sellTokenOrder2)
-      eventsProbe.expectMsg(QueueEvent.Placed(sellTokenOrder2))
+      ref ! PlaceLimitOrder(sellTokenOrder2)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -195,6 +195,7 @@ class AddressActorSpecification
             eventsProbe.ref ! event
             Future.successful(Some(QueueEventWithMeta(0, 0, event)))
           },
+          _ => OrderBook.AggregatedSnapshot(),
           false
         )))
     f(
@@ -213,7 +214,7 @@ class AddressActorSpecification
     Portfolio(b.getOrElse(Waves, 0L), LeaseBalance.empty, b.collect { case (id @ IssuedAsset(_), v) => id -> v })
   }
 
-  private def addr(seed: String): Address              = privateKey(seed).toAddress
+  private def addr(seed: String): Address       = privateKey(seed).toAddress
   private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes("utf-8"), 0)
 
   override protected def afterAll(): Unit = {

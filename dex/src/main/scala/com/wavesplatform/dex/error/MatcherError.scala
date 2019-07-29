@@ -8,7 +8,7 @@ import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSett
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
 sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterContext => MatcherErrorMessage) {
@@ -328,6 +328,24 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
                    |step price = ${'step -> prcSettings.stepPrice}"""
     )
 
+case class MarketOrderCancel(id: Order.Id)
+    extends MatcherError(marketOrder, commonEntity, disabled, e"The market order ${'id -> id} cannot be cancelled manually")
+
+case class InvalidMarketOrderPrice(mo: Order)
+    extends MatcherError(
+      marketOrder,
+      price,
+      outOfBound,
+      if (mo.orderType == OrderType.BUY)
+        e"""Price of the buy market order
+         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |is too low for its full execution with the current market state"""
+      else
+        e"""Price of the sell market order
+         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |is too high for its full execution with the current market state"""
+    )
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -344,15 +362,16 @@ object Entity {
   object orderBook extends Entity(8)
   object order     extends Entity(9)
 
-  object version    extends Entity(10)
-  object asset      extends Entity(11)
-  object pubKey     extends Entity(12)
-  object signature  extends Entity(13)
-  object assetPair  extends Entity(14)
-  object amount     extends Entity(15)
-  object price      extends Entity(16)
-  object fee        extends Entity(17)
-  object expiration extends Entity(18)
+  object version     extends Entity(10)
+  object asset       extends Entity(11)
+  object pubKey      extends Entity(12)
+  object signature   extends Entity(13)
+  object assetPair   extends Entity(14)
+  object amount      extends Entity(15)
+  object price       extends Entity(16)
+  object fee         extends Entity(17)
+  object expiration  extends Entity(18)
+  object marketOrder extends Entity(19)
 
   object producer extends Entity(100)
 }

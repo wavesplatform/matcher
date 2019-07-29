@@ -312,7 +312,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           assertBadRequestAndResponse(
             node
               .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes),
-            "The account's script of .* returned the error"
+            "An access to the blockchain.height is denied on DEX"
           )
         }
 

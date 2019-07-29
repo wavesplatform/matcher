@@ -6,7 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.model.LimitOrder
+import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
@@ -198,7 +198,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       node.reservedBalance(alice) shouldBe empty
       node.tradableBalance(alice, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
 
-      val expectedReservedWaves = matcherFee - LimitOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
+      val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
       node.reservedBalance(bob)("WAVES") shouldBe expectedReservedWaves
 
       node.cancelOrder(bob, wctUsdPair, node.fullOrderHistory(bob).head.id)

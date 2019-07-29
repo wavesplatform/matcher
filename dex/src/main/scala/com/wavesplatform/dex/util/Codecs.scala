@@ -26,13 +26,28 @@ object Codecs {
         IssuedAsset(ByteStr(arr))
     }
 
-    def putFinalOrderStatus(st: OrderStatus): ByteBuffer = st match {
-      case OrderStatus.Filled(filled)    => b.put(0.toByte).putLong(filled)
-      case OrderStatus.Cancelled(filled) => b.put(1.toByte).putLong(filled)
-      case other                         => throw new IllegalArgumentException(s"Can't encode order status $other")
+    def putFinalOrderStatus(orderInfoVersion: Byte, st: OrderStatus): ByteBuffer = {
+      val tpe: Byte = st match {
+        case _: OrderStatus.Filled    => 0
+        case _: OrderStatus.Cancelled => 1
+        case x                        => throw new IllegalArgumentException(s"Can't encode order status $x")
+      }
+      val r = b.put(tpe).putLong(st.filledAmount)
+      if (orderInfoVersion <= 1) r else r.putLong(st.filledFee)
     }
 
-    def getFinalOrderStatus: OrderStatus.Final =
-      if (b.get() == 1) OrderStatus.Cancelled(b.getLong) else OrderStatus.Filled(b.getLong)
+    def getFinalOrderStatus(orderInfoVersion: Byte, totalAmount: Long, totalFee: Long): OrderStatus.Final = {
+      def fee(filledAmount: Long) = if (orderInfoVersion <= 1) (BigInt(filledAmount) * totalFee / totalAmount).toLong else b.getLong
+
+      b.get match {
+        case 0 =>
+          val filledAmount = b.getLong
+          OrderStatus.Filled(filledAmount, fee(filledAmount))
+        case 1 =>
+          val filledAmount = b.getLong
+          OrderStatus.Cancelled(filledAmount, fee(filledAmount))
+        case x => throw new IllegalArgumentException(s"Can't parse order status: $x")
+      }
+    }
   }
 }

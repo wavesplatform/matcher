@@ -3,7 +3,7 @@ package com.wavesplatform.dex
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.history.HistoryRouter
+import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.transaction.Asset
@@ -19,6 +19,7 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
                        historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
+
   import AddressDirectory._
   import context._
 
@@ -49,12 +50,8 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
     handler.forward(msg)
   }
 
-  import HistoryRouter._
-
   override def receive: Receive = {
-
-    case Envelope(address, cmd) =>
-      forward(address, cmd)
+    case Envelope(address, cmd) => forward(address, cmd)
 
     case e @ Events.OrderAdded(lo, timestamp) =>
       forward(lo.order.sender, e)
@@ -62,14 +59,22 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
 
     case e @ Events.OrderExecuted(submitted, counter, timestamp) =>
       forward(submitted.order.sender, e)
-      if (counter.order.sender != submitted.order.sender) {
-        forward(counter.order.sender, e)
+      if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
+
+      lazy val isFirstExecution  = submitted.amount == submitted.order.amount
+      lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
+
+      (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
+        case (true, true, _)     => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
+        case (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
+        case _                   => Unit
       }
-      if (e.submittedRemainingAmount == 0) historyRouter foreach { _ ! SaveOrder(submitted, timestamp) } // handle the case when the order is filled right after placing
+
       historyRouter foreach { _ ! SaveEvent(e) }
 
-    case e @ Events.OrderCanceled(lo, _, _) =>
-      forward(lo.order.sender, e)
+    case e @ Events.OrderCanceled(ao, _, timestamp) =>
+      forward(ao.order.sender, e)
+      if (ao.isMarket && ao.amount == ao.order.amount) historyRouter foreach { _ ! SaveOrder(ao, timestamp) }
       historyRouter foreach { _ ! SaveEvent(e) }
 
     case StartSchedules =>

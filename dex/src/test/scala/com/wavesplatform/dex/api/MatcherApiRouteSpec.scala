@@ -10,6 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -50,7 +51,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         mkGet(route)(Base58.encode(publicKey), ts, ";;") ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "invalid signature"
+          message.value shouldEqual "The request has an invalid signature"
         }
       }
 

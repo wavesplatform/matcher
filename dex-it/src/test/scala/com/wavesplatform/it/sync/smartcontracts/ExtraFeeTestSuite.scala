@@ -1,11 +1,15 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.wavesplatform.common.utils.EitherExt2
+import akka.http.scaladsl.model.StatusCodes
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.DoubleExt
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -17,7 +21,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   // set smart account
   setContract(Some("true"), alice)
 
-  // issue one simple and two smart assets
+  // issue one simple and three smart assets
   val asset0: String = node
     .broadcastIssue(alice, "Asset0", "Test", defaultAssetQuantity, 0, reissuable = false, smartIssueFee, None)
     .id
@@ -27,7 +31,10 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   val asset2: String = node
     .broadcastIssue(bob, "SmartAsset2", "Test", defaultAssetQuantity, 0, reissuable = false, smartIssueFee, trueScript)
     .id
-  Seq(asset0, asset1, asset2).foreach(node.waitForTransaction(_))
+  val feeAsset: ByteStr = ByteStr(Base58.decode(node
+    .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, trueScript)
+    .id))
+  Seq(asset0, asset1, asset2, feeAsset.toString).foreach(node.waitForTransaction(_))
 
   // distribute
   {
@@ -37,6 +44,31 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       node.broadcastTransfer(bob, alice.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
     )
     xs.foreach(node.waitForTransaction(_))
+
+    val txIds = Seq(IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
+    txIds.foreach(node.waitForTransaction(_))
+  }
+
+  override protected def nodeConfigs: Seq[Config] = {
+
+    val orderFeeSettingsStr =
+      s"""
+         |waves.dex {
+         |  allowed-order-versions = [1, 2, 3]
+         |  order-fee {
+         |    mode = dynamic
+         |    dynamic {
+         |      base-fee = $tradeFee
+         |    }
+         |  }
+         |}
+       """.stripMargin
+
+    super.nodeConfigs.map(
+      ConfigFactory
+        .parseString(orderFeeSettingsStr)
+        .withFallback
+    )
   }
 
   "When matcher executes orders" - {
@@ -116,6 +148,41 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           node.accountBalances(matcher.address)._1 shouldBe matcherInitBalance + expectedFee
         }
       }
+    }
+
+    "with non-waves asset fee with one Smart Account and one Smart Asset" in {
+      val oneSmartPair = createAssetPair(asset0, asset1)
+
+      val bobInitBalance     = node.assetBalance(bob.address, feeAsset.toString).balance
+      val matcherInitBalance = node.assetBalance(matcher.address, feeAsset.toString).balance
+      val feeAssetRate = 0.0005
+      node.upsertRate(IssuedAsset(feeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
+      node.upsertRate(IssuedAsset(BtcId), feeAssetRate, expectedStatusCode = StatusCodes.Created)
+
+      val expectedWavesFee = tradeFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
+      val expectedFee = 550L// 2 x "smart asset" and 1 x "matcher script"
+      val counter = node.placeOrder(
+        node.prepareOrder(
+          sender = bob,
+          pair = oneSmartPair,
+          orderType = SELL,
+          amount = amount,
+          price = price,
+          fee = expectedFee,
+          version = 3,
+          matcherFeeAssetId = IssuedAsset(feeAsset)
+        )
+      ).message.id
+      node.waitOrderStatus(oneSmartPair, counter, "Accepted")
+
+      info("expected fee should be reserved")
+      node.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
+
+      val submitted = node.placeOrder(alice, oneSmartPair, BUY, amount, price, expectedWavesFee, 2).message.id
+      node.waitOrderInBlockchain(submitted)
+
+      node.assertAssetBalance(bob.address, feeAsset.toString, bobInitBalance - expectedFee)
+      node.assertAssetBalance(matcher.address, feeAsset.toString, matcherInitBalance + expectedFee)
     }
   }
 

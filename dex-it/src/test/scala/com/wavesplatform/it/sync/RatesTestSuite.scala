@@ -86,7 +86,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // add rate for unexisted asset
     assertNotFoundAndMessage(
-      node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created, apiKey =  node.apiKey),
+      node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
       "The asset unexistedAsset not found")
 
     // add rate for wct

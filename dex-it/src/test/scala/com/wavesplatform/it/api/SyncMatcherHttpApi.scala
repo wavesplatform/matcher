@@ -91,8 +91,9 @@ object SyncMatcherHttpApi extends Assertions {
                    price: Long,
                    fee: Long,
                    version: Byte = 1: Byte,
-                   timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
-      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive))
+                   timeToLive: Duration = 30.days - 1.seconds,
+                   matcherFeeAssetId: Asset = Waves): MatcherResponse =
+      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, matcherFeeAssetId))
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
@@ -104,7 +105,7 @@ object SyncMatcherHttpApi extends Assertions {
                         orderId: String,
                         expectedStatus: String,
                         waitTime: Duration = OrderRequestAwaitTime,
-                        retryInterval: FiniteDuration = 1.second): MatcherStatusResponse =
+                        retryInterval: FiniteDuration = 5.second): MatcherStatusResponse =
       sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus, retryInterval), waitTime)
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,

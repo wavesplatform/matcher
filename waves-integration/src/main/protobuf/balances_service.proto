@@ -12,8 +12,15 @@ service BalancesService {
 }
 
 message BalanceChangesRequest {
-    bytes address = 1;
-    waves.AssetId asset = 2;
+
+    enum Action {
+        SUBSCRIBE = 0;
+        UNSUBSCRIBE = 1;
+    }
+
+    Action action = 1;
+    bytes address = 2;
+    waves.AssetId asset = 3;
 }
 
 message BalanceChangesResponse {
@@ -23,8 +30,11 @@ message BalanceChangesResponse {
 }
 
 message CurrentObservableBalancesResponse {
-    message AssetsSet {
-        repeated waves.AssetId assets = 1;
+
+    message ResponseMapEntry {
+        bytes address = 1;
+        repeated waves.AssetId assets = 2;
     }
-    map<string, AssetsSet> observableBalancesMap = 1;
+
+    repeated ResponseMapEntry observableBalancesMap = 1;
 }

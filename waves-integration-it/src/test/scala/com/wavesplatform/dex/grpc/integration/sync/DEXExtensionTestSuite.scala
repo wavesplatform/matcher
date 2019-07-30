@@ -8,6 +8,7 @@ import com.wavesplatform.dex.grpc.integration.dto.{BalanceChangesResponse => VBa
 import com.wavesplatform.dex.grpc.integration.protobuf.BalancesServiceConversions
 import com.wavesplatform.dex.grpc.integration.protobuf.Implicits._
 import com.wavesplatform.dex.grpc.integration.services.BalancesServiceGrpc.BalancesServiceStub
+import com.wavesplatform.dex.grpc.integration.services.CurrentObservableBalancesResponse.ResponseMapEntry
 import com.wavesplatform.dex.grpc.integration.services.{BalanceChangesRequest, BalanceChangesResponse, BalancesServiceGrpc}
 import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -54,21 +55,13 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
   private def getAddress(addressStr: String): Address = Address.fromString(addressStr).explicitGet()
   private def getAsset(assetStr: String): Asset       = Asset.fromString(Some(assetStr))
 
-  private def getCurrentObservableBalances: Future[Map[String, Set[Asset]]] = {
+  private def getCurrentObservableBalances: Future[Map[Address, Set[Asset]]] = {
     client.getCurrentObservableBalances { Empty() }.map { resp =>
-      resp.observableBalancesMap.map { case (addressStr, assets) => addressStr -> assets.assets.map(_.toVanillaAsset).toSet }
+      resp.observableBalancesMap.map { case ResponseMapEntry(address, assets) => address.toVanillaAddress -> assets.map(_.toVanillaAsset).toSet }.toMap
     }
   }
 
   test("DEX gRPC extension for the Waves node should be tunable and send balance changes via gRPC") {
-
-    // scenario:
-    // 1. check that initial observable balances on the node (server) side are empty
-    // 2. add subscriptions for first and second addresses by Waves and check that now observable balances are not empty
-    // 3. first address issues asset
-    // 4. add subscriptions for first and second addresses by issued asset and check that now observable balances are correct
-    // 5. first address sends issued asset to the second address
-    // 6. check balance changes for both addresses
 
     val addressOne = getAddress(firstAddress)
     val addressTwo = getAddress(secondAddress)
@@ -77,20 +70,20 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
       Await.result(getCurrentObservableBalances, 30.seconds) shouldBe empty
     }
 
-    Thread.sleep(1000) // overcome messages buffering
+    Thread.sleep(500) // overcome messages buffering
 
     withClue("Tune DEX extension output stream first time (add subscriptions for two addresses by Waves)\n") {
 
       Seq(addressOne, addressTwo) foreach { address =>
-        requestObserver.onNext { BalanceChangesRequest(address.toPBAddress, Waves.toPBAsset) }
+        requestObserver.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.SUBSCRIBE, address.toPBAddress, Waves.toPBAsset) }
       }
 
-      Thread.sleep(1000) // overcome messages buffering
+      Thread.sleep(500) // overcome messages buffering
 
       Await.result(getCurrentObservableBalances, 30.seconds) shouldBe
         Map(
-          firstAddress  -> Set(Waves),
-          secondAddress -> Set(Waves)
+          addressOne -> Set(Waves),
+          addressTwo -> Set(Waves)
         )
     }
 
@@ -104,15 +97,15 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
     withClue("Tune DEX extension output stream second time (add subscriptions for the first and second addresses by issued asset)\n") {
 
       Seq(addressOne, addressTwo) foreach { address =>
-        requestObserver.onNext { BalanceChangesRequest(address.toPBAddress, issuedAsset.toPBAsset) }
+        requestObserver.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.SUBSCRIBE, address.toPBAddress, issuedAsset.toPBAsset) }
       }
 
-      Thread.sleep(1000) // overcome messages buffering
+      Thread.sleep(500) // overcome messages buffering
 
       Await.result(getCurrentObservableBalances, 30.seconds) shouldBe
         Map(
-          firstAddress  -> Set(Waves, issuedAsset),
-          secondAddress -> Set(Waves, issuedAsset)
+          addressOne -> Set(Waves, issuedAsset),
+          addressTwo -> Set(Waves, issuedAsset)
         )
     }
 
@@ -137,9 +130,24 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
 
       balanceChanges.mapValues(_.toSet) shouldBe
         Map(
-          getAddress(firstAddress)  -> firstAddressBalanceChanges,
-          getAddress(secondAddress) -> secondAddressBalanceChanges
+          addressOne -> firstAddressBalanceChanges,
+          addressTwo -> secondAddressBalanceChanges
         )
+    }
+
+    withClue("Unsubscribe from some assets and address and check results\n") {
+
+      balanceChanges.clear()
+
+      requestObserver <|
+        (_.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.UNSUBSCRIBE, addressOne.toPBAddress, None) }) <|
+        (_.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.UNSUBSCRIBE, addressTwo.toPBAddress, Waves.toPBAsset) })
+
+      Thread.sleep(500)
+      Await.result(getCurrentObservableBalances, 30.seconds) shouldBe Map(addressTwo -> Set(issuedAsset))
+      sender.transfer(secondAddress, firstAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
+
+      balanceChanges.mapValues(_.toSet) shouldBe Map(addressTwo -> Set(issuedAsset -> someAssetAmount, issuedAsset -> 0))
     }
   }
 }

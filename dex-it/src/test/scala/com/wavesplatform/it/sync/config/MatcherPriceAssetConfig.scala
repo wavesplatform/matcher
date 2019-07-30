@@ -84,8 +84,7 @@ object MatcherPriceAssetConfig {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .right
-    .get
+    .explicitGet()
 
   val IssueEthTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
@@ -100,8 +99,7 @@ object MatcherPriceAssetConfig {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .right
-    .get
+    .explicitGet()
 
   val IssueBtcTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
@@ -116,8 +114,7 @@ object MatcherPriceAssetConfig {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .right
-    .get
+    .explicitGet()
 
   val BtcId = IssueBtcTx.id()
   val EthId = IssueEthTx.id()

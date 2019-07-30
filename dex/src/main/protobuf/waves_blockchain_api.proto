@@ -95,7 +95,7 @@ message AssetDescriptionResponse {
 message AssetDescription {
     bytes name = 1;
     int32 decimals = 2;
-    bool has_script = 3;
+    bool has_script = 3; // TODO
 }
 
 message RunAssetScriptRequest {

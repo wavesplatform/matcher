@@ -11,11 +11,11 @@ import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.waves.WavesBlockchainContext
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
-import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -58,7 +58,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
       override def isFeatureActivated(id: Short): Boolean = ???
 
-      override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = ???
+      override def assetDescription(asset: IssuedAsset): Option[BriefAssetDescription] = ???
 
       override def hasScript(asset: IssuedAsset): Boolean = ???
 

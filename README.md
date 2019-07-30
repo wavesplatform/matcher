@@ -218,6 +218,12 @@ sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /pat
 
 2. The root directory name must not be "dex" (or other module name): https://youtrack.jetbrains.com/issue/SCL-15210
 
+3. If the "dex" project disappeared after "Reimport All sbt Projects":
+
+   1. Close the project
+   2. Delete the ".idea" subdirectory of the project's directory
+   3. Open it again in IntelliJ IDEA
+
 ## 11. Production recommendations
 
 Recommended sections for your logback.xml

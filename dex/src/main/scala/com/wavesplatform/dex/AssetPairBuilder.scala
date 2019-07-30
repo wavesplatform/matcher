@@ -5,15 +5,17 @@ import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
-import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
-class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset => Option[AssetDescription], blacklistedAssets: Set[IssuedAsset]) {
+class AssetPairBuilder(settings: MatcherSettings,
+                       assetDescription: IssuedAsset => Option[BriefAssetDescription],
+                       blacklistedAssets: Set[IssuedAsset]) {
   import Either.cond
   import Ordered._
 
@@ -33,8 +35,8 @@ class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset 
       case (Some(pi), Some(ai)) => pi < ai
     }
 
-  private def isBlacklistedByName(asset: IssuedAsset, desc: AssetDescription): Boolean =
-    settings.blacklistedNames.exists(_.findFirstIn(new String(desc.name, UTF_8)).nonEmpty)
+  private def isBlacklistedByName(asset: IssuedAsset, desc: BriefAssetDescription): Boolean =
+    settings.blacklistedNames.exists(_.findFirstIn(new String(desc.name, UTF_8)).nonEmpty) // TODO bytes => string ?
 
   def validateAssetId(asset: Asset): Result[Asset] = validateAssetId(asset, AssetSide.Unknown)
 

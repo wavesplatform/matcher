@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.implicits._
@@ -19,12 +20,11 @@ import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestr
 import com.wavesplatform.dex.waves.WavesBlockchainContext
 import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
@@ -46,8 +46,8 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc               = mkAssetId("WBTC")
-  private val pairWavesBtc       = AssetPair(Waves, wbtc)
+  private val wbtc         = mkAssetId("WBTC")
+  private val pairWavesBtc = AssetPair(Waves, wbtc)
 
   private val defaultPortfolio     = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
   private val defaultAssetDecimals = 8
@@ -687,8 +687,8 @@ class OrderValidatorSpecification
     ov(order) shouldBe 'right
   }
 
-  private def mkAssetDescription(decimals: Int): AssetDescription =
-    AssetDescription(MatcherAccount, Array.emptyByteArray, Array.emptyByteArray, decimals, reissuable = false, BigInt(0), None, 0)
+  private def mkAssetDescription(decimals: Int): BriefAssetDescription =
+    BriefAssetDescription(name = "name".getBytes(StandardCharsets.UTF_8), decimals = decimals, hasScript = false)
 
   private def newBuyOrder: Order =
     buy(pair = pairWavesBtc, amount = 100 * Constants.UnitsInWave, price = 0.0022, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))
@@ -845,6 +845,6 @@ class OrderValidatorSpecification
   private def assignNoScript(bc: WavesBlockchainContext, asset: IssuedAsset): Unit =
     (bc.hasScript(_: IssuedAsset)).when(asset).returns(true)
 
-  private def assignAssetDescription(bc: WavesBlockchainContext, xs: (IssuedAsset, AssetDescription)*): Unit =
+  private def assignAssetDescription(bc: WavesBlockchainContext, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     (bc.assetDescription _).when(*).onCall((x: IssuedAsset) => xs.toMap.get(x))
 }

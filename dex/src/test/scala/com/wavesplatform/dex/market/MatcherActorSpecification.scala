@@ -5,17 +5,15 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
-import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
+import com.wavesplatform.dex.model.{BriefAssetDescription, Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatchingRules, RawMatchingRules}
-import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -38,9 +36,9 @@ class MatcherActorSpecification
     with NTPTime {
 
   private val defaultAssetDescription =
-    Some(AssetDescription(KeyPair(ByteStr.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0))
+    Some(BriefAssetDescription(name = "Unknown".getBytes, decimals = 8, hasScript = false))
 
-  private def assetDescription(assetId: IssuedAsset): Option[AssetDescription] = defaultAssetDescription
+  private def assetDescription(assetId: IssuedAsset): Option[BriefAssetDescription] = defaultAssetDescription
 
   "MatcherActor" should {
     "return all open markets" in {

@@ -4,6 +4,7 @@ import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.api.grpc.ToVanillaConversions._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.smart.MatcherScriptRunner
 import com.wavesplatform.lang.ValidationError
@@ -30,10 +31,10 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
 
   override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = {
     val result = Observable(request.transactionIds: _*).map { txId =>
-      blockchain.transactionHeight(to(txId)) match {
+      blockchain.transactionHeight(txId.toVanilla) match {
         case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height) // TODO
         case None =>
-          utx.transactionById(to(txId)) match {
+          utx.transactionById(txId.toVanilla) match {
             case Some(_) => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED)
             case None    => TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS)
           }
@@ -81,7 +82,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
   }
 
   override def hasAssetScript(request: AssetIdRequest): Future[HasScriptResponse] = Future {
-    HasScriptResponse(has = blockchain.hasAssetScript(IssuedAsset(to(request.assetId))))
+    HasScriptResponse(has = blockchain.hasAssetScript(IssuedAsset(request.assetId.toVanilla)))
   }
 
   override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = {
@@ -89,7 +90,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
 
     for {
       r <- Future {
-        val asset = IssuedAsset(to(request.assetId))
+        val asset = IssuedAsset(request.assetId.toVanilla)
         blockchain.assetScript(asset) match {
           case None => Result.Empty
           case Some(script) =>
@@ -116,7 +117,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
   }
 
   override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] =
-    Address.fromBytes(to(request.address)).toFuture.map { addr =>
+    Address.fromBytes(request.address.toVanilla).toFuture.map { addr =>
       HasScriptResponse(has = blockchain.hasScript(addr))
     }
 
@@ -124,7 +125,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     import RunScriptResponse._
 
     for {
-      address <- Address.fromBytes(to(request.address)).toFuture
+      address <- Address.fromBytes(request.address.toVanilla).toFuture
       r <- Future {
         blockchain.accountScript(address) match {
           case None => Result.Empty
@@ -149,12 +150,12 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
 
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] =
     for {
-      addr    <- Address.fromBytes(to(request.address)).toFuture
-      assetId <- Future { request.assetId.fold[Asset](Waves)(issued => IssuedAsset(to(issued.getIssuedAsset))) }
+      addr    <- Address.fromBytes(request.address.toVanilla).toFuture
+      assetId <- Future { request.assetId.fold[Asset](Waves)(issued => IssuedAsset(issued.getIssuedAsset.toVanilla)) }
     } yield SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
-    val seen = blockchain.filledVolumeAndFee(to(request.orderId)).volume > 0
+    val seen = blockchain.filledVolumeAndFee(request.orderId.toVanilla).volume > 0
     ForgedOrderResponse(isForged = seen)
   }
 }

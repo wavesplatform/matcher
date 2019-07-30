@@ -4,6 +4,7 @@ import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.AssetDescription
@@ -49,7 +50,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
   private val settings = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
 
-  private def mkBuilder(knownAssets: (IssuedAsset, Option[AssetDescription])*): AssetPairBuilder =
+  private def mkBuilder(knownAssets: (IssuedAsset, Option[BriefAssetDescription])*): AssetPairBuilder =
     new AssetPairBuilder(settings, knownAssets.toMap.withDefault(x => throw new NoSuchElementException(s"Can't find '$x' asset")), blacklistedAssets)
 
   private val pairs = Table(
@@ -120,14 +121,6 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
 object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
-  private def mkAssetDescription(assetName: String = ""): Option[AssetDescription] =
-    Some(
-      AssetDescription(PublicKey(Array.emptyByteArray),
-                       assetName.getBytes(Charsets.UTF_8),
-                       Array.emptyByteArray,
-                       8,
-                       reissuable = false,
-                       BigInt(1),
-                       None,
-                       0))
+  private def mkAssetDescription(assetName: String = ""): Option[BriefAssetDescription] =
+    Some(BriefAssetDescription(name = assetName.getBytes(Charsets.UTF_8), decimals = 8, hasScript = false))
 }

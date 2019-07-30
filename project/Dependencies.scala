@@ -71,8 +71,6 @@ object Dependencies {
       shapeless.value
     ))
 
-  val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
-
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
@@ -91,6 +89,7 @@ object Dependencies {
 
   lazy val dex = Seq(
     kindProjector,
+    "com.github.scopt" %% "scopt" % "4.0.0-RC2",
     akkaModule("actor"),
     akkaModule("persistence-query"),
     akkaHttp,

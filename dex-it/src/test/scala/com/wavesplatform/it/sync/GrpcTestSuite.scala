@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
-import com.wavesplatform.dex.waves.WavesBlockchainGrpcContext
+import com.wavesplatform.dex.waves.WavesBlockchainSyncGrpcContext
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -312,8 +312,7 @@ class GrpcTestSuite extends MatcherSuiteBase {
 
   // TODO check that the functions returns new data after the state is changed?
 
-  @silent("deprecated") private def mkContext: WavesBlockchainGrpcContext = new WavesBlockchainGrpcContext(
-    matcherAddress = IssueEthTx.sender.toAddress,
+  @silent("deprecated") private def mkContext: WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
     ManagedChannelBuilder
       .forAddress(
         dockerNode.networkAddress.getHostString,

@@ -10,21 +10,17 @@ import akka.stream.ActorMaterializer
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.waves.WavesBlockchainContext
+import com.wavesplatform.dex.waves.WavesBlockchainSyncGrpcContext
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter, UtilApp}
 import com.wavesplatform.utx.UtxPool
+import io.grpc.ManagedChannelBuilder
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
@@ -44,35 +40,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private var matcher: Matcher = _
 
   def run(): Unit = {
-    val extensionContext = new WavesBlockchainContext {
-//      private val channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext(true).build
-//      private val transactions = TransactionsApiGrpc.blockingStub(channel)
-
-      override def wasForged(id: ByteStr): Boolean = ??? //{
-//        transactions.getTransactions(TransactionsRequest())
-//      }
-
-      override def broadcastTx(txs: ExchangeTransaction): Boolean = ???
-
-      override def forgedOrder(orderId: ByteStr): Boolean = ???
-
-      override def isFeatureActivated(id: Short): Boolean = ???
-
-      override def assetDescription(asset: IssuedAsset): Option[BriefAssetDescription] = ???
-
-      override def hasScript(asset: IssuedAsset): Boolean = ???
-
-      override def runScript(asset: IssuedAsset, input: ExchangeTransaction): WavesBlockchainContext.RunScriptResult = ???
-
-      override def hasScript(address: Address): Boolean = ???
-
-      override def runScript(address: Address, input: Order): WavesBlockchainContext.RunScriptResult = ???
-
-      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
-
-      override def spendableBalance(address: Address, asset: Asset): Long = ???
-    }
-
+    val extensionContext = mkContext(settings.wavesNodeGrpc.host, settings.wavesNodeGrpc.port)
     matcher = new Matcher(settings, extensionContext)
     matcher.start()
 
@@ -82,6 +50,13 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
       Metrics.shutdown()
     }
   }
+
+  private def mkContext(host: String, port: Int): WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
+    ManagedChannelBuilder
+      .forAddress(host, port)
+      .usePlaintext(true)
+      .build()
+  )
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _

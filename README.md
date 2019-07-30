@@ -224,6 +224,14 @@ sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /pat
    2. Delete the ".idea" subdirectory of the project's directory
    3. Open it again in IntelliJ IDEA
 
+4. Can't test Cli hides passwords in IntelliJ IDEA and sbt. `System.console` is inaccessible in IDE, so we created a
+   fallback (and unsafe) way to read passwords. This is a known [issue](https://youtrack.jetbrains.net/issue/IDEA-18814).
+   To test Cli how it will work for users:
+   
+   1. Copy a command from the IntelliJ IDEA's "Run" tab
+   2. Remove `javaagent` option
+   3. Paste this into a terminal and run
+
 ## 11. Production recommendations
 
 Recommended sections for your logback.xml

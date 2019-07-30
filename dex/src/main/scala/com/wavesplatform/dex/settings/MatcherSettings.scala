@@ -5,7 +5,7 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.db.AccountStorage.AccountStorageSettings
+import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
@@ -14,6 +14,7 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.RawMatchingRules.rawMatchingRulesNelReader
+import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -21,12 +22,14 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
 case class MatcherSettings(addressSchemeCharacter: Char,
-                           accountStorage: AccountStorageSettings,
+                           accountStorage: AccountStorage.Settings,
+                           wavesNodeGrpc: GRPCSettings,
                            ntpServer: String,
                            restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
@@ -117,8 +120,12 @@ object MatcherSettings {
     val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
-      config.as[String]("address-scheme-character").headOption.getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!")),
-      config.as[AccountStorageSettings]("account-storage"),
+      config
+        .as[String]("address-scheme-character")
+        .headOption
+        .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!")),
+      accountStorageSettingsReader.read(config, "account-storage"),
+      config.as[GRPCSettings]("waves-node-grpc"),
       config.as[String]("ntp-server"),
       config.as[RestAPISettings]("rest-api"),
       exchangeTxBaseFee,

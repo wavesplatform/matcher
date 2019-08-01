@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync._
@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 
 import scala.concurrent.duration._
 
-class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
+class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase with CanSetScript {
 
   import OrdersFromScriptedAccTestSuite._
 

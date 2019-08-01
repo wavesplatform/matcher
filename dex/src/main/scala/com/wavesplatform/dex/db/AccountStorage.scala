@@ -1,17 +1,19 @@
 package com.wavesplatform.dex.db
 
-import java.io.File
+import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.file.Files
+import java.util.Base64
 
 import cats.syntax.either._
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.crypto
+import com.wavesplatform.dex.crypto.Enigma
 import com.wavesplatform.dex.db.AccountStorage.Settings.EncryptedFile
-import com.wavesplatform.utils.JsonFileStorage
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.util.Try
+import scala.collection.mutable.ArrayBuffer
 
 case class AccountStorage(keyPair: KeyPair)
 object AccountStorage {
@@ -22,7 +24,7 @@ object AccountStorage {
 
     implicit val valueReader: ValueReader[Settings] = ValueReader.relative[Settings] { config =>
       config.getString("type") match {
-        case "in-mem" => InMem(Base64.decode(config.getString("in-mem.seed-in-base64")))
+        case "in-mem" => InMem(Base64.getDecoder.decode(config.getString("in-mem.seed-in-base64")))
         case "encrypted-file" =>
           EncryptedFile(
             path = new File(config.getString("encrypted-file.path")),
@@ -36,16 +38,43 @@ object AccountStorage {
   def load(settings: Settings): Either[String, AccountStorage] = settings match {
     case Settings.InMem(seed) => Right(AccountStorage(KeyPair(seed)))
     case Settings.EncryptedFile(file, password) =>
-      for {
-        _ <- Either.cond(file.isFile, (), s"A file '${file.getAbsolutePath}' doesn't exist")
-        encodedContent <- Try(JsonFileStorage.load[String](file.getAbsolutePath, Some(JsonFileStorage.prepareKey(password)))).toEither
-          .leftMap(_.getMessage)
-        decodedContent <- ByteStr.decodeBase64(encodedContent).toEither.leftMap(_.getMessage)
-      } yield AccountStorage(KeyPair(decodedContent))
+      if (file.isFile) {
+        val encryptedSeedBytes = readFile(file)
+        val key                = Enigma.prepareDefaultKey(password)
+        val decryptedBytes     = Enigma.decrypt(key, encryptedSeedBytes)
+        AccountStorage(KeyPair(decryptedBytes)).asRight
+      } else s"A file '${file.getAbsolutePath}' doesn't exist".asLeft
   }
 
   def save(seed: ByteStr, to: EncryptedFile): Unit = {
     Files.createDirectories(to.path.getParentFile.toPath)
-    JsonFileStorage.save(seed.base64Raw, to.path.getAbsolutePath, Some(JsonFileStorage.prepareKey(to.password)))
+    val key                = Enigma.prepareDefaultKey(to.password)
+    val encryptedSeedBytes = Enigma.encrypt(key, seed.arr)
+    writeFile(to.path, encryptedSeedBytes)
+  }
+
+  def getAccountSeed(baseSeed: ByteStr, nonce: Int): ByteStr = ByteStr(crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), baseSeed)))
+
+  def readFile(file: File): Array[Byte] = {
+    val reader = new FileInputStream(file)
+    try {
+      val buff = new Array[Byte](1024)
+      val r    = new ArrayBuffer[Byte]
+      while (reader.available() > 0) {
+        val read = reader.read(buff)
+        if (read > 0) {
+          r.appendAll(buff.iterator.take(read))
+        }
+      }
+      r.toArray
+    } finally {
+      reader.close()
+    }
+  }
+
+  def writeFile(file: File, bytes: Array[Byte]): Unit = {
+    val writer = new FileOutputStream(file, false)
+    try writer.write(bytes)
+    finally writer.close()
   }
 }

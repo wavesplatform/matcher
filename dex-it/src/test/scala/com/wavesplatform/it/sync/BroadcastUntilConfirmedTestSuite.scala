@@ -1,24 +1,16 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderV1}
 
 import scala.concurrent.duration.DurationInt
 
-class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
-  private def minerConfig = ConfigFactory.parseString(
-    """waves {
-      |  network.node-name = node02
-      |  extensions = []
-      |}""".stripMargin).withFallback(Default.head)
+class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
-  private def matcherConfig =
+  override protected val dexNodeConfig: Config =
     ConfigFactory
       .parseString(s"""waves {
                       |  miner.enable = no
@@ -27,18 +19,14 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
                       |    interval = 20s
                       |  }
                       |}""".stripMargin)
-      .withFallback(Default.head)
-
-  override protected def nodeConfigs: Seq[Config] = Seq(matcherConfig, minerConfig)
-
-  private def minerDockerNode = dockerNodes().last
+      .withFallback(super.dexNodeConfig)
 
   "BroadcastUntilConfirmed" in {
     markup("Issue an asset")
-    node.signedBroadcast(IssueEthTx.json())
+    wavesApi.broadcast(IssueEthTx)
     val pair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
-    nodes.waitForTransaction(IssueEthTx.id().toString)
-    nodes.waitForHeightArise()
+    wavesApi.waitForTransaction(IssueEthTx.id())
+    wavesApi.waitForHeightArise()
 
     markup("Prepare orders")
     val now = System.currentTimeMillis()
@@ -65,16 +53,16 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     )
 
     markup("Shutdown miners")
-    val minerContainerId = docker.stopContainer(minerDockerNode)
+    dockerClient.disconnectFromNetwork(wavesContainer())
 
     markup("Place orders, those should match")
-    node.placeOrder(alicePlace)
-    node.placeOrder(bobPlace)
-    node.waitOrderStatus(pair, alicePlace.idStr(), "Filled")
-    val exchangeTxId = node.waitTransactionsByOrder(alicePlace.idStr(), 1).head.id
+    dexApi.place(alicePlace)
+    dexApi.place(bobPlace)
+    dexApi.waitForOrder(alicePlace.id(), "Filled")
+    val exchangeTxId = dexApi.waitTransactionsByOrder(alicePlace.id(), 1).head.id()
 
     markup("Start miners and wait until it receives the transaction")
-    docker.startContainer(minerContainerId)
-    nodes.waitForTransaction(exchangeTxId)
+    dockerClient.connectToNetwork(wavesContainer())
+    wavesApi.waitForTransaction(exchangeTxId)
   }
 }

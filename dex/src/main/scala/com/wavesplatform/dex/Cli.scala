@@ -34,7 +34,12 @@ object Cli {
               .abbr("cas-seed-format")
               .text("The format of seed to enter, 'raw-string' by default")
               .valueName("<raw-string,base64>")
-              .action((x, s) => s.copy(createAccountStorageSeedFormat = x))
+              .action((x, s) => s.copy(createAccountStorageSeedFormat = x)),
+            opt[Int]("create-account-storage-account-nonce")
+              .abbr("cas-account-nonce")
+              .text("The nonce for account, the default value means you entered the account seed")
+              .valueName("<number>")
+              .action((x, s) => s.copy(createAccountStorageAccountNonce = Some(x)))
           )
       )
     }
@@ -52,10 +57,12 @@ object Cli {
                 System.exit(1)
               }
 
-              val seed     = readSeedFromFromStdIn("Enter the seed of DEX's account: ", args.createAccountStorageSeedFormat)
-              val password = readSecretFromStdIn("Enter the password for file: ")
+              val seedPromptText = s"Enter the${if (args.createAccountStorageAccountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
+              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.createAccountStorageSeedFormat)
+              val password       = readSecretFromStdIn("Enter the password for file: ")
+              val accountSeed    = args.createAccountStorageAccountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
               AccountStorage.save(
-                seed,
+                accountSeed,
                 AccountStorage.Settings.EncryptedFile(
                   accountFile,
                   password
@@ -106,7 +113,8 @@ object Cli {
   private val defaultFile = new File(".")
   private case class Args(command: Option[Command] = None,
                           createAccountStorageDir: File = defaultFile,
-                          createAccountStorageSeedFormat: SeedFormat = SeedFormat.RawString)
+                          createAccountStorageSeedFormat: SeedFormat = SeedFormat.RawString,
+                          createAccountStorageAccountNonce: Option[Int] = None)
 
   private def readSeedFromFromStdIn(prompt: String, format: SeedFormat): ByteStr = {
     val rawSeed = readSecretFromStdIn(prompt)

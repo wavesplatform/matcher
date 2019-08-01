@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync._
@@ -14,7 +14,7 @@ import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
-class OrderTypeTestSuite extends MatcherSuiteBase {
+class OrderTypeTestSuite extends MatcherSuiteBase with CanSetScript {
   private val aliceAsset =
     node
       .broadcastIssue(alice, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, None)

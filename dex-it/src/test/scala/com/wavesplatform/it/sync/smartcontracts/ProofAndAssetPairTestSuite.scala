@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync._
@@ -15,7 +15,7 @@ import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
-class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
+class ProofAndAssetPairTestSuite extends MatcherSuiteBase with CanSetScript {
   private val aliceAsset =
     node.broadcastIssue(alice, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, None).id
 

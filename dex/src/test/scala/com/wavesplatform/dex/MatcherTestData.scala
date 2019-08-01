@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
-import com.wavesplatform.{NTPTime, crypto}
+import com.wavesplatform.{NTPTime, crypto => wcrypto}
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -30,7 +30,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
   val WalletSeed                   = ByteStr("Matcher".getBytes("utf-8"))
-  val MatcherSeed: Array[Byte]     = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherSeed: Array[Byte]     = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount               = KeyPair(MatcherSeed)
   val accountGen: Gen[KeyPair]     = bytes32gen.map(seed => KeyPair(seed))
   val positiveLongGen: Gen[Long]   = Gen.choose(1, Long.MaxValue)

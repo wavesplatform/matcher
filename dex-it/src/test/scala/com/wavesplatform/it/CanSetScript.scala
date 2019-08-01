@@ -6,10 +6,10 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.Suite
 
-trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
+// todo move to api
+trait CanSetScript extends Nodes {
   this: Suite =>
 
   def setContract(contractText: Option[String], acc: KeyPair): String = {
@@ -26,3 +26,4 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
       .id
   }
 }
+

@@ -15,10 +15,9 @@ abstract class MatcherSuiteBase
     extends FreeSpec
     with Matchers
     with CancelAfterFailure
-    with ReportingTestName
-    with NodesFromDocker
     with BeforeAndAfterAll
-    with MatcherNode {
+    with ReportingTestName
+    with NodesFromDocker {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 

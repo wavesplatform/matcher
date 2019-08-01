@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
@@ -9,7 +9,7 @@ import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class ExtraFeeTestSuite extends MatcherSuiteBase {
+class ExtraFeeTestSuite extends MatcherSuiteBase with CanSetScript {
   val trueScript = Some(ScriptCompiler("true", isAssetScript = false).explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
   val amount     = 1L
   val price      = 100000000L

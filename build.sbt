@@ -6,7 +6,7 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "v1.0.2"
+def nodeVersionTag: String = "master"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
@@ -32,6 +32,14 @@ lazy val `dex-it` = project
         exposedPorts += 6870,
         additionalFiles += (`grpc-server` / Universal / stage).value
       )))
+
+lazy val `waves-integration` = project.dependsOn(node % "compile;test->test;runtime->provided")
+
+lazy val `waves-integration-it` = project
+  .dependsOn(
+    `waves-integration`,
+    `node-it` % "compile;test->test"
+  )
 
 lazy val `dex-generator` = project.dependsOn(
   dex,
@@ -139,9 +147,10 @@ checkPRRaw := {
 }
 
 commands += Command.command("checkPR") { state =>
-  val updatedState = Project
-    .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+  val updatedState =
+    Project
+      .extract(state)
+      .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }

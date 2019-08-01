@@ -325,8 +325,10 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
   }
 
   override def start(): Unit = {
+
     val journalDir  = new File(settings.journalDataDir)
     val snapshotDir = new File(settings.snapshotsDataDir)
+
     journalDir.mkdirs()
     snapshotDir.mkdirs()
 

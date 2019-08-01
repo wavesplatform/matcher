@@ -15,7 +15,7 @@ import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset

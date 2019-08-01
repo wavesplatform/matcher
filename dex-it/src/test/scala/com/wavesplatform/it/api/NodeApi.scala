@@ -4,9 +4,9 @@ import cats.Id
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.docker.NodeContainer
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction
+import io.grpc.ManagedChannel
 import io.grpc.stub.StreamObserver
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -31,9 +31,9 @@ object NodeApi {
     def toUnit(implicit ec: ExecutionContext): Future[Unit] = self.map(_ => ())
   }
 
-  def async(node: NodeContainer)(implicit ec: ExecutionContext): NodeApi[Future] = new NodeApi[Future] {
-    private val txApi     = TransactionsApiGrpc.stub(node.grpcChannel)
-    private val blocksApi = BlocksApiGrpc.stub(node.grpcChannel)
+  def async(grpcChannel: => ManagedChannel)(implicit ec: ExecutionContext): NodeApi[Future] = new NodeApi[Future] {
+    private val txApi     = TransactionsApiGrpc.stub(grpcChannel)
+    private val blocksApi = BlocksApiGrpc.stub(grpcChannel)
 
     override def broadcast(tx: transaction.Transaction): Future[Unit] = txApi.broadcast(tx.toPB).toUnit
 

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderV1}
 
@@ -53,16 +53,16 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
     )
 
     markup("Shutdown miners")
-    dockerClient.disconnectFromNetwork(wavesContainer())
+    dockerClient().disconnectFromNetwork(wavesContainer())
 
     markup("Place orders, those should match")
     dexApi.place(alicePlace)
     dexApi.place(bobPlace)
-    dexApi.waitForOrder(alicePlace.id(), "Filled")
-    val exchangeTxId = dexApi.waitTransactionsByOrder(alicePlace.id(), 1).head.id()
+    dexApi.waitForOrderStatus(alicePlace.id(), "Filled")
+    val exchangeTxId = dexApi.waitForTransactionsByOrder(alicePlace.id(), 1).head.id()
 
     markup("Start miners and wait until it receives the transaction")
-    dockerClient.connectToNetwork(wavesContainer())
+    dockerClient().connectToNetwork(wavesContainer())
     wavesApi.waitForTransaction(exchangeTxId)
   }
 }

@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}

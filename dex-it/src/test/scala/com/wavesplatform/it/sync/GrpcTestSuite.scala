@@ -13,7 +13,7 @@ import com.wavesplatform.dex.waves.WavesBlockchainSyncGrpcContext
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{matcher, _}
+import com.wavesplatform.it.config.DexTestConfig.{matcher, _}
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{Docker, MatcherSuiteBase}
 import com.wavesplatform.lang.script.v1.ExprScript

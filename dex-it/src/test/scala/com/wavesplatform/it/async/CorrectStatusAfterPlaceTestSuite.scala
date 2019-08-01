@@ -7,7 +7,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.async.CorrectStatusAfterPlaceTestSuite._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1

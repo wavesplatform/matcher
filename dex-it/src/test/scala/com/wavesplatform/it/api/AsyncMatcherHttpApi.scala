@@ -11,7 +11,7 @@ import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
+import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -236,7 +236,7 @@ object AsyncMatcherHttpApi extends Assertions {
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
       val unsigned =
-        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+        Order(sender, DexTestConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)
     }
 

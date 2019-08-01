@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

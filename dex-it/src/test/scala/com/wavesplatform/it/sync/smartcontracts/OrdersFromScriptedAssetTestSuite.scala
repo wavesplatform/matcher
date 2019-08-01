@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script

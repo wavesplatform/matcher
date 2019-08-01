@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.config
+package com.wavesplatform.it.config
 
 import java.nio.charset.StandardCharsets
 
@@ -10,6 +10,9 @@ import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.it.Docker
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -19,7 +22,7 @@ import com.wavesplatform.wallet.Wallet
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-object MatcherPriceAssetConfig {
+object DexTestConfig {
 
   private val genesisConfig = ConfigFactory.parseResources("genesis.conf")
   AddressScheme.current = new AddressScheme {
@@ -165,8 +168,16 @@ object MatcherPriceAssetConfig {
                                             |  rest-order-limit = $orderLimit
                                             |}""".stripMargin)
 
+  val NodesConfig: Config = ConfigFactory.parseResources("nodes.conf")
+
+  val WavesNodeConfig: Config          = Docker.genesisOverride.withFallback(ConfigFactory.parseResources("nodes/waves.conf"))
+  val WavesNodeSettings: WavesSettings = WavesSettings.fromRootConfig(WavesNodeConfig.resolve())
+
+  val DexNodeConfig: Config            = ConfigFactory.parseResources("nodes/dex.conf")
+  val DexNodeSettings: MatcherSettings = MatcherSettings.valueReader.read(DexNodeConfig.resolve(), "waves.dex")
+
   val Configs: Seq[Config] = Seq(
-    updatedMatcherConfig.withFallback(ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala.head)
+    updatedMatcherConfig.withFallback(NodesConfig.getConfigList("nodes").asScala.head)
   )
 
   def createAssetPair(asset1: String, asset2: String): AssetPair = {

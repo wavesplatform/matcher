@@ -5,7 +5,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen

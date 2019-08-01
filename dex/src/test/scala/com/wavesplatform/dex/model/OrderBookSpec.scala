@@ -36,9 +36,35 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
   "place several buy orders at the same price" in {}
 
+  "place orders with different tick sizes" in {
+    val ob                 = OrderBook.empty
+
+    val normalizedTickSizes =
+      Array(1L, 7L, 8L, 100L, 211L, 320L, 100000L, 124337L, 250250L, toNormalized(10L), 651983183L, toNormalized(100L))
+    val prices = Gen.choose(1, 100000L)
+    for (tickSize <- normalizedTickSizes) {
+      forAll(prices) { price =>
+        ob.add(buy(pair, 1583290045643L, price), ntpNow, tickSize)
+      }
+      forAll(prices) { price =>
+        ob.add(sell(pair, 984651354686L, price), ntpNow, tickSize)
+      }
+      for ((level, orders) <- ob.getBids; order <- orders) {
+        order.price - level should be < tickSize
+        level % tickSize shouldBe 0
+      }
+      for ((level, orders) <- ob.getAsks; order <- orders) {
+        level - order.price should be < tickSize
+        level % tickSize shouldBe 0
+      }
+      ob.cancelAll(ntpNow)
+    }
+  }
+
   "place buy and sell orders with prices different from each other less than tick size in one level" in {
     val ob                 = OrderBook.empty
-    val normalizedTickSize = toNormalized(100L)
+    val tickSize: Long = 100L
+    val normalizedTickSize = toNormalized(tickSize)
 
     val buyOrd1 = buy(pair, 1583290045643L, 34100)
     val buyOrd2 = buy(pair, 170484969L, 34120)
@@ -46,6 +72,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val buyOrd4 = buy(pair, 44521418495L, 34303)
     val buyOrd5 = buy(pair, 44521418494L, 34357)
     val buyOrd6 = buy(pair, 44521418493L, 34389)
+    val buyOrdZero = buy(pair, 44521418493L, 90)
 
     val sellOrd1 = sell(pair, 2583290045643L, 44100)
     val sellOrd2 = sell(pair, 270484969L, 44120)
@@ -60,6 +87,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     ob.add(buyOrd4, ntpNow, normalizedTickSize)
     ob.add(buyOrd5, ntpNow, normalizedTickSize)
     ob.add(buyOrd6, ntpNow, normalizedTickSize)
+    ob.add(buyOrdZero, ntpNow, normalizedTickSize)
 
     ob.add(sellOrd1, ntpNow, normalizedTickSize)
     ob.add(sellOrd2, ntpNow, normalizedTickSize)
@@ -68,14 +96,15 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     ob.add(sellOrd5, ntpNow, normalizedTickSize)
     ob.add(sellOrd6, ntpNow, normalizedTickSize)
 
-    ob.getBids.keySet shouldBe SortedSet[Long](34300, 34200, 34100).map(toNormalized)
+    ob.getBids.keySet shouldBe SortedSet[Long](0, 34300, 34200, 34100).map(toNormalized)
     ob.getAsks.keySet shouldBe SortedSet[Long](44100, 44200, 44300, 44400).map(toNormalized)
 
     ob.getBids shouldBe mutable.TreeMap[Price, Level](
       Seq(
+        0 -> Vector(buyOrdZero),
         34300 -> Vector(buyOrd4, buyOrd5, buyOrd6),
         34200 -> Vector(buyOrd3),
-        34100 -> Vector(buyOrd1, buyOrd2),
+        34100 -> Vector(buyOrd1, buyOrd2)
       ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
     )
 
@@ -84,7 +113,16 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         44100 -> Vector(sellOrd1),
         44200 -> Vector(sellOrd2),
         44300 -> Vector(sellOrd3),
-        44400 -> Vector(sellOrd4, sellOrd5, sellOrd6),
+        44400 -> Vector(sellOrd4, sellOrd5, sellOrd6)
+      ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
+    )
+
+    ob.cancelAll(ntpNow)
+    val sellTickSizeOrder = sell(pair, 54521418493L, 40)
+    ob.add(sellTickSizeOrder, ntpNow, normalizedTickSize)
+    ob.getAsks shouldBe mutable.TreeMap[Price, Level](
+      Seq(
+        tickSize -> Vector(sellTickSizeOrder)
       ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
     )
   }

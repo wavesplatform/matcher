@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
 import scala.concurrent.duration._

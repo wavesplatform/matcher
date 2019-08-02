@@ -1,8 +1,8 @@
 import java.nio.charset.StandardCharsets
 
-import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
+import DexDockerKeys._
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex
@@ -40,11 +40,13 @@ lazy val versionSourceTask = Def.task {
 
 Compile / sourceGenerators += versionSourceTask
 
-Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postrm)(
-  Postrm ->
-    s"""#!/bin/sh
-       |set -e
-       |if [ "$$1" = purge ]; then
-       |  rm -rf /var/lib/${nodePackageName.value}/matcher
-       |fi""".stripMargin
-)
+// Docker
+
+inTask(docker)(
+  Seq(
+    additionalFiles ++= Seq(
+      (Universal / stage).value
+//      (Test / resourceDirectory).value / "template.conf",
+//      (Test / sourceDirectory).value / "container" / "wallet"
+    )
+  ))

@@ -10,8 +10,8 @@ import akka.stream.ActorMaterializer
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainSyncGrpcContext
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.waves.WavesBlockchainSyncGrpcContext
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.Asset

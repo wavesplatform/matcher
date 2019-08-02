@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.wavesplatform.api.http.TransactionNotAllowedByAccountScript
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.{CanSetScript, MatcherSuiteBase}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.Json

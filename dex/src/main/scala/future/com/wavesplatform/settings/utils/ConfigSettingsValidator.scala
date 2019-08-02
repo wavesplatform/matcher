@@ -4,7 +4,6 @@ import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigException}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import future.com.wavesplatform.transaction.assets.exchange.Implicits._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 

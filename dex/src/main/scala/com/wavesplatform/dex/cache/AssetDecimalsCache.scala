@@ -2,7 +2,7 @@ package com.wavesplatform.dex.cache
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.dex.model.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair

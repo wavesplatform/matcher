@@ -6,8 +6,8 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor._
-import com.wavesplatform.dex.model.BriefAssetDescription
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings

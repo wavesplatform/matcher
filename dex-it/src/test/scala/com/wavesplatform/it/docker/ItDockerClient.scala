@@ -3,26 +3,19 @@ package com.wavesplatform.it.docker
 import java.net.InetSocketAddress
 import java.util.Properties
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.spotify.docker.client.DockerClient
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages.{ContainerConfig, EndpointConfig, HostConfig, Network}
 import com.typesafe.config.{Config, ConfigRenderOptions}
-import com.wavesplatform.dex.api.grpc.WavesBlockchainApiGrpc
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.it.config.DexTestConfig.WavesNodeConfig
-import com.wavesplatform.it.util.GlobalTimer
+import com.wavesplatform.it.docker.ItDockerClient._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.ManagedChannel
-import org.asynchttpclient.AsyncHttpClient
-import org.asynchttpclient.Dsl.{config => clientConfig, _}
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
-import ItDockerClient._
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
-import com.wavesplatform.it.Docker.{jsonMapper, propsMapper}
 
 class ItDockerClient(client: DockerClient, network: Network) extends ScorexLogging {
   def createWavesNode(config: Config, ip: String): NodeContainer =

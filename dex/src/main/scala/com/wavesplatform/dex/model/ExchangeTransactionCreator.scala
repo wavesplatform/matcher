@@ -8,7 +8,7 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
@@ -91,7 +91,7 @@ object ExchangeTransactionCreator {
     */
   def minFee(baseFee: Long, hasMatcherAccountScript: Boolean, assetPair: AssetPair, hasScript: IssuedAsset => Boolean): Long = {
     def assetFee(assetId: Asset): Long = assetId match {
-      case asset: IssuedAsset if hasScript(asset) => CommonValidation.ScriptExtraFee
+      case asset: IssuedAsset if hasScript(asset) => FeeValidation.ScriptExtraFee
       case _                                      => 0L
     }
 
@@ -102,5 +102,5 @@ object ExchangeTransactionCreator {
   }
 
   def minAccountFee(hasMatcherAccountScript: Boolean): Long =
-    if (hasMatcherAccountScript) CommonValidation.ScriptExtraFee else 0L
+    if (hasMatcherAccountScript) FeeValidation.ScriptExtraFee else 0L
 }

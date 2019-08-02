@@ -5,7 +5,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.model.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.Asset

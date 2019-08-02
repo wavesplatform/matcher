@@ -1,5 +1,6 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
+import WavesExtensionDockerKeys.buildNodeContainer
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -23,15 +24,9 @@ lazy val dex = project.dependsOn(
 lazy val `dex-it` = project
   .dependsOn(
     dex,
-    `grpc-server`,
+    `waves-integration-it`,
     `node-it` % "compile;test->test"
   )
-  .settings(
-    inTask(docker)(
-      Seq(
-        exposedPorts += 6870,
-        additionalFiles += (`grpc-server` / Universal / stage).value
-      )))
 
 lazy val `waves-integration` = project.dependsOn(
   node % "compile;test->test;runtime->provided"
@@ -118,7 +113,7 @@ inScope(Global)(
     },
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value // grpc-server
+    buildNodeContainer := (`node-it` / Docker / docker).value
   ))
 
 // ThisBuild options

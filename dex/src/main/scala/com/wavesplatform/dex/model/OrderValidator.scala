@@ -7,16 +7,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.waves.WavesBlockchainContext
-import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -38,7 +38,7 @@ object OrderValidator extends ScorexLogging {
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200
 
-  val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+  val exchangeTransactionCreationFee: Long = FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
 

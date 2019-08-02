@@ -44,6 +44,7 @@ lazy val versionSourceTask = Def.task {
 inConfig(Compile)(
   Seq(
     sourceGenerators += versionSourceTask,
+    PB.deleteTargetDirectory := false,
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
   )
 )

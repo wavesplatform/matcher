@@ -1,12 +1,13 @@
-package com.wavesplatform.dex.api.grpc
+package com.wavesplatform.dex.grpc.integration.services
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
-import com.wavesplatform.dex.api.grpc.ToVanillaConversions._
-import com.wavesplatform.dex.error
-import com.wavesplatform.dex.smart.MatcherScriptRunner
+import com.wavesplatform.dex.grpc.integration.error
+import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.{EitherToFutureConversionOps, StreamObserverMonixOps}
+import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
@@ -100,7 +101,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
               .getOrElse(throw new IllegalArgumentException("Can't parse the transaction"))
 
             try {
-              ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2 match {
+              ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2 match {
                 case Left(execError) => Result.ScriptError(execError)
                 case Right(FALSE)    => Result.Denied(Empty())
                 case Right(TRUE)     => Result.Empty

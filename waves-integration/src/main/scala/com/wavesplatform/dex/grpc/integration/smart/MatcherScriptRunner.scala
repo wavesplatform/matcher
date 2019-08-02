@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.smart
+package com.wavesplatform.dex.grpc.integration.smart
 
 import cats.Eval
 import cats.implicits._

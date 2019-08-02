@@ -1,8 +1,7 @@
 syntax = "proto3";
 
-package waves.dex.grpc;
-
-option java_package = "com.wavesplatform.dex.api.grpc";
+package waves.dex.grpc.integration;
+option java_package = "com.wavesplatform.dex.grpc.integration.services";
 
 import "transaction.proto";
 import "google/protobuf/empty.proto";

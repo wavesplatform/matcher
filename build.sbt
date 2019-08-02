@@ -6,7 +6,7 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "master"
+def nodeVersionTag: String = "1a474761801b558a01060b894a7ab418995a1adf"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
@@ -17,7 +17,7 @@ lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$
 
 lazy val dex = project.dependsOn(
   node % "compile;test->test;runtime->provided",
-  `grpc-server`
+  `waves-integration`
 )
 
 lazy val `dex-it` = project
@@ -33,7 +33,9 @@ lazy val `dex-it` = project
         additionalFiles += (`grpc-server` / Universal / stage).value
       )))
 
-lazy val `waves-integration` = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val `waves-integration` = project.dependsOn(
+  node % "compile;test->test;runtime->provided"
+)
 
 lazy val `waves-integration-it` = project
   .dependsOn(
@@ -53,8 +55,12 @@ lazy val it = project
     Test / test := Def
       .sequential(
         root / Compile / packageAll,
-        `dex-it` / Docker / docker,
-        `dex-it` / Test / test
+        Def.task {
+          val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
+          val dexDocker = (`dex-it` / Docker / docker).value
+        },
+        `waves-integration-it` / Test /test,
+        `dex-it` / Test / test,
       )
       .value
   )

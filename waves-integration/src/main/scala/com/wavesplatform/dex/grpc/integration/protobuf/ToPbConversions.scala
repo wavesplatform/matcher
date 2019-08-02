@@ -1,12 +1,13 @@
-package com.wavesplatform.dex.api.grpc
+package com.wavesplatform.dex.grpc.integration.protobuf
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.{account => va}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.protobuf.transaction.Recipient.Recipient.Address
 import com.wavesplatform.protobuf.transaction.{Amount, AssetId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.{exchange => ve}
+import com.wavesplatform.{account => va}
 
 object ToPbConversions {
   implicit class VanillaExchangeTransactionOps(tx: ve.ExchangeTransaction) {

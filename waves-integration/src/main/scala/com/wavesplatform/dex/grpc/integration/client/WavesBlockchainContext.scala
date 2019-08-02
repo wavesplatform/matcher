@@ -1,9 +1,9 @@
-package com.wavesplatform.dex.waves
+package com.wavesplatform.dex.grpc.integration.client
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.BriefAssetDescription
-import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}

@@ -3,13 +3,7 @@ import WavesExtensionDockerPlugin.autoImport._
 enablePlugins(WavesExtensionDockerPlugin, ItTestPlugin)
 
 description := "DEX integration tests"
-libraryDependencies ++= Dependencies.itTest
-
-val silencerVersion = "1.4.1"
-libraryDependencies ++= Seq(
-  compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
-  "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided
-)
+libraryDependencies ++= Dependencies.itTest ++ Dependencies.silencer
 
 docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(

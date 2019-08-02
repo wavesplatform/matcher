@@ -1,4 +1,4 @@
-package com.wavesplatform.dex
+package com.wavesplatform.dex.grpc.integration
 
 import java.io.{PrintWriter, StringWriter}
 

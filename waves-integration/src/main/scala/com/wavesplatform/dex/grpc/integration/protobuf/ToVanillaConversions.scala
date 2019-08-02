@@ -1,11 +1,12 @@
-package com.wavesplatform.dex.api.grpc
+package com.wavesplatform.dex.grpc.integration.protobuf
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.api.grpc.AssetDescriptionResponse.MaybeDescription
-import com.wavesplatform.dex.model.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
+import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError

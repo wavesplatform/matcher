@@ -1,21 +1,21 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.dex.grpc.integration.sync
 
 import java.nio.charset.StandardCharsets
 
 import com.github.ghik.silencer.silent
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.model.BriefAssetDescription
-import com.wavesplatform.dex.waves.WavesBlockchainContext.RunScriptResult
-import com.wavesplatform.dex.waves.WavesBlockchainSyncGrpcContext
+import com.wavesplatform.dex.grpc.integration.ItTestSuiteBase
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainSyncGrpcContext
+import com.wavesplatform.dex.grpc.integration.config.Accounts._
+import com.wavesplatform.dex.grpc.integration.config.Assets._
+import com.wavesplatform.dex.grpc.integration.config.Fee
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.config.DexTestConfig.{matcher, _}
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{Docker, MatcherSuiteBase}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -28,22 +28,7 @@ import io.grpc.ManagedChannelBuilder
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class GrpcTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = Seq(
-    ConfigFactory.parseString("""|
-      |waves {
-      |  network.node-name = node02
-      |  extensions = [ "com.wavesplatform.dex.GrpcServerExtension" ]
-      |
-      |  grpc {
-      |    host = 0.0.0.0
-      |    port = 6870
-      |  }
-      |}""".stripMargin).withFallback(Default.head)
-  )
-
-  private def dockerNode: Docker.DockerNode = dockerNodes().head
+class GrpcTestSuite extends ItTestSuiteBase {
 
   private lazy val context = mkContext
 
@@ -76,9 +61,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
 
       val executedAmount = 1L
       val executedPrice  = 2 * Order.PriceConstant
-      val pair           = AssetPair.createAssetPair(IssueEthTx.id().base58, "WAVES").get
-      val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
-      val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
+      val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
+      val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
+      val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
 
       val exchangeTx = ExchangeTransactionV2
         .create(
@@ -87,9 +72,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
           sellOrder = sell,
           amount = executedAmount,
           price = executedPrice,
-          buyMatcherFee = matcherFee,
-          sellMatcherFee = matcherFee,
-          fee = matcherFee,
+          buyMatcherFee = Fee.matcher,
+          sellMatcherFee = Fee.matcher,
+          fee = Fee.matcher,
           timestamp = now
         )
         .right
@@ -104,8 +89,8 @@ class GrpcTestSuite extends MatcherSuiteBase {
 
       val executedAmount = 1L
       val executedPrice  = 2 * Order.PriceConstant
-      val pair           = AssetPair.createAssetPair(IssueEthTx.id().base58, "WAVES").get
-      val buy            = Order.buy(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
+      val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
+      val buy            = Order.buy(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
       val sell = Order.sell(KeyPair("fake-bob".getBytes(StandardCharsets.UTF_8)),
                             matcher,
                             pair,
@@ -113,7 +98,7 @@ class GrpcTestSuite extends MatcherSuiteBase {
                             executedPrice,
                             now,
                             now + 1.day.toMillis,
-                            matcherFee)
+                            Fee.matcher)
 
       val exchangeTx = ExchangeTransactionV2
         .create(
@@ -122,9 +107,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
           sellOrder = sell,
           amount = executedAmount,
           price = executedPrice,
-          buyMatcherFee = matcherFee,
-          sellMatcherFee = matcherFee,
-          fee = matcherFee,
+          buyMatcherFee = Fee.matcher,
+          sellMatcherFee = Fee.matcher,
+          fee = Fee.matcher,
           timestamp = now
         )
         .explicitGet()
@@ -191,9 +176,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
         val now            = System.currentTimeMillis()
         val executedAmount = 1L
         val executedPrice  = 2 * Order.PriceConstant
-        val pair           = AssetPair.createAssetPair(issueTx.id().base58, "WAVES").get
-        val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
-        val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
+        val pair           = AssetPair.createAssetPair(issueTx.id().toString, "WAVES").get
+        val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
+        val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
 
         val exchangeTx = ExchangeTransactionV2
           .create(
@@ -202,9 +187,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
             sellOrder = sell,
             amount = executedAmount,
             price = executedPrice,
-            buyMatcherFee = matcherFee,
-            sellMatcherFee = matcherFee,
-            fee = matcherFee,
+            buyMatcherFee = Fee.matcher,
+            sellMatcherFee = Fee.matcher,
+            fee = Fee.matcher,
             timestamp = now
           )
           .explicitGet()
@@ -260,7 +245,7 @@ class GrpcTestSuite extends MatcherSuiteBase {
         val now            = System.currentTimeMillis()
         val executedAmount = 1L
         val executedPrice  = 2 * Order.PriceConstant
-        val pair           = AssetPair.createAssetPair(IssueEthTx.id().base58, "WAVES").get
+        val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
         val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, 0)
 
         context.runScript(receiver.toAddress, buy) shouldBe RunScriptResult.Allowed
@@ -283,9 +268,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
 
       val executedAmount = 1L
       val executedPrice  = 2 * Order.PriceConstant
-      val pair           = AssetPair.createAssetPair(IssueEthTx.id().base58, "WAVES").get
-      val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
-      val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, matcherFee)
+      val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
+      val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
+      val sell           = Order.sell(alice, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, Fee.matcher)
 
       val exchangeTx = ExchangeTransactionV2
         .create(
@@ -294,9 +279,9 @@ class GrpcTestSuite extends MatcherSuiteBase {
           sellOrder = sell,
           amount = executedAmount,
           price = executedPrice,
-          buyMatcherFee = matcherFee,
-          sellMatcherFee = matcherFee,
-          fee = matcherFee,
+          buyMatcherFee = Fee.matcher,
+          sellMatcherFee = Fee.matcher,
+          fee = Fee.matcher,
           timestamp = now
         )
         .right
@@ -315,8 +300,8 @@ class GrpcTestSuite extends MatcherSuiteBase {
   @silent("deprecated") private def mkContext: WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
     ManagedChannelBuilder
       .forAddress(
-        dockerNode.networkAddress.getHostString,
-        dockerNode.nodeExternalPort(6870)
+        node.networkAddress.getHostString,
+        node.nodeExternalPort(6887)
       )
       .usePlaintext(true)
       .build()

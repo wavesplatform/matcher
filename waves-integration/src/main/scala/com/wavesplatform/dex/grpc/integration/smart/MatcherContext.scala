@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.smart
+package com.wavesplatform.dex.grpc.integration.smart
 
 import cats.Eval
 import com.wavesplatform.account.{Address, Alias}
@@ -39,7 +39,6 @@ import shapeless.Coproduct
 import scala.util.control.NoStackTrace
 
 // Used only for order validation
-// @TODO move to extension
 object MatcherContext {
 
   def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] = {
@@ -122,5 +121,6 @@ object MatcherContext {
       * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
     override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = kill("collectLposPortfolios")
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
+    override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")
   }
 }

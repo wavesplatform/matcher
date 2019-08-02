@@ -29,6 +29,8 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
       NettyServerBuilder
         .forAddress(bindAddress)
         .addService(BalancesServiceGrpc.bindService(new BalancesServiceGrpcImpl(context), apiScheduler))
+        .addService(
+          WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcImpl(context.blockchain, context.utx, context.broadcastTx), apiScheduler))
         .build()
         .start()
 

@@ -14,6 +14,12 @@ object Dependencies {
 
   private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %% s"cats-$module" % version)
 
+  val silencerVersion = "1.4.1"
+  val silencer = Seq(
+    compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
+    "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided
+  )
+
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
   val akkaHttp                   = akkaHttpModule("akka-http")
@@ -107,7 +113,6 @@ object Dependencies {
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime"      % scalapb.compiler.Version.scalapbVersion % "protobuf"
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   )
 }

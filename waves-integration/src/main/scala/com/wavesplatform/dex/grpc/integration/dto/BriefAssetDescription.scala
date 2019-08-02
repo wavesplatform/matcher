@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.model
+package com.wavesplatform.dex.grpc.integration.dto
 
 import com.wavesplatform.common.state.ByteStr
 

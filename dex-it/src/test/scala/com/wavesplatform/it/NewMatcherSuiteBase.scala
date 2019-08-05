@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import cats.Id
 import cats.instances.try_._
 import com.softwaremill.sttp._
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.{DexApi, NodeApi}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, WavesNodeContainer}
@@ -36,15 +36,27 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected def dexApi: DexApi[Id]                  = DexApi.unWrapped(DexApi[Try](getDexApiAddress))
   protected def dexConfig: Config                   = DexTestConfig.containerConfig("dex-1")
   protected val dexContainer: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient().createDex("dex-1", dexConfig.resolve())
+    val grpcAddr = dockerClient().getInetSocketAddress(wavesNodeContainer(), wavesNodeConfig.getInt("waves.dex.grpc.integration.port"))
+    println(grpcAddr)
+    val wavesNodeGrpcConfig = ConfigFactory.parseString(s"""
+      |waves.dex.waves-node-grpc {
+      |  host = ${grpcAddr.getAddress.getHostAddress}
+      |  port = ${grpcAddr.getPort}
+      |}""".stripMargin)
+    dockerClient().createDex("dex-1", wavesNodeGrpcConfig.withFallback(dexConfig).resolve())
   }
 
   override protected def beforeAll(): Unit = {
+    log.debug(s"Doing beforeAll")
     super.beforeAll()
-    List(wavesNodeContainer, dexContainer).foreach(x => dockerClient().start(x()))
+
+    List(wavesNodeContainer, dexContainer).foreach { x =>
+      dockerClient().start(x())
+    }
   }
 
   override protected def afterAll(): Unit = {
+    log.debug(s"Doing afterAll")
     List(wavesNodeContainer, dexContainer).foreach(x => dockerClient().stop(x()))
     super.afterAll()
   }

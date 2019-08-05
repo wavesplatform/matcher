@@ -23,6 +23,7 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
             from(baseImage.value)
             add(additionalFiles.value, "/opt/waves/")
             expose(exposedPorts.value.toSeq: _*)
+            runShell("chmod", "+x", "/opt/waves/start-waves.sh")
           }
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)

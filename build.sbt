@@ -11,9 +11,6 @@ def nodeVersionTag: String = "1a474761801b558a01060b894a7ab418995a1adf"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
-// @TODO Remove in future, after: https://github.com/wavesplatform/Waves/pull/2426
-lazy val `grpc-server` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "grpc-server")
-
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
 lazy val dex = project.dependsOn(
@@ -126,8 +123,7 @@ enablePlugins(ReleasePlugin)
 // https://stackoverflow.com/a/48592704/4050580
 def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
   node,
-  `node-it`,
-  `grpc-server`
+  `node-it`
 )
 
 Compile / cleanAll := {

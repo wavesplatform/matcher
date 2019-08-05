@@ -17,17 +17,18 @@ object DexItDockerPlugin extends AutoPlugin {
       Seq(
         additionalFiles := Seq.empty,
         exposedPorts := Set(6886),
-        baseImage := "com.wavesplatform/waves-dex",
+        baseImage := "com.wavesplatform/waves-dex:latest",
         dockerfile := {
           new Dockerfile {
             from(baseImage.value)
-            add(additionalFiles.value, "/opt/waves-dex")
+            add(additionalFiles.value, "/opt/waves-dex/")
             expose(exposedPorts.value.toSeq: _*)
           }
         },
-        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess),
-        docker := docker.dependsOn(LocalProject("dex") / docker).value
-      ))
+        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+      )) ++ Seq(
+      docker := docker.dependsOn(LocalProject("dex") / docker).value
+    )
 }
 
 object DexItDockerKeys {

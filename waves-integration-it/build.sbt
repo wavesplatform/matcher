@@ -13,7 +13,8 @@ inTask(docker)(
     additionalFiles ++= Seq(
       (LocalProject("waves-integration") / Universal / stage).value,
       (Test / resourceDirectory).value / "template.conf",
-      (Test / sourceDirectory).value / "container" / "wallet"
+      (Test / sourceDirectory).value / "container" / "wallet",
+      (Test / sourceDirectory).value / "container" / "start-waves.sh"
     )
   )
 )

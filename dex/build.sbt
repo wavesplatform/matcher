@@ -45,8 +45,8 @@ Compile / sourceGenerators += versionSourceTask
 inTask(docker)(
   Seq(
     additionalFiles ++= Seq(
-      (Universal / stage).value
-//      (Test / resourceDirectory).value / "template.conf",
-//      (Test / sourceDirectory).value / "container" / "wallet"
+      (Universal / stage).value,
+      (Compile / sourceDirectory).value / "container" / "start.sh",
+      (Compile / sourceDirectory).value / "container" / "default.conf"
     )
   ))

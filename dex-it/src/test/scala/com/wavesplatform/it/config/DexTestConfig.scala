@@ -1,33 +1,48 @@
 package com.wavesplatform.it.config
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
-import com.wavesplatform.it.util._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.it.Docker
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
+import com.wavesplatform.it.util._
+import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.wallet.Wallet
+import net.ceedubs.ficus.Ficus._
+import com.wavesplatform.settings._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
 object DexTestConfig {
 
-  private val genesisConfig = ConfigFactory.parseResources("genesis.conf")
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = genesisConfig.getString("genesis-generator.network-type").head.toByte
-  }
+  private val containerConfigCache = new AtomicReference[Map[String, Config]](Map.empty)
+  def containerConfig(name: String): Config =
+    containerConfigCache
+      .updateAndGet { prev: Map[String, Config] =>
+        if (prev.isDefinedAt(name)) prev
+        else
+          prev.updated(
+            name, {
+              val baseConfig = if (name.startsWith("waves-")) genesisConfig else ConfigFactory.empty()
+              baseConfig.withFallback(ConfigFactory.parseResources(s"nodes/$name.conf"))
+            }
+          )
+      }
+      .apply(name)
+
+  private val genesisConfig = genesisOverride
 
   val accounts: Map[String, KeyPair] = {
     val config           = ConfigFactory.parseResources("genesis.conf")
@@ -170,11 +185,26 @@ object DexTestConfig {
 
   val NodesConfig: Config = ConfigFactory.parseResources("nodes.conf")
 
-  val WavesNodeConfig: Config          = Docker.genesisOverride.withFallback(ConfigFactory.parseResources("nodes/waves.conf"))
-  val WavesNodeSettings: WavesSettings = WavesSettings.fromRootConfig(WavesNodeConfig.resolve())
+  private def genesisOverride: Config = {
+    val genesisTs = System.currentTimeMillis()
 
-  val DexNodeConfig: Config            = ConfigFactory.parseResources("nodes/dex.conf")
-  val DexNodeSettings: MatcherSettings = MatcherSettings.valueReader.read(DexNodeConfig.resolve(), "waves.dex")
+    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
+                                            |  timestamp = $genesisTs
+                                            |  block-timestamp = $genesisTs
+                                            |  signature = null # To calculate it in Block.genesis
+                                            |}""".stripMargin)
+
+    val genesisConfig    = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-5.conf"))
+    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = genesisConfig.getString("waves.blockchain.custom.address-scheme-character").head.toByte
+    }
+
+    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+
+    parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
+  }
 
   val Configs: Seq[Config] = Seq(
     updatedMatcherConfig.withFallback(NodesConfig.getConfigList("nodes").asScala.head)

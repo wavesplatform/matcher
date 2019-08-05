@@ -25,9 +25,10 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
             expose(exposedPorts.value.toSeq: _*)
           }
         },
-        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess),
-        docker := docker.dependsOn(buildNodeContainer).value
-      ))
+        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+      )) ++ Seq(
+      docker := docker.dependsOn(buildNodeContainer).value
+    )
 }
 
 object WavesExtensionDockerKeys {

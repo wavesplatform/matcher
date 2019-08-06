@@ -6,9 +6,9 @@ import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+
 class MatcherRulesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = {

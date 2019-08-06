@@ -1,15 +1,8 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
-import com.google.protobuf.empty.Empty
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.dto.{BalanceChangesResponse => VBalanceChangesResponse}
-import com.wavesplatform.dex.grpc.integration.protobuf.BalancesServiceConversions
-import com.wavesplatform.dex.grpc.integration.protobuf.Implicits._
-import com.wavesplatform.dex.grpc.integration.services.BalancesServiceGrpc.BalancesServiceStub
-import com.wavesplatform.dex.grpc.integration.services.CurrentObservableBalancesResponse.ResponseMapEntry
-import com.wavesplatform.dex.grpc.integration.services.{BalanceChangesRequest, BalanceChangesResponse, BalancesServiceGrpc}
+import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueFee, minFee, someAssetAmount}
@@ -17,19 +10,32 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import io.grpc.stub.StreamObserver
-import io.grpc.{ManagedChannel, ManagedChannelBuilder}
+import monix.execution.Ack
+import monix.execution.Ack.Continue
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.Observer
 import mouse.any._
+import org.scalatest.concurrent.Eventually
+import org.scalatest.{Assertion, BeforeAndAfterEach}
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
-class DEXExtensionTestSuite extends BaseTransactionSuite {
+class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach with Eventually {
 
-  val balanceChanges = scala.collection.mutable.Map.empty[Address, Seq[(Asset, Long)]]
+  val balanceChanges           = scala.collection.mutable.Map.empty[Address, Seq[(Asset, Long)]]
+  val (addressOne, addressTwo) = (getAddress(firstAddress), getAddress(secondAddress))
 
-  override protected def nodeConfigs: Seq[Config] = {
-    super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0").withFallback)
+  val target    = s"localhost:${nodes.head.nodeExternalPort(6887)}"
+  val dexClient = new DEXClient(target)
+
+  val eventsObserver: Observer[(Address, Asset, Long)] = new Observer[(Address, Asset, Long)] {
+    override def onError(ex: Throwable): Unit = Unit
+    override def onComplete(): Unit           = Unit
+    override def onNext(elem: (Address, Asset, Long)): Future[Ack] = elem |> {
+      case (address, asset, balance) =>
+        balanceChanges.update(address, balanceChanges.getOrElse(address, Seq.empty) :+ (asset -> balance))
+        Continue
+    }
   }
 
   protected override def createDocker: Docker = new Docker(
@@ -37,55 +43,24 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
     tag = getClass.getSimpleName
   )
 
-  lazy val channel: ManagedChannel     = ManagedChannelBuilder.forAddress("localhost", nodes.head.nodeExternalPort(6887)).usePlaintext().build
-  lazy val client: BalancesServiceStub = BalancesServiceGrpc.stub(channel)
+  def getAddress(addressStr: String): Address = Address.fromString { addressStr }.explicitGet()
+  def getAsset(assetStr: String): Asset       = Asset.fromString { Some(assetStr) }
 
-  lazy val responseObserver: StreamObserver[BalanceChangesResponse] = new StreamObserver[BalanceChangesResponse] {
-    def onError(t: Throwable): Unit = Unit
-    def onCompleted(): Unit         = Unit
-    def onNext(value: BalanceChangesResponse): Unit =
-      BalancesServiceConversions.vanilla(value) |> {
-        case VBalanceChangesResponse(address, asset, balance) =>
-          balanceChanges.update(address, balanceChanges.getOrElse(address, Seq.empty) :+ (asset -> balance))
-      }
+  def assertBalanceChanges(address: Address)(expectedBalanceChanges: Set[(Asset, Long)]): Assertion = eventually {
+    balanceChanges.get(address).map(_.toSet) shouldBe Some(expectedBalanceChanges)
   }
 
-  lazy val requestObserver: StreamObserver[BalanceChangesRequest] = client.getBalanceChanges(responseObserver)
-
-  private def getAddress(addressStr: String): Address = Address.fromString(addressStr).explicitGet()
-  private def getAsset(assetStr: String): Asset       = Asset.fromString(Some(assetStr))
-
-  private def getCurrentObservableBalances: Future[Map[Address, Set[Asset]]] = {
-    client.getCurrentObservableBalances { Empty() }.map { resp =>
-      resp.observableBalancesMap.map { case ResponseMapEntry(address, assets) => address.toVanillaAddress -> assets.map(_.toVanillaAsset).toSet }.toMap
-    }
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    dexClient.balanceServiceClient <| { _.requestBalanceChanges() } <| { _.spendableBalanceChanges.subscribe(eventsObserver) }
   }
 
-  test("DEX gRPC extension for the Waves node should be tunable and send balance changes via gRPC") {
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    balanceChanges.clear()
+  }
 
-    val addressOne = getAddress(firstAddress)
-    val addressTwo = getAddress(secondAddress)
-
-    withClue("There aren't observable balances in the beginning\n") {
-      Await.result(getCurrentObservableBalances, 30.seconds) shouldBe empty
-    }
-
-    Thread.sleep(500) // overcome messages buffering
-
-    withClue("Tune DEX extension output stream first time (add subscriptions for two addresses by Waves)\n") {
-
-      Seq(addressOne, addressTwo) foreach { address =>
-        requestObserver.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.SUBSCRIBE, address.toPBAddress, Waves.toPBAsset) }
-      }
-
-      Thread.sleep(500) // overcome messages buffering
-
-      Await.result(getCurrentObservableBalances, 30.seconds) shouldBe
-        Map(
-          addressOne -> Set(Waves),
-          addressTwo -> Set(Waves)
-        )
-    }
+  test("DEX gRPC extension for the Waves node should send balance changes via gRPC") {
 
     val issuedAssetId =
       sender
@@ -94,60 +69,23 @@ class DEXExtensionTestSuite extends BaseTransactionSuite {
 
     val issuedAsset = getAsset(issuedAssetId)
 
-    withClue("Tune DEX extension output stream second time (add subscriptions for the first and second addresses by issued asset)\n") {
-
-      Seq(addressOne, addressTwo) foreach { address =>
-        requestObserver.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.SUBSCRIBE, address.toPBAddress, issuedAsset.toPBAsset) }
-      }
-
-      Thread.sleep(500) // overcome messages buffering
-
-      Await.result(getCurrentObservableBalances, 30.seconds) shouldBe
-        Map(
-          addressOne -> Set(Waves, issuedAsset),
-          addressTwo -> Set(Waves, issuedAsset)
-        )
-    }
-
     sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
 
-    withClue("Check balance changes for both addresses. NOTE: there are duplications due to (seemingly) UTX pool implementation\n") {
-
-      val firstAddressBalanceChanges =
-        Set(
-          Waves       -> 100.waves, // default balance
-          Waves       -> (100.waves - issueFee),
-          Waves       -> (100.waves - issueFee - minFee),
-          issuedAsset -> someAssetAmount,
-          issuedAsset -> 0
-        )
-
-      val secondAddressBalanceChanges =
-        Set(
-          Waves       -> 100.waves,
-          issuedAsset -> someAssetAmount
-        )
-
-      balanceChanges.mapValues(_.toSet) shouldBe
-        Map(
-          addressOne -> firstAddressBalanceChanges,
-          addressTwo -> secondAddressBalanceChanges
-        )
+    assertBalanceChanges(addressOne) {
+      Set(
+        Waves       -> 100.waves, // default balance
+        Waves       -> (100.waves - issueFee), // first address issued asset
+        Waves       -> (100.waves - issueFee - minFee), // first address sent asset to the second address
+        issuedAsset -> someAssetAmount, // initial asset amount
+        issuedAsset -> 0L // balance after transfer
+      )
     }
 
-    withClue("Unsubscribe from some assets and address and check results\n") {
-
-      balanceChanges.clear()
-
-      requestObserver <|
-        (_.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.UNSUBSCRIBE, addressOne.toPBAddress, None) }) <|
-        (_.onNext { BalanceChangesRequest(BalanceChangesRequest.Action.UNSUBSCRIBE, addressTwo.toPBAddress, Waves.toPBAsset) })
-
-      Thread.sleep(500)
-      Await.result(getCurrentObservableBalances, 30.seconds) shouldBe Map(addressTwo -> Set(issuedAsset))
-      sender.transfer(secondAddress, firstAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
-
-      balanceChanges.mapValues(_.toSet) shouldBe Map(addressTwo -> Set(issuedAsset -> someAssetAmount, issuedAsset -> 0))
+    assertBalanceChanges(addressTwo) {
+      Set(
+        Waves       -> 100.waves, // default balance
+        issuedAsset -> someAssetAmount // balance after transfer
+      )
     }
   }
 }

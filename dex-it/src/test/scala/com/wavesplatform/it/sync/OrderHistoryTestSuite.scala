@@ -49,12 +49,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   val postgresContainerLauncher =
     new DockerContainerLauncher(
-      postgresImageName,
-      postgresContainerName,
-      postgresEnv,
-      postgresContainerIp,
-      postgresContainerPort,
-      wavesNetwork.name
+      imageName = postgresImageName,
+      containerName = postgresContainerName,
+      containerIp = postgresContainerIp,
+      containerPort = postgresContainerPort,
+      env = postgresEnv,
+      networkName = wavesNetwork.name,
+      imageTag = "10"
     )
 
   val batchLingerMs: Int  = OrderHistorySettings.defaultBatchLingerMs

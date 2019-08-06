@@ -48,7 +48,11 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
 
   private val time = new NTP(settings.ntpServer)
 
-  private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet()
+  private val matcherKeyPair = {
+    val r = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet()
+    log.info(s"The DEX's public key: ${Base58.encode(r.publicKey.arr)}, account address: ${r.publicKey.toAddress.stringRepr}")
+    r
+  }
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
 

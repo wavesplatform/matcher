@@ -4,7 +4,9 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.{Base64, Scanner}
 
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.db.AccountStorage
 import scopt.{OParser, RenderingMode}
 
@@ -21,6 +23,26 @@ object Cli {
       OParser.sequence(
         programName("dex-cli"),
         head("DEX CLI", Version.VersionString),
+        opt[Char]("address-scheme")
+          .abbr("as")
+          .text("The network byte as char. By default it is the testnet: 'T'")
+          .valueName("<one char>")
+          .action((x, s) => s.copy(addressSchemeByte = Some(x))),
+        cmd(Command.GenerateAccountSeed.name)
+          .action((_, s) => s.copy(command = Some(Command.GenerateAccountSeed)))
+          .text("Generates an account seed from base seed and nonce")
+          .children(
+            opt[SeedFormat]("seed-format")
+              .abbr("sf")
+              .text("The format of seed to enter, 'raw-string' by default")
+              .valueName("<raw-string,base64>")
+              .action((x, s) => s.copy(seedFormat = x)),
+            opt[Int]("account-nonce")
+              .abbr("an")
+              .text("The nonce for account, the default value means you entered the account seed")
+              .valueName("<number>")
+              .action((x, s) => s.copy(accountNonce = Some(x)))
+          ),
         cmd(Command.CreateAccountStorage.name)
           .action((_, s) => s.copy(command = Some(Command.CreateAccountStorage)))
           .text("Creates an encrypted account storage")
@@ -30,16 +52,16 @@ object Cli {
               .text("The directory for account.dat file")
               .required()
               .action((x, s) => s.copy(createAccountStorageDir = x)),
-            opt[SeedFormat]("create-account-storage-seed-format")
-              .abbr("cas-seed-format")
+            opt[SeedFormat]("seed-format")
+              .abbr("seed-format")
               .text("The format of seed to enter, 'raw-string' by default")
               .valueName("<raw-string,base64>")
-              .action((x, s) => s.copy(createAccountStorageSeedFormat = x)),
-            opt[Int]("create-account-storage-account-nonce")
-              .abbr("cas-account-nonce")
+              .action((x, s) => s.copy(seedFormat = x)),
+            opt[Int]("account-nonce")
+              .abbr("account-nonce")
               .text("The nonce for account, the default value means you entered the account seed")
               .valueName("<number>")
-              .action((x, s) => s.copy(createAccountStorageAccountNonce = Some(x)))
+              .action((x, s) => s.copy(accountNonce = Some(x)))
           )
       )
     }
@@ -49,7 +71,33 @@ object Cli {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
         case Some(command) =>
           println(s"Running '${command.name}' command")
+          AddressScheme.current = new AddressScheme {
+            override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte
+          }
           command match {
+            case Command.GenerateAccountSeed =>
+              val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
+              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
+              val accountSeed    = KeyPair(args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _)))
+
+              println(s"""Do not share this information with others!
+                         |
+                         |The seed is:
+                         |Base58 format: ${Base58.encode(accountSeed.seed.arr)}
+                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.seed.arr)}
+                         |
+                         |The private key is:
+                         |Base58 format: ${Base58.encode(accountSeed.privateKey.arr)}
+                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.privateKey.arr)}
+                         |
+                         |The public key is:
+                         |Base58 format: ${Base58.encode(accountSeed.publicKey.arr)}
+                         |Base64 format: ${Base64.getEncoder.encodeToString(accountSeed.publicKey.arr)}
+                         |
+                         |The address is:
+                         |Base58 format: ${Base58.encode(accountSeed.publicKey.toAddress.bytes)}
+                         |""".stripMargin)
+
             case Command.CreateAccountStorage =>
               val accountFile = args.createAccountStorageDir.toPath.resolve("account.dat").toFile.getAbsoluteFile
               if (accountFile.isFile) {
@@ -57,10 +105,10 @@ object Cli {
                 System.exit(1)
               }
 
-              val seedPromptText = s"Enter the${if (args.createAccountStorageAccountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
-              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.createAccountStorageSeedFormat)
+              val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
+              val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
               val password       = readSecretFromStdIn("Enter the password for file: ")
-              val accountSeed    = args.createAccountStorageAccountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
+              val accountSeed    = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
               AccountStorage.save(
                 accountSeed,
                 AccountStorage.Settings.EncryptedFile(
@@ -93,6 +141,10 @@ object Cli {
   }
 
   private object Command {
+    case object GenerateAccountSeed extends Command {
+      override def name: String = "create-account-seed"
+    }
+
     case object CreateAccountStorage extends Command {
       override def name: String = "create-account-storage"
     }
@@ -111,10 +163,11 @@ object Cli {
   }
 
   private val defaultFile = new File(".")
-  private case class Args(command: Option[Command] = None,
-                          createAccountStorageDir: File = defaultFile,
-                          createAccountStorageSeedFormat: SeedFormat = SeedFormat.RawString,
-                          createAccountStorageAccountNonce: Option[Int] = None)
+  private case class Args(addressSchemeByte: Option[Char] = None,
+                          seedFormat: SeedFormat = SeedFormat.RawString,
+                          accountNonce: Option[Int] = None,
+                          command: Option[Command] = None,
+                          createAccountStorageDir: File = defaultFile)
 
   private def readSeedFromFromStdIn(prompt: String, format: SeedFormat): ByteStr = {
     val rawSeed = readSecretFromStdIn(prompt)
@@ -135,8 +188,8 @@ object Cli {
       case Some(console) => new String(console.readPassword(prompt))
       case None =>
         System.out.print(prompt)
-        val scanner = new Scanner(System.in)
-        scanner.nextLine()
+        val scanner = new Scanner(System.in, StandardCharsets.UTF_8.name())
+        if (scanner.hasNextLine) scanner.nextLine() else ""
     }
     if (r.isEmpty) {
       System.err.println("Please enter a non-empty password")

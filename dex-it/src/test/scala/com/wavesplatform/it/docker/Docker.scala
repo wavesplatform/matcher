@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints._
+import com.spotify.docker.client.DockerClient.{ExecCreateParam, ExecStartParameter}
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
@@ -67,10 +68,20 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     r
   }
 
-  def getInetSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
-    val ns      = client.inspectContainer(container.id).networkSettings()
-    val binding = ns.ports().get(s"$internalPort/tcp").get(0)
-    new InetSocketAddress(ns.ipAddress(), binding.hostPort().toInt)
+  /**
+    * @return The address inside the network
+    */
+  def getInternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
+    val ns = client.inspectContainer(container.id).networkSettings()
+    new InetSocketAddress(ns.networks().get(network().name()).ipAddress(), internalPort)
+  }
+
+  /**
+    * @return The address outside the network, from host machine
+    */
+  def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
+    val binding = client.inspectContainer(container.id).networkSettings().ports().get(s"$internalPort/tcp").get(0)
+    new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
   }
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
@@ -190,7 +201,6 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def stop(container: DockerContainer): Unit = {
-    saveLog(container)
     val containerInfo = client.inspectContainer(container.id)
     log.debug(s"""${prefix(container)} Information:
                  |Exit code: ${containerInfo.state().exitCode()}
@@ -205,6 +215,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         log.error(s"${prefix(container)} Can't stop", e)
         throw e
     }
+
+    saveLog(container)
   }
 
   def disconnectFromNetwork(container: DockerContainer): Unit = {
@@ -216,7 +228,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   def connectToNetwork(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Connecting to network '${network().name()}' ...")
     try client.connectToNetwork(
-      container.id,
+      network().id(),
       NetworkConnection
         .builder()
         .containerId(container.id)
@@ -228,6 +240,14 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         log.error(s"${prefix(container)} Can't connect to the network '${network().name()}'", e)
         throw e
     }
+  }
+
+  def printDebugMessage(container: DockerContainer, text: String): Unit = {
+    val escaped = text.replace('\'', '\"')
+    val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
+    val exec    = client.execStart(id)
+    try exec.readFully()
+    catch { case NonFatal(e) => log.error(s"Can't print a debug message", e) } finally exec.close()
   }
 
   private def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {
@@ -287,7 +307,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     } catch {
       case NonFatal(e) =>
         // https://github.com/moby/moby/issues/17217
-        log.warn(s"Can't remove the '${network().id()}' network")
+        log.warn(s"Can't remove the '${network().id()}' network", e)
     }
 
     client.close()

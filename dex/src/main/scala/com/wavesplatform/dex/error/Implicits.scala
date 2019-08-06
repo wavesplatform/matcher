@@ -48,7 +48,7 @@ object Implicits {
 
   implicit val balanceShow = new ContextShow[Map[Asset, Long]] {
     override def show(input: Map[Asset, Long])(context: ErrorFormatterContext): String =
-      input.map(Function.tupled(Amount.apply)).map(amountShow.show(_)(context)).mkString(" and ")
+      input.map(Function.tupled(Amount.apply)).toList.sortBy(x => AssetPair.assetIdStr(x.asset)).map(amountShow.show(_)(context)).mkString(" and ")
   }
 
   implicit def setShow[T](implicit itemShow: ContextShow[T]) = new ContextShow[Set[T]] {

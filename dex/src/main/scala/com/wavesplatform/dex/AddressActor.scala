@@ -68,7 +68,11 @@ class AddressActor(owner: Address,
     }
   }
 
-  private def tradableBalance(assetId: Asset): Long = spendableBalance(assetId) - openVolume(assetId)
+  private def tradableBalance(assetId: Asset): Long = {
+    val s = spendableBalance(assetId)
+    log.info(s"Has $s $assetId")
+    s - openVolume(assetId)
+  }
 
   private def accountStateValidator(acceptedOrder: AcceptedOrder): OrderValidator.Result[AcceptedOrder] = {
     OrderValidator.accountStateAware(owner,

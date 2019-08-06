@@ -35,8 +35,8 @@ object ToPbConversions {
 
   implicit class VanillaAssetOps(self: Asset) {
     def toPB: AssetId = self match {
-      case Asset.IssuedAsset(assetId) => AssetId().withIssuedAsset(assetId.toPB)
-      case Asset.Waves                => AssetId().withWaves(com.google.protobuf.empty.Empty())
+      case Asset.IssuedAsset(assetId) => AssetId(AssetId.Asset.IssuedAsset(assetId.toPB))
+      case Asset.Waves                => AssetId(AssetId.Asset.Waves(com.google.protobuf.empty.Empty.defaultInstance))
     }
   }
 

@@ -84,7 +84,8 @@ object Dependencies {
     jacksonModule("dataformat", "dataformat-properties"),
     "org.scalacheck"        %% "scalacheck" % "1.14.0",
     "com.softwaremill.sttp" %% "core"       % "1.6.4",
-    "com.softwaremill.sttp" %% "play-json"  % "1.6.4"
+    "com.softwaremill.sttp" %% "play-json"  % "1.6.4",
+    "com.lihaoyi"           %% "sourcecode" % "0.1.7"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(

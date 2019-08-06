@@ -150,10 +150,12 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
   }
 
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] =
-    for {
-      addr    <- Address.fromBytes(request.address.toVanilla).toFuture
-      assetId <- Future { request.assetId.fold[Asset](Waves)(issued => IssuedAsset(issued.getIssuedAsset.toVanilla)) }
-    } yield SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
+    Address.fromBytes(request.address.toVanilla).toFuture.map { addr =>
+      val assetId = request.assetId.fold[Asset](Waves)(_.toVanilla) // TODO
+      val b       = blockchain.balance(addr, assetId)
+      log.info(s"spendableAssetBalance(addr=$addr, asset=$assetId) = $b")
+      SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
+    }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
     val seen = blockchain.filledVolumeAndFee(request.orderId.toVanilla).volume > 0

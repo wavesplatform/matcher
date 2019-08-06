@@ -8,6 +8,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.AssetId
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
@@ -78,6 +79,14 @@ object ToVanillaConversions {
 
   implicit class PbByteStringOps(val self: ByteString) extends AnyVal {
     def toVanilla: ByteStr = ByteStr(self.toByteArray)
+  }
+
+  implicit class PbAssetIdOps(val self: AssetId) extends AnyVal {
+    def toVanilla: Asset = self.asset match {
+      case AssetId.Asset.Empty              => Asset.Waves // TODO
+      case _: AssetId.Asset.Waves           => Asset.Waves
+      case AssetId.Asset.IssuedAsset(value) => Asset.IssuedAsset(value.toVanilla)
+    }
   }
 
   implicit class PbMaybeDescriptionOps(val self: MaybeDescription) extends AnyVal {

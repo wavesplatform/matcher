@@ -9,12 +9,24 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.DoubleExt
+import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils.compilerContext
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import fastparse.core.Parsed
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
-  val trueScript = Some(ScriptCompiler("true", isAssetScript = false).explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
+
+  private def createBoolScript(code: String) = {
+    val Parsed.Success(expr, _) = Parser.parseExpr(code).get
+    ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+  }
+
+  val trueScript = Some(createBoolScript("true")) //TODO добавить типовые проверки в скрипт
+  val falseScript = Some(createBoolScript("false"))
   val amount     = 1L
   val price      = 100000000L
 
@@ -33,6 +45,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     .id
   val feeAsset: ByteStr = ByteStr(Base58.decode(node
     .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, trueScript)
+    .id))
+  val falseFeeAsset: ByteStr = ByteStr(Base58.decode(node
+    .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, falseScript)
     .id))
   Seq(asset0, asset1, asset2, feeAsset.toString).foreach(node.waitForTransaction(_))
 
@@ -162,7 +177,6 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
       val expectedFee = 550L// 1 x "smart asset" and 1 x "matcher script"
       val counter = node.placeOrder(
-        node.prepareOrder(
           sender = bob,
           pair = oneSmartPair,
           orderType = SELL,
@@ -171,7 +185,6 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           fee = expectedFee,
           version = 3,
           matcherFeeAssetId = IssuedAsset(feeAsset)
-        )
       ).message.id
       node.waitOrderStatus(oneSmartPair, counter, "Accepted")
 
@@ -183,6 +196,24 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
       node.assertAssetBalance(bob.address, feeAsset.toString, bobInitBalance - expectedFee)
       node.assertAssetBalance(matcher.address, feeAsset.toString, matcherInitBalance + expectedFee)
+    }
+
+    "with asset fee assigned false script" in {
+      val oneSmartPair = createAssetPair(asset0, asset1)
+      val feeAssetRate = 0.0005
+      node.upsertRate(IssuedAsset(falseFeeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
+      assertBadRequestAndResponse(
+        node.placeOrder(
+            sender = bob,
+            pair = oneSmartPair,
+            orderType = SELL,
+            amount = amount,
+            price = price,
+            fee = 550,
+            version = 3,
+            matcherFeeAssetId = IssuedAsset(falseFeeAsset)
+          ), s"The asset's script of $falseFeeAsset rejected the order"
+        )
     }
   }
 

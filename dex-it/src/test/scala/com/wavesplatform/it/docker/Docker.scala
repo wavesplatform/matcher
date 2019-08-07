@@ -80,7 +80,11 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     * @return The address outside the network, from host machine
     */
   def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
-    val binding = client.inspectContainer(container.id).networkSettings().ports().get(s"$internalPort/tcp").get(0)
+    val ns = client.inspectContainer(container.id).networkSettings()
+    val binding = Option(ns.ports().get(s"$internalPort/tcp"))
+      .map(_.get(0))
+      .getOrElse(throw new IllegalStateException(s"There is no mapping '$internalPort/tcp' for '${container.name}'"))
+
     new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
   }
 
@@ -139,7 +143,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def createWavesNode(name: String, config: Config): WavesNodeContainer = {
-    val number = parseNumber(name)
+    val number = getNumber(name)
     val id = create(
       number,
       name,
@@ -173,7 +177,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def createDex(name: String, config: Config): DexContainer = {
-    val number = parseNumber(name)
+    val number = getNumber(name)
     val grpc   = config.as[GRPCSettings]("waves.dex.waves-node-grpc")
     val id = create(
       number,
@@ -356,12 +360,18 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   private def prefix(container: DockerContainer): String = s"[name='${container.name}', id=${container.id}]"
 
-  private def parseNumber(name: String): Int =
-    name
+  private def getNumber(name: String): Int = {
+    val raw = name
       .split('-')
       .lastOption
       .flatMap(x => Try(x.toInt).toOption)
       .getOrElse(throw new IllegalArgumentException(s"Can't parse the container's number: '$name'. It should have a form: <name>-<number>"))
+
+    if (raw >= 5) throw new IllegalArgumentException("All slots are filled")
+    else if (name.startsWith("dex-")) raw
+    else if (name.startsWith("waves-")) raw + 5
+    else throw new IllegalArgumentException(s"Can't parse number from '$name'. Know 'dex-' and 'waves-' only")
+  }
 
   dumpContainers(client.listContainers())
   sys.addShutdownHook {

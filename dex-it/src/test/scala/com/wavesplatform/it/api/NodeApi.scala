@@ -18,6 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait NodeApi[F[_]] {
+  def waitReady: F[Unit]
   def connect(toNode: InetSocketAddress): F[Unit]
 
   def broadcast(tx: transaction.Transaction): F[Unit]
@@ -43,6 +44,10 @@ object NodeApi {
   def apply[F[_]](apiKey: String, host: => InetSocketAddress)(implicit M: MonadError[F, Throwable], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): NodeApi[F] =
     new NodeApi[F] {
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
+
+      override def waitReady: F[Unit] = {
+        ???
+      }
 
       override def connect(toNode: InetSocketAddress): F[Unit] = {
         val req = sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey).mapResponse(_ => ())

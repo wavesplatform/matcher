@@ -194,7 +194,8 @@ object DexTestConfig {
                                             |  signature = null # To calculate it in Block.genesis
                                             |}""".stripMargin)
 
-    val genesisConfig    = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-5.conf"))
+    // TODO waves-base.conf
+    val genesisConfig    = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-1.conf"))
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
 
     AddressScheme.current = new AddressScheme {

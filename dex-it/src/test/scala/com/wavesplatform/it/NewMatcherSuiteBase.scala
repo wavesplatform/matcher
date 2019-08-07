@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import java.net.InetSocketAddress
-import java.util.concurrent.{ExecutorService, Executors, ThreadFactory}
+import java.util.concurrent.Executors
 
 import cats.Id
 import cats.instances.try_._
@@ -13,7 +13,7 @@ import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import org.scalatest.{Args, BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers, Status}
+import org.scalatest._
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
@@ -27,47 +27,47 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 
   protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce(docker.Docker(getClass))
 
-  protected def getWavesNodeRestApiAddress: InetSocketAddress =
-    dockerClient().getExternalSocketAddress(wavesNodeContainer(), wavesNodeConfig.getInt("waves.rest-api.port"))
-  protected def getWavesNodeNetworkApiAddress: InetSocketAddress =
-    dockerClient().getInternalSocketAddress(wavesNodeContainer(), wavesNodeConfig.getInt("waves.network.port"))
-  protected def wavesNodeApi: NodeApi[Id] = NodeApi.unWrapped(NodeApi[Try]("integration-test-rest-api", getWavesNodeRestApiAddress))
-  protected def wavesNodeName = "waves-5"
-  protected def wavesNodeConfig: Config   = DexTestConfig.containerConfig(wavesNodeName)
-  protected val wavesNodeContainer: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode(wavesNodeName, wavesNodeConfig.resolve())
+  // Waves miner node
+
+  protected def wavesNode1Config: Config = DexTestConfig.containerConfig("waves-1")
+  protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
+    dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve())
+  }
+  protected def wavesNode1Api: NodeApi[Id] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
+    NodeApi.unWrapped(NodeApi[Try]("integration-test-rest-api", apiAddress))
+  }
+  protected def wavesNode1NetworkApiAddress: InetSocketAddress =
+    dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))
+
+  // Dex server
+
+  protected def dex1Config: Config                 = DexTestConfig.containerConfig("dex-1")
+  protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
+  protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
+    val grpcAddr            = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
+    val wavesNodeGrpcConfig = ConfigFactory.parseString(s"""waves.dex.waves-node-grpc {
+                                                           |  host = ${grpcAddr.getAddress.getHostAddress}
+                                                           |  port = ${grpcAddr.getPort}
+                                                           |}""".stripMargin)
+    dockerClient().createDex("dex-1", wavesNodeGrpcConfig.withFallback(dex1Config).resolve())
+  }
+  protected def dex1Api: TracedDexApi[Id] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
+    TracedDexApi.wrap(DexApi.unWrapped(DexApi[Try](apiAddress)))
   }
 
-  protected def getDexApiAddress: InetSocketAddress =
-    dockerClient().getExternalSocketAddress(dexContainer(), dexConfig.getInt("waves.dex.rest-api.port"))
-  protected def dexApi: TracedDexApi[Id] = TracedDexApi.wrap(DexApi.unWrapped(DexApi[Try](getDexApiAddress)))
-  protected def dexConfig: Config        = DexTestConfig.containerConfig("dex-1")
-  protected val dexContainer: Coeval[DexContainer] = Coeval.evalOnce {
-    val grpcAddr            = dockerClient().getInternalSocketAddress(wavesNodeContainer(), wavesNodeConfig.getInt("waves.dex.grpc.integration.port"))
-    val wavesNodeGrpcConfig = ConfigFactory.parseString(s"""
-      |waves.dex.waves-node-grpc {
-      |  host = ${grpcAddr.getAddress.getHostAddress}
-      |  port = ${grpcAddr.getPort}
-      |}""".stripMargin)
-    dockerClient().createDex("dex-1", wavesNodeGrpcConfig.withFallback(dexConfig).resolve())
-  }
-
-  protected def allContainers: List[DockerContainer] = List(wavesNodeContainer, dexContainer).map(x => x())
+  protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Doing beforeAll")
     super.beforeAll()
-
-    // todo - dexContainer depends on wavesNodeContainer
-    List(wavesNodeContainer, dexContainer).foreach { x =>
-      dockerClient().start(x())
-      Thread.sleep(5000)
-    }
+    allContainers.foreach(dockerClient().start)
   }
 
   override protected def afterAll(): Unit = {
     log.debug(s"Doing afterAll")
-    allContainers.foreach(x => dockerClient().stop(x))
+    dockerClient().close()
     super.afterAll()
   }
 

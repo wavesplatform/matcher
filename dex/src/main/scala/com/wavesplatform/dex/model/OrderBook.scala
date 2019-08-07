@@ -53,8 +53,8 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
 
   def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRules.Default.normalizedTickSize): Seq[Event] = {
     val (events, lt) = o.orderType match {
-      case OrderType.BUY  => doMatch(ts, buy, LimitOrder(o), Seq.empty, bids, asks, lastTrade, normalizedTickSize)
-      case OrderType.SELL => doMatch(ts, sell, LimitOrder(o), Seq.empty, asks, bids, lastTrade, normalizedTickSize)
+      case OrderType.BUY  => doMatch(ts, canMatchBuy, LimitOrder(o), Seq.empty, bids, asks, lastTrade, normalizedTickSize)
+      case OrderType.SELL => doMatch(ts, canMatchSell, LimitOrder(o), Seq.empty, asks, bids, lastTrade, normalizedTickSize)
     }
 
     lastTrade = lt
@@ -68,10 +68,11 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
 }
 
 object OrderBook {
-  type Level = Vector[LimitOrder]
-  type Side  = mutable.TreeMap[Price, Level]
 
+  type Level        = Vector[LimitOrder]
+  type Side         = mutable.TreeMap[Price, Level]
   type SideSnapshot = Map[Price, Seq[LimitOrder]]
+
   object SideSnapshot {
     def serialize(dest: mutable.ArrayBuilder[Byte], snapshot: SideSnapshot): Unit = {
       dest ++= Ints.toByteArray(snapshot.size)
@@ -164,22 +165,23 @@ object OrderBook {
   case class AggregatedSnapshot(bids: Seq[LevelAgg] = Seq.empty, asks: Seq[LevelAgg] = Seq.empty)
 
   implicit class SideExt(val side: Side) extends AnyVal {
-    def best: Option[LimitOrder] = side.headOption.flatMap(_._2.headOption)
+
+    /** Returns best limit order in this side and price of its level */
+    def best: Option[(LimitOrder, Price)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(_ -> levelPrice) }
 
     final def removeBest(): LimitOrder = side.headOption match {
-      case l if l.forall(_._2.isEmpty) =>
-        throw new IllegalArgumentException("Cannot remove the best element from an empty level")
+      case l if l.forall(_._2.isEmpty) => throw new IllegalArgumentException("Cannot remove the best element from an empty level")
       case Some((price, level)) =>
         if (level.length == 1) side -= price
         else side += price -> level.tail
         level.head
     }
 
-    def replaceBest(newBestAsk: LimitOrder): Side = {
+    def replaceBest(newBest: LimitOrder): Side = {
       require(side.nonEmpty, "Cannot replace the best level of an empty side")
       val (price, level) = side.head
       require(level.nonEmpty, "Cannot replace the best element of an empty level")
-      side += (price -> (newBestAsk +: level.tail))
+      side += (price -> (newBest +: level.tail))
     }
 
     def remove(price: Price, orderId: ByteStr): LimitOrder = {
@@ -190,23 +192,35 @@ object OrderBook {
       toRemove.head
     }
 
-    def aggregated: Iterable[LevelAgg] =
-      for {
-        (p, l) <- side.view
-        if l.nonEmpty
-      } yield LevelAgg(l.map(_.amount).sum, p)
+    def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
   }
 
-  private object buy extends ((Long, Long) => Boolean) {
-    def apply(submittedPrice: Long, counterPrice: Long): Boolean = submittedPrice >= counterPrice
-    override val toString                                        = "submitted >= counter"
+  /**
+    * Represents couple of prices associated with the order. In general, the price of the level (which contains the order)
+    * may differ from the order price due to the tick size
+    */
+  //noinspection ScalaStyle
+  private case class Prices(levelPrice: Price, orderPrice: Price) {
+    def >=(other: Prices): Boolean = (this.levelPrice >= other.levelPrice) && (this.orderPrice >= other.orderPrice)
+    def <=(other: Prices): Boolean = (this.levelPrice <= other.levelPrice) && (this.orderPrice <= other.orderPrice)
   }
 
-  private object sell extends ((Long, Long) => Boolean) {
-    def apply(submittedPrice: Long, counterPrice: Long): Boolean = submittedPrice <= counterPrice
-    override val toString                                        = "submitted <= counter"
+  /** Returns true if submitted buy order can be matched with counter sell order */
+  private object canMatchBuy extends ((Prices, Prices) => Boolean) {
+    def apply(submittedPrices: Prices, counterPrices: Prices): Boolean = submittedPrices >= counterPrices
+    override val toString                                              = "submitted >= counter"
   }
 
+  /** Returns true if submitted sell order can be matched with counter buy order */
+  private object canMatchSell extends ((Prices, Prices) => Boolean) {
+    def apply(submittedPrices: Prices, counterPrices: Prices): Boolean = submittedPrices <= counterPrices
+    override val toString                                              = "submitted <= counter"
+  }
+
+  /**
+    * Corrects order price by the tick size in favor of the client.
+    * Buy order prices are rounded '''down''', sell order prices are rounded '''upwards'''
+    */
   private def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Long): Price =
     if (price % normalizedTickSize == 0) price
     else
@@ -215,29 +229,33 @@ object OrderBook {
         case OrderType.SELL => (price / normalizedTickSize + 1) * normalizedTickSize
       }
 
-  /** @param canMatch (submittedPrice, counterPrice) => Boolean */
+  /** @param canMatch (Prices, Prices) => Boolean */
   @tailrec
-  private def doMatch(
-      eventTs: Long,
-      canMatch: (Long, Long) => Boolean,
-      submitted: LimitOrder,
-      prevEvents: Seq[Event],
-      submittedSide: Side,
-      counterSide: Side,
-      lastTrade: Option[LastTrade],
-      normalizedTickSize: Long
-  ): (Seq[Event], Option[LastTrade]) =
+  private def doMatch(eventTs: Long,
+                      canMatch: (Prices, Prices) => Boolean,
+                      submitted: LimitOrder,
+                      prevEvents: Seq[Event],
+                      submittedSide: Side,
+                      counterSide: Side,
+                      lastTrade: Option[LastTrade],
+                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) =
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, false, eventTs) +: prevEvents, lastTrade)
-    else
+    else {
+      val correctedLevelPriceOfSubmittedOrder = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
       counterSide.best match {
-        case counter if counter.forall(c => !canMatch(submitted.price, c.price)) =>
-          val correctedKey = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
-          submittedSide += correctedKey -> (submittedSide.getOrElse(correctedKey, Vector.empty) :+ submitted)
+        case counterAndItsLevelPrice if counterAndItsLevelPrice.forall {
+          case (counter, levelPriceOfCounterOrder) =>
+            !canMatch(
+              Prices(levelPrice = correctedLevelPriceOfSubmittedOrder, orderPrice = submitted.price),
+              Prices(levelPrice = levelPriceOfCounterOrder, orderPrice = counter.price)
+            )
+        } =>
+          submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submitted)
           (OrderAdded(submitted, eventTs) +: prevEvents, lastTrade)
-        case Some(counter) =>
-          if (!submitted.isValid(counter.price)) {
-            (OrderCanceled(submitted, true, eventTs) +: prevEvents, lastTrade)
-          } else if (!counter.order.isValid(eventTs)) {
+        case Some((counter, _)) =>
+          if (!submitted.isValid(counter.price)) (OrderCanceled(submitted, true, eventTs) +: prevEvents, lastTrade)
+          else if (!counter.order.isValid(eventTs)) {
+
             counterSide.removeBest()
             doMatch(eventTs,
                     canMatch,
@@ -247,6 +265,7 @@ object OrderBook {
                     counterSide,
                     lastTrade,
                     normalizedTickSize)
+
           } else {
             val x         = OrderExecuted(submitted, counter, eventTs)
             val newEvents = x +: prevEvents
@@ -264,6 +283,7 @@ object OrderBook {
             }
           }
       }
+  }
 
   private def formatSide(side: Side) =
     side

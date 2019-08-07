@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRules
@@ -86,6 +87,40 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         44400 -> Vector(sellOrd4, sellOrd5, sellOrd6),
       ).map { case (price, orders) => toNormalized(price) -> orders.map(LimitOrder.apply) }: _*
     )
+  }
+
+  "place matchable orders with and without tick size" in {
+    val ob = OrderBook.empty
+
+    val amt                = 54521418493L
+    val normalizedTickSize = toNormalized(8)
+
+    val counterSellOrder  = LimitOrder(sell(pair, amt, 9))
+    val submittedBuyOrder = LimitOrder(buy(pair, amt, 10))
+
+    val counterOrderTime   = ntpNow
+    val submittedOrderTime = ntpNow
+
+    withClue("matchable orders should be matched without tick size:\n") {
+      ob.add(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
+      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime))
+
+      ob.getAsks shouldBe empty
+      ob.getBids shouldBe empty
+    }
+
+    withClue("matchable orders should not be matched with tick size:\n") {
+      ob.add(counterSellOrder, ntpNow, normalizedTickSize)
+      ob.add(submittedBuyOrder, ntpNow, normalizedTickSize)
+
+      ob.getAsks shouldBe mutable.TreeMap[Price, Level](
+        Seq(16 -> Vector(counterSellOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
+      )
+
+      ob.getBids shouldBe mutable.TreeMap[Price, Level](
+        Seq(8 -> Vector(submittedBuyOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
+      )
+    }
   }
 
   "place sell orders" in {

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.smartcontracts
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -25,8 +25,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  val trueScript = Some(createBoolScript("true")) //TODO добавить типовые проверки в скрипт
-  val falseScript = Some(createBoolScript("false"))
+  val trueScript = Some(Base64.encode(createBoolScript("true").bytes.apply)) //TODO добавить типовые проверки в скрипт
+  val falseScript = Some(Base64.encode(createBoolScript("false").bytes.apply))
   val amount     = 1L
   val price      = 100000000L
 

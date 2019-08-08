@@ -244,12 +244,12 @@ object OrderBook {
       val correctedLevelPriceOfSubmittedOrder = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
       counterSide.best match {
         case counterAndItsLevelPrice if counterAndItsLevelPrice.forall {
-          case (counter, levelPriceOfCounterOrder) =>
-            !canMatch(
-              Prices(levelPrice = correctedLevelPriceOfSubmittedOrder, orderPrice = submitted.price),
-              Prices(levelPrice = levelPriceOfCounterOrder, orderPrice = counter.price)
-            )
-        } =>
+              case (counter, levelPriceOfCounterOrder) =>
+                !canMatch(
+                  Prices(levelPrice = correctedLevelPriceOfSubmittedOrder, orderPrice = submitted.price),
+                  Prices(levelPrice = levelPriceOfCounterOrder, orderPrice = counter.price)
+                )
+            } =>
           submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submitted)
           (OrderAdded(submitted, eventTs) +: prevEvents, lastTrade)
         case Some((counter, _)) =>
@@ -283,7 +283,7 @@ object OrderBook {
             }
           }
       }
-  }
+    }
 
   private def formatSide(side: Side) =
     side

@@ -102,16 +102,16 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val submittedOrderTime = ntpNow
 
     withClue("matchable orders should be matched without tick size:\n") {
-      ob.add(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
-      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime))
+      ob.add(counterSellOrder.order, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
+      ob.add(submittedBuyOrder.order, submittedOrderTime) shouldBe Seq(OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime))
 
       ob.getAsks shouldBe empty
       ob.getBids shouldBe empty
     }
 
     withClue("matchable orders should not be matched with tick size:\n") {
-      ob.add(counterSellOrder, ntpNow, normalizedTickSize)
-      ob.add(submittedBuyOrder, ntpNow, normalizedTickSize)
+      ob.add(counterSellOrder.order, ntpNow, normalizedTickSize)
+      ob.add(submittedBuyOrder.order, ntpNow, normalizedTickSize)
 
       ob.getAsks shouldBe mutable.TreeMap[Price, Level](
         Seq(16 -> Vector(counterSellOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*

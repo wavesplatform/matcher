@@ -86,7 +86,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
       orderBook = _ => None,
       getMarketStatus = _ => None,
-      tickSize = _ => 0.1,
+      getActualTickSize = _ => 0.1,
       orderValidator = _ => Left(error.FeatureNotImplemented),
       orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, getAssetDecimals, _ => None),
       matcherSettings = settings,

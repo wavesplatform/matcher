@@ -3,7 +3,7 @@ package com.wavesplatform.dex.model
 import cats.data.NonEmptyList
 import com.wavesplatform.NoShrink
 import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.settings.RawMatchingRules
+import com.wavesplatform.dex.settings.RawMatchingRule
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -17,7 +17,7 @@ class RawMatchingRulesSpecification extends PropSpec with PropertyChecks with Ma
 
     forAll(g) {
       case (currOffset, rules) =>
-        val updatedRules = RawMatchingRules.skipOutdated(currOffset, rules)
+        val updatedRules = RawMatchingRule.skipOutdated(currOffset, rules)
         updatedRules.toList match {
           case first :: Nil =>
             withClue(s"first.startOffset=${first.startOffset}, currOffset=$currOffset") {
@@ -37,18 +37,18 @@ class RawMatchingRulesSpecification extends PropSpec with PropertyChecks with Ma
 
   private val currOffsetGen = Gen.choose(0L, Long.MaxValue)
 
-  private def nextRulesGen(prevRules: RawMatchingRules): Gen[Option[RawMatchingRules]] =
+  private def nextRulesGen(prevRules: RawMatchingRule): Gen[Option[RawMatchingRule]] =
     if (prevRules.startOffset == Long.MaxValue) Gen.const(None)
     else
       for {
         startOffset <- Gen.choose(prevRules.startOffset + 1, Long.MaxValue)
         tickSize    <- Gen.choose(1, Double.MaxValue)
-      } yield Some(RawMatchingRules(startOffset, tickSize))
+      } yield Some(RawMatchingRule(startOffset, tickSize))
 
-  private val firstRuleGen: Gen[RawMatchingRules] = Gen.choose(1, Double.MaxValue).map(RawMatchingRules(0L, _))
+  private val firstRuleGen: Gen[RawMatchingRule] = Gen.choose(1, Double.MaxValue).map(RawMatchingRule(0L, _))
 
-  private def rulesChainGen(maxNumber: Int): Gen[NonEmptyList[RawMatchingRules]] = {
-    def loop(rest: Int, acc: Gen[NonEmptyList[RawMatchingRules]]): Gen[NonEmptyList[RawMatchingRules]] =
+  private def rulesChainGen(maxNumber: Int): Gen[NonEmptyList[RawMatchingRule]] = {
+    def loop(rest: Int, acc: Gen[NonEmptyList[RawMatchingRule]]): Gen[NonEmptyList[RawMatchingRule]] =
       if (rest == 0) acc
       else
         for {

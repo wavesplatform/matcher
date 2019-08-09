@@ -11,6 +11,7 @@ import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.NonEmptyList
+import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -19,14 +20,14 @@ import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
-import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, RawMatchingRule}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset
@@ -53,6 +54,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private implicit val as: ActorSystem                 = context.actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
+
   import as.dispatcher
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
@@ -70,9 +72,9 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
-  private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(context.blockchain)
+  private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val actualMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRule]
+  private val assetDecimalsCache  = new AssetDecimalsCache(context.blockchain)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -89,32 +91,26 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def normalize(assetPair: AssetPair)(rawMatchingRules: RawMatchingRules): MatchingRules =
-    MatchingRules(
-      rawMatchingRules.startOffset,
-      normalizedTickSize = Normalization.normalizePrice(
-        rawMatchingRules.tickSize,
+  /**
+    * Returns denormalized matching rules for the specified asset pair.
+    * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
+    */
+  private def getRawMatchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRule] = {
+    lazy val defaultRule =
+      MatchingRule.DefaultRule.denormalize(
         assetPair,
-        MatcherModel.getPairDecimals(assetPair, context.blockchain).getOrElse((8, 8))
+        context.blockchain,
+        defaultTickSize = { e =>
+          val errorMsg =
+            s"""Can't convert matching rule for $assetPair: ${e.mkMessage(errorContext).text}.
+             | Usually this happens when the blockchain was rolled back.""".stripMargin
+          log.error(errorMsg)
+          RawMatchingRule.DefaultTickSize
+        }
       )
-    )
 
-  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
-    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
-
-  private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
-    RawMatchingRules(
-      startOffset = matchingRules.startOffset,
-      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back.")
-        0.00000001
-      }.merge
-    )
-
-  private def matchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRules] = {
-    lazy val default = convert(assetPair, MatchingRules.Default)
-    val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
-    if (xs.head.startOffset == 0) xs else default :: xs
+    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one { defaultRule })
+    if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
@@ -125,12 +121,12 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      newMatchingRules => rawMatchingRules.put(assetPair, newMatchingRules),
-      normalize(assetPair),
       settings,
       transactionCreator.createTransaction,
       context.time,
-      matchingRules(assetPair)
+      matchingRules = getRawMatchingRules(assetPair),
+      actualizeCurrentMatchingRules = actualMatchingRule => actualMatchingRules.put(assetPair, actualMatchingRule),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, context.blockchain),
     )
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
@@ -181,13 +177,15 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
-        assetPair => {
-          lazy val default = RawMatchingRules(
-            startOffset = 0,
-            tickSize = denormalizeTickSize(assetPair, 1).left.map(_ => 0.00000001).merge
-          )
+        getActualTickSize = assetPair => {
 
-          rawMatchingRules.computeIfAbsent(assetPair, _ => default).tickSize
+          lazy val defaultTickSize =
+            Denormalization
+              .denormalizePrice(MatchingRule.DefaultTickSize, assetPair, context.blockchain)
+              .leftMap(_ => RawMatchingRule.DefaultTickSize)
+              .merge
+
+          Option { actualMatchingRules.get(assetPair) } map (_.tickSize) getOrElse defaultTickSize
         },
         validateOrder,
         orderBooksSnapshotCache,

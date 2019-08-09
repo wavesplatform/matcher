@@ -12,7 +12,7 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.RawMatchingRules.rawMatchingRulesNelReader
+import com.wavesplatform.dex.settings.RawMatchingRule.rawMatchingRuleNelReader
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -51,7 +51,7 @@ case class MatcherSettings(account: String,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                           matchingRules: Map[AssetPair, NonEmptyList[RawMatchingRules]],
+                           matchingRules: Map[AssetPair, NonEmptyList[RawMatchingRule]],
                            whiteListOnly: Boolean,
                            allowedAssetPairs: Set[AssetPair],
                            allowedOrderVersions: Set[Byte],
@@ -106,7 +106,7 @@ object MatcherSettings {
     val orderFee          = config.as[OrderFeeSettings]("order-fee")
     val deviation         = config.as[DeviationsSettings]("max-price-deviations")
     val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules     = config.getValidatedMap[AssetPair, NonEmptyList[RawMatchingRules]]("matching-rules")(validateAssetPairKey)
+    val matchingRules     = config.getValidatedMap[AssetPair, NonEmptyList[RawMatchingRule]]("matching-rules")(validateAssetPairKey)
     val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
 
     val whiteListOnly           = config.as[Boolean]("white-list-only")

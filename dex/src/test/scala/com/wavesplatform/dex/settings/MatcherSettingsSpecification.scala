@@ -534,10 +534,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[RawMatchingRules](
-            RawMatchingRules(100L, 0.002),
+          NonEmptyList[RawMatchingRule](
+            RawMatchingRule(100L, 0.002),
             List(
-              RawMatchingRules(500L, 0.001)
+              RawMatchingRule(500L, 0.001)
             )
           )
       )

@@ -30,14 +30,15 @@ case class OrderRestrictionsSettings(stepAmount: Double,
 
 object OrderRestrictionsSettings {
 
-  val Default = OrderRestrictionsSettings(
-    stepAmount = 0.00000001,
-    minAmount = 0.00000001,
-    maxAmount = 1000000000,
-    stepPrice = 0.00000001,
-    minPrice = 0.00000001,
-    maxPrice = 1000000
-  )
+  val Default =
+    OrderRestrictionsSettings(
+      stepAmount = 0.00000001,
+      minAmount = 0.00000001,
+      maxAmount = 1000000000,
+      stepPrice = 0.00000001,
+      minPrice = 0.00000001,
+      maxPrice = 1000000
+    )
 
   implicit val orderRestrictionsSettingsReader: ValueReader[OrderRestrictionsSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)

@@ -21,13 +21,14 @@ object MatcherModel {
     asset.fold[Either[MatcherError, Int]](Right(8)) { issuedAsset =>
       blockchain
         .assetDescription(issuedAsset)
-        .toRight[MatcherError](error.AssetNotFound(issuedAsset))
+        .toRight[MatcherError] { error.AssetNotFound(issuedAsset) }
         .map(_.decimals)
     }
 
   def getPairDecimals(pair: AssetPair, blockchain: Blockchain): Either[MatcherError, (Int, Int)] =
     (getAssetDecimals(pair.amountAsset, blockchain), getAssetDecimals(pair.priceAsset, blockchain)).tupled
 
+  /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
   object Normalization {
 
     def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Long =
@@ -42,6 +43,7 @@ object MatcherModel {
     }
   }
 
+  /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
   object Denormalization {
 
     def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
@@ -50,7 +52,7 @@ object MatcherModel {
     def denormalizeAmountAndFee(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
       getAssetDecimals(pair.amountAsset, blockchain).map(denormalizeAmountAndFee(value, _))
 
-    def denormalizePrice(value: Long, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
+    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
 
     def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =

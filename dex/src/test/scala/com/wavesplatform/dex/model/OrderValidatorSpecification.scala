@@ -344,9 +344,9 @@ class OrderValidatorSpecification
 
       "order's fee is out of deviation bounds (market aware)" in {
         val percentSettings   = PercentSettings(AssetType.PRICE, 10)
-        val deviationSettings = DeviationsSettings(true, 100, 100, maxFeeDeviation = 10)
+        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10)
 
-        val bestAsk = LevelAgg(1000L, 4000L)
+        val bestAsk = LevelAgg(100000000000L, 400000000000L)
 
         val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
         assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, None, Some(bestAsk)))
@@ -358,8 +358,8 @@ class OrderValidatorSpecification
             matcher = MatcherAccount,
             pair = pairWavesBtc,
             orderType = OrderType.BUY,
-            amount = 1000,
-            price = 1000,
+            amount = 100000000000L,
+            price = 100000000000L,
             timestamp = System.currentTimeMillis() - 10000L,
             expiration = System.currentTimeMillis() + 10000L,
             matcherFee = 1000L,

@@ -1,13 +1,10 @@
 package com.wavesplatform.dex.model
 
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -16,6 +13,7 @@ import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -50,11 +48,16 @@ class OrderValidatorSpecification
   private val pairWavesBtc       = AssetPair(Waves, wbtc)
   private lazy val accountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
 
-  private val defaultPortfolio     = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
-  private val defaultAssetDecimals = 8
+  private val defaultPortfolio          = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
+  private val defaultAssetDecimals: Int = 8
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = 8
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => defaultAssetDecimals
+
+  val pairDecimals = new AssetPairDecimals(defaultAssetDecimals.toByte, defaultAssetDecimals.toByte)
+
+  implicit class DoubleOps(value: Double) {
+    val waves: Long = pairDecimals.amount(value)
+    val btc: Long   = pairDecimals.price(value)
   }
 
   "OrderValidator" should {
@@ -269,115 +272,94 @@ class OrderValidatorSpecification
           }
       }
 
-      "buy order's price is too high (market aware)" in {
-        val preconditions =
-          for {
-            bestAmount <- maxWavesAmountGen
-            bestPrice  <- Gen.choose(1, (Long.MaxValue / bestAmount) - 100)
+      "order's price is out of deviation bounds (market aware)" in {
+        val deviationSettings = DeviationsSettings(enabled = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
 
-            bestAsk                = LevelAgg(bestAmount, bestPrice)
-            deviationSettings      = DeviationsSettings(enabled = true, 50, 70, 50)
-            tooHighPriceInBuyOrder = (bestAsk.price * (1 + (deviationSettings.maxPriceLoss / 100))).toLong + 50L
+        val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
+        val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-            (order, orderFeeSettings) <- orderWithFeeSettingsGenerator(OrderType.BUY, tooHighPriceInBuyOrder)
-          } yield {
-            val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
-            assetPair2MarketStatus.put(order.assetPair, MarketStatus(None, None, Some(bestAsk)))
-            (order, orderFeeSettings, deviationSettings, Option(assetPair2MarketStatus.get(order.assetPair)))
-          }
+        val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
+        val orderFeeSettings     = DynamicSettings(0.003.waves)
+        val priceValidation      = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
 
-        forAll(preconditions) {
-          case (order, orderFeeSettings, deviationSettings, nonEmptyMarketStatus) =>
-            OrderValidator.marketAware(orderFeeSettings, deviationSettings, nonEmptyMarketStatus, rateCache)(order) should produce(
-              "DeviantOrderPrice")
+        val buyOrder  = createOrder(OrderType.BUY, amount = 250.waves, price = 0.00011081.btc)
+        val sellOrder = createOrder(OrderType.SELL, amount = 250.waves, price = 0.00011081.btc)
+
+        /**
+          * BUY orders:  (1 - p) * best bid <= price <= (1 + l) * best ask
+          * SELL orders: (1 - l) * best bid <= price <= (1 + p) * best ask
+          *
+          * where:
+          *
+          *   p = max price deviation profit / 100
+          *   l = max price deviation loss / 100
+          *   best bid = highest price of buy
+          *   best ask = lowest price of sell
+          */
+        priceValidation { buyOrder } shouldBe 'right
+
+        withClue("buy order price should be >= 0.5 * best bid = 0.5 * 0.00011080.btc = 0.00005540.btc\n") {
+          priceValidation { buyOrder.updatePrice(0.00005540.btc) } shouldBe 'right                     // the lowest acceptable
+          priceValidation { buyOrder.updatePrice(0.00005539.btc) } should produce("DeviantOrderPrice") // too low
+        }
+
+        withClue("buy order price should be <= 1.7 * best ask = 1.7 * 0.00011082.btc = 0.00018839.btc\n") {
+          priceValidation { buyOrder.updatePrice(0.00018839.btc) } shouldBe 'right                     // the highest acceptable
+          priceValidation { buyOrder.updatePrice(0.00018840.btc) } should produce("DeviantOrderPrice") // too high
+        }
+
+        priceValidation { sellOrder } shouldBe 'right
+
+        withClue("sell order price should be >= 0.3 * best bid = 0.3 * 0.00011080.btc = 0.00003324.btc\n") {
+          priceValidation { sellOrder.updatePrice(0.00003324.btc) } shouldBe 'right                     // the lowest acceptable
+          priceValidation { sellOrder.updatePrice(0.00003323.btc) } should produce("DeviantOrderPrice") // too low
+        }
+
+        withClue("sell order price should be <= 1.5 * best ask = 1.5 * 0.00011082.btc = 0.00016623.btc\n") {
+          priceValidation { sellOrder.updatePrice(0.00016623.btc) } shouldBe 'right                     // the highest acceptable
+          priceValidation { sellOrder.updatePrice(0.00016624.btc) } should produce("DeviantOrderPrice") // too high
         }
       }
 
-      "sell order's price is out of deviation bounds (market aware)" in {
-        val fixedWavesFeeSettings = DynamicSettings(300000L)
-
-        // seller cannot sell with price which:
-        //   1. less than 50% of best bid (sell order price must be >= 2000)
-        //   2. higher than 170% of best ask (sell order price must be <= 8500)
-
-        val deviationSettings = DeviationsSettings(true, maxPriceProfit = 70, maxPriceLoss = 50, 50)
-        val bestBid           = LevelAgg(1000L, 4000L)
-        val bestAsk           = LevelAgg(1000L, 5000L)
-
-        val tooLowPrice      = 1999L // = 50% of best bid (4000) - 1, hence invalid
-        val lowButValidPrice = 2000L // = 50% of best bid (4000)
-
-        val tooHighPrice      = 8501L // = 170% of best ask (5000) + 1, hence invalid
-        val highButValidPrice = 8500L // = 170% of best ask (5000)
-
-        val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
-        assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, Some(bestBid), Some(bestAsk)))
-        val nonEmptyMarketStatus = assetPair2MarketStatus.get(pairWavesBtc)
-
-        val tooLowPriceOrder =
-          Order(
-            sender = KeyPair("seed".getBytes("utf-8")),
-            matcher = MatcherAccount,
-            pair = pairWavesBtc,
-            orderType = OrderType.SELL,
-            amount = 1000,
-            price = tooLowPrice,
-            timestamp = System.currentTimeMillis() - 10000L,
-            expiration = System.currentTimeMillis() + 10000L,
-            matcherFee = 1000L,
-            version = 3: Byte,
-            matcherFeeAssetId = Waves
-          )
-
-        val lowButValidPriceOrder  = tooLowPriceOrder.updatePrice(lowButValidPrice)
-        val tooHighPriceOrder      = tooLowPriceOrder.updatePrice(tooHighPrice)
-        val highButValidPriceOrder = tooLowPriceOrder.updatePrice(highButValidPrice)
-
-        val orderValidator = OrderValidator.marketAware(fixedWavesFeeSettings, deviationSettings, Option(nonEmptyMarketStatus), rateCache) _
-
-        orderValidator(tooLowPriceOrder) should produce("DeviantOrderPrice")
-        orderValidator(lowButValidPriceOrder) shouldBe 'right
-
-        orderValidator(tooHighPriceOrder) should produce("DeviantOrderPrice")
-        orderValidator(highButValidPriceOrder) shouldBe 'right
-      }
-
       "order's fee is out of deviation bounds (market aware)" in {
-        val percentSettings   = PercentSettings(AssetType.PRICE, 10)
-        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10)
 
-        val bestAsk = LevelAgg(100000000000L, 400000000000L)
+        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
+        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
 
-        val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
-        assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, None, Some(bestAsk)))
-        val nonEmptyMarketStatus = assetPair2MarketStatus.get(pairWavesBtc)
+        val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
+        val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-        val order =
-          Order(
-            sender = KeyPair("seed".getBytes("utf-8")),
-            matcher = MatcherAccount,
-            pair = pairWavesBtc,
-            orderType = OrderType.BUY,
-            amount = 100000000000L,
-            price = 100000000000L,
-            timestamp = System.currentTimeMillis() - 10000L,
-            expiration = System.currentTimeMillis() + 10000L,
-            matcherFee = 1000L,
-            version = 3: Byte,
-            matcherFeeAssetId = wbtc
-          )
+        val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
+        val feeValidation        = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
 
-        val validFee =
-          OrderValidator
-            .getMinValidFeeForSettings(order, percentSettings, bestAsk.price, rateCache, 1 - (deviationSettings.maxFeeDeviation / 100))
+        // matherFee = 1% of (amount * price) = 0.000277025 => 0.00027702
+        val buyOrder  = createOrder(OrderType.BUY, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
+        val sellOrder = createOrder(OrderType.SELL, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
 
-        val validOrder   = order.updateFee(validFee)
-        val invalidOrder = order.updateFee(validFee - 1L)
+        /**
+          * BUY orders:  fee >= fs * (1 - fd) * best ask * amount
+          * SELL orders: fee >= fs * (1 - fd) * best bid * amount
+          *
+          * where:
+          *
+          *   fs = fee in percents from order-fee settings (order-fee.percent.min-fee) / 100
+          *   fd = max fee deviation / 100
+          *   best bid = highest price of buy
+          *   best ask = lowest price of sell
+          */
+        feeValidation { buyOrder } shouldBe 'right
 
-        val orderValidator = OrderValidator.marketAware(percentSettings, deviationSettings, Option(nonEmptyMarketStatus), rateCache) _
+        withClue("buy order fee should be >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
+          feeValidation { buyOrder.updateFee(0.00024935.btc) } shouldBe 'right                          // the lowest acceptable
+          feeValidation { buyOrder.updateFee(0.00024934.btc) } should produce("DeviantOrderMatcherFee") // too low
+        }
 
-        orderValidator(invalidOrder) should produce("DeviantOrderMatcherFee")
-        orderValidator(validOrder) shouldBe 'right
+        feeValidation { sellOrder } shouldBe 'right
+
+        withClue("sell order fee should be >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
+          feeValidation { sellOrder.updateFee(0.00024930.btc) } shouldBe 'right                          // the lowest acceptable
+          feeValidation { sellOrder.updateFee(0.00024929.btc) } should produce("DeviantOrderMatcherFee") // too low
+        }
       }
 
       "it's version is not allowed by matcher" in forAll(orderWithFeeSettingsGenerator) {
@@ -799,6 +781,27 @@ class OrderValidatorSpecification
 
     OrderValidator
       .blockchainAware(blockchain, transactionCreator, MatcherAccount.toAddress, ntpTime, orderFeeSettings, orderRestrictions, rateCache)(order)
+  }
+
+  private def createOrder(orderType: OrderType,
+                          amount: Long,
+                          price: Long,
+                          matcherFee: Long = 0.003.waves,
+                          version: Byte = 3,
+                          matcherFeeAsset: Asset = Waves): Order = {
+    Order(
+      sender = KeyPair("seed".getBytes("utf-8")),
+      matcher = MatcherAccount,
+      pair = pairWavesBtc,
+      orderType = orderType,
+      amount = amount,
+      price = price,
+      timestamp = ntpNow,
+      expiration = ntpNow + 10000L,
+      matcherFee = matcherFee,
+      version = version,
+      matcherFeeAssetId = matcherFeeAsset
+    )
   }
 
   private implicit class OrderOps(order: Order) {

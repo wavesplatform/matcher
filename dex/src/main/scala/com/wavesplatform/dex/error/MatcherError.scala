@@ -252,10 +252,14 @@ case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
       order,
       price,
       outOfBound,
-      e"""The order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds
-                     |(max profit: ${'maxProfit -> deviationSettings.maxPriceProfit}% and
-                     |max loss: ${'maxLoss -> deviationSettings.maxPriceLoss}%
-                     |in relation to the best bid/ask)"""
+      if (ord.orderType == OrderType.BUY)
+        e"""The buy order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+         |${'bestBidPercent -> (100 - deviationSettings.maxPriceProfit)}% of best bid price <= order price <=
+         |${'bestAskPercent -> (100 + deviationSettings.maxPriceLoss)}% of best ask price"""
+      else
+        e"""The sell order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+           |${'bestBidPercent -> (100 - deviationSettings.maxPriceLoss)}% of best bid price <= order price <=
+           |${'bestAskPercent -> (100 + deviationSettings.maxPriceProfit)}% of best ask price"""
     )
 
 case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
@@ -263,8 +267,12 @@ case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSetti
       order,
       fee,
       outOfBound,
-      e"""The order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds
-                     |(max deviation: ${'maxDeviation -> deviationSettings.maxFeeDeviation}% in relation to the best bid/ask)"""
+      if (ord.orderType == OrderType.BUY)
+        e"""The buy order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+       |matcher fee >= ${'bestAskFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
+      else
+        e"""The sell order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+         |matcher fee >= ${'bestBidFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -306,7 +314,7 @@ case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings
       denied,
       e"""The order's amount
                      |${'amount -> Amount(ord.assetPair.amountAsset, ord.amount)}
-                     |does not meet matcher requirements:
+                     |does not meet matcher's requirements:
                      |max amount = ${'max -> amtSettings.maxAmount},
                      |min amount = ${'min -> amtSettings.minAmount},
                      |step amount = ${'step -> amtSettings.stepAmount}"""
@@ -322,7 +330,7 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
       denied,
       e"""The order's price
                    |${'price -> Price(ord.assetPair, ord.price)}
-                   |does not meet matcher requirements:
+                   |does not meet matcher's requirements:
                    |max price = ${'max -> prcSettings.maxPrice},
                    |min price = ${'min -> prcSettings.minPrice},
                    |step price = ${'step -> prcSettings.stepPrice}"""

@@ -189,6 +189,10 @@ object AsyncMatcherHttpApi extends Assertions {
             .as[Seq[OrderbookHistory]]
       }
 
+    def fullOrdersHistory(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderbookHistory]] = {
+      matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}?activeOnly=$activeOnly", sender).as[Seq[OrderbookHistory]]
+    }
+
     def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderbookHistory]] = {
       matcherGetWithSignature(s"/matcher/orderbook/${assetPair.toUri}/publicKey/${Base58.encode(sender.publicKey)}?activeOnly=$activeOnly", sender)
         .as[Seq[OrderbookHistory]]

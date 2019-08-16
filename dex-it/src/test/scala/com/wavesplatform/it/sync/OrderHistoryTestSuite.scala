@@ -199,7 +199,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   val dPrice: Double  = Denormalization.denormalizePrice(price, Decimals, Decimals)
   val dFee: Double    = Denormalization.denormalizeAmountAndFee(matcherFee, Decimals)
 
-  "Order history should save all orders and events" ignore  {
+  "Order history should save all orders and events" in  {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
@@ -214,7 +214,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events: 1 big counter and 2 small submitted" ignore {
+  "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
     def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 1 * amount, price, matcherFee)
     val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 3 * amount, price, matcherFee).message.id
@@ -252,7 +252,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events: 1 small counter and 1 big submitted" ignore {
+  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
     val smallBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, 1 * amount, price, matcherFee).message.id
     val bigSellOrder  = node.placeOrder(bob, wctUsdPair, SELL, 5 * amount, price, matcherFee).message.id
 
@@ -278,7 +278,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save market orders and their events" ignore {
+  "Order history should correctly save market orders and their events" in {
 
     node.cancelAllOrders(bob)
     node.cancelAllOrders(alice)
@@ -349,7 +349,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     withClue("in cancelled order") {
       val aliceOrderId = node.placeOrder(alice, wctUsdPair, BUY, amount, price, matcherFee).message.id
-      node.orderStatus(aliceOrderId, wctUsdPair).filledAmount shouldBe None
+      node.orderStatus(aliceOrderId, wctUsdPair).filledFee shouldBe None
       node.cancelOrder(alice, wctUsdPair, aliceOrderId)
       Array(node.orderHistoryByPair(alice, wctUsdPair), node.ordersByAddress(alice, activeOnly = false), node.fullOrderHistory(alice)).foreach(
         orderbookHistory => {
@@ -368,7 +368,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       val aliceOrderId = node.placeOrder(alice, wctUsdPair, BUY, amount, price, matcherFee).message.id
       val bobOrderId =  node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
       node.waitOrderInBlockchain(aliceOrderId)
-      Array(bobOrderId, aliceOrderId).foreach((id: String) => node.orderStatus(id, wctUsdPair).filledAmount shouldBe Some(amount))
+      Array(bobOrderId, aliceOrderId).foreach((id: String) => node.orderStatus(id, wctUsdPair).filledFee shouldBe Some(matcherFee))
       Array(node.orderHistoryByPair(alice, wctUsdPair), node.ordersByAddress(alice, activeOnly = false), node.fullOrderHistory(alice)).foreach(
         orderbookHistory => {
           val orderbook = orderbookHistory.find(_.id == aliceOrderId).get
@@ -386,7 +386,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       val aliceOrderId = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, price, matcherFee).message.id
       val bobOrderId =  node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
       node.waitOrderInBlockchain(aliceOrderId)
-      Array(bobOrderId, aliceOrderId).foreach((id: String) => node.orderStatus(id, wctUsdPair).filledAmount shouldBe Some(amount))
+      node.orderStatus(aliceOrderId, wctUsdPair).filledFee shouldBe Some(matcherFee / 2)
+      node.orderStatus(bobOrderId, wctUsdPair).filledFee shouldBe Some(matcherFee)
       for (activeOnly <- Array(true, false)) {
         Array(node.orderHistoryByPair(alice, wctUsdPair, activeOnly), node.ordersByAddress(alice, activeOnly), node.fullOrderHistory(alice, activeOnly)).foreach(
           orderbookHistory => {
@@ -405,7 +406,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       val bobOrderId =  node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
       node.waitOrderInBlockchain(aliceOrderId)
       node.cancelOrder(alice, wctUsdPair, aliceOrderId)
-      Array(bobOrderId, aliceOrderId).foreach((id: String) => node.orderStatus(id, wctUsdPair).filledAmount shouldBe Some(amount))
+      node.orderStatus(aliceOrderId, wctUsdPair).filledFee shouldBe Some(matcherFee / 2)
+      node.orderStatus(bobOrderId, wctUsdPair).filledFee shouldBe Some(matcherFee)
       Array(node.orderHistoryByPair(alice, wctUsdPair), node.ordersByAddress(alice, activeOnly = false), node.fullOrderHistory(alice)).foreach(
         orderbookHistory => {
           val orderbook = orderbookHistory.find(_.id == aliceOrderId).get
@@ -417,6 +419,22 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       Array(node.orderHistoryByPair(alice, wctUsdPair,activeOnly = true), node.ordersByAddress(alice, activeOnly = true), node.fullOrderHistory(alice, activeOnly = true)).foreach(
         orderbookHistory => orderbookHistory.find(_.id == aliceOrderId) shouldBe None
       )
+    }
+
+    withClue("in partially filled orders with fractional filled amount") {
+      val aliceOrderId = node.placeOrder(alice, wctUsdPair, BUY, 9 * amount, price, matcherFee).message.id
+      node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
+      node.waitOrderInBlockchain(aliceOrderId)
+      node.orderStatus(aliceOrderId, wctUsdPair).filledFee shouldBe Some(33333)
+      Array(node.orderHistoryByPair(alice, wctUsdPair), node.ordersByAddress(alice, activeOnly = false), node.fullOrderHistory(alice)).foreach(
+        orderbookHistory => {
+          val orderbook = orderbookHistory.find(_.id == aliceOrderId).get
+          orderbook.fee shouldBe matcherFee
+          orderbook.filledFee shouldBe 33333
+          orderbook.feeAsset shouldBe Waves
+        }
+      )
+      node.cancelOrder(alice, wctUsdPair, aliceOrderId)
     }
   }
 }

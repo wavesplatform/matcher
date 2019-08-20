@@ -299,25 +299,38 @@ class OrderValidatorSpecification
         priceValidation { buyOrder } shouldBe 'right
 
         withClue("buy order price should be >= 0.5 * best bid = 0.5 * 0.00011080.btc = 0.00005540.btc\n") {
-          priceValidation { buyOrder.updatePrice(0.00005540.btc) } shouldBe 'right                     // the lowest acceptable
-          priceValidation { buyOrder.updatePrice(0.00005539.btc) } should produce("DeviantOrderPrice") // too low
+          Array(0, 0.00000001, 0.00000033, 0.00000450, 0.0000045, 0.00002770, 0.0000277, 0.00005539).foreach(price =>
+            priceValidation { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
+        }
+
+        withClue("0.5 * best bid <= buy order price <= 1.7 * best ask (0.00005540.btc <= price <= 0.00018839.btc)\n") {
+          Array(0.00005540, 0.00005541, 0.00005580, 0.00005641, 0.00006, 0.0001, 0.00017999, 0.00018799, 0.00018829, 0.00018838, 0.00018839).foreach(price =>
+            priceValidation { buyOrder.updatePrice(price.btc) } shouldBe 'right)
         }
 
         withClue("buy order price should be <= 1.7 * best ask = 1.7 * 0.00011082.btc = 0.00018839.btc\n") {
-          priceValidation { buyOrder.updatePrice(0.00018839.btc) } shouldBe 'right                     // the highest acceptable
-          priceValidation { buyOrder.updatePrice(0.00018840.btc) } should produce("DeviantOrderPrice") // too high
+          Array(0.00018840, 0.00018841, 0.00037678, 0.00123456, 0.01951753, 0.98745612, 1, 1.12345678, 5000.12341234, 100000.1, 100000.1234, 100000.12347894).foreach(price =>
+            priceValidation { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
         }
 
         priceValidation { sellOrder } shouldBe 'right
 
         withClue("sell order price should be >= 0.3 * best bid = 0.3 * 0.00011080.btc = 0.00003324.btc\n") {
-          priceValidation { sellOrder.updatePrice(0.00003324.btc) } shouldBe 'right                     // the lowest acceptable
-          priceValidation { sellOrder.updatePrice(0.00003323.btc) } should produce("DeviantOrderPrice") // too low
+        Array(0, 0.00000001, 0.00000011, 0.000015, 0.00003322, 0.00002999, 0.00003299, 0.00003319, 0.00003323).foreach(price =>
+            priceValidation { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice")
+          )
+        }
+
+        withClue("0.3 * best bid <= sell order price <= 1.5 * best ask (0.00003324.btc <= price <= 0.00016623.btc)\n") {
+          Array(0.00003324, 0.00003325, 0.00003999, 0.00006648, 0.00016622, 0.00016623).foreach(price =>
+            priceValidation { sellOrder.updatePrice(price.btc) } shouldBe 'right
+          )
         }
 
         withClue("sell order price should be <= 1.5 * best ask = 1.5 * 0.00011082.btc = 0.00016623.btc\n") {
-          priceValidation { sellOrder.updatePrice(0.00016623.btc) } shouldBe 'right                     // the highest acceptable
-          priceValidation { sellOrder.updatePrice(0.00016624.btc) } should produce("DeviantOrderPrice") // too high
+          Array(0.00016624, 0.0001671, 0.00016633, 0.000167, 0.00017, 0.00033248, 0.0009, 0.00123123, 0.12312311, 1.12312312, 123.12312123, 100000.1, 100000.123123).foreach(price =>
+            priceValidation { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice")
+          )
         }
       }
 
@@ -350,15 +363,29 @@ class OrderValidatorSpecification
         feeValidation { buyOrder } shouldBe 'right
 
         withClue("buy order fee should be >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
-          feeValidation { buyOrder.updateFee(0.00024935.btc) } shouldBe 'right                          // the lowest acceptable
-          feeValidation { buyOrder.updateFee(0.00024934.btc) } should produce("DeviantOrderMatcherFee") // too low
+          Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929, 0.00024934).foreach(fee =>
+            feeValidation { buyOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee")
+          )
+        }
+
+        withClue("buy order fee >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
+          Array(0.00024935, 0.00024936, 0.0002494, 0.00025001, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312).foreach(fee =>
+            feeValidation { buyOrder.updateFee(fee.btc) } shouldBe 'right
+          )
         }
 
         feeValidation { sellOrder } shouldBe 'right
 
         withClue("sell order fee should be >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
-          feeValidation { sellOrder.updateFee(0.00024930.btc) } shouldBe 'right                          // the lowest acceptable
-          feeValidation { sellOrder.updateFee(0.00024929.btc) } should produce("DeviantOrderMatcherFee") // too low
+          Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929).foreach(fee =>
+            feeValidation { sellOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee")
+          )
+        }
+
+        withClue("sell order fee >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
+          Array(0.00024930, 0.00024931, 0.00024940, 0.00025, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312).foreach(fee =>
+            feeValidation { sellOrder.updateFee(fee.btc) } shouldBe 'right
+          )
         }
       }
 

@@ -22,3 +22,5 @@ libraryDependencies ++= Seq(
   "org.vafer"                    % "jdeb"                      % "1.5" artifacts Artifact("jdeb", "jar", "jar"),
   "com.thesamet.scalapb"         %% "compilerplugin"           % "0.8.4"
 )
+
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full) // Remove after scala 2.13 migration

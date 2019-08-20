@@ -118,6 +118,7 @@ trait TracedDexApi[F[_]] {
 
 object TracedDexApi {
   def wrap[F[_]](underlying: DexApi[F]): TracedDexApi[F] = new TracedDexApi[F] with ScorexLogging {
+
     def place(order: Order)(implicit file: sourcecode.File, line: sourcecode.Line): F[Unit] = {
       val requestId = UUID.randomUUID()
       log.trace(s"[$requestId] ${file.value}:${line.value} place($order)")

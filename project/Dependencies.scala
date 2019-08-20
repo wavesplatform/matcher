@@ -78,14 +78,18 @@ object Dependencies {
       shapeless.value
     ))
 
+  lazy val common = Seq(
+    "com.lihaoyi"   %% "sourcecode"          % "0.1.7",
+    "org.typelevel" %% "cats-tagless-macros" % "0.9"
+  )
+
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
     "org.scalacheck"        %% "scalacheck" % "1.14.0",
     "com.softwaremill.sttp" %% "core"       % "1.6.4",
-    "com.softwaremill.sttp" %% "play-json"  % "1.6.4",
-    "com.lihaoyi"           %% "sourcecode" % "0.1.7"
+    "com.softwaremill.sttp" %% "play-json"  % "1.6.4"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(

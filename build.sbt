@@ -13,8 +13,11 @@ lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeV
 
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
+lazy val common = project
+
 lazy val dex = project.dependsOn(
   node % "compile;test->test;runtime->provided",
+  common,
   `waves-integration`
 )
 
@@ -26,6 +29,7 @@ lazy val `dex-it` = project
   )
 
 lazy val `waves-integration` = project.dependsOn(
+  common,
   node % "compile;test->test;runtime->provided"
 )
 

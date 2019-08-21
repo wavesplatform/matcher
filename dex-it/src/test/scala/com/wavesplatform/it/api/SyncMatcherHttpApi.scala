@@ -183,6 +183,12 @@ object SyncMatcherHttpApi extends Assertions {
                             waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
 
+    def cancelOrdersForPairOnce(sender: KeyPair,
+                                assetPair: AssetPair,
+                                timestamp: Long = System.currentTimeMillis(),
+                                waitTime: Duration = OrderRequestAwaitTime): Response =
+      sync(async(m).cancelOrdersForPairOnce(sender, assetPair, timestamp), waitTime)
+
     def cancelAllOrders(sender: KeyPair,
                         timestamp: Long = System.currentTimeMillis(),
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =

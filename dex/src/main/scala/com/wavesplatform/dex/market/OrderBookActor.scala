@@ -4,11 +4,11 @@ import akka.actor.{Actor, ActorRef, Props}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.api._
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
-import com.wavesplatform.dex.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
+import com.wavesplatform.dex.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
@@ -145,12 +145,13 @@ class OrderBookActor(owner: ActorRef,
     }
   }
 
-  private def onCancelOrder(event: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
-    cancelTimer.measure(orderBook.cancel(orderIdToCancel, event.timestamp) match {
+  private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit =
+    cancelTimer.measure(orderBook.cancel(id, event.timestamp) match {
       case Some(cancelEvent) =>
         processEvents(List(cancelEvent))
       case None =>
         log.warn(s"Error applying $event: order not found")
+        addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))
     })
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {

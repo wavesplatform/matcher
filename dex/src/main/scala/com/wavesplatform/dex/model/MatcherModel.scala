@@ -206,6 +206,8 @@ object Events {
 
   case class OrderCanceled(limitOrder: LimitOrder, unmatchable: Boolean, timestamp: Long) extends Event
 
+  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
+
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
   case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {

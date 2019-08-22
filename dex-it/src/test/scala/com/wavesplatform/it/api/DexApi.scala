@@ -5,6 +5,7 @@ import java.util.UUID
 
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import cats.tagless.{autoFunctorK, finalAlg}
 import cats.{Id, MonadError}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
@@ -19,6 +20,8 @@ import play.api.libs.json._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Try
 
+@finalAlg
+@autoFunctorK
 trait DexApi[F[_]] {
   def place(requestId: UUID, order: Order): F[Unit]
   def waitForOrder(requestId: UUID, id: Order.Id)(pred: Option[MatcherStatusResponse] => Boolean): F[Unit]

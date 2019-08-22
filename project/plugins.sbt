@@ -24,3 +24,4 @@ libraryDependencies ++= Seq(
 )
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full) // Remove after scala 2.13 migration
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")

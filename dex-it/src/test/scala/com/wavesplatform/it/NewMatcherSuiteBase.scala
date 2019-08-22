@@ -3,7 +3,11 @@ package com.wavesplatform.it
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 
-import cats.Id
+import cats.arrow.FunctionK
+import cats.tagless._
+
+import cats.tagless.implicits._
+import cats.{Id, ~>}
 import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
@@ -17,6 +21,12 @@ import org.scalatest._
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
+
+object NewMatcherSuiteBase {
+  implicit val unwrap : Try ~> cats.Id = new FunctionK[Try, cats.Id] {
+    def apply[A](fa: Try[A]): cats.Id[A] = fa.get
+  }
+}
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with ScorexLogging {
 
@@ -35,7 +45,8 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   }
   protected def wavesNode1Api: NodeApi[Id] = {
     def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
-    NodeApi.unWrapped(NodeApi[Try]("integration-test-rest-api", apiAddress))
+    implicit val t = NodeApi[Try]("integration-test-rest-api", apiAddress)
+    NodeApi[Id]("integration-test-rest-api", apiAddress))
   }
   protected def wavesNode1NetworkApiAddress: InetSocketAddress =
     dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))

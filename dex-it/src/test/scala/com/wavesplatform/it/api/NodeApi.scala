@@ -115,13 +115,6 @@ object NodeApi {
         }
     }
 
-  def unWrapped(async: NodeApi[Try]): NodeApi[Id] = new NodeApi[Id] {
-    override def connect(toNode: InetSocketAddress): Id[Unit]     = async.connect(toNode).get
-    override def broadcast(tx: transaction.Transaction): Id[Unit] = async.broadcast(tx).get
-    override def waitForTransaction(id: ByteStr): Id[Unit]        = async.waitForTransaction(id).get
-    override def waitForHeightArise(): Id[Unit]                   = async.waitForHeightArise().get
-  }
-
   case class HeightResponse(height: Int)
   object HeightResponse {
     implicit val format: Format[HeightResponse] = Json.format[HeightResponse]

@@ -146,7 +146,7 @@ class AddressActor(
   private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
     val promisedResponse = Promise[Resp]
     eventCache += id -> promisedResponse
-    storeEvent(event).transformWith {
+    val withSave = storeEvent(event).transformWith {
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(storeError)
@@ -158,6 +158,8 @@ class AddressActor(
             promisedResponse.future
         }
     }
+
+    Future.firstCompletedOf(List(promisedResponse.future, withSave)) // Multiple cancel requests can be resolved by first
   }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
@@ -224,8 +226,7 @@ class AddressActor(
         handleOrderTerminated(lo, OrderStatus.finalStatus(lo, unmatchable))
       }
 
-    case e @ OrderCancelFailed(id, reason) =>
-      log.info(s"===> $e")
+    case OrderCancelFailed(id, reason) =>
       pendingCancellation.remove(id).foreach(_.success(api.OrderCancelRejected(reason)))
   }
 

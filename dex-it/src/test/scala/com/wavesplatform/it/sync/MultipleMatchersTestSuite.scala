@@ -7,7 +7,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherCommand, MatcherState, SyncMatcherHttpApi, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{MatcherCommand, MatcherState, OrderbookHistory, SyncMatcherHttpApi, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.tags.DexItKafkaRequired
 import com.wavesplatform.it.{Node, _}
@@ -71,8 +71,10 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
   "Batch cancel and single cancels simultaneously" in {
     val allOrders =
-      Gen.containerOfN[Vector, Order](200, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
-        Gen.containerOfN[Vector, Order](200, orderGen(matcher, alice, assetPairs, Seq(OrderType.BUY))).sample.get
+      (Gen.containerOfN[Vector, Order](150, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
+        Gen.containerOfN[Vector, Order](150, orderGen(matcher, alice, assetPairs, Seq(OrderType.BUY))).sample.get).toSet
+
+    log.info(s"Total orders: ${allOrders.size}")
 
     allOrders.foreach(matcher1Node.placeOrder)
     allOrders.foreach(order => matcher1Node.waitOrderStatus(order.assetPair, order.idStr(), "Accepted"))
@@ -84,9 +86,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
         val asyncNode1 = async(matcher1Node)
         val asyncNode2 = async(matcher2Node)
 
-        def singleCancels(orders: Seq[Order]) = Future.sequence {
+        def singleCancels(owner: KeyPair, orders: Iterable[Order]) = Future.sequence {
           orders.map { order =>
-            asyncNode1.cancelOrder(bob, order.assetPair, order.idStr()).transform {
+            asyncNode1.cancelOrder(owner, order.assetPair, order.idStr()).transform {
               case Success(_) => Success(())
               case Failure(UnexpectedStatusCodeException(_, _, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" =>
                 Success(())
@@ -95,17 +97,23 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
           }
         }
 
-        def batchCancels(assetPairs: Set[AssetPair]) = Future.sequence {
-          assetPairs.map(asyncNode2.cancelOrdersForPairOnce(bob, _, System.currentTimeMillis()).map { response =>
+        def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]) = Future.sequence {
+          assetPairs.map(asyncNode2.cancelOrdersForPairOnce(owner, _, System.currentTimeMillis()).map { response =>
             if (response.getStatusCode == 503) throw new IOException(s"Unexpected status code: 503")
             else Future.successful(())
           })
         }
 
-        batchCancels(assetPairs.toSet).zip(singleCancels(allOrders))
+        batchCancels(alice, assetPairs)
+          .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
+          .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
+          .zip(batchCancels(bob, assetPairs))
       },
-      2.minute
+      3.minutes
     )
+
+    matcher1Node.waitFor[Seq[OrderbookHistory]]("no alice orders")(_.ordersByAddress(alice, activeOnly = true), _.isEmpty, 5.seconds)
+    matcher1Node.waitFor[Seq[OrderbookHistory]]("no bob orders")(_.ordersByAddress(bob, activeOnly = true), _.isEmpty, 5.seconds)
   }
 
   "Place, fill and cancel a lot of orders" in {

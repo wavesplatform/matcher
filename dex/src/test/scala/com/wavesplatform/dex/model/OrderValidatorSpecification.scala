@@ -55,12 +55,12 @@ class OrderValidatorSpecification
 
   private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDecimals
 
-  val WavesBtcPairDecimals, EthWavesPairDecimals = new AssetPairDecimals(defaultAssetDecimals.toByte, defaultAssetDecimals.toByte)
+  val wavesBtcPairDecimals, ethWavesPairDecimals = new AssetPairDecimals(defaultAssetDecimals.toByte, defaultAssetDecimals.toByte)
 
   implicit class DoubleOps(value: Double) {
-    val waves: Long = WavesBtcPairDecimals.amount(value)
-    val btc: Long   = WavesBtcPairDecimals.price(value)
-    val eth: Long   = EthWavesPairDecimals.amount(value)
+    val waves: Long = wavesBtcPairDecimals.amount(value)
+    val btc: Long   = wavesBtcPairDecimals.price(value)
+    val eth: Long   = ethWavesPairDecimals.amount(value)
   }
 
   "OrderValidator" should {

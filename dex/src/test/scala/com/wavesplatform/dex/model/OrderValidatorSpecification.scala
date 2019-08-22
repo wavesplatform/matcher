@@ -391,20 +391,6 @@ class OrderValidatorSpecification
       }
 
       "order's fee is out of deviation bounds (market aware)" in {
-
-        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
-        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
-
-        val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
-        val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
-
-        val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
-        val feeValidation        = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
-
-        // matherFee = 1% of (amount * price) = 0.000277025 => 0.00027702
-        val buyOrder  = createOrder(OrderType.BUY, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
-        val sellOrder = createOrder(OrderType.SELL, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
-
         /**
           * BUY orders:  fee >= fs * (1 - fd) * best ask * amount
           * SELL orders: fee >= fs * (1 - fd) * best bid * amount
@@ -416,32 +402,60 @@ class OrderValidatorSpecification
           *   best bid = highest price of buy
           *   best ask = lowest price of sell
           */
+        val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
+        val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
+
+        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
+        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
+        val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
+        val feeValidation = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
+        val feeValidationWithoutAsks = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None)), rateCache) _
+        val feeValidationWithoutBids = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk))), rateCache) _
+        val feeValidationWithoutBounds = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, None)), rateCache) _
+
+        // matherFee = 1% of (amount * price) = 0.000277025 => 0.00027702
+        val buyOrder  = createOrder(OrderType.BUY, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
+        val sellOrder = createOrder(OrderType.SELL, amount = 250.waves, price = 0.00011081.btc, matcherFee = 0.00027702.btc, matcherFeeAsset = wbtc)
+        val lowBuyOrdersFees = Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929, 0.00024934)
+        val validBuyOrdersFees = Array(0.00024935, 0.00024936, 0.0002494, 0.00025001, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312)
+
         feeValidation { buyOrder } shouldBe 'right
 
+        withClue("buy order fee can be any if there is no asks") {
+          (lowBuyOrdersFees ++ validBuyOrdersFees).foreach(fee => {
+            val updatedOrder = buyOrder.updateFee(fee.btc)
+            feeValidationWithoutAsks { updatedOrder } shouldBe 'right
+            feeValidationWithoutBounds { updatedOrder } shouldBe 'right
+          })
+        }
+
         withClue("buy order fee should be >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
-          Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929, 0.00024934).foreach(fee =>
-            feeValidation { buyOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee")
-          )
+          lowBuyOrdersFees.foreach(fee => feeValidation { buyOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee"))
         }
 
         withClue("buy order fee >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
-          Array(0.00024935, 0.00024936, 0.0002494, 0.00025001, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312).foreach(fee =>
-            feeValidation { buyOrder.updateFee(fee.btc) } shouldBe 'right
-          )
+          validBuyOrdersFees.foreach(fee => feeValidation { buyOrder.updateFee(fee.btc) } shouldBe 'right)
         }
+
+        val lowSellOrdersFees = Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929)
+        val validSellOrdersFees = Array(0.00024930, 0.00024931, 0.00024940, 0.00025, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312)
 
         feeValidation { sellOrder } shouldBe 'right
 
+        withClue("sell order fee can be any if there is no bids") {
+          (lowSellOrdersFees ++ validSellOrdersFees).foreach(fee => {
+            val updatedOrder = sellOrder.updateFee(fee.btc)
+            feeValidationWithoutBids { updatedOrder } shouldBe 'right
+            feeValidationWithoutBounds { updatedOrder } shouldBe 'right
+          })
+        }
+
         withClue("sell order fee should be >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
-          Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929).foreach(fee =>
-            feeValidation { sellOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee")
-          )
+          lowSellOrdersFees.foreach(fee => feeValidation { sellOrder.updateFee(fee.btc) } should produce("DeviantOrderMatcherFee"))
         }
 
         withClue("sell order fee >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
-          Array(0.00024930, 0.00024931, 0.00024940, 0.00025, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312).foreach(fee =>
-            feeValidation { sellOrder.updateFee(fee.btc) } shouldBe 'right
-          )
+          validSellOrdersFees.foreach(fee => feeValidation { sellOrder.updateFee(fee.btc) } shouldBe 'right)
         }
       }
 

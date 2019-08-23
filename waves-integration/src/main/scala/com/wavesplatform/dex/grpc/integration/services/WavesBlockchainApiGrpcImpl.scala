@@ -68,7 +68,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
   override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {
     import AssetDescriptionResponse._
 
-    val desc = blockchain.assetDescription(IssuedAsset(request.assetId.toByteArray))
+    val desc = blockchain.assetDescription(IssuedAsset(request.assetId.toVanilla))
     val gRpcDesc = desc.fold[MaybeDescription](MaybeDescription.Empty) { desc =>
       MaybeDescription.Description(
         AssetDescription(

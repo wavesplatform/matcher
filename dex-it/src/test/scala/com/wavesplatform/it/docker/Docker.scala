@@ -1,15 +1,6 @@
 package com.wavesplatform.it.docker
 
-import java.io.{
-  ByteArrayInputStream,
-  ByteArrayOutputStream,
-  FileOutputStream,
-  InputStream,
-  InputStreamReader,
-  OutputStream,
-  PipedInputStream,
-  PipedOutputStream
-}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileOutputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
@@ -20,29 +11,27 @@ import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
+import cats.kernel.Monoid
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints._
-import com.spotify.docker.client.DockerClient.{ExecCreateParam, ExecStartParameter}
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.settings._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.apache.commons.compress.archivers.ArchiveEntry
-import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveInputStream, TarArchiveOutputStream}
-import org.apache.commons.io.IOUtils
+import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
+import cats.instances.string._
+import cats.instances.map._
 
 class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
@@ -149,7 +138,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       name,
       wavesNodeImage,
       Map(
-        "WAVES_NODE_CONFIGPATH" -> s"/opt/waves/$name.conf"
+        "WAVES_NODE_CONFIGPATH" -> s"/opt/waves/$name.conf",
+        "WAVES_OPTS"            -> "-Dlogback.configurationFile=/opt/waves/logback.xml"
       )
     )
 
@@ -185,7 +175,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       dexImage,
       Map(
         "WAVES_DEX_CONFIGPATH" -> s"/opt/waves-dex/$name.conf",
-        "WAVES_DEX_OPTS"       -> s"-Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port}"
+        "WAVES_DEX_OPTS"       -> s"-Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port} -Dlogback.configurationFile=/opt/waves-dex/logback.xml"
       )
     )
 
@@ -272,12 +262,18 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         .publishAllPorts(true)
         .build()
 
+      // TODO
+      val fixedEnv = Monoid.combine(
+        env,
+        Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
+      )
+
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number)).asJava))
         .hostConfig(hostConfig)
-        .env(env.map { case (k, v) => s"$k=$v" }.toList.asJava)
+        .env(fixedEnv.map { case (k, v) => s"$k=$v" }.toList.asJava)
         .build()
 
       log.debug(s"Creating container ${info()} ...")

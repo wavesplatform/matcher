@@ -1,15 +1,16 @@
 package com.wavesplatform.it.sync
 
 import java.net.InetSocketAddress
+import java.util.UUID
 
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
+import com.wavesplatform.it.{NewMatcherSuiteBase, fp}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderV1}
 import monix.eval.Coeval
@@ -21,11 +22,11 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
   // Validator node
   protected def getWavesNode2ApiAddress: InetSocketAddress =
-    dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
-  protected def wavesNode2Api: NodeApi[Id] = NodeApi.unWrapped(NodeApi[Try]("integration-test-rest-api", getWavesNode2ApiAddress))
+    dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Config.getInt("waves.rest-api.port"))
+  protected def wavesNode2Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", getWavesNode2ApiAddress))
   protected def wavesNode2Config: Config   = DexTestConfig.containerConfig("waves-2")
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2", wavesNode1Config.resolve())
+    dockerClient().createWavesNode("waves-2", wavesNode2Config.resolve())
   }
 
   // DEX connects to a waves validator node
@@ -45,54 +46,64 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   // DEX needs to know activated features to know which order versions should be enabled.
   override protected def allContainers: List[DockerContainer] = wavesNode2Container() :: super.allContainers
 
+  private val pair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
+  private val now  = System.currentTimeMillis()
+
+  private val alicePlace = OrderV1.sell(
+    sender = alice,
+    matcher = matcher,
+    pair = pair,
+    amount = 100000L,
+    price = 80000L,
+    timestamp = now,
+    expiration = now + 1.day.toMillis,
+    matcherFee = 300000L
+  )
+
+  private val bobPlace = OrderV1.buy(
+    sender = bob,
+    matcher = matcher,
+    pair = pair,
+    amount = 200000L,
+    price = 100000L,
+    timestamp = now,
+    expiration = now + 1.day.toMillis,
+    matcherFee = 300000L
+  )
+
   "BroadcastUntilConfirmed" in {
     markup("Issue an asset")
     wavesNode1Api.broadcast(IssueEthTx)
-    val pair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
-    wavesNode1Api.waitForTransaction(IssueEthTx.id())
+    wavesNode2Api.waitForTransaction(IssueEthTx.id())
+    wavesNode2Api.waitForHeightArise()
 
-    markup("Prepare orders")
-    val now = System.currentTimeMillis()
-    val alicePlace = OrderV1.sell(
-      sender = alice,
-      matcher = matcher,
-      pair = pair,
-      amount = 100000L,
-      price = 80000L,
-      timestamp = now,
-      expiration = now + 1.day.toMillis,
-      matcherFee = 300000L
-    )
-
-    val bobPlace = OrderV1.buy(
-      sender = bob,
-      matcher = matcher,
-      pair = pair,
-      amount = 200000L,
-      price = 100000L,
-      timestamp = now,
-      expiration = now + 1.day.toMillis,
-      matcherFee = 300000L
-    )
-
-    markup("Shutdown a dependent NODE container")
-    dockerClient().disconnectFromNetwork(dex1NodeContainer)
+    markup("Disconnect a miner node from the network")
+    dockerClient().disconnectFromNetwork(wavesNode1Container())
 
     markup("Place orders, those should match")
-    dex1Api.place(alicePlace)
-    dex1Api.place(bobPlace)
-    dex1Api.waitForOrderStatus(alicePlace.id(), "Filled")
-    val exchangeTxId = dex1Api.waitForTransactionsByOrder(alicePlace.id(), 1).head.id()
+    dex1Api.place(UUID.randomUUID(), alicePlace)
+    dex1Api.place(UUID.randomUUID(), bobPlace)
+    dex1Api.waitForOrderStatus(UUID.randomUUID(), alicePlace.id(), "Filled")
 
-    markup("Start miners and wait until it receives the transaction")
-    dockerClient().connectToNetwork(dex1NodeContainer)
+    markup("Wait for a transaction")
+    val exchangeTxId = dex1Api.waitForTransactionsByOrder(UUID.randomUUID(), alicePlace.id(), 1).head.id()
+
+    markup("Connect the miner node to the network")
+    dockerClient().connectToNetwork(wavesNode1Container())
+
+    markup("Wait until it receives the transaction")
     wavesNode2Api.waitForTransaction(exchangeTxId)
   }
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    //super.beforeAll()
+    dockerClient().start(wavesNode1Container())
+    dockerClient().start(wavesNode2Container())
     wavesNode1Api.waitReady
     wavesNode2Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
+    wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
+    dockerClient().start(dex1Container())
+    dex1Api.waitReady
   }
 }

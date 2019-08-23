@@ -1,12 +1,12 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, SocketException}
 import java.util.UUID
 
+import cats.MonadError
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.tagless.{autoFunctorK, finalAlg}
-import cats.{Id, MonadError}
+import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.common.state.ByteStr
@@ -18,11 +18,11 @@ import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.Try
+import scala.util.control.NonFatal
 
-@finalAlg
-@autoFunctorK
 trait DexApi[F[_]] {
+  def waitReady: F[Unit]
+
   def place(requestId: UUID, order: Order): F[Unit]
   def waitForOrder(requestId: UUID, id: Order.Id)(pred: Option[MatcherStatusResponse] => Boolean): F[Unit]
   def waitForTransactionsByOrder(requestId: UUID, id: Order.Id)(
@@ -30,6 +30,8 @@ trait DexApi[F[_]] {
 }
 
 object DexApi {
+  implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
+
   // TODO
   implicit val exchangeTxReads: Reads[exchange.ExchangeTransaction] = Reads { json =>
     JsSuccess(TransactionFactory.fromSignedRequest(json).right.get.asInstanceOf[exchange.ExchangeTransaction])
@@ -53,6 +55,17 @@ object DexApi {
       val defaultAssetPair: AssetPair = AssetPair(IssuedAsset(ByteStr(Array.fill(32)(1))), Waves)
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
+
+      override def waitReady: F[Unit] = {
+        val req = sttp.get(uri"$apiUri").mapResponse(_ => ())
+
+        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
+          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
+          case NonFatal(e)        => M.raiseError(e)
+        }
+
+        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
+      }
 
       override def place(requestId: UUID, order: Order): F[Unit] = {
         val req = sttp.post(uri"$apiUri/orderbook").body(order).mapResponse(_ => ()).tag("requestId", requestId)
@@ -97,15 +110,6 @@ object DexApi {
           case Right(Right(r))    => M.pure(r)
         }
     }
-
-  def unWrapped(source: DexApi[Try]): DexApi[Id] = new DexApi[Id] {
-    override def place(requestId: UUID, order: Order): Id[Unit] = source.place(requestId, order).get
-    override def waitForOrder(requestId: UUID, id: Order.Id)(pred: Option[MatcherStatusResponse] => Boolean): Id[Unit] =
-      source.waitForOrder(requestId, id)(pred).get
-    override def waitForTransactionsByOrder(requestId: UUID, id: Order.Id)(
-        pred: List[exchange.ExchangeTransaction] => Boolean): Id[List[exchange.ExchangeTransaction]] =
-      source.waitForTransactionsByOrder(requestId, id)(pred).get
-  }
 }
 
 trait TracedDexApi[F[_]] {

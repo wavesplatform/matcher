@@ -1,25 +1,41 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, SocketException}
 
+import cats.MonadError
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.{Id, MonadError}
+import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.util.control.NonFatal
+
+case class ConnectedPeersResponse(peers: List[PeerInfo])
+object ConnectedPeersResponse {
+  implicit val format: Format[ConnectedPeersResponse] = Json.format[ConnectedPeersResponse]
+}
+
+case class PeerInfo(address: String,
+                    declaredAddress: String,
+                    peerName: String,
+                    peerNonce: Long,
+                    applicationName: String,
+                    applicationVersion: String)
+object PeerInfo {
+  implicit val format: Format[PeerInfo] = Json.format[PeerInfo]
+}
 
 trait NodeApi[F[_]] {
   def waitReady: F[Unit]
   def connect(toNode: InetSocketAddress): F[Unit]
+  def connected: F[ConnectedPeersResponse]
+  def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
   def broadcast(tx: transaction.Transaction): F[Unit]
   def waitForTransaction(id: ByteStr): F[Unit]
@@ -27,34 +43,49 @@ trait NodeApi[F[_]] {
 }
 
 object NodeApi {
-  implicit final class FutureTOps(val self: Future.type) extends AnyVal {
-    def repeatUntil[T](f: => Future[T], delay: FiniteDuration)(pred: T => Boolean)(implicit ec: ExecutionContext): Future[T] =
-      f.flatMap { x =>
-        if (pred(x)) Future.successful(x)
-        else GlobalTimer.instance.sleep(delay).flatMap(_ => repeatUntil(f, delay)(pred))
-      }
-  }
-
-  implicit final class FutureOps[T](val self: Future[T]) extends AnyVal {
-    def toUnit(implicit ec: ExecutionContext): Future[Unit] = self.map(_ => ())
-  }
+  implicit val functorK: FunctorK[NodeApi] = Derive.functorK[NodeApi]
 
   implicit val transactionWrites: Writes[transaction.Transaction] = Writes[transaction.Transaction](_.json())
 
-  def apply[F[_]](apiKey: String, host: => InetSocketAddress)(implicit M: MonadError[F, Throwable], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): NodeApi[F] =
+  def apply[F[_]](apiKey: String,
+                  host: => InetSocketAddress)(implicit M: MonadError[F, Throwable], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): NodeApi[F] =
     new NodeApi[F] {
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
 
       override def waitReady: F[Unit] = {
-        ???
+        val req = sttp.get(uri"$apiUri/blocks/height").mapResponse(_ => ())
+
+        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
+          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
+          case NonFatal(e)        => M.raiseError(e)
+        }
+
+        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
 
       override def connect(toNode: InetSocketAddress): F[Unit] = {
-        val req = sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey).mapResponse(_ => ())
+        val req =
+          sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey).mapResponse(_ => ())
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
           if (resp.code == StatusCodes.Ok) M.pure(())
           else M.raiseError[Unit](new RuntimeException("There is no such method!"))
         }
+      }
+
+      override def connected: F[ConnectedPeersResponse] = {
+        val req = sttp.get(uri"$apiUri/peers/connected").response(asJson[ConnectedPeersResponse])
+        repeatUntilAttempts(httpBackend.send(req), 1.second, 10)(resp => resp.code == StatusCodes.Ok).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_)            => M.raiseError[ConnectedPeersResponse](new RuntimeException(s"The server returned an error: ${resp.code}"))
+            case Right(Left(error)) => M.raiseError[ConnectedPeersResponse](new RuntimeException(s"Can't parse the response: $error"))
+            case Right(Right(r))    => M.pure(r)
+          }
+        }
+      }
+
+      override def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit] = {
+        val hostName = toNode.getHostName
+        repeatUntil(connected, 1.second)(_.peers.exists(p => p.address.contains(hostName))).map(_ => ())
       }
 
       override def broadcast(tx: transaction.Transaction): F[Unit] = {
@@ -102,6 +133,17 @@ object NodeApi {
           if (pred(x)) M.pure(x) else W.wait(delay).flatMap(_ => loop())
         }
         loop()
+      }
+
+      def repeatUntilAttempts[T](f: => F[T], delay: FiniteDuration, maxAttempts: Int)(pred: T => Boolean): F[T] = {
+        def loop(restAttempts: Int): F[T] =
+          if (restAttempts == 0) M.raiseError(new RuntimeException("All attempts are out"))
+          else
+            f.flatMap { x =>
+              if (pred(x)) M.pure(x) else W.wait(delay).flatMap(_ => loop(restAttempts - 1))
+            }
+
+        loop(maxAttempts)
       }
 
       def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(

@@ -1,0 +1,15 @@
+package com.wavesplatform.it
+
+import cats.arrow.FunctionK
+import cats.tagless.FunctorK
+import cats.{Id, ~>}
+
+import scala.util.Try
+
+package object fp {
+  implicit val tryToId: Try ~> Id = new FunctionK[Try, Id] {
+    def apply[A](fa: Try[A]): Id[A] = fa.get
+  }
+
+  def sync[F[_[_]]](x: F[Try])(implicit functorK: FunctorK[F]): F[Id] = functorK.mapK(x)(tryToId)
+}

@@ -101,6 +101,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    order-book-snapshot-http-cache {
       |      cache-timeout = 11m
       |      depth-ranges = [1, 5, 333]
+      |      default-depth = 5
       |    }
       |    balance-watching-buffer-interval = 33s
       |    events-queue {
@@ -167,7 +168,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
       cacheTimeout = 11.minutes,
-      depthRanges = List(1, 5, 333)
+      depthRanges = List(1, 5, 333),
+      defaultDepth = Some(5)
     )
     settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(

@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 /**
@@ -32,15 +33,19 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
   */
 class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
+  val deviationProfit = 70
+  val deviationLoss = 60
+  val deviationFee = 40
+
   override protected def nodeConfigs: Seq[Config] = {
     val orderDeviations =
       s"""
          |waves.dex {
          |  max-price-deviations {
          |    enable = yes
-         |    profit = 70
-         |    loss = 60
-         |    fee = 40
+         |    profit = $deviationProfit
+         |    loss = $deviationLoss
+         |    fee = $deviationFee
          |  }
          |
          |  order-fee {
@@ -60,6 +65,28 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     node.waitForTransaction(node.broadcastRequest(IssueBtcTx.json()).id)
+  }
+
+  def orderIsOutOfDeviationBounds(price: String, orderType: OrderType): String = {
+    def lowBound: Int = orderType match {
+      case SELL => 100 - deviationLoss
+      case BUY => 100 - deviationProfit
+    }
+    def upperBound: Int = orderType match {
+      case SELL => 100 + deviationProfit
+      case BUY => 100 + deviationLoss
+    }
+    s"The $orderType order's price $price is out of deviation bounds. It should meet the following matcher's requirements: " +
+      s"$lowBound% of best bid price <= order price <= $upperBound% of best ask price"
+  }
+
+  def feeIsOutOfDeviationBounds(fee: String, feeAssetId: String, orderType: OrderType): String = {
+    def marketType: String = orderType match {
+      case SELL => "bid"
+      case BUY => "ask"
+    }
+    s"The $orderType order's matcher fee $fee $feeAssetId is out of deviation bounds. " +
+      s"It should meet the following matcher's requirements: matcher fee >= ${100 - deviationFee}% of fee which should be paid in case of matching with best $marketType"
   }
 
   "buy orders price is" - {
@@ -84,7 +111,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         node.orderBook(wavesBtcPair).bids shouldBe List(LevelResponse(1000.waves, 300000))
 
         assertBadRequestAndMessage(node.placeOrder(bob, wavesBtcPair, BUY, 1000.waves, 89999, matcherFee),
-          "The order's price 0.00089999 is out of deviation bounds (max profit: 70% and max loss: 60% in relation to the best bid/ask)", 400)
+          orderIsOutOfDeviationBounds("0.00089999", BUY), 400)
         node.cancelOrder(bob, wavesBtcPair, bestBidOrderId)
       }
 
@@ -94,7 +121,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         node.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
         assertBadRequestAndMessage(node.placeOrder(bob, wavesBtcPair, BUY, 1000.waves, 800001, matcherFee),
-          "The order's price 0.00800001 is out of deviation bounds (max profit: 70% and max loss: 60% in relation to the best bid/ask)", 400)
+          orderIsOutOfDeviationBounds("0.00800001", BUY), 400)
         node.cancelOrder(alice, wavesBtcPair, bestAskOrderId)
       }
     }
@@ -122,7 +149,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         node.orderBook(wavesBtcPair).bids shouldBe List(LevelResponse(1000.waves, 300000))
 
         assertBadRequestAndMessage(node.placeOrder(alice, wavesBtcPair, SELL, 1000.waves, 119999, matcherFee),
-          "The order's price 0.00119999 is out of deviation bounds (max profit: 70% and max loss: 60% in relation to the best bid/ask)", 400)
+          orderIsOutOfDeviationBounds("0.00119999", SELL), 400)
         node.cancelOrder(bob, wavesBtcPair, bestBidOrderId)
       }
 
@@ -131,8 +158,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         node.waitOrderStatus(wavesBtcPair, bestAskOrderId, expectedStatus = "Accepted")
         node.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
-        assertBadRequestAndMessage(node.placeOrder(bob, wavesBtcPair, BUY, 1000.waves, 850001, matcherFee),
-          "The order's price 0.00850001 is out of deviation bounds (max profit: 70% and max loss: 60% in relation to the best bid/ask)", 400)
+        assertBadRequestAndMessage(node.placeOrder(bob, wavesBtcPair, SELL, 1000.waves, 850001, matcherFee),
+          orderIsOutOfDeviationBounds("0.00850001", SELL), 400)
         node.cancelOrder(alice, wavesBtcPair, bestAskOrderId)
       }
     }
@@ -161,7 +188,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       node.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 600000))
 
       assertBadRequestAndMessage(node.placeOrder(bob, wavesBtcPair, BUY, 1000.waves, 800000, 359999).message.id,
-        "The order's matcher fee 0.00359999 WAVES is out of deviation bounds (max deviation: 40% in relation to the best bid/ask)", 400)
+        feeIsOutOfDeviationBounds("0.00359999", "WAVES", BUY), 400)
       node.cancelOrder(alice, wavesBtcPair, bestAskOrderId)
 
       val bestBidOrderId = node.placeOrder(bob, wavesBtcPair, BUY, 1000.waves, 700000, matcherFee).message.id
@@ -169,7 +196,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       node.orderBook(wavesBtcPair).bids shouldBe List(LevelResponse(1000.waves, 700000))
 
       assertBadRequestAndMessage(node.placeOrder(alice, wavesBtcPair, SELL, 1000.waves, 600000, 419999).message.id,
-        "The order's matcher fee 0.00419999 WAVES is out of deviation bounds (max deviation: 40% in relation to the best bid/ask)", 400)
+        feeIsOutOfDeviationBounds("0.00419999", "WAVES", SELL), 400)
       node.cancelOrder(bob, wavesBtcPair, bestBidOrderId)
     }
   }

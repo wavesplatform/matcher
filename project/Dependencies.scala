@@ -79,8 +79,7 @@ object Dependencies {
     ))
 
   lazy val common = Seq(
-    "com.lihaoyi"   %% "sourcecode"          % "0.1.7",
-    "org.typelevel" %% "cats-tagless-macros" % "0.9"
+    "com.lihaoyi"   %% "sourcecode" % "0.1.7"
   )
 
   lazy val itTest = scalaTest +: Seq(

@@ -12,10 +12,8 @@ import net.ceedubs.ficus.readers.ValueReader
 case class MatchingRules(startOffset: QueueEventWithMeta.Offset, normalizedTickSize: Long)
 
 object MatchingRules {
-
   val Default                                 = MatchingRules(0L, 1)
   val DefaultNel: NonEmptyList[MatchingRules] = NonEmptyList.one(Default)
-
 }
 
 case class RawMatchingRules(startOffset: Long, tickSize: Double)
@@ -38,10 +36,7 @@ object RawMatchingRules {
     val offsetValidated   = cfgValidator.validateByPredicate[Long](s"$path.start-offset")(_ >= 0, "required 0 <= start offset")
     val tickSizeValidated = cfgValidator.validateByPredicate[Double](s"$path.tick-size")(_ > 0, "required 0 < tick size")
 
-    (
-      offsetValidated,
-      tickSizeValidated
-    ) mapN RawMatchingRules.apply getValueOrThrowErrors
+    (offsetValidated, tickSizeValidated) mapN RawMatchingRules.apply getValueOrThrowErrors
   }
 
   implicit val rawMatchingRulesNelReader: ValueReader[NonEmptyList[RawMatchingRules]] =

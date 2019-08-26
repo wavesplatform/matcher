@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class MatcherRulesTestSuite extends MatcherSuiteBase {
+class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = {
 
@@ -20,7 +20,6 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
          |    "$WctId-$UsdId": [
          |      {
          |        start-offset = 2
-         |        merge-prices = yes
          |        tick-size    = 5
          |      }
          |    ]

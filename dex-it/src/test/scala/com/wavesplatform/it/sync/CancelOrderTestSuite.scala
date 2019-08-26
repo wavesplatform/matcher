@@ -1,47 +1,47 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderV1}
 
-import scala.concurrent.duration._
-
-class CancelOrderTestSuite extends MatcherSuiteBase {
-  private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
-
+class CancelOrderTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    val xs = Seq(IssueUsdTx, IssueBtcTx).map(_.json()).map(node.signedBroadcast(_))
-    xs.foreach(tx => node.waitForTransaction(tx.id))
+    wavesNode1Api.waitReady
+    dex1Api.waitReady
+    val assets = List(IssueUsdTx, IssueBtcTx)
+    assets.map(wavesNode1Api.broadcast)
+    assets.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
   }
 
   "Order can be canceled" - {
     "by sender" in {
-      val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
-      node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+      val order = mkBobOrder
+      dex1Api.place(order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      node.cancelOrder(bob, wavesUsdPair, orderId)
-      node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
+      dex1Api.cancel(bob, order.assetPair, order.id())
+      dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-      node.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
-        case o if o.id == orderId => o.status shouldEqual "Cancelled"
+      dex1Api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
+        case o if o.id == order.idStr() => o.status shouldEqual OrderStatus.Cancelled.name // TODO
       }
     }
+
     "with API key" in {
-      val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
-      node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+      val order = mkBobOrder
+      dex1Api.place(order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      node.cancelOrderWithApiKey(orderId)
-      node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
+      dex1Api.cancelWithApiKey(order.id())
+      dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-      node.fullOrderHistory(bob).filter(_.id == orderId).head.status shouldBe "Cancelled"
-      node.orderHistoryByPair(bob, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
+      dex1Api.orderHistory(bob).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled.name
+      dex1Api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled.name
 
-      val orderBook = node.orderBook(wavesUsdPair)
+      val orderBook = dex1Api.orderBook(wavesUsdPair)
       orderBook.bids shouldBe empty
       orderBook.asks shouldBe empty
     }
@@ -49,55 +49,50 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   "Cancel is rejected" - {
     "when request sender is not the sender of and order" in {
-      val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
-      node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+      val order = mkBobOrder
+      dex1Api.place(order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      node.expectCancelRejected(matcher, wavesUsdPair, orderId)
+      val r = dex1Api.tryCancel(matcher, order)
+      r shouldBe 'left
+      r.left.get.error shouldBe 9437193 // TODO
 
       // Cleanup
-      node.cancelOrder(bob, wavesUsdPair, orderId)
-      node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled")
+      dex1Api.cancel(bob, order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
     }
   }
 
-  "Batch cancel" - {
-    "works for" - {
-      "all orders placed by an address" in {
-        node.fullOrderHistory(bob)
+  "Batch cancel works for" - {
+    "all orders placed by an address" in {
+      val orders = mkBobOrders(wavesUsdPair) ::: mkBobOrders(wavesBtcPair)
+      orders.foreach(dex1Api.place)
+      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
 
-        val usdOrderIds = 1 to 5 map { i =>
-          node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves + i, 400, matcherFee).message.id
-        }
+      dex1Api.cancelAll(bob)
 
-        node.assetBalance(bob.toAddress.stringRepr, BtcId.toString)
+      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
+    }
 
-        val btcOrderIds = 1 to 5 map { i =>
-          node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 100.waves + i, 400, matcherFee).message.id
-        }
+    "a pair" in {
+      val wavesUsdOrders = mkBobOrders(wavesUsdPair)
+      val wavesBtcOrders = mkBobOrders(wavesBtcPair)
+      val orders         = wavesUsdOrders ::: wavesBtcOrders
+      orders.foreach(dex1Api.place)
+      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
 
-        (usdOrderIds ++ btcOrderIds).foreach(id => node.waitOrderStatus(wavesUsdPair, id, "Accepted"))
+      dex1Api.cancelAllByPair(bob, wavesBtcPair)
 
-        node.cancelAllOrders(bob)
-
-        (usdOrderIds ++ btcOrderIds).foreach(id => node.waitOrderStatus(wavesUsdPair, id, "Cancelled"))
-      }
-
-      "a pair" in {
-        val usdOrderIds = 1 to 5 map { i =>
-          node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves + i, 400, matcherFee).message.id
-        }
-
-        val btcOrderIds = 1 to 5 map { i =>
-          node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 100.waves + i, 400, matcherFee).message.id
-        }
-
-        (usdOrderIds ++ btcOrderIds).foreach(id => node.waitOrderStatus(wavesUsdPair, id, "Accepted"))
-
-        node.cancelOrdersForPair(bob, wavesBtcPair)
-
-        btcOrderIds.foreach(id => node.waitOrderStatus(wavesUsdPair, id, "Cancelled"))
-        usdOrderIds.foreach(id => node.waitOrderStatus(wavesUsdPair, id, "Accepted"))
-      }
+      wavesBtcOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
+      wavesUsdOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
     }
   }
+
+  private def mkBobOrder: Order =
+    OrderV1.sell(bob, matcher, wavesUsdPair, 100.waves, 800, System.currentTimeMillis(), System.currentTimeMillis() + 600000, matcherFee)
+
+  private def mkBobOrders(assetPair: AssetPair): List[Order] =
+    (1 to 5).map { i =>
+      OrderV1.sell(bob, matcher, assetPair, 100.waves + i, 400, System.currentTimeMillis(), System.currentTimeMillis() + 600000, matcherFee)
+    }.toList
 }

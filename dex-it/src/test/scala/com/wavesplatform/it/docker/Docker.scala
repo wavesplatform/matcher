@@ -169,13 +169,25 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   def createDex(name: String, config: Config): DexContainer = {
     val number = getNumber(name)
     val grpc   = config.as[GRPCSettings]("waves.dex.waves-node-grpc")
+
+    val allowedKeysPrefixes = List(
+      "waves-node-grpc",
+      "blacklisted-assets",
+      "price-assets",
+      "rest-order-limit",
+    )
+    val props = renderProperties(asProperties(config.getConfig("waves.dex")).asScala.collect {
+      case (key, v) if allowedKeysPrefixes.exists(key.startsWith) => s"waves.dex.$key" -> v
+    }.toMap)
+
     val id = create(
       number,
       name,
       dexImage,
       Map(
         "WAVES_DEX_CONFIGPATH" -> s"/opt/waves-dex/$name.conf",
-        "WAVES_DEX_OPTS"       -> s"-Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port} -Dlogback.configurationFile=/opt/waves-dex/logback.xml"
+        // -Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port}
+        "WAVES_DEX_OPTS" -> s"$props -Dlogback.configurationFile=/opt/waves-dex/logback.xml"
       )
     )
 
@@ -394,9 +406,8 @@ object Docker {
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
-  private def renderProperties(p: Properties): String =
-    p.asScala
-      .map {
+  private def renderProperties(p: Map[String, String]): String =
+    p.map {
         case (k, v) if v.contains(" ") => k -> s""""$v""""
         case x                         => x
       }

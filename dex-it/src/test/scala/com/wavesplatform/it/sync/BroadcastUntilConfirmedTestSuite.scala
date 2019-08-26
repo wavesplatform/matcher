@@ -1,12 +1,11 @@
 package com.wavesplatform.it.sync
 
 import java.net.InetSocketAddress
-import java.util.UUID
 
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.NodeApi
+import com.wavesplatform.it.api.{NodeApi, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
@@ -75,18 +74,17 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
     markup("Issue an asset")
     wavesNode1Api.broadcast(IssueEthTx)
     wavesNode2Api.waitForTransaction(IssueEthTx.id())
-    wavesNode2Api.waitForHeightArise()
 
     markup("Disconnect a miner node from the network")
     dockerClient().disconnectFromNetwork(wavesNode1Container())
 
     markup("Place orders, those should match")
-    dex1Api.place(UUID.randomUUID(), alicePlace)
-    dex1Api.place(UUID.randomUUID(), bobPlace)
-    dex1Api.waitForOrderStatus(UUID.randomUUID(), alicePlace.id(), "Filled")
+    dex1Api.place(alicePlace)
+    dex1Api.place(bobPlace)
+    dex1Api.waitForOrderStatus(alicePlace, OrderStatus.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1Api.waitForTransactionsByOrder(UUID.randomUUID(), alicePlace.id(), 1).head.id()
+    val exchangeTxId = dex1Api.waitForTransactionsByOrder(alicePlace.id(), 1).head.id()
 
     markup("Connect the miner node to the network")
     dockerClient().connectToNetwork(wavesNode1Container())
@@ -96,14 +94,11 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   }
 
   override protected def beforeAll(): Unit = {
-    //super.beforeAll()
-    dockerClient().start(wavesNode1Container())
-    dockerClient().start(wavesNode2Container())
+    super.beforeAll()
     wavesNode1Api.waitReady
     wavesNode2Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
-    dockerClient().start(dex1Container())
     dex1Api.waitReady
   }
 }

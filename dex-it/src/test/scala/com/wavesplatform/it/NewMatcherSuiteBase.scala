@@ -8,7 +8,7 @@ import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.{DexApi, LoggingSttpBackend, NodeApi, TracedDexApi}
+import com.wavesplatform.it.api.{DexApi, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
 import com.wavesplatform.utils.ScorexLogging
@@ -46,18 +46,19 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected def dex1Config: Config                 = DexTestConfig.containerConfig("dex-1")
   protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    val grpcAddr            = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
-    println(grpcAddr)
-    val wavesNodeGrpcConfig = ConfigFactory.parseString(s"""waves.dex.waves-node-grpc {
-                                                           |  host = ${grpcAddr.getAddress.getHostAddress}
-                                                           |  port = ${grpcAddr.getPort}
-                                                           |}""".stripMargin)
-    dockerClient().createDex("dex-1", wavesNodeGrpcConfig.withFallback(dex1Config).resolve())
+    val grpcAddr = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
+    val wavesNodeGrpcConfig = ConfigFactory
+      .parseString(s"""waves.dex.waves-node-grpc {
+                      |  host = ${grpcAddr.getAddress.getHostAddress}
+                      |  port = ${grpcAddr.getPort}
+                      |}""".stripMargin)
+    val config = DexTestConfig.updatedMatcherConfig.withFallback(wavesNodeGrpcConfig).withFallback(dex1Config).resolve()
+    dockerClient().createDex("dex-1", config)
   }
+
   protected def dex1Api: DexApi[Id] = {
     def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
-    fp.sync(DexApi[Try](apiAddress))
-    // TracedDexApi.wrap(DexApi.unWrapped(DexApi[Try](apiAddress)))
+    fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
   }
 
   protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())

@@ -23,6 +23,7 @@ object Dependencies {
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val mouse                      = "org.typelevel" %% "mouse" % "0.22"
 
   private val catsEffect = catsModule("effect", "1.2.0")
   private val catsCore   = catsModule("core")
@@ -89,16 +90,18 @@ object Dependencies {
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   ).map(_ % Test)
 
-  lazy val dex = Seq(
-    kindProjector,
-    akkaModule("actor"),
-    akkaModule("persistence-query"),
-    akkaHttp,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
-    janino
-  ) ++ Seq(
-    akkaModule("testkit"),
-    akkaModule("persistence-tck"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-  ).map(_ % Test) ++ test ++ quill
+  lazy val dex =
+    Seq(
+      kindProjector,
+      akkaModule("actor"),
+      akkaModule("persistence-query"),
+      akkaHttp,
+      "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
+      janino,
+      mouse
+    ) ++ Seq(
+      akkaModule("testkit"),
+      akkaModule("persistence-tck"),
+      "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
+    ).map(_ % Test) ++ test ++ quill
 }

@@ -10,7 +10,7 @@ class LoggingSttpBackend[R[_], S](delegate: SttpBackend[R, S]) extends SttpBacke
     log.info(s"$prefix Sending $request")
     responseMonad.map(responseMonad.handleError(delegate.send(request)) {
       case e: Exception =>
-        log.error(s"$prefix Exception during request", e)
+        log.error(s"$prefix Exception during request: ${e.getMessage}")
         responseMonad.error(e)
     }) { response =>
       if (response.isSuccess) log.debug(s"$prefix Got response: $response")

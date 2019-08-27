@@ -1,13 +1,14 @@
 package com.wavesplatform.it
 
 import java.net.InetSocketAddress
+import java.nio.file.Paths
 import java.util.concurrent.Executors
 
 import cats.Id
 import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.config.DexTestConfig
@@ -61,6 +62,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
                       |  host = ${grpcAddr.getAddress.getHostAddress}
                       |  port = ${grpcAddr.getPort}
                       |}""".stripMargin)
+    // TODO Has a greater priority than local.conf!
     val config = DexTestConfig.updatedMatcherConfig.withFallback(wavesNodeGrpcConfig).withFallback(dex1Config).resolve()
     dockerClient().createDex("dex-1", config)
   }
@@ -107,11 +109,6 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 trait TestUtils {
   this: NewMatcherSuiteBase =>
 
-  protected def issueAssets(txs: IssueTransaction*): Unit = {
-    txs.map(wavesNode1Api.broadcast)
-    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
-  }
-
   /**
     * @param marcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
@@ -153,4 +150,37 @@ trait TestUtils {
         version = version,
         matcherFeeAssetId = marcherFeeAssetId
       )
+
+  protected def issueAssets(txs: IssueTransaction*): Unit = {
+    txs.map(wavesNode1Api.broadcast)
+    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
+  }
+
+  protected def restartContainer(container: DockerContainer, api: HasWaitReady[cats.Id]): Unit = {
+    dockerClient().stop(container)
+    dockerClient().start(container)
+    api.waitReady
+  }
+
+  protected def replaceLocalConfig(container: DockerContainer, config: Config): Unit =
+    replaceLocalConfig(
+      container,
+      config
+        .resolve()
+        .root()
+        .render(
+          ConfigRenderOptions
+            .concise()
+            .setOriginComments(false)
+            .setComments(false)
+            .setFormatted(true)
+            .setJson(false)
+        )
+    )
+
+  protected def replaceLocalConfig(container: DockerContainer, content: String): Unit = {
+    val path = Paths.get(container.basePath, "local.conf")
+    log.trace(s"Replacing '$path' of $container by:\n$content")
+    dockerClient().writeFile(container, path, content)
+  }
 }

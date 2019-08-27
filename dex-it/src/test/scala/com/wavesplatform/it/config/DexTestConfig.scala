@@ -176,9 +176,9 @@ object DexTestConfig {
 
   val orderLimit = 10
 
-  val ForbiddenAssetId     = "FdbnAsset"
+  val ForbiddenAssetId = "FdbnAsset" // Hardcoded in dex-1.conf
+
   val updatedMatcherConfig = parseString(s"""waves.dex {
-                                            |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit
                                             |}""".stripMargin)
@@ -195,8 +195,8 @@ object DexTestConfig {
                                             |}""".stripMargin)
 
     // TODO waves-base.conf
-    val genesisConfig    = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-1.conf"))
-    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+    val genesisConfig = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-1.conf"))
+    val gs            = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
 
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = genesisConfig.getString("waves.blockchain.custom.address-scheme-character").head.toByte

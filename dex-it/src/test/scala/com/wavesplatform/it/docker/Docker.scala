@@ -3,7 +3,7 @@ package com.wavesplatform.it.docker
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileOutputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{FileSystems, Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Collections._
@@ -131,22 +131,11 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     attempt(5)
   }
 
-  def createWavesNode(name: String, config: Config): WavesNodeContainer = {
-    val number = getNumber(name)
-    val id = create(
-      number,
-      name,
-      wavesNodeImage,
-      Map(
-        "WAVES_NODE_CONFIGPATH" -> s"/opt/waves/$name.conf",
-        "WAVES_OPTS"            -> "-Dlogback.configurationFile=/opt/waves/logback.xml"
-      )
-    )
-
+  def writeFile(container: DockerContainer, to: Path, content: String): Unit = {
     val os    = new ByteArrayOutputStream()
     val s     = new TarArchiveOutputStream(os)
-    val bytes = config.resolve().root().render().getBytes(StandardCharsets.UTF_8)
-    val entry = new TarArchiveEntry(s"$name.conf")
+    val bytes = content.getBytes(StandardCharsets.UTF_8)
+    val entry = new TarArchiveEntry(s"${to.getFileName}")
     entry.setSize(bytes.size)
     s.putArchiveEntry(entry)
     s.write(bytes)
@@ -155,13 +144,26 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     val is = new ByteArrayInputStream(os.toByteArray)
     s.close()
 
-    try {
-      client.copyToContainer(is, id, s"/opt/waves/")
-    } finally {
-      is.close()
-    }
+    try client.copyToContainer(is, container.id, s"${to.getParent.toString}")
+    finally is.close()
+  }
 
-    val r = new WavesNodeContainer(id, number, name, config)
+  def createWavesNode(name: String, config: Config): WavesNodeContainer = {
+    val number   = getNumber(name)
+    val basePath = "/opt/waves"
+    val id = create(
+      number,
+      name,
+      wavesNodeImage,
+      Map(
+        "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
+        "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
+      )
+    )
+
+    val r = new WavesNodeContainer(id, number, name, config, basePath)
+    // Could not work in Windows
+    writeFile(r, Paths.get(s"$basePath/$name.conf"), config.resolve().root().render())
     knownContainers.add(r)
     r
   }
@@ -172,7 +174,9 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
     val allowedKeysPrefixes = List(
       "waves-node-grpc",
-      "blacklisted-assets",
+      "blacklisted",
+      "allowed-asset-pairs",
+      "white-list-only",
       "price-assets",
       "rest-order-limit",
       "events-queue"
@@ -181,18 +185,19 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       case (key, v) if allowedKeysPrefixes.exists(key.startsWith) => s"waves.dex.$key" -> v
     }.toMap)
 
+    val basePath = "/opt/waves-dex"
     val id = create(
       number,
       name,
       dexImage,
       Map(
-        "WAVES_DEX_CONFIGPATH" -> s"/opt/waves-dex/$name.conf",
+        "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
         // -Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port}
-        "WAVES_DEX_OPTS" -> s"$props -Dlogback.configurationFile=/opt/waves-dex/logback.xml"
+        "WAVES_DEX_OPTS" -> s"$props -Dlogback.configurationFile=$basePath/logback.xml"
       )
     )
 
-    val r = new DexContainer(id, number, name, config)
+    val r = new DexContainer(id, number, name, config, basePath)
     knownContainers.add(r)
     r
   }

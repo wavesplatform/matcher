@@ -7,6 +7,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
 import com.google.common.primitives.Longs
+import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.account.KeyPair
@@ -23,12 +24,24 @@ import play.api.libs.json._
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 
-case class MatcherError(error: Int, message: String, status: String)
+case class MatcherError(error: Int, message: String, status: String, params: MatcherError.Params)
 object MatcherError {
   implicit val format: Format[MatcherError] = Json.format[MatcherError]
+
+  case class Params(assetId: Option[String], address: Option[String])
+  object Params {
+    implicit val format: Format[Params] = Json.format[Params]
+  }
+}
+
+case class OrderStatusResponse(status: OrderStatus, filledAmount: Option[Long])
+object OrderStatusResponse {
+  implicit val format: Format[OrderStatusResponse] = Json.format[OrderStatusResponse]
 }
 
 trait DexApi[F[_]] extends HasWaitReady[F] {
+  def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[String, Long]]
+
   def tryPlace(order: Order): F[Either[MatcherError, Unit]]
 
   def place(order: Order): F[Unit]
@@ -44,8 +57,11 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def cancelWithApiKey(id: Order.Id): F[MatcherStatusResponse]
 
-  def orderStatus(order: Order): F[MatcherStatusResponse] = orderStatus(order.assetPair, order.id())
-  def orderStatus(assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse]
+  def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
+  def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
+
+  def orderStatus(order: Order): F[OrderStatusResponse] = orderStatus(order.assetPair, order.id())
+  def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse]
 
   def transactionsByOrder(id: Order.Id): F[List[exchange.ExchangeTransaction]]
 
@@ -57,6 +73,10 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
                          activeOnly: Option[Boolean] = None,
                          timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]]
 
+  def allOrderBooks: F[MarketDataInfo]
+
+  def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]]
+
   def orderBook(assetPair: AssetPair): F[OrderBookResponse]
 
   def currentOffset: F[Long]
@@ -64,8 +84,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   // TODO move
 
-  def waitForOrder(order: Order)(pred: MatcherStatusResponse => Boolean): F[Unit] = waitForOrder(order.assetPair, order.id())(pred)
-  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: MatcherStatusResponse => Boolean): F[Unit]
+  def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[Unit] = waitForOrder(order.assetPair, order.id())(pred)
+  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[Unit]
 
   def waitForOrderStatus(order: Order, status: OrderStatus): F[Unit] = waitForOrderStatus(order.assetPair, order.id(), status)
   def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[Unit]
@@ -107,6 +127,16 @@ object DexApi {
       import ops._
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
+
+      override def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[String, Long]] = {
+        val req = sttp
+          .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
+          .headers(timestampAndSignatureHeaders(of, timestamp))
+          .response(asJson[Map[String, Long]])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap(parseResponse)
+      }
 
       override def tryPlace(order: Order): F[Either[MatcherError, Unit]] = {
         val req = sttp.post(uri"$apiUri/orderbook").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
@@ -205,12 +235,34 @@ object DexApi {
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap(parseResponse)
       }
 
-      override def orderStatus(assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse] = {
+      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
         val req = sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
-          .response(asJson[MatcherStatusResponse])
+          .response(asJson[OrderStatusResponse])
           .tag("requestId", UUID.randomUUID())
-        repeatUntilResponse[MatcherStatusResponse](httpBackend.send(req), 1.second)(_.code == StatusCodes.Ok)
+
+        httpBackend.send(req).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Right(Right(r)) => M.pure(Right(r))
+            case Right(Left(error)) =>
+              M.raiseError[Either[MatcherError, OrderStatusResponse]](new RuntimeException(s"Can't parse the response: $error"))
+            case Left(bytes) =>
+              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
+              catch {
+                case NonFatal(e) =>
+                  M.raiseError[Either[MatcherError, OrderStatusResponse]](
+                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
+              }
+          }
+        }
+      }
+
+      override def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = {
+        val req = sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+          .response(asJson[OrderStatusResponse])
+          .tag("requestId", UUID.randomUUID())
+        repeatUntilResponse[OrderStatusResponse](httpBackend.send(req), 1.second)(_.code == StatusCodes.Ok)
       }
 
       override def transactionsByOrder(id: Order.Id): F[List[exchange.ExchangeTransaction]] = {
@@ -222,7 +274,7 @@ object DexApi {
                                 activeOnly: Option[Boolean] = None,
                                 timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] = {
         val req = sttp
-          .get(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}${activeOnly.fold("")(x => s"?activeOnly=$x}")}")
+          .get(appendActiveOnly(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}", activeOnly))
           .headers(timestampAndSignatureHeaders(owner, timestamp))
           .response(asJson[List[OrderBookHistoryItem]])
           .tag("requestId", UUID.randomUUID())
@@ -233,7 +285,7 @@ object DexApi {
       override def orderHistoryWithApiKey(owner: com.wavesplatform.account.Address,
                                           activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] = {
         val req = sttp
-          .get(uri"$apiUri/orders/${owner.stringRepr}${activeOnly.fold("")(x => s"?activeOnly=$x}")}")
+          .get(appendActiveOnly(uri"$apiUri/orders/${owner.stringRepr}", activeOnly))
           .headers(apiKeyHeaders)
           .response(asJson[List[OrderBookHistoryItem]])
           .tag("requestId", UUID.randomUUID())
@@ -246,13 +298,47 @@ object DexApi {
                                       activeOnly: Option[Boolean] = None,
                                       timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] = {
         val req = sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58
-            .encode(owner.publicKey)}${activeOnly.fold("")(x => s"?activeOnly=$x}")}")
+          .get(
+            appendActiveOnly(
+              uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58.encode(owner.publicKey)}",
+              activeOnly
+            ))
           .headers(timestampAndSignatureHeaders(owner, timestamp))
           .response(asJson[List[OrderBookHistoryItem]])
           .tag("requestId", UUID.randomUUID())
 
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap(parseResponse)
+      }
+
+      override def allOrderBooks: F[MarketDataInfo] = {
+        val req = sttp
+          .get(uri"$apiUri/orderbook")
+          .response(asJson[MarketDataInfo])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap(parseResponse)
+      }
+
+      override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]] = {
+        val req = sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+          .response(asJson[OrderBookResponse])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Right(Right(r)) => M.pure(Right(r))
+            case Right(Left(error)) =>
+              M.raiseError[Either[MatcherError, OrderBookResponse]](new RuntimeException(s"Can't parse the response: $error"))
+            case Left(bytes) =>
+              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
+              catch {
+                case NonFatal(e) =>
+                  M.raiseError[Either[MatcherError, OrderBookResponse]](
+                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
+              }
+          }
+        }
       }
 
       override def orderBook(assetPair: AssetPair): F[OrderBookResponse] = {
@@ -311,11 +397,11 @@ object DexApi {
         repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
 
-      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: MatcherStatusResponse => Boolean): F[Unit] =
+      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[Unit] =
         repeatUntil(orderStatus(assetPair, id), 1.second)(pred).map(_ => ())
 
       override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[Unit] =
-        waitForOrder(assetPair, id)(_.status == status.name) // TODO
+        waitForOrder(assetPair, id)(_.status == status)
 
       override def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[exchange.ExchangeTransaction]] =
         waitForTransactionsByOrder(id)(_.lengthCompare(atLeast) >= 0)
@@ -323,6 +409,9 @@ object DexApi {
       override def waitForTransactionsByOrder(id: Order.Id)(
           pred: List[exchange.ExchangeTransaction] => Boolean): F[List[exchange.ExchangeTransaction]] =
         repeatUntil[List[exchange.ExchangeTransaction]](transactionsByOrder(id), 1.second)(pred)
+
+      private def appendActiveOnly(uri: Uri, activeOnly: Option[Boolean]): Uri =
+        activeOnly.fold(uri)(x => uri.copy(queryFragments = List(QueryFragment.KeyValue("activeOnly", x.toString))))
 
       private def timestampAndSignatureHeaders(owner: KeyPair, timestamp: Long): Map[String, String] = Map(
         "Timestamp" -> timestamp.toString,

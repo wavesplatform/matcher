@@ -281,6 +281,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         new AddressDirectory(
           context.spendableBalanceChanged,
           settings,
+          orderDb,
           (address, startSchedules) =>
             Props(new AddressActor(
               address,

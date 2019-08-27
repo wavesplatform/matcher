@@ -4,7 +4,7 @@ import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.{LimitOrder, OrderHistoryStub}
@@ -85,6 +85,7 @@ class ReservedBalanceSpecification
       new AddressDirectory(
         ignoreSpendableBalanceChanged,
         matcherSettings,
+        EmptyOrderDB,
         (address, enableSchedules) =>
           Props(new AddressActor(
             address,

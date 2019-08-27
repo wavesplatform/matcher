@@ -28,10 +28,13 @@ package object it {
       }
   }
 
-  def orderGen(matcher: PublicKey, trader: KeyPair, assetPairs: Seq[AssetPair]): Gen[Order] =
+  def orderGen(matcher: PublicKey,
+               trader: KeyPair,
+               assetPairs: Seq[AssetPair],
+               types: Seq[OrderType] = Seq(OrderType.BUY, OrderType.SELL)): Gen[Order] =
     for {
       assetPair      <- Gen.oneOf(assetPairs)
-      tpe            <- Gen.oneOf(OrderType.BUY, OrderType.SELL)
+      tpe            <- Gen.oneOf(types)
       amount         <- Gen.choose(10, 100)
       price          <- Gen.choose(10, 100)
       orderVersion   <- Gen.oneOf(1: Byte, 2: Byte)

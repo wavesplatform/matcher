@@ -10,7 +10,7 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.transaction.Asset
@@ -146,7 +146,7 @@ class AddressActor(
   private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
     val promisedResponse = Promise[Resp]
     eventCache += id -> promisedResponse
-    storeEvent(event).transformWith {
+    val withSave = storeEvent(event).transformWith {
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(storeError)
@@ -158,6 +158,8 @@ class AddressActor(
             promisedResponse.future
         }
     }
+
+    Future.firstCompletedOf(List(promisedResponse.future, withSave)) // Multiple cancel requests can be resolved by first
   }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
@@ -223,6 +225,9 @@ class AddressActor(
         release(id)
         handleOrderTerminated(lo, OrderStatus.finalStatus(lo, unmatchable))
       }
+
+    case OrderCancelFailed(id, reason) =>
+      pendingCancellation.remove(id).foreach(_.success(api.OrderCancelRejected(reason)))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {

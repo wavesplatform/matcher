@@ -4,16 +4,12 @@ import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderV1}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class CancelOrderTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    wavesNode1Api.waitReady
-    dex1Api.waitReady
-    val assets = List(IssueUsdTx, IssueBtcTx)
-    assets.map(wavesNode1Api.broadcast)
-    assets.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
+    issueAssets(IssueUsdTx, IssueBtcTx)
   }
 
   "Order can be canceled" - {
@@ -26,7 +22,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
-        case o if o.id == order.idStr() => o.status shouldEqual OrderStatus.Cancelled.name // TODO
+        case o if o.id == order.idStr() => o.status shouldEqual OrderStatus.Cancelled
       }
     }
 
@@ -38,8 +34,8 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.cancelWithApiKey(order.id())
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-      dex1Api.orderHistory(bob).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled.name
-      dex1Api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled.name
+      dex1Api.orderHistory(bob).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled
+      dex1Api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled
 
       val orderBook = dex1Api.orderBook(wavesUsdPair)
       orderBook.bids shouldBe empty
@@ -88,11 +84,6 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def mkBobOrder: Order =
-    OrderV1.sell(bob, matcher, wavesUsdPair, 100.waves, 800, System.currentTimeMillis(), System.currentTimeMillis() + 600000, matcherFee)
-
-  private def mkBobOrders(assetPair: AssetPair): List[Order] =
-    (1 to 5).map { i =>
-      OrderV1.sell(bob, matcher, assetPair, 100.waves + i, 400, System.currentTimeMillis(), System.currentTimeMillis() + 600000, matcherFee)
-    }.toList
+  private def mkBobOrder                        = prepareOrder(bob, matcher, wavesUsdPair, OrderType.SELL, 100.waves, 800)
+  private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => prepareOrder(bob, matcher, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
 }

@@ -4,8 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.WavesSettings
 
-object ItDockerClient {}
-
 abstract class DockerContainer {
   def id: String
   def number: Int

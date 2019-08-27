@@ -8,17 +8,24 @@ import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.{DexApi, LoggingSttpBackend, NodeApi}
+import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
+import com.wavesplatform.it.sync.matcherFee
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.util.Try
 
-abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with ScorexLogging {
+abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build()))
@@ -33,6 +40,8 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
     dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve())
   }
+
+  // TODO move to container
   protected def wavesNode1Api: NodeApi[cats.Id] = {
     def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
@@ -62,11 +71,13 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   }
 
   protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())
+  protected def allApis: List[HasWaitReady[cats.Id]] = List(wavesNode1Api, dex1Api)
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Doing beforeAll")
     super.beforeAll()
     allContainers.foreach(dockerClient().start)
+    allApis.foreach(_.waitReady)
   }
 
   override protected def afterAll(): Unit = {
@@ -91,4 +102,55 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     }
   }
 
+}
+
+trait TestUtils {
+  this: NewMatcherSuiteBase =>
+
+  protected def issueAssets(txs: IssueTransaction*): Unit = {
+    txs.map(wavesNode1Api.broadcast)
+    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
+  }
+
+  /**
+    * @param marcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
+    */
+  protected def prepareOrder(owner: KeyPair,
+                             matcher: PublicKey,
+                             pair: AssetPair,
+                             orderType: OrderType,
+                             amount: Long,
+                             price: Long,
+                             matcherFee: Long = matcherFee,
+                             marcherFeeAssetId: Asset = Waves,
+                             timestamp: Long = System.currentTimeMillis(),
+                             timeToLive: Duration = 30.days - 1.seconds,
+                             version: Byte = 1): Order =
+    if (marcherFeeAssetId == Waves)
+      Order(
+        sender = owner,
+        matcher = matcher,
+        pair = pair,
+        orderType = orderType,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = timestamp + timeToLive.toMillis,
+        matcherFee = matcherFee,
+        version = version,
+      )
+    else
+      Order(
+        sender = owner,
+        matcher = matcher,
+        pair = pair,
+        orderType = orderType,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = timestamp + timeToLive.toMillis,
+        matcherFee = matcherFee,
+        version = version,
+        matcherFeeAssetId = marcherFeeAssetId
+      )
 }

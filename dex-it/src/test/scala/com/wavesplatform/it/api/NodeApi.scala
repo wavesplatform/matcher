@@ -10,7 +10,9 @@ import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction
+import com.wavesplatform.{account, transaction}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -21,18 +23,14 @@ object ConnectedPeersResponse {
   implicit val format: Format[ConnectedPeersResponse] = Json.format[ConnectedPeersResponse]
 }
 
-case class PeerInfo(address: String,
-                    declaredAddress: String,
-                    peerName: String,
-                    peerNonce: Long,
-                    applicationName: String,
-                    applicationVersion: String)
+case class PeerInfo(address: String, declaredAddress: String, peerName: String, peerNonce: Long, applicationName: String, applicationVersion: String)
 object PeerInfo {
   implicit val format: Format[PeerInfo] = Json.format[PeerInfo]
 }
 
-trait NodeApi[F[_]] {
-  def waitReady: F[Unit]
+trait NodeApi[F[_]] extends HasWaitReady[F] {
+  def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]
+
   def connect(toNode: InetSocketAddress): F[Unit]
   def connected: F[ConnectedPeersResponse]
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
@@ -52,15 +50,17 @@ object NodeApi {
     new NodeApi[F] {
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
 
-      override def waitReady: F[Unit] = {
-        val req = sttp.get(uri"$apiUri/blocks/height").mapResponse(_ => ())
-
-        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
-          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
-          case NonFatal(e)        => M.raiseError(e)
-        }
-
-        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
+      override def balance(address: account.Address, asset: Asset): F[Long] = {
+        val req = sttp.get(uri"$apiUri/assets/balance/$address/${AssetPair.assetIdStr(asset)}").response(asJson[AssetBalance])
+        repeatUntilAttempts(httpBackend.send(req), 1.second, 10)(resp => resp.code == StatusCodes.Ok)
+          .flatMap { resp =>
+            resp.rawErrorBody match {
+              case Left(_)            => M.raiseError[AssetBalance](new RuntimeException(s"The server returned an error: ${resp.code}"))
+              case Right(Left(error)) => M.raiseError[AssetBalance](new RuntimeException(s"Can't parse the response: $error"))
+              case Right(Right(r))    => M.pure(r)
+            }
+          }
+          .map(_.balance)
       }
 
       override def connect(toNode: InetSocketAddress): F[Unit] = {
@@ -126,6 +126,17 @@ object NodeApi {
             case Right(Right(r))    => M.pure(r.height)
           }
         }
+      }
+
+      override def waitReady: F[Unit] = {
+        val req = sttp.get(uri"$apiUri/blocks/height").mapResponse(_ => ())
+
+        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
+          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
+          case NonFatal(e)        => M.raiseError(e)
+        }
+
+        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
 
       def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] = {

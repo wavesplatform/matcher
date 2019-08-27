@@ -1,70 +1,64 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi.{sync => _, _}
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.SyncHttpApi.{sync => _}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
-import scala.concurrent.duration._
 import scala.util.Random
 
-class DisableProducerTestSuite extends MatcherSuiteBase {
-  private def matcherConfig = ConfigFactory.parseString(s"""waves.dex.events-queue {
+class DisableProducerTestSuite extends NewMatcherSuiteBase {
+  private def disabledProducerConfig = ConfigFactory.parseString(s"""waves.dex.events-queue {
        |  local.enable-storing  = no
        |  kafka.producer.enable = no
        |}""".stripMargin)
 
-  override protected def nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
-  private def orderVersion                        = (Random.nextInt(2) + 1).toByte
+  override protected def dex1Config: Config = disabledProducerConfig.withFallback(super.dex1Config)
 
-  "check no events are written to queue" - {
-    // Alice issues new asset
-    val aliceAsset = node.signedBroadcast(IssueEthTx.json()).id
-    node.waitForTransaction(aliceAsset)
-    node.waitForHeight(node.height + 1)
+  private def orderVersion = (Random.nextInt(2) + 1).toByte
 
-    val aliceWavesPair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
-    // check assets's balances
-    node.assertAssetBalance(alice.address, aliceAsset, IssueEthTx.quantity)
-    node.assertAssetBalance(matcher.address, aliceAsset, 0)
+  private val aliceAsset     = IssuedAsset(EthId)
+  private val aliceWavesPair = ethWavesPair
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    issueAssets(IssueEthTx)
+  }
+
+  "Check no commands are written to queue" - {
+    "check assets's balances" in {
+      wavesNode1Api.balance(alice, aliceAsset) shouldBe IssueEthTx.quantity
+      wavesNode1Api.balance(matcher, aliceAsset) shouldBe 0L
+    }
 
     "place an order and wait some time" in {
-      // Alice places sell order
-      val order1 =
-        node.prepareOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 20.days)
+      def test(order: Order): Unit = {
+        val orderPlace = dex1Api.tryPlace(order)
+        orderPlace shouldBe 'left
+        orderPlace.left.get.error shouldBe 528 // FeatureDisabled
+      }
 
-      node
-        .expectIncorrectOrderPlacement(
-          order1,
-          expectedStatusCode = 501,
-          expectedStatus = "NotImplemented",
-          expectedMessage = Some("This feature is disabled, contact with the administrator")
-        )
-
-      // Alice places buy order
-      val order2 =
-        node.prepareOrder(alice, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 21.days)
-
-      node
-        .expectIncorrectOrderPlacement(
-          order2,
-          expectedStatusCode = 501,
-          expectedStatus = "NotImplemented",
-          expectedMessage = Some("This feature is disabled, contact with the administrator")
-        )
+      List(
+        prepareOrder(alice, matcher, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = orderVersion),
+        prepareOrder(alice, matcher, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee, version = orderVersion)
+      ).foreach(test)
 
       Thread.sleep(5000)
-      node.getCurrentOffset should be(-1)
-      node.getLastOffset should be(-1)
 
-      docker.killAndStartContainer(dockerNodes().head)
+      dex1Api.currentOffset should be(-1)
+      dex1Api.lastOffset should be(-1)
+    }
 
-      node.getCurrentOffset should be(-1)
-      node.getLastOffset should be(-1)
+    "Commands aren't written to queue after restart" in {
+      dockerClient().stop(dex1Container())
+      dockerClient().start(dex1Container())
+      dex1Api.waitReady
+
+      dex1Api.currentOffset should be(-1)
+      dex1Api.lastOffset should be(-1)
     }
   }
 }

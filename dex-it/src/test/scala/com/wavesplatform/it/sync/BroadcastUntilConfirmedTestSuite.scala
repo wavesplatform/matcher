@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.{NodeApi, OrderStatus}
+import com.wavesplatform.it.api.{HasWaitReady, NodeApi, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
@@ -44,6 +44,7 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   // Must start before DEX, otherwise DEX will fail to start.
   // DEX needs to know activated features to know which order versions should be enabled.
   override protected def allContainers: List[DockerContainer] = wavesNode2Container() :: super.allContainers
+  override protected def allApis: List[HasWaitReady[Id]] = wavesNode2Api :: super.allApis
 
   private val pair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
   private val now  = System.currentTimeMillis()
@@ -71,10 +72,6 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   )
 
   "BroadcastUntilConfirmed" in {
-    markup("Issue an asset")
-    wavesNode1Api.broadcast(IssueEthTx)
-    wavesNode2Api.waitForTransaction(IssueEthTx.id())
-
     markup("Disconnect a miner node from the network")
     dockerClient().disconnectFromNetwork(wavesNode1Container())
 
@@ -95,10 +92,8 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    wavesNode1Api.waitReady
-    wavesNode2Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
-    dex1Api.waitReady
+    issueAssets(IssueEthTx)
   }
 }

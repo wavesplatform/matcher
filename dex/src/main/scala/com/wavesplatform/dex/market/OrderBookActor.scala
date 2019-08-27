@@ -13,7 +13,7 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, RawMatchingRule}
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
@@ -28,11 +28,11 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
-                     updateMatchingRules: RawMatchingRules => Unit,
-                     normalize: RawMatchingRules => MatchingRules,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var matchingRules: NonEmptyList[RawMatchingRules])
+                     var matchingRules: NonEmptyList[RawMatchingRule],
+                     actualizeCurrentMatchingRules: RawMatchingRule => Unit,
+                     normalizeMatchingRule: RawMatchingRule => MatchingRule)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -47,11 +47,15 @@ class OrderBookActor(owner: ActorRef,
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
-  private var actualRules: MatchingRules = normalize(matchingRules.head)
-  private def update(updated: NonEmptyList[RawMatchingRules]): Unit = if (matchingRules.head != updated.head) {
-    matchingRules = updated
-    updateMatchingRules(matchingRules.head)
-    actualRules = normalize(matchingRules.head)
+  private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
+
+  private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
+    val actualRules = RawMatchingRule.skipOutdated(offset, matchingRules)
+    if (matchingRules.head != actualRules.head) {
+      matchingRules = actualRules
+      actualizeCurrentMatchingRules(matchingRules.head)
+      actualRule = normalizeMatchingRule(matchingRules.head)
+    }
   }
 
   override def receive: Receive = recovering
@@ -68,9 +72,7 @@ class OrderBookActor(owner: ActorRef,
         case Some(x) => s"Recovery completed at $x: $orderBook"
       })
 
-      lastProcessedOffset.foreach { x =>
-        update(RawMatchingRules.skipOutdated(x, matchingRules))
-      }
+      lastProcessedOffset foreach actualizeRules
 
       updateMarketStatus(MarketStatus(orderBook))
       updateSnapshot(orderBook.aggregatedSnapshot)
@@ -85,7 +87,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def working: Receive = {
     case request: QueueEventWithMeta =>
-      update(RawMatchingRules.skipOutdated(request.offset, matchingRules))
+      actualizeRules(request.offset)
       lastProcessedOffset match {
         case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
         case _ =>
@@ -156,7 +158,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRules.normalizedTickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRule.normalizedTickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -183,18 +185,19 @@ class OrderBookActor(owner: ActorRef,
 }
 
 object OrderBookActor {
+
   def props(parent: ActorRef,
             addressActor: ActorRef,
             snapshotStore: ActorRef,
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
-            updateMatchingRules: RawMatchingRules => Unit,
-            normalize: RawMatchingRules => MatchingRules,
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            matchingRules: NonEmptyList[RawMatchingRules]): Props =
+            matchingRules: NonEmptyList[RawMatchingRule],
+            actualizeCurrentMatchingRules: RawMatchingRule => Unit,
+            normalizeMatchingRule: RawMatchingRule => MatchingRule): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -203,12 +206,13 @@ object OrderBookActor {
         assetPair,
         updateSnapshot,
         updateMarketStatus,
-        updateMatchingRules,
-        normalize,
         createTransaction,
         time,
-        matchingRules
-      ))
+        matchingRules,
+        actualizeCurrentMatchingRules,
+        normalizeMatchingRule,
+      )
+    )
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

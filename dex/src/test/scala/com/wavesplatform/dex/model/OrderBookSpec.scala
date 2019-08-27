@@ -7,7 +7,7 @@ import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
-import com.wavesplatform.dex.settings.MatchingRules
+import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -151,8 +151,8 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         val ob = OrderBook.empty
 
         val sellOrder = sell(pair, 54521418493L, 44389)
-        ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
-        ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
 
         ob.getAsks.size shouldBe 1
 
@@ -166,7 +166,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
       val sellOrder = sell(pair, 54521418493L, 44389)
       ob.add(sellOrder, ntpNow, toNormalized(100L))
-      ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
+      ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
 
       ob.getAsks.size shouldBe 2
 

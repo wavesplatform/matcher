@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.dex.model.OrderBook.LastTrade
-import com.wavesplatform.dex.settings.MatchingRules
+import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.lang.utils.Serialize.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import play.api.libs.functional.syntax._
@@ -51,7 +51,7 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRules.Default.normalizedTickSize): Seq[Event] = {
+  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.normalizedTickSize): Seq[Event] = {
     val (events, lt) = o.orderType match {
       case OrderType.BUY  => doMatch(ts, canMatchBuy, LimitOrder(o), Seq.empty, bids, asks, lastTrade, normalizedTickSize)
       case OrderType.SELL => doMatch(ts, canMatchSell, LimitOrder(o), Seq.empty, asks, bids, lastTrade, normalizedTickSize)

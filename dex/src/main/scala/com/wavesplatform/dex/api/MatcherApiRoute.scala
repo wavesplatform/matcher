@@ -48,7 +48,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
-                           tickSize: AssetPair => Double,
+                           getActualTickSize: AssetPair => Double,
                            orderValidator: Order => Either[MatcherError, Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
@@ -280,9 +280,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def orderBookInfoJson(pair: AssetPair): JsObject =
     Json.obj(
-      "restrictions" -> matcherSettings.orderRestrictions.getOrElse(pair, OrderRestrictionsSettings.Default).getJson.value,
+      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.getJson.value },
       "matchingRules" -> Json.obj(
-        "tickSize" -> formatValue(tickSize(pair))
+        "tickSize" -> formatValue { getActualTickSize(pair) }
       )
     )
 
@@ -318,24 +318,28 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/orderbook")
   @ApiOperation(value = "Get the open trading markets", notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
   def orderbooks: Route = (path("orderbook") & pathEndOrSingleSlash & get) {
-    complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
-      StatusCodes.OK -> Json.obj(
-        "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-        "markets" -> JsArray(markets.map { m =>
-          Json
-            .obj(
-              "amountAsset"     -> m.pair.amountAssetStr,
-              "amountAssetName" -> m.amountAssetName,
-              "amountAssetInfo" -> m.amountAssetInfo,
-              "priceAsset"      -> m.pair.priceAssetStr,
-              "priceAssetName"  -> m.priceAssetName,
-              "priceAssetInfo"  -> m.priceAssetinfo,
-              "created"         -> m.created
-            )
-            .deepMerge(orderBookInfoJson(m.pair))
-        })
-      )
-    })
+    complete(
+      (matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
+        StatusCodes.OK -> Json.obj(
+          "matcherPublicKey" -> Base58.encode(matcherPublicKey),
+          "markets" -> JsArray(
+            markets.map { m =>
+              Json
+                .obj(
+                  "amountAsset"     -> m.pair.amountAssetStr,
+                  "amountAssetName" -> m.amountAssetName,
+                  "amountAssetInfo" -> m.amountAssetInfo,
+                  "priceAsset"      -> m.pair.priceAssetStr,
+                  "priceAssetName"  -> m.priceAssetName,
+                  "priceAssetInfo"  -> m.priceAssetinfo,
+                  "created"         -> m.created
+                )
+                .deepMerge { orderBookInfoJson(m.pair) }
+            }
+          )
+        )
+      }
+    )
   }
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =

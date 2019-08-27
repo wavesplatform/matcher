@@ -175,7 +175,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     val allowedKeysPrefixes = List(
       "waves-node-grpc",
       "blacklisted",
-      "allowed-asset-pairs",
+      "allowed",
       "white-list-only",
       "price-assets",
       "rest-order-limit",

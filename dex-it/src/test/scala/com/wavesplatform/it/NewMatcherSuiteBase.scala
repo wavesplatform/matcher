@@ -110,7 +110,7 @@ trait TestUtils {
   this: NewMatcherSuiteBase =>
 
   /**
-    * @param marcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
+    * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
   protected def prepareOrder(owner: KeyPair,
                              matcher: PublicKey,
@@ -119,11 +119,11 @@ trait TestUtils {
                              amount: Long,
                              price: Long,
                              matcherFee: Long = matcherFee,
-                             marcherFeeAssetId: Asset = Waves,
+                             matcherFeeAssetId: Asset = Waves,
                              timestamp: Long = System.currentTimeMillis(),
                              timeToLive: Duration = 30.days - 1.seconds,
                              version: Byte = 1): Order =
-    if (marcherFeeAssetId == Waves)
+    if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,
         matcher = matcher,
@@ -148,7 +148,7 @@ trait TestUtils {
         expiration = timestamp + timeToLive.toMillis,
         matcherFee = matcherFee,
         version = version,
-        matcherFeeAssetId = marcherFeeAssetId
+        matcherFeeAssetId = matcherFeeAssetId
       )
 
   protected def issueAssets(txs: IssueTransaction*): Unit = {

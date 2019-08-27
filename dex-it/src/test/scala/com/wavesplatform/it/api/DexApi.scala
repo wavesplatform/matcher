@@ -16,7 +16,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.it.api.dex.ThrowableMonadError
-import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json._
@@ -45,6 +45,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryPlace(order: Order): F[Either[MatcherError, Unit]]
 
   def place(order: Order): F[Unit]
+  def placeMarket(order: Order): F[Unit]
 
   def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
@@ -79,16 +80,18 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def orderBook(assetPair: AssetPair): F[OrderBookResponse]
 
+  def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)]
+
   def currentOffset: F[Long]
   def lastOffset: F[Long]
 
   // TODO move
 
-  def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[Unit] = waitForOrder(order.assetPair, order.id())(pred)
-  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[Unit]
+  def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
+  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse]
 
-  def waitForOrderStatus(order: Order, status: OrderStatus): F[Unit] = waitForOrderStatus(order.assetPair, order.id(), status)
-  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[Unit]
+  def waitForOrderStatus(order: Order, status: OrderStatus): F[OrderStatusResponse] = waitForOrderStatus(order.assetPair, order.id(), status)
+  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse]
 
   def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[exchange.ExchangeTransaction]]
   def waitForTransactionsByOrder(id: Order.Id)(pred: List[exchange.ExchangeTransaction] => Boolean): F[List[exchange.ExchangeTransaction]]
@@ -157,6 +160,14 @@ object DexApi {
       // replace with tryPlace
       override def place(order: Order): F[Unit] = {
         val req = sttp.post(uri"$apiUri/orderbook").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
+        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
+          if (resp.isSuccess) M.pure(())
+          else M.raiseError[Unit](new RuntimeException(s"The server returned an error: ${resp.code}"))
+        }
+      }
+
+      override def placeMarket(order: Order): F[Unit] = {
+        val req = sttp.post(uri"$apiUri/orderbook/market").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
           if (resp.isSuccess) M.pure(())
           else M.raiseError[Unit](new RuntimeException(s"The server returned an error: ${resp.code}"))
@@ -350,6 +361,22 @@ object DexApi {
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap(parseResponse)
       }
 
+      override def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = {
+        val req =
+          sttp
+            .put(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+            .body(Json.stringify(Json.toJson(rate)))
+            .contentType("application/json", "UTF-8")
+            .headers(apiKeyHeaders)
+            .response(asJson[RatesResponse])
+            .tag("requestId", UUID.randomUUID())
+
+        for {
+          rawResp <- httpBackend.send(req)
+          resp    <- parseResponse[RatesResponse](rawResp)
+        } yield (rawResp.code, resp)
+      }
+
       override def currentOffset: F[Long] = {
         val req = sttp
           .get(uri"$apiUri/debug/currentOffset")
@@ -397,10 +424,10 @@ object DexApi {
         repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
 
-      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[Unit] =
-        repeatUntil(orderStatus(assetPair, id), 1.second)(pred).map(_ => ())
+      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
+        repeatUntil(orderStatus(assetPair, id), 1.second)(pred)
 
-      override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[Unit] =
+      override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse] =
         waitForOrder(assetPair, id)(_.status == status)
 
       override def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[exchange.ExchangeTransaction]] =

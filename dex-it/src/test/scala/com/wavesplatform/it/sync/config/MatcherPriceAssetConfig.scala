@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
@@ -119,10 +120,10 @@ object MatcherPriceAssetConfig {
     .right
     .get
 
-  val BtcId = IssueBtcTx.id()
-  val EthId = IssueEthTx.id()
-  val UsdId = IssueUsdTx.id()
-  val WctId = IssueWctTx.id()
+  val BtcId: ByteStr = IssueBtcTx.id()
+  val EthId: ByteStr = IssueEthTx.id()
+  val UsdId: ByteStr = IssueUsdTx.id()
+  val WctId: ByteStr = IssueWctTx.id()
 
   val wctUsdPair = AssetPair(
     amountAsset = IssuedAsset(WctId),
@@ -162,7 +163,7 @@ object MatcherPriceAssetConfig {
   val orderLimit = 10
 
   val ForbiddenAssetId     = "FdbnAsset"
-  val updatedMatcherConfig = parseString(s"""waves.dex {
+  val updatedMatcherConfig: Config = parseString(s"""waves.dex {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit

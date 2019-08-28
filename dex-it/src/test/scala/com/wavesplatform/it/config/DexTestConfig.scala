@@ -139,6 +139,11 @@ object DexTestConfig {
   val UsdId = IssueUsdTx.id()
   val WctId = IssueWctTx.id()
 
+  val BtcAsset = IssuedAsset(BtcId)
+  val EthAsset = IssuedAsset(EthId)
+  val UsdAsset = IssuedAsset(UsdId)
+  val WctAsset = IssuedAsset(WctId)
+
   val wctUsdPair = AssetPair(
     amountAsset = IssuedAsset(WctId),
     priceAsset = IssuedAsset(UsdId)

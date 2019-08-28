@@ -2,29 +2,33 @@ package com.wavesplatform.it
 
 import java.net.InetSocketAddress
 import java.nio.file.Paths
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, ThreadLocalRandom}
 
 import cats.Id
 import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.matcherFee
+import com.wavesplatform.it.sync.{leasingFee, matcherFee, minFee}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.util.Try
+import scala.util.{Random, Try}
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
 
@@ -109,6 +113,8 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 trait TestUtils {
   this: NewMatcherSuiteBase =>
 
+  protected def orderVersion = (ThreadLocalRandom.current().nextInt(3) + 1).toByte
+
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
@@ -122,7 +128,7 @@ trait TestUtils {
                              matcherFeeAssetId: Asset = Waves,
                              timestamp: Long = System.currentTimeMillis(),
                              timeToLive: Duration = 30.days - 1.seconds,
-                             version: Byte = 1): Order =
+                             version: Byte = orderVersion): Order =
     if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,
@@ -150,6 +156,54 @@ trait TestUtils {
         version = version,
         matcherFeeAssetId = matcherFeeAssetId
       )
+
+  protected def prepareTransfer(sender: KeyPair,
+                                recipient: Address,
+                                amount: Long,
+                                asset: Asset,
+                                feeAmount: Long = minFee,
+                                feeAsset: Asset = Waves,
+                                timestamp: Long = System.currentTimeMillis()): TransferTransaction =
+    TransferTransactionV1
+      .selfSigned(
+        assetId = asset,
+        sender = sender,
+        recipient = recipient,
+        amount = amount,
+        timestamp = timestamp,
+        feeAssetId = feeAsset,
+        feeAmount = feeAmount,
+        attachment = Array.emptyByteArray
+      )
+      .explicitGet()
+
+  protected def prepareLease(sender: KeyPair,
+                             recipient: Address,
+                             amount: Long,
+                             fee: Long = leasingFee,
+                             timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
+    LeaseTransactionV1
+      .selfSigned(
+        sender = sender,
+        amount = amount,
+        fee = fee,
+        timestamp = timestamp,
+        recipient = recipient
+      )
+      .explicitGet()
+
+  protected def prepareLeaseCancel(sender: KeyPair,
+                                   leaseId: ByteStr,
+                                   fee: Long = leasingFee,
+                                   timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
+    LeaseCancelTransactionV1
+      .selfSigned(
+        sender = sender,
+        leaseId = leaseId,
+        fee = fee,
+        timestamp = timestamp
+      )
+      .explicitGet()
 
   protected def issueAssets(txs: IssueTransaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)

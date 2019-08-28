@@ -8,8 +8,6 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
-import scala.util.Random
-
 class DisableProducerTestSuite extends NewMatcherSuiteBase {
   private def disabledProducerConfig = ConfigFactory.parseString(s"""waves.dex.events-queue {
        |  local.enable-storing  = no
@@ -17,8 +15,6 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
        |}""".stripMargin)
 
   override protected def dex1Config: Config = disabledProducerConfig.withFallback(super.dex1Config)
-
-  private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   private val aliceAsset     = IssuedAsset(EthId)
   private val aliceWavesPair = ethWavesPair
@@ -42,8 +38,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
       }
 
       List(
-        prepareOrder(alice, matcher, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = orderVersion),
-        prepareOrder(alice, matcher, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee, version = orderVersion)
+        prepareOrder(alice, matcher, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
+        prepareOrder(alice, matcher, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
       ).foreach(test)
 
       Thread.sleep(5000)

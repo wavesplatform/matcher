@@ -1,26 +1,29 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class TradingMarketsTestSuite extends MatcherSuiteBase {
+class TradingMarketsTestSuite extends NewMatcherSuiteBase {
   val (amount, price) = (1000L, 1000000000L)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    issueAssets(IssueWctTx)
+  }
 
   "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
-      val wctTxId = node.broadcastRequest(IssueWctTx.json()).id
-      node.waitForTransaction(wctTxId)
-      node.waitForHeight(node.height + 1)
+      val order = prepareOrder(alice, matcher, wctWavesPair, BUY, amount, price)
 
-      val order = node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee).message.id
-      node.waitOrderStatus(wctWavesPair, order, "Accepted")
+      // TODO utility method for combination
+      dex1Api.place(order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      docker.restartNode(node)
+      restartContainer(dex1Container(), dex1Api)
 
-      val markets = node.tradingMarkets().markets
+      val markets = dex1Api.allOrderBooks.markets
       markets.size shouldBe 1
       markets.head.amountAssetName shouldNot be("Unknown")
       markets.head.priceAssetName shouldNot be("Unknown")

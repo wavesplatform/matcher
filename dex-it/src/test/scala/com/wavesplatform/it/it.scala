@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.it.api.AsyncMatcherHttpApi._
 import com.wavesplatform.it.api.MatcherCommand
 import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -14,16 +13,32 @@ import scala.util.Random
 import scala.util.control.NonFatal
 
 package object it {
-  def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Unit =
-    Await.ready(Future.sequence(xs.map(executeCommand(_))), timeout)
 
-  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Unit] = x match {
-    case MatcherCommand.Place(node, order) => node.placeOrder(order).map(_ => ())
-    case MatcherCommand.Cancel(node, owner, order) =>
-      try node.cancelOrder(owner, order.assetPair, order.idStr()).map(_ => ())
+  /**
+    * @return The number of successful commands
+    */
+  def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int = {
+    // TODO DEX-390
+    // Await.result(Future.sequence(xs.map(executeCommand(_))), timeout).sum
+    def loop(rest: Seq[MatcherCommand], acc: Future[Int]): Future[Int] = rest match {
+      case Seq() => acc
+      case x +: xs =>
+        val newAcc = for {
+          r  <- acc
+          rx <- executeCommand(x)
+        } yield r + rx
+        loop(xs, newAcc)
+    }
+    Await.result(loop(xs, Future.successful(0)), timeout)
+  }
+
+  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Int] = x match {
+    case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
+    case MatcherCommand.Cancel(api, owner, order) =>
+      try api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
       catch {
         case NonFatal(e) =>
-          if (ignoreErrors) Future.successful(())
+          if (ignoreErrors) Future.successful(0)
           else Future.failed(e)
       }
   }

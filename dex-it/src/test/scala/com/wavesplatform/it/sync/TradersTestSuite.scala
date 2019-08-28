@@ -173,7 +173,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
           val leaseAmount = bobBalance - matcherFee - price / 2
           val lease       = prepareLease(bob, alice, leaseAmount, leasingFee)
-          val leaseId     = wavesNode1Api.broadcast(lease)
+          wavesNode1Api.broadcast(lease)
 
           withClue(s"The order '${order.idStr()}' was cancelled") {
             dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)

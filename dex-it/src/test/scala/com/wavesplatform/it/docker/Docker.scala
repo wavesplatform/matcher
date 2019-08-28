@@ -179,7 +179,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       "white-list-only",
       "price-assets",
       "rest-order-limit",
-      "events-queue"
+      "events-queue",
+      "snapshots-interval"
     )
     val props = renderProperties(asProperties(config.getConfig("waves.dex")).asScala.collect {
       case (key, v) if allowedKeysPrefixes.exists(key.startsWith) => s"waves.dex.$key" -> v

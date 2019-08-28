@@ -333,12 +333,7 @@ object AsyncMatcherHttpApi extends Assertions {
           }
 
         clean {
-          api.MatcherState(offset,
-                           TreeMap(snapshots.toSeq: _*),
-                           TreeMap(orderBooks: _*),
-                           TreeMap(orderStatuses: _*),
-                           TreeMap(reservedBalances: _*),
-                           TreeMap(orderHistoryMap.toSeq: _*))
+          api.MatcherState(offset, TreeMap(snapshots.toSeq: _*), TreeMap(orderBooks: _*), ???, TreeMap(reservedBalances: _*), ???)
         }
       }
 

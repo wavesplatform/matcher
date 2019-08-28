@@ -5,7 +5,6 @@ import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi.{sync => _}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class DisableProducerTestSuite extends NewMatcherSuiteBase {
@@ -16,9 +15,6 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
   override protected def dex1Config: Config = disabledProducerConfig.withFallback(super.dex1Config)
 
-  private val aliceAsset     = IssuedAsset(EthId)
-  private val aliceWavesPair = ethWavesPair
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     issueAssets(IssueEthTx)
@@ -26,8 +22,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
   "Check no commands are written to queue" - {
     "check assets's balances" in {
-      wavesNode1Api.balance(alice, aliceAsset) shouldBe IssueEthTx.quantity
-      wavesNode1Api.balance(matcher, aliceAsset) shouldBe 0L
+      wavesNode1Api.balance(alice, EthAsset) shouldBe IssueEthTx.quantity
+      wavesNode1Api.balance(matcher, EthAsset) shouldBe 0L
     }
 
     "place an order and wait some time" in {
@@ -38,8 +34,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
       }
 
       List(
-        prepareOrder(alice, matcher, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
-        prepareOrder(alice, matcher, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
+        prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
+        prepareOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
       ).foreach(test)
 
       Thread.sleep(5000)

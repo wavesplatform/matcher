@@ -5,14 +5,16 @@ import java.nio.file.Paths
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
 import cats.Id
+import cats.instances.future._
 import cats.instances.try_._
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
+import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, NodeApi}
+import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
 import com.wavesplatform.it.sync.{leasingFee, matcherFee, minFee}
@@ -26,16 +28,18 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
 
-import scala.concurrent.ExecutionContext
+import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.util.{Random, Try}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build()))
 
-  protected implicit val tryHttpBackend = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](AsyncHttpClientFutureBackend())
+  protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce(docker.Docker(getClass))
 
@@ -71,6 +75,12 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     dockerClient().createDex("dex-1", config)
   }
 
+  // TODO val
+  protected def dex1AsyncApi: DexApi[Future] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
+    DexApi[Future]("integration-test-rest-api", apiAddress)
+  }
+
   protected def dex1Api: DexApi[Id] = {
     def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
     fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
@@ -89,6 +99,8 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def afterAll(): Unit = {
     log.debug(s"Doing afterAll")
     dockerClient().close()
+    futureHttpBackend.close()
+    tryHttpBackend.close()
     super.afterAll()
   }
 
@@ -140,7 +152,7 @@ trait TestUtils {
         timestamp = timestamp,
         expiration = timestamp + timeToLive.toMillis,
         matcherFee = matcherFee,
-        version = version,
+        version = math.min(version, 2).toByte,
       )
     else
       Order(
@@ -237,4 +249,43 @@ trait TestUtils {
     log.trace(s"Replacing '$path' of $container by:\n$content")
     dockerClient().writeFile(container, path, content)
   }
+
+  protected def matcherState(dexApi: DexApi[Id], assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[KeyPair]): Id[MatcherState] = {
+    val offset               = dexApi.currentOffset
+    val snapshots            = dexApi.allSnapshotOffsets
+    val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
+    val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
+    val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
+    val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
+    val orderHistory = accountsOrderHistory.map {
+      case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
+    }
+
+    val orderHistoryMap = orderHistory
+      .groupBy(_._1) // group by accounts
+      .map {
+        case (account, xs) =>
+          val assetPairHistory = xs.groupBy(_._2).map { // group by asset pair
+            case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
+          }
+
+          account -> (TreeMap.empty[AssetPair, Seq[OrderBookHistoryItem]] ++ assetPairHistory)
+      }
+
+    clean {
+      api.MatcherState(offset,
+                       TreeMap(snapshots.toSeq: _*),
+                       TreeMap(orderBooks: _*),
+                       TreeMap(orderStatuses: _*),
+                       TreeMap(reservedBalances: _*),
+                       TreeMap(orderHistoryMap.toSeq: _*))
+    }
+  }
+
+  private def clean(x: MatcherState): MatcherState = x.copy(
+    orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
+  )
+
+  private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
+  private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 }

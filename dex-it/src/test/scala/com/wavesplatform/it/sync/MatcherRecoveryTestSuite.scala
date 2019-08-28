@@ -2,40 +2,34 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
-import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class MatcherRecoveryTestSuite extends MatcherSuiteBase {
-  protected def configOverrides: Config = ConfigFactory.parseString("""waves.dex {
-      |  snapshots-interval = 51
-      |}""".stripMargin)
-
-  override protected def nodeConfigs: Seq[Config] = Configs.map(configOverrides.withFallback)
+class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
+  override protected def dex1Config: Config = ConfigFactory.parseString("waves.dex.snapshots-interval = 51").withFallback(super.dex1Config)
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
 
-  private val assetPairs = Seq(ethUsdPair, wavesUsdPair, ethWavesPair)
+  private val assetPairs = List(ethUsdPair, wavesUsdPair, ethWavesPair)
   private val orders     = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
   private val lastOrder  = orderGen(matcher, alice, assetPairs).sample.get
 
+  private var successfulCommandsNumber = 0
+
   "Place, fill and cancel a lot of orders" in {
     val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
-    val commands = Random.shuffle(orders.map(MatcherCommand.Place(node, _))) ++ cancels.map(MatcherCommand.Cancel(node, alice, _))
-    executeCommands(commands)
-    executeCommands(List(MatcherCommand.Place(node, lastOrder)))
+    val commands = Random.shuffle(orders.map(MatcherCommand.Place(dex1AsyncApi, _))) ++ cancels.map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
+    successfulCommandsNumber += executeCommands(commands)
+    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1AsyncApi, lastOrder)))
   }
 
   "Wait until all requests are processed - 1" in {
-    node.waitForStableOffset(10, 100, 200.millis)
+    dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
   }
 
   private var stateBefore: MatcherState = _
@@ -51,31 +45,23 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
           snapshotOffset should be > 0L
         }
     }
-    node.waitForHeight(node.height + 1)
   }
 
-  "Restart the matcher" in docker.restartContainer(node)
+  "Restart the matcher" in restartContainer(dex1Container(), dex1Api)
 
-  "Wait until all requests are processed - 2" in {
-    node.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(_.getCurrentOffset, _ == stateBefore.offset, 300.millis)
-    withClue("Last command processed") {
-      node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-    }
-  }
+  "Wait until all requests are processed - 2" in dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1)
 
   "Verify the state" in {
     val stateAfter = state
     stateBefore shouldBe stateAfter
   }
 
-  private def state = cleanState(node.matcherState(assetPairs, orders, Seq(alice)))
+  private def state = cleanState(matcherState(dex1Api, assetPairs, orders, Seq(alice)))
 
   protected def cleanState(state: MatcherState): MatcherState = state
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-
-    val xs = Seq(IssueEthTx, IssueUsdTx).map(_.json()).map(node.broadcastRequest(_))
-    xs.foreach(x => node.waitForTransaction(x.id))
+    issueAssets(IssueEthTx, IssueUsdTx)
   }
 }

@@ -5,7 +5,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -18,15 +17,11 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
       .withFallback(super.dex1Config)
 
   val (amount, price) = (1000L, PriceConstant)
-  val ethAsset        = IssuedAsset(EthId)
-  val wctAsset        = IssuedAsset(WctId)
-  val usdAsset        = IssuedAsset(UsdId)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-
     issueAssets(IssueUsdTx, IssueWctTx, IssueEthTx)
-    List(usdAsset, wctAsset, ethAsset).foreach(asset => dex1Api.upsertRate(asset, 1.0)._1 shouldBe StatusCodes.Created)
+    List(UsdAsset, WctAsset, EthAsset).foreach(asset => dex1Api.upsertRate(asset, 1.0)._1 shouldBe StatusCodes.Created)
   }
 
   "Sunny day tests for market orders" in {
@@ -34,11 +29,11 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
     // Alice has WAVES, ETH, USD => Alice can buy WCT @ WAVES (fee in ETH) and sell ETH @ WAVES (fee in USD)
     // Bob has WAVES, WCT => Bob can sell WCT @ WAVES and buy ETH @ WAVES
 
-    def bigBuyOrder: Order   = prepareOrder(alice, matcher, wctUsdPair, BUY, 10 * amount, price, matcherFeeAssetId = ethAsset)
-    def smallBuyOrder: Order = prepareOrder(alice, matcher, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = ethAsset)
+    def bigBuyOrder: Order   = prepareOrder(alice, matcher, wctUsdPair, BUY, 10 * amount, price, matcherFeeAssetId = EthAsset)
+    def smallBuyOrder: Order = prepareOrder(alice, matcher, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = EthAsset)
 
-    def bigSellOrder: Order   = prepareOrder(alice, matcher, ethWavesPair, SELL, 10 * amount, price, matcherFeeAssetId = usdAsset)
-    def smallSellOrder: Order = prepareOrder(alice, matcher, ethWavesPair, SELL, 5 * amount, price, matcherFeeAssetId = usdAsset)
+    def bigSellOrder: Order   = prepareOrder(alice, matcher, ethWavesPair, SELL, 10 * amount, price, matcherFeeAssetId = UsdAsset)
+    def smallSellOrder: Order = prepareOrder(alice, matcher, ethWavesPair, SELL, 5 * amount, price, matcherFeeAssetId = UsdAsset)
 
     def bestPrice(counterOrderType: OrderType): Double = counterOrderType match { case SELL => price * 0.97; case _ => price * 1.03 }
     def goodPrice(counterOrderType: OrderType): Double = counterOrderType match { case SELL => price * 0.98; case _ => price * 1.02 }

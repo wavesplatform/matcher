@@ -1,9 +1,8 @@
 package com.wavesplatform.dex.grpc.integration
 
-import com.wavesplatform.dex.grpc.integration.clients.BalanceServiceClient
+import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient
 import io.grpc._
 import io.grpc.internal.DnsNameResolverProvider
-import io.grpc.util.RoundRobinLoadBalancerFactory
 
 class DEXClient(target: String) {
 
@@ -11,9 +10,9 @@ class DEXClient(target: String) {
     ManagedChannelBuilder
       .forTarget(target)
       .nameResolverFactory(new DnsNameResolverProvider)
-      .loadBalancerFactory(RoundRobinLoadBalancerFactory.getInstance)
+      .defaultLoadBalancingPolicy("round_robin")
       .usePlaintext()
       .build
 
-  lazy val balanceServiceClient = new BalanceServiceClient(channel)
+  lazy val balancesServiceClient = new BalancesServiceClient(channel)
 }

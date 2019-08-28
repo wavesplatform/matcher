@@ -2,13 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -16,7 +16,9 @@ import scala.util.Random
 
 class TradersTestSuite extends MatcherSuiteBase {
 
-  override protected def nodeConfigs: Seq[Config] = super.nodeConfigs.map(TradersTestSuite.matcherSettingsOrderV3Allowed.withFallback)
+  override protected def nodeConfigs: Seq[Config] = {
+    super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]").withFallback)
+  }
 
   private def orderVersion = (Random.nextInt(3) + 1).toByte
 
@@ -258,8 +260,4 @@ class TradersTestSuite extends MatcherSuiteBase {
     order.message.id
   }
 
-}
-
-object TradersTestSuite {
-  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.dex { allowed-order-versions = [1, 2, 3] }")
 }

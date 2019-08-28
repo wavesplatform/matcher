@@ -45,7 +45,6 @@ case class MatcherSettings(account: String,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
-                           balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: OrderFeeSettings,
@@ -57,7 +56,8 @@ case class MatcherSettings(account: String,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings])
+                           orderHistory: Option[OrderHistorySettings],
+                           wavesNodeExtensionAddress: String)
 
 object MatcherSettings {
 
@@ -94,8 +94,6 @@ object MatcherSettings {
     val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
 
-    val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
-
     val eventsQueue            = config.as[EventsQueueSettings]("events-queue")
     val processConsumedTimeout = config.as[FiniteDuration]("process-consumed-timeout")
     val recoverOrderHistory    = !new File(dataDirectory).exists()
@@ -113,8 +111,9 @@ object MatcherSettings {
     val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
-    val postgresConnection = config.as[PostgresConnection]("postgres")
-    val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
+    val postgresConnection        = config.as[PostgresConnection]("postgres")
+    val orderHistory              = config.as[Option[OrderHistorySettings]]("order-history")
+    val wavesNodeExtensionAddress = config.as[String]("waves-node-extension-address")
 
     MatcherSettings(
       account,
@@ -137,7 +136,6 @@ object MatcherSettings {
       maxOrdersPerRequest,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
-      balanceWatchingBufferInterval,
       eventsQueue,
       processConsumedTimeout,
       orderFee,
@@ -149,7 +147,8 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory
+      orderHistory,
+      wavesNodeExtensionAddress
     )
   }
 }

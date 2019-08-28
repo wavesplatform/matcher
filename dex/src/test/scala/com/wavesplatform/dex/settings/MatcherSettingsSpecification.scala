@@ -102,7 +102,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |      cache-timeout = 11m
       |      depth-ranges = [1, 5, 333]
       |    }
-      |    balance-watching-buffer-interval = 33s
       |    events-queue {
       |      type = "kafka"
       |
@@ -169,7 +168,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333)
     )
-    settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
       local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),

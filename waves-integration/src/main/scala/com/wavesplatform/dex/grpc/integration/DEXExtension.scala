@@ -20,10 +20,10 @@ import scala.concurrent.Future
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
   @volatile
-  var server: Server = _
+  private var server: Server = _
 
-  implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
-  implicit val chosenCase: NameMapper  = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
   private def startServer(settings: DEXExtensionSettings): Server = {
     new InetSocketAddress(settings.host, settings.port) |> { bindAddress =>

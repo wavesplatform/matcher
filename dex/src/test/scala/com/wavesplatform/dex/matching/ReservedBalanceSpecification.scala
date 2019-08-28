@@ -7,6 +7,8 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.PlaceMarketOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
+//import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._
@@ -17,6 +19,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, WithDB}
+import monix.reactive.subjects.Subject
 import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -78,6 +81,10 @@ class ReservedBalanceSpecification
 
   override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
 
+  import com.wavesplatform.utils.Implicits._
+
+  private val ignoreSpendableBalanceChanges = Subject.empty[SpendableBalanceChanges]
+
   private implicit val timeout: Timeout = 5.seconds
 
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
@@ -88,7 +95,7 @@ class ReservedBalanceSpecification
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectory(
-        ignoreSpendableBalanceChanged,
+        ignoreSpendableBalanceChanges,
         matcherSettings,
         (address, enableSchedules) =>
           Props(
@@ -457,7 +464,7 @@ class ReservedBalanceSpecification
     system.actorOf(
       Props(
         new AddressDirectory(
-          ignoreSpendableBalanceChanged,
+          ignoreSpendableBalanceChanges,
           matcherSettings,
           (address, enableSchedules) =>
             Props(

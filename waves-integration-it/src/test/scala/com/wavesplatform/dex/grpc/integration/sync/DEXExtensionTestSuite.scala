@@ -1,8 +1,10 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
 import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueFee, minFee, someAssetAmount}
@@ -22,20 +24,20 @@ import scala.concurrent.Future
 
 class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach with Eventually {
 
-  val balanceChanges           = scala.collection.mutable.Map.empty[Address, Seq[(Asset, Long)]]
+  override protected def nodeConfigs: Seq[Config] = {
+    super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0").withFallback)
+  }
+
+  var balanceChanges           = Map.empty[Address, Map[Asset, Long]]
   val (addressOne, addressTwo) = (getAddress(firstAddress), getAddress(secondAddress))
 
   val target    = s"localhost:${nodes.head.nodeExternalPort(6887)}"
   val dexClient = new DEXClient(target)
 
-  val eventsObserver: Observer[(Address, Asset, Long)] = new Observer[(Address, Asset, Long)] {
-    override def onError(ex: Throwable): Unit = Unit
-    override def onComplete(): Unit           = Unit
-    override def onNext(elem: (Address, Asset, Long)): Future[Ack] = elem |> {
-      case (address, asset, balance) =>
-        balanceChanges.update(address, balanceChanges.getOrElse(address, Seq.empty) :+ (asset -> balance))
-        Continue
-    }
+  val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
+    override def onError(ex: Throwable): Unit                       = Unit
+    override def onComplete(): Unit                                 = Unit
+    override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges = balanceChanges ++ elem; Continue }
   }
 
   protected override def createDocker: Docker = new Docker(
@@ -46,18 +48,18 @@ class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach
   def getAddress(addressStr: String): Address = Address.fromString { addressStr }.explicitGet()
   def getAsset(assetStr: String): Asset       = Asset.fromString { Some(assetStr) }
 
-  def assertBalanceChanges(address: Address)(expectedBalanceChanges: Set[(Asset, Long)]): Assertion = eventually {
-    balanceChanges.get(address).map(_.toSet) shouldBe Some(expectedBalanceChanges)
+  def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
+    balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet) shouldBe expectedBalanceChanges
   }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    dexClient.balanceServiceClient <| { _.requestBalanceChanges() } <| { _.spendableBalanceChanges.subscribe(eventsObserver) }
+    dexClient.balancesServiceClient <| { _.requestBalanceChanges() } <| { _.spendableBalanceChanges.subscribe(eventsObserver) }
   }
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    balanceChanges.clear()
+    balanceChanges = Map.empty[Address, Map[Asset, Long]]
   }
 
   test("DEX gRPC extension for the Waves node should send balance changes via gRPC") {
@@ -69,22 +71,24 @@ class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach
 
     val issuedAsset = getAsset(issuedAssetId)
 
-    sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
-
-    assertBalanceChanges(addressOne) {
-      Set(
-        Waves       -> 100.waves, // default balance
-        Waves       -> (100.waves - issueFee), // first address issued asset
-        Waves       -> (100.waves - issueFee - minFee), // first address sent asset to the second address
-        issuedAsset -> someAssetAmount, // initial asset amount
-        issuedAsset -> 0L // balance after transfer
+    assertBalanceChanges {
+      Map(
+        addressOne -> Map(
+          Waves       -> (100.waves - issueFee),
+          issuedAsset -> someAssetAmount
+        )
       )
     }
 
-    assertBalanceChanges(addressTwo) {
-      Set(
-        Waves       -> 100.waves, // default balance
-        issuedAsset -> someAssetAmount // balance after transfer
+    sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
+
+    assertBalanceChanges {
+      Map(
+        addressOne -> Map(
+          Waves       -> (100.waves - issueFee - minFee),
+          issuedAsset -> 0L
+        ),
+        addressTwo -> Map(issuedAsset -> someAssetAmount)
       )
     }
   }

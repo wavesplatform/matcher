@@ -21,6 +21,7 @@ import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookS
 import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -34,6 +35,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
+import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration._
@@ -276,11 +278,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     context.actorSystem.actorOf(HistoryRouter.props(context.blockchain, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
+  private lazy val gRPCExtensionClient = new DEXClient(settings.wavesNodeExtensionAddress)
+
   private lazy val addressActors =
     context.actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          context.spendableBalanceChanged,
+          gRPCExtensionClient.balancesServiceClient <| { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
           (address, startSchedules) =>
             Props(

@@ -16,5 +16,5 @@ message BalanceChangesResponse {
         waves.AssetId asset = 2;
         int64 balance = 3;
     }
-    repeated Record balanceChangesBatch = 1;
+    repeated Record batch = 1;
 }

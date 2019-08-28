@@ -16,7 +16,7 @@ lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
 
 lazy val `dex-it` = project
   .dependsOn(
-    dex,
+    dex       % "compile;test->test",
     `node-it` % "compile;test->test"
   )
 
@@ -91,7 +91,8 @@ inScope(Global)(
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
     buildNodeContainer := (`node-it` / Docker / docker).value
-  ))
+  )
+)
 
 // ThisBuild options
 git.useGitDescribe := true

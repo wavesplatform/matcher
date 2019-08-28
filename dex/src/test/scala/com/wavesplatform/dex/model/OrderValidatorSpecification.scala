@@ -280,7 +280,6 @@ class OrderValidatorSpecification
         val deviationSettings = DeviationsSettings(enabled = true, maxPriceProfit = 50, maxPriceLoss = 70, maxFeeDeviation = 50)
         val orderFeeSettings     = DynamicSettings(0.003.waves)
 
-
         val buyOrder  = createOrder(OrderType.BUY, amount = 250.waves, price = 0.00011081.btc)
         val sellOrder = createOrder(OrderType.SELL, amount = 250.waves, price = 0.00011081.btc)
 
@@ -352,7 +351,6 @@ class OrderValidatorSpecification
           (lowSellOrderPrices ++ midSellOrderPrices).foreach(price =>
             priceValidationWithUpperBound { sellOrder.updatePrice(price.btc) } shouldBe 'right
           )
-
         }
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
@@ -393,7 +391,6 @@ class OrderValidatorSpecification
           highSellOrderPrices.foreach(price =>
             priceValidation { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice")
           )
-
         }
       }
 
@@ -942,9 +939,5 @@ class OrderValidatorSpecification
       version = version,
       matcherFeeAssetId = matcherFeeAsset
     )
-  }
-
-  private implicit class OrderOps(order: Order) {
-    def isBuyOrder: Boolean = order.orderType match { case OrderType.BUY => true; case _ => false }
   }
 }

@@ -10,7 +10,6 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSe
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import future.com.wavesplatform.transaction.assets.exchange.Implicits._
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FlatSpec, Matchers}
 

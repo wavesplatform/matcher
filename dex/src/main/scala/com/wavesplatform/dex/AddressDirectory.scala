@@ -26,6 +26,7 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   private var startSchedules: Boolean = false
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
+  /** Sends balance changes to AddressActors */
   spendableBalanceChanges.foreach {
     _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.BalanceUpdated { assetBalances }) }
   } { Scheduler(context.dispatcher) }

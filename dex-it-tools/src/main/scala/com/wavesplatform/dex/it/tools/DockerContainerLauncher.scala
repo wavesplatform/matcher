@@ -1,11 +1,11 @@
-package com.wavesplatform.it
+package com.wavesplatform.dex.it.tools
 
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages.{ContainerConfig, EndpointConfig, HostConfig, PortBinding}
-import com.wavesplatform.it.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError, VolumePair}
+import com.wavesplatform.dex.it.tools.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError, VolumePair}
 import mouse.any._
 
 import scala.collection.JavaConverters._

@@ -21,7 +21,7 @@ object MatcherScriptRunner {
         case Right(ctx)  => EvaluatorV1.applyWithLogging(ctx, s.expr)
       }
 
-    case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf)), _) =>
+    case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
       MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
@@ -34,7 +34,7 @@ object MatcherScriptRunner {
           EvaluatorV1.evalWithLogging(ctx, evalContract)
       }
 
-    case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None), _) =>
+    case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
       (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](order) match {
         case Right(_) => Right(TRUE)
         case Left(_)  => Right(FALSE)

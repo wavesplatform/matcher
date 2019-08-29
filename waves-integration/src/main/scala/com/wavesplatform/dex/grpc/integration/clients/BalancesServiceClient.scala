@@ -25,7 +25,7 @@ class BalancesServiceClient(channel: Channel) extends ScorexLogging {
   private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges]
 
   private def toVanilla(record: BalanceChangesResponse.Record): (Address, Asset, Long) = {
-    (record.address.toVanillaAddress, record.getAsset.toVanillaAsset, record.balance)
+    (record.address.toVanillaAddress, record.asset.toVanillaAsset, record.balance)
   }
 
   /**

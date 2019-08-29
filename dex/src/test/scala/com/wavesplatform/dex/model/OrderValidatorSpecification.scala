@@ -401,22 +401,21 @@ class OrderValidatorSpecification
         } yield (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize)
 
         forAll(preconditions) {
-          case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepSize, tickSize) =>
-            def normalizeAmount(value: Double): Long =
-              Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
-            def normalizePrice(value: Double): Long = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
+          case (order, sender, orderFeeSettings, amountAssetDecimals, priceAssetDecimals, stepAmount, stepPrice) =>
+            def normalizeAmount(value: Double): Long = Normalization.normalizeAmountAndFee(value, amountAssetDecimals) // value * 10 ^ amountAssetDecimals
+            def normalizePrice(value: Double): Long  = Normalization.normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
             def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals)
             def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
 
-            val normalizedStepSize = normalizeAmount(stepSize).max(2) // if normalized size == 1 then all amounts/prices are multiple of size
-            val normalizedTickSize = normalizePrice(tickSize).max(2)
+            val normalizedStepAmount = normalizeAmount(stepAmount).max(2) // if normalized size == 1 then all amounts/prices are multiple of size
+            val normalizedStepPrice = normalizePrice(stepPrice).max(2)
 
             def getRestrictionsByOrder(order: Order, mergeSmallPrices: Boolean = false): OrderRestrictionsSettings = OrderRestrictionsSettings(
-              stepAmount = denormalizeAmount(normalizedStepSize),
+              stepAmount = denormalizeAmount(normalizedStepAmount),
               minAmount = denormalizeAmount(order.amount / 2),
               maxAmount = denormalizeAmount(order.amount * 2),
-              stepPrice = denormalizePrice(normalizedTickSize),
+              stepPrice = denormalizePrice(normalizedStepPrice),
               minPrice = denormalizePrice(order.price / 2),
               maxPrice = denormalizePrice(order.price * 2)
             )
@@ -424,8 +423,8 @@ class OrderValidatorSpecification
             def updateOrderAmount(ord: Order, amt: Long): Order = Order.sign(ord.updateAmount(amt), sender)
             def updateOrderPrice(ord: Order, prc: Long): Order  = Order.sign(ord.updatePrice(prc), sender)
 
-            val correctPrice  = (order.price / normalizedTickSize * normalizedTickSize).max(normalizedTickSize)                                     // price is a multiple of the tick size
-            val correctAmount = (Order.correctAmount(order.amount, correctPrice) / normalizedStepSize * normalizedStepSize).max(normalizedStepSize) // amount is a multiple of the step size
+            val correctPrice  = (order.price / normalizedStepPrice * normalizedStepPrice).max(normalizedStepPrice)                                     // price is a multiple of the tick size
+            val correctAmount = (Order.correctAmount(order.amount, correctPrice) / normalizedStepAmount * normalizedStepAmount).max(normalizedStepAmount) // amount is a multiple of the step size
 
             val defaultOrder        = Order.sign(order.updatePrice(correctPrice).updateAmount(correctAmount), sender)
             val defaultRestrictions = getRestrictionsByOrder(defaultOrder)

@@ -21,6 +21,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
@@ -53,9 +54,9 @@ class OrderValidatorSpecification
   private val defaultPortfolio     = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
   private val defaultAssetDecimals = 8
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = 8
-  }
+  private val estimator = ScriptEstimatorV2
+
+  implicit val errorContext: ErrorFormatterContext = _ => 8
 
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in asa() { v =>
@@ -523,7 +524,7 @@ class OrderValidatorSpecification
           def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[Script]): Result[Order] =
             setScriptsAndValidate(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order)
 
-          val (invalidScript, _) = ScriptCompiler.compile("(5 / 0) == 2").explicitGet()
+          val (invalidScript, _) = ScriptCompiler.compile("(5 / 0) == 2", estimator).explicitGet()
           val falseScript        = ExprScript(Terms.FALSE).explicitGet()
 
           orderFeeSettings match {
@@ -552,7 +553,7 @@ class OrderValidatorSpecification
 
       val pk     = KeyPair(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
-      val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
+      val script = ScriptCompiler("true && (height > 0)", isAssetScript = false, estimator).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
       ov(o).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
     }
@@ -638,7 +639,7 @@ class OrderValidatorSpecification
             |  case o: Order => height >= 0
             |  case _ => true
             |}""".stripMargin
-        val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+        val script = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()._1
         (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
         ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")

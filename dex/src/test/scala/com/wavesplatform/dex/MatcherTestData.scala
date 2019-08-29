@@ -78,7 +78,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val config = loadConfig(ConfigFactory.parseString("""waves {
       |  directory: "/tmp/waves-test"
-      |  matcher {
+      |  dex {
       |    account: ""
       |    bind-address: "127.0.0.1"
       |    port: 6886

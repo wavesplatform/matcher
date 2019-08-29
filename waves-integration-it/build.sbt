@@ -2,7 +2,7 @@ import WavesExtensionDockerPlugin.autoImport._
 
 enablePlugins(WavesExtensionDockerPlugin, ItTestPlugin)
 
-description := "Integration tests of the DEX gRPC extension for the Waves node "
+description := "Integration tests of the DEX gRPC extension for the Waves node"
 
 libraryDependencies ++= Dependencies.itTest
 

@@ -6,26 +6,32 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "master"
+def nodeVersionTag: String = "31dcd8a3e8a9274cd2b7e8e7c32481fe78263387"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
-lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val dex = project.dependsOn(
+  `waves-integration`,
+  node % "compile;test->test;runtime->provided"
+)
 
-lazy val `dex-it` = project
-  .dependsOn(
-    dex,
-    `node-it` % "compile;test->test"
-  )
+lazy val `dex-it-tools` = project
+
+lazy val `dex-it` = project.dependsOn(
+  dex       % "compile;test->test",
+  `node-it` % "compile;test->test",
+  `dex-it-tools`
+)
 
 lazy val `waves-integration` = project.dependsOn(node % "compile;test->test;runtime->provided")
 
 lazy val `waves-integration-it` = project
   .dependsOn(
     `waves-integration`,
-    `node-it` % "compile;test->test"
+    `node-it` % "compile;test->test",
+    `dex-it-tools`
   )
 
 lazy val `dex-generator` = project.dependsOn(

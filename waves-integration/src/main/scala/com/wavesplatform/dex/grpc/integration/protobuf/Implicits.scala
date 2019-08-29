@@ -1,33 +1,29 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
 import com.google.common.primitives.Bytes
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.transaction.PBAmounts
+import com.wavesplatform.transaction.Asset
 import mouse.any._
 
 object Implicits {
 
-  import com.google.protobuf.{ByteString => PBByteString}
-  import com.wavesplatform.account.{AddressScheme, Address => VAddress}
-  import com.wavesplatform.protobuf.transaction.{PBAmounts, AssetId => PBAssetId}
-  import com.wavesplatform.transaction.{Asset => VAsset}
-
-  implicit class PBByteStringOps(byteString: PBByteString) {
-    def toVanillaAddress: VAddress = {
-      Bytes.concat(Array(VAddress.AddressVersion, AddressScheme.current.chainId), byteString.toByteArray) |> { header =>
-        VAddress.fromBytes { Bytes.concat(header, VAddress calcCheckSum header) } explicitGet ()
+  implicit class ByteStringOps(byteString: ByteString) {
+    def toVanillaAddress: Address = {
+      Bytes.concat(Array(Address.AddressVersion, AddressScheme.current.chainId), byteString.toByteArray) |> { header =>
+        Address.fromBytes { Bytes.concat(header, Address calcCheckSum header) } explicitGet ()
       }
     }
+    def toVanillaAsset: Asset = PBAmounts.toVanillaAssetId(byteString)
   }
 
-  implicit class PBAssetOps(assetId: PBAssetId) {
-    def toVanillaAsset: VAsset = PBAmounts.toVanillaAssetId(assetId)
+  implicit class AddressOps(address: Address) {
+    def toPBAddress: ByteString = ByteString.copyFrom(address.bytes.arr.slice(2, address.bytes.arr.length - Address.ChecksumLength))
   }
 
-  implicit class VAddressOps(address: VAddress) {
-    def toPBAddress: PBByteString = PBByteString.copyFrom(address.bytes.arr.slice(2, address.bytes.arr.length - VAddress.ChecksumLength))
-  }
-
-  implicit class VAssetOps(asset: VAsset) {
-    def toPBAsset: Option[PBAssetId] = Some(PBAmounts.toPBAssetId(asset))
+  implicit class AssetOps(asset: Asset) {
+    def toPBAsset: ByteString = PBAmounts.toPBAssetId(asset)
   }
 }

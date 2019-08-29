@@ -226,7 +226,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
       "place order and then set contract with many proofs" in {
         setContract(Some("true"), alice)
 
-        val transferTx = node.broadcastTransfer(alice, bob.address, 1000, 0.005.waves, Some(aliceAsset), None)
+        val transferTx = node.broadcastTransfer(alice, bob.toAddress.toString, 1000, 0.005.waves, Some(aliceAsset), None)
         node.waitForTransaction(transferTx.id)
 
         for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {

@@ -13,14 +13,15 @@ import akka.util.Timeout
 import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db._
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -34,6 +35,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
+import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration._
@@ -171,8 +173,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
-
+    val keyHashStr = context.settings.config.getString("waves.rest-api.api-key-hash")
     Seq(
       MatcherApiRoute(
         pairBuilder,
@@ -199,7 +200,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-        keyHash,
+        keyHashStr,
         rateCache,
         settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
       ),
@@ -207,7 +208,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHash
+        keyHashStr,
+        settings
       )
     )
   }
@@ -276,11 +278,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     context.actorSystem.actorOf(HistoryRouter.props(context.blockchain, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
+  private lazy val gRPCExtensionClient = new DEXClient(settings.wavesNodeExtensionAddress)
+
   private lazy val addressActors =
     context.actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          context.spendableBalanceChanged,
+          gRPCExtensionClient.balancesServiceClient <| { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
           (address, startSchedules) =>
             Props(
@@ -355,7 +359,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           context.time,
           tx => context.utx.putIfNew(tx).resultE.isRight,
           context.blockchain.containsTransaction(_),
-          txs => txs.foreach(context.broadcastTx)
+          txs => txs.foreach(context.broadcastTransaction)
         ),
       "exchange-transaction-broadcast"
     )

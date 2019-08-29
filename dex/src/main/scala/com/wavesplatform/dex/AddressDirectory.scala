@@ -3,17 +3,17 @@ package com.wavesplatform.dex
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.collection.mutable
 
-class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
+class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChanges],
                        settings: MatcherSettings,
                        addressActorProps: (Address, Boolean) => Props,
                        historyRouter: Option[ActorRef])
@@ -26,17 +26,10 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)],
   private var startSchedules: Boolean = false
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
-  spendableBalanceChanged
-    .filter(x => children.contains(x._1))
-    .bufferTimed(settings.balanceWatchingBufferInterval)
-    .filter(_.nonEmpty)
-    .foreach { changes =>
-      val acc = mutable.Map.empty[Address, Set[Asset]]
-
-      changes.foreach { case (addr, changed)   => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
-      acc.foreach { case (addr, changedAssets) => children.get(addr).foreach(_ ! AddressActor.BalanceUpdated(changedAssets)) }
-
-    }(Scheduler(context.dispatcher))
+  /** Sends balance changes to AddressActors */
+  spendableBalanceChanges.foreach {
+    _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.BalanceUpdated { assetBalances }) }
+  } { Scheduler(context.dispatcher) }
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 

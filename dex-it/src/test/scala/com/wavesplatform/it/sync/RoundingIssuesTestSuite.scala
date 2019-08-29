@@ -17,8 +17,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
   }
 
   "should correctly fill an order with small amount" in {
-    val aliceBalanceBefore = node.accountBalances(alice.address)._1
-    val bobBalanceBefore   = node.accountBalances(bob.address)._1
+    val aliceBalanceBefore = node.accountBalances(alice.toAddress.toString)._1
+    val bobBalanceBefore   = node.accountBalances(bob.toAddress.toString)._1
 
     val counter   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
     val counterId = node.placeOrder(counter).message.id
@@ -39,8 +39,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     (rawExchangeTx \ "buyMatcherFee").as[Long] shouldBe 40L
     (rawExchangeTx \ "sellMatcherFee").as[Long] shouldBe 296219L
 
-    val aliceBalanceAfter = node.accountBalances(alice.address)._1
-    val bobBalanceAfter   = node.accountBalances(bob.address)._1
+    val aliceBalanceAfter = node.accountBalances(alice.toAddress.toString)._1
+    val bobBalanceAfter   = node.accountBalances(bob.toAddress.toString)._1
 
     (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
     (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)

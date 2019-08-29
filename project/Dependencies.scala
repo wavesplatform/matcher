@@ -24,6 +24,7 @@ object Dependencies {
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
   val mouse                      = "org.typelevel" %% "mouse" % "0.22"
+  val spotify                    = ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded")
 
   private val catsEffect = catsModule("effect", "1.2.0")
   val catsCore           = catsModule("core")
@@ -76,7 +77,7 @@ object Dependencies {
 
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
-    ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
+    spotify,
     jacksonModule("dataformat", "dataformat-properties"),
     "org.asynchttpclient" % "async-http-client" % "2.7.0",
     "org.scalacheck"      %% "scalacheck"       % "1.14.0"

@@ -7,6 +7,7 @@ import com.wavesplatform.dex.error.ProduceError.produce
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType, OrderV1}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -16,6 +17,9 @@ import org.scalatest.{FreeSpecLike, Matchers}
 import scala.util.Try
 
 class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
+
+  private val estimator = ScriptEstimatorV2
+
   private val sampleOrder = OrderV1(
     sender = KeyPair("test".getBytes()),
     matcher = PublicKey("matcher".getBytes("utf-8")),
@@ -54,7 +58,8 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |      case _ => false
             |    }
             |}
-            |""".stripMargin
+            |""".stripMargin,
+        estimator
       )
       .explicitGet()
       ._1
@@ -73,7 +78,8 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |      case _ => false
             |    }
             |}
-            |""".stripMargin
+            |""".stripMargin,
+        estimator
       )
       .explicitGet()
       ._1

@@ -105,7 +105,8 @@ inScope(Global)(
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
     buildNodeContainer := (`node-it` / Docker / docker).value
-  ))
+  )
+)
 
 // ThisBuild options
 git.useGitDescribe := true

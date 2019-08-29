@@ -271,12 +271,12 @@ object OrderValidator extends ScorexLogging {
     * Checks if price is in deviation bounds
     *
     *   For BUY orders:  (1 - p) * best bid <= price <= (1 + l) * best ask
-    *   For SELL orders: (1 - l) * best bid <= price <= (1 + p) * best ask,
+    *   For SELL orders: (1 - l) * best bid <= price <= (1 + p) * best ask
     *
     * where:
     *
-    *   p = max price deviation profit,
-    *   l = max price deviation loss,
+    *   p = max price deviation profit / 100
+    *   l = max price deviation loss / 100
     *   best bid = highest price of buy
     *   best ask = lowest price of sell
     */
@@ -294,21 +294,23 @@ object OrderValidator extends ScorexLogging {
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
     }
 
-    lift(order).ensure(error.DeviantOrderPrice(order, deviationSettings)) { _ =>
+    lift(order).ensure { error.DeviantOrderPrice(order, deviationSettings) } { _ =>
       if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
       else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
     }
   }
 
   /**
-    * Checks if fee is in deviation bounds. Only applicable for the percent order fee settings
+    * Checks if fee is in deviation bounds, i.e. orders's fee is higher than the specified percentage of fee,
+    * which the client would pay for the matching with the best counter order. Only applicable to the `percent` order fee mode.
     *
-    *   For BUY orders:  fee >= fee percent * (1 - f) * best ask * amount
-    *   For SELL orders: fee >= fee percent * (1 - f) * best bid * amount,
+    *   For BUY orders:  fee >= fs * (1 - fd) * best ask * amount
+    *   For SELL orders: fee >= fs * (1 - fd) * best bid * amount
     *
     * where:
     *
-    *   f = max fee deviation
+    *   fs = fee in percents from order-fee settings (order-fee.percent.min-fee) / 100
+    *   fd = max fee deviation / 100
     *   best bid = highest price of buy
     *   best ask = lowest price of sell
     */

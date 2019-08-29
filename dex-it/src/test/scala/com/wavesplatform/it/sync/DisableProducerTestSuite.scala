@@ -17,7 +17,7 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueEthTx)
+    broadcast(IssueEthTx)
   }
 
   "Check no commands are written to queue" - {
@@ -27,15 +27,11 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
     }
 
     "place an order and wait some time" in {
-      def test(order: Order): Unit = {
-        val orderPlace = dex1Api.tryPlace(order)
-        orderPlace shouldBe 'left
-        orderPlace.left.get.error shouldBe 528 // FeatureDisabled
-      }
+      def test(order: Order): Unit = dex1Api.tryPlace(order) should failWith(528) // FeatureDisabled
 
       List(
-        prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
-        prepareOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
+        mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
+        mkOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
       ).foreach(test)
 
       Thread.sleep(5000)

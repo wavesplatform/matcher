@@ -10,12 +10,12 @@ class TradingMarketsTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueWctTx)
+    broadcast(IssueWctTx)
   }
 
   "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
-      val order = prepareOrder(alice, matcher, wctWavesPair, BUY, amount, price)
+      val order = mkOrder(alice, matcher, wctWavesPair, BUY, amount, price)
 
       // TODO utility method for combination
       dex1Api.place(order)

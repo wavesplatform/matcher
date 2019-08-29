@@ -20,17 +20,17 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
+    broadcast(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
   }
 
   "When blacklists are empty" in {
     val (dec2, dec8) = (1000L, 1000000000L)
 
     Then("Place some orders")
-    val usdOrder  = prepareOrder(alice, matcher, wavesUsdPair, BUY, dec8, dec2)
-    val wctOrder  = prepareOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
-    val ethOrder  = prepareOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
-    val btcOrder1 = prepareOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val usdOrder  = mkOrder(alice, matcher, wavesUsdPair, BUY, dec8, dec2)
+    val wctOrder  = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
+    val ethOrder  = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder1 = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
     List(usdOrder, wctOrder, ethOrder, btcOrder1).foreach(dex1Api.place)
     dex1Api.waitForOrderStatus(btcOrder1, OrderStatus.Accepted)
 
@@ -49,10 +49,10 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     testOrderStatusDenied(wctOrder, IssuedAsset(WctId))
     testOrderStatusDenied(ethOrder, IssuedAsset(EthId))
 
-    testOrderPlacementDenied(prepareOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8), IssuedAsset(WctId))
-    testOrderPlacementDenied(prepareOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8), IssuedAsset(EthId))
+    testOrderPlacementDenied(mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8), IssuedAsset(WctId))
+    testOrderPlacementDenied(mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8), IssuedAsset(EthId))
 
-    testOrderPlacementDenied(prepareOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8), bob)
+    testOrderPlacementDenied(mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
     dex1Api.orderStatus(btcOrder1).status shouldBe OrderStatus.Accepted
@@ -85,7 +85,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
-    val btcOrder2 = prepareOrder(alice, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val btcOrder2 = mkOrder(alice, matcher, wavesBtcPair, SELL, dec8, dec8)
     dex1Api.place(btcOrder2)
     dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
 
@@ -102,21 +102,16 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.orderStatus(ethOrder).status shouldBe OrderStatus.Accepted
 
     And("new orders can be placed")
-    val newWctOrder = prepareOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
-    val newEthOrder = prepareOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
-    val btcOrder3   = prepareOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val newWctOrder = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
+    val newEthOrder = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder3   = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
     val newOrders   = List(newWctOrder, newEthOrder, btcOrder3)
     newOrders.foreach(dex1Api.place)
     newOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
   }
 
-  private def testOrderPlacementDenied(order: Order, address: Address): Unit = {
-    val r = dex1Api.tryPlace(order)
-    r shouldBe 'left
-    val error = r.left.get
-    error.error shouldBe 3145733
-    error.params.address.get shouldBe address.stringRepr
-  }
+  private def testOrderPlacementDenied(order: Order, address: Address): Unit =
+    dex1Api.tryPlace(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
 
   private def testOrderPlacementDenied(order: Order, blacklistedAsset: Asset): Unit =
     failedDueAssetBlacklist(dex1Api.tryPlace(order), order.assetPair, blacklistedAsset)

@@ -3,7 +3,7 @@ package com.wavesplatform.it.api
 import cats.MonadError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -36,7 +36,7 @@ object OrderStatus {
   )
 }
 
-case class OrderBookHistoryItem(id: String,
+case class OrderBookHistoryItem(id: Order.Id,
                                 `type`: String,
                                 amount: Long,
                                 price: Long,

@@ -7,6 +7,7 @@ import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.market.MatcherActor
@@ -27,6 +28,10 @@ import scala.util.Random
 
 object DexTestConfig {
 
+  AddressScheme.current = new AddressScheme {
+    override val chainId: Byte = 'Y'.toByte
+  }
+
   private val containerConfigCache = new AtomicReference[Map[String, Config]](Map.empty)
   def containerConfig(name: String): Config =
     containerConfigCache
@@ -42,7 +47,7 @@ object DexTestConfig {
       }
       .apply(name)
 
-  private val genesisConfig = genesisOverride
+  val genesisConfig = genesisOverride
 
   val accounts: Map[String, KeyPair] = {
     val config           = ConfigFactory.parseResources("genesis.conf")
@@ -181,7 +186,8 @@ object DexTestConfig {
 
   val orderLimit = 10
 
-  val ForbiddenAssetId = "FdbnAsset" // Hardcoded in dex-1.conf
+  val ForbiddenAssetId = ByteStr.decodeBase58("FdbnAsset").get // Hardcoded in dex-1.conf
+  val ForbiddenAsset   = IssuedAsset(ForbiddenAssetId)
 
   val updatedMatcherConfig = parseString(s"""waves.dex {
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
@@ -203,9 +209,9 @@ object DexTestConfig {
     val genesisConfig = timestampOverrides.withFallback(ConfigFactory.parseResources("nodes/waves-1.conf"))
     val gs            = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
 
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = genesisConfig.getString("waves.blockchain.custom.address-scheme-character").head.toByte
-    }
+//    AddressScheme.current = new AddressScheme {
+//      override val chainId: Byte = genesisConfig.getString("waves.blockchain.custom.address-scheme-character").head.toByte
+//    }
 
     val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
 

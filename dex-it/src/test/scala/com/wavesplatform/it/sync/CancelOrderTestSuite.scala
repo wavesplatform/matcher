@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 class CancelOrderTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueUsdTx, IssueBtcTx)
+    broadcast(IssueUsdTx, IssueBtcTx)
   }
 
   "Order can be canceled" - {
@@ -22,7 +22,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
-        case o if o.id == order.idStr() => o.status shouldEqual OrderStatus.Cancelled
+        case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled
       }
     }
 
@@ -34,8 +34,8 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.cancelWithApiKey(order.id())
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-      dex1Api.orderHistory(bob).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled
-      dex1Api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.idStr()).get.status shouldBe OrderStatus.Cancelled
+      dex1Api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+      dex1Api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
 
       val orderBook = dex1Api.orderBook(wavesUsdPair)
       orderBook.bids shouldBe empty
@@ -84,6 +84,6 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def mkBobOrder                        = prepareOrder(bob, matcher, wavesUsdPair, OrderType.SELL, 100.waves, 800)
-  private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => prepareOrder(bob, matcher, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
+  private def mkBobOrder                        = mkOrder(bob, matcher, wavesUsdPair, OrderType.SELL, 100.waves, 800)
+  private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => mkOrder(bob, matcher, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
 }

@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import java.net.InetSocketAddress
+import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
@@ -11,22 +12,25 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherState, NodeApi, OrderBookHistoryItem}
+import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherError, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.{leasingFee, matcherFee, minFee}
+import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee}
+import com.wavesplatform.it.test.FailWith
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
+import org.scalatest.matchers.Matcher
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -34,6 +38,12 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
+
+  AddressScheme.current = new AddressScheme {
+    override val chainId: Byte = 'Y'.toByte
+  }
+
+  println(s"NewMatcherSuiteBase ===> ${AddressScheme.current.chainId.toChar}")
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build()))
@@ -130,52 +140,55 @@ trait TestUtils {
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
-  protected def prepareOrder(owner: KeyPair,
-                             matcher: PublicKey,
-                             pair: AssetPair,
-                             orderType: OrderType,
-                             amount: Long,
-                             price: Long,
-                             matcherFee: Long = matcherFee,
-                             matcherFeeAssetId: Asset = Waves,
-                             timestamp: Long = System.currentTimeMillis(),
-                             timeToLive: Duration = 30.days - 1.seconds,
-                             version: Byte = orderVersion): Order =
-    if (matcherFeeAssetId == Waves)
-      Order(
-        sender = owner,
-        matcher = matcher,
-        pair = pair,
-        orderType = orderType,
-        amount = amount,
-        price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
-        matcherFee = matcherFee,
-        version = math.min(version, 2).toByte,
-      )
-    else
-      Order(
-        sender = owner,
-        matcher = matcher,
-        pair = pair,
-        orderType = orderType,
-        amount = amount,
-        price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
-        matcherFee = matcherFee,
-        version = version,
-        matcherFeeAssetId = matcherFeeAssetId
-      )
+  protected def mkOrder(owner: KeyPair,
+                        matcher: PublicKey,
+                        pair: AssetPair,
+                        orderType: OrderType,
+                        amount: Long,
+                        price: Long,
+                        matcherFee: Long = matcherFee,
+                        matcherFeeAssetId: Asset = Waves,
+                        timestamp: Long = System.currentTimeMillis(),
+                        timeToLive: Duration = 30.days - 1.seconds,
+                        version: Byte = orderVersion): Order =
+    {
+      println(s"===> mkOrder: ${AddressScheme.current.chainId.toChar}")
+      if (matcherFeeAssetId == Waves)
+        Order(
+          sender = owner,
+          matcher = matcher,
+          pair = pair,
+          orderType = orderType,
+          amount = amount,
+          price = price,
+          timestamp = timestamp,
+          expiration = timestamp + timeToLive.toMillis,
+          matcherFee = matcherFee,
+          version = math.min(version, 2).toByte,
+        )
+      else
+        Order(
+          sender = owner,
+          matcher = matcher,
+          pair = pair,
+          orderType = orderType,
+          amount = amount,
+          price = price,
+          timestamp = timestamp,
+          expiration = timestamp + timeToLive.toMillis,
+          matcherFee = matcherFee,
+          version = version,
+          matcherFeeAssetId = matcherFeeAssetId
+        )
+    }
 
-  protected def prepareTransfer(sender: KeyPair,
-                                recipient: Address,
-                                amount: Long,
-                                asset: Asset,
-                                feeAmount: Long = minFee,
-                                feeAsset: Asset = Waves,
-                                timestamp: Long = System.currentTimeMillis()): TransferTransaction =
+  protected def mkTransfer(sender: KeyPair,
+                           recipient: Address,
+                           amount: Long,
+                           asset: Asset,
+                           feeAmount: Long = minFee,
+                           feeAsset: Asset = Waves,
+                           timestamp: Long = System.currentTimeMillis()): TransferTransaction =
     TransferTransactionV1
       .selfSigned(
         assetId = asset,
@@ -189,11 +202,11 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def prepareLease(sender: KeyPair,
-                             recipient: Address,
-                             amount: Long,
-                             fee: Long = leasingFee,
-                             timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
+  protected def mkLease(sender: KeyPair,
+                        recipient: Address,
+                        amount: Long,
+                        fee: Long = leasingFee,
+                        timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
     LeaseTransactionV1
       .selfSigned(
         sender = sender,
@@ -204,10 +217,10 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def prepareLeaseCancel(sender: KeyPair,
-                                   leaseId: ByteStr,
-                                   fee: Long = leasingFee,
-                                   timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
+  protected def mkLeaseCancel(sender: KeyPair,
+                              leaseId: ByteStr,
+                              fee: Long = leasingFee,
+                              timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
     LeaseCancelTransactionV1
       .selfSigned(
         sender = sender,
@@ -217,7 +230,30 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def issueAssets(txs: IssueTransaction*): Unit = {
+  protected def mkIssue(issuer: KeyPair,
+                        name: String,
+                        quantity: Long,
+                        decimals: Int = 8,
+                        reissuable: Boolean = false,
+                        script: Option[Script] = None,
+                        fee: Long = issueFee,
+                        timestamp: Long = System.currentTimeMillis()): IssueTransaction =
+    IssueTransactionV2
+      .selfSigned(
+        AddressScheme.current.chainId,
+        sender = issuer,
+        name = name.getBytes(),
+        description = s"$name asset".getBytes(StandardCharsets.UTF_8),
+        quantity = quantity,
+        decimals = decimals.toByte,
+        reissuable = false,
+        script = None,
+        fee = fee,
+        timestamp = timestamp
+      )
+      .explicitGet()
+
+  protected def broadcast(txs: IssueTransaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
     txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
   }
@@ -250,7 +286,18 @@ trait TestUtils {
     dockerClient().writeFile(container, path, content)
   }
 
-  protected def matcherState(dexApi: DexApi[Id], assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[KeyPair]): Id[MatcherState] = {
+  protected def waitForOrderAtNode(orderId: Order.Id,
+                                   dexApi: DexApi[Id] = dex1Api,
+                                   wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] = {
+    val tx = dexApi.waitForTransactionsByOrder(orderId, 1).head
+    wavesNodeApi.waitForTransaction(tx.id())
+    tx
+  }
+
+  protected def matcherState(assetPairs: Seq[AssetPair],
+                             orders: IndexedSeq[Order],
+                             accounts: Seq[KeyPair],
+                             dexApi: DexApi[Id] = dex1Api): Id[MatcherState] = {
     val offset               = dexApi.currentOffset
     val snapshots            = dexApi.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
@@ -288,4 +335,9 @@ trait TestUtils {
 
   private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
   private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
+
+  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                  = new FailWith(errorCode)
+  def failWith(errorCode: Int, message: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(message))
+  def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] =
+    new FailWith(errorCode, None, containsParams)
 }

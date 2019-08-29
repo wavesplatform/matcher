@@ -56,12 +56,12 @@ class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
     stateBefore shouldBe stateAfter
   }
 
-  private def state = cleanState(matcherState(dex1Api, assetPairs, orders, Seq(alice)))
+  private def state = cleanState(matcherState(assetPairs, orders, Seq(alice)))
 
   protected def cleanState(state: MatcherState): MatcherState = state
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueEthTx, IssueUsdTx)
+    broadcast(IssueEthTx, IssueUsdTx)
   }
 }

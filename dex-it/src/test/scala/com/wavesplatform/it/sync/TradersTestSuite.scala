@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
+import com.wavesplatform.it.api.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -17,7 +17,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueUsdTx, IssueWctTx)
+    broadcast(IssueUsdTx, IssueWctTx)
   }
 
   "Verifications of tricky ordering cases" - {
@@ -34,18 +34,16 @@ class TradersTestSuite extends NewMatcherSuiteBase {
         priceAsset = IssuedAsset(ByteStr("WAVES".getBytes()))
       )
 
-      val trickyBobOrderWB58      = prepareOrder(bob, matcher, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      val trickyBobOrderWB58Place = dex1Api.tryPlace(trickyBobOrderWB58)
-      trickyBobOrderWB58Place shouldBe 'left
-      trickyBobOrderWB58Place.left.get.error shouldBe 9440512 // OrderInvalidSignature
+      val trickyBobOrderWB58 = mkOrder(bob, matcher, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      dex1Api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
-      val trickyBobOrderWS      = prepareOrder(bob, matcher, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      val trickyBobOrderWSPlace = dex1Api.tryPlace(trickyBobOrderWS)
-      trickyBobOrderWSPlace shouldBe 'left
-      trickyBobOrderWSPlace.left.get.error shouldBe 11534345 // AssetNotFound
-      trickyBobOrderWSPlace.left.get.params.assetId.get shouldBe trickyBobWavesPairWS.priceAssetStr
+      val trickyBobOrderWS = mkOrder(bob, matcher, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      dex1Api.tryPlace(trickyBobOrderWS) should failWith(
+        11534345,
+        MatcherError.Params(assetId = Some(trickyBobWavesPairWS.priceAssetStr)) // AssetNotFound
+      )
 
-      val correctBobOrder = prepareOrder(bob, matcher, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val correctBobOrder = mkOrder(bob, matcher, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.place(correctBobOrder)
       dex1Api.waitForOrderStatus(correctBobOrder, OrderStatus.Accepted)
 
@@ -79,7 +77,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount)
 
           // Transfer all coins except required for one order
-          wavesNode1Api.broadcast(prepareTransfer(bob, alice, transferAmount, WctAsset))
+          wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, WctAsset))
 
           withClue(s"The newest order '${newestOrder.idStr()}' was cancelled") {
             dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
@@ -91,7 +89,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           withClue("Cleanup") {
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            wavesNode1Api.broadcast(prepareTransfer(alice, bob, transferAmount, WctAsset))
+            wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, WctAsset))
           }
         }
 
@@ -101,7 +99,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
           // Lease all waves except required for one order
           val leaseAmount = bobBalance - matcherFee - leasingFee
-          val lease       = prepareLease(bob, alice, leaseAmount, leasingFee)
+          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
           wavesNode1Api.broadcast(lease)
 
           withClue(s"The newest order '${newestOrder.idStr()}' was cancelled") {
@@ -114,7 +112,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           withClue("Cleanup") {
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            wavesNode1Api.broadcast(prepareLeaseCancel(bob, lease.id()))
+            wavesNode1Api.broadcast(mkLeaseCancel(bob, lease.id()))
           }
         }
 
@@ -124,7 +122,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
           // Transfer all waves except required for one order
           val transferAmount = bobBalance - matcherFee - minFee
-          wavesNode1Api.broadcast(prepareTransfer(bob, alice, transferAmount, Waves, minFee))
+          wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, Waves, minFee))
 
           withClue(s"The newest order '${newestOrder.idStr()}' was cancelled") {
             dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
@@ -136,7 +134,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           withClue("Cleanup") {
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            wavesNode1Api.broadcast(prepareTransfer(alice, bob, transferAmount, Waves))
+            wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
           }
         }
       }
@@ -149,7 +147,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
           // Lease all waves except required for one order
           val leaseAmount = bobBalance - matcherFee - 10.waves - leasingFee // TODO ???
-          val lease       = prepareLease(bob, alice, leaseAmount, leasingFee)
+          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
           wavesNode1Api.broadcast(lease)
 
           withClue(s"The newest order '${newestOrder.idStr()}' is Cancelled") {
@@ -162,7 +160,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           withClue("Cleanup") {
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            wavesNode1Api.broadcast(prepareLeaseCancel(bob, lease.id()))
+            wavesNode1Api.broadcast(mkLeaseCancel(bob, lease.id()))
           }
         }
 
@@ -172,14 +170,14 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           val order      = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
 
           val leaseAmount = bobBalance - matcherFee - price / 2
-          val lease       = prepareLease(bob, alice, leaseAmount, leasingFee)
+          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
           wavesNode1Api.broadcast(lease)
 
           withClue(s"The order '${order.idStr()}' was cancelled") {
             dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
           }
 
-          withClue("Cleanup")(wavesNode1Api.broadcast(prepareLeaseCancel(bob, lease.id())))
+          withClue("Cleanup")(wavesNode1Api.broadcast(mkLeaseCancel(bob, lease.id())))
         }
 
         "moved waves, insufficient fee" in {
@@ -189,27 +187,27 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           val order      = bobPlacesBuyWaveOrder(wctWavesPair, 1, price * Order.PriceConstant)
 
           val transferAmount = bobBalance - matcherFee - price
-          wavesNode1Api.broadcast(prepareTransfer(bob, alice, transferAmount, Waves, matcherFee)) // TODO fee
+          wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, Waves, matcherFee)) // TODO fee
 
           withClue(s"The order '${order.idStr()}' was cancelled") {
             dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
           }
 
-          withClue("Cleanup")(wavesNode1Api.broadcast(prepareTransfer(alice, bob, transferAmount, Waves, matcherFee)))
+          withClue("Cleanup")(wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves, matcherFee)))
         }
       }
     }
   }
 
   private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
-    val r = prepareOrder(bob, matcher, assetPair, OrderType.BUY, amount, price)
+    val r = mkOrder(bob, matcher, assetPair, OrderType.BUY, amount, price)
     dex1Api.place(r)
     dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
     r
   }
 
   private def bobPlacesSellWctOrder(bobCoinAmount: Int): Order = {
-    val r = prepareOrder(bob, matcher, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
+    val r = mkOrder(bob, matcher, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
     dex1Api.place(r)
     dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
     r

@@ -20,7 +20,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    issueAssets(IssueUsdTx, IssueWctTx, IssueEthTx)
+    broadcast(IssueUsdTx, IssueWctTx, IssueEthTx)
     List(UsdAsset, WctAsset, EthAsset).foreach(asset => dex1Api.upsertRate(asset, 1.0)._1 shouldBe StatusCodes.Created)
   }
 
@@ -29,20 +29,20 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
     // Alice has WAVES, ETH, USD => Alice can buy WCT @ WAVES (fee in ETH) and sell ETH @ WAVES (fee in USD)
     // Bob has WAVES, WCT => Bob can sell WCT @ WAVES and buy ETH @ WAVES
 
-    def bigBuyOrder: Order   = prepareOrder(alice, matcher, wctUsdPair, BUY, 10 * amount, price, matcherFeeAssetId = EthAsset)
-    def smallBuyOrder: Order = prepareOrder(alice, matcher, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = EthAsset)
+    def bigBuyOrder: Order   = mkOrder(alice, matcher, wctUsdPair, BUY, 10 * amount, price, matcherFeeAssetId = EthAsset)
+    def smallBuyOrder: Order = mkOrder(alice, matcher, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = EthAsset)
 
-    def bigSellOrder: Order   = prepareOrder(alice, matcher, ethWavesPair, SELL, 10 * amount, price, matcherFeeAssetId = UsdAsset)
-    def smallSellOrder: Order = prepareOrder(alice, matcher, ethWavesPair, SELL, 5 * amount, price, matcherFeeAssetId = UsdAsset)
+    def bigSellOrder: Order   = mkOrder(alice, matcher, ethWavesPair, SELL, 10 * amount, price, matcherFeeAssetId = UsdAsset)
+    def smallSellOrder: Order = mkOrder(alice, matcher, ethWavesPair, SELL, 5 * amount, price, matcherFeeAssetId = UsdAsset)
 
     def bestPrice(counterOrderType: OrderType): Double = counterOrderType match { case SELL => price * 0.97; case _ => price * 1.03 }
     def goodPrice(counterOrderType: OrderType): Double = counterOrderType match { case SELL => price * 0.98; case _ => price * 1.02 }
 
     def placeCounterOrdersOfType(counterOrderType: OrderType, pair: AssetPair): Unit = {
       val orders = List(
-        prepareOrder(bob, matcher, pair, counterOrderType, 3 * amount, bestPrice(counterOrderType).toLong),
-        prepareOrder(bob, matcher, pair, counterOrderType, 2 * amount, goodPrice(counterOrderType).toLong),
-        prepareOrder(bob, matcher, pair, counterOrderType, 1 * amount, goodPrice(counterOrderType).toLong)
+        mkOrder(bob, matcher, pair, counterOrderType, 3 * amount, bestPrice(counterOrderType).toLong),
+        mkOrder(bob, matcher, pair, counterOrderType, 2 * amount, goodPrice(counterOrderType).toLong),
+        mkOrder(bob, matcher, pair, counterOrderType, 1 * amount, goodPrice(counterOrderType).toLong)
       )
       orders.foreach(dex1Api.place)
       orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))

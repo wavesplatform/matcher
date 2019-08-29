@@ -10,16 +10,19 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.it.api.OrderBookHistoryItem.byteStrFormat
 import com.wavesplatform.it.api.dex.ThrowableMonadError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json._
+import shapeless.ops.hlist.{Mapper, ToTraversable, Zip}
+import shapeless.{Generic, HList, HNil, _}
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
@@ -28,9 +31,26 @@ case class MatcherError(error: Int, message: String, status: String, params: Mat
 object MatcherError {
   implicit val format: Format[MatcherError] = Json.format[MatcherError]
 
-  case class Params(assetId: Option[String], address: Option[String])
+  case class Params(assetId: Option[String] = None, address: Option[String] = None)
   object Params {
     implicit val format: Format[Params] = Json.format[Params]
+
+    private object containsPoly extends Poly1 {
+      implicit def contains[T: Ordering] = at[(Option[T], Option[T])] {
+        case (Some(l), Some(r)) => l == r
+        case (None, None)       => true
+        case _                  => false
+      }
+    }
+
+    private def internalContains[HParams <: HList, ZHParams <: HList, Booleans <: HList](obj: Params, part: Params)(
+        implicit gen: Generic.Aux[Params, HParams],
+        zip: Zip.Aux[HParams :: HParams :: HNil, ZHParams],
+        mapper: Mapper.Aux[containsPoly.type, ZHParams, Booleans],
+        toList: ToTraversable.Aux[Booleans, List, Boolean]): Boolean =
+      gen.to(obj).zip(gen.to(part))(zip).map(containsPoly).toList[Boolean](toList).forall(identity)
+
+    def contains(obj: Params, part: Params): Boolean = internalContains(obj, part)
   }
 }
 
@@ -40,12 +60,14 @@ object OrderStatusResponse {
 }
 
 trait DexApi[F[_]] extends HasWaitReady[F] {
-  def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[String, Long]]
+  def publicKey: F[PublicKey]
+
+  def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]]
 
   def tryPlace(order: Order): F[Either[MatcherError, Unit]]
 
-  def place(order: Order): F[Unit]
-  def placeMarket(order: Order): F[Unit]
+  def place(order: Order): F[MatcherResponse]
+  def placeMarket(order: Order): F[MatcherResponse]
 
   def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
@@ -103,6 +125,9 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
 object DexApi {
   implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
+  implicit val balanceReads = Reads.map[Long].map { xs =>
+    xs.map { case (k, v) => AssetPair.extractAssetId(k).get -> v }
+  }
 
   // TODO
   implicit val exchangeTxReads: Reads[exchange.ExchangeTransaction] = Reads { json =>
@@ -135,11 +160,20 @@ object DexApi {
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
 
-      override def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[String, Long]] = {
+      override def publicKey: F[PublicKey] = {
+        val req = sttp
+          .get(uri"$apiUri")
+          .response(asJson[ByteStr])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap(parseResponse).map(x => PublicKey(x))
+      }
+
+      override def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
         val req = sttp
           .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
           .headers(timestampAndSignatureHeaders(of, timestamp))
-          .response(asJson[Map[String, Long]])
+          .response(asJson[Map[Asset, Long]])
           .tag("requestId", UUID.randomUUID())
 
         httpBackend.send(req).flatMap(parseResponse)
@@ -162,20 +196,14 @@ object DexApi {
       }
 
       // replace with tryPlace
-      override def place(order: Order): F[Unit] = {
-        val req = sttp.post(uri"$apiUri/orderbook").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
-        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
-          if (resp.isSuccess) M.pure(())
-          else M.raiseError[Unit](new RuntimeException(s"The server returned an error: ${resp.code}"))
-        }
+      override def place(order: Order): F[MatcherResponse] = {
+        val req = sttp.post(uri"$apiUri/orderbook").body(order).response(asJson[MatcherResponse]).tag("requestId", UUID.randomUUID())
+        httpBackend.send(req).flatMap(parseResponse)
       }
 
-      override def placeMarket(order: Order): F[Unit] = {
-        val req = sttp.post(uri"$apiUri/orderbook/market").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
-        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
-          if (resp.isSuccess) M.pure(())
-          else M.raiseError[Unit](new RuntimeException(s"The server returned an error: ${resp.code}"))
-        }
+      override def placeMarket(order: Order): F[MatcherResponse] = {
+        val req = sttp.post(uri"$apiUri/orderbook/market").body(order).response(asJson[MatcherResponse]).tag("requestId", UUID.randomUUID())
+        httpBackend.send(req).flatMap(parseResponse)
       }
 
       override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] = {

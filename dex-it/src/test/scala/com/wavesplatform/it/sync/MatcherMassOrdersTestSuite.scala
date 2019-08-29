@@ -14,17 +14,17 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     val assets = List(IssueUsdTx, IssueEthTx)
-    issueAssets(assets: _*)
+    broadcast(assets: _*)
     assets
-      .map(tx => prepareTransfer(alice, bob, tx.quantity / 2, IssuedAsset(tx.id())))
+      .map(tx => mkTransfer(alice, bob, tx.quantity / 2, IssuedAsset(tx.id())))
       .foreach(wavesNode1Api.broadcast)
   }
 
   // timeToLive to generate different orders
-  private val aliceOrderFill     = prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 1.day)
-  private val alicePartialOrder  = prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 2.days)
-  private val aliceOrderToCancel = prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 3.days)
-  private val aliceActiveOrder   = prepareOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
+  private val aliceOrderFill     = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 1.day)
+  private val alicePartialOrder  = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 2.days)
+  private val aliceOrderToCancel = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 3.days)
+  private val aliceActiveOrder   = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
     "Place initial orders" in {
@@ -108,11 +108,11 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def genAndPlaceOrders(n: Int, sender: KeyPair, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] =
+  private def genAndPlaceOrders(n: Int, sender: KeyPair, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[Order.Id] =
     (1 to n).map { _ =>
-      val order = prepareOrder(sender, matcher, assetPair, orderType, amount, Order.PriceConstant, timeToLive = (120 + Random.nextInt(70)).seconds)
+      val order = mkOrder(sender, matcher, assetPair, orderType, amount, Order.PriceConstant, timeToLive = (120 + Random.nextInt(70)).seconds)
       dex1Api.place(order)
-      order.idStr()
+      order.id()
     }
 
 }

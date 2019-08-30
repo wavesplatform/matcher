@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, OrderStatus}
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -129,7 +129,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
       "submitting sell orders should check availability of asset" in {
         // Bob trying to place order on more assets than he has - order rejected
         val badOrder = mkOrder(bob, matcher, aliceWavesPair, SELL, 300, 1900.waves)
-        dex1Api.tryPlace(badOrder) should failWith(400)
+        dex1Api.tryPlace(badOrder) should failWith(3147270) // BalanceNotEnough
 
         // Bob places order on available amount of assets - order accepted
         val order3 = mkOrder(bob, matcher, aliceWavesPair, SELL, 150, 1900.waves, matcherFee)
@@ -219,7 +219,9 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
       }
 
       "request order book for blacklisted pair" in {
-        dex1Api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(404, s"The asset $ForbiddenAssetId not found")
+        dex1Api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
+          11534345,
+          MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
       }
 
       "should consider UTX pool when checking the balance" in {

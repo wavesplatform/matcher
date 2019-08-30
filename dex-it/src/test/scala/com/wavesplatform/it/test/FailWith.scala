@@ -6,7 +6,8 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.util.{Left, Right}
 
-class FailWith(expectedErrorCode: Int, expectedMessage: Option[String] = None, expectedParams: Params = Params()) extends Matcher[Either[MatcherError, Any]] {
+class FailWith(expectedErrorCode: Int, expectedMessage: Option[String] = None, expectedParams: Params = Params())
+    extends Matcher[Either[MatcherError, Any]] {
   override def apply(input: Either[MatcherError, Any]): MatchResult = result(
     matches = input match {
       case Right(_) => false
@@ -17,9 +18,9 @@ class FailWith(expectedErrorCode: Int, expectedMessage: Option[String] = None, e
 
   private def result(matches: Boolean, r: Either[MatcherError, Any]): MatchResult =
     MatchResult(
-      matches = false,
-      "expecting Left(MatcherError(errorCode={0}, params={1})) but got {2}",
+      matches = matches,
+      s"expecting Left(MatcherError(errorCode={0}, expectedMessage={1} params={2})) but got {3}",
       "got expected error",
-      IndexedSeq(expectedErrorCode, expectedParams, r)
+      IndexedSeq(expectedErrorCode, expectedMessage, expectedParams, r)
     )
 }

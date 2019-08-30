@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -8,6 +9,8 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 
@@ -28,7 +31,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
          |      },
          |      {
          |        start-offset = 6
-         |        tick-size    = 0.00000001
+         |        tick-size    = 0.01
          |      },
          |      {
          |        start-offset = 8
@@ -38,6 +41,24 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
          |        start-offset = 16
          |        tick-size    = 10
          |      },
+         |      {
+         |        start-offset = 17
+         |        tick-size    = 12
+         |      }
+         |    ],
+         |    "$WctId-WAVES": [
+         |      {
+         |        start-offset = 17
+         |        tick-size    = 12
+         |      }
+         |    ],
+         |    "WAVES-$BtcId": [
+         |      {
+         |        start-offset = 17
+         |        tick-size    = 12
+         |      }
+         |    ],
+         |    "WAVES-$UsdId": [
          |      {
          |        start-offset = 17
          |        tick-size    = 12
@@ -52,8 +73,24 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
+    Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
       node.waitForTransaction(tx.id)
+    }
+  }
+
+  def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {
+    assetBalance(owner, assetPair.priceAssetStr)
+  }
+
+  def amountAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {
+    assetBalance(owner, assetPair.amountAssetStr)
+  }
+
+  def assetBalance(owner: KeyPair, assetId: String): Long = {
+    if (assetId == "WAVES")
+      node.accountBalances(owner.address)._1
+    else {
+      node.assetBalance(owner.address, assetId).balance
     }
   }
 
@@ -184,14 +221,37 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   // offset is 19, after test - 23
-  "Matching orders of neighbors levels" in {
-    val bestAskOrderId = node.placeOrder(bob, wctUsdPair, SELL, amount, 17 * price, matcherFee).message.id
+  "Matching orders of same price but neighbors levels" in {
+    val bestAskOrderId = node.placeOrder(alice, wctUsdPair, SELL, amount, 17 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
-    val bestBidOrderId = node.placeOrder(alice, wctUsdPair, BUY, amount, 17 * price, matcherFee).message.id
+    val bestBidOrderId = node.placeOrder(bob, wctUsdPair, BUY, amount, 17 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
 
-    node.cancelOrder(bob, wctUsdPair, bestAskOrderId)
-    node.cancelOrder(alice, wctUsdPair, bestBidOrderId)
+    node.cancelOrder(alice, wctUsdPair, bestAskOrderId)
+    node.cancelOrder(bob, wctUsdPair, bestBidOrderId)
+  }
+
+  "Matching orders with different decimals" in {
+    Array((wctUsdPair, amount, price), (wctWavesPair, amount, price * 1000000L), (wavesUsdPair, 1.waves, 100L), (wavesBtcPair, amount, price)).foreach {
+      case (pair: AssetPair, amount: Long, price: Long) =>
+        withClue(pair) {
+          // TODO check balances
+          val bestAskOrderId = node.placeOrder(alice, pair, SELL, amount, 17 * price, matcherFee).message.id
+          node.orderBook(pair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
+          val bestBidOrderId = node.placeOrder(bob, pair, BUY, amount, 17 * price, matcherFee).message.id
+          node.orderBook(pair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
+
+          node.cancelOrder(alice, pair, bestAskOrderId)
+          node.cancelOrder(bob, pair, bestBidOrderId)
+
+          val filledOrderId = node.placeOrder(bob, pair, BUY, amount, 25 * price, matcherFee).message.id
+          val partiallyFilledOrderId = node.placeOrder(alice, pair, SELL, 2 * amount, 17 * price, matcherFee).message.id
+          node.waitOrderStatus(pair, filledOrderId, expectedStatus = "Filled")
+          node.waitOrderStatus(pair, partiallyFilledOrderId, expectedStatus = "PartiallyFilled")
+
+          node.cancelOrder(alice, pair, partiallyFilledOrderId)
+        }
+    }
   }
 
   "level 0" in {

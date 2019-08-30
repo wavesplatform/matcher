@@ -1,6 +1,9 @@
 package com.wavesplatform.it.api
 
+import cats.syntax.apply._
+import cats.syntax.either._
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import com.softwaremill.sttp.{DeserializationError, Response}
 import com.wavesplatform.it.api.dex.ThrowableMonadError
 import play.api.libs.json.JsError
@@ -8,13 +11,13 @@ import play.api.libs.json.JsError
 import scala.concurrent.duration.FiniteDuration
 
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
-  def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] = {
-    def loop(): F[T] = f.flatMap { x =>
-      if (pred(x)) M.pure(x) else W.wait(delay).flatMap(_ => loop())
+  def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] =
+    f.flatMap {
+      _.tailRecM[F, T] { x =>
+        if (pred(x)) M.pure(x.asRight)
+        else W.wait(delay).productR(f).map(_.asLeft)
+      }
     }
-
-    loop()
-  }
 
   def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
       pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =

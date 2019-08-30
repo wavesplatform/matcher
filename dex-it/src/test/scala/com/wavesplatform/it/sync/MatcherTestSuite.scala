@@ -27,7 +27,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
   private val bobAsset1         = IssuedAsset(bobAsset1Id)
   private val bob1WavesPair     = AssetPair(bobAsset1, Waves)
 
-  private val issueBob2Asset2Tx = mkIssue(alice, "Bob-2-X", someAssetAmount, 5)
+  private val issueBob2Asset2Tx = mkIssue(alice, "Bob-2-X", someAssetAmount, 0)
   private val bobAsset2Id       = issueBob2Asset2Tx.id()
   private val bobAsset2         = IssuedAsset(bobAsset2Id)
   private val bob2WavesPair     = AssetPair(bobAsset2, Waves)

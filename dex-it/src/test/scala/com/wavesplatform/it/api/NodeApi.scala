@@ -3,6 +3,8 @@ package com.wavesplatform.it.api
 import java.net.{InetSocketAddress, SocketException}
 
 import cats.MonadError
+import cats.syntax.apply._
+import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
@@ -10,9 +12,10 @@ import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.{account, transaction}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.{account, transaction}
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -50,17 +53,32 @@ object NodeApi {
     new NodeApi[F] {
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
 
-      override def balance(address: account.Address, asset: Asset): F[Long] = {
-        val req = sttp.get(uri"$apiUri/assets/balance/$address/${AssetPair.assetIdStr(asset)}").response(asJson[AssetBalance])
-        repeatUntilAttempts(httpBackend.send(req), 1.second, 10)(resp => resp.code == StatusCodes.Ok)
-          .flatMap { resp =>
-            resp.rawErrorBody match {
-              case Left(_)            => M.raiseError[AssetBalance](new RuntimeException(s"The server returned an error: ${resp.code}"))
-              case Right(Left(error)) => M.raiseError[AssetBalance](new RuntimeException(s"Can't parse the response: $error"))
-              case Right(Right(r))    => M.pure(r)
+      override def balance(address: account.Address, asset: Asset): F[Long] = asset match {
+        case asset: IssuedAsset =>
+          val req = sttp.get(uri"$apiUri/assets/balance/$address/${AssetPair.assetIdStr(asset)}").response(asJson[AssetBalance])
+          httpBackend
+            .send(req)
+            .flatMap { resp =>
+              resp.rawErrorBody match {
+                case Left(_)            => M.raiseError[AssetBalance](new RuntimeException(s"The server returned an error: ${resp.code}"))
+                case Right(Left(error)) => M.raiseError[AssetBalance](new RuntimeException(s"Can't parse the response: $error"))
+                case Right(Right(r))    => M.pure(r)
+              }
             }
-          }
-          .map(_.balance)
+            .map(_.balance)
+
+        case Waves =>
+          val req = sttp.get(uri"$apiUri/addresses/balance/$address").response(asJson[Balance])
+          httpBackend
+            .send(req)
+            .flatMap { resp =>
+              resp.rawErrorBody match {
+                case Left(_)            => M.raiseError[Balance](new RuntimeException(s"The server returned an error: ${resp.code}"))
+                case Right(Left(error)) => M.raiseError[Balance](new RuntimeException(s"Can't parse the response: $error"))
+                case Right(Right(r))    => M.pure(r)
+              }
+            }
+            .map(_.balance)
       }
 
       override def connect(toNode: InetSocketAddress): F[Unit] = {
@@ -139,23 +157,23 @@ object NodeApi {
         repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
 
-      def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] = {
-        def loop(): F[T] = f.flatMap { x =>
-          if (pred(x)) M.pure(x) else W.wait(delay).flatMap(_ => loop())
+      def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] =
+        f.flatMap {
+          _.tailRecM[F, T] { x =>
+            if (pred(x)) M.pure(x.asRight)
+            else W.wait(delay).productR(f).map(_.asLeft)
+          }
         }
-        loop()
-      }
 
-      def repeatUntilAttempts[T](f: => F[T], delay: FiniteDuration, maxAttempts: Int)(pred: T => Boolean): F[T] = {
-        def loop(restAttempts: Int): F[T] =
-          if (restAttempts == 0) M.raiseError(new RuntimeException("All attempts are out"))
-          else
-            f.flatMap { x =>
-              if (pred(x)) M.pure(x) else W.wait(delay).flatMap(_ => loop(restAttempts - 1))
-            }
-
-        loop(maxAttempts)
-      }
+      def repeatUntilAttempts[T](f: => F[T], delay: FiniteDuration, maxAttempts: Int)(pred: T => Boolean): F[T] =
+        f.flatMap { x =>
+          (x, maxAttempts - 1).tailRecM[F, T] {
+            case (x, restAttempts) =>
+              if (pred(x)) M.pure(x.asRight)
+              else if (restAttempts == 0) M.raiseError(new RuntimeException("All attempts are out"))
+              else W.wait(delay).productR(f).map(x => (x, restAttempts - 1).asLeft)
+          }
+        }
 
       def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
           pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =

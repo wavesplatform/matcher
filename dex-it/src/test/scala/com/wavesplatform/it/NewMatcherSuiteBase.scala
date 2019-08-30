@@ -43,8 +43,6 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     override val chainId: Byte = 'Y'.toByte
   }
 
-  println(s"NewMatcherSuiteBase ===> ${AddressScheme.current.chainId.toChar}")
-
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build()))
 
@@ -151,8 +149,6 @@ trait TestUtils {
                         timestamp: Long = System.currentTimeMillis(),
                         timeToLive: Duration = 30.days - 1.seconds,
                         version: Byte = orderVersion): Order =
-    {
-      println(s"===> mkOrder: ${AddressScheme.current.chainId.toChar}")
       if (matcherFeeAssetId == Waves)
         Order(
           sender = owner,
@@ -180,7 +176,6 @@ trait TestUtils {
           version = version,
           matcherFeeAssetId = matcherFeeAssetId
         )
-    }
 
   protected def mkTransfer(sender: KeyPair,
                            recipient: Address,

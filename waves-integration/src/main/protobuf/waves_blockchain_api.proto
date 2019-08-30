@@ -159,7 +159,7 @@ message Order {
     waves.Amount matcher_fee = 10;
     int32 version = 11;
     repeated bytes proofs = 12;
-    bytes matcher_fee_asset_id = 13;
+    waves.AssetId matcher_fee_asset_id = 13;
 }
 
 message SignedExchangeTransaction {

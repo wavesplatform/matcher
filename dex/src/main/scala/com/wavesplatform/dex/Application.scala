@@ -87,7 +87,6 @@ object Application {
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.addressSchemeCharacter.toByte
     }
-    println(s"==> Application: ${AddressScheme.current.chainId}")
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects

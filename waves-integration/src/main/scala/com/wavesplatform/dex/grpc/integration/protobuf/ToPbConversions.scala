@@ -16,8 +16,8 @@ object ToPbConversions {
         transaction = Some(
           ExchangeTransaction(
             chainId = tx.chainByte.getOrElse(va.AddressScheme.current.chainId).toInt,
-            senderPublicKey = ByteString.copyFrom(tx.sender.bytes.arr),
-            fee = Some(Amount(assetId = None, amount = tx.fee)),
+            senderPublicKey = tx.sender.toPB,
+            fee = Some(Amount(assetId = Some(tx.assetFee._1.toPB), amount = tx.assetFee._2)),
             timestamp = tx.timestamp,
             version = tx.version,
             data = ExchangeTransaction.Data.Exchange(
@@ -34,29 +34,31 @@ object ToPbConversions {
   }
 
   implicit class VanillaAssetOps(self: Asset) {
-    def toPB: AssetId = self match {
-      case Asset.IssuedAsset(assetId) => AssetId(AssetId.Asset.IssuedAsset(assetId.toPB))
-      case Asset.Waves                => AssetId(AssetId.Asset.Waves(com.google.protobuf.empty.Empty.defaultInstance))
-    }
+    def toPB: AssetId =
+      AssetId(self match {
+        case Asset.IssuedAsset(assetId) => AssetId.Asset.IssuedAsset(assetId.toPB)
+        case Asset.Waves                => AssetId.Asset.Empty
+      })
   }
 
   implicit class VanillaOrderOps(order: ve.Order) {
     def toPB: Order = Order(
-      chainId = 0,
-      ByteString.copyFrom(order.senderPublicKey),
-      ByteString.copyFrom(order.matcherPublicKey),
-      Some(Order.AssetPair(Some(order.assetPair.amountAsset.protoId), Some(order.assetPair.priceAsset.protoId))),
-      order.orderType match {
+      chainId = va.AddressScheme.current.chainId.toInt,
+      senderPublicKey = order.senderPublicKey.toPB,
+      matcherPublicKey = order.matcherPublicKey.toPB,
+      assetPair = Some(Order.AssetPair(Some(order.assetPair.amountAsset.toPB), Some(order.assetPair.priceAsset.toPB))),
+      orderSide = order.orderType match {
         case ve.OrderType.BUY  => Order.Side.BUY
         case ve.OrderType.SELL => Order.Side.SELL
       },
-      order.amount,
-      order.price,
-      order.timestamp,
-      order.expiration,
-      Some(Amount(Some(order.matcherFeeAssetId.toPB), order.matcherFee)),
-      order.version,
-      order.proofs.map(_.toPB)
+      amount = order.amount,
+      price = order.price,
+      timestamp = order.timestamp,
+      expiration = order.expiration,
+      matcherFee = Some(Amount(Some(order.matcherFeeAssetId.toPB), order.matcherFee)),
+      version = order.version,
+      proofs = order.proofs.map(_.toPB),
+      matcherFeeAssetId = Some(order.matcherFeeAssetId.toPB)
     )
   }
 

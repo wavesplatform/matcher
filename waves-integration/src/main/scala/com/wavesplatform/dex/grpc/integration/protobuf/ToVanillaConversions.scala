@@ -9,7 +9,6 @@ import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.AssetId
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.{Asset, Proofs}
@@ -49,7 +48,7 @@ object ToVanillaConversions {
                 tx.timestamp,
                 proofs
               )
-            case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v") // ??
+            case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
           }
         }
       } yield r
@@ -58,22 +57,25 @@ object ToVanillaConversions {
   implicit class PbOrderOps(val order: Order) extends AnyVal {
     def toVanilla: exchange.Order =
       exchange.Order(
-        PublicKey(order.senderPublicKey.toVanilla),
-        PublicKey(order.matcherPublicKey.toVanilla),
-        exchange.AssetPair(Asset.fromProtoId(order.getAssetPair.getAmountAssetId), Asset.fromProtoId(order.getAssetPair.getPriceAssetId)),
-        order.orderSide match {
+        senderPublicKey = PublicKey(order.senderPublicKey.toVanilla),
+        matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
+        assetPair = exchange.AssetPair(order.getAssetPair.getAmountAssetId.toVanilla, order.getAssetPair.getPriceAssetId.toVanilla),
+        orderType = order.orderSide match {
           case Order.Side.BUY             => exchange.OrderType.BUY
           case Order.Side.SELL            => exchange.OrderType.SELL
           case Order.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
         },
-        order.amount,
-        order.price,
-        order.timestamp,
-        order.expiration,
-        order.getMatcherFee.amount,
-        order.proofs.map(_.toByteArray: ByteStr),
-        order.version.toByte,
-        IssuedAsset(order.matcherFeeAssetId.toVanilla)
+        amount = order.amount,
+        price = order.price,
+        timestamp = order.timestamp,
+        expiration = order.expiration,
+        matcherFee = order.getMatcherFee.amount,
+        proofs = order.proofs.map(_.toVanilla),
+        version = order.version.toByte,
+        matcherFeeAssetId = order.matcherFeeAssetId match {
+          case None        => throw new IllegalArgumentException("The matcherFeeAssetId must be specified")
+          case Some(asset) => asset.toVanilla
+        }
       )
   }
 
@@ -83,9 +85,10 @@ object ToVanillaConversions {
 
   implicit class PbAssetIdOps(val self: AssetId) extends AnyVal {
     def toVanilla: Asset = self.asset match {
-      case AssetId.Asset.Empty              => Asset.Waves // TODO
-      case _: AssetId.Asset.Waves           => Asset.Waves
-      case AssetId.Asset.IssuedAsset(value) => Asset.IssuedAsset(value.toVanilla)
+      case AssetId.Asset.IssuedAsset(value) =>
+        if (value.isEmpty) throw new IllegalArgumentException("IssuedAsset can't contain an empty byte array")
+        Asset.IssuedAsset(value.toVanilla)
+      case _ => Asset.Waves
     }
   }
 

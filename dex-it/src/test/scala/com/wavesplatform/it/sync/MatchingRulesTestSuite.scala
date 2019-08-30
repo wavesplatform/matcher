@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
-class MatcherRulesTestSuite extends MatcherSuiteBase {
+class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = {
 
@@ -83,18 +83,18 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
   // offset is 6, after test - 12
   "Orders should be cancelled correctly when matcher rules are changed" in {
 
-    // here tick size is disabled (offset = 0)
+    // here tick size is disabled (offset = 6)
     val buyOrder1 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder1, "Accepted")
 
-    // here tick size is disabled (offset = 1)
+    // here tick size is disabled (offset = 7)
     val buyOrder2 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder2, "Accepted")
 
     val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
     val aliceWctBalance = node.assetBalance(alice.address, WctId.toString).balance
 
-    // here tick size = 5 (offset = 2), hence new order is placed into corrected price level 5, not 7
+    // here tick size = 5 (offset = 8), hence new order is placed into corrected price level 5, not 7
     val buyOrder3 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder3, "Accepted")
 
@@ -163,7 +163,7 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, sellOrder, "Accepted")
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 20 * price))
 
-    val buyOrder = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, 20 * price, matcherFee).message.id
+    val buyOrder = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, 25 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder, "Filled")
     node.waitOrderInBlockchain(buyOrder)
@@ -177,7 +177,7 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
 
     withClue("partially filled order cancellation") {
       node.reservedBalance(alice)("WAVES") shouldBe matcherFee / 2
-      node.reservedBalance(alice)(UsdId.toString) shouldBe 20 * price * amount / PriceConstant
+      node.reservedBalance(alice)(UsdId.toString) shouldBe 25 * price * amount / PriceConstant
       node.cancelOrder(alice, wctUsdPair, buyOrder)
       node.reservedBalance(alice) shouldBe Map()
     }

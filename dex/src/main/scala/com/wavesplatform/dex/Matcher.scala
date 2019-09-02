@@ -14,13 +14,14 @@ import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db._
+import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -34,6 +35,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
+import mouse.any._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
@@ -169,8 +171,8 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHash = Base58.tryDecode(settings.restApi.apiKeyHash).toOption
-
+    //val keyHash = Base58.tryDecode(settings.restApi.apiKeyHash).toOption
+    val keyHashStr = settings.restApi.apiKeyHash
     Seq(
       MatcherApiRoute(
         pairBuilder,
@@ -197,7 +199,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         () => ExchangeTransactionCreator.minAccountFee(hasMatcherAccountScript),
-        keyHash,
+        keyHashStr,
         rateCache,
         settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context).isRight)
       ),
@@ -205,7 +207,8 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHash
+        keyHashStr,
+        settings
       )
     )
   }
@@ -274,11 +277,13 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
     actorSystem.actorOf(HistoryRouter.props(assetDecimalsCache.get, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
+  private lazy val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}")
+
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          context.spendableBalanceChanged,
+          gRPCExtensionClient.balancesServiceClient <| { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
           (address, startSchedules) =>
             Props(

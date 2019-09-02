@@ -3,14 +3,15 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import future.com.wavesplatform.transaction.assets.exchange.Implicits._
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -74,9 +75,17 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""waves {
       |  directory = /waves
       |  dex {
-      |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
-      |    bind-address = 127.0.0.1
-      |    port = 6886
+      |    account-storage {
+      |      type = "in-mem"
+      |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+      |    }
+      |    rest-api {
+      |      address = 127.1.2.3
+      |      port = 6880
+      |      api-key-hash = foobarhash
+      |      cors = no
+      |      api-key-different-host = no
+      |    }
       |    exchange-tx-base-fee = 300000
       |    actor-response-timeout = 11s
       |    snapshots-interval = 999
@@ -102,7 +111,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |      cache-timeout = 11m
       |      depth-ranges = [1, 5, 333]
       |    }
-      |    balance-watching-buffer-interval = 33s
       |    events-queue {
       |      type = "kafka"
       |
@@ -150,9 +158,14 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val config = configWithSettings()
 
     val settings = config.as[MatcherSettings]("waves.dex")
-    settings.accountStorage should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
-//    settings.bindAddress should be("127.0.0.1")
-//    settings.port should be(6886)
+    settings.accountStorage should be(AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get))
+    settings.restApi shouldBe RestAPISettings(
+      address = "127.1.2.3",
+      port = 6880,
+      apiKeyHash = "foobarhash",
+      cors = false,
+      apiKeyDifferentHost = false
+    )
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
     settings.journalDataDir should be("/waves/matcher/journal")
@@ -169,7 +182,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333)
     )
-    settings.balanceWatchingBufferInterval should be(33.seconds)
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
       local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
@@ -253,10 +265,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
 
-    val invalidMode =
+    def invalidMode(invalidModeName: String = "invalid"): String =
       s"""
          |order-fee {
-         |  mode = invalid
+         |  mode = $invalidModeName
          |  dynamic {
          |    base-fee = 300000
          |  }
@@ -326,12 +338,15 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
        """.stripMargin
 
     def configStr(x: String): Config    = configWithSettings(orderFeeStr = x)
-    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode()))
+    val settingsDeprecatedNameMode      = getSettingByConfig(configStr(invalidMode("waves")))
     val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
     val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
     settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
+
+    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee.mode value: waves")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(

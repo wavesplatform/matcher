@@ -48,8 +48,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase with CanSetScript 
 
     setContract(Some("true"), bob)
     node.waitForTransaction(node.broadcastRequest(aliceAssetTx.json()).id)
-    node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-    node.assertAssetBalance(matcher.address, aliceAsset, 0)
+    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
+    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
   }
 
   "issue asset and run test" - {

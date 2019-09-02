@@ -40,7 +40,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
       configWithBlacklisted(
         assets = Array(WctId.toString),
         names = Array("ETH.*"),
-        addresses = Array(bob.address)
+        addresses = Array(bob.toAddress.toString)
       )
     )
     restartContainer(dex1Container(), dex1Api)

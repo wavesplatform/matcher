@@ -79,7 +79,6 @@ class ExchangeTransactionCreatorSpecification
     }
 
     "create valid exchange transaction when orders are matched partially" in {
-
       import com.wavesplatform.transaction.assets.exchange.OrderOps._
 
       val preconditions = for { ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator } yield {
@@ -92,7 +91,11 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
-          val tc = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => false)
+          val activeSmartAccountTrading =
+            if (buyOrder.version == 1 && sellOrder.version == 1) Map.empty[Short, Boolean]
+            else Map(BlockchainFeatures.SmartAccountTrading.id -> true)
+
+          val tc = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, activeSmartAccountTrading.getOrElse(_, false))
           val tx = tc.createTransaction(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
 
           tx shouldBe 'right

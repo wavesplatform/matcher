@@ -8,7 +8,9 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.AssetId
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.order.Order
+import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.{Asset, Proofs}
@@ -20,7 +22,7 @@ object ToVanillaConversions {
         tx <- self.transaction.fold[Either[ValidationError, ExchangeTransaction]](GenericError("The transaction must be specified").asLeft)(_.asRight)
         data <- tx.data.exchange
           .fold[Either[ValidationError, ExchangeTransactionData]](GenericError("The transaction's data must be specified").asLeft)(_.asRight)
-        fee <- tx.fee.toRight(GenericError("The fee must be specified"))
+        fee <- tx.fee.fold[Either[ValidationError, Amount]](GenericError("The transaction's fee must be specified").asLeft)(_.asRight)
         r <- {
           val proofs = Proofs(self.proofs.map(_.toVanilla))
           tx.version match {
@@ -59,7 +61,7 @@ object ToVanillaConversions {
       exchange.Order(
         senderPublicKey = PublicKey(order.senderPublicKey.toVanilla),
         matcherPublicKey = PublicKey(order.matcherPublicKey.toVanilla),
-        assetPair = exchange.AssetPair(order.getAssetPair.getAmountAssetId.toVanilla, order.getAssetPair.getPriceAssetId.toVanilla),
+        assetPair = exchange.AssetPair(order.getAssetPair.amountAssetId.toVanillaAsset, order.getAssetPair.priceAssetId.toVanillaAsset),
         orderType = order.orderSide match {
           case Order.Side.BUY             => exchange.OrderType.BUY
           case Order.Side.SELL            => exchange.OrderType.SELL
@@ -69,27 +71,22 @@ object ToVanillaConversions {
         price = order.price,
         timestamp = order.timestamp,
         expiration = order.expiration,
-        matcherFee = order.getMatcherFee.amount,
+        matcherFee = order.matcherFee.map(_.amount) match {
+          case None    => throw new IllegalArgumentException("The matcherFee must be specified")
+          case Some(x) => x
+        },
         proofs = order.proofs.map(_.toVanilla),
         version = order.version.toByte,
-        matcherFeeAssetId = order.matcherFeeAssetId match {
+        matcherFeeAssetId = order.matcherFee.map(_.assetId) match {
           case None        => throw new IllegalArgumentException("The matcherFeeAssetId must be specified")
-          case Some(asset) => asset.toVanilla
+          case Some(asset) => asset.toVanillaAsset
         }
       )
   }
 
   implicit class PbByteStringOps(val self: ByteString) extends AnyVal {
-    def toVanilla: ByteStr = ByteStr(self.toByteArray)
-  }
-
-  implicit class PbAssetIdOps(val self: AssetId) extends AnyVal {
-    def toVanilla: Asset = self.asset match {
-      case AssetId.Asset.IssuedAsset(value) =>
-        if (value.isEmpty) throw new IllegalArgumentException("IssuedAsset can't contain an empty byte array")
-        Asset.IssuedAsset(value.toVanilla)
-      case _ => Asset.Waves
-    }
+    def toVanilla: ByteStr    = ByteStr(self.toByteArray)
+    def toVanillaAsset: Asset = if (self.isEmpty) Asset.Waves else Asset.IssuedAsset(self.toVanilla)
   }
 
   implicit class PbMaybeDescriptionOps(val self: MaybeDescription) extends AnyVal {

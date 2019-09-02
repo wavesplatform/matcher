@@ -8,7 +8,7 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.{ApiRoute, _}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -24,6 +24,7 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -59,10 +60,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: () => Long,
-                           apiKeyHash: Option[Array[Byte]],
+                           apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
+    with AuthRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
@@ -134,7 +136,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
-    (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
+    (pathEndOrSingleSlash & entity(as[Order])) { order =>
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(
@@ -195,7 +197,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/settings/rates")
-  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (asset cost in Waves)", httpMethod = "GET")
+  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (cost of 1 Waves in asset)", httpMethod = "GET")
   def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
 
   @Path("/settings/rates/{assetId}")
@@ -260,7 +262,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = false,
                            dataType = "integer",
                            paramType = "query")
-    ))
+    )
+  )
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
@@ -275,7 +278,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
       getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { ms =>
@@ -290,7 +294,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def orderBookInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
       complete(StatusCodes.OK -> orderBookInfoJson(pair))
@@ -320,7 +325,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "body",
         dataType = "com.wavesplatform.transaction.assets.exchange.Order"
       )
-    ))
+    )
+  )
   def placeLimitOrder: Route = placeOrder("orderbook", isMarket = false)
 
   @Path("/orderbook/market")
@@ -338,7 +344,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "body",
         dataType = "com.wavesplatform.transaction.assets.exchange.Order"
       )
-    ))
+    )
+  )
   def placeMarketOrder: Route = placeOrder("orderbook" / "market", isMarket = true)
 
   @Path("/orderbook")
@@ -397,7 +404,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "body",
         dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
-    ))
+    )
+  )
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
     withAssetPair(p, formatError = e => OrderCancelRejected(e)) { pair =>
       unavailableOrderBookBarrier(pair) {
@@ -422,7 +430,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "body",
         dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
-    ))
+    )
+  )
   def cancelAll: Route = (path("orderbook" / "cancel") & post) {
     handleCancelRequest(None)
   }
@@ -447,9 +456,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "body",
         dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
       )
-    ))
+    )
+  )
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
-    json[CancelOrderRequest] { req =>
+    jsonPost[CancelOrderRequest] { req =>
       req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
     }
   }
@@ -498,7 +508,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = true,
                            dataType = "string",
                            paramType = "header")
-    ))
+    )
+  )
   def getAssetPairAndPublicKeyOrderHistory: Route = (path("orderbook" / AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
     withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
       parameters('activeOnly.as[Boolean].?) { activeOnly =>
@@ -528,7 +539,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = true,
                            dataType = "string",
                            paramType = "header")
-    ))
+    )
+  )
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
       signedGet(publicKey) {
@@ -542,7 +554,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
     DBUtils.order(db, orderId) match {
       case Some(order) => handleCancelRequest(None, order.sender, Some(orderId), None)
@@ -563,7 +576,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "query",
         defaultValue = "false"
       ),
-    ))
+    )
+  )
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
       loadOrders(address, None, activeOnly.getOrElse(true))
@@ -577,7 +591,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
@@ -597,7 +612,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = true,
                            dataType = "string",
                            paramType = "header")
-    ))
+    )
+  )
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
@@ -613,7 +629,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
@@ -635,7 +652,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { pair =>
     orderBook(pair) match {
       case Some(Right(_)) =>
@@ -654,7 +672,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
-    ))
+    )
+  )
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
     complete(StatusCodes.OK -> Json.toJson(DBUtils.transactionsForOrder(db, orderId)))
   }
@@ -698,6 +717,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
     }
   }
+
+  // TODO remove AuthRoute
+  override def settings: RestAPISettings =
+    RestAPISettings(
+      true,
+      matcherSettings.restApi.address,
+      matcherSettings.restApi.port,
+      apiKeyHashStr,
+      true,
+      true,
+      100,
+      100
+    )
 }
 
 object MatcherApiRoute {

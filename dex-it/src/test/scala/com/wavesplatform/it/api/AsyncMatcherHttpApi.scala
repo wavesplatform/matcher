@@ -14,6 +14,9 @@ import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
+import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
@@ -198,19 +201,19 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
 
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
     def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
-                        retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
+                        retryInterval: FiniteDuration = 5.second): Future[MatcherStatusResponse] = {
       waitFor[MatcherStatusResponse](
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
         _.orderStatus(orderId, assetPair),
         _.status == expectedStatus,
-        5.seconds)
+        retryInterval)
     }
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,
@@ -233,11 +236,16 @@ object AsyncMatcherHttpApi extends Assertions {
                      fee: Long,
                      version: Byte,
                      timestamp: Long = System.currentTimeMillis(),
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
-      val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val unsigned =
-        Order(sender, DexTestConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
-      Order.sign(unsigned, sender)
+                     timeToLive: Duration = 30.days - 1.seconds,
+                     matcherFeeAssetId: Asset = Waves): Order = {
+//      val timeToLiveTimestamp = timestamp + timeToLive.toMillis
+//      val unsigned = version match {
+//        case 3 => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version,
+//          matcherFeeAssetId)
+//        case _ => Order(sender, DexTestConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+//      }
+//      Order.sign(unsigned, sender)
+      ???
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
@@ -253,8 +261,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    price: Long,
                    fee: Long,
                    version: Byte,
-                   timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive)
+                   timeToLive: Duration = 30.days - 1.seconds,
+                   matcherFeeAssetId: Asset = Waves): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, matcherFeeAssetId = matcherFeeAssetId)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
@@ -284,7 +293,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      matcherGetWithApiKey(s"/matcher/orders/${sender.address}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
+      matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
     def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]
@@ -341,11 +350,11 @@ object AsyncMatcherHttpApi extends Assertions {
       orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
     )
 
-    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int): Future[RatesResponse] = {
+    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int, apiKey: String = matcherNode.apiKey): Future[RatesResponse] = {
       put(
         s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}",
         (rb: RequestBuilder) =>
-          rb.withApiKey(matcherNode.apiKey)
+          rb.withApiKey(apiKey)
             .setHeader("Content-type", "application/json;charset=utf-8")
             .setBody(stringify(toJson(rate))),
         expectedStatusCode
@@ -354,9 +363,9 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def getRates(): Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
 
-    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[RatesResponse] = {
+    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200, apiKey: String = matcherNode.apiKey): Future[RatesResponse] = {
       retrying(
-        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
+        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(apiKey).build(),
         statusCode = expectedStatusCode
       ).as[RatesResponse]
     }

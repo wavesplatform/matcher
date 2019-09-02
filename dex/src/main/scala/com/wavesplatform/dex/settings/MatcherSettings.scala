@@ -6,6 +6,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
@@ -22,7 +23,6 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
@@ -50,7 +50,6 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
-                           balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: OrderFeeSettings,
@@ -96,8 +95,6 @@ object MatcherSettings {
 
     val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-
-    val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
 
     val eventsQueue            = config.as[EventsQueueSettings]("events-queue")
     val processConsumedTimeout = config.as[FiniteDuration]("process-consumed-timeout")
@@ -145,7 +142,6 @@ object MatcherSettings {
       maxOrdersPerRequest,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
-      balanceWatchingBufferInterval,
       eventsQueue,
       processConsumedTimeout,
       orderFee,

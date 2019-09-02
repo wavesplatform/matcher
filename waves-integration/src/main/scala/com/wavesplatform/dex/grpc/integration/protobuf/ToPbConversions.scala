@@ -3,8 +3,10 @@ package com.wavesplatform.dex.grpc.integration.protobuf
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.services._
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.order.{AssetPair, Order}
+import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
 import com.wavesplatform.protobuf.transaction.Recipient.Recipient.Address
-import com.wavesplatform.protobuf.transaction.{Amount, AssetId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.{exchange => ve}
 import com.wavesplatform.{account => va}
@@ -17,7 +19,7 @@ object ToPbConversions {
           ExchangeTransaction(
             chainId = tx.chainByte.getOrElse(va.AddressScheme.current.chainId).toInt,
             senderPublicKey = tx.sender.toPB,
-            fee = Some(Amount(assetId = Some(tx.assetFee._1.toPB), amount = tx.assetFee._2)),
+            fee = Some(Amount(assetId = tx.assetFee._1.toPB, amount = tx.assetFee._2)),
             timestamp = tx.timestamp,
             version = tx.version,
             data = ExchangeTransaction.Data.Exchange(
@@ -34,11 +36,10 @@ object ToPbConversions {
   }
 
   implicit class VanillaAssetOps(self: Asset) {
-    def toPB: AssetId =
-      AssetId(self match {
-        case Asset.IssuedAsset(assetId) => AssetId.Asset.IssuedAsset(assetId.toPB)
-        case Asset.Waves                => AssetId.Asset.Empty
-      })
+    def toPB: ByteString = self match {
+      case Asset.IssuedAsset(assetId) => assetId.toPB
+      case Asset.Waves                => ByteString.EMPTY
+    }
   }
 
   implicit class VanillaOrderOps(order: ve.Order) {
@@ -46,7 +47,7 @@ object ToPbConversions {
       chainId = va.AddressScheme.current.chainId.toInt,
       senderPublicKey = order.senderPublicKey.toPB,
       matcherPublicKey = order.matcherPublicKey.toPB,
-      assetPair = Some(Order.AssetPair(Some(order.assetPair.amountAsset.toPB), Some(order.assetPair.priceAsset.toPB))),
+      assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
       orderSide = order.orderType match {
         case ve.OrderType.BUY  => Order.Side.BUY
         case ve.OrderType.SELL => Order.Side.SELL
@@ -55,10 +56,9 @@ object ToPbConversions {
       price = order.price,
       timestamp = order.timestamp,
       expiration = order.expiration,
-      matcherFee = Some(Amount(Some(order.matcherFeeAssetId.toPB), order.matcherFee)),
+      matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee)),
       version = order.version,
-      proofs = order.proofs.map(_.toPB),
-      matcherFeeAssetId = Some(order.matcherFeeAssetId.toPB)
+      proofs = order.proofs.map(_.toPB)
     )
   }
 

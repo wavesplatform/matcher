@@ -94,8 +94,9 @@ object SyncMatcherHttpApi extends Assertions {
                    price: Long,
                    fee: Long,
                    version: Byte = 1: Byte,
-                   timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
-      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive))
+                   timeToLive: Duration = 30.days - 1.seconds,
+                   matcherFeeAssetId: Asset = Waves): MatcherResponse =
+      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, matcherFeeAssetId))
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
@@ -106,8 +107,9 @@ object SyncMatcherHttpApi extends Assertions {
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
-                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
+                        waitTime: Duration = OrderRequestAwaitTime,
+                        retryInterval: FiniteDuration = 5.second): MatcherStatusResponse =
+      sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus, retryInterval), waitTime)
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,
                                  orderId: String,
@@ -168,8 +170,9 @@ object SyncMatcherHttpApi extends Assertions {
                                      fee: Long = 300000L,
                                      version: Byte = 1,
                                      timeToLive: Duration = 30.days - 1.seconds,
-                                     expectedMessage: Option[String] = None): Boolean =
-      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive),
+                                     expectedMessage: Option[String] = None,
+                                     matcherFeeAssetId: Asset = Waves): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, matcherFeeAssetId),
                                     400,
                                     "OrderRejected",
                                     expectedMessage)
@@ -257,12 +260,12 @@ object SyncMatcherHttpApi extends Assertions {
                      waitTime: Duration = RequestAwaitTime * 5): MatcherState =
       sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
 
-    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode): RatesResponse =
-      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue), waitTime)
+    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue, apiKey), waitTime)
 
     def getRates: Map[Asset, Double] = sync(async(m).getRates())
 
-    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
-      sync(async(m).deleteRate(asset, expectedStatusCode.intValue))
+    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).deleteRate(asset, expectedStatusCode.intValue, apiKey))
   }
 }

@@ -9,14 +9,15 @@ import com.spotify.docker.client.messages.Network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
+import com.wavesplatform.dex.it.tools.DockerContainerLauncher
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
@@ -49,12 +50,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   val postgresContainerLauncher =
     new DockerContainerLauncher(
-      postgresImageName,
-      postgresContainerName,
-      postgresEnv,
-      postgresContainerIp,
-      postgresContainerPort,
-      wavesNetwork.name
+      imageName = postgresImageName,
+      containerName = postgresContainerName,
+      containerIp = postgresContainerIp,
+      containerPort = postgresContainerPort,
+      env = postgresEnv,
+      networkName = wavesNetwork.name,
+      imageTag = "10"
     )
 
   val batchLingerMs: Int  = OrderHistorySettings.defaultBatchLingerMs

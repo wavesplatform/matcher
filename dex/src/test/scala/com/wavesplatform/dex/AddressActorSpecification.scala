@@ -203,7 +203,15 @@ class AddressActorSpecification
       eventsProbe,
       (updatedPortfolio, notify) => {
         val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
-        if (notify) addressActor ! BalanceUpdated(prevPortfolio.changedAssetIds(updatedPortfolio))
+        if (notify)
+          addressActor !
+            BalanceUpdated {
+              prevPortfolio
+                .changedAssetIds(updatedPortfolio)
+                .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
+                .toMap
+                .withDefaultValue(0)
+            }
       }
     )
     addressActor ! PoisonPill

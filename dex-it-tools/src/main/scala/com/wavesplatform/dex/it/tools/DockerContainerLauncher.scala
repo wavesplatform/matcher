@@ -1,34 +1,39 @@
-package com.wavesplatform.it
+package com.wavesplatform.dex.it.tools
 
 import cats.implicits._
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages.{ContainerConfig, EndpointConfig, HostConfig, PortBinding}
-import com.wavesplatform.it.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError}
+import com.wavesplatform.dex.it.tools.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError, VolumePair}
+import mouse.any._
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
 class DockerContainerLauncher(imageName: String,
                               containerName: String,
-                              env: String,
                               containerIp: String,
                               containerPort: String,
-                              networkName: String,
+                              imageTag: String = "",
+                              env: String = "",
+                              networkName: String = "",
                               hostPort: Option[String] = None,
-                              imageTag: String = "latest") {
+                              volumePath: Option[VolumePair] = None,
+                              capabilities: Seq[String] = Seq.empty) {
 
   val dockerClient: DefaultDockerClient = DefaultDockerClient.fromEnv().build()
 
-  private val hostConfig = {
-    val hostConfigBuilder = HostConfig.builder()
-    hostPort
-      .fold(hostConfigBuilder.publishAllPorts(true)) { port =>
-        hostConfigBuilder.portBindings(Map(containerPort -> List(PortBinding.of("0.0.0.0", port)).asJava).asJava)
+  private val hostConfig: HostConfig =
+    HostConfig.builder() |> { builder =>
+      hostPort.fold(builder.publishAllPorts(true)) { port =>
+        builder.portBindings(Map(containerPort -> List(PortBinding.of("0.0.0.0", port)).asJava).asJava)
       }
-      .build()
-  }
+    } |> { builder =>
+      volumePath.fold(builder) { case VolumePair(localPath, containerPath) => builder.appendBinds(s"$localPath:$containerPath") }
+    } |> { builder =>
+      Option(capabilities).filter(_.nonEmpty).fold(builder)(caps => builder.capAdd(caps: _*))
+    } |> (_.build)
 
   private def endpointConfig: EndpointConfig = {
     EndpointConfig
@@ -38,16 +43,16 @@ class DockerContainerLauncher(imageName: String,
       .build()
   }
 
-  private val containerConfig = {
-    dockerClient.pull(s"$imageName:$imageTag")
-    ContainerConfig
-      .builder()
-      .hostConfig(hostConfig)
-      .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(networkName -> endpointConfig).asJava))
-      .exposedPorts(containerPort)
-      .image(imageName)
-      .env(env)
-      .build()
+  private val containerConfig: ContainerConfig = {
+    s"$imageName${if (imageTag.nonEmpty) s":$imageTag" else ""}" |> { image =>
+      dockerClient.pull(image)
+      ContainerConfig
+        .builder()
+        .hostConfig(hostConfig)
+        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(networkName -> endpointConfig).asJava))
+        .exposedPorts(containerPort)
+        .image(image) |> (builder => if (env.nonEmpty) builder.env(env) else builder) |> (_.build)
+    }
   }
 
   private val creation    = dockerClient.createContainer(containerConfig, containerName)
@@ -70,6 +75,9 @@ class DockerContainerLauncher(imageName: String,
 }
 
 object DockerContainerLauncher {
+
   trait DockerError                                   extends Product with Serializable
   case class ContainerIsNotStartedYetError(m: String) extends DockerError
+
+  case class VolumePair(localPath: String, containerPath: String)
 }

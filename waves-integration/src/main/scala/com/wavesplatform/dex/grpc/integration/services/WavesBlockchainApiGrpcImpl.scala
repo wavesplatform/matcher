@@ -6,14 +6,14 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.error
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
-import com.wavesplatform.dex.grpc.integration.protobuf.{EitherToFutureConversionOps, StreamObserverMonixOps}
+import com.wavesplatform.dex.grpc.integration.protobuf.{EitherVEExt, StreamObserverMonixOps}
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
@@ -44,7 +44,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     responseObserver.completeWith(result)
   }
 
-  override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] =
+  override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] = Future {
     request.transaction
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap(_.toVanilla)
@@ -59,7 +59,8 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
           .leftFlatMap(_ => BroadcastResponse().asRight)
         r
       }
-      .toFuture
+      .explicitGetErr()
+  }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(isActivated = blockchain.activatedFeatures.contains(request.featureId.toShort))
@@ -86,79 +87,68 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     HasScriptResponse(has = blockchain.hasAssetScript(IssuedAsset(request.assetId.toVanilla)))
   }
 
-  override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = {
+  override def runAssetScript(request: RunAssetScriptRequest): Future[RunScriptResponse] = Future {
     import RunScriptResponse._
 
-    for {
-      r <- Future {
-        val asset = IssuedAsset(request.assetId.toVanilla)
-        blockchain.assetScript(asset) match {
-          case None => Result.Empty
-          case Some(script) =>
-            val tx = request.transaction
-              .getOrElse(throw new IllegalArgumentException("Expected a transaction"))
-              .toVanilla
-              .getOrElse(throw new IllegalArgumentException("Can't parse the transaction"))
+    val asset = IssuedAsset(request.assetId.toVanilla)
 
-            try {
-              ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2 match {
-                case Left(execError) => Result.ScriptError(execError)
-                case Right(FALSE)    => Result.Denied(Empty())
-                case Right(TRUE)     => Result.Empty
-                case Right(x)        => Result.UnexpectedResult(x.toString)
-              }
-            } catch {
-              case NonFatal(e) =>
-                log.trace(error.formatStackTrace(e))
-                Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
-            }
-        }
-      }
-    } yield RunScriptResponse(r)
+    val r = blockchain.assetScript(asset) match {
+      case None => Result.Empty
+      case Some(script) =>
+        val tx = request.transaction
+          .getOrElse(throw new IllegalArgumentException("Expected a transaction"))
+          .toVanilla
+          .getOrElse(throw new IllegalArgumentException("Can't parse the transaction"))
+        parseScriptResult(ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = true, asset.id)._2)
+    }
+    RunScriptResponse(r)
   }
 
-  override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] =
-    Address.fromBytes(request.address.toVanilla).toFuture.map { addr =>
-      HasScriptResponse(has = blockchain.hasScript(addr))
-    }
+  override def hasAddressScript(request: HasAddressScriptRequest): Future[HasScriptResponse] = Future {
+    Address
+      .fromBytes(request.address.toVanilla)
+      .map { addr =>
+        HasScriptResponse(has = blockchain.hasScript(addr))
+      }
+      .explicitGetErr()
+  }
 
-  override def runAddressScript(request: RunAddressScriptRequest): Future[RunScriptResponse] = {
+  override def runAddressScript(request: RunAddressScriptRequest): Future[RunScriptResponse] = Future {
     import RunScriptResponse._
 
-    for {
-      address <- Address.fromBytes(request.address.toVanilla).toFuture
-      r <- Future {
-        blockchain.accountScript(address) match {
-          case None => Result.Empty
-          case Some(script) =>
-            val order = request.order.map(_.toVanilla).getOrElse(throw new IllegalArgumentException("Expected an order"))
-            try {
-              MatcherScriptRunner(script, order)._2 match {
-                case Left(execError) => Result.ScriptError(execError)
-                case Right(FALSE)    => Result.Denied(Empty())
-                case Right(TRUE)     => Result.Empty
-                case Right(x)        => Result.UnexpectedResult(x.toString)
-              }
-            } catch {
-              case NonFatal(e) =>
-                log.trace(error.formatStackTrace(e))
-                Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
-            }
-        }
-      }
-    } yield RunScriptResponse(r)
+    val address = Address.fromBytes(request.address.toVanilla).explicitGetErr()
+    val r = blockchain.accountScript(address) match {
+      case None => Result.Empty
+      case Some(script) =>
+        val order = request.order.map(_.toVanilla).getOrElse(throw new IllegalArgumentException("Expected an order"))
+        parseScriptResult(MatcherScriptRunner(script, order)._2)
+    }
+
+    RunScriptResponse(r)
   }
 
-  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] =
-    Address.fromBytes(request.address.toVanilla).toFuture.map { addr =>
-      val assetId = request.assetId.fold[Asset](Waves)(_.toVanilla) // TODO
-      val b       = blockchain.balance(addr, assetId)
-      log.info(s"spendableAssetBalance(addr=$addr, asset=$assetId) = $b")
-      SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
-    }
+  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
+    val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
+    val assetId = request.assetId.toVanillaAsset
+    SpendableAssetBalanceResponse(blockchain.balance(addr, assetId))
+  }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
     val seen = blockchain.filledVolumeAndFee(request.orderId.toVanilla).volume > 0
     ForgedOrderResponse(isForged = seen)
+  }
+
+  private def parseScriptResult(raw: Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
+    import RunScriptResponse.Result
+    try raw match {
+      case Left(execError) => Result.ScriptError(execError)
+      case Right(FALSE)    => Result.Denied(Empty())
+      case Right(TRUE)     => Result.Empty
+      case Right(x)        => Result.UnexpectedResult(x.toString)
+    } catch {
+      case NonFatal(e) =>
+        log.trace(error.formatStackTrace(e))
+        Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
+    }
   }
 }

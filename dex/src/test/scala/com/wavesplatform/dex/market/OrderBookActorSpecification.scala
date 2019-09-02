@@ -35,7 +35,7 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory: ExchangeTransactionCreator = ??? // = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => false)
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 

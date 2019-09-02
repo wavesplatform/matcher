@@ -7,36 +7,40 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "1a474761801b558a01060b894a7ab418995a1adf"
+def nodeVersionTag: String = "31dcd8a3e8a9274cd2b7e8e7c32481fe78263387"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
-lazy val common = project
+lazy val `dex-common` = project
 
 lazy val dex = project.dependsOn(
+  `waves-integration`,
+  `dex-common`,
   node % "compile;test->test;runtime->provided",
-  common,
-  `waves-integration`
 )
 
-lazy val `dex-it` = project
-  .dependsOn(
-    dex,
-    `waves-integration-it`,
-    `node-it` % "compile;test->test"
-  )
+lazy val `dex-it-tools` = project
+
+lazy val `dex-it` = project.dependsOn(
+  dex       % "compile;test->test",
+  `node-it` % "compile;test->test",
+  `waves-integration-it`,
+  `dex-it-tools`,
+  `dex-common`
+)
 
 lazy val `waves-integration` = project.dependsOn(
-  common,
+  `dex-common`,
   node % "compile;test->test;runtime->provided"
 )
 
 lazy val `waves-integration-it` = project
   .dependsOn(
     `waves-integration`,
-    `node-it` % "compile;test->test"
+    `node-it` % "compile;test->test",
+    `dex-it-tools`
   )
 
 lazy val `dex-generator` = project.dependsOn(
@@ -53,10 +57,10 @@ lazy val it = project
         root / Compile / packageAll,
         Def.task {
           val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
-          val dexDocker = (`dex-it` / Docker / docker).value
+          val dexDocker              = (`dex-it` / Docker / docker).value
         },
-        `waves-integration-it` / Test /test,
-        `dex-it` / Test / test,
+        `waves-integration-it` / Test / test,
+        `dex-it` / Test / test
       )
       .value
   )
@@ -115,7 +119,8 @@ inScope(Global)(
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
     buildNodeContainer := (`node-it` / Docker / docker).value
-  ))
+  )
+)
 
 // ThisBuild options
 git.useGitDescribe := true

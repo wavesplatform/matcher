@@ -45,7 +45,7 @@ object HistoryRouter {
         OrderRecord(
           id = order.id().toString,
           tpe = if (acceptedOrder.isMarket) marketOrderType else limitOrderType,
-          senderAddress = order.sender.address,
+          senderAddress = order.sender.toAddress.toString,
           senderPublicKey = order.senderPublicKey.toString,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,

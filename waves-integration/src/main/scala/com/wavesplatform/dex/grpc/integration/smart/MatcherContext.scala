@@ -11,28 +11,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountDataInfo,
-  AssetDescription,
-  AssetDistribution,
-  AssetDistributionPage,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  Height,
-  InvokeScriptResult,
-  LeaseBalance,
-  Portfolio,
-  TransactionId,
-  VolumeAndFee
-}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, Blockchain, DataEntry, InvokeScriptResult, LeaseBalance, Portfolio, TransactionId, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
-import com.wavesplatform.utils.CloseableIterator
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -80,21 +64,16 @@ object MatcherContext {
     override def totalFee(height: Int): Option[Long]                                         = kill("totalFee")
 
     /** Features related */
-    override def approvedFeatures: Map[Short, Int]                                                               = kill("approvedFeatures")
-    override def activatedFeatures: Map[Short, Int]                                                              = kill("activatedFeatures")
-    override def featureVotes(height: Int): Map[Short, Int]                                                      = kill("featureVotes")
-    override def portfolio(a: Address): Portfolio                                                                = kill("portfolio")
-    override def transactionInfo(id: ByteStr): Option[(Int, Transaction)]                                        = kill("transactionInfo")
-    override def transactionHeight(id: ByteStr): Option[Int]                                                     = kill("transactionHeight")
-    override def nftList(address: Address, from: Option[Asset.IssuedAsset]): CloseableIterator[IssueTransaction] = kill("nftList")
-    override def addressTransactions(address: Address,
-                                     types: Set[TransactionParser],
-                                     fromId: Option[ByteStr]): CloseableIterator[(Height, Transaction)] = kill("addressTransactions")
-    override def containsTransaction(tx: Transaction): Boolean                                          = kill("containsTransaction")
-    override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                      = kill("assetDescription")
-    override def resolveAlias(a: Alias): Either[ValidationError, Address]                               = kill("resolveAlias")
-    override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]                                   = kill("leaseDetails")
-    override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee                                     = kill("filledVolumeAndFee")
+    override def approvedFeatures: Map[Short, Int]                                 = kill("approvedFeatures")
+    override def activatedFeatures: Map[Short, Int]                                = kill("activatedFeatures")
+    override def featureVotes(height: Int): Map[Short, Int]                        = kill("featureVotes")
+    override def transactionInfo(id: ByteStr): Option[(Int, Transaction)]          = kill("transactionInfo")
+    override def transactionHeight(id: ByteStr): Option[Int]                       = kill("transactionHeight")
+    override def containsTransaction(tx: Transaction): Boolean                     = kill("containsTransaction")
+    override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = kill("assetDescription")
+    override def resolveAlias(a: Alias): Either[ValidationError, Address]          = kill("resolveAlias")
+    override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]              = kill("leaseDetails")
+    override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee                = kill("filledVolumeAndFee")
 
     /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
     override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = kill("balanceSnapshots")
@@ -107,14 +86,6 @@ object MatcherContext {
     override def accountData(acc: Address): AccountDataInfo                                       = kill("accountData")
     override def leaseBalance(address: Address): LeaseBalance                                     = kill("leaseBalance")
     override def balance(address: Address, mayBeAssetId: Asset): Long                             = kill("balance")
-    override def assetDistribution(asset: Asset.IssuedAsset): AssetDistribution                   = kill("assetDistribution")
-    override def assetDistributionAtHeight(asset: Asset.IssuedAsset,
-                                           height: Int,
-                                           count: Int,
-                                           fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
-      kill("assetDistributionAtHeight")
-    override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = kill("wavesDistribution")
-    override def allActiveLeases: CloseableIterator[LeaseTransaction]                        = kill("allActiveLeases")
 
     /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
       *
@@ -122,5 +93,6 @@ object MatcherContext {
     override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = kill("collectLposPortfolios")
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")
+    override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]                = kill("collectActiveLeases")
   }
 }

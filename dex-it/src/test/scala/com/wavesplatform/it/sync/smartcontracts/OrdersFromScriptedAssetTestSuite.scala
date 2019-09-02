@@ -14,6 +14,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
@@ -112,7 +113,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("update a script")
-    val setAssetScriptId = node.setAssetScript(AllowAsset2Id, matcher.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
+    val setAssetScriptId = node.setAssetScript(AllowAsset2Id, matcher.toAddress.toString, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
     node.waitForTransaction(setAssetScriptId)
 
     info("a counter order wasn't rejected")
@@ -138,7 +139,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("update a script")
-    val setAssetScriptId = node.setAssetScript(AllowAsset3Id, matcher.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
+    val setAssetScriptId = node.setAssetScript(AllowAsset3Id, matcher.toAddress.toString, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
     node.waitForTransaction(setAssetScriptId)
 
     info("a counter order wasn't rejected")
@@ -238,7 +239,7 @@ object OrdersFromScriptedAssetTestSuite {
                         | case other => true
                         |}
                         |""".stripMargin
-    ScriptCompiler(scriptText, isAssetScript = true).explicitGet()._1
+    ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1
   }
 
   val activationHeight = 10

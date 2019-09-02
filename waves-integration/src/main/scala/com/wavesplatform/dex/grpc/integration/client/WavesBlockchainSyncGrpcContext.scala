@@ -55,7 +55,7 @@ class WavesBlockchainSyncGrpcContext(channel: ManagedChannel) extends WavesBlock
       .spendableAssetBalance(
         SpendableAssetBalanceRequest(
           address = address.bytes.toPB,
-          assetId = Some(asset.toPB)
+          assetId = asset.toPB
         )
       )
       .balance

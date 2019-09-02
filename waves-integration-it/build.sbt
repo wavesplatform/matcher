@@ -2,10 +2,11 @@ import WavesExtensionDockerKeys._
 
 enablePlugins(WavesExtensionDockerPlugin, ItTestPlugin)
 
-description := "Integration tests of the DEX gRPC extension for the Waves node "
+description := "Integration tests of the DEX gRPC extension for the Waves node"
 
 libraryDependencies ++= Dependencies.itTest ++ Dependencies.silencer
 
+docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/waves-integration-it:latest")),

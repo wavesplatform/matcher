@@ -50,7 +50,7 @@ class ExchangeTransactionBroadcastActorSpecification
       }
     }
 
-    "broadcast a transaction in next period if it wasn't confirmed" in {
+    "broadcast a transaction in a next period if it wasn't confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
       val actor       = defaultActor(ntpTime, isConfirmed = _ => false, broadcast = tx => {
         broadcasted = List(tx)
@@ -59,9 +59,6 @@ class ExchangeTransactionBroadcastActorSpecification
 
       val event = sampleEvent()
       system.eventStream.publish(event)
-      eventually {
-        broadcasted should not be empty
-      }
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
@@ -81,10 +78,9 @@ class ExchangeTransactionBroadcastActorSpecification
 
       val event = sampleEvent()
       system.eventStream.publish(event)
-      eventually {
-        broadcasted should not be empty
-      }
+      broadcasted = Seq.empty
 
+      actor ! ExchangeTransactionBroadcastActor.Send
       actor ! ExchangeTransactionBroadcastActor.Send
       eventually {
         broadcasted shouldBe empty
@@ -100,10 +96,9 @@ class ExchangeTransactionBroadcastActorSpecification
 
       val event = sampleEvent(500.millis)
       system.eventStream.publish(event)
-      eventually {
-        broadcasted should not be empty
-      }
+      broadcasted = Seq.empty
 
+      actor ! ExchangeTransactionBroadcastActor.Send
       actor ! ExchangeTransactionBroadcastActor.Send
       eventually {
         broadcasted shouldBe empty
@@ -121,7 +116,7 @@ class ExchangeTransactionBroadcastActorSpecification
         maxPendingTime = 5.minute
       ),
       time = time,
-      _ => true,
+      isConfirmed,
       broadcast = broadcast
     )
   )

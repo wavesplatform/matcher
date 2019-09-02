@@ -3,18 +3,16 @@ package com.wavesplatform.dex.grpc.integration
 import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.lang.ValidationError
+import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
+import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
 import scala.concurrent.Future
 
 package object protobuf {
-
-  type PBSBalanceChangesResponse = com.wavesplatform.dex.grpc.integration.services.BalanceChangesResponse
-  val PBSBalanceChangesResponse = com.wavesplatform.dex.grpc.integration.services.BalanceChangesResponse
-
-  type VanillaBalanceChangesResponse = com.wavesplatform.dex.grpc.integration.dto.BalanceChangesResponse
 
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
     // TODO: More convenient back-pressure implementation
@@ -104,8 +102,8 @@ package object protobuf {
 
         case _ => // No back-pressure
           obs
-            .doOnError(exception => streamObserver.onError(GRPCErrors.toStatusException(exception)))
-            .doOnComplete(() => streamObserver.onCompleted())
+            .doOnError(exception => Task(streamObserver.onError(GRPCErrors.toStatusException(exception))))
+            .doOnComplete(Task(streamObserver.onCompleted()))
             .foreach(value => streamObserver.onNext(value))
       }
     }
@@ -115,13 +113,11 @@ package object protobuf {
     }
   }
 
-  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit toThrowable: E => Throwable) {
-    def toFuture: Future[T] = {
-      val result = either.left
-        .map(e => GRPCErrors.toStatusException(toThrowable(e)))
-        .toTry
+  implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
+    def explicitGetErr(): T = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
+  }
 
-      Future.fromTry(result)
-    }
+  implicit class OptionErrExt[T](e: Option[T]) {
+    def explicitGetErr(err: ApiError): T = e.getOrElse(throw GRPCErrors.toStatusException(err))
   }
 }

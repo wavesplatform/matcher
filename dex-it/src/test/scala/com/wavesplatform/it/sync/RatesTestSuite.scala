@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -83,6 +84,11 @@ class RatesTestSuite extends MatcherSuiteBase {
     // default rates
     node.getRates shouldBe defaultRateMap
 
+    // add rate for unexisted asset
+    assertNotFoundAndMessage(
+      node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
+      "The asset unexistedAsset not found")
+
     // add rate for wct
     node.upsertRate(wctAsset, wctRate, expectedStatusCode = Created).message shouldBe s"Rate $wctRate for the asset $wctStr added"
     node.getRates shouldBe defaultRateMap + (wctAsset -> wctRate)
@@ -100,6 +106,9 @@ class RatesTestSuite extends MatcherSuiteBase {
     // delete rate for wct
     node.deleteRate(wctAsset).message shouldBe s"Rate for the asset $wctStr deleted, old value = $wctRateUpdated"
     node.getRates shouldBe defaultRateMap
+
+    // delete unexisted rate
+    assertNotFoundAndMessage(node.deleteRate(wctAsset), s"Rate for the asset $wctStr is not specified")
   }
 
   "Changing rates affects order validation" in {

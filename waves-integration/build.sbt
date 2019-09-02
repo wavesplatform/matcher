@@ -8,7 +8,7 @@ resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++=
   Seq(
     Dependencies.grpc,
-    Seq(Dependencies.mouse)
+    Seq(Dependencies.mouse, ("com.wavesplatform" % "protobuf-schemas" % "1.0.0-SNAPSHOT" classifier "proto") % "protobuf")
   ).flatten
 
 val packageSettings = Seq(

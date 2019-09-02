@@ -64,6 +64,8 @@ object MatcherModel {
     }
   }
 
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
+
   sealed trait DecimalsFormat
   final case object Denormalized extends DecimalsFormat
   final case object Normalized   extends DecimalsFormat
@@ -157,14 +159,14 @@ object OrderStatus {
     def json: JsObject = Json.obj("status" -> name)
 
     override def filledAmount: Long = 0
-    override def filledFee: Long = 0
+    override def filledFee: Long    = 0
   }
   case object NotFound extends Final {
     val name           = "NotFound"
     def json: JsObject = Json.obj("status" -> name, "message" -> "The limit order is not found")
 
     override def filledAmount: Long = 0
-    override def filledFee: Long = 0
+    override def filledFee: Long    = 0
   }
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
     val name           = "PartiallyFilled"
@@ -180,7 +182,7 @@ object OrderStatus {
   }
 
   def finalStatus(lo: LimitOrder, unmatchable: Boolean): Final = {
-    val filledAmount = lo.order.amount - lo.amount
+    val filledAmount     = lo.order.amount - lo.amount
     val filledMatcherFee = lo.order.matcherFee - lo.fee
     if (unmatchable && filledAmount > 0) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }

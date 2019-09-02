@@ -90,11 +90,9 @@ object ExchangeTransactionCreator {
     */
   def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair, baseFee: Long): Long = {
 
-    def assetFee(assetId: Asset): Long = assetId match {
-      case Waves => 0L
-      case asset: IssuedAsset =>
-        if (blockchain hasAssetScript asset) CommonValidation.ScriptExtraFee
-        else 0L
+    def assetFee(assetId: Asset): Long = assetId.fold(0L) { asset =>
+      if (blockchain hasAssetScript asset) CommonValidation.ScriptExtraFee
+      else 0L
     }
 
     baseFee +

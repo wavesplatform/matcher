@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Price
@@ -38,6 +38,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   def rateCache: RateCache = RateCache.inMem
 
+  val defaultAssetDecimals                  = 8
+  val getDefaultAssetDecimals: Asset => Int = _ => defaultAssetDecimals
+
   def wrap(x: Order): QueueEventWithMeta                   = wrap(seqNr.incrementAndGet(), x)
   def wrap(n: Long, x: Order): QueueEventWithMeta          = wrap(n, QueueEvent.Placed(x))
   def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
@@ -59,14 +62,16 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     IssuedAsset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
-  val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
+  val assetPairGen: Gen[AssetPair] = {
+    Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
+  }
 
   val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
 
-  val config = loadConfig(ConfigFactory.parseString("""waves {
+  val config: Config = loadConfig(ConfigFactory.parseString("""waves {
       |  directory: "/tmp/waves-test"
-      |  matcher {
+      |  dex {
       |    account: ""
       |    bind-address: "127.0.0.1"
       |    port: 6886
@@ -81,7 +86,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |  }
       |}""".stripMargin))
 
-  val matcherSettings = config.as[MatcherSettings]("waves.dex")
+  val matcherSettings: MatcherSettings = config.as[MatcherSettings]("waves.dex")
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample
@@ -386,7 +391,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       case (3, percentSettings: PercentSettings) =>
         order
           .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
-          .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price, rateCache))
+          .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price, rateCache, getDefaultAssetDecimals))
       case (_, DynamicSettings(baseFee)) =>
         order
           .updateMatcherFeeAssetId(matcherFeeAssetForDynamicSettings getOrElse Waves)

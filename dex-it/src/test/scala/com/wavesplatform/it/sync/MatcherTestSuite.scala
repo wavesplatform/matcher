@@ -224,76 +224,76 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
           MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
       }
 
-      "should consider UTX pool when checking the balance" in {
-        wavesNode1Api.balance(alice, bobAsset1) shouldBe 0
-        wavesNode1Api.balance(matcher, bobAsset1) shouldBe 0
-        wavesNode1Api.balance(bob, bobAsset1) shouldBe someAssetAmount
-
-        val order6 = mkOrder(bob, matcher, bob2WavesPair, SELL, someAssetAmount, 0.005.waves)
-        dex1Api.place(order6)
-        dex1Api.waitForOrderStatus(order6, OrderStatus.Accepted)
-
-        // Alice wants to buy all Bob's assets for 1 Wave
-        val order7 = mkOrder(alice, matcher, bob2WavesPair, BUY, someAssetAmount, 0.005.waves)
-        dex1Api.place(order7)
-        dex1Api.waitForOrderStatus(order7, OrderStatus.Filled)
-
-        waitForOrderAtNode(order7.id())
-        // Bob tries to do the same operation, but at now he have no assets
-        dex1Api.tryPlace(order6) should failWith(100) // hehe
-      }
-
-      "trader can buy waves for assets with order without having waves" in {
-        val bobBalance = wavesNode1Api.balance(bob, Waves)
-        wavesNode1Api.balance(alice, bobAsset2) shouldBe 0
-        wavesNode1Api.balance(matcher, bobAsset2) shouldBe 0
-        wavesNode1Api.balance(bob, bobAsset2) shouldBe someAssetAmount
-
-        // Bob wants to sell all own assets for 1 Wave
-        val order8 = mkOrder(bob, matcher, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
-
-        // Bob moves all waves to Alice
-        val transferAmount = bobBalance - minFee
-        wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, Waves))
-
-        wavesNode1Api.balance(bob, Waves) shouldBe 0
-
-        // Order should stay accepted
-        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
-
-        // Cleanup
-        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
-        wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
-      }
-
-      "market status" in {
-        val ask       = 5.waves
-        val askAmount = 5000000
-
-        val bid       = 10.waves
-        val bidAmount = 10000000
-
-        dex1Api.place(mkOrder(bob, matcher, bob2WavesPair, SELL, askAmount, ask))
-
-        val resp1 = dex1Api.orderBookStatus(bob2WavesPair)
-        resp1.lastPrice shouldBe None
-        resp1.lastSide shouldBe None
-        resp1.bid shouldBe None
-        resp1.bidAmount shouldBe None
-        resp1.ask shouldBe Some(ask)
-        resp1.askAmount shouldBe Some(askAmount)
-
-        dex1Api.place(mkOrder(alice, matcher, bob2WavesPair, BUY, bidAmount, bid))
-
-        val resp2 = dex1Api.orderBookStatus(bob2WavesPair)
-        resp2.lastPrice shouldBe Some(ask)
-        resp2.lastSide shouldBe Some(OrderType.BUY.toString)
-        resp2.bid shouldBe Some(bid)
-        resp2.bidAmount shouldBe Some(bidAmount - askAmount)
-        resp2.ask shouldBe None
-        resp2.askAmount shouldBe None
-      }
+//      "should consider UTX pool when checking the balance" in {
+//        wavesNode1Api.balance(alice, bobAsset1) shouldBe 0
+//        wavesNode1Api.balance(matcher, bobAsset1) shouldBe 0
+//        wavesNode1Api.balance(bob, bobAsset1) shouldBe someAssetAmount
+//
+//        val order6 = mkOrder(bob, matcher, bob2WavesPair, SELL, someAssetAmount, 0.005.waves)
+//        dex1Api.place(order6)
+//        dex1Api.waitForOrderStatus(order6, OrderStatus.Accepted)
+//
+//        // Alice wants to buy all Bob's assets for 1 Wave
+//        val order7 = mkOrder(alice, matcher, bob2WavesPair, BUY, someAssetAmount, 0.005.waves)
+//        dex1Api.place(order7)
+//        dex1Api.waitForOrderStatus(order7, OrderStatus.Filled)
+//
+//        waitForOrderAtNode(order7.id())
+//        // Bob tries to do the same operation, but at now he have no assets
+//        dex1Api.tryPlace(order6) should failWith(100) // hehe
+//      }
+//
+//      "trader can buy waves for assets with order without having waves" in {
+//        val bobBalance = wavesNode1Api.balance(bob, Waves)
+//        wavesNode1Api.balance(alice, bobAsset2) shouldBe 0
+//        wavesNode1Api.balance(matcher, bobAsset2) shouldBe 0
+//        wavesNode1Api.balance(bob, bobAsset2) shouldBe someAssetAmount
+//
+//        // Bob wants to sell all own assets for 1 Wave
+//        val order8 = mkOrder(bob, matcher, bob2WavesPair, SELL, someAssetAmount, 1.waves)
+//        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
+//
+//        // Bob moves all waves to Alice
+//        val transferAmount = bobBalance - minFee
+//        wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, Waves))
+//
+//        wavesNode1Api.balance(bob, Waves) shouldBe 0
+//
+//        // Order should stay accepted
+//        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
+//
+//        // Cleanup
+//        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
+//        wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
+//      }
+//
+//      "market status" in {
+//        val ask       = 5.waves
+//        val askAmount = 5000000
+//
+//        val bid       = 10.waves
+//        val bidAmount = 10000000
+//
+//        dex1Api.place(mkOrder(bob, matcher, bob2WavesPair, SELL, askAmount, ask))
+//
+//        val resp1 = dex1Api.orderBookStatus(bob2WavesPair)
+//        resp1.lastPrice shouldBe None
+//        resp1.lastSide shouldBe None
+//        resp1.bid shouldBe None
+//        resp1.bidAmount shouldBe None
+//        resp1.ask shouldBe Some(ask)
+//        resp1.askAmount shouldBe Some(askAmount)
+//
+//        dex1Api.place(mkOrder(alice, matcher, bob2WavesPair, BUY, bidAmount, bid))
+//
+//        val resp2 = dex1Api.orderBookStatus(bob2WavesPair)
+//        resp2.lastPrice shouldBe Some(ask)
+//        resp2.lastSide shouldBe Some(OrderType.BUY.toString)
+//        resp2.bid shouldBe Some(bid)
+//        resp2.bidAmount shouldBe Some(bidAmount - askAmount)
+//        resp2.ask shouldBe None
+//        resp2.askAmount shouldBe None
+//      }
     }
   }
 

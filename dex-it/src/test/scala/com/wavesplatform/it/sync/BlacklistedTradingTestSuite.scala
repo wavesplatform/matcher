@@ -122,12 +122,8 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
   private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
     failedDueAssetBlacklist(dex1Api.tryOrderBook(assetPair), assetPair, blacklistedAsset)
 
-  private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) = {
-    r shouldBe 'left
-    val error = r.left.get
-    error.error shouldBe expectedErrorCode(assetPair, blacklistedAsset)
-    error.params.assetId.get shouldBe AssetPair.assetIdStr(blacklistedAsset)
-  }
+  private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
+    r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(AssetPair.assetIdStr(blacklistedAsset))))
 
   private def expectedErrorCode(assetPair: AssetPair, blacklistedAsset: Asset): Int =
     if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted

@@ -71,7 +71,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
       placeMarketOrder(bob, ethWavesPair, BUY, amount = 5.eth, price = 155.90000000.waves).filledAmount shouldBe Some(5.eth)
 
-      dex1Api.reservedBalance(alice) shouldBe Map { EthId.toString -> 1.eth }
+      dex1Api.reservedBalance(alice) shouldBe Map(eth -> 1.eth)
       dex1Api.reservedBalance(bob) shouldBe empty
 
       dex1Api.orderBook(ethWavesPair).asks shouldBe List { LevelResponse(1.eth, 155.20242978.waves) }
@@ -106,7 +106,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
       placeMarketOrder(bob, wavesUsdPair, SELL, amount = 5.waves, price = 1.20.usd).filledAmount shouldBe Some(5.waves)
 
-      dex1Api.reservedBalance(alice) shouldBe Map { UsdId.toString -> 1.21.usd }
+      dex1Api.reservedBalance(alice) shouldBe Map(usd -> 1.21.usd)
       dex1Api.reservedBalance(bob) shouldBe empty
 
       dex1Api.orderBook(wavesUsdPair).asks shouldBe empty

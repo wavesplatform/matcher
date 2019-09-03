@@ -11,7 +11,10 @@ class FailWith(expectedErrorCode: Int, expectedMessage: Option[String] = None, e
   override def apply(input: Either[MatcherError, Any]): MatchResult = result(
     matches = input match {
       case Right(_) => false
-      case Left(e)  => e.error == expectedErrorCode && expectedMessage.forall(_ == e.message) && Params.contains(e.params, expectedParams)
+      case Left(e) =>
+        e.error == expectedErrorCode && expectedMessage.forall(_ == e.message) && (
+          expectedParams.isEmpty || e.params.exists(x => Params.contains(x, expectedParams))
+        )
     },
     input
   )

@@ -27,11 +27,14 @@ import shapeless.{Generic, HList, HNil, _}
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 
-case class MatcherError(error: Int, message: String, status: String, params: MatcherError.Params)
+case class MatcherError(error: Int, message: String, status: String, params: Option[MatcherError.Params])
 object MatcherError {
   implicit val format: Format[MatcherError] = Json.format[MatcherError]
 
-  case class Params(assetId: Option[String] = None, address: Option[String] = None)
+  case class Params(assetId: Option[String] = None, address: Option[String] = None) {
+    def isEmpty: Boolean = assetId.isEmpty && address.isEmpty
+  }
+
   object Params {
     implicit val format: Format[Params] = Json.format[Params]
 
@@ -185,11 +188,11 @@ object DexApi {
           resp.rawErrorBody match {
             case Right(r) => M.pure(Right(r))
             case Left(bytes) =>
-              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
-              catch {
-                case NonFatal(e) =>
+              Json.parse(bytes).validate[MatcherError] match {
+                case JsSuccess(x, _) => M.pure(Left(x))
+                case JsError(e) =>
                   M.raiseError[Either[MatcherError, Unit]](
-                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
+                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError:\n${e.mkString("\n")}"))
               }
           }
         }

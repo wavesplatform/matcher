@@ -56,7 +56,7 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
 
       val orderIds = dex1Api.orderHistory(alice).map(_.id)
 
-      orderIds should contain(aliceActiveOrder.idStr())
+      orderIds should contain(aliceActiveOrder.id())
 
       genAndPlaceOrders(orderLimit + 1, alice, wavesUsdPair, OrderType.SELL, 3)
 
@@ -68,8 +68,8 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
       // Alice check that order Active order is still in list
       val orderIdsAfterMatching = dex1Api.orderHistory(alice).map(_.id)
 
-      orderIdsAfterMatching should contain(aliceActiveOrder.idStr())
-      orderIdsAfterMatching should contain(alicePartialOrder.idStr())
+      orderIdsAfterMatching should contain(aliceActiveOrder.id())
+      orderIdsAfterMatching should contain(alicePartialOrder.id())
 
       dex1Api.waitForOrderStatus(aliceActiveOrder, OrderStatus.Accepted)
       dex1Api.waitForOrderStatus(alicePartialOrder, OrderStatus.PartiallyFilled)

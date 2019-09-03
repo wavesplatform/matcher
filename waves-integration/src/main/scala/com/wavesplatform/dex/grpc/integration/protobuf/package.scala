@@ -4,13 +4,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
-import io.grpc.StatusException
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
-
-import scala.concurrent.Future
 
 package object protobuf {
 

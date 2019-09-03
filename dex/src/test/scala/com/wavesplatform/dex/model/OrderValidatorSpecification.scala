@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
@@ -19,8 +18,6 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSe
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
@@ -659,21 +656,21 @@ class OrderValidatorSpecification
 //      (bc.accountScript _).when(pk.toAddress).returns(Some(script))
 //      ov(o).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
 //    }
-
-    "validate order with smart token" when {
-      val asset1 = mkAssetId("asset1")
-      val asset2 = mkAssetId("asset2")
-      val pair   = AssetPair(asset1, asset2)
-      val portfolio = Portfolio(10 * Constants.UnitsInWave,
-                                LeaseBalance.empty,
-                                Map(
-                                  asset1 -> 10 * Constants.UnitsInWave,
-                                  asset2 -> 10 * Constants.UnitsInWave
-                                ))
-
-      val permitScript = ExprScript(Terms.TRUE).explicitGet()
-      val denyScript   = ExprScript(Terms.FALSE).explicitGet()
-
+//
+//    "validate order with smart token" when {
+//      val asset1 = mkAssetId("asset1")
+//      val asset2 = mkAssetId("asset2")
+//      val pair   = AssetPair(asset1, asset2)
+//      val portfolio = Portfolio(10 * Constants.UnitsInWave,
+//                                LeaseBalance.empty,
+//                                Map(
+//                                  asset1 -> 10 * Constants.UnitsInWave,
+//                                  asset2 -> 10 * Constants.UnitsInWave
+//                                ))
+//
+//      val permitScript = ExprScript(Terms.TRUE).explicitGet()
+//      val denyScript   = ExprScript(Terms.FALSE).explicitGet()
+//
 //      "two assets are smart and they permit an order" when test { (ov, bc, o) =>
 //        (bc.assetScript _).when(asset1).returns(Some(permitScript))
 //        (bc.assetScript _).when(asset2).returns(Some(permitScript))
@@ -694,34 +691,34 @@ class OrderValidatorSpecification
 //
 //        ov(o) should produce("AssetScriptDeniedOrder")
 //      }
-
-      def test(f: (Order => OrderValidator.Result[Order], WavesBlockchainContext, Order) => Any): Unit = (1 to 2).foreach { version =>
-        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
-          val features = Seq(BlockchainFeatures.SmartAssets) ++ {
-            if (version == 1) Seq.empty else Seq(BlockchainFeatures.SmartAccountTrading)
-          }
-          activate(bc, features.contains(_))
-          assignAssetDescription(
-            bc,
-            asset1 -> mkAssetDescription(8),
-            asset2 -> mkAssetDescription(8)
-          )
-
-          val pk = KeyPair(randomBytes())
-          val o = buy(
-            pair = pair,
-            amount = 100 * Constants.UnitsInWave,
-            price = 0.0022,
-            sender = Some(pk),
-            matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
-            ts = Some(System.currentTimeMillis()),
-            version = version.toByte
-          )
-          assignNoScript(bc, o.sender.toAddress)
-          f(ov, bc, o)
-        }
-      }
-    }
+//
+//      def test(f: (Order => OrderValidator.Result[Order], WavesBlockchainContext, Order) => Any): Unit = (1 to 2).foreach { version =>
+//        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
+//          val features = Seq(BlockchainFeatures.SmartAssets) ++ {
+//            if (version == 1) Seq.empty else Seq(BlockchainFeatures.SmartAccountTrading)
+//          }
+//          activate(bc, features.contains(_))
+//          assignAssetDescription(
+//            bc,
+//            asset1 -> mkAssetDescription(8),
+//            asset2 -> mkAssetDescription(8)
+//          )
+//
+//          val pk = KeyPair(randomBytes())
+//          val o = buy(
+//            pair = pair,
+//            amount = 100 * Constants.UnitsInWave,
+//            price = 0.0022,
+//            sender = Some(pk),
+//            matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+//            ts = Some(System.currentTimeMillis()),
+//            version = version.toByte
+//          )
+//          assignNoScript(bc, o.sender.toAddress)
+//          f(ov, bc, o)
+//        }
+//      }
+//    }
 
     "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
       portfolioTest(defaultPortfolio) { (ov, bc) =>
@@ -807,8 +804,8 @@ class OrderValidatorSpecification
       version = version
     )
 
-  private def activate(bc: WavesBlockchainContext, isActive: PartialFunction[Short, Boolean]): Unit =
-    activate(bc, isActive.lift(_).getOrElse(false))
+//  private def activate(bc: WavesBlockchainContext, isActive: PartialFunction[Short, Boolean]): Unit =
+//    activate(bc, isActive.lift(_).getOrElse(false))
 
   private def activate(bc: WavesBlockchainContext, isActive: Function[Short, Boolean]): Unit =
     (bc.isFeatureActivated _).when(*).onCall(isActive)

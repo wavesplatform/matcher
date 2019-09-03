@@ -24,6 +24,7 @@ import kamon.system.SystemMetrics
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
+import com.github.ghik.silencer.silent
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -51,7 +52,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     }
   }
 
-  private def mkContext(host: String, port: Int): WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
+  @silent("deprecated") private def mkContext(host: String, port: Int): WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
     ManagedChannelBuilder
       .forAddress(host, port)
       .usePlaintext(true)

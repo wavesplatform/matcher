@@ -5,7 +5,7 @@ import DexDockerKeys._
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.dex
+libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

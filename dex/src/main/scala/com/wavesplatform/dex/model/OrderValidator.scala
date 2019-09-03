@@ -395,6 +395,12 @@ object OrderValidator extends ScorexLogging {
       _ <- validateBalance(order, tradableBalance)
     } yield order
 
+  def tickSizeAware(actualNormalizedTickSize: Long)(order: Order): Result[Order] = {
+    lift(order).ensure { error.OrderInvalidPriceLevel(order, actualNormalizedTickSize) } { o =>
+      o.orderType == OrderType.SELL || OrderBook.correctPriceByTickSize(o.price, o.orderType, actualNormalizedTickSize) > 0
+    }
+  }
+
   private def lift[T](x: T): Result[T] = x.asRight[MatcherError]
   private def success: Result[Unit]    = lift(())
 }

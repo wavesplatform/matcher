@@ -3,7 +3,7 @@ package com.wavesplatform.it.docker
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileOutputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.StandardCharsets
-import java.nio.file.{FileSystems, Files, Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Collections._
@@ -11,6 +11,8 @@ import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
+import cats.instances.map._
+import cats.instances.string._
 import cats.kernel.Monoid
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
@@ -20,18 +22,13 @@ import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
-import com.wavesplatform.settings._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
-import cats.instances.string._
-import cats.instances.map._
 
 class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
@@ -170,7 +167,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   def createDex(name: String, config: Config): DexContainer = {
     val number = getNumber(name)
-    val grpc   = config.as[GRPCSettings]("waves.dex.waves-node-grpc")
+//    val grpc   = config.as[GRPCSettings]("waves.dex.waves-node-grpc")
 
     val allowedKeysPrefixes = List(
       "waves-node-grpc",

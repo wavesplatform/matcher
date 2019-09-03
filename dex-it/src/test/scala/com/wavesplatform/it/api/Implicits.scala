@@ -1,11 +1,11 @@
 package com.wavesplatform.it.api
 
-import cats.MonadError
-import cats.syntax.flatMap._
-import com.softwaremill.sttp.{DeserializationError, Response, MonadError => _}
-import play.api.libs.json.JsError
-
-import scala.concurrent.duration.FiniteDuration
+//import cats.MonadError
+//import cats.syntax.flatMap._
+//import com.softwaremill.sttp.{DeserializationError, Response, MonadError => _}
+//import play.api.libs.json.JsError
+//
+//import scala.concurrent.duration.FiniteDuration
 
 object Implicits {
   // should be lazy

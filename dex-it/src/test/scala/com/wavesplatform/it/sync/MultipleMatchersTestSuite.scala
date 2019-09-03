@@ -1,22 +1,22 @@
-package com.wavesplatform.it.sync
-
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.{Node, _}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.tags.DexItKafkaRequired
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import org.scalacheck.Gen
-
-import scala.concurrent.duration.DurationInt
-import scala.util.Random
-import scala.util.control.NonFatal
-
+//package com.wavesplatform.it.sync
+//
+//import com.typesafe.config.{Config, ConfigFactory}
+//import com.wavesplatform.account.KeyPair
+//import com.wavesplatform.it.NodeConfigs.Default
+//import com.wavesplatform.it.{Node, _}
+//import com.wavesplatform.it.api.SyncHttpApi._
+//import com.wavesplatform.it.api.SyncMatcherHttpApi._
+//import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
+//import com.wavesplatform.it.config.DexTestConfig._
+//import com.wavesplatform.it.tags.DexItKafkaRequired
+//import com.wavesplatform.transaction.Asset.Waves
+//import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+//import org.scalacheck.Gen
+//
+//import scala.concurrent.duration.DurationInt
+//import scala.util.Random
+//import scala.util.control.NonFatal
+//
 //@DexItKafkaRequired
 //class MultipleMatchersTestSuite extends MatcherSuiteBase {
 //  private def configOverrides = ConfigFactory.parseString("""waves.dex {

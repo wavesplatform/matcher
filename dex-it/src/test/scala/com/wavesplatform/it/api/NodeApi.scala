@@ -9,7 +9,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{DeserializationError, Response, SttpBackend, MonadError => _, _}
+import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
@@ -175,15 +175,15 @@ object NodeApi {
           }
         }
 
-      def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
-          pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =
-        repeatUntil(f, delay)(pred).flatMap { resp =>
-          resp.rawErrorBody match {
-            case Left(_)            => M.raiseError[T](new RuntimeException(s"The server returned an error: ${resp.code}"))
-            case Right(Left(error)) => M.raiseError[T](new RuntimeException(s"Can't parse the response: $error"))
-            case Right(Right(r))    => M.pure(r)
-          }
-        }
+//      def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
+//          pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =
+//        repeatUntil(f, delay)(pred).flatMap { resp =>
+//          resp.rawErrorBody match {
+//            case Left(_)            => M.raiseError[T](new RuntimeException(s"The server returned an error: ${resp.code}"))
+//            case Right(Left(error)) => M.raiseError[T](new RuntimeException(s"Can't parse the response: $error"))
+//            case Right(Right(r))    => M.pure(r)
+//          }
+//        }
     }
 
   case class HeightResponse(height: Int)

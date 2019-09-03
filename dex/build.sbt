@@ -1,9 +1,11 @@
-import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
+import java.nio.charset.StandardCharsets
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
+import DexDockerKeys._
+
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.dex
+libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
@@ -30,18 +32,21 @@ lazy val versionSourceTask = Def.task {
        |  val VersionString = "${version.value}"
        |  val VersionTuple = ($major, $minor, $patch)
        |}
-       |""".stripMargin
+       |""".stripMargin,
+    charset = StandardCharsets.UTF_8
   )
   Seq(versionFile)
 }
 
-inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
+Compile / sourceGenerators += versionSourceTask
 
-Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postrm)(
-  Postrm ->
-    s"""#!/bin/sh
-       |set -e
-       |if [ "$$1" = purge ]; then
-       |  rm -rf /var/lib/${nodePackageName.value}/matcher
-       |fi""".stripMargin
-)
+// Docker
+
+inTask(docker)(
+  Seq(
+    additionalFiles ++= Seq(
+      (Universal / stage).value,
+      (Compile / sourceDirectory).value / "container" / "start.sh",
+      (Compile / sourceDirectory).value / "container" / "default.conf"
+    )
+  ))

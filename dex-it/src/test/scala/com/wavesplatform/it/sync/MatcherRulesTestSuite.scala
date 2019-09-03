@@ -1,66 +1,53 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.LevelResponse
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
+import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class MatcherRulesTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = {
-
-    val matcherRulesStr =
-      s"""
-         |waves.dex {
-         |  matching-rules = {
-         |    "$WctId-$UsdId": [
-         |      {
-         |        start-offset = 2
-         |        merge-prices = yes
-         |        tick-size    = 5
-         |      }
-         |    ]
-         |  }
-         |}
-       """.stripMargin
-
-    super.nodeConfigs.map(ConfigFactory.parseString(matcherRulesStr).withFallback)
-  }
+class MatcherRulesTestSuite extends NewMatcherSuiteBase {
+  override protected def dex1Config: Config = ConfigFactory.parseString(s"""
+       |waves.dex.matching-rules.$wctUsdPair = [
+       |  {
+       |    start-offset = 2
+       |    merge-prices = yes
+       |    tick-size    = 5
+       |  }
+       |]
+       """.stripMargin).withFallback(super.dex1Config)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
-      node.waitForTransaction(tx.id)
-    }
+    broadcast(IssueUsdTx, IssueWctTx)
   }
 
   val (amount, price) = (1000L, PriceConstant)
 
   "Orders should be cancelled correctly when matcher rules are changed" in {
-
     // here tick size is disabled (offset = 0)
-    val buyOrder1 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
-    node.waitOrderStatus(wctUsdPair, buyOrder1, "Accepted")
+    val buyOrder1 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    dex1Api.place(buyOrder1)
+    dex1Api.waitForOrderStatus(buyOrder1, OrderStatus.Accepted)
 
     // here tick size is disabled (offset = 1)
-    val buyOrder2 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
-    node.waitOrderStatus(wctUsdPair, buyOrder2, "Accepted")
+    val buyOrder2 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    dex1Api.place(buyOrder2)
+    dex1Api.waitForOrderStatus(buyOrder2, OrderStatus.Accepted)
 
     // here tick size = 5 (offset = 2), hence new order is placed into corrected price level 5, not 7
-    val buyOrder3 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
-    node.waitOrderStatus(wctUsdPair, buyOrder3, "Accepted")
+    val buyOrder3 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    dex1Api.place(buyOrder3)
+    dex1Api.waitForOrderStatus(buyOrder3, OrderStatus.Accepted)
 
     // now there are 2 price levels
-    node.orderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
+    dex1Api.orderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
 
     // price level 5 will be deleted after cancelling of buyOrder3
-    node.cancelOrder(alice, wctUsdPair, buyOrder3)
-    node.waitOrderStatus(wctUsdPair, buyOrder3, "Cancelled")
+    dex1Api.cancel(alice, buyOrder3)
+    dex1Api.waitForOrderStatus(buyOrder3, OrderStatus.Cancelled)
 
-    node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
+    dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
   }
 }

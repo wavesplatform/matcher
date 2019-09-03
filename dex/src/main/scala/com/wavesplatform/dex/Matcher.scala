@@ -13,15 +13,16 @@ import akka.util.Timeout
 import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
-import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
+import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -29,34 +30,33 @@ import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
-import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.state.VolumeAndFee
+import com.wavesplatform.extensions.Extension
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
+import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
 import mouse.any._
-import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(context: Context) extends Extension with ScorexLogging {
+class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implicit val actorSystem: ActorSystem, val materializer: ActorMaterializer)
+    extends Extension
+    with ScorexLogging {
 
-  private val settings = context.settings.config.as[MatcherSettings]("waves.dex")
+  import actorSystem.dispatcher
 
-  private val matcherKeyPair = (for {
-    address <- Address.fromString(settings.account)
-    pk      <- context.wallet.privateKeyAccount(address)
-  } yield pk).explicitGet()
+  private val time = new NTP(settings.ntpServer)
+
+  private val matcherKeyPair = {
+    val r = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet()
+    log.info(s"The DEX's public key: ${Base58.encode(r.publicKey.arr)}, account address: ${r.publicKey.toAddress.stringRepr}")
+    r
+  }
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
-
-  private implicit val as: ActorSystem                 = context.actorSystem
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()
-  import as.dispatcher
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
@@ -69,18 +69,21 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       }
     }
 
-  private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain, blacklistedAssets)
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
+  private val pairBuilder    = new AssetPairBuilder(settings, context.assetDescription, blacklistedAssets)
+  private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+
+  private def hasMatcherAccountScript = context.hasScript(matcherKeyPair)
+  private val transactionCreator =
+    new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, context.hasScript(_), context.isFeatureActivated)
 
   private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(context.blockchain)
+  private val assetDecimalsCache = new AssetDecimalsCache(context.assetDescription)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
       settings.orderBookSnapshotHttpCache,
-      context.time,
+      time,
       assetDecimalsCache.get,
       p => Option(orderBookCache.get(p))
     )
@@ -98,22 +101,17 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       normalizedTickSize = Normalization.normalizePrice(
         rawMatchingRules.tickSize,
         assetPair,
-        MatcherModel.getPairDecimals(assetPair, context.blockchain).getOrElse((8, 8))
+        MatcherModel.getPairDecimals(assetPair, assetDecimalsCache.get)
       )
     )
 
-  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
-    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
+  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Double =
+    Denormalization.denormalizePrice(normalizedTickSize, assetPair, x => assetDecimalsCache.get(x))
 
   private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
     RawMatchingRules(
       startOffset = matchingRules.startOffset,
-      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(
-          s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back."
-        )
-        0.00000001
-      }.merge
+      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize)
     )
 
   private def matchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRules] = {
@@ -134,14 +132,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       normalize(assetPair),
       settings,
       transactionCreator.createTransaction,
-      context.time,
+      time,
       matchingRules(assetPair)
     )
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
       log.info("Events will be stored locally")
-      new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), context.time)
+      new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
@@ -156,13 +154,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
-      _ <- OrderValidator.timeAware(context.time)(o)
+      _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
-        context.blockchain,
+        context,
         transactionCreator.createTransaction,
         matcherPublicKey.toAddress,
-        context.time,
+        time,
         settings.orderFee,
         settings.orderRestrictions,
         rateCache
@@ -173,7 +171,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHashStr = context.settings.config.getString("waves.rest-api.api-key-hash")
+    //val keyHash = Base58.tryDecode(settings.restApi.apiKeyHash).toOption
+    val keyHashStr = settings.restApi.apiKeyHash
     Seq(
       MatcherApiRoute(
         pairBuilder,
@@ -186,7 +185,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         assetPair => {
           lazy val default = RawMatchingRules(
             startOffset = 0,
-            tickSize = denormalizeTickSize(assetPair, 1).left.map(_ => 0.00000001).merge
+            tickSize = denormalizeTickSize(assetPair, 1)
           )
 
           rawMatchingRules.computeIfAbsent(assetPair, _ => default).tickSize
@@ -196,13 +195,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         settings,
         () => status.get(),
         db,
-        context.time,
+        time,
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
-        ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
+        () => ExchangeTransactionCreator.minAccountFee(hasMatcherAccountScript),
         keyHashStr,
         rateCache,
-        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
+        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context).isRight)
       ),
       MatcherApiRouteV1(
         pairBuilder,
@@ -226,14 +225,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
 
-  lazy val orderBookSnapshotStore: ActorRef = context.actorSystem.actorOf(
+  lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
     "order-book-snapshot-store"
   )
 
   private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
-  lazy val matcher: ActorRef = context.actorSystem.actorOf(
+  lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       settings,
       assetPairsDb, {
@@ -267,7 +266,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       },
       orderBooks,
       orderBookProps,
-      context.blockchain.assetDescription
+      context.assetDescription
     ),
     MatcherActor.name
   )
@@ -275,13 +274,13 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private lazy val orderDb = OrderDB(settings, db)
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
-    context.actorSystem.actorOf(HistoryRouter.props(context.blockchain, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouter.props(assetDecimalsCache.get, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
-  private lazy val gRPCExtensionClient = new DEXClient(settings.wavesNodeExtensionAddress)
+  private lazy val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}")
 
   private lazy val addressActors =
-    context.actorSystem.actorOf(
+    actorSystem.actorOf(
       Props(
         new AddressDirectory(
           gRPCExtensionClient.balancesServiceClient <| { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
@@ -290,16 +289,15 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
             Props(
               new AddressActor(
                 address,
-                context.utx.spendableBalance(address, _),
+                context.spendableBalance(address, _),
                 5.seconds,
-                context.time,
+                time,
                 orderDb,
-                id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
+                context.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.get,
                 startSchedules
-              )
-          ),
+              )),
           historyRouter
         )
       ),
@@ -346,25 +344,24 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     checkDirectory(journalDir)
     checkDirectory(snapshotDir)
 
-    log.info(s"Starting matcher on: ${settings.bindAddress}:${settings.port} ...")
+    log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
-    val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, context.settings.restAPISettings).compositeRoute
-    matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.bindAddress, settings.port), 5.seconds)
+    val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
+    matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
 
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-    context.actorSystem.actorOf(
+    actorSystem.actorOf(
       ExchangeTransactionBroadcastActor
         .props(
           settings.exchangeTransactionBroadcast,
-          context.time,
-          tx => context.utx.putIfNew(tx).resultE.isRight,
-          context.blockchain.containsTransaction(_),
-          txs => txs.foreach(context.broadcastTransaction)
+          time,
+          context.wasForged,
+          context.broadcastTx
         ),
       "exchange-transaction-broadcast"
     )
 
-    context.actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
 
     val startGuard = for {
       _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
@@ -390,7 +387,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
     val failure = Promise[Unit]()
-    context.actorSystem.scheduler.scheduleOnce(timeout) {
+    actorSystem.scheduler.scheduleOnce(timeout) {
       failure.failure(new TimeoutException(s"Can't restore snapshots in ${timeout.toSeconds} seconds"))
     }
 
@@ -410,7 +407,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       if (currentOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
         p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
-      else context.actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
+      else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))
     }
 
     val p = Promise[Unit]()

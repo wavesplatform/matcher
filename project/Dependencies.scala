@@ -14,6 +14,12 @@ object Dependencies {
 
   private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %% s"cats-$module" % version)
 
+  val silencerVersion = "1.4.1"
+  val silencer = Seq(
+    compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
+    "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided
+  )
+
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
   val akkaHttp                   = akkaHttpModule("akka-http")
@@ -73,14 +79,19 @@ object Dependencies {
       shapeless.value
     ))
 
-  val console = Seq("com.github.scopt" %% "scopt" % "4.0.0-RC2")
+  lazy val common = Seq(
+    "com.lihaoyi" %% "sourcecode" % "0.1.7"
+  )
 
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     spotify,
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
+    "org.scalacheck"        %% "scalacheck"                       % "1.14.0",
+    "com.softwaremill.sttp" %% "core"                             % "1.6.4",
+    "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
+    "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
+    "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -94,12 +105,14 @@ object Dependencies {
   lazy val dex =
     Seq(
       kindProjector,
+      "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       akkaModule("actor"),
       akkaModule("persistence-query"),
       akkaHttp,
       "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
       janino,
-      mouse
+      mouse,
+      "org.typelevel" %% "cats-tagless-macros" % "0.9"
     ) ++ Seq(
       akkaModule("testkit"),
       akkaModule("persistence-tck"),
@@ -108,7 +121,6 @@ object Dependencies {
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime"      % scalapb.compiler.Version.scalapbVersion % "protobuf"
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   )
 }

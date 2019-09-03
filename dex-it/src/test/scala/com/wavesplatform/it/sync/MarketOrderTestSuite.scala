@@ -2,47 +2,48 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse}
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.{LevelResponse, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import mouse.any._
 
-class MarketOrderTestSuite extends MatcherSuiteBase {
+class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
+  override protected def dex1Config: Config =
+    ConfigFactory
+      .parseString("waves.dex.allowed-order-versions = [1, 2, 3]")
+      .withFallback(super.dex1Config)
+
+  val (amount, price) = (1000L, PriceConstant)
   implicit class DoubleOps(value: Double) {
     val waves: Long = wavesUsdPairDecimals.amount(value)
     val usd: Long   = wavesUsdPairDecimals.price(value)
     val eth: Long   = ethWavesPairDecimals.amount(value)
   }
 
-  override protected def nodeConfigs: Seq[Config] = {
-    super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]").withFallback)
-  }
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueEthTx) foreach { tx =>
-      node.waitForTransaction(node.broadcastRequest(tx.json.value).id)
-    }
+    broadcast(IssueUsdTx, IssueEthTx)
   }
 
   "Sunny day tests for market orders" in {
 
-    def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(orders: (Long, Long)*): Unit = {
-      orders.foreach {
-        case (amount, price) =>
-          node.placeOrder(sender, pair, ordersType, amount, price, 0.003.waves).message.id |> (lo => node.waitOrderStatus(pair, lo, "Accepted"))
+    def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {
+      val orders = amountPrices.map {
+        case (amount, price) => mkOrder(sender, matcher, pair, ordersType, amount, price, 0.003.waves)
+      }
+      orders.foreach { order =>
+        dex1Api.place(order)
+        dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
       }
     }
 
-    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): MatcherStatusResponse = {
-      node.prepareOrder(sender, pair, orderType, amount, price, fee = 0.003.waves) |>
-        (markerOrder => node.placeMarketOrder(markerOrder).message.id) |>
-        (orderId => node.waitOrderStatus(pair, orderId, "Filled"))
+    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse = {
+      val order = mkOrder(sender, matcher, pair, orderType, amount, price, 0.003.waves)
+      dex1Api.placeMarket(order)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
     }
 
     withClue("BIG BUY market order executed partially (buy whole counter side):\n") {
@@ -54,11 +55,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeMarketOrder(bob, ethWavesPair, BUY, amount = 10.eth, price = 155.90000000.waves).filledAmount shouldBe Some(6.eth)
 
-      node.reservedBalance(alice) shouldBe empty
-      node.reservedBalance(bob) shouldBe empty
+      dex1Api.reservedBalance(alice) shouldBe empty
+      dex1Api.reservedBalance(bob) shouldBe empty
 
-      node.orderBook(ethWavesPair).asks shouldBe empty
-      node.orderBook(ethWavesPair).bids shouldBe empty
+      dex1Api.orderBook(ethWavesPair).asks shouldBe empty
+      dex1Api.orderBook(ethWavesPair).bids shouldBe empty
     }
 
     withClue("SMALL BUY market order executed fully:\n") {
@@ -70,14 +71,15 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeMarketOrder(bob, ethWavesPair, BUY, amount = 5.eth, price = 155.90000000.waves).filledAmount shouldBe Some(5.eth)
 
-      node.reservedBalance(alice) shouldBe Map { EthId.toString -> 1.eth }
-      node.reservedBalance(bob) shouldBe empty
+      dex1Api.reservedBalance(alice) shouldBe Map(eth -> 1.eth)
+      dex1Api.reservedBalance(bob) shouldBe empty
 
-      node.orderBook(ethWavesPair).asks shouldBe List { LevelResponse(1.eth, 155.20242978.waves) }
-      node.orderBook(ethWavesPair).bids shouldBe empty
+      dex1Api.orderBook(ethWavesPair).asks shouldBe List { LevelResponse(1.eth, 155.20242978.waves) }
+      dex1Api.orderBook(ethWavesPair).bids shouldBe empty
     }
 
-    node <| { _.cancelAllOrders(bob) } <| { _.cancelAllOrders(alice) }
+    dex1Api.cancelAll(bob)
+    dex1Api.cancelAll(alice)
 
     withClue("BIG SELL market order executed partially (close whole counter side):\n") {
       placeCounterOrders(alice, wavesUsdPair, BUY)(
@@ -88,11 +90,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeMarketOrder(bob, wavesUsdPair, SELL, amount = 10.waves, price = 1.20.usd).filledAmount shouldBe Some(6.waves)
 
-      node.reservedBalance(alice) shouldBe empty
-      node.reservedBalance(bob) shouldBe empty
+      dex1Api.reservedBalance(alice) shouldBe empty
+      dex1Api.reservedBalance(bob) shouldBe empty
 
-      node.orderBook(wavesUsdPair).asks shouldBe empty
-      node.orderBook(wavesUsdPair).bids shouldBe empty
+      dex1Api.orderBook(wavesUsdPair).asks shouldBe empty
+      dex1Api.orderBook(wavesUsdPair).bids shouldBe empty
     }
 
     withClue("SMALL SELL market order executed fully:\n") {
@@ -104,11 +106,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeMarketOrder(bob, wavesUsdPair, SELL, amount = 5.waves, price = 1.20.usd).filledAmount shouldBe Some(5.waves)
 
-      node.reservedBalance(alice) shouldBe Map { UsdId.toString -> 1.21.usd }
-      node.reservedBalance(bob) shouldBe empty
+      dex1Api.reservedBalance(alice) shouldBe Map(usd -> 1.21.usd)
+      dex1Api.reservedBalance(bob) shouldBe empty
 
-      node.orderBook(wavesUsdPair).asks shouldBe empty
-      node.orderBook(wavesUsdPair).bids shouldBe List { LevelResponse(1.waves, 1.21.usd) }
+      dex1Api.orderBook(wavesUsdPair).asks shouldBe empty
+      dex1Api.orderBook(wavesUsdPair).bids shouldBe List { LevelResponse(1.waves, 1.21.usd) }
     }
   }
 

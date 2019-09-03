@@ -10,15 +10,12 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.http.api_key
+import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
-import com.wavesplatform.it.{Node, api}
-import com.wavesplatform.dex.api.CancelOrderRequest
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
@@ -26,7 +23,6 @@ import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.{Json, Writes}
 
-import scala.collection.immutable.TreeMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -238,13 +234,14 @@ object AsyncMatcherHttpApi extends Assertions {
                      timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds,
                      matcherFeeAssetId: Asset = Waves): Order = {
-      val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val unsigned = version match {
-        case 3 => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version,
-          matcherFeeAssetId)
-        case _ => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
-      }
-      Order.sign(unsigned, sender)
+//      val timeToLiveTimestamp = timestamp + timeToLive.toMillis
+//      val unsigned = version match {
+//        case 3 => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version,
+//          matcherFeeAssetId)
+//        case _ => Order(sender, DexTestConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+//      }
+//      Order.sign(unsigned, sender)
+      ???
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
@@ -317,42 +314,37 @@ object AsyncMatcherHttpApi extends Assertions {
       loop(0, 0, -1)
     }
 
-    def matcherState(assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[KeyPair]): Future[MatcherState] =
-      for {
-        offset           <- matcherNode.getCurrentOffset
-        snapshots        <- matcherNode.getAllSnapshotOffsets
-        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
-        orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
-        reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
-        accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
-        orderHistory <- Future.traverse(accountsOrderHistory) {
-          case (account, pair) => matcherNode.orderHistoryByPair(account, pair).map(r => (account, pair, r))
-        }
-      } yield {
-        val orderHistoryMap = orderHistory
-          .groupBy(_._1) // group by accounts
-          .map {
-            case (account, xs) =>
-              val assetPairHistory = xs.groupBy(_._2).map { // group by asset pair
-                case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
-              }
-
-              account -> (TreeMap.empty[AssetPair, Seq[OrderbookHistory]] ++ assetPairHistory)
-          }
-
-        clean {
-          api.MatcherState(offset,
-                           TreeMap(snapshots.toSeq: _*),
-                           TreeMap(orderBooks: _*),
-                           TreeMap(orderStatuses: _*),
-                           TreeMap(reservedBalances: _*),
-                           TreeMap(orderHistoryMap.toSeq: _*))
-        }
-      }
-
-    private def clean(x: MatcherState): MatcherState = x.copy(
-      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
-    )
+    def matcherState(assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[KeyPair]): Future[MatcherState] = ???
+//      for {
+//        offset           <- matcherNode.getCurrentOffset
+//        snapshots        <- matcherNode.getAllSnapshotOffsets
+//        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
+//        orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
+//        reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
+//        accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
+//        orderHistory <- Future.traverse(accountsOrderHistory) {
+//          case (account, pair) => matcherNode.orderHistoryByPair(account, pair).map(r => (account, pair, r))
+//        }
+//      } yield {
+//        val orderHistoryMap = orderHistory
+//          .groupBy(_._1) // group by accounts
+//          .map {
+//            case (account, xs) =>
+//              val assetPairHistory = xs.groupBy(_._2).map { // group by asset pair
+//                case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
+//              }
+//
+//              account -> (TreeMap.empty[AssetPair, Seq[OrderbookHistory]] ++ assetPairHistory)
+//          }
+//
+//        clean {
+//          api.MatcherState(offset, TreeMap(snapshots.toSeq: _*), TreeMap(orderBooks: _*), ???, ???, ???)
+//        }
+//      }
+//
+//    private def clean(x: MatcherState): MatcherState = x.copy(
+//      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
+//    )
 
     def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int, apiKey: String = matcherNode.apiKey): Future[RatesResponse] = {
       put(
@@ -383,6 +375,6 @@ object AsyncMatcherHttpApi extends Assertions {
     def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
   }
 
-  private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
-  private implicit val KeyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
+//  private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
+//  private implicit val KeyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 }

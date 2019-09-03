@@ -6,6 +6,7 @@ resolvers ++= Seq(
 )
 
 Seq(
+  "org.jetbrains"     % "sbt-ide-settings"       % "1.0.0",
   "com.eed3si9n"      % "sbt-assembly"           % "0.14.5",
   "com.typesafe.sbt"  % "sbt-native-packager"    % "1.3.2",
   "org.scalastyle"    %% "scalastyle-sbt-plugin" % "1.0.0",
@@ -13,8 +14,7 @@ Seq(
   "se.marcuslonnberg" % "sbt-docker"             % "1.4.1",
   "com.typesafe.sbt"  % "sbt-git"                % "0.9.3",
   "com.lucidchart"    % "sbt-scalafmt"           % "1.15",
-  "com.thesamet"      % "sbt-protoc"             % "0.99.19",
-  "org.jetbrains"     % "sbt-ide-settings"       % "1.0.0"
+  "com.thesamet"      % "sbt-protoc"             % "0.99.19"
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
@@ -22,3 +22,6 @@ libraryDependencies ++= Seq(
   "org.vafer"                    % "jdeb"                      % "1.5" artifacts Artifact("jdeb", "jar", "jar"),
   "com.thesamet.scalapb"         %% "compilerplugin"           % "0.8.4"
 )
+
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full) // Remove after scala 2.13 migration
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")

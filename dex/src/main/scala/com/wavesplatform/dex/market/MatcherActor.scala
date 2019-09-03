@@ -6,13 +6,13 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.google.common.base.Charsets
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.{ActorNameParser, WorkingStash}
 import com.wavesplatform.dex.{WatchDistributedCompletionActor, error}
-import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -25,7 +25,7 @@ class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: IssuedAsset => Option[AssetDescription])
+                   assetDescription: IssuedAsset => Option[BriefAssetDescription])
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -54,16 +54,16 @@ class MatcherActor(settings: MatcherSettings,
 
   private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
 
-  private def getAssetName(asset: Asset, desc: Option[AssetDescription]): String =
+  private def getAssetName(asset: Asset, desc: Option[BriefAssetDescription]): String =
     asset match {
       case Waves => AssetPair.WavesName
       case _     => desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
-  private def getAssetInfo(asset: Asset, desc: Option[AssetDescription]): Option[AssetInfo] =
+  private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
-  private def getAssetDescriptionByAssetId(assetId: Asset): Option[AssetDescription] = assetId match {
+  private def getAssetDescriptionByAssetId(assetId: Asset): Option[BriefAssetDescription] = assetId match {
     case Waves                  => None
     case asset @ IssuedAsset(_) => assetDescription(asset)
   }
@@ -268,7 +268,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: IssuedAsset => Option[AssetDescription]): Props =
+            assetDescription: IssuedAsset => Option[BriefAssetDescription]): Props =
     Props(
       new MatcherActor(
         matcherSettings,

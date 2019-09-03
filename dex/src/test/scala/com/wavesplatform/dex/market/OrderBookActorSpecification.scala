@@ -22,7 +22,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -36,7 +35,7 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => false)
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
@@ -86,7 +85,7 @@ class OrderBookActorSpecification
         p => Option(md.get(p)),
         _ => (),
         raw => MatchingRules(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact),
-        txFactory,
+        txFactory.createTransaction,
         ntpTime,
         matchingRules
       ) with RestartableActor

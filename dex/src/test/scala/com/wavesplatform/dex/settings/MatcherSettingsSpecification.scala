@@ -3,8 +3,10 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
@@ -73,9 +75,17 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""waves {
       |  directory = /waves
       |  dex {
-      |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
-      |    bind-address = 127.0.0.1
-      |    port = 6886
+      |    account-storage {
+      |      type = "in-mem"
+      |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+      |    }
+      |    rest-api {
+      |      address = 127.1.2.3
+      |      port = 6880
+      |      api-key-hash = foobarhash
+      |      cors = no
+      |      api-key-different-host = no
+      |    }
       |    exchange-tx-base-fee = 300000
       |    actor-response-timeout = 11s
       |    snapshots-interval = 999
@@ -148,9 +158,14 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val config = configWithSettings()
 
     val settings = config.as[MatcherSettings]("waves.dex")
-    settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
-    settings.bindAddress should be("127.0.0.1")
-    settings.port should be(6886)
+    settings.accountStorage should be(AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get))
+    settings.restApi shouldBe RestAPISettings(
+      address = "127.1.2.3",
+      port = 6880,
+      apiKeyHash = "foobarhash",
+      cors = false,
+      apiKeyDifferentHost = false
+    )
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
     settings.journalDataDir should be("/waves/matcher/journal")

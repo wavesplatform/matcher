@@ -2,104 +2,132 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.account.Address
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
-class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
+class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen {
 
   import BlacklistedTradingTestSuite._
 
-  override protected def nodeConfigs: Seq[Config] = Seq(configWithBlacklisted().withFallback(Configs.head))
+  override protected def dex1Config: Config = configWithBlacklisted().withFallback(super.dex1Config)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    val xs = Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_))
-    val height = xs.map(tx => node.waitForTransaction(tx.id).height).max
-    node.waitForHeight(height + 1)
+    broadcast(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
   }
 
   "When blacklists are empty" in {
     val (dec2, dec8) = (1000L, 1000000000L)
 
     Then("Place some orders")
-    val usdOrder  = node.placeOrder(alice, wavesUsdPair, BUY, dec8, dec2, matcherFee).message.id
-    val wctOrder  = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id
-    val ethOrder  = node.placeOrder(alice, ethWavesPair, SELL, dec8, dec8, matcherFee).message.id
-    val btcOrder1 = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
-    node.waitOrderStatus(wctWavesPair, btcOrder1, "Accepted")
+    val usdOrder  = mkOrder(alice, matcher, wavesUsdPair, BUY, dec8, dec2)
+    val wctOrder  = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
+    val ethOrder  = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder1 = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    List(usdOrder, wctOrder, ethOrder, btcOrder1).foreach(dex1Api.place)
+    dex1Api.waitForOrderStatus(btcOrder1, OrderStatus.Accepted)
 
     Then("We blacklist some assets and addresses and restart the node")
-    docker.restartNode(
-      node,
+    replaceLocalConfig(
+      dex1Container(),
       configWithBlacklisted(
         assets = Array(WctId.toString),
         names = Array("ETH.*"),
         addresses = Array(bob.toAddress.toString)
       )
     )
+    restartContainer(dex1Container(), dex1Api)
 
     Then("orders for blacklisted assets are not available and new orders can't be placed")
-    node.orderStatusExpectInvalidAssetId(wctOrder, wctWavesPair, WctId.toString, _.message.contains("is blacklisted"))
-    node.orderStatusExpectInvalidAssetId(ethOrder, ethWavesPair, EthId.toString, _.message.contains("is blacklisted"))
-    node.expectRejectedOrderPlacement(alice, wctWavesPair, BUY, dec2, dec8)
-    node.expectRejectedOrderPlacement(alice, ethWavesPair, SELL, dec8, dec8)
-    node.expectRejectedOrderPlacement(bob, wavesBtcPair, SELL, dec8, dec8)
+    testOrderStatusDenied(wctOrder, IssuedAsset(WctId))
+    testOrderStatusDenied(ethOrder, IssuedAsset(EthId))
+
+    testOrderPlacementDenied(mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8), IssuedAsset(WctId))
+    testOrderPlacementDenied(mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8), IssuedAsset(EthId))
+
+    testOrderPlacementDenied(mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
-    node.orderStatus(btcOrder1, wavesBtcPair).status shouldBe "Accepted"
+    dex1Api.orderStatus(btcOrder1).status shouldBe OrderStatus.Accepted
 
     And("orders for other assets are still available")
-    node.orderStatus(usdOrder, wavesUsdPair).status shouldBe "Accepted"
+    dex1Api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
 
     And("OrderBook for blacklisted assets is not available")
-    node.orderBookExpectInvalidAssetId(wctWavesPair, WctId.toString, _.message.contains("is blacklisted"))
-    node.orderBookExpectInvalidAssetId(ethWavesPair, EthId.toString, _.message.contains("is blacklisted"))
-    node.orderBook(wavesBtcPair).asks.size shouldBe 1
+    testOrderBookDenied(wctWavesPair, IssuedAsset(WctId))
+    testOrderBookDenied(ethWavesPair, IssuedAsset(EthId))
+    dex1Api.orderBook(wavesBtcPair).asks.size shouldBe 1
 
     And("OrderHistory returns info about all orders")
-    node.activeOrderHistory(alice).size shouldBe 3
-    node.activeOrderHistory(alice).foreach(_.status shouldBe "Accepted")
-    node.activeOrderHistory(bob).size shouldBe 1
-    node.activeOrderHistory(bob).head.status shouldBe "Accepted"
+    val aliceOrderHistory = dex1Api.orderHistory(alice, activeOnly = Some(true))
+    aliceOrderHistory.size shouldBe 3
+    aliceOrderHistory.foreach(_.status shouldBe OrderStatus.Accepted)
+
+    val bobOrderHistory = dex1Api.orderHistory(bob, activeOnly = Some(true))
+    bobOrderHistory.size shouldBe 1
+    bobOrderHistory.head.status shouldBe OrderStatus.Accepted
 
     And("Trading markets have info about all asset pairs")
-    node.tradingMarkets().markets.size shouldBe 4
+    dex1Api.allOrderBooks.markets.size shouldBe 4
 
     And("balances are still reserved")
-    node.reservedBalance(alice).size shouldBe 3
-    node.reservedBalance(bob).size shouldBe 1
+    dex1Api.reservedBalance(alice).size shouldBe 3
+    dex1Api.reservedBalance(bob).size shouldBe 1
 
     And("orders for other assets are still available")
-    node.orderStatus(usdOrder, wavesUsdPair).status shouldBe "Accepted"
+    dex1Api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
-    val btcOrder2 = node.placeOrder(alice, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
-    node.waitOrderStatus(wavesBtcPair, btcOrder2, "Accepted")
+    val btcOrder2 = mkOrder(alice, matcher, wavesBtcPair, SELL, dec8, dec8)
+    dex1Api.place(btcOrder2)
+    dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
 
     And("now if all blacklists are cleared")
-    docker.restartNode(node, configWithBlacklisted())
+    replaceLocalConfig(dex1Container(), configWithBlacklisted())
+    restartContainer(dex1Container(), dex1Api)
 
     Then("OrderBook for blacklisted assets is available again")
-    node.orderBook(wctWavesPair).bids.size shouldBe 1
-    node.orderBook(ethWavesPair).asks.size shouldBe 1
+    dex1Api.orderBook(wctWavesPair).bids.size shouldBe 1
+    dex1Api.orderBook(ethWavesPair).asks.size shouldBe 1
 
     And("order statuses are available again")
-    node.orderStatus(wctOrder, wctWavesPair).status shouldBe "Accepted"
-    node.orderStatus(ethOrder, ethWavesPair).status shouldBe "Accepted"
+    dex1Api.orderStatus(wctOrder).status shouldBe OrderStatus.Accepted
+    dex1Api.orderStatus(ethOrder).status shouldBe OrderStatus.Accepted
 
     And("new orders can be placed")
-    val newWctOrder = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id
-    val newEthOrder = node.placeOrder(alice, ethWavesPair, SELL, dec8, dec8, matcherFee).message.id
-    val btcOrder3   = node.placeOrder(bob, wavesBtcPair, SELL, dec8, dec8, matcherFee).message.id
-    node.waitOrderStatus(wctWavesPair, btcOrder3, "Accepted")
-    node.orderStatus(newWctOrder, wctWavesPair).status shouldBe "Accepted"
-    node.orderStatus(newEthOrder, ethWavesPair).status shouldBe "Accepted"
+    val newWctOrder = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
+    val newEthOrder = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder3   = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val newOrders   = List(newWctOrder, newEthOrder, btcOrder3)
+    newOrders.foreach(dex1Api.place)
+    newOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
   }
 
+  private def testOrderPlacementDenied(order: Order, address: Address): Unit =
+    dex1Api.tryPlace(order) should failWith(3145733, MatcherError.Params(address = Some(address.stringRepr)))
+
+  private def testOrderPlacementDenied(order: Order, blacklistedAsset: Asset): Unit =
+    failedDueAssetBlacklist(dex1Api.tryPlace(order), order.assetPair, blacklistedAsset)
+
+  private def testOrderStatusDenied(order: Order, blacklistedAsset: Asset): Unit =
+    failedDueAssetBlacklist(dex1Api.tryOrderStatus(order), order.assetPair, blacklistedAsset)
+
+  private def testOrderBookDenied(assetPair: AssetPair, blacklistedAsset: Asset): Unit =
+    failedDueAssetBlacklist(dex1Api.tryOrderBook(assetPair), assetPair, blacklistedAsset)
+
+  private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
+    r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(AssetPair.assetIdStr(blacklistedAsset))))
+
+  private def expectedErrorCode(assetPair: AssetPair, blacklistedAsset: Asset): Int =
+    if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted
+    else 11538437 // PriceAssetBlacklisted
 }
 
 object BlacklistedTradingTestSuite {

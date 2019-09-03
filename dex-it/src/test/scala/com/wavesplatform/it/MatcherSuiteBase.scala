@@ -4,7 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase.baseConfig
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
+import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -15,10 +15,9 @@ abstract class MatcherSuiteBase
     extends FreeSpec
     with Matchers
     with CancelAfterFailure
-    with ReportingTestName
-    with NodesFromDocker
     with BeforeAndAfterAll
-    with MatcherNode {
+    with ReportingTestName
+    with NodesFromDocker {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
@@ -39,7 +38,7 @@ abstract class MatcherSuiteBase
 
   protected def node = dockerNodes().head
 
-  protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
+  protected def nodeConfigs: Seq[Config] = DexTestConfig.Configs
 
 }
 

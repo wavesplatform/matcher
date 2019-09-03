@@ -8,14 +8,15 @@ import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{RequestGen, WithDB, crypto}
@@ -30,18 +31,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
+  private val asset          = IssuedAsset(smartAssetTx.id())
 
-  private val smartAssetDesc =
-    AssetDescription(
-      issuer = smartAssetTx.sender,
-      name = smartAssetTx.name,
-      description = smartAssetTx.description,
-      decimals = smartAssetTx.decimals,
-      reissuable = smartAssetTx.reissuable,
-      totalVolume = smartAssetTx.quantity,
-      script = smartAssetTx.script,
-      sponsorship = 0
-    )
+  private val smartAssetDesc = BriefAssetDescription(
+    name = ByteStr(smartAssetTx.name),
+    decimals = smartAssetTx.decimals,
+    hasScript = false
+  )
 
   routePath("/balance/reserved/{publicKey}") - {
 
@@ -193,12 +189,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
-
-    val blockchain   = stub[Blockchain]
     val addressActor = TestProbe("address")
-
-    (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
-
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.GetReservedBalance) => sender ! Map.empty[Asset, Long]
@@ -210,29 +201,39 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
     implicit val context: ErrorFormatterContext = _ => 8
 
-    val route =
-      MatcherApiRoute(
-        assetPairBuilder = new AssetPairBuilder(settings, blockchain, Set.empty),
-        matcherPublicKey = matcherKeyPair.publicKey,
-        matcher = ActorRef.noSender,
-        addressActor = addressActor.ref,
-        storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
-        orderBook = _ => None,
-        getMarketStatus = _ => None,
-        tickSize = _ => 0.1,
-        orderValidator = _ => Left(error.FeatureNotImplemented),
-        orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, _ => 8, _ => None),
-        matcherSettings = settings,
-        matcherStatus = () => Matcher.Status.Working,
-        db = db,
-        time = ntpTime,
-        currentOffset = () => 0L,
-        lastOffset = () => Future.successful(0L),
-        matcherAccountFee = 300000L,
-        apiKeyHashStr = Base58.encode { crypto.secureHash(apiKey getBytes "UTF-8") },
-        rateCache = rateCache,
-        validatedAllowedOrderVersions = Set(1, 2, 3)
-      ).route
+    val route: Route = MatcherApiRoute(
+      assetPairBuilder = new AssetPairBuilder(
+        settings,
+        x =>
+          if (x == asset) Some(BriefAssetDescription(name = ByteStr(smartAssetDesc.name), decimals = smartAssetDesc.decimals, hasScript = false))
+          else None,
+        Set.empty
+      ),
+      matcherPublicKey = matcherKeyPair.publicKey,
+      matcher = ActorRef.noSender,
+      addressActor = addressActor.ref,
+      storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
+      orderBook = _ => None,
+      getMarketStatus = _ => None,
+      tickSize = _ => 0.1,
+      orderValidator = _ => Left(error.FeatureNotImplemented),
+      orderBookSnapshot = new OrderBookSnapshotHttpCache(
+        settings.orderBookSnapshotHttpCache,
+        ntpTime,
+        x => if (x == asset) smartAssetDesc.decimals else throw new IllegalArgumentException(s"No information about $x"),
+        _ => None
+      ),
+      matcherSettings = settings,
+      matcherStatus = () => Matcher.Status.Working,
+      db = db,
+      time = ntpTime,
+      currentOffset = () => 0L,
+      lastOffset = () => Future.successful(0L),
+      matcherAccountFee = () => 300000L,
+      apiKeyHashStr = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8"))),
+      rateCache = rateCache,
+      validatedAllowedOrderVersions = Set(1, 2, 3)
+    ).route
 
     f(route)
   }

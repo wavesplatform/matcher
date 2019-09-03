@@ -5,21 +5,20 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatchingRules, RawMatchingRules}
-import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
+import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NTPTime, WithDB}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
@@ -37,11 +36,10 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private val blockchain: Blockchain = stub[Blockchain]
-  (blockchain.assetDescription _)
-    .when(*)
-    .returns(Some(AssetDescription(KeyPair(ByteStr.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
-    .anyNumberOfTimes()
+  private val defaultAssetDescription =
+    Some(BriefAssetDescription(name = "Unknown".getBytes, decimals = 8, hasScript = false))
+
+  private def assetDescription(assetId: IssuedAsset): Option[BriefAssetDescription] = defaultAssetDescription
 
   "MatcherActor" should {
     "return all open markets" in {
@@ -50,14 +48,6 @@ class MatcherActorSpecification
 
       val pair  = AssetPair(randomAssetId, randomAssetId)
       val order = buy(pair, 2000, 1)
-
-      (blockchain.accountScript _)
-        .when(order.sender.toAddress)
-        .returns(None)
-
-      (blockchain.accountScript _)
-        .when(order.matcherPublicKey.toAddress)
-        .returns(None)
 
       probe.send(actor, wrapLimitOrder(order))
       probe.send(actor, GetMarkets)
@@ -76,14 +66,6 @@ class MatcherActorSpecification
       val pair  = AssetPair(randomAssetId, randomAssetId)
       val order = buy(pair, 2000, 1)
 
-      (blockchain.accountScript _)
-        .when(order.sender.toAddress)
-        .returns(None)
-
-      (blockchain.accountScript _)
-        .when(order.matcherPublicKey.toAddress)
-        .returns(None)
-
       probe.send(actor, wrapLimitOrder(order))
       addressActor.expectMsgType[Events.OrderAdded]
     }
@@ -99,7 +81,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (_, _) => Props(new FailAtStartActor),
-            blockchain.assetDescription
+            assetDescription
           )
         )
 
@@ -152,7 +134,7 @@ class MatcherActorSpecification
             startResult => working = startResult.isRight,
             ob,
             (_, _) => Props(new FailAtStartActor()),
-            blockchain.assetDescription
+            assetDescription
           )
         )
       )
@@ -183,7 +165,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new FailAtStartActor),
-                blockchain.assetDescription
+                assetDescription
               )
             )
           ))
@@ -210,7 +192,7 @@ class MatcherActorSpecification
                 startResult => stopped = startResult.isLeft,
                 ob,
                 (_, _) => Props(new NothingDoActor),
-                blockchain.assetDescription
+                assetDescription
               )
             )
           )
@@ -316,7 +298,7 @@ class MatcherActorSpecification
               _ => {},
               ob,
               (pair, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
-              blockchain.assetDescription
+              assetDescription
             )
           )
         )
@@ -339,7 +321,7 @@ class MatcherActorSpecification
             doNothingOnRecovery,
             ob,
             (assetPair, matcher) => Props(new DeletingActor(matcher, assetPair, Some(9L))),
-            blockchain.assetDescription
+            assetDescription
           )
         )
 
@@ -399,7 +381,7 @@ class MatcherActorSpecification
           if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
           r(idx)._1
         },
-        blockchain.assetDescription
+        assetDescription
       )
     )
 
@@ -431,7 +413,7 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
-    val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => true).createTransaction _
     TestActorRef(
       new MatcherActor(
         matcherSettings,
@@ -453,7 +435,7 @@ class MatcherActorSpecification
             ntpTime,
             NonEmptyList.one(RawMatchingRules(0, 0.00000001))
         ),
-        blockchain.assetDescription
+        assetDescription
       )
     )
   }

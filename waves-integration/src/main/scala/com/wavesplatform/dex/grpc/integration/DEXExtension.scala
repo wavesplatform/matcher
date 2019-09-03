@@ -2,8 +2,8 @@ package com.wavesplatform.dex.grpc.integration
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.dex.grpc.integration.services.BalancesServiceGrpcImpl
-import com.wavesplatform.dex.grpc.integration.services.balances._
+import com.wavesplatform.dex.grpc.integration.services.balances.BalancesServiceGrpc
+import com.wavesplatform.dex.grpc.integration.services.{BalancesServiceGrpcImpl, WavesBlockchainApiGrpc, WavesBlockchainApiGrpcImpl}
 import com.wavesplatform.dex.grpc.integration.settings.DEXExtensionSettings
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
@@ -25,22 +25,21 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
   implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
-  private def startServer(settings: DEXExtensionSettings): Server = {
+  private def startServer(settings: DEXExtensionSettings): Server =
     new InetSocketAddress(settings.host, settings.port) |> { bindAddress =>
       NettyServerBuilder
         .forAddress(bindAddress)
         .addService(BalancesServiceGrpc.bindService(new BalancesServiceGrpcImpl(context, settings.balanceChangesBatchLinger), apiScheduler))
-        .build
-        .start <| (_ => log.info { s"gRPC DEX extension was bound to $bindAddress" })
+        .addService(
+          WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcImpl(context.blockchain, context.utx, context.broadcastTransaction), apiScheduler))
+        .build()
+        .start()
+        .unsafeTap(_ => log.info(s"gRPC DEX extension was bound to $bindAddress"))
     }
-  }
 
-  override def start(): Unit = context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration") |> { settings =>
-    this.server = startServer(settings)
-  }
+  override def start(): Unit = server = startServer(context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration"))
 
   override def shutdown(): Future[Unit] = {
-
     log.info("Shutting down gRPC DEX extension")
 
     if (server != null) {

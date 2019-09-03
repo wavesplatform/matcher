@@ -5,13 +5,11 @@ import akka.stream.ActorMaterializer
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.dex.Version
-import com.wavesplatform.settings.RestAPISettings
 import io.swagger.models.{Scheme, Swagger}
 
-class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiClasses: Set[Class[_]], settings: RestAPISettings)
+class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiClasses: Set[Class[_]], override val host: String)
     extends SwaggerHttpService {
 
-  override val host: String = settings.bindAddress + ":" + settings.port
   override val info: Info = Info(
     "The Web Interface to the Waves DEX API",
     Version.VersionString,

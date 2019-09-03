@@ -5,6 +5,8 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
@@ -13,6 +15,7 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.RawMatchingRules.rawMatchingRulesNelReader
+import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -24,9 +27,11 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(account: String,
-                           bindAddress: String,
-                           port: Int,
+case class MatcherSettings(addressSchemeCharacter: Char,
+                           accountStorage: AccountStorage.Settings,
+                           wavesNodeGrpc: GRPCSettings,
+                           ntpServer: String,
+                           restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
@@ -56,8 +61,9 @@ case class MatcherSettings(account: String,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings],
-                           wavesNodeExtensionAddress: String)
+                           orderHistory: Option[OrderHistorySettings])
+
+case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
 
 object MatcherSettings {
 
@@ -67,10 +73,6 @@ object MatcherSettings {
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
     import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
-
-    val account     = config.as[String]("account")
-    val bindAddress = config.as[String]("bind-address")
-    val port        = config.as[Int]("port")
 
     val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
@@ -111,14 +113,18 @@ object MatcherSettings {
     val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
     val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
 
-    val postgresConnection        = config.as[PostgresConnection]("postgres")
-    val orderHistory              = config.as[Option[OrderHistorySettings]]("order-history")
-    val wavesNodeExtensionAddress = config.as[String]("waves-node-extension-address")
+    val postgresConnection = config.as[PostgresConnection]("postgres")
+    val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
-      account,
-      bindAddress,
-      port,
+      config
+        .as[String]("address-scheme-character")
+        .headOption
+        .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!")),
+      accountStorageSettingsReader.read(config, "account-storage"),
+      config.as[GRPCSettings]("waves-node-grpc"),
+      config.as[String]("ntp-server"),
+      config.as[RestAPISettings]("rest-api"),
       exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,
@@ -147,8 +153,7 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory,
-      wavesNodeExtensionAddress
+      orderHistory
     )
   }
 }

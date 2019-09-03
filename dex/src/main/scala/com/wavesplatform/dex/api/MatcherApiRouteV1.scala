@@ -82,8 +82,8 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   override def settings: RestAPISettings =
     RestAPISettings(
       true,
-      matcherSettings.bindAddress,
-      matcherSettings.port,
+      matcherSettings.restApi.address,
+      matcherSettings.restApi.port,
       apiKeyHashStr,
       true,
       true,

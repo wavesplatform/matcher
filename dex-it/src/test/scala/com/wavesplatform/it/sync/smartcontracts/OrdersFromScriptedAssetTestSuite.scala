@@ -39,12 +39,12 @@
 //    val pair = AssetPair(Waves, IssuedAsset(AllowAsset.id()))
 //
 //    val counter =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
-//    node.waitOrderStatus(pair, counter.message.id, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee))
+//    dex1Api.waitForOrderStatus(counter.message.id, OrderStatus.Accepted)
 //
 //    val submitted =
-//      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
-//    node.waitOrderStatus(pair, submitted.message.id, "Filled")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee))
+//    dex1Api.waitForOrderStatus(submitted.message.id, OrderStatus.Filled)
 //
 //    node.waitOrderInBlockchain(submitted.message.id)
 //    node.waitForHeight(activationHeight + 1, 2.minutes)
@@ -53,8 +53,8 @@
 //  "can place if the script returns TRUE" in {
 //    val pair = AssetPair.createAssetPair(UnscriptedAssetId, AllowAssetId).get
 //    val counterId =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-//    node.waitOrderStatus(pair, counterId, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Accepted)
 //    node.cancelOrder(matcher, pair, counterId)
 //  }
 //
@@ -78,13 +78,13 @@
 //    info("place counter")
 //    val pair = AssetPair.createAssetPair(UnscriptedAssetId, AllowAssetId).get
 //    val counterId =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-//    node.waitOrderStatus(pair, counterId, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Accepted)
 //
 //    info("place a submitted order")
 //    val submittedId =
-//      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-//    node.waitOrderStatus(pair, submittedId, "Filled")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(submittedId, OrderStatus.Filled)
 //  }
 //
 //  "can execute against scripted, if both scripts returns TRUE" in {
@@ -93,39 +93,39 @@
 //    info("place a counter order")
 //    val pair = AssetPair.createAssetPair(allowAsset2Id, AllowAssetId).get
 //    val counterId =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
-//    node.waitOrderStatus(pair, counterId, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Accepted)
 //
 //    info("place a submitted order")
 //    val submittedId =
-//      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee)).message.id
 //
 //    info("both orders are cancelled")
-//    node.waitOrderStatus(pair, submittedId, "Filled")
-//    node.waitOrderStatus(pair, counterId, "Filled")
+//    dex1Api.waitForOrderStatus(submittedId, OrderStatus.Filled)
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Filled)
 //  }
 //
 //  "can't execute against unscripted, if the script returns FALSE" in {
 //    info("place a counter order")
 //    val pair = AssetPair.createAssetPair(AllowAsset2Id, UnscriptedAssetId).get
 //    val counterId =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-//    node.waitOrderStatus(pair, counterId, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Accepted)
 //
 //    info("update a script")
 //    val setAssetScriptId = node.setAssetScript(AllowAsset2Id, matcher.toAddress.toString, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
-//    node.waitForTransaction(setAssetScriptId)
+//    wavesNode1Api.waitForTransaction(setAssetScriptId)
 //
 //    info("a counter order wasn't rejected")
 //    node.orderStatus(counterId, pair).status shouldBe "Accepted"
 //
 //    info("place a submitted order")
 //    val submittedId =
-//      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
 //
 //    info("two orders form an invalid transaction")
-//    node.waitOrderStatus(pair, submittedId, "Filled")
-//    node.waitOrderStatus(pair, counterId, "PartiallyFilled")
+//    dex1Api.waitForOrderStatus(submittedId, OrderStatus.Filled)
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.PartiallyFilled)
 //
 //    val txs = node.waitTransactionsByOrder(submittedId, 1)
 //    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
@@ -135,23 +135,23 @@
 //    info("place a counter order")
 //    val pair = AssetPair.createAssetPair(AllowAsset3Id, AllowAssetId).get
 //    val counterId =
-//      node.placeOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
-//    node.waitOrderStatus(pair, counterId, "Accepted")
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee)).message.id
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.Accepted)
 //
 //    info("update a script")
 //    val setAssetScriptId = node.setAssetScript(AllowAsset3Id, matcher.toAddress.toString, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
-//    node.waitForTransaction(setAssetScriptId)
+//    wavesNode1Api.waitForTransaction(setAssetScriptId)
 //
 //    info("a counter order wasn't rejected")
 //    node.orderStatus(counterId, pair).status shouldBe "Accepted"
 //
 //    info("place a submitted order")
 //    val submittedId =
-//      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+//      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee)).message.id
 //
 //    info("two orders form an invalid transaction")
-//    node.waitOrderStatus(pair, submittedId, "Filled")
-//    node.waitOrderStatus(pair, counterId, "PartiallyFilled")
+//    dex1Api.waitForOrderStatus(submittedId, OrderStatus.Filled)
+//    dex1Api.waitForOrderStatus(counterId, OrderStatus.PartiallyFilled)
 //
 //    val txs = node.waitTransactionsByOrder(submittedId, 1)
 //    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
@@ -162,14 +162,14 @@
 //    val allowAsset2   = mkAllowAsset()
 //    val allowAsset2Id = allowAsset2.id().toString
 //    node.signedIssue(createSignedIssueRequest(allowAsset2))
-//    node.waitForTransaction(allowAsset2Id)
+//    wavesNode1Api.waitForTransaction(allowAsset2Id)
 //    allowAsset2Id
 //  }
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    val xs = Seq(UnscriptedAsset, AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(_.json()).map(node.broadcastRequest(_))
-//    xs.foreach(tx => node.waitForTransaction(tx.id))
+//    val xs = Seq(UnscriptedAsset, AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(_.json()).map(wavesNode1Api.broadcast(_))
+//    xs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id))
 //  }
 //}
 //

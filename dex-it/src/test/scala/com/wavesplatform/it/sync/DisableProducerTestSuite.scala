@@ -31,7 +31,7 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
       List(
         mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
-        mkOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
+        mkOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant)
       ).foreach(test)
 
       Thread.sleep(5000)

@@ -12,19 +12,19 @@
 //class RoundingIssuesTestSuite extends MatcherSuiteBase {
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    val xs = Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_))
-//    xs.foreach(x => node.waitForTransaction(x.id))
+//    val xs = Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(wavesNode1Api.broadcast(_))
+//    xs.foreach(x => wavesNode1Api.waitForTransaction(x.id))
 //  }
 //
 //  "should correctly fill an order with small amount" in {
 //    val aliceBalanceBefore = node.accountBalances(alice.toAddress.toString)._1
 //    val bobBalanceBefore   = node.accountBalances(bob.toAddress.toString)._1
 //
-//    val counter   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
-//    val counterId = node.placeOrder(counter).message.id
+//    val counter   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, 3100000000L, 238)
+//    val counterId = dex1Api.place(counter).message.id
 //
-//    val submitted   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 235)
-//    val submittedId = node.placeOrder(submitted).message.id
+//    val submitted   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 425532L, 235)
+//    val submittedId = dex1Api.place(submitted).message.id
 //
 //    val filledAmount = 420169L
 //    node.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(filledAmount), 1.minute)
@@ -47,11 +47,11 @@
 //  }
 //
 //  "reserved balance should not be negative" in {
-//    val counter   = node.prepareOrder(bob, ethBtcPair, OrderType.BUY, 923431000L, 31887L)
-//    val counterId = node.placeOrder(counter).message.id
+//    val counter   = mkOrder(bob, matcher,ethBtcPair, OrderType.BUY, 923431000L, 31887L)
+//    val counterId = dex1Api.place(counter).message.id
 //
-//    val submitted   = node.prepareOrder(alice, ethBtcPair, OrderType.SELL, 223345000L, 31887L)
-//    val submittedId = node.placeOrder(submitted).message.id
+//    val submitted   = mkOrder(alice, matcher,ethBtcPair, OrderType.SELL, 223345000L, 31887L)
+//    val submittedId = dex1Api.place(submitted).message.id
 //
 //    val filledAmount = 223344937L
 //    node.waitOrderStatusAndAmount(ethBtcPair, submittedId, "Filled", Some(filledAmount), 1.minute)
@@ -66,14 +66,14 @@
 //  }
 //
 //  "should correctly fill 2 counter orders" in {
-//    val counter1 = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 98333333L, 60L)
-//    node.placeOrder(counter1).message.id
+//    val counter1 = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 98333333L, 60L)
+//    dex1Api.place(counter1).message.id
 //
-//    val counter2   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 100000000L, 70L)
-//    val counter2Id = node.placeOrder(counter2).message.id
+//    val counter2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 100000000L, 70L)
+//    val counter2Id = dex1Api.place(counter2).message.id
 //
-//    val submitted   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
-//    val submittedId = node.placeOrder(submitted).message.id
+//    val submitted   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
+//    val submittedId = dex1Api.place(submitted).message.id
 //
 //    node.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)
 //    node.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(99523810L), 1.minute)

@@ -132,7 +132,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
         dex1Api.tryPlace(badOrder) should failWith(3147270) // BalanceNotEnough
 
         // Bob places order on available amount of assets - order accepted
-        val order3 = mkOrder(bob, matcher, aliceWavesPair, SELL, 150, 1900.waves, matcherFee)
+        val order3 = mkOrder(bob, matcher, aliceWavesPair, SELL, 150, 1900.waves)
         dex1Api.place(order3)
         dex1Api.waitForOrderStatus(order3, OrderStatus.Accepted)
 
@@ -303,8 +303,8 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //    val ap08 = issueAssetPair(alice, 0, 8)
 //
 //    {
-//      val xs = Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(_.json()).map(node.broadcastRequest(_))
-//      xs.foreach(x => node.waitForTransaction(x.id))
+//      val xs = Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(_.json()).map(wavesNode1Api.broadcast(_))
+//      xs.foreach(x => wavesNode1Api.waitForTransaction(x.id))
 //    }
 //
 //    val assets =
@@ -321,8 +321,8 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
 //        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
 //        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
-//        val o1         = node.prepareOrder(alice, pair, SELL, amount, minInvalid)
-//        val o2         = node.prepareOrder(alice, pair, SELL, amount, maxInvalid)
+//        val o1         = mkOrder(alice, matcher,pair, SELL, amount, minInvalid)
+//        val o2         = mkOrder(alice, matcher,pair, SELL, amount, maxInvalid)
 //
 //        node.expectIncorrectOrderPlacement(o1, 400, "OrderRejected", Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
 //        node.expectIncorrectOrderPlacement(o2, 400, "OrderRejected", Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
@@ -333,7 +333,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //      s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
 //        val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
 //        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
-//        val o1                = node.placeOrder(alice, pair, BUY, amount, minNonZeroInvalid, matcherFee)
+//        val o1                = dex1Api.place(mkOrder(alice, matcher,pair, BUY, amount, minNonZeroInvalid))
 //        o1.status shouldBe "OrderAccepted"
 //      }
 //    }
@@ -342,10 +342,10 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //  "Order statuses for old orders" in {
 //    val (amountAssetTx, priceAssetTx, pair) = issueAssetPair(alice, 2, 8)
 //
-//    def placeOrder(i: Int, tpe: OrderType) = node.placeOrder(alice, pair, tpe, 100L + i, Order.PriceConstant, matcherFee)
+//    def placeOrder(i: Int, tpe: OrderType) = dex1Api.place(mkOrder(alice, matcher,pair, tpe, 100L + i, Order.PriceConstant))
 //
-//    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(node.broadcastRequest(_)).map(_.id)
-//    txIds.foreach(node.waitForTransaction(_))
+//    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(wavesNode1Api.broadcast(_)).map(_.id)
+//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
 //
 //    val ids = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
 //      List(

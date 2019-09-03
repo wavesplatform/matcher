@@ -50,7 +50,7 @@
 //
 //  // Issue assets by Alice
 //  private val assetIds = {
-//    val txs = Seq(issue1, issue2).map(x => matcher1Node.broadcastRequest(x.json()).id -> x)
+//    val txs = Seq(issue1, issue2).map(x => matcher1wavesNode1Api.broadcast(x).id -> x)
 //    txs.map { case (id, info) => nodes.waitForTransaction(id).id -> info }.toMap
 //  }
 //

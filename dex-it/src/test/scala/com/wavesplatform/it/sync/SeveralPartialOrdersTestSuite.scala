@@ -14,7 +14,7 @@
 //class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    node.waitForTransaction(node.broadcastRequest(IssueUsdTx.json()).id)
+//    wavesNode1Api.waitForTransaction(wavesNode1Api.broadcast(IssueUsdTx).id)
 //  }
 //
 //  "Alice and Bob trade WAVES-USD" - {
@@ -26,18 +26,18 @@
 //      // Alice wants to sell USD for Waves
 //      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
 //
-//      val bobOrder1   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-//      val bobOrder1Id = node.placeOrder(bobOrder1).message.id
+//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
 //      node.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
-//      val aliceOrder   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-//      val aliceOrderId = node.placeOrder(aliceOrder).message.id
+//      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrderId = dex1Api.place(aliceOrder).message.id
 //      node.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled", 1.minute)
 //
-//      val aliceOrder2   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-//      val aliceOrder2Id = node.placeOrder(aliceOrder2).message.id
+//      val aliceOrder2   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder2Id = dex1Api.place(aliceOrder2).message.id
 //      node.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
 //
 //      // Bob wants to buy some USD
@@ -53,8 +53,8 @@
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
-//      val bobOrder2   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-//      val bobOrder2Id = node.placeOrder(bobOrder2).message.id
+//      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 //
 //      val orderBook2 = node.orderBook(wavesUsdPair)
@@ -69,14 +69,14 @@
 //    }
 //
 //    "place one submitted orders and two counter" in {
-//      val aliceOrder1   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-//      val aliceOrder1Id = node.placeOrder(aliceOrder1).message.id
+//      val aliceOrder1   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder1Id = dex1Api.place(aliceOrder1).message.id
 //
-//      val aliceOrder2   = node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-//      val aliceOrder2Id = node.placeOrder(aliceOrder2).message.id
+//      val aliceOrder2   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder2Id = dex1Api.place(aliceOrder2).message.id
 //
-//      val bobOrder1   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-//      val bobOrder1Id = node.placeOrder(bobOrder1).message.id
+//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //
 //      node.waitOrderStatus(wavesUsdPair, aliceOrder1Id, "Filled", 1.minute)
 //      node.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
@@ -92,8 +92,8 @@
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
-//      val bobOrder2   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-//      val bobOrder2Id = node.placeOrder(bobOrder2).message.id
+//      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 //
 //      val orderBook2 = node.orderBook(wavesUsdPair)

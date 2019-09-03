@@ -46,29 +46,29 @@
 //    val bobAsset = node
 //      .broadcastIssue(bob, "BobCoin", "Test", someAssetAmount, 0, reissuable = false, issueFee, None)
 //      .id
-//    Seq(aliceAsset, bobAsset).foreach(node.waitForTransaction(_))
+//    Seq(aliceAsset, bobAsset).foreach(wavesNode1Api.waitForTransaction(_))
 //
 //    val alicePair = AssetPair(IssuedAsset(decodeBase58(aliceAsset).get), Waves)
 //    val bobPair   = AssetPair(IssuedAsset(decodeBase58(bobAsset).get), Waves)
 //
 //    info("'fullOrderHistory' and 'ordersByAddress' (activeOnly=false) must return no more 'rest-order-limit' orders")
 //
-//    val active0 = node.placeOrder(alice, alicePair, SELL, 1, 15.waves, matcherFee).message.id
+//    val active0 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 15.waves)).message.id
 //
-//    val active1    = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val partial1   = node.placeOrder(alice, alicePair, SELL, 2, 9.waves, matcherFee).message.id
-//    val filled1    = node.placeOrder(alice, alicePair, SELL, 1, 8.waves, matcherFee).message.id
-//    val cancelled1 = node.placeOrder(alice, alicePair, SELL, 1, 11.waves, matcherFee).message.id
-//    val active2    = node.placeOrder(alice, bobPair, BUY, 1, 2.waves, matcherFee).message.id
-//    val filled2    = node.placeOrder(alice, bobPair, BUY, 1, 4.waves, matcherFee).message.id
-//    val partial2   = node.placeOrder(alice, bobPair, BUY, 2, 3.waves, matcherFee).message.id
-//    val cancelled2 = node.placeOrder(alice, bobPair, BUY, 1, 2.waves, matcherFee).message.id
+//    val active1    = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val partial1   = dex1Api.place(mkOrder(alice, alicePair, SELL, 2, 9.waves)).message.id
+//    val filled1    = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 8.waves)).message.id
+//    val cancelled1 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 11.waves)).message.id
+//    val active2    = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
+//    val filled2    = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 4.waves)).message.id
+//    val partial2   = dex1Api.place(mkOrder(alice, bobPair, BUY, 2, 3.waves)).message.id
+//    val cancelled2 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
 //
 //    // orders for matching Alice's orders
-//    node.placeOrder(bob, alicePair, BUY, 1, 8.waves, matcherFee).message.id // fill filled1
-//    node.placeOrder(bob, alicePair, BUY, 1, 9.waves, matcherFee).message.id // part fill partial1
-//    node.placeOrder(bob, bobPair, SELL, 1, 4.waves, matcherFee).message.id  // fill filled2
-//    node.placeOrder(bob, bobPair, SELL, 1, 3.waves, matcherFee).message.id  // part fill partial2
+//    dex1Api.place(mkOrder(bob, alicePair, BUY, 1, 8.waves)).message.id // fill filled1
+//    dex1Api.place(mkOrder(bob, alicePair, BUY, 1, 9.waves)).message.id // part fill partial1
+//    dex1Api.place(mkOrder(bob, bobPair, SELL, 1, 4.waves)).message.id  // fill filled2
+//    dex1Api.place(mkOrder(bob, bobPair, SELL, 1, 3.waves)).message.id  // part fill partial2
 //
 //    node.cancelOrder(alice, alicePair, cancelled1)
 //    node.cancelOrder(alice, alicePair, cancelled2)
@@ -86,10 +86,10 @@
 //
 //    info("'fullOrderHistory' and 'ordersByAddress' must return all active orders, even if they are more than the limit")
 //
-//    val active3 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active4 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active5 = node.placeOrder(alice, bobPair, BUY, 1, 2.waves, matcherFee).message.id
-//    val active6 = node.placeOrder(alice, bobPair, BUY, 1, 2.waves, matcherFee).message.id
+//    val active3 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active4 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active5 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
+//    val active6 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
 //
 //    node.waitOrderStatus(bobPair, active6, "Accepted", 1.minutes)
 //
@@ -103,10 +103,10 @@
 //
 //    info("'orderHistoryByPair' must return no more 'rest-order-limit' orders")
 //
-//    val active7  = node.placeOrder(alice, alicePair, SELL, 1, 9.waves, matcherFee).message.id
-//    val active8  = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active9  = node.placeOrder(alice, bobPair, BUY, 1, 1.waves, matcherFee).message.id
-//    val active10 = node.placeOrder(alice, bobPair, BUY, 1, 1.waves, matcherFee).message.id
+//    val active7  = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 9.waves)).message.id
+//    val active8  = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active9  = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 1.waves)).message.id
+//    val active10 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 1.waves)).message.id
 //
 //    node.waitOrderStatus(bobPair, active10, "Accepted", 1.minutes)
 //
@@ -120,10 +120,10 @@
 //
 //    info("all the methods move active orders that were filled")
 //
-//    node.placeOrder(bob, bobPair, SELL, 1, 3.waves, matcherFee).message.id   // fill partial2
-//    node.placeOrder(bob, bobPair, SELL, 2, 2.waves, matcherFee).message.id   // fill active2, active5
-//    node.placeOrder(bob, alicePair, BUY, 2, 9.waves, matcherFee).message.id  // fill partial1, active7
-//    node.placeOrder(bob, alicePair, BUY, 1, 10.waves, matcherFee).message.id // fill active1
+//    dex1Api.place(mkOrder(bob, bobPair, SELL, 1, 3.waves)).message.id   // fill partial2
+//    dex1Api.place(mkOrder(bob, bobPair, SELL, 2, 2.waves)).message.id   // fill active2, active5
+//    dex1Api.place(mkOrder(bob, alicePair, BUY, 2, 9.waves)).message.id  // fill partial1, active7
+//    dex1Api.place(mkOrder(bob, alicePair, BUY, 1, 10.waves)).message.id // fill active1
 //
 //    node.waitOrderStatus(bobPair, active1, "Filled", 1.minutes)
 //
@@ -139,11 +139,11 @@
 //
 //    info("'orderHistoryByPair' must return all active orders, even if they are more than the limit")
 //
-//    val active11 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active12 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active13 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active14 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
-//    val active15 = node.placeOrder(alice, alicePair, SELL, 1, 10.waves, matcherFee).message.id
+//    val active11 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active12 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active13 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active14 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
+//    val active15 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
 //
 //    node.waitOrderStatus(bobPair, active15, "Accepted", 1.minutes)
 //

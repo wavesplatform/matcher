@@ -40,8 +40,8 @@
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    val txIds = Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
-//    txIds.foreach(node.waitForTransaction(_))
+//    val txIds = Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(wavesNode1Api.broadcast(_).id)
+//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
 //  }
 //
 //  "supported non-waves order fee" - {
@@ -153,7 +153,7 @@
 //  "asset fee is not supported" - {
 //    val btcRate = 0.0005
 //    val ethRate = 0.0064
-//    val order = node.prepareOrder(
+//    val order = mkOrder(
 //      sender = bob,
 //      pair = wavesBtcPair,
 //      orderType = OrderType.BUY,
@@ -165,12 +165,12 @@
 //    )
 //
 //    "only waves supported" in {
-//      assertBadRequestAndResponse(node.placeOrder(order), s"Required one of the following fee asset: WAVES. But given $BtcId")
+//      assertBadRequestAndResponse(dex1Api.place(mkOrder(order), matcher,s"Required one of the following fee asset: WAVES. But given $BtcId"))
 //    }
 //
 //    "not only waves supported" in {
 //      node.upsertRate(IssuedAsset(EthId), 0.1, expectedStatusCode = StatusCodes.Created)
-//      assertBadRequestAndResponse(node.placeOrder(order), s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId")
+//      assertBadRequestAndResponse(dex1Api.place(mkOrder(order), matcher,s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId"))
 //      node.deleteRate(IssuedAsset(EthId))
 //    }
 //
@@ -180,7 +180,7 @@
 //      val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
 //      val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
 //      val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-//      val bobOrderId      = node.placeOrder(order).message.id
+//      val bobOrderId      = dex1Api.place(order).message.id
 //      node.deleteRate(IssuedAsset(BtcId))
 //      node
 //        .placeOrder(
@@ -328,7 +328,7 @@
 //        )
 //        .message
 //        .id
-//      node.waitOrderStatus(wavesBtcPair, bobOrderId, "Accepted")
+//      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
 //      node.reservedBalance(bob).keys should not contain "WAVES"
 //
 //      val aliceOrderId = node
@@ -345,7 +345,7 @@
 //        .message
 //        .id
 //      Array(bobOrderId, aliceOrderId)
-//        .foreach(orderId => node.waitOrderStatus(wavesBtcPair, orderId, "Filled"))
+//        .foreach(orderId => dex1Api.waitForOrderStatus(orderId, OrderStatus.Filled))
 //      Array(bobOrderId, aliceOrderId)
 //        .foreach(orderId => node.waitOrderInBlockchain(orderId))
 //      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 50150L)
@@ -434,7 +434,7 @@
 //          )
 //          .message
 //          .id
-//        node.waitOrderStatus(wavesBtcPair, bobOrderId, "Accepted")
+//        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
 //        node.reservedBalance(bob).keys should not contain "WAVES"
 //
 //        val aliceOrderId = node

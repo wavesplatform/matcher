@@ -49,7 +49,7 @@
 //  val falseFeeAsset: ByteStr = ByteStr(Base58.decode(node
 //    .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, falseScript)
 //    .id))
-//  Seq(asset0, asset1, asset2, feeAsset.toString).foreach(node.waitForTransaction(_))
+//  Seq(asset0, asset1, asset2, feeAsset.toString).foreach(wavesNode1Api.waitForTransaction(_))
 //
 //  // distribute
 //  {
@@ -58,10 +58,10 @@
 //      node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None).id,
 //      node.broadcastTransfer(bob, alice.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
 //    )
-//    xs.foreach(node.waitForTransaction(_))
+//    xs.foreach(wavesNode1Api.waitForTransaction(_))
 //
-//    val txIds = Seq(IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
-//    txIds.foreach(node.waitForTransaction(_))
+//    val txIds = Seq(IssueBtcTx).map(_.json()).map(wavesNode1Api.broadcast(_).id)
+//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
 //  }
 //
 //  override protected def nodeConfigs: Seq[Config] = {
@@ -109,13 +109,13 @@
 //          expectedMessage = Some("Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
 //        )
 //
-//        val counter = node.placeOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, 2).message.id
-//        node.waitOrderStatus(oneSmartPair, counter, "Accepted")
+//        val counter = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, SELL, amount, price, expectedFee, 2)).message.id
+//        dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //        info("expected fee should be reserved")
 //        node.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
-//        val submitted = node.placeOrder(bob, oneSmartPair, BUY, amount, price, expectedFee, 2).message.id
+//        val submitted = dex1Api.place(mkOrder(bob, matcher,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //        node.waitOrderInBlockchain(submitted)
 //
 //        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
@@ -149,13 +149,13 @@
 //            expectedMessage = Some("Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES")
 //          )
 //
-//          val counter = node.placeOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, 2).message.id
-//          node.waitOrderStatus(bothSmartPair, counter, "Accepted")
+//          val counter = dex1Api.place(mkOrder(alice, matcher,bothSmartPair, SELL, amount, price, expectedFee, 2)).message.id
+//          dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //          info("expected fee should be reserved")
 //          node.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
-//          val submitted = node.placeOrder(bob, bothSmartPair, BUY, amount, price, expectedFee, 2).message.id
+//          val submitted = dex1Api.place(mkOrder(bob, matcher,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //          node.waitOrderInBlockchain(submitted)
 //
 //          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
@@ -186,12 +186,12 @@
 //          version = 3,
 //          matcherFeeAssetId = IssuedAsset(feeAsset)
 //      ).message.id
-//      node.waitOrderStatus(oneSmartPair, counter, "Accepted")
+//      dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //      info("expected fee should be reserved")
 //      node.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
 //
-//      val submitted = node.placeOrder(alice, oneSmartPair, BUY, amount, price, expectedWavesFee, 2).message.id
+//      val submitted = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, BUY, amount, price, expectedWavesFee, 2)).message.id
 //      node.waitOrderInBlockchain(submitted)
 //
 //      node.assertAssetBalance(bob.toAddress.toString, feeAsset.toString, bobInitBalance - expectedFee)

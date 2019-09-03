@@ -180,7 +180,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       "snapshots-interval",
       "matching-rules"
     )
-    val props = renderProperties(asProperties(config.getConfig("waves.dex")).asScala.collect {
+    val props = renderProperties(asProperties(config.resolve().getConfig("waves.dex")).asScala.collect {
       case (key, v) if allowedKeysPrefixes.exists(key.startsWith) => s"waves.dex.$key" -> v
     }.toMap)
 

@@ -79,7 +79,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
                       |  port = ${grpcAddr.getPort}
                       |}""".stripMargin)
     // TODO Has a greater priority than local.conf!
-    val config = DexTestConfig.updatedMatcherConfig.withFallback(wavesNodeGrpcConfig).withFallback(dex1Config).resolve()
+    val config = wavesNodeGrpcConfig.withFallback(dex1Config).withFallback(DexTestConfig.updatedMatcherConfig).resolve()
     dockerClient().createDex("dex-1", config)
   }
 

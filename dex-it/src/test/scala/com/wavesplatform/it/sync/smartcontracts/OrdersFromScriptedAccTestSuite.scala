@@ -47,7 +47,7 @@
 //    super.beforeAll()
 //
 //    setContract(Some("true"), bob)
-//    node.waitForTransaction(node.broadcastRequest(aliceAssetTx.json()).id)
+//    wavesNode1Api.waitForTransaction(wavesNode1Api.broadcast(aliceAssetTx).id)
 //    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
 //    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
 //  }
@@ -55,14 +55,14 @@
 //  "issue asset and run test" - {
 //    "trading is deprecated" in {
 //      assertBadRequestAndResponse(
-//        node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes),
+//        dex1Api.place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes)),
 //        "An account's feature isn't yet supported"
 //      )
 //    }
 //
 //    "can't place an OrderV2 before the activation" in {
 //      assertBadRequestAndResponse(
-//        node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
+//        dex1Api.place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes)),
 //        "The order of version .* isn't yet supported"
 //      )
 //    }
@@ -71,7 +71,7 @@
 //      node.waitForHeight(activationHeight, 5.minutes)
 //      setContract(Some("true && (height > 0)"), bob)
 //      assertBadRequestAndResponse(
-//        node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
+//        dex1Api.place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes)),
 //        "An access to the blockchain.height is denied on DEX"
 //      )
 //    }
@@ -79,7 +79,7 @@
 //    "scripted account can trade once SmartAccountTrading is activated" in {
 //      setContract(Some(sDupNames), bob)
 //      val bobOrder =
-//        node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes)
+//        dex1Api.place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes))
 //      bobOrder.status shouldBe "OrderAccepted"
 //    }
 //
@@ -158,13 +158,13 @@
 //    "can trade from non-scripted account" in {
 //      // Alice places sell order
 //      val aliceOrder =
-//        node.placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, version = 1, 10.minutes)
+//        dex1Api.place(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes))
 //
 //      aliceOrder.status shouldBe "OrderAccepted"
 //
 //      val orderId = aliceOrder.message.id
 //      // Alice checks that the order in order book
-//      node.waitOrderStatus(aliceWavesPair, orderId, "Filled")
+//      dex1Api.waitForOrderStatus(orderId, OrderStatus.Filled)
 //      node.fullOrderHistory(alice).head.status shouldBe "Filled"
 //    }
 //  }

@@ -53,7 +53,7 @@
 //    }
 //
 //    ordersPack2.foreach { order =>
-//      node.placeOrder(order)
+//      dex1Api.place(order)
 //    }
 //
 //    node.waitFor[QueueEventWithMeta.Offset]("ordersPack2Size - all events are consumed")(
@@ -86,7 +86,7 @@
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    val ids = Seq(issue1, issue2).map(x => node.broadcastRequest(x.json())).map(_.id)
+//    val ids = Seq(issue1, issue2).map(x => wavesNode1Api.broadcast(x)).map(_.id)
 //    ids.foreach(nodes.waitForTransaction)
 //    node.waitForHeight(node.height + 1)
 //  }

@@ -15,14 +15,14 @@
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    node.waitForTransaction(node.broadcastRequest(IssueUsdTx.json()).id)
+//    wavesNode1Api.waitForTransaction(wavesNode1Api.broadcast(IssueUsdTx).id)
 //  }
 //
 //  "settings of allowing orderV3" - {
 //    val price         = 100000000L
 //
 //    "try to place not allowed orderV3" in {
-//      val orderv3 = node.prepareOrder(
+//      val orderv3 = mkOrder(
 //        sender = alice,
 //        pair = wavesUsdPair,
 //        OrderType.BUY,
@@ -30,22 +30,22 @@
 //        price = price,
 //        version = 3,
 //      )
-//      assertBadRequestAndResponse(node.placeOrder(orderv3), "The orders of version 3 are denied by matcher")
+//      assertBadRequestAndResponse(dex1Api.place(mkOrder(orderv3), matcher,"The orders of version 3 are denied by matcher"))
 //    }
 //
 //    "matching orderV1 and orderV3" in {
-//      val preparedOrderV2 = node.prepareOrder(
+//      val preparedOrderV2 = mkOrder(
 //        sender = alice,
 //        pair = wavesUsdPair,
 //        OrderType.BUY,
 //        amount = 3,
 //        price = price
 //      )
-//      val order = node.placeOrder(preparedOrderV2)
+//      val order = dex1Api.place(preparedOrderV2)
 //      node.waitOrderProcessed(wavesUsdPair, order.message.id)
 //
 //      docker.restartNode(node, OrderV3TestSuite.matcherSettingsOrderV3Allowed)
-//      val preparedOrderV3 = node.prepareOrder(
+//      val preparedOrderV3 = mkOrder(
 //        sender = bob,
 //        pair = wavesUsdPair,
 //        OrderType.SELL,
@@ -53,7 +53,7 @@
 //        price = price,
 //        version = 3
 //      )
-//      val orderV3 = node.placeOrder(preparedOrderV3)
+//      val orderV3 = dex1Api.place(preparedOrderV3)
 //      node.waitOrderProcessed(wavesUsdPair, orderV3.message.id)
 //
 //      node.waitOrderStatusAndAmount(wavesUsdPair, order.message.id, "PartiallyFilled", Some(2), 1.minute)

@@ -9,7 +9,7 @@ import cats.tagless.{Derive, FunctorK}
 import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
+import com.softwaremill.sttp.{Id, Response, SttpBackend, MonadError => _, _}
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -104,6 +104,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]]
 
   def orderBook(assetPair: AssetPair): F[OrderBookResponse]
+
+  def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]]
   def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse]
 
   def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)]
@@ -182,20 +184,13 @@ object DexApi {
         httpBackend.send(req).flatMap(parseResponse)
       }
 
-      override def tryPlace(order: Order): F[Either[MatcherError, Unit]] = {
-        val req = sttp.post(uri"$apiUri/orderbook").body(order).mapResponse(_ => ()).tag("requestId", UUID.randomUUID())
-        httpBackend.send(req).flatMap { resp =>
-          resp.rawErrorBody match {
-            case Right(r) => M.pure(Right(r))
-            case Left(bytes) =>
-              Json.parse(bytes).validate[MatcherError] match {
-                case JsSuccess(x, _) => M.pure(Left(x))
-                case JsError(e) =>
-                  M.raiseError[Either[MatcherError, Unit]](
-                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError:\n${e.mkString("\n")}"))
-              }
-          }
-        }
+      override def tryPlace(order: Order): F[Either[MatcherError, Unit]] = try_ {
+        sttp
+          .post(uri"$apiUri/orderbook")
+          .followRedirects(false)
+          .body(order)
+          .mapResponse(_ => ())
+          .tag("requestId", UUID.randomUUID())
       }
 
       // replace with tryPlace
@@ -209,30 +204,17 @@ object DexApi {
         httpBackend.send(req).flatMap(parseResponse)
       }
 
-      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] = {
-        val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
-        val req =
+      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] =
+        tryParse[MatcherStatusResponse] {
+          val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
             .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
+            .followRedirects(false)
             .body(body)
             .contentType("application/json", "UTF-8")
             .response(asJson[MatcherStatusResponse])
             .tag("requestId", UUID.randomUUID())
-        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
-          resp.rawErrorBody match {
-            case Right(Right(r)) => M.pure(Right(r))
-            case Right(Left(error)) =>
-              M.raiseError[Either[MatcherError, MatcherStatusResponse]](new RuntimeException(s"Can't parse the response: $error"))
-            case Left(bytes) =>
-              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
-              catch {
-                case NonFatal(e) =>
-                  M.raiseError[Either[MatcherError, MatcherStatusResponse]](
-                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
-              }
-          }
         }
-      }
 
       // replace with tryCancel
       override def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse] = {
@@ -281,26 +263,12 @@ object DexApi {
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap(parseResponse)
       }
 
-      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
-        val req = sttp
+      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = tryParse {
+        sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+          .followRedirects(false)
           .response(asJson[OrderStatusResponse])
           .tag("requestId", UUID.randomUUID())
-
-        httpBackend.send(req).flatMap { resp =>
-          resp.rawErrorBody match {
-            case Right(Right(r)) => M.pure(Right(r))
-            case Right(Left(error)) =>
-              M.raiseError[Either[MatcherError, OrderStatusResponse]](new RuntimeException(s"Can't parse the response: $error"))
-            case Left(bytes) =>
-              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
-              catch {
-                case NonFatal(e) =>
-                  M.raiseError[Either[MatcherError, OrderStatusResponse]](
-                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
-              }
-          }
-        }
       }
 
       override def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = {
@@ -366,26 +334,12 @@ object DexApi {
         httpBackend.send(req).flatMap(parseResponse)
       }
 
-      override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]] = {
-        val req = sttp
+      override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]] = tryParse {
+        sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+          .followRedirects(false)
           .response(asJson[OrderBookResponse])
           .tag("requestId", UUID.randomUUID())
-
-        httpBackend.send(req).flatMap { resp =>
-          resp.rawErrorBody match {
-            case Right(Right(r)) => M.pure(Right(r))
-            case Right(Left(error)) =>
-              M.raiseError[Either[MatcherError, OrderBookResponse]](new RuntimeException(s"Can't parse the response: $error"))
-            case Left(bytes) =>
-              try M.pure(Left(Json.parse(bytes).validate[MatcherError].get))
-              catch {
-                case NonFatal(e) =>
-                  M.raiseError[Either[MatcherError, OrderBookResponse]](
-                    new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
-              }
-          }
-        }
       }
 
       override def orderBook(assetPair: AssetPair): F[OrderBookResponse] = {
@@ -395,6 +349,15 @@ object DexApi {
           .tag("requestId", UUID.randomUUID())
 
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap(parseResponse)
+      }
+
+      override def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]] = tryParse {
+        sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
+          .followRedirects(false)
+          .headers(apiKeyHeaders)
+          .response(asJson[MarketStatusResponse])
+          .tag("requestId", UUID.randomUUID())
       }
 
       override def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse] = {
@@ -494,6 +457,12 @@ object DexApi {
         repeatUntil[List[exchange.ExchangeTransaction]](transactionsByOrder(id), 1.second)(pred)
 
       override def waitForCurrentOffset(pred: Long => Boolean): F[Long] = repeatUntil[Long](currentOffset, 1.second)(pred)
+
+      private def tryParse[T](req: RequestT[Id, Either[DeserializationError[JsError], T], Nothing]): F[Either[MatcherError, T]] =
+        httpBackend.send(req).flatMap(parseTryResponseEither[MatcherError, T])
+
+      private def try_(req: RequestT[Id, Unit, Nothing]): F[Either[MatcherError, Unit]] =
+        httpBackend.send(req).flatMap(parseTryResponse[MatcherError, Unit])
 
       private def appendActiveOnly(uri: Uri, activeOnly: Option[Boolean]): Uri =
         activeOnly.fold(uri)(x => uri.copy(queryFragments = List(QueryFragment.KeyValue("activeOnly", x.toString))))

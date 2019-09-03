@@ -20,7 +20,7 @@
 //      .broadcastIssue(alice, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, None)
 //      .id
 //
-//  Seq(aliceAsset, node.broadcastRequest(IssueUsdTx.json()).id).map(node.waitForTransaction(_))
+//  Seq(aliceAsset, wavesNode1Api.broadcast(IssueUsdTx).id).map(wavesNode1Api.waitForTransaction(_))
 //
 //  private val predefAssetPair = wavesUsdPair
 //  private val aliceWavesPair  = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)

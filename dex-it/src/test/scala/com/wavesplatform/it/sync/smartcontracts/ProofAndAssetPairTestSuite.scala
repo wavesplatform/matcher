@@ -21,7 +21,7 @@
 //
 //  {
 //    val issueTx = node.signedIssue(createSignedIssueRequest(IssueUsdTx))
-//    node.waitForTransaction(issueTx.id)
+//    wavesNode1Api.waitForTransaction(issueTx.id)
 //  }
 //
 //  private val predefAssetPair = wavesUsdPair
@@ -137,10 +137,10 @@
 //          node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
 //
 //          node.cancelOrder(alice, predefAssetPair, aliceOrd1)
-//          node.waitOrderStatus(predefAssetPair, aliceOrd1, "Cancelled")
+//          dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Cancelled)
 //
 //          node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
-//          node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Cancelled")
+//          dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Cancelled)
 //        }
 //      }
 //
@@ -176,7 +176,7 @@
 //          node.waitOrderStatus(predefAssetPair, ord1, "Accepted", 1.minute)
 //
 //          node.cancelOrder(alice, predefAssetPair, ord1)
-//          node.waitOrderStatus(predefAssetPair, ord1, "Cancelled")
+//          dex1Api.waitForOrderStatus(ord1, OrderStatus.Cancelled)
 //        }
 //
 //        "reset" in setContract(None, alice)
@@ -227,7 +227,7 @@
 //        setContract(Some("true"), alice)
 //
 //        val transferTx = node.broadcastTransfer(alice, bob.toAddress.toString, 1000, 0.005.waves, Some(aliceAsset), None)
-//        node.waitForTransaction(transferTx.id)
+//        wavesNode1Api.waitForTransaction(transferTx.id)
 //
 //        for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {
 //          markup(s"$i")

@@ -12,8 +12,8 @@
 //class OrderBookTestSuite extends MatcherSuiteBase {
 //
 //  {
-//    val xs = Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_))
-//    xs.foreach(x => node.waitForTransaction(x.id))
+//    val xs = Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(wavesNode1Api.broadcast(_))
+//    xs.foreach(x => wavesNode1Api.waitForTransaction(x.id))
 //    node.waitForHeight(node.height + 1)
 //  }
 //
@@ -30,33 +30,33 @@
 //  val (amount, price) = (1000L, PriceConstant)
 //
 //  "When delete order book" - {
-//    val buyOrder        = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, price, matcherFee).message.id
-//    val anotherBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, amount, price, matcherFee).message.id
+//    val buyOrder        = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, 2 * amount, price)).message.id
+//    val anotherBuyOrder = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, amount, price)).message.id
 //
-//    val submitted = node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
+//    val submitted = dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, amount, price)).message.id
 //
-//    val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 2 * price, matcherFee).message.id
+//    val sellOrder = dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, amount, 2 * price)).message.id
 //
-//    node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
-//    node.waitOrderStatus(wctUsdPair, submitted, "Filled")
+//    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+//    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
 //
 //    val (aliceRBForOnePair, bobRBForOnePair) = (reservedBalancesOf(alice), reservedBalancesOf(bob))
 //
-//    val buyOrderForAnotherPair = node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee).message.id
+//    val buyOrderForAnotherPair = dex1Api.place(mkOrder(alice, matcher,wctWavesPair, BUY, amount, price)).message.id
 //    val sellOrderForAnotherPair =
-//      node.placeOrder(bob, wctWavesPair, SELL, amount, 2 * price, matcherFee).message.id
+//      dex1Api.place(mkOrder(bob, matcher,wctWavesPair, SELL, amount, 2 * price)).message.id
 //
-//    node.waitOrderStatus(wctWavesPair, buyOrderForAnotherPair, "Accepted")
-//    node.waitOrderStatus(wctWavesPair, sellOrderForAnotherPair, "Accepted")
+//    dex1Api.waitForOrderStatus(buyOrderForAnotherPair, OrderStatus.Accepted)
+//    dex1Api.waitForOrderStatus(sellOrderForAnotherPair, OrderStatus.Accepted)
 //
 //    val (aliceRBForBothPairs, bobRBForBothPairs) = (reservedBalancesOf(alice), reservedBalancesOf(bob))
 //
 //    node.deleteOrderBook(wctUsdPair)
 //
 //    "orders by the pair should be canceled" in {
-//      node.waitOrderStatus(wctUsdPair, buyOrder, "Cancelled")
-//      node.waitOrderStatus(wctUsdPair, anotherBuyOrder, "Cancelled")
-//      node.waitOrderStatus(wctUsdPair, sellOrder, "Cancelled")
+//      dex1Api.waitForOrderStatus(buyOrder, OrderStatus.Cancelled)
+//      dex1Api.waitForOrderStatus(anotherBuyOrder, OrderStatus.Cancelled)
+//      dex1Api.waitForOrderStatus(sellOrder, OrderStatus.Cancelled)
 //    }
 //
 //    "orderbook was deleted" in {
@@ -87,7 +87,7 @@
 //    "it should not affect other pairs and their orders" in {
 //      node.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
 //      node.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
-//      node.placeOrder(alice, wctWavesPair, BUY, amount, price, matcherFee)
+//      dex1Api.place(mkOrder(alice, matcher,wctWavesPair, BUY, amount, price))
 //
 //      val orderBook = node.orderBook(wctWavesPair)
 //      orderBook.bids shouldNot be(empty)

@@ -133,7 +133,7 @@
 //    postgresContainerLauncher.startContainer()
 //    createTables(s"localhost:$getPostgresContainerHostPort")
 //
-//    Seq(IssueUsdTx, IssueWctTx, IssueEthTx).map(_.json()).map(node.broadcastRequest(_)).foreach(tx => node.waitForTransaction(tx.id))
+//    Seq(IssueUsdTx, IssueWctTx, IssueEthTx).map(_.json()).map(wavesNode1Api.broadcast(_)).foreach(tx => wavesNode1Api.waitForTransaction(tx.id))
 //    node.upsertRate(ethAsset, 1.0, expectedStatusCode = Created)
 //  }
 //
@@ -206,8 +206,8 @@
 //
 //    (1 to ordersCount)
 //      .foreach { _ =>
-//        node.placeOrder(alice, wctUsdPair, BUY, 1, price, matcherFee)
-//        node.placeOrder(bob, wctUsdPair, SELL, 1, price, matcherFee)
+//        dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, 1, price))
+//        dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, 1, price))
 //      }
 //
 //    retry(10, batchLingerMs) {
@@ -218,18 +218,18 @@
 //
 //  "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 //
-//    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 1 * amount, price, matcherFee)
-//    val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 3 * amount, price, matcherFee).message.id
+//    def sellOrder: Order = mkOrder(bob, matcher,wctUsdPair, SELL, 1 * amount, price)
+//    val buyOrder         = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, 3 * amount, price)).message.id
 //
-//    val sellOrder1 = node.placeOrder(sellOrder).message.id
+//    val sellOrder1 = dex1Api.place(sellOrder).message.id
 //
-//    node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
-//    node.waitOrderStatus(wctUsdPair, sellOrder1, "Filled")
+//    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+//    dex1Api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
 //
-//    val sellOrder2 = node.placeOrder(sellOrder).message.id
+//    val sellOrder2 = dex1Api.place(sellOrder).message.id
 //
-//    node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
-//    node.waitOrderStatus(wctUsdPair, sellOrder2, "Filled")
+//    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+//    dex1Api.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
 //
 //    node.cancelOrder(alice, wctUsdPair, buyOrder)
 //
@@ -255,11 +255,11 @@
 //  }
 //
 //  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
-//    val smallBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, 1 * amount, price, matcherFee).message.id
-//    val bigSellOrder  = node.placeOrder(bob, wctUsdPair, SELL, 5 * amount, price, matcherFee).message.id
+//    val smallBuyOrder = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, 1 * amount, price)).message.id
+//    val bigSellOrder  = dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, 5 * amount, price)).message.id
 //
-//    node.waitOrderStatus(wctUsdPair, smallBuyOrder, "Filled")
-//    node.waitOrderStatus(wctUsdPair, bigSellOrder, "PartiallyFilled")
+//    dex1Api.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
+//    dex1Api.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
 //
 //    retry(20, batchLingerMs) {
 //
@@ -285,7 +285,7 @@
 //    node.cancelAllOrders(bob)
 //    node.cancelAllOrders(alice)
 //
-//    def bigBuyOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, 5 * amount, price, matcherFee, version = 3, matcherFeeAssetId = ethAsset)
+//    def bigBuyOrder: Order = mkOrder(alice, matcher,wctUsdPair, BUY, 5 * amount, price, version = 3, matcherFeeAssetId = ethAsset)
 //
 //    withClue("place buy market order into empty order book") {
 //
@@ -306,10 +306,10 @@
 //
 //    withClue("place buy market order into nonempty order book") {
 //      Seq(
-//        node.placeOrder(bob, wctUsdPair, SELL, amount, (price * 0.97).toLong, matcherFee).message.id,
-//        node.placeOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong, matcherFee).message.id,
-//        node.placeOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong, matcherFee).message.id
-//      ).foreach(lo => node.waitOrderStatus(wctUsdPair, lo, "Accepted"))
+//        dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, amount, (price * 0.97).toLong)).message.id,
+//        dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, amount, (price * 0.98).toLong)).message.id,
+//        dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, amount, (price * 0.98).toLong)).message.id
+//      ).foreach(lo => dex1Api.waitForOrderStatus(lo, OrderStatus.Accepted))
 //
 //      val marketBuyOrder = node.placeMarketOrder(bigBuyOrder).message.id
 //      node.waitOrderStatusAndAmount(wctUsdPair, marketBuyOrder, "Filled", Some(3 * amount))

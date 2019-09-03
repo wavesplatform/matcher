@@ -1,196 +1,161 @@
-//package com.wavesplatform.it.sync
-//
-//import com.typesafe.config.{Config, ConfigFactory}
-//import com.wavesplatform.common.utils.EitherExt2
-//import com.wavesplatform.it.MatcherSuiteBase
-//import com.wavesplatform.it.api.SyncHttpApi._
-//import com.wavesplatform.it.api.SyncMatcherHttpApi
-//import com.wavesplatform.it.api.SyncMatcherHttpApi._
-//import com.wavesplatform.it.config.DexTestConfig._
-//import com.wavesplatform.it.util._
-//import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-//import com.wavesplatform.transaction.assets.IssueTransactionV1
-//import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-//
-//class MatcherTickerTestSuite extends MatcherSuiteBase {
-//
-//  import MatcherTickerTestSuite._
-//
-//  override protected def nodeConfigs: Seq[Config] = Configs.map(updatedMatcherConfig.withFallback)
-//
-//  override protected def beforeAll(): Unit = {
-//    super.beforeAll()
-//
-//    val issueTx = node.broadcastRequest(IssueUsdTx.json())
-//    node.waitForTransaction(issueTx.id)
-//  }
-//
-//  "matcher ticker validation" - {
-//    "get tickers for unavailable asset should produce error" in {
-//      SyncMatcherHttpApi.assertNotFoundAndMessage(node.marketStatus(wctWavesPair), s"The asset ${IssueEightDigitAssetTx.id()} not found")
-//    }
-//
-//    "status of empty orderbook" in {
-////    TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-////      SyncMatcherHttpApi.assertNotFoundAndMessage(node.marketStatus(wavesUsdPair), s"")
-//    }
-//
-//    "error of non-existed order" in {
-//      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-////      SyncMatcherHttpApi.assertNotFoundAndMessage(node.orderStatus(IssueUsdTx.id().toString, wavesUsdPair), s"")
-//    }
-//
-//    "try to work with incorrect pair" in {
-//      val usdWavesPair = AssetPair(UsdId, Waves)
-//
+package com.wavesplatform.it.sync
+
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
+
+class MatcherTickerTestSuite extends NewMatcherSuiteBase {
+
+  override protected def dex1Config: Config =
+    ConfigFactory
+      .parseString(s"""waves.dex.price-assets = ["$UsdId", "WAVES"]""".stripMargin)
+      .withFallback(super.dex1Config)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    broadcast(IssueUsdTx, IssueBtcTx)
+  }
+
+  private val btcUsdPair = AssetPair(
+    amountAsset = btc,
+    priceAsset = usd
+  )
+
+  // Because BTC is not a price asset in this test
+  private val btcWavesPair = AssetPair(
+    amountAsset = btc,
+    priceAsset = Waves
+  )
+
+  "matcher ticker validation" - {
+    "get tickers for unavailable asset should produce error" in {
+      dex1Api.tryOrderBookStatus(wctUsdPair) should failWith(11534345, MatcherError.Params(assetId = Some(WctId.toString)))
+    }
+
+    "status of empty orderbook" in {
+//    TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1Api.orderBookStatus(wavesUsdPair), s"")
+    }
+
+    "error of non-existed order" in {
+      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(node.orderStatus(IssueUsdTx.id().toString, wavesUsdPair), s"")
+    }
+
+    "try to work with incorrect pair" in {
+      val usdWavesPair = AssetPair(usd, Waves)
+
+      intercept[RuntimeException] {
+        dex1Api.tryOrderBook(usdWavesPair)
+      }
+
+      dex1Api.tryOrderBook(wavesUsdPair) shouldBe 'right
 //      assert(
 //        node
 //          .matcherGet(s"/matcher/orderbook/${usdWavesPair.amountAssetStr}/${usdWavesPair.priceAssetStr}/status", statusCode = 301)
 //          .getHeader("Location")
 //          .contains(s"WAVES/${usdWavesPair.amountAssetStr}"))
-//
-//      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-////      SyncMatcherHttpApi.assertNotFoundAndMessage(node.placeOrder(node, usdWavesPair, OrderType.BUY, 1.waves, 200), "")
-//    }
-//
-//    "issue tokens" in {
-//      val tx = node.broadcastRequest(IssueEightDigitAssetTx.json())
-//      node.waitForTransaction(tx.id)
-//    }
-//
-//    val bidPrice  = 200
-//    val bidAmount = 1.waves
-//    val askPrice  = 400
-//    val askAmount = bidAmount / 2
-//
-//    "place bid order for first pair" in {
-//      node.placeOrder(alice, edUsdPair, OrderType.BUY, bidAmount, bidPrice, matcherFee)
-//      val aliceOrder = node.placeOrder(alice, edUsdPair, OrderType.BUY, bidAmount, bidPrice, matcherFee).message.id
-//      node.waitOrderStatus(edUsdPair, aliceOrder, "Accepted")
-//
-//      val r = node.marketStatus(edUsdPair)
-//      r.lastPrice shouldBe None
-//      r.lastSide shouldBe None
-//      r.bid shouldBe Some(bidPrice)
-//      r.bidAmount shouldBe Some(2 * bidAmount)
-//      r.ask shouldBe None
-//      r.askAmount shouldBe None
-//    }
-//
-//    "place ask order for second pair" in {
-//      node.placeOrder(bob, wctWavesPair, OrderType.SELL, askAmount, askPrice, matcherFee)
-//      val bobOrder = node.placeOrder(bob, wctWavesPair, OrderType.SELL, askAmount, askPrice, matcherFee).message.id
-//      node.waitOrderStatus(wctWavesPair, bobOrder, "Accepted")
-//      val r = node.marketStatus(wctWavesPair)
-//      r.lastPrice shouldBe None
-//      r.lastSide shouldBe None
-//      r.bid shouldBe None
-//      r.bidAmount shouldBe None
-//      r.ask shouldBe Some(askPrice)
-//      r.askAmount shouldBe Some(2 * askAmount)
-//    }
-//
-//    "place ask order for first pair" in {
-//      node.placeOrder(bob, edUsdPair, OrderType.SELL, askAmount, askPrice, matcherFee)
-//      val bobOrder = node.placeOrder(bob, edUsdPair, OrderType.SELL, askAmount, askPrice, matcherFee).message.id
-//      node.waitOrderStatus(edUsdPair, bobOrder, "Accepted")
-//      val r = node.marketStatus(edUsdPair)
-//      r.lastPrice shouldBe None
-//      r.lastSide shouldBe None
-//      r.bid shouldBe Some(bidPrice)
-//      r.bidAmount shouldBe Some(2 * bidAmount)
-//      r.ask shouldBe Some(askPrice)
-//      r.askAmount shouldBe Some(2 * askAmount)
-//    }
-//
-//    "match bid order for first pair" in {
-//      val bobOrder = node.placeOrder(bob, edUsdPair, OrderType.SELL, askAmount, bidPrice, matcherFee).message.id
-//      node.waitOrderStatus(edUsdPair, bobOrder, "Filled")
-//      val r = node.marketStatus(edUsdPair)
-//      r.lastPrice shouldBe Some(bidPrice)
-//      r.lastSide shouldBe Some("sell")
-//      r.bid shouldBe Some(bidPrice)
-//      r.bidAmount shouldBe Some(2 * bidAmount - askAmount)
-//      r.ask shouldBe Some(askPrice)
-//      r.askAmount shouldBe Some(2 * askAmount)
-//
-//      val bobOrder1 = node.placeOrder(bob, edUsdPair, OrderType.SELL, 3 * askAmount, bidPrice, matcherFee).message.id
-//      node.waitOrderStatus(edUsdPair, bobOrder1, "Filled")
-//      val s = node.marketStatus(edUsdPair)
-//      s.lastPrice shouldBe Some(bidPrice)
-//      s.lastSide shouldBe Some("sell")
-//      s.bid shouldBe None
-//      s.bidAmount shouldBe None
-//      s.ask shouldBe Some(askPrice)
-//      s.askAmount shouldBe Some(2 * askAmount)
-//    }
-//
-//    "match ask order for first pair" in {
-//      val aliceOrder = node.placeOrder(alice, edUsdPair, OrderType.BUY, bidAmount, askPrice, matcherFee).message.id
-//      node.waitOrderStatus(edUsdPair, aliceOrder, "Filled")
-//      val r = node.marketStatus(edUsdPair)
-//      r.lastPrice shouldBe Some(askPrice)
-//      r.lastSide shouldBe Some("buy")
-//      r.bid shouldBe None
-//      r.bidAmount shouldBe None
-//      r.ask shouldBe None
-//      r.askAmount shouldBe None
-//    }
-//  }
-//
-//}
-//
-//object MatcherTickerTestSuite {
-//
-//  import ConfigFactory._
-//
-//  val Decimals: Byte = 2
-//
-//  val usdAssetName             = "USD-X"
-//  val eightDigitAssetAssetName = "Eight-X"
-//  val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
-//    .selfSigned(
-//      sender = alice,
-//      name = usdAssetName.getBytes(),
-//      description = "asset description".getBytes(),
-//      quantity = defaultAssetQuantity,
-//      decimals = Decimals,
-//      reissuable = false,
-//      fee = 1.waves,
-//      timestamp = System.currentTimeMillis()
-//    )
-//    .explicitGet()
-//
-//  val IssueEightDigitAssetTx: IssueTransactionV1 = IssueTransactionV1
-//    .selfSigned(
-//      sender = bob,
-//      name = eightDigitAssetAssetName.getBytes(),
-//      description = "asset description".getBytes(),
-//      quantity = defaultAssetQuantity,
-//      decimals = 8,
-//      reissuable = false,
-//      fee = 1.waves,
-//      timestamp = System.currentTimeMillis()
-//    )
-//    .explicitGet()
-//
-//  val UsdId: IssuedAsset             = IssuedAsset(IssueUsdTx.id())
-//  val EightDigitAssetId: IssuedAsset = IssuedAsset(IssueEightDigitAssetTx.id())
-//
-//  val edUsdPair = AssetPair(
-//    amountAsset = EightDigitAssetId,
-//    priceAsset = UsdId
-//  )
-//
-//  val wctWavesPair = AssetPair(
-//    amountAsset = EightDigitAssetId,
-//    priceAsset = Waves
-//  )
-//
-//  val wavesUsdPair = AssetPair(
-//    amountAsset = Waves,
-//    priceAsset = UsdId
-//  )
-//
-//  private val updatedMatcherConfig = parseString(s"""waves.dex.price-assets = ["${UsdId.id.toString}", "WAVES"]""".stripMargin)
-//}
+
+      //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1Api.place(mkOrder(node, matcher,usdWavesPair, OrderType.BUY, 1.waves, 200), ""))
+    }
+
+    val bidPrice  = 200
+    val bidAmount = 1.waves
+    val askPrice  = 400
+    val askAmount = bidAmount / 2
+
+    "place bid order for first pair" in {
+      dex1Api.place(mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
+
+      val aliceOrder = mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, bidPrice)
+      dex1Api.place(aliceOrder)
+      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
+
+      val r = dex1Api.orderBookStatus(btcUsdPair)
+      r.lastPrice shouldBe None
+      r.lastSide shouldBe None
+      r.bid shouldBe Some(bidPrice)
+      r.bidAmount shouldBe Some(2 * bidAmount)
+      r.ask shouldBe None
+      r.askAmount shouldBe None
+    }
+
+    "place ask order for second pair" in {
+      dex1Api.place(mkOrder(bob, matcher, btcWavesPair, OrderType.SELL, askAmount, askPrice))
+
+      val bobOrder = mkOrder(bob, matcher, btcWavesPair, OrderType.SELL, askAmount, askPrice)
+      dex1Api.place(bobOrder)
+      dex1Api.waitForOrderStatus(bobOrder, OrderStatus.Accepted)
+
+      val r = dex1Api.orderBookStatus(btcWavesPair)
+      r.lastPrice shouldBe None
+      r.lastSide shouldBe None
+      r.bid shouldBe None
+      r.bidAmount shouldBe None
+      r.ask shouldBe Some(askPrice)
+      r.askAmount shouldBe Some(2 * askAmount)
+    }
+
+    "place ask order for first pair" in {
+      dex1Api.place(mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, askPrice))
+
+      val bobOrder = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, askPrice)
+      dex1Api.place(bobOrder)
+      dex1Api.waitForOrderStatus(bobOrder, OrderStatus.Accepted)
+
+      val r = dex1Api.orderBookStatus(btcUsdPair)
+      r.lastPrice shouldBe None
+      r.lastSide shouldBe None
+      r.bid shouldBe Some(bidPrice)
+      r.bidAmount shouldBe Some(2 * bidAmount)
+      r.ask shouldBe Some(askPrice)
+      r.askAmount shouldBe Some(2 * askAmount)
+    }
+
+    "match bid order for first pair" in {
+      val bobOrder1 = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, bidPrice)
+      dex1Api.place(bobOrder1)
+      dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
+
+      val r1 = dex1Api.orderBookStatus(btcUsdPair)
+      r1.lastPrice shouldBe Some(bidPrice)
+      r1.lastSide shouldBe Some("sell") // TODO stringly typed
+      r1.bid shouldBe Some(bidPrice)
+      r1.bidAmount shouldBe Some(2 * bidAmount - askAmount)
+      r1.ask shouldBe Some(askPrice)
+      r1.askAmount shouldBe Some(2 * askAmount)
+
+      val bobOrder2 = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice)
+      dex1Api.place(bobOrder2).message.id
+      dex1Api.waitForOrderStatus(bobOrder2, OrderStatus.Filled)
+
+      val r2 = dex1Api.orderBookStatus(btcUsdPair)
+      r2.lastPrice shouldBe Some(bidPrice)
+      r2.lastSide shouldBe Some("sell")
+      r2.bid shouldBe None
+      r2.bidAmount shouldBe None
+      r2.ask shouldBe Some(askPrice)
+      r2.askAmount shouldBe Some(2 * askAmount)
+    }
+
+    "match ask order for first pair" in {
+      val aliceOrder = mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, askPrice)
+      dex1Api.place(aliceOrder)
+      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+
+      val r = dex1Api.orderBookStatus(btcUsdPair)
+      r.lastPrice shouldBe Some(askPrice)
+      r.lastSide shouldBe Some("buy")
+      r.bid shouldBe None
+      r.bidAmount shouldBe None
+      r.ask shouldBe None
+      r.askAmount shouldBe None
+    }
+  }
+
+}

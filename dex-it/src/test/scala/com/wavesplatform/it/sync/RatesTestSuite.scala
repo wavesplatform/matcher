@@ -56,8 +56,8 @@
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
-//    val txIds = Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
-//    txIds.foreach(node.waitForTransaction(_))
+//    val txIds = Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(wavesNode1Api.broadcast(_).id)
+//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
 //
 //    val transferTxId = node
 //      .broadcastRequest(
@@ -75,10 +75,10 @@
 //          .explicitGet()
 //          .json())
 //      .id
-//    node.waitForTransaction(transferTxId)
+//    wavesNode1Api.waitForTransaction(transferTxId)
 //  }
 //
-//  def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, matcherFeeAssetId = btcAsset)
+//  def getOrder: Order = mkOrder(alice, matcher,wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, matcherFeeAssetId = btcAsset)
 //
 //  "Rates can be handled via REST" in {
 //    // default rates
@@ -116,8 +116,8 @@
 //    node.upsertRate(btcAsset, 1, expectedStatusCode = Created)
 //
 //    // place order with admissible fee (according to btc rate = 1)
-//    val placedOrderId1 = node.placeOrder(getOrder).message.id
-//    node.waitOrderStatus(wctUsdPair, placedOrderId1, "Accepted")
+//    val placedOrderId1 = dex1Api.place(getOrder).message.id
+//    dex1Api.waitForOrderStatus(placedOrderId1, OrderStatus.Accepted)
 //
 //    // slightly increase rate for btc
 //    node.upsertRate(btcAsset, 1.1, expectedStatusCode = OK)
@@ -133,8 +133,8 @@
 //    // return previous rate for btc
 //    node.upsertRate(btcAsset, 1, expectedStatusCode = OK)
 //
-//    val placedOrderId2 = node.placeOrder(getOrder).message.id
-//    node.waitOrderStatus(wctUsdPair, placedOrderId2, "Accepted")
+//    val placedOrderId2 = dex1Api.place(getOrder).message.id
+//    dex1Api.waitForOrderStatus(placedOrderId2, OrderStatus.Accepted)
 //
 //    node.deleteRate(btcAsset)
 //  }

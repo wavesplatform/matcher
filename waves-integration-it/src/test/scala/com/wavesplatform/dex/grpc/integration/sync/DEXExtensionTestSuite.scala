@@ -1,17 +1,21 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.sync.DEXExtensionTestSuite._
+import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueFee, minFee, someAssetAmount}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.wallet.Wallet
 import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.global
@@ -20,21 +24,20 @@ import mouse.any._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach with Eventually {
+class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with Eventually {
 
-  override protected def nodeConfigs: Seq[Config] = {
+  override protected def nodeConfigs: Seq[Config] =
     super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0").withFallback)
-  }
 
-  var balanceChanges           = Map.empty[Address, Map[Asset, Long]]
-  val (addressOne, addressTwo) = (getAddress(firstAddress), getAddress(secondAddress))
+  private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
-  val target    = s"localhost:${nodes.head.nodeExternalPort(6887)}"
-  val dexClient = new DEXClient(target)
+  private val target    = s"localhost:${nodes.head.nodeExternalPort(6887)}"
+  private val dexClient = new DEXClient(target)
 
-  val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
+  private val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
     override def onError(ex: Throwable): Unit                       = Unit
     override def onComplete(): Unit                                 = Unit
     override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges = balanceChanges ++ elem; Continue }
@@ -45,10 +48,7 @@ class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach
     tag = getClass.getSimpleName
   )
 
-  def getAddress(addressStr: String): Address = Address.fromString { addressStr }.explicitGet()
-  def getAsset(assetStr: String): Asset       = Asset.fromString { Some(assetStr) }
-
-  def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
+  private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet) shouldBe expectedBalanceChanges
   }
 
@@ -62,34 +62,86 @@ class DEXExtensionTestSuite extends BaseTransactionSuite with BeforeAndAfterEach
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
   }
 
-  test("DEX gRPC extension for the Waves node should send balance changes via gRPC") {
+  "DEX gRPC extension for the Waves node should send balance changes via gRPC" in {
+    val aliceInitialBalance = node.balanceDetails(alice.toAddress.stringRepr).available
+    val bobInitialBalance   = node.balanceDetails(bob.toAddress.stringRepr).available
 
-    val issuedAssetId =
-      sender
-        .issue(firstAddress, "name", "description", someAssetAmount, 2, reissuable = false, issueFee)
-        .id <| nodes.waitForHeightAriseAndTxPresent
+    val issueAssetTx = IssueTransactionV2
+      .selfSigned(
+        chainId = AddressScheme.current.chainId,
+        sender = alice,
+        name = "name".getBytes(StandardCharsets.UTF_8),
+        description = "description".getBytes(StandardCharsets.UTF_8),
+        quantity = someAssetAmount,
+        decimals = 2,
+        reissuable = false,
+        script = None,
+        fee = issueFee,
+        timestamp = System.currentTimeMillis()
+      )
+      .explicitGet()
+    val issuedAsset = IssuedAsset(issueAssetTx.id())
 
-    val issuedAsset = getAsset(issuedAssetId)
+    node.broadcastRequest(issueAssetTx.json()).id
+    nodes.waitForTransaction(issueAssetTx.id().toString)
 
     assertBalanceChanges {
       Map(
-        addressOne -> Map(
-          Waves       -> (100.waves - issueFee),
+        alice.toAddress -> Map(
+          Waves       -> (aliceInitialBalance - issueFee),
           issuedAsset -> someAssetAmount
         )
       )
     }
 
-    sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId)).id |> nodes.waitForHeightAriseAndTxPresent
+    val transferTx = TransferTransactionV2
+      .selfSigned(
+        assetId = issuedAsset,
+        sender = alice,
+        recipient = bob,
+        amount = someAssetAmount,
+        timestamp = System.currentTimeMillis(),
+        feeAssetId = Waves,
+        feeAmount = minFee,
+        attachment = Array.emptyByteArray
+      )
+      .explicitGet()
+
+    node.broadcastRequest(transferTx.json())
+    nodes.waitForTransaction(transferTx.id().toString)
 
     assertBalanceChanges {
       Map(
-        addressOne -> Map(
-          Waves       -> (100.waves - issueFee - minFee),
+        alice.toAddress -> Map(
+          Waves       -> (aliceInitialBalance - issueFee - minFee),
           issuedAsset -> 0L
         ),
-        addressTwo -> Map(issuedAsset -> someAssetAmount)
+        bob.toAddress -> Map(
+          Waves       -> bobInitialBalance,
+          issuedAsset -> someAssetAmount
+        )
       )
     }
   }
+}
+
+object DEXExtensionTestSuite {
+  private val accounts: Map[String, KeyPair] = {
+    val config           = ConfigFactory.parseResources("genesis.conf")
+    val distributionsKey = "genesis-generator.distributions"
+    val distributions    = config.getObject(distributionsKey)
+    distributions
+      .keySet()
+      .asScala
+      .map { accountName =>
+        val prefix   = s"$distributionsKey.$accountName"
+        val seedText = config.getString(s"$prefix.seed-text")
+        val nonce    = config.getInt(s"$prefix.nonce")
+        accountName -> Wallet.generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
+      }
+      .toMap
+  }
+
+  private val alice: KeyPair = accounts("alice")
+  private val bob: KeyPair   = accounts("bob")
 }

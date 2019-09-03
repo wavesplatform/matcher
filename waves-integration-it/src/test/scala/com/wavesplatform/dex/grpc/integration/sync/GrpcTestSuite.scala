@@ -201,7 +201,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
 
   "hasScript/runScript(Address)" - {
     "returns false if there is no script" in {
-      context.hasScript(matcher.toAddress) shouldBe false
+      context.hasScript(matcher) shouldBe false
     }
 
     "returns true if a script was assigned" in {
@@ -212,7 +212,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
           .selfSigned(
             assetId = Waves,
             sender = alice,
-            recipient = receiver.toAddress,
+            recipient = receiver,
             amount = 5.waves,
             timestamp = System.currentTimeMillis(),
             feeAssetId = Waves,
@@ -238,7 +238,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
         node.broadcastRequest(setScriptTx.json())
         node.waitForTransaction(setScriptTx.id().toString)
 
-        context.hasScript(receiver.toAddress) shouldBe true
+        context.hasScript(receiver) shouldBe true
       }
 
       withClue("run script") {
@@ -248,14 +248,14 @@ class GrpcTestSuite extends ItTestSuiteBase {
         val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
         val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, 0)
 
-        context.runScript(receiver.toAddress, buy) shouldBe RunScriptResult.Allowed
+        context.runScript(receiver, buy) shouldBe RunScriptResult.Allowed
       }
     }
   }
 
   "spendableBalance" in {
-    context.spendableBalance(bob.toAddress, Waves) shouldBe 0L
-    context.spendableBalance(bob.toAddress, randomIssuedAsset) shouldBe 0L
+    context.spendableBalance(bob, Waves) shouldBe 494994799699998L
+    context.spendableBalance(bob, randomIssuedAsset) shouldBe 0L
   }
 
   "forgedOrder" - {

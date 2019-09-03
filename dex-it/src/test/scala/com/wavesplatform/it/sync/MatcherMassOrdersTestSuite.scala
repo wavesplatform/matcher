@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.OrderStatus
@@ -11,6 +12,8 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
+  override protected def dex1Config: Config = ConfigFactory.parseString(s"waves.dex.rest-order-limit = $orderLimit").withFallback(super.dex1Config)
+
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     val assets = List(IssueUsdTx, IssueEthTx)
@@ -29,10 +32,7 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
     "Place initial orders" in {
       // Alice places sell orders
-      dex1Api.place(aliceOrderFill)
-      dex1Api.place(alicePartialOrder)
-      dex1Api.place(aliceOrderToCancel)
-      dex1Api.place(aliceActiveOrder)
+      List(aliceOrderFill, alicePartialOrder, aliceOrderToCancel, aliceActiveOrder).foreach(dex1Api.place)
 
       dex1Api.cancel(alice, aliceOrderToCancel) // TODO: remove this line in DEX-160
       dex1Api.waitForOrderStatus(aliceOrderToCancel, OrderStatus.Cancelled)
@@ -66,13 +66,26 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
       Thread.sleep(5000)
 
       // Alice check that order Active order is still in list
-      val orderIdsAfterMatching = dex1Api.orderHistory(alice).map(_.id)
-
-      orderIdsAfterMatching should contain(aliceActiveOrder.id())
-      orderIdsAfterMatching should contain(alicePartialOrder.id())
-
       dex1Api.waitForOrderStatus(aliceActiveOrder, OrderStatus.Accepted)
       dex1Api.waitForOrderStatus(alicePartialOrder, OrderStatus.PartiallyFilled)
+
+      withClue("no flag") {
+        val orderIdsAfterMatching1 = dex1Api.orderHistory(alice).map(_.id)
+        orderIdsAfterMatching1 should contain(aliceActiveOrder.id())
+        orderIdsAfterMatching1 should contain(alicePartialOrder.id())
+      }
+
+      withClue("activeOnly=false") {
+        val orderIdsAfterMatching2 = dex1Api.orderHistory(alice, activeOnly = Some(false)).map(_.id)
+        orderIdsAfterMatching2 should contain(aliceActiveOrder.id())
+        orderIdsAfterMatching2 should contain(alicePartialOrder.id())
+      }
+
+      withClue("activeOnly=true") {
+        val orderIdsAfterMatching3 = dex1Api.orderHistory(alice, activeOnly = Some(true)).map(_.id)
+        orderIdsAfterMatching3 should contain(aliceActiveOrder.id())
+        orderIdsAfterMatching3 should contain(alicePartialOrder.id())
+      }
 
       dex1Api.orderHistory(bob).map(_.id) should equal(bobsOrderIds.drop(1).reverse)
       dex1Api.orderHistoryByPair(bob, wavesUsdPair).map(_.id) should equal(bobsOrderIds.drop(1).reverse)

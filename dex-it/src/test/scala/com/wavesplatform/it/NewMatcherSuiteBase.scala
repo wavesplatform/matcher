@@ -100,6 +100,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def beforeAll(): Unit = {
     log.debug(s"Doing beforeAll")
     super.beforeAll()
+    // TODO: DEX should start after API ready
     allContainers.foreach(dockerClient().start)
     allApis.foreach(_.waitReady)
   }

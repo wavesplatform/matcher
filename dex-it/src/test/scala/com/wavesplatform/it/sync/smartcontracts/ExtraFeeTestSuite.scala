@@ -6,11 +6,12 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.DoubleExt
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
-  val trueScript = Some(ScriptCompiler("true", isAssetScript = false).explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
+  val trueScript = Some(ScriptCompiler("true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
   val amount     = 1L
   val price      = 100000000L
 
@@ -32,9 +33,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   // distribute
   {
     val xs = Seq(
-      node.broadcastTransfer(alice, bob.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset0), None).id,
-      node.broadcastTransfer(alice, bob.address, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None).id,
-      node.broadcastTransfer(bob, alice.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
+      node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset0), None).id,
+      node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None).id,
+      node.broadcastTransfer(bob, alice.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
     )
     xs.foreach(node.waitForTransaction(_))
   }
@@ -44,9 +45,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
         val oneSmartPair = createAssetPair(asset0, asset1)
 
-        val aliceInitBalance   = node.accountBalances(alice.address)._1
-        val bobInitBalance     = node.accountBalances(bob.address)._1
-        val matcherInitBalance = node.accountBalances(matcher.address)._1
+        val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
+        val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
+        val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
 
         val expectedFee = tradeFee + smartFee // 1 x "smart asset"
         val invalidFee  = expectedFee - 1
@@ -71,9 +72,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val submitted = node.placeOrder(bob, oneSmartPair, BUY, amount, price, expectedFee, 2).message.id
         node.waitOrderInBlockchain(submitted)
 
-        node.accountBalances(alice.address)._1 shouldBe aliceInitBalance - expectedFee
-        node.accountBalances(bob.address)._1 shouldBe bobInitBalance - expectedFee
-        node.accountBalances(matcher.address)._1 shouldBe matcherInitBalance + expectedFee
+        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
+        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
+        node.accountBalances(matcher.toAddress.toString)._1 shouldBe matcherInitBalance + expectedFee
       }
     }
 
@@ -84,9 +85,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 
-          val aliceInitBalance   = node.accountBalances(alice.address)._1
-          val bobInitBalance     = node.accountBalances(bob.address)._1
-          val matcherInitBalance = node.accountBalances(matcher.address)._1
+          val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
+          val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
+          val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
 
           val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
           val invalidFee  = expectedFee - 1
@@ -111,9 +112,9 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           val submitted = node.placeOrder(bob, bothSmartPair, BUY, amount, price, expectedFee, 2).message.id
           node.waitOrderInBlockchain(submitted)
 
-          node.accountBalances(alice.address)._1 shouldBe aliceInitBalance - expectedFee
-          node.accountBalances(bob.address)._1 shouldBe bobInitBalance - expectedFee
-          node.accountBalances(matcher.address)._1 shouldBe matcherInitBalance + expectedFee
+          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
+          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
+          node.accountBalances(matcher.toAddress.toString)._1 shouldBe matcherInitBalance + expectedFee
         }
       }
     }

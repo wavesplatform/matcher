@@ -19,7 +19,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.state.diffs.{CommonValidation, FeeValidation}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -43,7 +43,7 @@ object OrderValidator extends ScorexLogging {
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200
 
-  val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+  val exchangeTransactionCreationFee: Long = FeeValidation.OldFeeUnits(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
@@ -257,16 +257,12 @@ object OrderValidator extends ScorexLogging {
   }
 
   private def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache, assetDecimals: Asset => Int): Result[Order] = {
-    if (order.version < 3) lift(order)
-    else {
+    lazy val requiredFeeAssetIds = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
+    lazy val requiredFee         = getMinValidFeeForSettings(order, orderFeeSettings, order.price, rateCache, assetDecimals)
 
-      lazy val requiredFeeAssetIds = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
-      lazy val requiredFee         = getMinValidFeeForSettings(order, orderFeeSettings, order.price, rateCache, assetDecimals)
-
-      lift(order)
-        .ensure(error.UnexpectedFeeAsset(requiredFeeAssetIds, order.matcherFeeAssetId))(o => requiredFeeAssetIds contains o.matcherFeeAssetId)
-        .ensure(error.FeeNotEnough(requiredFee, order.matcherFee, order.matcherFeeAssetId))(_.matcherFee >= requiredFee)
-    }
+    lift(order)
+      .ensure(error.UnexpectedFeeAsset(requiredFeeAssetIds, order.matcherFeeAssetId))(o => requiredFeeAssetIds contains o.matcherFeeAssetId)
+      .ensure(error.FeeNotEnough(requiredFee, order.matcherFee, order.matcherFeeAssetId))(_.matcherFee >= requiredFee)
   }
 
   def matcherSettingsAware(matcherPublicKey: PublicKey,

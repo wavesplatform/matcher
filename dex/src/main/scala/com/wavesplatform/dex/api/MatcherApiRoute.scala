@@ -8,7 +8,7 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.{ApiRoute, _}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -21,8 +21,9 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarket
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
+import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -58,10 +59,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
-                           apiKeyHash: Option[Array[Byte]],
+                           apiKeyHashStr: String,
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
+    with AuthRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
@@ -105,7 +107,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound(_)): Directive1[AssetPair] =
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
@@ -303,7 +305,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def place: Route = path("orderbook") {
-    (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
+    (pathEndOrSingleSlash & entity(as[Order])) { order =>
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(placeTimer.measureFuture(orderValidator(order) match {
@@ -427,7 +429,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
-    json[CancelOrderRequest] { req =>
+    jsonPost[CancelOrderRequest] { req =>
       req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
     }
   }
@@ -676,6 +678,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
     }
   }
+
+  // TODO remove AuthRoute
+  override def settings: RestAPISettings =
+    RestAPISettings(
+      true,
+      matcherSettings.bindAddress,
+      matcherSettings.port,
+      apiKeyHashStr,
+      true,
+      true,
+      100,
+      100
+    )
 }
 
 object MatcherApiRoute {

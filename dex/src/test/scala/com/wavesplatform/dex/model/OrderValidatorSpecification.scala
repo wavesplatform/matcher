@@ -19,6 +19,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
@@ -215,22 +216,18 @@ class OrderValidatorSpecification
 
         withClue("AMOUNT/RECEIVING asset type, min fee = 0.3%, fee should be >= 1.5.waves\n") {
           val order = createOrder(pairWavesBtc, OrderType.BUY, 500.waves, 0.00011162.btc, matcherFee = 1.5.waves, matcherFeeAsset = Waves)
-
-          validateByPercentSettings(AssetType.AMOUNT) { order } shouldBe 'right
-          validateByPercentSettings(AssetType.AMOUNT) { order.updateFee(1.49999999.waves) } should produce("FeeNotEnough")
-
-          validateByPercentSettings(AssetType.RECEIVING) { order } shouldBe 'right
-          validateByPercentSettings(AssetType.RECEIVING) { order.updateFee(1.49999999.waves) } should produce("FeeNotEnough")
+          Seq(AssetType.AMOUNT, AssetType.RECEIVING).foreach { assetType =>
+            validateByPercentSettings(assetType) { order } shouldBe 'right
+            validateByPercentSettings(assetType) { order.updateFee(1.49999999.waves) } should produce("FeeNotEnough")
+          }
         }
 
         withClue("PRICE/SPENDING asset type, min fee = 0.3%, fee should be >= 0.00016743.btc\n") {
           val order = createOrder(pairWavesBtc, OrderType.BUY, 500.waves, 0.00011162.btc, matcherFee = 0.00016743.btc, matcherFeeAsset = wbtc)
-
-          validateByPercentSettings(AssetType.PRICE) { order } shouldBe 'right
-          validateByPercentSettings(AssetType.PRICE) { order.updateFee(0.00016742.btc) } should produce("FeeNotEnough")
-
-          validateByPercentSettings(AssetType.SPENDING) { order } shouldBe 'right
-          validateByPercentSettings(AssetType.SPENDING) { order.updateFee(0.00016742.btc) } should produce("FeeNotEnough")
+          Seq(AssetType.PRICE, AssetType.SPENDING).foreach { assetType =>
+            validateByPercentSettings(assetType) { order } shouldBe 'right
+            validateByPercentSettings(assetType) { order.updateFee(0.00016742.btc) } should produce("FeeNotEnough")
+          }
         }
       }
 
@@ -286,6 +283,21 @@ class OrderValidatorSpecification
             case _: DynamicSettings => orderValidator(correctedOrder) should produce("FeeNotEnough")
             case _                  => orderValidator(correctedOrder) shouldBe 'right
           }
+      }
+
+      "it's version doesn't meet matcher's requirements" in {
+
+        def orderOfVersion(version: Byte): Order = {
+          createOrder(pairWavesUsd, OrderType.BUY, 100.waves, 3.usd, matcherFee = 0.003.waves, version = version, matcherFeeAsset = Waves)
+        }
+
+        Seq[Byte](1, 2, 3) foreach { version =>
+          validateByMatcherSettings { FixedSettings(wusd, 0.01.usd) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
+          validateByMatcherSettings { FixedSettings(Waves, 0.003.waves) } { orderOfVersion(version) } shouldBe 'right
+
+          validateByMatcherSettings { PercentSettings(AssetType.PRICE, 0.003) } { orderOfVersion(version) } should produce("UnexpectedFeeAsset")
+          validateByMatcherSettings { PercentSettings(AssetType.AMOUNT, 0.003) } { orderOfVersion(version) } shouldBe 'right
+        }
       }
 
       "matcherFee is insufficient in case of scripted account or asset" in forAll(orderWithoutWavesInPairAndWithFeeSettingsGenerator) {
@@ -430,15 +442,20 @@ class OrderValidatorSpecification
         orderValidator(validOrder) shouldBe 'right
       }
 
-      "it's version is not allowed by matcher" in forAll(orderWithFeeSettingsGenerator) {
-        case (order, _, orderFeeSettings) =>
-          if (order.version > 1) {
-            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) should produce("OrderVersionDenied")
-            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
-          } else {
-            validateByMatcherSettings(orderFeeSettings, allowedOrderVersions = Set(1))(order) shouldBe 'right
-            validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
-          }
+      "it's version is not allowed by matcher" in {
+
+        def orderOfVersion(version: Byte): Order = {
+          createOrder(pairWavesUsd, OrderType.BUY, 100.waves, 3.usd, matcherFee = 0.003.waves, version = version, matcherFeeAsset = Waves)
+        }
+
+        def validate(allowedOrderVersions: Set[Byte]): Order => Result[Order] = {
+          validateByMatcherSettings(DynamicSettings(0.003.waves), allowedOrderVersions = allowedOrderVersions)
+        }
+
+        validate { Set(1) } { orderOfVersion(2) } should produce("OrderVersionDenied")
+        validate { Set(1, 2) } { orderOfVersion(3) } should produce("OrderVersionDenied")
+
+        Seq[Byte](1, 2, 3).foreach { version => validate(Set(1, 2, 3)) { orderOfVersion(version) } shouldBe 'right }
       }
 
       "amount or price does not meet matcher's settings requirements" in {
@@ -539,7 +556,7 @@ class OrderValidatorSpecification
           def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[Script]): Result[Order] =
             setScriptsAndValidate(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order)
 
-          val (invalidScript, _) = ScriptCompiler.compile("(5 / 0) == 2").explicitGet()
+          val (invalidScript, _) = ScriptCompiler.compile("(5 / 0) == 2", ScriptEstimatorV2).explicitGet()
           val falseScript        = ExprScript(Terms.FALSE).explicitGet()
 
           orderFeeSettings match {
@@ -568,7 +585,7 @@ class OrderValidatorSpecification
 
       val pk     = KeyPair(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
-      val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
+      val script = ScriptCompiler("true && (height > 0)", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
       ov(o).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
     }
@@ -654,16 +671,12 @@ class OrderValidatorSpecification
             |  case o: Order => height >= 0
             |  case _ => true
             |}""".stripMargin
-        val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+        val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
         (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
         ov(newBuyOrder(account, version = 2)).left.map(_.toJson(errorContext)) should produce("An access to the blockchain.height is denied on DEX")
       }
     }
-  }
-
-  "sunny day test when order meets matcher's settings requirements" in forAll(orderWithFeeSettingsGenerator) {
-    case (order, _, orderFeeSettings) => validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
   }
 
   private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.Result[Order], Blockchain) => Any): Unit = {
@@ -808,9 +821,9 @@ class OrderValidatorSpecification
                           orderType: OrderType,
                           amount: Long,
                           price: Long,
-                          matcherFee: Long = 0.003.waves,
+                          matcherFee: Long,
                           version: Byte = 3,
-                          matcherFeeAsset: Asset = Waves): Order = {
+                          matcherFeeAsset: Asset): Order = {
     Order(
       sender = KeyPair("seed".getBytes("utf-8")),
       matcher = MatcherAccount,

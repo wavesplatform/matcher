@@ -29,8 +29,8 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
     val aliceWavesPair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
     // check assets's balances
-    node.assertAssetBalance(alice.address, aliceAsset, IssueEthTx.quantity)
-    node.assertAssetBalance(matcher.address, aliceAsset, 0)
+    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, IssueEthTx.quantity)
+    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
 
     "place an order and wait some time" in {
       // Alice places sell order

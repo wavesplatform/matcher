@@ -1,112 +1,119 @@
-//package com.wavesplatform.it.sync
-//
-//import com.typesafe.config.{Config, ConfigFactory}
-//import com.wavesplatform.account.KeyPair
-//import com.wavesplatform.it.NodeConfigs.Default
-//import com.wavesplatform.it.{Node, _}
-//import com.wavesplatform.it.api.SyncHttpApi._
-//import com.wavesplatform.it.api.SyncMatcherHttpApi._
-//import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
-//import com.wavesplatform.it.config.DexTestConfig._
-//import com.wavesplatform.it.tags.DexItKafkaRequired
-//import com.wavesplatform.transaction.Asset.Waves
-//import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-//import org.scalacheck.Gen
-//
-//import scala.concurrent.duration.DurationInt
-//import scala.util.Random
-//import scala.util.control.NonFatal
-//
-//@DexItKafkaRequired
-//class MultipleMatchersTestSuite extends MatcherSuiteBase {
-//  private def configOverrides = ConfigFactory.parseString("""waves.dex {
-//      |  price-assets = ["WAVES"]
-//      |  snapshots-interval = 51
-//      |}""".stripMargin)
-//
-//  private def matcher1NodeConfig = configOverrides.withFallback(Default.head)
-//  private def matcher2NodeConfig =
-//    ConfigFactory
-//      .parseString("""
-//      |waves {
-//      |  network.node-name = node11
-//      |  miner.miner.enable = no
-//      |}
-//      |waves.dex.events-queue.kafka.group = 1""".stripMargin)
-//      .withFallback(matcher1NodeConfig)
-//
-//  override protected def nodeConfigs: Seq[Config] = Seq(matcher1NodeConfig, matcher2NodeConfig)
-//
-//  private def matcher1Node = nodes.head
-//  private def matcher2Node = nodes(1)
-//
-//  private val placesNumber  = 200
-//  private val cancelsNumber = placesNumber / 10
-//
-//  private val (issue1, issue2, assetPair1) = issueAssetPair(alice, 8, 8)
-//  private val assetPair2                   = AssetPair(assetPair1.amountAsset, Waves)
-//  private val assetPair3                   = AssetPair(assetPair1.priceAsset, Waves)
-//  private val assetPairs                   = Seq(assetPair1, assetPair2, assetPair3)
-//
-//  // Issue assets by Alice
-//  private val assetIds = {
-//    val txs = Seq(issue1, issue2).map(x => matcher1wavesNode1Api.broadcast(x).id -> x)
-//    txs.map { case (id, info) => nodes.waitForTransaction(id).id -> info }.toMap
-//  }
-//
-//  // Share assets with Bob
-//  {
-//    val xs = assetIds.map { case (id, info) => node.broadcastTransfer(alice, bob.address, info.quantity / 2, minFee, Some(id), None).id }
-//    xs.foreach(nodes.waitForTransaction)
-//  }
-//
-//  private val aliceOrders = mkOrders(alice)
-//  private val bobOrders   = mkOrders(alice)
-//  private val orders      = aliceOrders ++ bobOrders
-//  private val lastOrder   = orderGen(matcher, alice, assetPairs).sample.get
-//
-//  "Place, fill and cancel a lot of orders" in {
-//    val alicePlaces = aliceOrders.map(MatcherCommand.Place(matcher1Node, _))
-//    val bobPlaces   = bobOrders.map(MatcherCommand.Place(matcher2Node, _))
-//    val places      = Random.shuffle(alicePlaces ++ bobPlaces)
-//
-//    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(matcher1Node, alice, _))
-//    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(matcher2Node, bob, _))
-//    val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
-//
-//    executeCommands(places ++ cancels)
-//    executeCommands(List(MatcherCommand.Place(matcher1Node, lastOrder)))
-//  }
-//
-//  "Wait until all requests are processed" in {
-//    try {
-//      val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
-//      matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
-//
-//      withClue("Last command processed") {
-//        matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-//        matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-//      }
-//    } catch {
-//      case NonFatal(e) =>
-//        log.info(s"Last offsets: node1=${matcher1Node.getLastOffset}, node2=${matcher2Node.getLastOffset}")
-//        throw e
-//    }
-//  }
-//
-//  "States on both matcher should be equal" in {
-//    val state1 = state(matcher1Node)
-//    val state2 = state(matcher2Node)
-//    state1 shouldBe state2
-//  }
-//
-//  private def mkOrders(account: KeyPair) =
-//    Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, account, assetPairs)).sample.get
-//
-//  private def state(node: Node) = clean(node.matcherState(assetPairs, orders, Seq(alice, bob)))
-//
-//  // Because we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
-//  private def clean(state: MatcherState): MatcherState = state.copy(
-//    snapshots = state.snapshots.map { case (k, _) => k -> 0L }
-//  )
-//}
+package com.wavesplatform.it.sync
+
+import cats.Id
+import cats.instances.future._
+import cats.instances.try_._
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.it._
+import com.wavesplatform.it.api.{DexApi, HasWaitReady, MatcherCommand, MatcherState, OrderStatus}
+import com.wavesplatform.it.config.DexTestConfig
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.docker.{DexContainer, DockerContainer}
+import com.wavesplatform.it.tags.DexItKafkaRequired
+import com.wavesplatform.transaction.assets.exchange.Order
+import monix.eval.Coeval
+import org.scalacheck.Gen
+
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+import scala.util.{Random, Try}
+
+@DexItKafkaRequired
+class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
+  private def configOverrides = ConfigFactory.parseString("""waves.dex {
+      |  price-assets = ["WAVES"]
+      |  snapshots-interval = 51
+      |}""".stripMargin)
+
+  override protected def dex1Config: Config = configOverrides.withFallback(dexBaseConfig).withFallback(super.dex1Config)
+
+  protected def dex2Config: Config                 = configOverrides.withFallback(dexBaseConfig).withFallback(DexTestConfig.containerConfig("dex-2"))
+  protected def dex2NodeContainer: DockerContainer = wavesNode1Container()
+  protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
+    val grpcAddr = dockerClient().getInternalSocketAddress(dex2NodeContainer, dex2NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
+    val wavesNodeGrpcConfig = ConfigFactory
+      .parseString(s"""waves.dex.waves-node-grpc {
+                      |  host = ${grpcAddr.getAddress.getHostAddress}
+                      |  port = ${grpcAddr.getPort}
+                      |}""".stripMargin)
+    val config = wavesNodeGrpcConfig.withFallback(dex2Config).withFallback(DexTestConfig.updatedMatcherConfig).resolve()
+    dockerClient().createDex("dex-2", config)
+  }
+
+  protected def dex2AsyncApi: DexApi[Future] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(dex2Container(), dex2Config.getInt("waves.dex.rest-api.port"))
+    DexApi[Future]("integration-test-rest-api", apiAddress)
+  }
+
+  protected def dex2Api: DexApi[Id] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(dex2Container(), dex2Config.getInt("waves.dex.rest-api.port"))
+    fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
+  }
+
+  override protected def allContainers: List[DockerContainer] = dex2Container() :: super.allContainers
+  override protected def allApis: List[HasWaitReady[Id]]      = dex2Api :: super.allApis
+
+  private val placesNumber  = 200
+  private val cancelsNumber = placesNumber / 10
+
+  private val assetPairs = Seq(createAssetPair(eth, wct), ethWavesPair, wctWavesPair)
+
+  private val aliceOrders = mkOrders(alice)
+  private val bobOrders   = mkOrders(bob)
+  private val orders      = aliceOrders ++ bobOrders
+  private val lastOrder   = orderGen(matcher, alice, assetPairs).sample.get
+
+  private var successfulCommandsNumber = 0
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    broadcast(IssueEthTx, IssueWctTx)
+    broadcast(
+      mkTransfer(alice, bob, IssueEthTx.quantity / 2, eth),
+      mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
+    )
+  }
+
+  "Place, fill and cancel a lot of orders" in {
+    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1AsyncApi, _))
+    val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2AsyncApi, _))
+    val places      = Random.shuffle(alicePlaces ++ bobPlaces)
+
+    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
+    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(dex2AsyncApi, bob, _))
+    val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
+
+    successfulCommandsNumber = executeCommands(places ++ cancels)
+    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1AsyncApi, lastOrder)))
+  }
+
+  "Wait until all requests are processed" in {
+    try {
+      val offset1 = dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+      dex2Api.waitForCurrentOffset(_ == offset1)
+
+      withClue("Last command processed") {
+        List(dex1AsyncApi, dex2AsyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
+      }
+    } catch {
+      case NonFatal(e) =>
+        log.info(s"Last offsets: node1=${dex1Api.lastOffset}, node2=${dex2Api.lastOffset}")
+        throw e
+    }
+  }
+
+  "States on both matcher should be equal" in {
+    val state1 = state(dex1Api)
+    val state2 = state(dex2Api)
+    state1 shouldBe state2
+  }
+
+  private def mkOrders(account: KeyPair) = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, account, assetPairs)).sample.get
+  private def state(dexApi: DexApi[Id])  = clean(matcherState(assetPairs, orders, Seq(alice), dexApi))
+
+  // Because we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
+  private def clean(state: MatcherState): MatcherState = state.copy(
+    snapshots = state.snapshots.map { case (k, _) => k -> 0L }
+  )
+}

@@ -21,7 +21,7 @@ import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeCont
 import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee}
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
@@ -36,6 +36,7 @@ import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import NewMatcherSuiteBase._
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
 
@@ -68,8 +69,9 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))
 
   // Dex server
+  protected val dexBaseConfig: Config = queueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
 
-  protected def dex1Config: Config                 = DexTestConfig.containerConfig("dex-1")
+  protected def dex1Config: Config                 = dexBaseConfig.withFallback(DexTestConfig.containerConfig("dex-1"))
   protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
     val grpcAddr = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
@@ -131,6 +133,18 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 
 }
 
+object NewMatcherSuiteBase {
+  private def queueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
+    ConfigFactory.parseString(s"""waves.dex.events-queue {
+                                 |  type = kafka
+                                 |  kafka {
+                                 |    servers = "$kafkaServer"
+                                 |    topic = "dex-$queueId"
+                                 |  }
+                                 |}""".stripMargin)
+  }
+}
+
 trait TestUtils {
   this: NewMatcherSuiteBase =>
 
@@ -150,33 +164,33 @@ trait TestUtils {
                         timestamp: Long = System.currentTimeMillis(),
                         timeToLive: Duration = 30.days - 1.seconds,
                         version: Byte = orderVersion): Order =
-      if (matcherFeeAssetId == Waves)
-        Order(
-          sender = owner,
-          matcher = matcher,
-          pair = pair,
-          orderType = orderType,
-          amount = amount,
-          price = price,
-          timestamp = timestamp,
-          expiration = timestamp + timeToLive.toMillis,
-          matcherFee = matcherFee,
-          version = math.min(version, 2).toByte,
-        )
-      else
-        Order(
-          sender = owner,
-          matcher = matcher,
-          pair = pair,
-          orderType = orderType,
-          amount = amount,
-          price = price,
-          timestamp = timestamp,
-          expiration = timestamp + timeToLive.toMillis,
-          matcherFee = matcherFee,
-          version = version,
-          matcherFeeAssetId = matcherFeeAssetId
-        )
+    if (matcherFeeAssetId == Waves)
+      Order(
+        sender = owner,
+        matcher = matcher,
+        pair = pair,
+        orderType = orderType,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = timestamp + timeToLive.toMillis,
+        matcherFee = matcherFee,
+        version = math.min(version, 2).toByte,
+      )
+    else
+      Order(
+        sender = owner,
+        matcher = matcher,
+        pair = pair,
+        orderType = orderType,
+        amount = amount,
+        price = price,
+        timestamp = timestamp,
+        expiration = timestamp + timeToLive.toMillis,
+        matcherFee = matcherFee,
+        version = version,
+        matcherFeeAssetId = matcherFeeAssetId
+      )
 
   protected def mkTransfer(sender: KeyPair,
                            recipient: Address,
@@ -249,7 +263,7 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def broadcast(txs: IssueTransaction*): Unit = {
+  protected def broadcast(txs: Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
     txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
   }

@@ -64,7 +64,7 @@
 //          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
 //
 //        assertBadRequest(
 //          node
@@ -90,7 +90,7 @@
 //          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
 //        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 //
@@ -104,13 +104,13 @@
 //          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
 //
 //        val aliceOrd2 = node
 //          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
 //        node.cancelOrder(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
 //        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
@@ -123,13 +123,13 @@
 //          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
 //
 //        val aliceOrd2 = node
 //          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
 //          .message
 //          .id
-//        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
 //        setContract(Some(sco1), alice)
 //
@@ -142,12 +142,12 @@
 //          .message
 //          .id
 //
-//        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
-//        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Filled", 1.minute)
-//        node.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
-//        node.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
+//        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Filled)
+//        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Filled)
+//        dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
+//        dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 //
-//        node.waitOrderInBlockchain(bobOrd1)
+//        waitForOrderAtNode(bobOrd1)
 //
 //        val txs = node.waitTransactionsByOrder(bobOrd2, 1)
 //        node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAccountScript.ErrorCode

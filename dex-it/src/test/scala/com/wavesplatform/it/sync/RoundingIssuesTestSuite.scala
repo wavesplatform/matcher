@@ -30,7 +30,7 @@
 //    node.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(filledAmount), 1.minute)
 //    node.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 //
-//    val tx = node.waitOrderInBlockchain(counterId).head
+//    val tx = waitForOrderAtNode(counterId).head
 //    node.cancelOrder(alice, wavesUsdPair, counterId)
 //    val rawExchangeTx = node.rawTransactionInfo(tx.id)
 //
@@ -59,7 +59,7 @@
 //
 //    withClue("Alice's reserved balance before cancel")(dex1Api.reservedBalance(alice) shouldBe empty)
 //
-//    node.waitOrderInBlockchain(counterId)
+//    waitForOrderAtNode(counterId)
 //    node.cancelOrder(bob, ethBtcPair, counterId)
 //
 //    withClue("Bob's reserved balance after cancel")(dex1Api.reservedBalance(bob) shouldBe empty)

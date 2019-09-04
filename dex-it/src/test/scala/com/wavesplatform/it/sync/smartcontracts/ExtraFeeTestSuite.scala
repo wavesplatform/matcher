@@ -54,9 +54,9 @@
 //  // distribute
 //  {
 //    val xs = Seq(
-//      node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset0), None).id,
-//      node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None).id,
-//      node.broadcastTransfer(bob, alice.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
+//      wavesNode1Api.broadcast(mkTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset0), None).id,
+//      wavesNode1Api.broadcast(mkTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None).id,
+//      wavesNode1Api.broadcast(mkTransfer(bob, alice.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None).id
 //    )
 //    xs.foreach(wavesNode1Api.waitForTransaction(_))
 //
@@ -116,7 +116,7 @@
 //        dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
 //        val submitted = dex1Api.place(mkOrder(bob, matcher,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
-//        node.waitOrderInBlockchain(submitted)
+//        waitForOrderAtNode(submitted)
 //
 //        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
 //        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
@@ -156,7 +156,7 @@
 //          dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
 //          val submitted = dex1Api.place(mkOrder(bob, matcher,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
-//          node.waitOrderInBlockchain(submitted)
+//          waitForOrderAtNode(submitted)
 //
 //          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
 //          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
@@ -168,11 +168,11 @@
 //    "with non-waves asset fee with one Smart Account and one Smart Asset" in {
 //      val oneSmartPair = createAssetPair(asset0, asset1)
 //
-//      val bobInitBalance     = node.assetBalance(bob.toAddress.toString, feeAsset.toString).balance
-//      val matcherInitBalance = node.assetBalance(matcher.toAddress.toString, feeAsset.toString).balance
+//      val bobInitBalance     = wavesNode1Api.balance(bob.toAddress.toString, feeAsset.toString).balance
+//      val matcherInitBalance = wavesNode1Api.balance(matcher.toAddress.toString, feeAsset.toString).balance
 //      val feeAssetRate = 0.0005
-//      node.upsertRate(IssuedAsset(feeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
-//      node.upsertRate(IssuedAsset(BtcId), feeAssetRate, expectedStatusCode = StatusCodes.Created)
+//      dex1Api.upsertRate(IssuedAsset(feeAsset), feeAssetRate)._1 shouldBe StatusCodes.Created
+//      dex1Api.upsertRate(IssuedAsset(BtcId), feeAssetRate)._1 shouldBe StatusCodes.Created
 //
 //      val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
 //      val expectedFee = 550L// 1 x "smart asset" and 1 x "matcher script"
@@ -192,16 +192,16 @@
 //      dex1Api.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
 //
 //      val submitted = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, BUY, amount, price, expectedWavesFee, 2)).message.id
-//      node.waitOrderInBlockchain(submitted)
+//      waitForOrderAtNode(submitted)
 //
-//      node.assertAssetBalance(bob.toAddress.toString, feeAsset.toString, bobInitBalance - expectedFee)
-//      node.assertAssetBalance(matcher.toAddress.toString, feeAsset.toString, matcherInitBalance + expectedFee)
+//      wavesNode1Api.balance(bob, feeAsset) shouldBe (bobInitBalance - expectedFee)
+//      wavesNode1Api.balance(matcher, feeAsset) shouldBe (matcherInitBalance + expectedFee)
 //    }
 //
 //    "with asset fee assigned false script" in {
 //      val oneSmartPair = createAssetPair(asset0, asset1)
 //      val feeAssetRate = 0.0005
-//      node.upsertRate(IssuedAsset(falseFeeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
+//      dex1Api.upsertRate(IssuedAsset(falseFeeAsset), feeAssetRate)._1 shouldBe StatusCodes.Created
 //      assertBadRequestAndResponse(
 //        dex1Api.place(
 //            sender = bob,

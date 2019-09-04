@@ -28,23 +28,23 @@
 //
 //      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
-//      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
+//      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Accepted)
 //      dex1Api.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
 //      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrderId = dex1Api.place(aliceOrder).message.id
-//      node.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled", 1.minute)
+//      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
 //      val aliceOrder2   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrder2Id = dex1Api.place(aliceOrder2).message.id
-//      node.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
+//      dex1Api.waitForOrderStatus(aliceOrder2Id, OrderStatus.Filled)
 //
 //      // Bob wants to buy some USD
-//      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Filled", 1.minute)
+//      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Filled)
 //
 //      // Each side get fair amount of assets
-//      node.waitOrderInBlockchain(bobOrder1Id)
+//      waitForOrderAtNode(bobOrder1Id)
 //      dex1Api.reservedBalance(bob) shouldBe empty
 //      dex1Api.reservedBalance(alice) shouldBe empty
 //
@@ -55,14 +55,14 @@
 //
 //      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
-//      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
+//      dex1Api.waitForOrderStatus(bobOrder2Id, OrderStatus.Accepted)
 //
 //      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
 //      orderBook2.bids shouldBe empty
 //
 //      node.cancelOrder(bob, wavesUsdPair, bobOrder2Id)
-//      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Cancelled", 1.minute)
+//      dex1Api.waitForOrderStatus(bobOrder2Id, OrderStatus.Cancelled)
 //
 //      dex1Api.reservedBalance(bob) shouldBe empty
 //      dex1Api.reservedBalance(alice) shouldBe empty
@@ -78,12 +78,12 @@
 //      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //
-//      node.waitOrderStatus(wavesUsdPair, aliceOrder1Id, "Filled", 1.minute)
-//      node.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
-//      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Filled", 1.minute)
+//      dex1Api.waitForOrderStatus(aliceOrder1Id, OrderStatus.Filled)
+//      dex1Api.waitForOrderStatus(aliceOrder2Id, OrderStatus.Filled)
+//      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Filled)
 //
 //      // Each side get fair amount of assets
-//      node.waitOrderInBlockchain(bobOrder1Id)
+//      waitForOrderAtNode(bobOrder1Id)
 //      dex1Api.reservedBalance(bob) shouldBe empty
 //      dex1Api.reservedBalance(alice) shouldBe empty
 //
@@ -94,7 +94,7 @@
 //
 //      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
-//      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
+//      dex1Api.waitForOrderStatus(bobOrder2Id, OrderStatus.Accepted)
 //
 //      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))

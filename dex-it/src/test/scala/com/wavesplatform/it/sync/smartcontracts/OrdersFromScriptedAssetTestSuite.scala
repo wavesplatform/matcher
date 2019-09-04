@@ -46,7 +46,7 @@
 //      dex1Api.place(mkOrder(matcher, matcher,pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee))
 //    dex1Api.waitForOrderStatus(submitted.message.id, OrderStatus.Filled)
 //
-//    node.waitOrderInBlockchain(submitted.message.id)
+//    waitForOrderAtNode(submitted.message.id)
 //    node.waitForHeight(activationHeight + 1, 2.minutes)
 //  }
 //

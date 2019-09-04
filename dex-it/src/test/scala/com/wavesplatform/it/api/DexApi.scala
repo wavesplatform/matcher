@@ -66,6 +66,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def publicKey: F[PublicKey]
 
   def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]]
+  def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]]
 
   def tryPlace(order: Order): F[Either[MatcherError, Unit]]
 
@@ -111,6 +112,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]]
 
   def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)]
+  def deleteRate(asset: Asset): F[Unit]
 
   def currentOffset: F[Long]
   def lastOffset: F[Long]
@@ -179,6 +181,16 @@ object DexApi {
       override def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
         val req = sttp
           .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
+          .headers(timestampAndSignatureHeaders(of, timestamp))
+          .response(asJson[Map[Asset, Long]])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap(parseResponse)
+      }
+
+      override def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
+        val req = sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
           .headers(timestampAndSignatureHeaders(of, timestamp))
           .response(asJson[Map[Asset, Long]])
           .tag("requestId", UUID.randomUUID())
@@ -395,6 +407,21 @@ object DexApi {
           rawResp <- httpBackend.send(req)
           resp    <- parseResponse[RatesResponse](rawResp)
         } yield (rawResp.code, resp)
+      }
+
+      override def deleteRate(asset: Asset): F[Unit] = {
+        val req =
+          sttp
+            .delete(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+            .contentType("application/json", "UTF-8")
+            .headers(apiKeyHeaders)
+            .mapResponse(_ => ())
+            .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap { resp =>
+          if (resp.isSuccess) M.pure(())
+          else M.raiseError(new RuntimeException(s"The server returned an error: ${resp.code}"))
+        }
       }
 
       override def currentOffset: F[Long] = {

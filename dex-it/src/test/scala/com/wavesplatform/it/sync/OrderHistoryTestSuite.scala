@@ -134,7 +134,7 @@
 //    createTables(s"localhost:$getPostgresContainerHostPort")
 //
 //    Seq(IssueUsdTx, IssueWctTx, IssueEthTx).map(_.json()).map(wavesNode1Api.broadcast(_)).foreach(tx => wavesNode1Api.waitForTransaction(tx.id))
-//    node.upsertRate(ethAsset, 1.0, expectedStatusCode = Created)
+//    dex1Api.upsertRate(ethAsset, 1.0)._1 shouldBe Created
 //  }
 //
 //  override protected def afterAll(): Unit = {
@@ -282,8 +282,8 @@
 //
 //  "Order history should correctly save market orders and their events" in {
 //
-//    node.cancelAllOrders(bob)
-//    node.cancelAllOrders(alice)
+//    dex1Api.cancelAll(bob)
+//    dex1Api.cancelAll(alice)
 //
 //    def bigBuyOrder: Order = mkOrder(alice, matcher,wctUsdPair, BUY, 5 * amount, price, version = 3, matcherFeeAssetId = ethAsset)
 //

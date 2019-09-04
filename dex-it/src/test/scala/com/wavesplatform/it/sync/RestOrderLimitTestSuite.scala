@@ -72,7 +72,7 @@
 //
 //    node.cancelOrder(alice, alicePair, cancelled1)
 //    node.cancelOrder(alice, alicePair, cancelled2)
-//    node.waitOrderStatus(bobPair, cancelled2, "Cancelled", 1.minutes)
+//    dex1Api.waitForOrderStatus(cancelled2, OrderStatus.Cancelled)
 //
 //    val activeOrdersAllFive       = Seq(partial2, active2, partial1, active1, active0)
 //    val allOrdersExceptTheFilled1 = activeOrdersAllFive ++ Seq(cancelled2, filled2, cancelled1)
@@ -91,7 +91,7 @@
 //    val active5 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
 //    val active6 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 2.waves)).message.id
 //
-//    node.waitOrderStatus(bobPair, active6, "Accepted", 1.minutes)
+//    dex1Api.waitForOrderStatus(active6, OrderStatus.Accepted)
 //
 //    val activeOrdersAllNine          = Seq(active6, active5, active4, active3) ++ activeOrdersAllFive
 //    val activeOrdersByPairWithTwoNew = Seq(active4, active3) ++ activeOrdersByPair
@@ -108,7 +108,7 @@
 //    val active9  = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 1.waves)).message.id
 //    val active10 = dex1Api.place(mkOrder(alice, bobPair, BUY, 1, 1.waves)).message.id
 //
-//    node.waitOrderStatus(bobPair, active10, "Accepted", 1.minutes)
+//    dex1Api.waitForOrderStatus(active10, OrderStatus.Accepted)
 //
 //    val activeOrdersAllThirteen               = Seq(active10, active9, active8, active7) ++ activeOrdersAllNine
 //    val activeOrdersByPairWithTwoMoreNew      = Seq(active8, active7) ++ activeOrdersByPairWithTwoNew
@@ -125,7 +125,7 @@
 //    dex1Api.place(mkOrder(bob, alicePair, BUY, 2, 9.waves)).message.id  // fill partial1, active7
 //    dex1Api.place(mkOrder(bob, alicePair, BUY, 1, 10.waves)).message.id // fill active1
 //
-//    node.waitOrderStatus(bobPair, active1, "Filled", 1.minutes)
+//    dex1Api.waitForOrderStatus(active1, OrderStatus.Filled)
 //
 //    val activeOrdersAllSeven            = Seq(active10, active9, active8, active6, active4, active3, active0)
 //    val allOrdersWithOneFilled          = activeOrdersAllSeven ++ Seq(active1)
@@ -145,7 +145,7 @@
 //    val active14 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
 //    val active15 = dex1Api.place(mkOrder(alice, alicePair, SELL, 1, 10.waves)).message.id
 //
-//    node.waitOrderStatus(bobPair, active15, "Accepted", 1.minutes)
+//    dex1Api.waitForOrderStatus(active15, OrderStatus.Accepted)
 //
 //    val activeOrdersAllTwelve     = Seq(active15, active14, active13, active12, active11) ++ activeOrdersAllSeven
 //    val activeOrdersByPairAllNine = Seq(active15, active14, active13, active12, active11) ++ allOrdersByPairWithTwoFilled.take(4)

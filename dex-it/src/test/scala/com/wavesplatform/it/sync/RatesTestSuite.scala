@@ -86,11 +86,11 @@
 //
 //    // add rate for unexisted asset
 //    assertNotFoundAndMessage(
-//      node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
+//      dex1Api.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2)._1 shouldBe Created,
 //      "The asset unexistedAsset not found")
 //
 //    // add rate for wct
-//    node.upsertRate(wctAsset, wctRate, expectedStatusCode = Created).message shouldBe s"Rate $wctRate for the asset $wctStr added"
+//    dex1Api.upsertRate(wctAsset, wctRate)._1 shouldBe Created.message shouldBe s"Rate $wctRate for the asset $wctStr added"
 //    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRate)
 //
 //    // update rate for wct
@@ -100,27 +100,27 @@
 //    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
 //
 //    // update rate for Waves is not allowed
-//    node.upsertRate(Waves, wctRateUpdated, expectedStatusCode = BadRequest).message shouldBe "Rate for Waves cannot be changed"
+//    dex1Api.upsertRate(Waves, wctRateUpdated)._1 shouldBe BadRequest.message shouldBe "Rate for Waves cannot be changed"
 //    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
 //
 //    // delete rate for wct
-//    node.deleteRate(wctAsset).message shouldBe s"Rate for the asset $wctStr deleted, old value = $wctRateUpdated"
+//    dex1Api.deleteRate(wctAsset).message shouldBe s"Rate for the asset $wctStr deleted, old value = $wctRateUpdated"
 //    node.getRates shouldBe defaultRateMap
 //
 //    // delete unexisted rate
-//    assertNotFoundAndMessage(node.deleteRate(wctAsset), s"Rate for the asset $wctStr is not specified")
+//    assertNotFoundAndMessage(dex1Api.deleteRate(wctAsset), s"Rate for the asset $wctStr is not specified")
 //  }
 //
 //  "Changing rates affects order validation" in {
 //    // set rate for btc
-//    node.upsertRate(btcAsset, 1, expectedStatusCode = Created)
+//    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe Created
 //
 //    // place order with admissible fee (according to btc rate = 1)
 //    val placedOrderId1 = dex1Api.place(getOrder).message.id
 //    dex1Api.waitForOrderStatus(placedOrderId1, OrderStatus.Accepted)
 //
 //    // slightly increase rate for btc
-//    node.upsertRate(btcAsset, 1.1, expectedStatusCode = OK)
+//    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe OK
 //
 //    // the same order now is rejected
 //    node.expectIncorrectOrderPlacement(
@@ -131,17 +131,17 @@
 //    )
 //
 //    // return previous rate for btc
-//    node.upsertRate(btcAsset, 1, expectedStatusCode = OK)
+//    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe OK
 //
 //    val placedOrderId2 = dex1Api.place(getOrder).message.id
 //    dex1Api.waitForOrderStatus(placedOrderId2, OrderStatus.Accepted)
 //
-//    node.deleteRate(btcAsset)
+//    dex1Api.deleteRate(btcAsset)
 //  }
 //
 //  "Rates are restored from the DB after matcher's restart" in {
 //    // add high rate for btc
-//    node.upsertRate(btcAsset, 1.1, expectedStatusCode = Created)
+//    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe Created
 //
 //    // order with low fee should be rejected
 //    node.expectIncorrectOrderPlacement(

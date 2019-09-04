@@ -48,8 +48,8 @@
 //
 //    setContract(Some("true"), bob)
 //    wavesNode1Api.waitForTransaction(wavesNode1Api.broadcast(aliceAssetTx).id)
-//    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
-//    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
+//    wavesNode1Api.balance(alice, aliceAsset) shouldBe (someAssetAmount)
+//    wavesNode1Api.balance(matcher, aliceAsset) shouldBe (0)
 //  }
 //
 //  "issue asset and run test" - {

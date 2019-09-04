@@ -346,8 +346,8 @@ trait TestUtils {
   private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
   private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 
-  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                  = new FailWith(errorCode)
-  def failWith(errorCode: Int, message: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(message))
+  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                      = new FailWith(errorCode)
+  def failWith(errorCode: Int, messagePart: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(messagePart))
   def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] =
     new FailWith(errorCode, None, containsParams)
 }

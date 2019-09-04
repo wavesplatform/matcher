@@ -72,7 +72,7 @@
 //      }
 //
 //      withClue("getAllSnapshotOffsets") {
-//        node.getAllSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
+//        dex1Api.allSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
 //      }
 //    }
 //
@@ -85,8 +85,8 @@
 //    }
 //
 //    "it should not affect other pairs and their orders" in {
-//      node.orderStatus(buyOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
-//      node.orderStatus(sellOrderForAnotherPair, wctWavesPair).status shouldBe "Accepted"
+//      dex1Api.orderStatus(buyOrderForAnotherPair).status shouldBe "Accepted"
+//      dex1Api.orderStatus(sellOrderForAnotherPair).status shouldBe "Accepted"
 //      dex1Api.place(mkOrder(alice, matcher,wctWavesPair, BUY, amount, price))
 //
 //      val orderBook = node.orderBook(wctWavesPair)

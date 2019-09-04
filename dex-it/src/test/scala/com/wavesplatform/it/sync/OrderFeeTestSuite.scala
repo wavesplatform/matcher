@@ -53,7 +53,7 @@
 //        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
 //
 //      assertBadRequestAndResponse(
-//        node.placeOrder(
+//        dex1Api.place(
 //          sender = bob,
 //          pair = wavesBtcPair,
 //          orderType = OrderType.BUY,
@@ -67,7 +67,7 @@
 //      )
 //
 //      assertBadRequestAndResponse(
-//        node.placeOrder(
+//        dex1Api.place(
 //          sender = bob,
 //          pair = wavesBtcPair,
 //          orderType = OrderType.BUY,
@@ -85,7 +85,7 @@
 //
 //    "is enough" in {
 //      node.upsertRate(IssuedAsset(BtcId), btcRate, expectedStatusCode = StatusCodes.Created)
-//      node.placeOrder(
+//      dex1Api.place(
 //        sender = bob,
 //        pair = wavesBtcPair,
 //        orderType = OrderType.SELL,
@@ -99,7 +99,7 @@
 //      node.reservedBalance(bob)("WAVES") shouldEqual 100000000L
 //      node.cancelAllOrders(bob)
 //
-//      node.placeOrder(
+//      dex1Api.place(
 //        sender = bob,
 //        pair = wavesBtcPair,
 //        orderType = OrderType.BUY,
@@ -134,7 +134,7 @@
 //        )
 //        .message
 //        .id
-//      node.placeOrder(
+//      dex1Api.place(
 //        sender = alice,
 //        pair = ethWavesPair,
 //        orderType = OrderType.SELL,
@@ -223,7 +223,7 @@
 //        .message
 //        .id
 //      node.reservedBalance(alice)(EthId.toString) shouldBe 1920L
-//      node.placeOrder(
+//      dex1Api.place(
 //        sender = bob,
 //        pair = wavesBtcPair,
 //        orderType = OrderType.BUY,

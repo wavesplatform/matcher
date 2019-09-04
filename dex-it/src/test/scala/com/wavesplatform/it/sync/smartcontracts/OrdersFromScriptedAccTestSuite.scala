@@ -97,7 +97,7 @@
 //        """.stripMargin
 //      setContract(Some(script), bob)
 //
-//      val bobOrder = node.placeOrder(
+//      val bobOrder = dex1Api.place(
 //        sender     = bob,
 //        pair       = aliceWavesPair,
 //        orderType  = OrderType.BUY,
@@ -128,7 +128,7 @@
 //
 //    "scripted dApp account accept correct order" in {
 //      setContract(Some(orderFilterScript), bob)
-//      val bobOrder = node.placeOrder(
+//      val bobOrder = dex1Api.place(
 //        sender     = bob,
 //        pair       = aliceWavesPair,
 //        orderType  = OrderType.BUY,

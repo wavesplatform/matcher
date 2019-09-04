@@ -83,7 +83,7 @@
 //
 //    "check filled amount and tradable balance" in {
 //      val bobsOrderId  = node.fullOrderHistory(bob).head.id
-//      val filledAmount = node.orderStatus(bobsOrderId, wavesUsdPair).filledAmount.getOrElse(0L)
+//      val filledAmount = dex1Api.orderStatus(bobsOrderId).filledAmount.getOrElse(0L)
 //
 //      filledAmount shouldBe adjustedAmount
 //    }

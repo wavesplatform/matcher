@@ -355,7 +355,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //    }
 //
 //    ids.foreach { id =>
-//      val status = node.orderStatus(id, pair, waitForStatus = false).status
+//      val status = dex1Api.orderStatus(id).status
 //      withClue(id)(status should not be "NotFound")
 //    }
 //  }
@@ -367,7 +367,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //    val oldestSnapshotOffset = node.getOldestSnapshotOffset
 //    oldestSnapshotOffset should be <= currentOffset
 //
-//    val snapshotOffsets = node.getAllSnapshotOffsets
+//    val snapshotOffsets = dex1Api.allSnapshotOffsets
 //    snapshotOffsets.foreach {
 //      case (assetPair, offset) =>
 //        withClue(assetPair) {

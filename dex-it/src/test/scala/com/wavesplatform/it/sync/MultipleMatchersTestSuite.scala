@@ -26,7 +26,7 @@ class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
       |  snapshots-interval = 51
       |}""".stripMargin)
 
-  override protected def dex1Config: Config = configOverrides.withFallback(dexBaseConfig).withFallback(super.dex1Config)
+  override protected def dex1Config: Config = configOverrides.withFallback(super.dex1Config)
 
   protected def dex2Config: Config                 = configOverrides.withFallback(dexBaseConfig).withFallback(DexTestConfig.containerConfig("dex-2"))
   protected def dex2NodeContainer: DockerContainer = wavesNode1Container()

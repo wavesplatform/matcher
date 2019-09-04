@@ -176,7 +176,7 @@
 //
 //      val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
 //      val expectedFee = 550L// 1 x "smart asset" and 1 x "matcher script"
-//      val counter = node.placeOrder(
+//      val counter = dex1Api.place(
 //          sender = bob,
 //          pair = oneSmartPair,
 //          orderType = SELL,
@@ -203,7 +203,7 @@
 //      val feeAssetRate = 0.0005
 //      node.upsertRate(IssuedAsset(falseFeeAsset), feeAssetRate, expectedStatusCode = StatusCodes.Created)
 //      assertBadRequestAndResponse(
-//        node.placeOrder(
+//        dex1Api.place(
 //            sender = bob,
 //            pair = oneSmartPair,
 //            orderType = SELL,

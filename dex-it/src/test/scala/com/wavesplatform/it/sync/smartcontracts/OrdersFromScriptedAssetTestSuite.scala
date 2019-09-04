@@ -117,7 +117,7 @@
 //    wavesNode1Api.waitForTransaction(setAssetScriptId)
 //
 //    info("a counter order wasn't rejected")
-//    node.orderStatus(counterId, pair).status shouldBe "Accepted"
+//    dex1Api.orderStatus(counterId).status shouldBe "Accepted"
 //
 //    info("place a submitted order")
 //    val submittedId =
@@ -143,7 +143,7 @@
 //    wavesNode1Api.waitForTransaction(setAssetScriptId)
 //
 //    info("a counter order wasn't rejected")
-//    node.orderStatus(counterId, pair).status shouldBe "Accepted"
+//    dex1Api.orderStatus(counterId).status shouldBe "Accepted"
 //
 //    info("place a submitted order")
 //    val submittedId =

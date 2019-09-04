@@ -219,7 +219,7 @@
 //          val exchangeTx2 = node.waitOrderInBlockchain(bobOrd2).headOption.getOrElse(fail("Expected an exchange transaction"))
 //          assert(exchangeTx2.fee == 300000)
 //
-//          node.reservedBalance(bob) shouldBe empty
+//          dex1Api.reservedBalance(bob) shouldBe empty
 //        }
 //      }
 //
@@ -281,7 +281,7 @@
 //          val exchangeTx2 = node.waitOrderInBlockchain(bobOrd2).headOption.getOrElse(fail("Expected an exchange transaction"))
 //          assert(exchangeTx2.fee == 300000)
 //
-//          node.reservedBalance(bob) shouldBe empty
+//          dex1Api.reservedBalance(bob) shouldBe empty
 //        }
 //
 //        setContract(None, alice)
@@ -360,7 +360,7 @@
 //
 //          node.ordersByAddress(alice, activeOnly = true).length shouldBe 0
 //
-//          node.reservedBalance(bob) shouldBe empty
+//          dex1Api.reservedBalance(bob) shouldBe empty
 //
 //          setContract(None, alice)
 //        }

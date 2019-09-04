@@ -113,7 +113,7 @@
 //        dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //        info("expected fee should be reserved")
-//        node.reservedBalance(alice)("WAVES") shouldBe expectedFee
+//        dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
 //        val submitted = dex1Api.place(mkOrder(bob, matcher,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //        node.waitOrderInBlockchain(submitted)
@@ -153,7 +153,7 @@
 //          dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //          info("expected fee should be reserved")
-//          node.reservedBalance(alice)("WAVES") shouldBe expectedFee
+//          dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
 //          val submitted = dex1Api.place(mkOrder(bob, matcher,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //          node.waitOrderInBlockchain(submitted)
@@ -189,7 +189,7 @@
 //      dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //      info("expected fee should be reserved")
-//      node.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
+//      dex1Api.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
 //
 //      val submitted = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, BUY, amount, price, expectedWavesFee, 2)).message.id
 //      node.waitOrderInBlockchain(submitted)

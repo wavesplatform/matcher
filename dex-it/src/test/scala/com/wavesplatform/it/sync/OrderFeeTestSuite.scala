@@ -95,8 +95,8 @@
 //        version = 3: Byte,
 //        matcherFeeAssetId = IssuedAsset(BtcId)
 //      )
-//      node.reservedBalance(bob).keys shouldNot contain(BtcId.toString)
-//      node.reservedBalance(bob)("WAVES") shouldEqual 100000000L
+//      dex1Api.reservedBalance(bob).keys shouldNot contain(BtcId.toString)
+//      dex1Api.reservedBalance(bob)("WAVES") shouldEqual 100000000L
 //      node.cancelAllOrders(bob)
 //
 //      dex1Api.place(
@@ -109,8 +109,8 @@
 //        version = 3: Byte,
 //        matcherFeeAssetId = IssuedAsset(BtcId)
 //      )
-//      node.reservedBalance(bob)(BtcId.toString) shouldEqual 50150L
-//      node.reservedBalance(bob).keys shouldNot contain("WAVES")
+//      dex1Api.reservedBalance(bob)(BtcId.toString) shouldEqual 50150L
+//      dex1Api.reservedBalance(bob).keys shouldNot contain("WAVES")
 //      node.cancelAllOrders(bob)
 //      node.deleteRate(IssuedAsset(BtcId))
 //    }
@@ -222,7 +222,7 @@
 //        )
 //        .message
 //        .id
-//      node.reservedBalance(alice)(EthId.toString) shouldBe 1920L
+//      dex1Api.reservedBalance(alice)(EthId.toString) shouldBe 1920L
 //      dex1Api.place(
 //        sender = bob,
 //        pair = wavesBtcPair,
@@ -235,7 +235,7 @@
 //      )
 //      node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled", 500.millis)
 //      node.waitOrderInBlockchain(aliceOrderId)
-//      node.reservedBalance(alice)(EthId.toString) shouldBe 960L
+//      dex1Api.reservedBalance(alice)(EthId.toString) shouldBe 960L
 //      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 150L - 50000L)
 //      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
 //      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 960L)
@@ -280,7 +280,7 @@
 //        .id
 //      val newBtcRate = btcRate * 2
 //      node.upsertRate(IssuedAsset(BtcId), newBtcRate, expectedStatusCode = StatusCodes.OK)
-//      node.reservedBalance(bob)(BtcId.toString) shouldBe 50150L
+//      dex1Api.reservedBalance(bob)(BtcId.toString) shouldBe 50150L
 //      node
 //        .placeOrder(
 //          sender = alice,
@@ -329,7 +329,7 @@
 //        .message
 //        .id
 //      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
-//      node.reservedBalance(bob).keys should not contain "WAVES"
+//      dex1Api.reservedBalance(bob).keys should not contain "WAVES"
 //
 //      val aliceOrderId = node
 //        .placeOrder(
@@ -435,7 +435,7 @@
 //          .message
 //          .id
 //        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
-//        node.reservedBalance(bob).keys should not contain "WAVES"
+//        dex1Api.reservedBalance(bob).keys should not contain "WAVES"
 //
 //        val aliceOrderId = node
 //          .placeOrder(
@@ -491,7 +491,7 @@
 //        .message
 //        .id
 //      node.cancelOrder(bob, assetPair, orderId).status shouldBe "OrderCanceled"
-//      node.reservedBalance(bob).keys.size shouldBe 0
+//      dex1Api.reservedBalance(bob).keys.size shouldBe 0
 //      node.tradableBalance(bob, wavesBtcPair) shouldEqual bobBalance
 //      node.deleteRate(IssuedAsset(BtcId))
 //    }
@@ -530,7 +530,7 @@
 //      Array(bobOrderId, aliceOrderId)
 //        .foreach(orderId => node.waitOrderInBlockchain(orderId))
 //      node.cancelOrder(alice, assetPair, aliceOrderId).status shouldBe "OrderCanceled"
-//      node.reservedBalance(alice).keys.size shouldBe 0
+//      dex1Api.reservedBalance(alice).keys.size shouldBe 0
 //      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 960L)
 //      Array(BtcId, EthId)
 //        .foreach(assetId => node.deleteRate(IssuedAsset(assetId)))

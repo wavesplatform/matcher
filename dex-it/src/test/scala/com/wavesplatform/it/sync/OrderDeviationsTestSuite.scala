@@ -43,7 +43,7 @@
 //    "in deviation bounds" in {
 //      /*val bestAskOrderId  = dex1Api.place(mkOrder(alice, matcher,wavesBtcPair, SELL, 1000.waves, 500000)).message.id
 //      node.waitOrderStatus(wavesBtcPair, bestAskOrderId, expectedStatus = "Accepted")
-//      node.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
+//      dex1Api.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 //
 //      val bestBidOrderId =  dex1Api.place(mkOrder(bob, matcher,wavesBtcPair, BUY, 1000.waves, 400000))*/
 //      pending

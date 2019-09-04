@@ -29,7 +29,7 @@
 //      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
-//      node.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
+//      dex1Api.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
 //      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
@@ -45,11 +45,11 @@
 //
 //      // Each side get fair amount of assets
 //      node.waitOrderInBlockchain(bobOrder1Id)
-//      node.reservedBalance(bob) shouldBe empty
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //
 //      // Previously cancelled order should not affect new orders
-//      val orderBook1 = node.orderBook(wavesUsdPair)
+//      val orderBook1 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
@@ -57,15 +57,15 @@
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 //
-//      val orderBook2 = node.orderBook(wavesUsdPair)
+//      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
 //      orderBook2.bids shouldBe empty
 //
 //      node.cancelOrder(bob, wavesUsdPair, bobOrder2Id)
 //      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Cancelled", 1.minute)
 //
-//      node.reservedBalance(bob) shouldBe empty
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //    }
 //
 //    "place one submitted orders and two counter" in {
@@ -84,11 +84,11 @@
 //
 //      // Each side get fair amount of assets
 //      node.waitOrderInBlockchain(bobOrder1Id)
-//      node.reservedBalance(bob) shouldBe empty
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //
 //      // Previously cancelled order should not affect new orders
-//      val orderBook1 = node.orderBook(wavesUsdPair)
+//      val orderBook1 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
@@ -96,7 +96,7 @@
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 //
-//      val orderBook2 = node.orderBook(wavesUsdPair)
+//      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
 //      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
 //      orderBook2.bids shouldBe empty
 //    }

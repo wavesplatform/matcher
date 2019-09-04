@@ -108,6 +108,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]]
   def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse]
 
+  def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]]
+
   def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)]
 
   def currentOffset: F[Long]
@@ -368,6 +370,15 @@ object DexApi {
           .tag("requestId", UUID.randomUUID())
 
         httpBackend.send(req).flatMap(parseResponse[MarketStatusResponse])
+      }
+
+      override def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]] = try_ {
+        sttp
+          .delete(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
+          .followRedirects(false)
+          .headers(apiKeyHeaders)
+          .mapResponse(_ => ())
+          .tag("requestId", UUID.randomUUID())
       }
 
       override def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = {

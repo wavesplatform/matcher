@@ -39,7 +39,7 @@
 //      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
-//      node.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
+//      dex1Api.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
 //      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
@@ -54,7 +54,7 @@
 //    }
 //
 //    "get opened trading markets. USD price-asset" in {
-//      val openMarkets = node.tradingMarkets()
+//      val openMarkets = dex1Api.allOrderBooks()
 //      openMarkets.markets.size shouldBe 1
 //      val markets = openMarkets.markets.head
 //
@@ -92,9 +92,9 @@
 //      val reservedFee = BigInt(matcherFee) - (BigInt(matcherFee) * adjustedAmount / sellOrderAmount)
 //      log.debug(s"reservedFee: $reservedFee")
 //      val expectedBobReservedBalance = correctedSellAmount - adjustedAmount + reservedFee
-//      node.reservedBalance(bob)("WAVES") shouldBe expectedBobReservedBalance
+//      dex1Api.reservedBalance(bob)("WAVES") shouldBe expectedBobReservedBalance
 //
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //    }
 //
 //    "check waves-usd tradable balance" in {
@@ -127,7 +127,7 @@
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      node.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
 //
-//      node.reservedBalance(bob)("WAVES") shouldBe correctedSellAmount2 + matcherFee
+//      dex1Api.reservedBalance(bob)("WAVES") shouldBe correctedSellAmount2 + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
 //
 //      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount2, price2)
@@ -161,8 +161,8 @@
 //
 //      node.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
 //
-//      node.reservedBalance(bob) shouldBe empty
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //    }
 //  }
 //
@@ -190,16 +190,16 @@
 //      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
 //      val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 //
-//      node.reservedBalance(bob)(s"$WctId") shouldBe expectedReservedBobWct
+//      dex1Api.reservedBalance(bob)(s"$WctId") shouldBe expectedReservedBobWct
 //      // 999999999652 = 999999999999 - 142 - 205
 //      node.tradableBalance(bob, wctUsdPair)(s"$WctId") shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
 //      node.tradableBalance(bob, wctUsdPair)(s"$UsdId") shouldBe bobUsdBalance + bobReceiveUsdAmount
 //
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //      node.tradableBalance(alice, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
 //
 //      val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
-//      node.reservedBalance(bob)("WAVES") shouldBe expectedReservedWaves
+//      dex1Api.reservedBalance(bob)("WAVES") shouldBe expectedReservedWaves
 //
 //      node.cancelOrder(bob, wctUsdPair, node.fullOrderHistory(bob).head.id)
 //    }
@@ -213,14 +213,14 @@
 //      node.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 //
 //      node.waitOrderInBlockchain(bobOrderId)
-//      node.reservedBalance(alice) shouldBe empty
-//      node.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
 //    }
 //
 //  }
 //
 //  "get opened trading markets. Check WCT-USD" in {
-//    val openMarkets = node.tradingMarkets()
+//    val openMarkets = dex1Api.allOrderBooks()
 //    val markets     = openMarkets.markets.last
 //
 //    markets.amountAssetName shouldBe wctAssetName
@@ -268,7 +268,7 @@
 //      node.waitOrderStatus(ethWavesPair, submittedId, "Filled", 1.minute)
 //
 //      node.waitOrderInBlockchain(submittedId)
-//      node.reservedBalance(bob) shouldBe empty
+//      dex1Api.reservedBalance(bob) shouldBe empty
 //      node.cancelOrder(alice, ethWavesPair, counterId2)
 //    }
 //  }
@@ -284,7 +284,7 @@
 //    node.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Cancelled", Some(0), 1.minute)
 //
 //    withClue("Alice's reserved balance:") {
-//      node.reservedBalance(alice) shouldBe empty
+//      dex1Api.reservedBalance(alice) shouldBe empty
 //    }
 //
 //    val aliceOrders = node.ordersByAddress(alice, activeOnly = false, 1.minute)

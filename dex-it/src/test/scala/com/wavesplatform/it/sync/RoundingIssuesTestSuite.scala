@@ -57,12 +57,12 @@
 //    node.waitOrderStatusAndAmount(ethBtcPair, submittedId, "Filled", Some(filledAmount), 1.minute)
 //    node.waitOrderStatusAndAmount(ethBtcPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 //
-//    withClue("Alice's reserved balance before cancel")(node.reservedBalance(alice) shouldBe empty)
+//    withClue("Alice's reserved balance before cancel")(dex1Api.reservedBalance(alice) shouldBe empty)
 //
 //    node.waitOrderInBlockchain(counterId)
 //    node.cancelOrder(bob, ethBtcPair, counterId)
 //
-//    withClue("Bob's reserved balance after cancel")(node.reservedBalance(bob) shouldBe empty)
+//    withClue("Bob's reserved balance after cancel")(dex1Api.reservedBalance(bob) shouldBe empty)
 //  }
 //
 //  "should correctly fill 2 counter orders" in {
@@ -79,7 +79,7 @@
 //    node.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(99523810L), 1.minute)
 //
 //    withClue("orderBook check") {
-//      val ob = node.orderBook(wavesUsdPair)
+//      val ob = dex1Api.orderBook(wavesUsdPair)
 //      ob.bids shouldBe empty
 //      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
 //    }

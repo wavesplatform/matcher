@@ -26,17 +26,17 @@
 //      // Alice wants to sell USD for Waves
 //      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
 //
-//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Accepted)
 //      dex1Api.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
-//      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrderId = dex1Api.place(aliceOrder).message.id
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
-//      val aliceOrder2   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder2   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrder2Id = dex1Api.place(aliceOrder2).message.id
 //      dex1Api.waitForOrderStatus(aliceOrder2Id, OrderStatus.Filled)
 //
@@ -53,7 +53,7 @@
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
-//      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder2   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      dex1Api.waitForOrderStatus(bobOrder2Id, OrderStatus.Accepted)
 //
@@ -69,13 +69,13 @@
 //    }
 //
 //    "place one submitted orders and two counter" in {
-//      val aliceOrder1   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder1   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrder1Id = dex1Api.place(aliceOrder1).message.id
 //
-//      val aliceOrder2   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder2   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrder2Id = dex1Api.place(aliceOrder2).message.id
 //
-//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //
 //      dex1Api.waitForOrderStatus(aliceOrder1Id, OrderStatus.Filled)
@@ -92,7 +92,7 @@
 //      orderBook1.asks shouldBe empty
 //      orderBook1.bids shouldBe empty
 //
-//      val bobOrder2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder2   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder2Id = dex1Api.place(bobOrder2).message.id
 //      dex1Api.waitForOrderStatus(bobOrder2Id, OrderStatus.Accepted)
 //

@@ -163,16 +163,16 @@ trait TestUtils {
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
   protected def mkOrder(owner: KeyPair,
-                        matcher: PublicKey,
                         pair: AssetPair,
                         orderType: OrderType,
                         amount: Long,
                         price: Long,
                         matcherFee: Long = matcherFee,
                         matcherFeeAssetId: Asset = Waves,
-                        timestamp: Long = System.currentTimeMillis(),
-                        timeToLive: Duration = 30.days - 1.seconds,
-                        version: Byte = orderVersion): Order =
+                        ts: Long = System.currentTimeMillis(),
+                        ttl: Duration = 30.days - 1.seconds,
+                        version: Byte = orderVersion,
+                        matcher: PublicKey = DexTestConfig.matcher): Order =
     if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,
@@ -181,8 +181,8 @@ trait TestUtils {
         orderType = orderType,
         amount = amount,
         price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
+        timestamp = ts,
+        expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
         version = version,
       )
@@ -194,8 +194,8 @@ trait TestUtils {
         orderType = orderType,
         amount = amount,
         price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
+        timestamp = ts,
+        expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
         version = 3,
         matcherFeeAssetId = matcherFeeAssetId

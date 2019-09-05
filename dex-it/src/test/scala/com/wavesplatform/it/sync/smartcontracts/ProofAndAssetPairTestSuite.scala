@@ -358,7 +358,7 @@
 //          val aliceOrd2Txs = node.waitTransactionsByOrder(aliceOrd2, 1)
 //          node.expectSignedBroadcastRejected(Json.toJson(aliceOrd2Txs.head))
 //
-//          node.ordersByAddress(alice, activeOnly = true).length shouldBe 0
+//          dex1Api.orderHistoryWithApiKey(alice, activeOnly = true).length shouldBe 0
 //
 //          dex1Api.reservedBalance(bob) shouldBe empty
 //

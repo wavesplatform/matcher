@@ -24,10 +24,10 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
   }
 
   // timeToLive to generate different orders
-  private val aliceOrderFill     = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 1.day)
-  private val alicePartialOrder  = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 2.days)
-  private val aliceOrderToCancel = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, timeToLive = 3.days)
-  private val aliceActiveOrder   = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
+  private val aliceOrderFill     = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 1.day)
+  private val alicePartialOrder  = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 2.days)
+  private val aliceOrderToCancel = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant, ttl = 3.days)
+  private val aliceActiveOrder   = mkOrder(alice, ethWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000)
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
     "Place initial orders" in {
@@ -123,7 +123,7 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
 
   private def genAndPlaceOrders(n: Int, sender: KeyPair, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[Order.Id] =
     (1 to n).map { _ =>
-      val order = mkOrder(sender, matcher, assetPair, orderType, amount, Order.PriceConstant, timeToLive = (120 + Random.nextInt(70)).seconds)
+      val order = mkOrder(sender, assetPair, orderType, amount, Order.PriceConstant, ttl = (120 + Random.nextInt(70)).seconds)
       dex1Api.place(order)
       order.id()
     }

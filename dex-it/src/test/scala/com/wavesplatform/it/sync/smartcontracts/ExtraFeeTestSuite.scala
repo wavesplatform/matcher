@@ -109,13 +109,13 @@
 //          expectedMessage = Some("Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
 //        )
 //
-//        val counter = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, SELL, amount, price, expectedFee, 2)).message.id
+//        val counter = dex1Api.place(mkOrder(alice,oneSmartPair, SELL, amount, price, expectedFee, 2)).message.id
 //        dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //        info("expected fee should be reserved")
 //        dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
-//        val submitted = dex1Api.place(mkOrder(bob, matcher,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
+//        val submitted = dex1Api.place(mkOrder(bob,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //        waitForOrderAtNode(submitted)
 //
 //        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
@@ -149,13 +149,13 @@
 //            expectedMessage = Some("Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES")
 //          )
 //
-//          val counter = dex1Api.place(mkOrder(alice, matcher,bothSmartPair, SELL, amount, price, expectedFee, 2)).message.id
+//          val counter = dex1Api.place(mkOrder(alice,bothSmartPair, SELL, amount, price, expectedFee, 2)).message.id
 //          dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 //
 //          info("expected fee should be reserved")
 //          dex1Api.reservedBalance(alice)("WAVES") shouldBe expectedFee
 //
-//          val submitted = dex1Api.place(mkOrder(bob, matcher,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
+//          val submitted = dex1Api.place(mkOrder(bob,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //          waitForOrderAtNode(submitted)
 //
 //          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
@@ -191,7 +191,7 @@
 //      info("expected fee should be reserved")
 //      dex1Api.reservedBalance(bob)(feeAsset.toString) shouldBe expectedFee
 //
-//      val submitted = dex1Api.place(mkOrder(alice, matcher,oneSmartPair, BUY, amount, price, expectedWavesFee, 2)).message.id
+//      val submitted = dex1Api.place(mkOrder(alice,oneSmartPair, BUY, amount, price, expectedWavesFee, 2)).message.id
 //      waitForOrderAtNode(submitted)
 //
 //      wavesNode1Api.balance(bob, feeAsset) shouldBe (bobInitBalance - expectedFee)

@@ -36,13 +36,13 @@
 //
 //    "place usd-waves order" in {
 //      // Alice wants to sell USD for Waves
-//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
+//      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Accepted)
 //      dex1Api.reservedBalance(bob)("WAVES") shouldBe sellOrderAmount + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 //
-//      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
+//      val aliceOrder   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
 //      val aliceOrderId = dex1Api.place(aliceOrder).message.id
 //      node.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Filled", Some(420169L), 1.minute)
 //
@@ -82,7 +82,7 @@
 //    }
 //
 //    "check filled amount and tradable balance" in {
-//      val bobsOrderId  = node.fullOrderHistory(bob).head.id
+//      val bobsOrderId  = dex1Api.orderHistory(bob).head.id
 //      val filledAmount = dex1Api.orderStatus(bobsOrderId).filledAmount.getOrElse(0L)
 //
 //      filledAmount shouldBe adjustedAmount
@@ -98,7 +98,7 @@
 //    }
 //
 //    "check waves-usd tradable balance" in {
-//      val orderHistory = node.fullOrderHistory(bob)
+//      val orderHistory = dex1Api.orderHistory(bob)
 //      orderHistory.size should be(1)
 //
 //      val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
@@ -123,14 +123,14 @@
 //      // Alice wants to sell USD for Waves
 //      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES")
-//      val bobOrder1   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
+//      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
 //      dex1Api.waitForOrderStatus(bobOrder1Id, OrderStatus.Accepted)
 //
 //      dex1Api.reservedBalance(bob)("WAVES") shouldBe correctedSellAmount2 + matcherFee
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
 //
-//      val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, buyOrderAmount2, price2)
+//      val aliceOrder   = mkOrder(alice,wavesUsdPair, OrderType.BUY, buyOrderAmount2, price2)
 //      val aliceOrderId = dex1Api.place(aliceOrder).message.id
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
@@ -151,9 +151,9 @@
 //      val buyAmount  = 46978
 //      val sellAmount = 56978
 //
-//      val bobOrderId = dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, sellAmount, sellPrice)).message.id
+//      val bobOrderId = dex1Api.place(mkOrder(bob,wctUsdPair, SELL, sellAmount, sellPrice)).message.id
 //      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
-//      val aliceOrderId = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, buyAmount, buyPrice)).message.id
+//      val aliceOrderId = dex1Api.place(mkOrder(alice,wctUsdPair, BUY, buyAmount, buyPrice)).message.id
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
 //      waitForOrderAtNode(aliceOrderId)
@@ -177,11 +177,11 @@
 //      val bobWctInitBalance = wavesNode1Api.balance(bob.toAddress.toString, WctId.toString).balance
 //
 //      val bobOrderId =
-//        dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice)).message.id
+//        dex1Api.place(mkOrder(bob,wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice)).message.id
 //      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
 //
 //      val aliceOrderId =
-//        dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, wctUsdBuyAmount, wctUsdPrice)).message.id
+//        dex1Api.place(mkOrder(alice,wctUsdPair, BUY, wctUsdBuyAmount, wctUsdPrice)).message.id
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
 //      waitForOrderAtNode(aliceOrderId)
@@ -201,14 +201,14 @@
 //      val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
 //      dex1Api.reservedBalance(bob)("WAVES") shouldBe expectedReservedWaves
 //
-//      node.cancelOrder(bob, wctUsdPair, node.fullOrderHistory(bob).head.id)
+//      node.cancelOrder(bob, wctUsdPair, dex1Api.orderHistory(bob).head.id)
 //    }
 //
 //    "reserved balance is empty after the total execution" in {
-//      val aliceOrderId = dex1Api.place(mkOrder(alice, matcher,wctUsdPair, BUY, 5000000, 100000)).message.id
+//      val aliceOrderId = dex1Api.place(mkOrder(alice,wctUsdPair, BUY, 5000000, 100000)).message.id
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Accepted)
 //
-//      val bobOrderId = dex1Api.place(mkOrder(bob, matcher,wctUsdPair, SELL, 5000000, 99908)).message.id
+//      val bobOrderId = dex1Api.place(mkOrder(bob,wctUsdPair, SELL, 5000000, 99908)).message.id
 //      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
 //      dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
 //
@@ -238,14 +238,14 @@
 //      val leasingAmount = node.accountBalances(bob.toAddress.toString)._1 - leasingFee - matcherFee / 2
 //      val leaseTxId     = node.broadcastLease(bob, matcher.toAddress.toString, leasingAmount, leasingFee, waitForTx = true).id
 //      val bobOrderId =
-//        dex1Api.place(mkOrder(bob, matcher,wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)).message.id
+//        dex1Api.place(mkOrder(bob,wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)).message.id
 //      dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
 //
 //      node.tradableBalance(bob, wctWavesPair)("WAVES") shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
 //      node.cancelOrder(bob, wctWavesPair, bobOrderId)
 //
 //      assertBadRequestAndResponse(
-//        dex1Api.place(mkOrder(bob, matcher,wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)),
+//        dex1Api.place(mkOrder(bob,wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)),
 //        "Not enough tradable balance"
 //      )
 //
@@ -255,13 +255,13 @@
 //
 //  "Alice and Bob trade ETH-WAVES" - {
 //    "reserved balance is empty after the total execution" in {
-//      val counterId1 = dex1Api.place(mkOrder(alice, matcher,ethWavesPair, SELL, 2864310, 300000)).message.id
+//      val counterId1 = dex1Api.place(mkOrder(alice,ethWavesPair, SELL, 2864310, 300000)).message.id
 //      dex1Api.waitForOrderStatus(counterId1, OrderStatus.Accepted)
 //
-//      val counterId2 = dex1Api.place(mkOrder(alice, matcher,ethWavesPair, SELL, 7237977, 300000)).message.id
+//      val counterId2 = dex1Api.place(mkOrder(alice,ethWavesPair, SELL, 7237977, 300000)).message.id
 //      dex1Api.waitForOrderStatus(counterId2, OrderStatus.Accepted)
 //
-//      val submittedId = dex1Api.place(mkOrder(bob, matcher,ethWavesPair, BUY, 4373667, 300000)).message.id
+//      val submittedId = dex1Api.place(mkOrder(bob,ethWavesPair, BUY, 4373667, 300000)).message.id
 //
 //      dex1Api.waitForOrderStatus(counterId1, OrderStatus.Filled)
 //      dex1Api.waitForOrderStatus(counterId2, OrderStatus.PartiallyFilled)
@@ -274,11 +274,11 @@
 //  }
 //
 //  "Submitted order Canceled during match" in {
-//    val bobOrder   = mkOrder(matcher, matcher,wavesUsdPair, OrderType.SELL, 10000000L, 10L)
+//    val bobOrder   = mkOrder(matcher,wavesUsdPair, OrderType.SELL, 10000000L, 10L)
 //    val bobOrderId = dex1Api.place(bobOrder).message.id
 //    dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Accepted)
 //
-//    val aliceOrder   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, 100000L, 1000L)
+//    val aliceOrder   = mkOrder(alice,wavesUsdPair, OrderType.BUY, 100000L, 1000L)
 //    val aliceOrderId = dex1Api.place(aliceOrder).message.id
 //
 //    node.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Cancelled", Some(0), 1.minute)
@@ -287,7 +287,7 @@
 //      dex1Api.reservedBalance(alice) shouldBe empty
 //    }
 //
-//    val aliceOrders = node.ordersByAddress(alice, activeOnly = false, 1.minute)
+//    val aliceOrders = dex1Api.orderHistoryWithApiKey(alice, activeOnly = false, 1.minute)
 //    aliceOrders should not be empty
 //
 //    val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))

@@ -29,16 +29,16 @@ class TradersTestSuite extends NewMatcherSuiteBase {
         priceAsset = IssuedAsset(ByteStr("WAVES".getBytes()))
       )
 
-      val trickyBobOrderWB58 = mkOrder(bob, matcher, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val trickyBobOrderWB58 = mkOrder(bob, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
-      val trickyBobOrderWS = mkOrder(bob, matcher, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.tryPlace(trickyBobOrderWS) should failWith(
         11534345,
         MatcherError.Params(assetId = Some(trickyBobWavesPairWS.priceAssetStr)) // AssetNotFound
       )
 
-      val correctBobOrder = mkOrder(bob, matcher, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.place(correctBobOrder)
       dex1Api.waitForOrderStatus(correctBobOrder, OrderStatus.Accepted)
 
@@ -195,14 +195,14 @@ class TradersTestSuite extends NewMatcherSuiteBase {
   }
 //
 //  private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
-//    val r = mkOrder(bob, matcher, assetPair, OrderType.BUY, amount, price)
+//    val r = mkOrder(bob, assetPair, OrderType.BUY, amount, price)
 //    dex1Api.place(r)
 //    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
 //    r
 //  }
 //
 //  private def bobPlacesSellWctOrder(bobCoinAmount: Int): Order = {
-//    val r = mkOrder(bob, matcher, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
+//    val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
 //    dex1Api.place(r)
 //    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
 //    r

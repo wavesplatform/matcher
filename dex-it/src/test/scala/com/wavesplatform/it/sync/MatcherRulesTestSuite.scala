@@ -27,17 +27,17 @@ class MatcherRulesTestSuite extends NewMatcherSuiteBase {
 
   "Orders should be cancelled correctly when matcher rules are changed" in {
     // here tick size is disabled (offset = 0)
-    val buyOrder1 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder1 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder1)
     dex1Api.waitForOrderStatus(buyOrder1, OrderStatus.Accepted)
 
     // here tick size is disabled (offset = 1)
-    val buyOrder2 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder2 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder2)
     dex1Api.waitForOrderStatus(buyOrder2, OrderStatus.Accepted)
 
     // here tick size = 5 (offset = 2), hence new order is placed into corrected price level 5, not 7
-    val buyOrder3 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder3 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder3)
     dex1Api.waitForOrderStatus(buyOrder3, OrderStatus.Accepted)
 

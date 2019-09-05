@@ -57,7 +57,7 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
 //          .contains(s"WAVES/${usdWavesPair.amountAssetStr}"))
 
       //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1Api.place(mkOrder(node, matcher,usdWavesPair, OrderType.BUY, 1.waves, 200), ""))
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(dex1Api.place(mkOrder(node,usdWavesPair, OrderType.BUY, 1.waves, 200), ""))
     }
 
     val bidPrice  = 200
@@ -66,9 +66,9 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
     val askAmount = bidAmount / 2
 
     "place bid order for first pair" in {
-      dex1Api.place(mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
+      dex1Api.place(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
 
-      val aliceOrder = mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, bidPrice)
+      val aliceOrder = mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice)
       dex1Api.place(aliceOrder)
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
 
@@ -82,9 +82,9 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
     }
 
     "place ask order for second pair" in {
-      dex1Api.place(mkOrder(bob, matcher, btcWavesPair, OrderType.SELL, askAmount, askPrice))
+      dex1Api.place(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
 
-      val bobOrder = mkOrder(bob, matcher, btcWavesPair, OrderType.SELL, askAmount, askPrice)
+      val bobOrder = mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice)
       dex1Api.place(bobOrder)
       dex1Api.waitForOrderStatus(bobOrder, OrderStatus.Accepted)
 
@@ -98,9 +98,9 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
     }
 
     "place ask order for first pair" in {
-      dex1Api.place(mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, askPrice))
+      dex1Api.place(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
 
-      val bobOrder = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, askPrice)
+      val bobOrder = mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice)
       dex1Api.place(bobOrder)
       dex1Api.waitForOrderStatus(bobOrder, OrderStatus.Accepted)
 
@@ -114,7 +114,7 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
     }
 
     "match bid order for first pair" in {
-      val bobOrder1 = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, askAmount, bidPrice)
+      val bobOrder1 = mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice)
       dex1Api.place(bobOrder1)
       dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
 
@@ -126,7 +126,7 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
       r1.ask shouldBe Some(askPrice)
       r1.askAmount shouldBe Some(2 * askAmount)
 
-      val bobOrder2 = mkOrder(bob, matcher, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice)
+      val bobOrder2 = mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice)
       dex1Api.place(bobOrder2).message.id
       dex1Api.waitForOrderStatus(bobOrder2, OrderStatus.Filled)
 
@@ -140,7 +140,7 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
     }
 
     "match ask order for first pair" in {
-      val aliceOrder = mkOrder(alice, matcher, btcUsdPair, OrderType.BUY, bidAmount, askPrice)
+      val aliceOrder = mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice)
       dex1Api.place(aliceOrder)
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 

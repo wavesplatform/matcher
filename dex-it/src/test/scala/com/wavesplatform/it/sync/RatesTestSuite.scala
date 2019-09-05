@@ -46,7 +46,7 @@ class RatesTestSuite extends NewMatcherSuiteBase {
     broadcast(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
   }
 
-  private def newOrder: Order = mkOrder(alice, matcher, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset, version = 3)
+  private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset, version = 3)
 
   "Rates can be handled via REST" in {
     // default rates

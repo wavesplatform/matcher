@@ -24,11 +24,11 @@ class OrderBookTestSuite extends NewMatcherSuiteBase {
   }
 
   private val (amount, price)         = (1000L, PriceConstant)
-  private val buyOrder                = mkOrder(alice, matcher, wctUsdPair, BUY, 2 * amount, price)
-  private val anotherBuyOrder         = mkOrder(alice, matcher, wctUsdPair, BUY, amount, price)
-  private val sellOrder               = mkOrder(bob, matcher, wctUsdPair, SELL, amount, 2 * price)
-  private val buyOrderForAnotherPair  = mkOrder(alice, matcher, wctWavesPair, BUY, amount, price)
-  private val sellOrderForAnotherPair = mkOrder(bob, matcher, wctWavesPair, SELL, amount, 2 * price)
+  private val buyOrder                = mkOrder(alice, wctUsdPair, BUY, 2 * amount, price)
+  private val anotherBuyOrder         = mkOrder(alice, wctUsdPair, BUY, amount, price)
+  private val sellOrder               = mkOrder(bob, wctUsdPair, SELL, amount, 2 * price)
+  private val buyOrderForAnotherPair  = mkOrder(alice, wctWavesPair, BUY, amount, price)
+  private val sellOrderForAnotherPair = mkOrder(bob, wctWavesPair, SELL, amount, 2 * price)
 
   private var aliceRBForOnePair = ReservedBalances(0, 0, 0)
   private var bobRBForOnePair   = ReservedBalances(0, 0, 0)
@@ -42,7 +42,7 @@ class OrderBookTestSuite extends NewMatcherSuiteBase {
   }
 
   "Place orders and delete the order book" in {
-    val submitted = mkOrder(bob, matcher, wctUsdPair, SELL, amount, price)
+    val submitted = mkOrder(bob, wctUsdPair, SELL, amount, price)
     List(buyOrder, anotherBuyOrder, submitted, sellOrder).foreach(dex1Api.place)
 
     dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
@@ -95,9 +95,9 @@ class OrderBookTestSuite extends NewMatcherSuiteBase {
     }
 
     "it should not affect other pairs and their orders" in {
-      dex1Api.orderStatus(buyOrderForAnotherPair).status shouldBe "Accepted"
-      dex1Api.orderStatus(sellOrderForAnotherPair).status shouldBe "Accepted"
-      dex1Api.place(mkOrder(alice, matcher, wctWavesPair, BUY, amount, price))
+      dex1Api.orderStatus(buyOrderForAnotherPair).status shouldBe OrderStatus.Accepted
+      dex1Api.orderStatus(sellOrderForAnotherPair).status shouldBe OrderStatus.Accepted
+      dex1Api.place(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
       val orderBook = dex1Api.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)

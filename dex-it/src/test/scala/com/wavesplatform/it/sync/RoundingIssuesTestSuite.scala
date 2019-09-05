@@ -20,10 +20,10 @@
 //    val aliceBalanceBefore = node.accountBalances(alice.toAddress.toString)._1
 //    val bobBalanceBefore   = node.accountBalances(bob.toAddress.toString)._1
 //
-//    val counter   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, 3100000000L, 238)
+//    val counter   = mkOrder(alice,wavesUsdPair, OrderType.BUY, 3100000000L, 238)
 //    val counterId = dex1Api.place(counter).message.id
 //
-//    val submitted   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 425532L, 235)
+//    val submitted   = mkOrder(bob,wavesUsdPair, OrderType.SELL, 425532L, 235)
 //    val submittedId = dex1Api.place(submitted).message.id
 //
 //    val filledAmount = 420169L
@@ -47,10 +47,10 @@
 //  }
 //
 //  "reserved balance should not be negative" in {
-//    val counter   = mkOrder(bob, matcher,ethBtcPair, OrderType.BUY, 923431000L, 31887L)
+//    val counter   = mkOrder(bob,ethBtcPair, OrderType.BUY, 923431000L, 31887L)
 //    val counterId = dex1Api.place(counter).message.id
 //
-//    val submitted   = mkOrder(alice, matcher,ethBtcPair, OrderType.SELL, 223345000L, 31887L)
+//    val submitted   = mkOrder(alice,ethBtcPair, OrderType.SELL, 223345000L, 31887L)
 //    val submittedId = dex1Api.place(submitted).message.id
 //
 //    val filledAmount = 223344937L
@@ -66,13 +66,13 @@
 //  }
 //
 //  "should correctly fill 2 counter orders" in {
-//    val counter1 = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 98333333L, 60L)
+//    val counter1 = mkOrder(bob,wavesUsdPair, OrderType.SELL, 98333333L, 60L)
 //    dex1Api.place(counter1).message.id
 //
-//    val counter2   = mkOrder(bob, matcher,wavesUsdPair, OrderType.SELL, 100000000L, 70L)
+//    val counter2   = mkOrder(bob,wavesUsdPair, OrderType.SELL, 100000000L, 70L)
 //    val counter2Id = dex1Api.place(counter2).message.id
 //
-//    val submitted   = mkOrder(alice, matcher,wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
+//    val submitted   = mkOrder(alice,wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
 //    val submittedId = dex1Api.place(submitted).message.id
 //
 //    node.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)

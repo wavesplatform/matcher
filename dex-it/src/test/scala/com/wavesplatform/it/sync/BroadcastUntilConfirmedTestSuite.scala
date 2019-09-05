@@ -38,8 +38,8 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   override protected def allContainers: List[DockerContainer] = wavesNode2Container() :: super.allContainers
   override protected def allApis: List[HasWaitReady[Id]]      = wavesNode2Api :: super.allApis
 
-  private val aliceOrder = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 100000L, 80000L)
-  private val bobOrder   = mkOrder(bob, matcher, ethWavesPair, OrderType.BUY, 200000L, 100000L)
+  private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
+  private val bobOrder   = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
 
   "BroadcastUntilConfirmed" in {
     markup("Disconnect a miner node from the network")

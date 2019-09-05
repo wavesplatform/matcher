@@ -3,11 +3,10 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.future._
 import cats.instances.try_._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, MatcherCommand, MatcherState, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer}
 import com.wavesplatform.it.tags.DexItKafkaRequired
@@ -21,35 +20,18 @@ import scala.util.{Random, Try}
 
 @DexItKafkaRequired
 class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
-  private def configOverrides = ConfigFactory.parseString("""waves.dex {
+  override protected val suiteInitialDexConfig = ConfigFactory.parseString("""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = 51
       |}""".stripMargin)
 
-  override protected def dex1Config: Config = configOverrides.withFallback(super.dex1Config)
-
-  protected def dex2Config: Config                 = configOverrides.withFallback(dexBaseConfig).withFallback(DexTestConfig.containerConfig("dex-2"))
-  protected def dex2NodeContainer: DockerContainer = wavesNode1Container()
   protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    val grpcAddr = dockerClient().getInternalSocketAddress(dex2NodeContainer, dex2NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
-    val wavesNodeGrpcConfig = ConfigFactory
-      .parseString(s"""waves.dex.waves-node-grpc {
-                      |  host = ${grpcAddr.getAddress.getHostAddress}
-                      |  port = ${grpcAddr.getPort}
-                      |}""".stripMargin)
-    val config = wavesNodeGrpcConfig.withFallback(dex2Config).withFallback(DexTestConfig.updatedMatcherConfig).resolve()
-    dockerClient().createDex("dex-2", config)
+    dockerClient().createDex("dex-2", dexRunConfig(), suiteInitialWavesNodeConfig)
   }
 
-  protected def dex2AsyncApi: DexApi[Future] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex2Container(), dex2Config.getInt("waves.dex.rest-api.port"))
-    DexApi[Future]("integration-test-rest-api", apiAddress)
-  }
-
-  protected def dex2Api: DexApi[Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex2Container(), dex2Config.getInt("waves.dex.rest-api.port"))
-    fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
-  }
+  private def dex2ApiAddress                 = dockerClient().getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
+  protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex2ApiAddress)
+  protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex2ApiAddress))
 
   override protected def allContainers: List[DockerContainer] = dex2Container() :: super.allContainers
   override protected def allApis: List[HasWaitReady[Id]]      = dex2Api :: super.allApis

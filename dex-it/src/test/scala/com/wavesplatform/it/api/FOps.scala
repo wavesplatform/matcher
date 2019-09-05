@@ -1,5 +1,7 @@
 package com.wavesplatform.it.api
 
+import java.nio.charset.StandardCharsets
+
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
@@ -26,7 +28,9 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 
   def parseResponse[T](resp: Response[Either[DeserializationError[JsError], T]]): F[T] =
     resp.rawErrorBody match {
-      case Left(_)            => M.raiseError[T](new RuntimeException(s"The server returned an error: ${resp.code}"))
+      case Left(e) =>
+        M.raiseError[T](
+          new RuntimeException(s"The server returned an error. HTTP code is ${resp.code}, body: ${new String(e, StandardCharsets.UTF_8)}"))
       case Right(Left(error)) => M.raiseError[T](new RuntimeException(s"Can't parse the response: $error"))
       case Right(Right(r))    => M.pure(r)
     }

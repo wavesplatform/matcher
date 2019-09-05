@@ -8,13 +8,14 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
 class OrderBookSnapshotsTestSuite extends NewMatcherSuiteBase {
-  private def interval        = 50L
-  private def configOverrides = ConfigFactory.parseString(s"""waves.dex {
+  private val interval = 50L
+
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = $interval
-      |}""".stripMargin)
-
-  override protected def dex1Config: Config = configOverrides.withFallback(super.dex1Config)
+      |}""".stripMargin
+  )
 
   private val assetPair1 = createAssetPair(eth, usd)
   private val assetPair2 = ethWavesPair

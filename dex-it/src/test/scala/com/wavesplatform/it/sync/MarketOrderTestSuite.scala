@@ -5,19 +5,15 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
-  override protected def dex1Config: Config =
-    ConfigFactory
-      .parseString("waves.dex.allowed-order-versions = [1, 2, 3]")
-      .withFallback(super.dex1Config)
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]")
 
-  val (amount, price) = (1000L, PriceConstant)
-  implicit class DoubleOps(value: Double) {
+  // TODO move to base class
+  private implicit class DoubleOps(value: Double) {
     val waves: Long = wavesUsdPairDecimals.amount(value)
     val usd: Long   = wavesUsdPairDecimals.price(value)
     val eth: Long   = ethWavesPairDecimals.amount(value)

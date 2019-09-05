@@ -1,69 +1,43 @@
-//package com.wavesplatform.it.sync
-//
-//import com.typesafe.config.{Config, ConfigFactory}
-//import com.wavesplatform.it.api.SyncHttpApi._
-//import com.wavesplatform.it.api.SyncMatcherHttpApi._
-//import com.wavesplatform.it.config.DexTestConfig._
-//import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
-//import com.wavesplatform.transaction.assets.exchange.OrderType
-//
-//import scala.concurrent.duration._
-//
-//class OrderV3TestSuite extends MatcherSuiteBase with NTPTime {
-//
-//  override protected def nodeConfigs: Seq[Config] = super.nodeConfigs.map(OrderV3TestSuite.matcherSettingsOrderV3Disabled.withFallback)
-//
-//  override protected def beforeAll(): Unit = {
-//    super.beforeAll()
-//    wavesNode1Api.waitForTransaction(wavesNode1Api.broadcast(IssueUsdTx).id)
-//  }
-//
-//  "settings of allowing orderV3" - {
-//    val price         = 100000000L
-//
-//    "try to place not allowed orderV3" in {
-//      val orderv3 = mkOrder(
-//        sender = alice,
-//        pair = wavesUsdPair,
-//        OrderType.BUY,
-//        amount = 3,
-//        price = price,
-//        version = 3,
-//      )
-//      assertBadRequestAndResponse(dex1Api.place(mkOrder(orderv3), matcher,"The orders of version 3 are denied by matcher"))
-//    }
-//
-//    "matching orderV1 and orderV3" in {
-//      val preparedOrderV2 = mkOrder(
-//        sender = alice,
-//        pair = wavesUsdPair,
-//        OrderType.BUY,
-//        amount = 3,
-//        price = price
-//      )
-//      val order = dex1Api.place(preparedOrderV2)
-//      node.waitOrderProcessed(wavesUsdPair, order.message.id)
-//
-//      docker.restartNode(node, OrderV3TestSuite.matcherSettingsOrderV3Allowed)
-//      val preparedOrderV3 = mkOrder(
-//        sender = bob,
-//        pair = wavesUsdPair,
-//        OrderType.SELL,
-//        amount = 2,
-//        price = price,
-//        version = 3
-//      )
-//      val orderV3 = dex1Api.place(preparedOrderV3)
-//      node.waitOrderProcessed(wavesUsdPair, orderV3.message.id)
-//
-//      node.waitOrderStatusAndAmount(wavesUsdPair, order.message.id, "PartiallyFilled", Some(2), 1.minute)
-//      node.waitOrderStatusAndAmount(wavesUsdPair, orderV3.message.id, "Filled", Some(2), 1.minute)
-//    }
-//  }
-//
-//}
-//
-//object OrderV3TestSuite {
-//  val matcherSettingsOrderV3Allowed: Config = ConfigFactory.parseString("waves.dex { allowed-order-versions = [1, 2, 3] }")
-//  val matcherSettingsOrderV3Disabled: Config = ConfigFactory.parseString("waves.dex { allowed-order = [1, 2] }")
-//}
+package com.wavesplatform.it.sync
+
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.api.OrderStatus
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.{NTPTime, NewMatcherSuiteBase}
+import com.wavesplatform.transaction.assets.exchange.OrderType
+
+class OrderV3TestSuite extends NewMatcherSuiteBase with NTPTime {
+  override protected val suiteInitialDexConfig: Config = allowedOrderVersion(1, 2)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    broadcast(IssueUsdTx)
+  }
+
+  "settings of allowing orderV3" - {
+    val price = 100000000L
+
+    "try to place not allowed orderV3" in {
+      val orderV3 = mkOrder(alice, matcher, wavesUsdPair, OrderType.BUY, 3, price, version = 3)
+      dex1Api.tryPlace(orderV3) should failWith(9439746, "The orders of version 3 are denied by matcher")
+    }
+
+    "matching orderV1 and orderV3" in {
+      val orderV1 = mkOrder(alice, matcher, wavesUsdPair, OrderType.BUY, 3, price, version = 1)
+      dex1Api.place(orderV1)
+      dex1Api.waitForOrderStatus(orderV1, OrderStatus.Accepted)
+
+      replaceSuiteConfig(dex1Container(), allowedOrderVersion(1, 2, 3))
+      restartContainer(dex1Container(), dex1Api)
+
+      val orderV3 = mkOrder(bob, matcher, wavesUsdPair, OrderType.SELL, 2, price, version = 3)
+      dex1Api.place(orderV3)
+
+      dex1Api.waitForOrderStatus(orderV1, OrderStatus.PartiallyFilled)
+      dex1Api.waitForOrderStatus(orderV3, OrderStatus.Filled)
+    }
+  }
+
+  private def allowedOrderVersion(versions: Int*): Config =
+    ConfigFactory.parseString(s"waves.dex.allowed-order-versions = [${versions.mkString(", ")}]")
+}

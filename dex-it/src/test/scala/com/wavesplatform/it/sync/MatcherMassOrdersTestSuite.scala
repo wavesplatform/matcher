@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
-  override protected def dex1Config: Config = ConfigFactory.parseString(s"waves.dex.rest-order-limit = $orderLimit").withFallback(super.dex1Config)
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"waves.dex.rest-order-limit = $orderLimit")
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

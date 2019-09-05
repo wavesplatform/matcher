@@ -21,12 +21,12 @@ import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeCont
 import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee}
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
@@ -36,9 +36,11 @@ import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import NewMatcherSuiteBase._
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
+
+  protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
+  protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
 
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = 'Y'.toByte
@@ -53,48 +55,34 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce(docker.Docker(getClass))
 
   // Waves miner node
+  protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(DexTestConfig.genesisConfig)
 
-  protected def wavesNode1Config: Config = DexTestConfig.containerConfig("waves-1")
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve())
+    dockerClient().createWavesNode("waves-1", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
   }
 
-  // TODO move to container
   protected def wavesNode1Api: NodeApi[cats.Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
+    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
   protected def wavesNode1NetworkApiAddress: InetSocketAddress =
-    dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))
+    dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
 
   // Dex server
-  protected val dexBaseConfig: Config = queueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
+  protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
+    dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
+      .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
+      .withFallback(DexTestConfig.updatedMatcherConfig)
+  }
 
-  protected def dex1Config: Config                 = dexBaseConfig.withFallback(DexTestConfig.containerConfig("dex-1"))
-  protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    val grpcAddr = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
-    val wavesNodeGrpcConfig = ConfigFactory
-      .parseString(s"""waves.dex.waves-node-grpc {
-                      |  host = ${grpcAddr.getAddress.getHostAddress}
-                      |  port = ${grpcAddr.getPort}
-                      |}""".stripMargin)
-    // TODO Has a greater priority than local.conf!
-    val config = wavesNodeGrpcConfig.withFallback(dex1Config).withFallback(DexTestConfig.updatedMatcherConfig).resolve()
-    dockerClient().createDex("dex-1", config)
+    dockerClient().createDex("dex-1", dexRunConfig(), suiteInitialDexConfig)
   }
 
-  // TODO val
-  protected def dex1AsyncApi: DexApi[Future] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
-    DexApi[Future]("integration-test-rest-api", apiAddress)
-  }
-
-  protected def dex1Api: DexApi[Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
-    fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
-  }
+  private def dex1ApiAddress                 = dockerClient().getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
+  protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
+  protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
 
   protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())
   protected def allApis: List[HasWaitReady[cats.Id]] = List(wavesNode1Api, dex1Api)
@@ -102,9 +90,22 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def beforeAll(): Unit = {
     log.debug(s"Doing beforeAll")
     super.beforeAll()
-    // TODO: DEX should start after API ready
-    allContainers.foreach(dockerClient().start)
-    allApis.foreach(_.waitReady)
+
+    val (waves, dex) = allContainers.partition {
+      case _: WavesNodeContainer => true
+      case _                     => false
+    }
+
+    val (wavesApi, dexApi) = allApis.partition {
+      case _: NodeApi[Id] => true
+      case _             => false
+    }
+
+    waves.foreach(dockerClient().start)
+    wavesApi.foreach(_.waitReady)
+
+    dex.foreach(dockerClient().start)
+    dexApi.foreach(_.waitReady)
   }
 
   override protected def afterAll(): Unit = {
@@ -131,10 +132,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     }
   }
 
-}
-
-object NewMatcherSuiteBase {
-  private def queueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
+  protected def dexQueueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
     ConfigFactory.parseString(s"""waves.dex.events-queue {
                                  |  type = kafka
                                  |  kafka {
@@ -142,6 +140,17 @@ object NewMatcherSuiteBase {
                                  |    topic = "dex-$queueId"
                                  |  }
                                  |}""".stripMargin)
+  }
+
+  protected def dexWavesGrpcConfig(target: WavesNodeContainer): Config = {
+    val grpcAddr = dockerClient().getInternalSocketAddress(target, target.grpcApiPort)
+    ConfigFactory
+      .parseString(s"""waves.dex {
+                      |  waves-node-grpc {
+                      |    host = ${grpcAddr.getAddress.getHostAddress}
+                      |    port = ${grpcAddr.getPort}
+                      |  }
+                      |}""".stripMargin)
   }
 }
 
@@ -175,7 +184,7 @@ trait TestUtils {
         timestamp = timestamp,
         expiration = timestamp + timeToLive.toMillis,
         matcherFee = matcherFee,
-        version = math.min(version, 2).toByte,
+        version = version,
       )
     else
       Order(
@@ -188,7 +197,7 @@ trait TestUtils {
         timestamp = timestamp,
         expiration = timestamp + timeToLive.toMillis,
         matcherFee = matcherFee,
-        version = version,
+        version = math.min(version, 2).toByte,
         matcherFeeAssetId = matcherFeeAssetId
       )
 
@@ -274,8 +283,8 @@ trait TestUtils {
     api.waitReady
   }
 
-  protected def replaceLocalConfig(container: DockerContainer, config: Config): Unit =
-    replaceLocalConfig(
+  protected def replaceSuiteConfig(container: DockerContainer, config: Config): Unit =
+    replaceSuiteConfig(
       container,
       config
         .resolve()
@@ -290,8 +299,8 @@ trait TestUtils {
         )
     )
 
-  protected def replaceLocalConfig(container: DockerContainer, content: String): Unit = {
-    val path = Paths.get(container.basePath, "local.conf")
+  protected def replaceSuiteConfig(container: DockerContainer, content: String): Unit = {
+    val path = Paths.get(container.basePath, "suite.conf")
     log.trace(s"Replacing '$path' of $container by:\n$content")
     dockerClient().writeFile(container, path, content)
   }

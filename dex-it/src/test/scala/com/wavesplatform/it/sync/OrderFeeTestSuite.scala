@@ -11,21 +11,18 @@ import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 // TODO refactor balances retrieving
 class OrderFeeTestSuite extends NewMatcherSuiteBase {
-
-  val baseFee = 30000
-
-  private def configOverrides: Config = ConfigFactory.parseString(s"""
-    |waves.dex {
-    |  allowed-order-versions = [1, 2, 3]
-    |  order-fee {
-    |    mode = dynamic
-    |    dynamic {
-    |      base-fee = $baseFee
-    |    }
-    |  }
-    |}""".stripMargin)
-
-  override protected def dex1Config: Config = configOverrides.withFallback(super.dex1Config)
+  private val baseFee = 30000
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  allowed-order-versions = [1, 2, 3]
+       |  order-fee {
+       |    mode = dynamic
+       |    dynamic {
+       |      base-fee = $baseFee
+       |    }
+       |  }
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

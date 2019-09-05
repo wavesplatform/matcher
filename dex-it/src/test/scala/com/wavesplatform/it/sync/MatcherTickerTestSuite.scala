@@ -9,11 +9,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MatcherTickerTestSuite extends NewMatcherSuiteBase {
-
-  override protected def dex1Config: Config =
-    ConfigFactory
-      .parseString(s"""waves.dex.price-assets = ["$UsdId", "WAVES"]""".stripMargin)
-      .withFallback(super.dex1Config)
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = ["$UsdId", "WAVES"]""".stripMargin)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

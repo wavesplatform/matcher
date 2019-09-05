@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
@@ -10,9 +9,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class TradersTestSuite extends NewMatcherSuiteBase {
-
-  override protected def dex1Config: Config =
-    ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]").withFallback(super.dex1Config)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

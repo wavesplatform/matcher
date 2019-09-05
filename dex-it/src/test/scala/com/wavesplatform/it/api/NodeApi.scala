@@ -10,6 +10,7 @@ import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
@@ -19,6 +20,7 @@ import com.wavesplatform.{account, transaction}
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 case class ConnectedPeersResponse(peers: List[PeerInfo])
@@ -41,6 +43,8 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def broadcast(tx: transaction.Transaction): F[Unit]
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForHeightArise(): F[Unit]
+
+  def config: F[Config]
 }
 
 object NodeApi {
@@ -133,6 +137,16 @@ object NodeApi {
             repeatUntil(currentHeight, 1.second)(_ > origHeight)
           }
           .map(_ => ())
+      }
+
+      override def config: F[Config] = {
+        val req = sttp.get(uri"$apiUri/blocks/height").response(asString("UTF-8"))
+        httpBackend.send(req).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_)        => M.raiseError[Config](new RuntimeException(s"The server returned an error: ${resp.code}"))
+            case Right(content) => M.fromTry(Try(ConfigFactory.parseString(content)))
+          }
+        }
       }
 
       def currentHeight: F[Int] = {

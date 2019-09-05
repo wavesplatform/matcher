@@ -1,12 +1,9 @@
 package com.wavesplatform.it.sync
 
-import java.net.InetSocketAddress
-
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.{HasWaitReady, NodeApi, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
 import com.wavesplatform.it.{NewMatcherSuiteBase, fp}
@@ -17,27 +14,24 @@ import scala.util.Try
 
 class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
-  // Validator node
-  protected def getWavesNode2ApiAddress: InetSocketAddress =
-    dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Config.getInt("waves.rest-api.port"))
-  protected def wavesNode2Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", getWavesNode2ApiAddress))
-  protected def wavesNode2Config: Config   = DexTestConfig.containerConfig("waves-2")
-  protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2", wavesNode2Config.resolve())
-  }
-
-  // DEX connects to a waves validator node
-  override protected def dex1NodeContainer = wavesNode2Container()
-  override protected val dex1Config: Config =
+  override protected def suiteInitialDexConfig: Config =
     ConfigFactory
-      .parseString(s"""waves {
-                      |  miner.enable = no
-                      |  dex.exchange-transaction-broadcast {
-                      |    broadcast-until-confirmed = yes
-                      |    interval = 20s
-                      |  }
-                      |}""".stripMargin)
-      .withFallback(super.dex1Config)
+      .parseString(s"""waves.dex.exchange-transaction-broadcast {
+                    |  broadcast-until-confirmed = yes
+                    |  interval = 20s
+                    |}""".stripMargin)
+      .withFallback(dexWavesGrpcConfig(wavesNode2Container())) // DEX connects to a waves validator node
+
+  // Validator node
+  protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
+    dockerClient().createWavesNode("waves-2",
+                                   wavesNodeRunConfig(),
+                                   ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
+  }
+  protected def wavesNode2Api: NodeApi[Id] = {
+    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
+    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+  }
 
   // Must start before DEX, otherwise DEX will fail to start.
   // DEX needs to know activated features to know which order versions should be enabled.

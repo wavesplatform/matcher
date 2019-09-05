@@ -10,6 +10,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{Id, Response, SttpBackend, MonadError => _, _}
+import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -480,6 +481,8 @@ object DexApi {
 
         repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
       }
+
+      override def config: F[Config] = ???
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
         repeatUntil(orderStatus(assetPair, id), 1.second)(pred)

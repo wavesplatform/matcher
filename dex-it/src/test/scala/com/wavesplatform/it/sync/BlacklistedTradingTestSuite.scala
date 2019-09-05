@@ -16,7 +16,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
   import BlacklistedTradingTestSuite._
 
-  override protected def dex1Config: Config = configWithBlacklisted().withFallback(super.dex1Config)
+  override protected def suiteInitialDexConfig: Config = configWithBlacklisted()
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -35,7 +35,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.waitForOrderStatus(btcOrder1, OrderStatus.Accepted)
 
     Then("We blacklist some assets and addresses and restart the node")
-    replaceLocalConfig(
+    replaceSuiteConfig(
       dex1Container(),
       configWithBlacklisted(
         assets = Array(WctId.toString),
@@ -90,7 +90,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
 
     And("now if all blacklists are cleared")
-    replaceLocalConfig(dex1Container(), configWithBlacklisted())
+    replaceSuiteConfig(dex1Container(), configWithBlacklisted())
     restartContainer(dex1Container(), dex1Api)
 
     Then("OrderBook for blacklisted assets is available again")
@@ -132,10 +132,10 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
 object BlacklistedTradingTestSuite {
 
-  def configWithBlacklisted(assets: Array[String] = Array.empty,
-                            names: Array[String] = Array.empty,
-                            addresses: Array[String] = Array.empty,
-                            allowedAssetPairs: Array[String] = Array.empty): Config = {
+  private def configWithBlacklisted(assets: Array[String] = Array.empty,
+                                    names: Array[String] = Array.empty,
+                                    addresses: Array[String] = Array.empty,
+                                    allowedAssetPairs: Array[String] = Array.empty): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
                 |waves.dex {

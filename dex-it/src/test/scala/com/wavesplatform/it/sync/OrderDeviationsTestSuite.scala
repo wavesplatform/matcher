@@ -21,17 +21,16 @@ import com.wavesplatform.it.config.DexTestConfig._
   */
 class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
 
-  private def configOverrides: Config = ConfigFactory.parseString(s"""
-      |waves.dex {
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    """waves.dex {
       |  max-price-deviations {
       |    enable = yes
       |    profit = 70
       |    loss = 60
       |    fee = 50
       |  }
-      |}""".stripMargin)
-
-  override protected def dex1Config: Config = configOverrides.withFallback(super.dex1Config)
+      |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

@@ -15,7 +15,7 @@ inTask(docker)(
     additionalFiles ++= Seq(
       (Test / sourceDirectory).value / "container" / "wallet",
       (Test / resourceDirectory).value / "logback.xml"
-    ) ++ sbt.IO.listFiles((Test / resourceDirectory).value / "nodes")
+    )
   )
 )
 

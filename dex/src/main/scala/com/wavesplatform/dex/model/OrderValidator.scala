@@ -233,7 +233,6 @@ object OrderValidator extends ScorexLogging {
   private def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
     if (order.version < 3) lift(order)
     else {
-
       lazy val requiredFeeAssetIds = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
       lazy val requiredFee         = getMinValidFeeForSettings(order, orderFeeSettings, order.price, rateCache)
 

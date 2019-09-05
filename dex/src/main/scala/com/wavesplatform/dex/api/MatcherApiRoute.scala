@@ -87,8 +87,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
   }
 
-  private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
-
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case Matcher.Status.Working  => pass
     case Matcher.Status.Starting => complete(DuringStart)
@@ -216,12 +214,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     entity(as[Double]) { rate =>
       withAsset(a) { asset =>
         complete(
-          if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be changed")
+          if (asset == Waves) SimpleErrorResponse(StatusCodes.BadRequest, error.WavesImmutableRate)
           else {
             val assetStr = AssetPair.assetIdStr(asset)
             rateCache.upsertRate(asset, rate) match {
-              case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
-              case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+              case None     => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
+              case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
             }
           }
         )
@@ -239,12 +237,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
-        if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
+        if (asset == Waves) SimpleErrorResponse(StatusCodes.BadRequest, error.WavesImmutableRate)
         else {
           val assetStr = AssetPair.assetIdStr(asset)
           rateCache.deleteRate(asset) match {
-            case None     => StatusCodes.NotFound -> wrapMessage(s"Rate for the asset $assetStr is not specified")
-            case Some(pv) => StatusCodes.OK       -> wrapMessage(s"Rate for the asset $assetStr deleted, old value = $pv")
+            case None     => SimpleErrorResponse(StatusCodes.NotFound, error.RateNotFound(asset))
+            case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
           }
         }
       )

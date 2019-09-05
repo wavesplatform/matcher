@@ -68,7 +68,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 //      "order with assets" - {
 //        "moved assets, insufficient assets" in {
 //          val orderAmount              = 4000
-//          val transferAmount           = IssueWctTx.quantity - 100
+//          val transferAmount           = IssueWctTx.quantity - 4000
 //          val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount)
 //
 //          // Transfer all coins except required for one order

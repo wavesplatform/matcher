@@ -112,8 +112,13 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]]
 
+  def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, RatesResponse)]]
   def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)]
-  def deleteRate(asset: Asset): F[Unit]
+
+  def tryDeleteRate(asset: Asset): F[Either[MatcherError, RatesResponse]]
+  def deleteRate(asset: Asset): F[RatesResponse]
+
+  def rates: F[Map[Asset, Double]]
 
   def currentOffset: F[Long]
   def lastOffset: F[Long]
@@ -394,6 +399,22 @@ object DexApi {
           .tag("requestId", UUID.randomUUID())
       }
 
+      override def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, RatesResponse)]] = {
+        val req =
+          sttp
+            .put(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+            .body(Json.stringify(Json.toJson(rate)))
+            .contentType("application/json", "UTF-8")
+            .headers(apiKeyHeaders)
+            .response(asJson[RatesResponse])
+            .tag("requestId", UUID.randomUUID())
+
+        for {
+          rawResp <- httpBackend.send(req)
+          resp    <- parseTryResponseEither[MatcherError, RatesResponse](rawResp)
+        } yield resp.map(rawResp.code -> _)
+      }
+
       override def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = {
         val req =
           sttp
@@ -410,19 +431,35 @@ object DexApi {
         } yield (rawResp.code, resp)
       }
 
-      override def deleteRate(asset: Asset): F[Unit] = {
+      override def tryDeleteRate(asset: Asset): F[Either[MatcherError, RatesResponse]] = tryParse {
+        sttp
+          .delete(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+          .contentType("application/json", "UTF-8")
+          .headers(apiKeyHeaders)
+          .response(asJson[RatesResponse])
+          .tag("requestId", UUID.randomUUID())
+      }
+
+      override def deleteRate(asset: Asset): F[RatesResponse] = {
         val req =
           sttp
             .delete(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
             .contentType("application/json", "UTF-8")
             .headers(apiKeyHeaders)
-            .mapResponse(_ => ())
+            .response(asJson[RatesResponse])
             .tag("requestId", UUID.randomUUID())
 
-        httpBackend.send(req).flatMap { resp =>
-          if (resp.isSuccess) M.pure(())
-          else M.raiseError(new RuntimeException(s"The server returned an error: ${resp.code}"))
-        }
+        httpBackend.send(req).flatMap(parseResponse)
+      }
+
+      override def rates: F[Map[Asset, Double]] = {
+        val req = sttp
+          .get(uri"$apiUri/settings/rates")
+          .headers(apiKeyHeaders)
+          .response(asJson[Map[Asset, Double]])
+          .tag("requestId", UUID.randomUUID())
+
+        httpBackend.send(req).flatMap(parseResponse)
       }
 
       override def currentOffset: F[Long] = {

@@ -1,165 +1,123 @@
-//package com.wavesplatform.it.sync
-//
-//import akka.http.scaladsl.model.StatusCodes._
-//import com.typesafe.config.{Config, ConfigFactory}
-//import com.wavesplatform.common.state.ByteStr
-//import com.wavesplatform.common.utils.EitherExt2
-//import com.wavesplatform.it.MatcherSuiteBase
-//import com.wavesplatform.it.api.SyncHttpApi._
-//import com.wavesplatform.it.api.SyncMatcherHttpApi._
-//import com.wavesplatform.it.config.DexTestConfig._
-//import com.wavesplatform.transaction.Asset
-//import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-//import com.wavesplatform.transaction.assets.exchange.Order
-//import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
-//import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
-//import com.wavesplatform.transaction.transfer.TransferTransactionV2
-//
-//class RatesTestSuite extends MatcherSuiteBase {
-//
-//  override protected def nodeConfigs: Seq[Config] = {
-//
-//    val orderFeeSettingsStr =
-//      s"""
-//         |waves.dex {
-//         |  allowed-order-versions = [1, 2, 3]
-//         |  order-fee {
-//         |    mode = dynamic
-//         |    dynamic {
-//         |      base-fee = 300000
-//         |    }
-//         |  }
-//         |}
-//       """.stripMargin
-//
-//    super.nodeConfigs.map(
-//      ConfigFactory
-//        .parseString(orderFeeSettingsStr)
-//        .withFallback
-//    )
-//  }
-//
-//  val defaultRateMap: Map[Asset, Double] = Map(Waves -> 1d)
-//
-//  val wctRate        = 0.2
-//  val wctRateUpdated = 0.5
-//
-//  val wctStr   = WctId.toString
-//  val wctAsset = IssuedAsset(WctId)
-//
-//  val btcStr   = BtcId.toString
-//  val btcAsset = IssuedAsset(BtcId)
-//
-//  val usdStr = UsdId.toString
-//
-//  val (amount, price) = (1000L, PriceConstant)
-//
-//  override protected def beforeAll(): Unit = {
-//    super.beforeAll()
-//    val txIds = Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(wavesNode1Api.broadcast(_).id)
-//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
-//
-//    val transferTxId = node
-//      .broadcastRequest(
-//        TransferTransactionV2
-//          .selfSigned(
-//            assetId = btcAsset,
-//            sender = bob,
-//            recipient = alice.toAddress,
-//            amount = matcherFee * 5,
-//            timestamp = System.currentTimeMillis(),
-//            feeAssetId = Waves,
-//            feeAmount = 300000,
-//            attachment = Array.emptyByteArray
-//          )
-//          .explicitGet()
-//          .json())
-//      .id
-//    wavesNode1Api.waitForTransaction(transferTxId)
-//  }
-//
-//  def getOrder: Order = mkOrder(alice, matcher,wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, matcherFeeAssetId = btcAsset)
-//
-//  "Rates can be handled via REST" in {
-//    // default rates
-//    node.getRates shouldBe defaultRateMap
-//
-//    // add rate for unexisted asset
-//    assertNotFoundAndMessage(
-//      dex1Api.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2)._1 shouldBe Created,
-//      "The asset unexistedAsset not found")
-//
-//    // add rate for wct
-//    dex1Api.upsertRate(wctAsset, wctRate)._1 shouldBe Created.message shouldBe s"Rate $wctRate for the asset $wctStr added"
-//    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRate)
-//
-//    // update rate for wct
-//    node
-//      .upsertRate(wctAsset, wctRateUpdated, expectedStatusCode = OK)
-//      .message shouldBe s"Rate for the asset $wctStr updated, old value = $wctRate, new value = $wctRateUpdated"
-//    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
-//
-//    // update rate for Waves is not allowed
-//    dex1Api.upsertRate(Waves, wctRateUpdated)._1 shouldBe BadRequest.message shouldBe "Rate for Waves cannot be changed"
-//    node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
-//
-//    // delete rate for wct
-//    dex1Api.deleteRate(wctAsset).message shouldBe s"Rate for the asset $wctStr deleted, old value = $wctRateUpdated"
-//    node.getRates shouldBe defaultRateMap
-//
-//    // delete unexisted rate
-//    assertNotFoundAndMessage(dex1Api.deleteRate(wctAsset), s"Rate for the asset $wctStr is not specified")
-//  }
-//
-//  "Changing rates affects order validation" in {
-//    // set rate for btc
-//    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe Created
-//
-//    // place order with admissible fee (according to btc rate = 1)
-//    val placedOrderId1 = dex1Api.place(getOrder).message.id
-//    dex1Api.waitForOrderStatus(placedOrderId1, OrderStatus.Accepted)
-//
-//    // slightly increase rate for btc
-//    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe OK
-//
-//    // the same order now is rejected
-//    node.expectIncorrectOrderPlacement(
-//      getOrder,
-//      400,
-//      "OrderRejected",
-//      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
-//    )
-//
-//    // return previous rate for btc
-//    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe OK
-//
-//    val placedOrderId2 = dex1Api.place(getOrder).message.id
-//    dex1Api.waitForOrderStatus(placedOrderId2, OrderStatus.Accepted)
-//
-//    dex1Api.deleteRate(btcAsset)
-//  }
-//
-//  "Rates are restored from the DB after matcher's restart" in {
-//    // add high rate for btc
-//    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe Created
-//
-//    // order with low fee should be rejected
-//    node.expectIncorrectOrderPlacement(
-//      getOrder,
-//      400,
-//      "OrderRejected",
-//      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
-//    )
-//
-//    // restart matcher
-//    docker.restartNode(node)
-//
-//    // order with low fee should be rejected again
-//    node.expectIncorrectOrderPlacement(
-//      getOrder,
-//      400,
-//      "OrderRejected",
-//      Some(s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
-//    )
-//  }
-//}
+package com.wavesplatform.it.sync
+
+import com.softwaremill.sttp.StatusCodes
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
+
+class RatesTestSuite extends NewMatcherSuiteBase {
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  allowed-order-versions = [1, 2, 3]
+       |  order-fee {
+       |    mode = dynamic
+       |    dynamic {
+       |      base-fee = 300000
+       |    }
+       |  }
+       |}""".stripMargin
+  )
+
+  val defaultRateMap: Map[Asset, Double] = Map(Waves -> 1d)
+
+  val wctRate        = 0.2
+  val wctRateUpdated = 0.5
+
+  val wctStr   = WctId.toString
+  val wctAsset = IssuedAsset(WctId)
+
+  val btcStr   = BtcId.toString
+  val btcAsset = IssuedAsset(BtcId)
+
+  val usdStr = UsdId.toString
+
+  val (amount, price) = (1000L, PriceConstant)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    broadcast(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    broadcast(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
+  }
+
+  private def newOrder: Order = mkOrder(alice, matcher, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset, version = 3)
+
+  "Rates can be handled via REST" in {
+    // default rates
+    dex1Api.rates shouldBe defaultRateMap
+
+    // add rate for unexisted asset
+    dex1Api.tryUpsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2) should failWith(
+      11534345,
+      MatcherError.Params(assetId = Some("unexistedAsset"))
+    )
+
+    // add rate for wct
+    val addWctRate = dex1Api.upsertRate(wctAsset, wctRate)
+    addWctRate._1 shouldBe StatusCodes.Created
+    addWctRate._2.message shouldBe s"The rate $wctRate for the asset $wctStr added"
+    dex1Api.rates shouldBe defaultRateMap + (wctAsset -> wctRate)
+
+    // update rate for wct
+    val updateWctRate = dex1Api.upsertRate(wctAsset, wctRateUpdated)
+    updateWctRate._1 shouldBe StatusCodes.Ok
+    updateWctRate._2.message shouldBe s"The rate for the asset $wctStr updated, old value = $wctRate, new value = $wctRateUpdated"
+    dex1Api.rates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
+
+    // update rate for Waves is not allowed
+    dex1Api.tryUpsertRate(Waves, wctRateUpdated) should failWith(20971531, "The rate for WAVES cannot be changed")
+    dex1Api.rates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
+
+    // delete rate for wct
+    dex1Api.deleteRate(wctAsset).message shouldBe s"The rate for the asset $wctStr deleted, old value = $wctRateUpdated"
+    dex1Api.rates shouldBe defaultRateMap
+
+    // delete unexisted rate
+    dex1Api.tryDeleteRate(wctAsset) should failWith(20971529, MatcherError.Params(assetId = Some(wctStr)))
+  }
+
+  "Changing rates affects order validation" in {
+    // set rate for btc
+    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Created
+
+    // place order with admissible fee (according to btc rate = 1)
+    val order1 = newOrder
+    dex1Api.place(order1)
+    dex1Api.waitForOrderStatus(order1, OrderStatus.Accepted)
+
+    // slightly increase rate for btc
+    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Ok
+
+    // the same order now is rejected
+    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+
+    // return previous rate for btc
+    dex1Api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Ok
+
+    val order2 = newOrder
+    dex1Api.place(order2)
+    dex1Api.waitForOrderStatus(order2, OrderStatus.Accepted)
+
+    dex1Api.deleteRate(btcAsset)
+  }
+
+  "Rates are restored from the DB after matcher's restart" in {
+    // add high rate for btc
+    dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Created
+
+    // order with low fee should be rejected
+    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+
+    // restart matcher
+    restartContainer(dex1Container(), dex1Api)
+
+    // order with low fee should be rejected again
+    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+  }
+}

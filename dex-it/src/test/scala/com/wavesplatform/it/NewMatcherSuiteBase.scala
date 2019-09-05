@@ -197,7 +197,7 @@ trait TestUtils {
         timestamp = timestamp,
         expiration = timestamp + timeToLive.toMillis,
         matcherFee = matcherFee,
-        version = math.min(version, 2).toByte,
+        version = 3,
         matcherFeeAssetId = matcherFeeAssetId
       )
 

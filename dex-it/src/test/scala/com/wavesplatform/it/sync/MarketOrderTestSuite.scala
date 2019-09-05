@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{LevelResponse, OrderStatus, OrderStatusResponse}
@@ -9,8 +8,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderTestSuite extends NewMatcherSuiteBase {
-
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]")
 
   // TODO move to base class
   private implicit class DoubleOps(value: Double) {

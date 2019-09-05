@@ -20,8 +20,8 @@
 //  }
 //
 //  "Alice and Bob trade WAVES-USD" - {
-//    val aliceWavesBalanceBefore = node.accountBalances(alice.toAddress.toString)._1
-//    val bobWavesBalanceBefore   = node.accountBalances(bob.toAddress.toString)._1
+//    val aliceWavesBalanceBefore = wavesNode1Api.balance(alice, Waves)
+//    val bobWavesBalanceBefore   = wavesNode1Api.balance(bob, Waves)
 //
 //    val price           = 238
 //    val buyOrderAmount  = 425532L
@@ -66,10 +66,10 @@
 //    }
 //
 //    "check usd and waves balance after fill" in {
-//      val aliceWavesBalanceAfter = node.accountBalances(alice.toAddress.toString)._1
+//      val aliceWavesBalanceAfter = wavesNode1Api.balance(alice, Waves)
 //      val aliceUsdBalance = wavesNode1Api.balance(alice.toAddress.toString, UsdId.toString).balance
 //
-//      val bobWavesBalanceAfter = node.accountBalances(bob.toAddress.toString)._1
+//      val bobWavesBalanceAfter = wavesNode1Api.balance(bob, Waves)
 //      val bobUsdBalance = wavesNode1Api.balance(bob.toAddress.toString, UsdId.toString).balance
 //
 //      (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
@@ -103,12 +103,12 @@
 //
 //      val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
-//      node.tradableBalance(alice, wavesUsdPair)("WAVES") shouldBe node.accountBalances(alice.toAddress.toString)._1
+//      node.tradableBalance(alice, wavesUsdPair)("WAVES") shouldBe wavesNode1Api.balance(alice, Waves)
 //
 //      val orderId = orderHistory.head.id
 //      node.cancelOrder(bob, wavesUsdPair, orderId)
 //      dex1Api.waitForOrderStatus(orderId, OrderStatus.Cancelled)
-//      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe node.accountBalances(bob.toAddress.toString)._1
+//      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe wavesNode1Api.balance(bob, Waves)
 //    }
 //  }
 //
@@ -121,7 +121,7 @@
 //
 //    "place usd-waves order" in {
 //      // Alice wants to sell USD for Waves
-//      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
+//      val bobWavesBalanceBefore = wavesNode1Api.balance(bob, Waves)
 //      node.tradableBalance(bob, wavesUsdPair)("WAVES")
 //      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id
@@ -235,7 +235,7 @@
 //    val wctWavesPrice      = 11234560000000L
 //
 //    "bob lease all waves exact half matcher fee" in {
-//      val leasingAmount = node.accountBalances(bob.toAddress.toString)._1 - leasingFee - matcherFee / 2
+//      val leasingAmount = wavesNode1Api.balance(bob, Waves) - leasingFee - matcherFee / 2
 //      val leaseTxId     = node.broadcastLease(bob, matcher.toAddress.toString, leasingAmount, leasingFee, waitForTx = true).id
 //      val bobOrderId =
 //        dex1Api.place(mkOrder(bob,wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)).message.id

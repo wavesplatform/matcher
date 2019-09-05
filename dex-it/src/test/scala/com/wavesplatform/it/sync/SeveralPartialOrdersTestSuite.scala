@@ -24,7 +24,7 @@
 //
 //    "place usd-waves order" in {
 //      // Alice wants to sell USD for Waves
-//      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
+//      val bobWavesBalanceBefore = wavesNode1Api.balance(bob, Waves)
 //
 //      val bobOrder1   = mkOrder(bob,wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
 //      val bobOrder1Id = dex1Api.place(bobOrder1).message.id

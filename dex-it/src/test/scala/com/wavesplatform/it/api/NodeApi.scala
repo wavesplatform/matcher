@@ -41,6 +41,8 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
   def broadcast(tx: transaction.Transaction): F[Unit]
+  def transactionInfo(id: ByteStr): F[Option[Transaction]]
+  def rawTransactionInfo(id: ByteStr): F[Option[JsValue]]
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForHeightArise(): F[Unit]
 
@@ -118,9 +120,7 @@ object NodeApi {
         }
       }
 
-      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(transactionInfo(id), 1.second)(_.nonEmpty).map(_ => ())
-
-      def transactionInfo(id: ByteStr): F[Option[Transaction]] = {
+      override def transactionInfo(id: ByteStr): F[Option[Transaction]] = {
         val req = sttp.get(uri"$apiUri/transactions/info/$id").response(asJson[Transaction])
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
           resp.rawErrorBody match {
@@ -130,6 +130,19 @@ object NodeApi {
           }
         }
       }
+
+      override def rawTransactionInfo(id: ByteStr): F[Option[JsValue]] = {
+        val req = sttp.get(uri"$apiUri/transactions/info/$id").response(asJson[JsValue])
+        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_)            => M.pure(None)
+            case Right(Left(error)) => M.raiseError[Option[JsValue]](new RuntimeException(s"Can't parse the response: $error"))
+            case Right(Right(r))    => M.pure(Some(r))
+          }
+        }
+      }
+
+      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(transactionInfo(id), 1.second)(_.nonEmpty).map(_ => ())
 
       override def waitForHeightArise(): F[Unit] = {
         currentHeight

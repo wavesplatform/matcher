@@ -91,9 +91,9 @@
 //      "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
 //        val oneSmartPair = createAssetPair(asset0, asset1)
 //
-//        val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
-//        val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
-//        val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
+//        val aliceInitBalance   = wavesNode1Api.balance(alice, Waves)
+//        val bobInitBalance     = wavesNode1Api.balance(bob, Waves)
+//        val matcherInitBalance = wavesNode1Api.balance(matcher, Waves)
 //
 //        val expectedFee = tradeFee + smartFee // 1 x "smart asset"
 //        val invalidFee  = expectedFee - 1
@@ -118,9 +118,9 @@
 //        val submitted = dex1Api.place(mkOrder(bob,oneSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //        waitForOrderAtNode(submitted)
 //
-//        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
-//        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
-//        node.accountBalances(matcher.toAddress.toString)._1 shouldBe matcherInitBalance + expectedFee
+//        wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
+//        wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
+//        wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
 //      }
 //    }
 //
@@ -131,9 +131,9 @@
 //
 //          val bothSmartPair = createAssetPair(asset1, asset2)
 //
-//          val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
-//          val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
-//          val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
+//          val aliceInitBalance   = wavesNode1Api.balance(alice, Waves)
+//          val bobInitBalance     = wavesNode1Api.balance(bob, Waves)
+//          val matcherInitBalance = wavesNode1Api.balance(matcher, Waves)
 //
 //          val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
 //          val invalidFee  = expectedFee - 1
@@ -158,9 +158,9 @@
 //          val submitted = dex1Api.place(mkOrder(bob,bothSmartPair, BUY, amount, price, expectedFee, 2)).message.id
 //          waitForOrderAtNode(submitted)
 //
-//          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceInitBalance - expectedFee
-//          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobInitBalance - expectedFee
-//          node.accountBalances(matcher.toAddress.toString)._1 shouldBe matcherInitBalance + expectedFee
+//          wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
+//          wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
+//          wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
 //        }
 //      }
 //    }

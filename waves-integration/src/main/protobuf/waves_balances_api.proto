@@ -1,11 +1,11 @@
 syntax = "proto3";
 
 package waves.dex.grpc.integration;
-option java_package = "com.wavesplatform.dex.grpc.integration.services.balances";
+option java_package = "com.wavesplatform.dex.grpc.integration.services";
 
 import "google/protobuf/empty.proto";
 
-service BalancesService {
+service WavesBalancesApi {
     rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
 }
 

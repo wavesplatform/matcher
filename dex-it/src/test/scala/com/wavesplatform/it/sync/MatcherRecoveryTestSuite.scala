@@ -62,6 +62,6 @@ class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueEthTx, IssueUsdTx)
+    broadcastAndAwait(IssueEthTx, IssueUsdTx)
   }
 }

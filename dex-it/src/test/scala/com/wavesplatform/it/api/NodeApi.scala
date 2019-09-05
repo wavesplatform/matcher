@@ -32,14 +32,20 @@ object PeerInfo {
 }
 
 trait NodeApi[F[_]] extends HasWaitReady[F] {
+
   def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]
 
   def connect(toNode: InetSocketAddress): F[Unit]
+
   def connected: F[ConnectedPeersResponse]
+
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
   def broadcast(tx: transaction.Transaction): F[Unit]
+
   def waitForTransaction(id: ByteStr): F[Unit]
+  def waitForTransaction(tx: transaction.Transaction): F[Unit] = waitForTransaction(tx.id.value)
+
   def waitForHeightArise(): F[Unit]
 }
 

@@ -11,7 +11,18 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, Blockchain, DataEntry, InvokeScriptResult, LeaseBalance, Portfolio, TransactionId, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  AssetDescription,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  InvokeScriptResult,
+  LeaseBalance,
+  Portfolio,
+  TransactionId,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.BlockchainContext
@@ -41,9 +52,11 @@ object MatcherContext {
   }
 
   private class Denied(methodName: String) extends SecurityException(s"An access to the blockchain.$methodName is denied on DEX") with NoStackTrace
+
   private def kill(methodName: String) = throw new Denied(methodName)
 
   private val deniedBlockchain = new Blockchain {
+
     override def settings: BlockchainSettings                                     = kill("settings")
     override def height: Int                                                      = kill("height")
     override def score: BigInt                                                    = kill("score")
@@ -87,9 +100,10 @@ object MatcherContext {
     override def leaseBalance(address: Address): LeaseBalance                                     = kill("leaseBalance")
     override def balance(address: Address, mayBeAssetId: Asset): Long                             = kill("balance")
 
-    /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-      *
-      * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
+    /**
+      * Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+      * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance
+      */
     override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = kill("collectLposPortfolios")
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")

@@ -7,7 +7,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.PlaceMarketOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.db.TestOrderDB
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._
@@ -87,7 +87,7 @@ class ReservedBalanceSpecification
   private implicit val timeout: Timeout = 5.seconds
 
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  val p    = new AssetPairDecimals(8, 2)
+  val p    = AssetPairDecimals(8, 2)
 
   var oh = new OrderHistoryStub(system, ntpTime)
 

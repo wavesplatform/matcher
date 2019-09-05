@@ -1,27 +1,22 @@
-package com.wavesplatform.dex.grpc.integration.clients
+package com.wavesplatform.dex.grpc.integration.clients.async
 
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
-import com.wavesplatform.dex.grpc.integration.protobuf.Implicits._
-import com.wavesplatform.dex.grpc.integration.services.balances.{BalanceChangesResponse, BalancesServiceGrpc}
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
+import com.wavesplatform.dex.grpc.integration.services.{BalanceChangesResponse, WavesBalancesApiGrpc}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Channel
 import io.grpc.stub.StreamObserver
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import mouse.any._
 
-object BalancesServiceClient {
-  type SpendableBalance        = Map[Asset, Long]
-  type SpendableBalanceChanges = Map[Address, SpendableBalance]
-}
+class WavesBalancesGrpcAsyncClient(channel: Channel)(implicit scheduler: Scheduler) extends ScorexLogging {
 
-class BalancesServiceClient(channel: Channel) extends ScorexLogging {
-
-  private val balancesService                = BalancesServiceGrpc.stub(channel)
+  private val balancesService                = WavesBalancesApiGrpc.stub(channel)
   private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges]
 
   private def toVanilla(record: BalanceChangesResponse.Record): (Address, Asset, Long) = {
@@ -41,7 +36,7 @@ class BalancesServiceClient(channel: Channel) extends ScorexLogging {
 
   private val balanceChangesObserver: StreamObserver[BalanceChangesResponse] =
     new StreamObserver[BalanceChangesResponse] {
-      override def onError(t: Throwable): Unit                 = log.warn(s"Error while listening to the balance changes stream occured: ${t.getMessage}")
+      override def onError(t: Throwable): Unit                 = log.warn(s"Error while listening to the balance changes stream was occurred: ${t.getMessage}")
       override def onCompleted(): Unit                         = log.info("Balance changes stream completed!")
       override def onNext(value: BalanceChangesResponse): Unit = groupByAddress(value) |> spendableBalanceChangesSubject.onNext
     }

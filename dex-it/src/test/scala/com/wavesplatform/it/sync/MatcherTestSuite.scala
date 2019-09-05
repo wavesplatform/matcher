@@ -36,7 +36,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
   }
 
   "Check cross ordering between Alice and Bob" - {

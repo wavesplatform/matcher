@@ -10,7 +10,7 @@ import org.scalatest.concurrent.Eventually
 class MatcherRestartTestSuite extends NewMatcherSuiteBase with Eventually {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueEthTx)
+    broadcastAndAwait(IssueEthTx)
   }
 
   "check order execution" - {

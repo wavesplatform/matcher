@@ -17,7 +17,7 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueEthTx)
+    broadcastAndAwait(IssueEthTx)
   }
 
   "Check no commands are written to queue" - {

@@ -6,12 +6,11 @@ import java.util.concurrent.atomic.AtomicReference
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.{AssetPairDecimals, AssetPairBuilder}
 import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.{AssetPairBuilder, AssetPairDecimals}
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.settings.GenesisSettings
@@ -21,7 +20,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
-import com.wavesplatform.settings._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.collection.JavaConverters._
@@ -34,10 +32,11 @@ object DexTestConfig {
   }
 
   private val containerConfigCache = new AtomicReference[Map[String, Config]](Map.empty)
-  def containerConfig(name: String): Config =
+
+  def containerConfig(name: String): Config = {
     containerConfigCache
       .updateAndGet { prev: Map[String, Config] =>
-        if (prev.isDefinedAt(name)) prev
+        if (prev isDefinedAt name) prev
         else
           prev.updated(
             name, {
@@ -47,13 +46,16 @@ object DexTestConfig {
           )
       }
       .apply(name)
+  }
 
-  val genesisConfig = genesisOverride
+  val genesisConfig: Config = genesisOverride
 
   val accounts: Map[String, KeyPair] = {
+
     val config           = ConfigFactory.parseResources("genesis.conf")
     val distributionsKey = "genesis-generator.distributions"
     val distributions    = config.getObject(distributionsKey)
+
     distributions
       .keySet()
       .asScala

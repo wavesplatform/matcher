@@ -2,17 +2,15 @@ package com.wavesplatform.dex.grpc.integration.sync
 
 import java.nio.charset.StandardCharsets
 
-import com.github.ghik.silencer.silent
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.ItTestSuiteBase
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainSyncGrpcContext
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.config.Accounts._
 import com.wavesplatform.dex.grpc.integration.config.Assets._
 import com.wavesplatform.dex.grpc.integration.config.Fee
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
@@ -23,14 +21,14 @@ import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import io.grpc.ManagedChannelBuilder
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class GrpcTestSuite extends ItTestSuiteBase {
+class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
 
-  private lazy val context = mkContext
+  private val target               = s"${node.networkAddress.getHostString}:${nodes.head.nodeExternalPort(6887)}"
+  private lazy val wavesSyncClient = new DEXClient(target).wavesBlockchainSyncClient
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -44,14 +42,14 @@ class GrpcTestSuite extends ItTestSuiteBase {
     val id = tx.id()
 
     "false for unknown tx" in {
-      context.wasForged(id) shouldBe false
+      wavesSyncClient.wasForged(id) shouldBe false
     }
 
     "true for forged tx" in {
       node.signedBroadcast(tx.json())
 
       node.waitForTransaction(id.toString)
-      context.wasForged(id) shouldBe true
+      wavesSyncClient.wasForged(id) shouldBe true
     }
   }
 
@@ -80,7 +78,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
         .right
         .get
 
-      context.broadcastTx(exchangeTx) shouldBe true
+      wavesSyncClient.broadcastTx(exchangeTx) shouldBe true
       node.waitForTransaction(exchangeTx.id().toString)
     }
 
@@ -114,28 +112,28 @@ class GrpcTestSuite extends ItTestSuiteBase {
         )
         .explicitGet()
 
-      context.broadcastTx(exchangeTx) shouldBe false
+      wavesSyncClient.broadcastTx(exchangeTx) shouldBe false
     }
   }
 
   "isFeatureActivated" - {
     "returns false for not yet activated feature" in {
-      context.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) shouldBe false
+      wavesSyncClient.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) shouldBe false
     }
 
     "returns true for activated feature" in {
-      context.isFeatureActivated(BlockchainFeatures.NG.id) shouldBe true
+      wavesSyncClient.isFeatureActivated(BlockchainFeatures.NG.id) shouldBe true
     }
   }
 
   "assetDescription" - {
     "returns None if there is no such asset" in {
-      context.assetDescription(IssuedAsset(IssueUsdTx.id())) shouldBe None
+      wavesSyncClient.assetDescription(IssuedAsset(IssueUsdTx.id())) shouldBe None
     }
 
     "returns an information for created assets" in {
       val issueTx = IssueEthTx
-      context.assetDescription(IssuedAsset(issueTx.id())) shouldBe Some(
+      wavesSyncClient.assetDescription(IssuedAsset(issueTx.id())) shouldBe Some(
         BriefAssetDescription(
           name = ByteStr(issueTx.name),
           decimals = issueTx.decimals,
@@ -146,7 +144,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
 
   "hasScript/runScript(IssuedAsset)" - {
     "hasn't a script" in {
-      context.hasScript(IssuedAsset(IssueEthTx.id())) shouldBe false
+      wavesSyncClient.hasScript(IssuedAsset(IssueEthTx.id())) shouldBe false
     }
 
     "has a script" in {
@@ -169,7 +167,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
         node.broadcastRequest(issueTx.json())
         node.waitForTransaction(issueTx.id().toString)
 
-        context.hasScript(IssuedAsset(issueTx.id())) shouldBe true
+        wavesSyncClient.hasScript(IssuedAsset(issueTx.id())) shouldBe true
       }
 
       withClue("run script") {
@@ -194,14 +192,14 @@ class GrpcTestSuite extends ItTestSuiteBase {
           )
           .explicitGet()
 
-        context.runScript(IssuedAsset(issueTx.id()), exchangeTx) shouldBe RunScriptResult.Allowed
+        wavesSyncClient.runScript(IssuedAsset(issueTx.id()), exchangeTx) shouldBe RunScriptResult.Allowed
       }
     }
   }
 
   "hasScript/runScript(Address)" - {
     "returns false if there is no script" in {
-      context.hasScript(matcher) shouldBe false
+      wavesSyncClient.hasScript(matcher) shouldBe false
     }
 
     "returns true if a script was assigned" in {
@@ -238,7 +236,7 @@ class GrpcTestSuite extends ItTestSuiteBase {
         node.broadcastRequest(setScriptTx.json())
         node.waitForTransaction(setScriptTx.id().toString)
 
-        context.hasScript(receiver) shouldBe true
+        wavesSyncClient.hasScript(receiver) shouldBe true
       }
 
       withClue("run script") {
@@ -248,19 +246,19 @@ class GrpcTestSuite extends ItTestSuiteBase {
         val pair           = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
         val buy            = Order.buy(bob, matcher, pair, executedAmount, executedPrice, now, now + 1.day.toMillis, 0)
 
-        context.runScript(receiver, buy) shouldBe RunScriptResult.Allowed
+        wavesSyncClient.runScript(receiver, buy) shouldBe RunScriptResult.Allowed
       }
     }
   }
 
   "spendableBalance" in {
-    context.spendableBalance(bob, Waves) shouldBe 494994799699998L
-    context.spendableBalance(bob, randomIssuedAsset) shouldBe 0L
+    wavesSyncClient.spendableBalance(bob, Waves) shouldBe 494994799699998L
+    wavesSyncClient.spendableBalance(bob, randomIssuedAsset) shouldBe 0L
   }
 
   "forgedOrder" - {
     "no such order" in {
-      context.forgedOrder(randomByteStr(32)) shouldBe false
+      wavesSyncClient.forgedOrder(randomByteStr(32)) shouldBe false
     }
 
     "the order was in a forged ExchangeTransaction" in {
@@ -290,22 +288,12 @@ class GrpcTestSuite extends ItTestSuiteBase {
       node.broadcastRequest(exchangeTx.json())
       node.waitForTransaction(exchangeTx.id().toString)
 
-      context.forgedOrder(buy.id()) shouldBe true
-      context.forgedOrder(sell.id()) shouldBe true
+      wavesSyncClient.forgedOrder(buy.id()) shouldBe true
+      wavesSyncClient.forgedOrder(sell.id()) shouldBe true
     }
   }
 
   // TODO check that the functions returns new data after the state is changed?
-
-  @silent("deprecated") private def mkContext: WavesBlockchainSyncGrpcContext = new WavesBlockchainSyncGrpcContext(
-    ManagedChannelBuilder
-      .forAddress(
-        node.networkAddress.getHostString,
-        node.nodeExternalPort(6887)
-      )
-      .usePlaintext(true)
-      .build()
-  )
 
   private def randomByteStr(len: Int): ByteStr = {
     val inner = new Array[Byte](len)

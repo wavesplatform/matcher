@@ -5,10 +5,9 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
-import com.wavesplatform.dex.grpc.integration.sync.DEXExtensionTestSuite._
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.sync.WavesGrpcAsyncClientTestSuite._
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
-import com.wavesplatform.it.Docker
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueFee, minFee, someAssetAmount}
 import com.wavesplatform.transaction.Asset
@@ -27,15 +26,12 @@ import org.scalatest.{Assertion, BeforeAndAfterEach}
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with Eventually {
+class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with Eventually {
 
   override protected def nodeConfigs: Seq[Config] =
     super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0").withFallback)
 
   private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
-
-  private val target    = s"localhost:${nodes.head.nodeExternalPort(6887)}"
-  private val dexClient = new DEXClient(target)
 
   private val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
     override def onError(ex: Throwable): Unit                       = Unit
@@ -43,18 +39,16 @@ class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with
     override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges = balanceChanges ++ elem; Continue }
   }
 
-  protected override def createDocker: Docker = new Docker(
-    imageName = "com.wavesplatform/waves-integration-it:latest",
-    tag = getClass.getSimpleName
-  )
-
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet) shouldBe expectedBalanceChanges
   }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    dexClient.balancesServiceClient <| { _.requestBalanceChanges() } <| { _.spendableBalanceChanges.subscribe(eventsObserver) }
+    val target = s"${node.networkAddress.getHostString}:${nodes.head.nodeExternalPort(6887)}"
+    new DEXClient(target).wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() }.unsafeTap {
+      _.spendableBalanceChanges.subscribe(eventsObserver)
+    }
   }
 
   override def beforeEach(): Unit = {
@@ -62,28 +56,30 @@ class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
   }
 
-  "DEX gRPC extension for the Waves node should send balance changes via gRPC" in {
+  "WavesBalancesApiGrpcServer should send balance changes via gRPC" in {
+
     val aliceInitialBalance = node.balanceDetails(alice.toAddress.stringRepr).available
     val bobInitialBalance   = node.balanceDetails(bob.toAddress.stringRepr).available
 
-    val issueAssetTx = IssueTransactionV2
-      .selfSigned(
-        chainId = AddressScheme.current.chainId,
-        sender = alice,
-        name = "name".getBytes(StandardCharsets.UTF_8),
-        description = "description".getBytes(StandardCharsets.UTF_8),
-        quantity = someAssetAmount,
-        decimals = 2,
-        reissuable = false,
-        script = None,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
-    val issuedAsset = IssuedAsset(issueAssetTx.id())
+    val issueAssetTx =
+      IssueTransactionV2
+        .selfSigned(
+          chainId = AddressScheme.current.chainId,
+          sender = alice,
+          name = "name".getBytes(StandardCharsets.UTF_8),
+          description = "description".getBytes(StandardCharsets.UTF_8),
+          quantity = someAssetAmount,
+          decimals = 2,
+          reissuable = false,
+          script = None,
+          fee = issueFee,
+          timestamp = System.currentTimeMillis
+        )
+        .explicitGet()
+    val issuedAsset = IssuedAsset(issueAssetTx.id.value)
 
-    node.broadcastRequest(issueAssetTx.json()).id
-    nodes.waitForTransaction(issueAssetTx.id().toString)
+    node.broadcastRequest(issueAssetTx.json.value).id
+    nodes.waitForTransaction(issueAssetTx.id.value.toString)
 
     assertBalanceChanges {
       Map(
@@ -100,15 +96,15 @@ class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with
         sender = alice,
         recipient = bob,
         amount = someAssetAmount,
-        timestamp = System.currentTimeMillis(),
+        timestamp = System.currentTimeMillis,
         feeAssetId = Waves,
         feeAmount = minFee,
         attachment = Array.emptyByteArray
       )
       .explicitGet()
 
-    node.broadcastRequest(transferTx.json())
-    nodes.waitForTransaction(transferTx.id().toString)
+    node.broadcastRequest(transferTx.json.value)
+    nodes.waitForTransaction(transferTx.id.value.toString)
 
     assertBalanceChanges {
       Map(
@@ -125,11 +121,14 @@ class DEXExtensionTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with
   }
 }
 
-object DEXExtensionTestSuite {
+object WavesGrpcAsyncClientTestSuite {
+
   private val accounts: Map[String, KeyPair] = {
+
     val config           = ConfigFactory.parseResources("genesis.conf")
     val distributionsKey = "genesis-generator.distributions"
     val distributions    = config.getObject(distributionsKey)
+
     distributions
       .keySet()
       .asScala

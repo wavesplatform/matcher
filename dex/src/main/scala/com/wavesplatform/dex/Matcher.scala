@@ -18,11 +18,11 @@ import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
+import com.wavesplatform.dex.cache.{AssetDecimalsCache, BalancesCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -35,6 +35,9 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
+import monix.execution.Ack
+import monix.execution.Ack.Continue
+import monix.reactive.Observer
 import mouse.any._
 
 import scala.concurrent.duration._
@@ -42,11 +45,12 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implicit val actorSystem: ActorSystem, val materializer: ActorMaterializer)
+class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem, val materializer: ActorMaterializer)
     extends Extension
     with ScorexLogging {
 
   import actorSystem.dispatcher
+  import gRPCExtensionClient.{wavesBalancesAsyncClient, wavesBlockchainSyncClient, scheduler}
 
   private val time = new NTP(settings.ntpServer)
 
@@ -69,16 +73,34 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
       }
     }
 
-  private val pairBuilder    = new AssetPairBuilder(settings, context.assetDescription, blacklistedAssets)
+  private val pairBuilder    = new AssetPairBuilder(settings, wavesBlockchainSyncClient.assetDescription, blacklistedAssets)
   private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
 
-  private def hasMatcherAccountScript = context.hasScript(matcherKeyPair)
-  private val transactionCreator =
-    new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, context.hasScript(_), context.isFeatureActivated)
+  private def hasMatcherAccountScript = wavesBlockchainSyncClient.hasScript(matcherKeyPair)
+
+  private val transactionCreator = {
+    new ExchangeTransactionCreator(matcherKeyPair,
+                                   settings,
+                                   hasMatcherAccountScript,
+                                   wavesBlockchainSyncClient.hasScript,
+                                   wavesBlockchainSyncClient.isFeatureActivated)
+  }
 
   private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(context.assetDescription)
+  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
+  private val balancesCache      = new BalancesCache(wavesBlockchainSyncClient.spendableBalance)
+
+  wavesBalancesAsyncClient.spendableBalanceChanges.subscribe {
+    new Observer[SpendableBalanceChanges] {
+      override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
+      override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
+      override def onError(ex: Throwable): Unit = {
+        log.warn(s"Error while listening to the balance changes stream occurred, all balances cache values will be updated! ${ex.getMessage}")
+        balancesCache.updateAllValues()
+      }
+    }
+  }(scheduler)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -157,7 +179,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
-        context,
+        wavesBlockchainSyncClient,
         transactionCreator.createTransaction,
         matcherPublicKey.toAddress,
         time,
@@ -171,7 +193,6 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    //val keyHash = Base58.tryDecode(settings.restApi.apiKeyHash).toOption
     val keyHashStr = settings.restApi.apiKeyHash
     Seq(
       MatcherApiRoute(
@@ -201,7 +222,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
         () => ExchangeTransactionCreator.minAccountFee(hasMatcherAccountScript),
         keyHashStr,
         rateCache,
-        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context).isRight)
+        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, wavesBlockchainSyncClient).isRight)
       ),
       MatcherApiRouteV1(
         pairBuilder,
@@ -266,7 +287,7 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
       },
       orderBooks,
       orderBookProps,
-      context.assetDescription
+      wavesBlockchainSyncClient.assetDescription
     ),
     MatcherActor.name
   )
@@ -277,27 +298,26 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
     actorSystem.actorOf(HistoryRouter.props(assetDecimalsCache.get, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
-  private lazy val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}")
-
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          gRPCExtensionClient.balancesServiceClient <| { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
+          wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
           (address, startSchedules) =>
             Props(
               new AddressActor(
                 address,
-                context.spendableBalance(address, _),
+                wavesBlockchainSyncClient.spendableBalance(address, _), // TODO change to balancesCache.get
                 5.seconds,
                 time,
                 orderDb,
-                context.forgedOrder,
+                wavesBlockchainSyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.get,
                 startSchedules
-              )),
+              )
+          ),
           historyRouter
         )
       ),
@@ -355,8 +375,8 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
         .props(
           settings.exchangeTransactionBroadcast,
           time,
-          context.wasForged,
-          context.broadcastTx
+          wavesBlockchainSyncClient.wasForged,
+          wavesBlockchainSyncClient.broadcastTx
         ),
       "exchange-transaction-broadcast"
     )
@@ -417,9 +437,11 @@ class Matcher(settings: MatcherSettings, context: WavesBlockchainContext)(implic
 }
 
 object Matcher extends ScorexLogging {
+
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   sealed trait Status
+
   object Status {
     case object Starting extends Status
     case object Working  extends Status

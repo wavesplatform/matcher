@@ -70,6 +70,6 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
     super.beforeAll()
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
-    broadcast(IssueEthTx)
+    broadcastAndAwait(IssueEthTx)
   }
 }

@@ -80,6 +80,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def cancel(owner: KeyPair, order: Order): F[MatcherStatusResponse] = cancel(owner, order.assetPair, order.id())
   def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse]
 
+  // TODO should handle MatcherError
   def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Unit]
   def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Unit]
 

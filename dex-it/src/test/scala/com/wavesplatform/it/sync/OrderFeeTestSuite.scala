@@ -11,16 +11,11 @@ import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 // TODO refactor balances retrieving
 class OrderFeeTestSuite extends NewMatcherSuiteBase {
-  private val baseFee = 30000
+  private val baseFee = 300000
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  allowed-order-versions = [1, 2, 3]
-       |  order-fee {
-       |    mode = dynamic
-       |    dynamic {
-       |      base-fee = $baseFee
-       |    }
-       |  }
+    s"""waves.dex.order-fee {
+       |  mode = dynamic
+       |  dynamic.base-fee = $baseFee
        |}""".stripMargin
   )
 
@@ -31,7 +26,6 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
 
   private def mkBobOrder: Order = mkOrder(
     owner = bob,
-    matcher = matcher,
     pair = wavesBtcPair,
     orderType = OrderType.BUY,
     amount = 1.waves,
@@ -43,7 +37,6 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
 
   private def mkAliceOrder: Order = mkOrder(
     owner = alice,
-    matcher = matcher,
     pair = wavesBtcPair,
     orderType = OrderType.SELL,
     amount = 1.waves,
@@ -62,13 +55,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.tryPlace(
         mkOrder(
           owner = bob,
-          matcher = matcher,
           pair = wavesBtcPair,
           orderType = OrderType.BUY,
           amount = 1.waves,
           price = 50000L,
           matcherFee = 100L, // ^ 150
-          version = 3: Byte,
           matcherFeeAssetId = btc
         )) should failWith(9441542, s"Required 0.0000015 $BtcId as fee for this order, but given 0.000001 $BtcId") // TODO
 
@@ -76,13 +67,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       val r = dex1Api.tryPlace(
         mkOrder(
           owner = bob,
-          matcher = matcher,
           pair = wavesBtcPair,
           orderType = OrderType.BUY,
           amount = 1.waves,
           price = 50000L,
           matcherFee = 1920L, // ^ 150
-          version = 3: Byte,
           matcherFeeAssetId = eth // ^ BTC
         ))
       r should failWith(3147270, s"0.0000192 $EthId")
@@ -96,13 +85,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(
         mkOrder(
           owner = bob,
-          matcher = matcher,
           pair = wavesBtcPair,
           orderType = OrderType.SELL,
           amount = 1.waves,
           price = 50000L,
           matcherFee = 150L,
-          version = 3: Byte,
           matcherFeeAssetId = btc
         )
       )
@@ -125,26 +112,22 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       if (bobEthBalance > 0) wavesNode1Api.broadcast(mkTransfer(bob, alice, bobEthBalance, eth))
       val bobOrder = mkOrder(
         owner = bob,
-        matcher = matcher,
         pair = ethWavesPair,
         orderType = OrderType.BUY,
         amount = 100000000L,
         price = 156250000000L,
         matcherFee = 1920L,
-        version = 3: Byte,
         matcherFeeAssetId = eth
       )
       dex1Api.place(bobOrder)
       dex1Api.place(
         mkOrder(
           owner = alice,
-          matcher = matcher,
           pair = ethWavesPair,
           orderType = OrderType.SELL,
           amount = 100000000L,
           price = 156250000000L,
           matcherFee = 1920L,
-          version = 3: Byte,
           matcherFeeAssetId = eth
         ))
       waitForOrderAtNode(bobOrder.id())
@@ -197,7 +180,6 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
         amount = 2.waves,
         price = 50000L,
         matcherFee = 1920L,
-        version = 3,
         matcherFeeAssetId = eth
       )
       dex1Api.place(aliceOrder)
@@ -286,13 +268,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
 
       val aliceOrder = mkOrder(
         owner = alice,
-        matcher = matcher,
         pair = wavesBtcPair,
         orderType = OrderType.SELL,
         amount = 2.waves,
         price = 50000L,
         matcherFee = 1920L,
-        version = 3,
         matcherFeeAssetId = eth
       )
       dex1Api.place(aliceOrder)
@@ -327,13 +307,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
 
         val aliceOrder = mkOrder(
           owner = alice,
-          matcher = matcher,
           pair = wavesBtcPair,
           orderType = OrderType.SELL,
           amount = aliceOrderAmount,
           price = 50000L,
           matcherFee = 1920L,
-          version = 3,
           matcherFeeAssetId = eth
         )
         dex1Api.place(aliceOrder)
@@ -362,13 +340,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       upsertRates(btc -> btcRate)
       val order = mkOrder(
         owner = bob,
-        matcher = matcher,
         pair = wavesBtcPair,
         orderType = OrderType.SELL,
         amount = 1.waves,
         price = 50000L,
         matcherFee = 150L,
-        version = 3: Byte,
         matcherFeeAssetId = btc
       )
       dex1Api.place(order)
@@ -383,7 +359,6 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       upsertRates(btc -> btcRate, eth -> ethRate)
       val bobOrder = mkOrder(
         owner = bob,
-        matcher = matcher,
         pair = wavesBtcPair,
         orderType = OrderType.BUY,
         amount = 1.waves,
@@ -395,13 +370,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(bobOrder)
       val aliceOrder = mkOrder(
         owner = alice,
-        matcher = matcher,
         pair = wavesBtcPair,
         orderType = OrderType.SELL,
         amount = 2.waves,
         price = 50000L,
         matcherFee = 1920L,
-        version = 3,
         matcherFeeAssetId = eth
       )
       dex1Api.place(aliceOrder)

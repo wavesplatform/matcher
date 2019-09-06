@@ -87,8 +87,8 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
         val order2 = mkOrder(bob, aliceWavesPair, BUY, 200, 2.waves * Order.PriceConstant)
         dex1Api.place(order2).status shouldBe "OrderAccepted"
 
-        dex1Api.waitForOrderStatus(aliceWavesPair, order1.id(), OrderStatus.PartiallyFilled)
-        dex1Api.waitForOrderStatus(aliceWavesPair, order2.id(), OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(order1, OrderStatus.PartiallyFilled)
+        dex1Api.waitForOrderStatus(order2, OrderStatus.Filled)
 
         dex1Api.orderHistoryByPair(bob, aliceWavesPair).map(_.id) should contain(order2.id())
         dex1Api.orderHistory(bob).map(_.id) should contain(order2.id())

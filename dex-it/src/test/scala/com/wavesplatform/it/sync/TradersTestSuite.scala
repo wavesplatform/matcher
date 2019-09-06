@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
@@ -9,6 +10,9 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class TradersTestSuite extends NewMatcherSuiteBase {
+
+  override protected val suiteInitialDexConfig: Config =
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "Aqy7PRU", "$UsdId", "WAVES" ]""".stripMargin)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

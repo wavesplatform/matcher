@@ -164,7 +164,7 @@
 //
 //      val orderId = aliceOrder.message.id
 //      // Alice checks that the order in order book
-//      dex1Api.waitForOrderStatus(orderId, OrderStatus.Filled)
+//      dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
 //      dex1Api.orderHistory(alice).head.status shouldBe "Filled"
 //    }
 //  }

@@ -164,7 +164,7 @@ object OrderValidator extends ScorexLogging {
         val mof =
           multiplyFeeByDouble(
             ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript),
-            rateCache.getRate(order.matcherFeeAssetId).get
+            rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
           )
         Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
       case _ => lift(order)
@@ -213,8 +213,11 @@ object OrderValidator extends ScorexLogging {
                                              multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
-      case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)
-      case FixedSettings(_, fixedMinFee)   => fixedMinFee
+      case DynamicSettings(dynamicBaseFee) =>
+        multiplyFeeByDouble(
+          dynamicBaseFee,
+          rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}")))
+      case FixedSettings(_, fixedMinFee) => fixedMinFee
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
         lazy val spentAmount   = order.getSpendAmount(order.amount, matchPrice).explicitGet()

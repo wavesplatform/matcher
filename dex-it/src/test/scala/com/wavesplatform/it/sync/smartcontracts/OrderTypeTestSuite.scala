@@ -72,7 +72,7 @@
 //            .message
 //            .id)
 //
-//        node.cancelOrder(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
+//        dex1Api.cancel(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
 //
 //        setContract(None, alice)
 //      }
@@ -92,7 +92,7 @@
 //          .id
 //        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
-//        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
+//        dex1Api.cancel(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 //
 //        setContract(None, alice)
 //      }
@@ -112,8 +112,8 @@
 //          .id
 //        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
-//        node.cancelOrder(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
-//        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
+//        dex1Api.cancel(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
+//        dex1Api.cancel(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 //
 //        setContract(None, alice)
 //      }

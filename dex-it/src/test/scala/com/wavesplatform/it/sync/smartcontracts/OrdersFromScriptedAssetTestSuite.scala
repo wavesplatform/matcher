@@ -55,7 +55,7 @@
 //    val counterId =
 //      dex1Api.place(mkOrder(matcher,pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee)).message.id
 //    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
-//    node.cancelOrder(matcher, pair, counterId)
+//    dex1Api.cancel(matcher, pair, counterId)
 //  }
 //
 //  "can't place if the script returns FALSE" in {

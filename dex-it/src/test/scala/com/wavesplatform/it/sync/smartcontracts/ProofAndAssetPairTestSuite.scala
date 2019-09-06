@@ -136,10 +136,10 @@
 //            .id
 //          dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 //
-//          node.cancelOrder(alice, predefAssetPair, aliceOrd1)
+//          dex1Api.cancel(alice, predefAssetPair, aliceOrd1)
 //          dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Cancelled)
 //
-//          node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
+//          dex1Api.cancel(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 //          dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Cancelled)
 //        }
 //      }
@@ -175,7 +175,7 @@
 //            .id
 //          dex1Api.waitForOrderStatus(ord1, OrderStatus.Accepted)
 //
-//          node.cancelOrder(alice, predefAssetPair, ord1)
+//          dex1Api.cancel(alice, predefAssetPair, ord1)
 //          dex1Api.waitForOrderStatus(ord1, OrderStatus.Cancelled)
 //        }
 //

@@ -231,7 +231,7 @@
 //    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
 //    dex1Api.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
 //
-//    node.cancelOrder(alice, wctUsdPair, buyOrder)
+//    dex1Api.cancel(alice, wctUsdPair, buyOrder)
 //
 //    retry(10, batchLingerMs) {
 //
@@ -290,7 +290,7 @@
 //    withClue("place buy market order into empty order book") {
 //
 //      val unmatchableMarketBuyOrder = node.placeMarketOrder(bigBuyOrder).message.id
-//      node.waitOrderStatusAndAmount(wctUsdPair, unmatchableMarketBuyOrder, "Filled", Some(0))
+//      node.waitOrderStatusAndAmount(wctUsdPair, unmatchableMarketBuyOrder, OrderStatus.Filled, Some(0))
 //
 //      retry(20, batchLingerMs) {
 //
@@ -312,7 +312,7 @@
 //      ).foreach(lo => dex1Api.waitForOrderStatus(lo, OrderStatus.Accepted))
 //
 //      val marketBuyOrder = node.placeMarketOrder(bigBuyOrder).message.id
-//      node.waitOrderStatusAndAmount(wctUsdPair, marketBuyOrder, "Filled", Some(3 * amount))
+//      node.waitOrderStatusAndAmount(wctUsdPair, marketBuyOrder, OrderStatus.Filled, Some(3 * amount))
 //
 //      retry(15, batchLingerMs) {
 //

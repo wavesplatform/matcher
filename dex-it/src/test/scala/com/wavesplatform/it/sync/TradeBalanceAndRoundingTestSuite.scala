@@ -241,6 +241,7 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
     val wctWavesSellAmount = 2
     val wctWavesPrice      = 11234560000000L
 
+    // TODO requires balance changes
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = wavesNode1Api.balance(bob, Waves) - leasingFee - matcherFee / 2
       val leaseTx       = mkLease(bob, matcher, leasingAmount)

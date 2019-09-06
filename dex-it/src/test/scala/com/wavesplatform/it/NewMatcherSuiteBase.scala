@@ -18,13 +18,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherError, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee}
+import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee, setScriptFee}
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
@@ -35,7 +38,7 @@ import org.scalatest.matchers.Matcher
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
 
@@ -98,7 +101,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 
     val (wavesApi, dexApi) = allApis.partition {
       case _: NodeApi[Id] => true
-      case _             => false
+      case _              => false
     }
 
     waves.foreach(dockerClient().start)
@@ -119,7 +122,10 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")
     val r = super.runTest(testName, args)
-    print(s"Test '$testName' ${if (r.succeeds()) "succeeded" else "failed"}")
+    r.whenCompleted {
+      case Success(r) => print(s"Test '$testName' ${if (r) "succeeded" else "failed"}")
+      case Failure(e) => print(s"Test '$testName' failed with exception '${e.getClass.getSimpleName}'")
+    }
     r
   }
 
@@ -252,10 +258,10 @@ trait TestUtils {
   protected def mkIssue(issuer: KeyPair,
                         name: String,
                         quantity: Long,
-                        decimals: Int = 8,
-                        reissuable: Boolean = false,
-                        script: Option[Script] = None,
+                        decimals: StatusCode = 8,
                         fee: Long = issueFee,
+                        script: Option[Script] = None,
+                        reissuable: Boolean = false,
                         timestamp: Long = System.currentTimeMillis()): IssueTransaction =
     IssueTransactionV2
       .selfSigned(
@@ -266,11 +272,35 @@ trait TestUtils {
         quantity = quantity,
         decimals = decimals.toByte,
         reissuable = false,
-        script = None,
+        script = script,
         fee = fee,
         timestamp = timestamp
       )
       .explicitGet()
+
+  protected def mkSetScript(accountOwner: KeyPair,
+                            script: Option[Script],
+                            fee: Long = setScriptFee,
+                            ts: Long = System.currentTimeMillis()): SetScriptTransaction =
+    SetScriptTransaction
+      .selfSigned(
+        sender = accountOwner,
+        script = script,
+        fee = fee,
+        timestamp = ts
+      )
+      .explicitGet()
+
+  protected def mkSetScriptText(accountOwner: KeyPair,
+                                scriptText: Option[String],
+                                fee: Long = setScriptFee,
+                                ts: Long = System.currentTimeMillis()): SetScriptTransaction = {
+    val script = scriptText.map { x =>
+      ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
+    }
+
+    mkSetScript(accountOwner, script, fee, ts)
+  }
 
   protected def broadcast(txs: Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)

@@ -106,7 +106,7 @@ message RunAssetScriptRequest {
 
 message RunAddressScriptRequest {
     bytes address = 1;
-    Order order = 2;
+    waves.Order order = 2;
 }
 
 message HasAddressScriptRequest {

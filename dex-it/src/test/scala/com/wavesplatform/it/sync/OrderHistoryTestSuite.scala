@@ -130,8 +130,8 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
   }
 
   override protected def afterAll(): Unit = {
-    postgresContainerLauncher.stopAndRemoveContainer()
     super.afterAll()
+    postgresContainerLauncher.stopAndRemoveContainer()
   }
 
   private lazy val ctx =

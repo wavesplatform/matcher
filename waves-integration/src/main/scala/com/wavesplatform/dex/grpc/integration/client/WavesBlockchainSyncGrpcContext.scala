@@ -33,12 +33,12 @@ class WavesBlockchainSyncGrpcContext(channel: ManagedChannel) extends WavesBlock
   override def assetDescription(asset: IssuedAsset): Option[BriefAssetDescription] =
     waves.assetDescription(AssetIdRequest(assetId = asset.id.toPB)).maybeDescription.toVanilla
 
-  override def hasScript(asset: IssuedAsset): Boolean = waves.hasAssetScript(AssetIdRequest(assetId = asset.id.toPB)).has
+  override def hasScript(asset: IssuedAsset): Boolean = waves.hasAssetScript(AssetIdRequest(assetId = asset.toPB)).has
 
   override def runScript(asset: IssuedAsset, input: ve.ExchangeTransaction): RunScriptResult =
     parse(waves.runAssetScript(RunAssetScriptRequest(assetId = asset.id.toPB, transaction = Some(input.toPB))))
 
-  override def hasScript(address: Address): Boolean = waves.hasAddressScript(HasAddressScriptRequest(address = address.bytes.toPB)).has
+  override def hasScript(address: Address): Boolean = waves.hasAddressScript(HasAddressScriptRequest(address = address.toPB)).has
 
   override def runScript(address: Address, input: ve.Order): RunScriptResult =
     parse(

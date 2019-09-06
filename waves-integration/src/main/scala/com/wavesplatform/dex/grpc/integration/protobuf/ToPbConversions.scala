@@ -67,6 +67,6 @@ object ToPbConversions {
   }
 
   implicit class VanillaAddressOps(val self: va.Address) extends AnyVal {
-    def toPB: Address = Address(self.bytes.toPB)
+    def toPB: ByteString = self.bytes.toPB
   }
 }

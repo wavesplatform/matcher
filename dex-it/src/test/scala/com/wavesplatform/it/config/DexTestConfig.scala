@@ -9,8 +9,8 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.{AssetPairDecimals, AssetPairBuilder}
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.dex.{AssetPairBuilder, AssetPairDecimals}
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.settings.GenesisSettings
@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
+import com.wavesplatform.settings._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.collection.JavaConverters._

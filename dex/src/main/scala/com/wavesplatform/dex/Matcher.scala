@@ -50,7 +50,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     with ScorexLogging {
 
   import actorSystem.dispatcher
-  import gRPCExtensionClient.{wavesBalancesAsyncClient, wavesBlockchainSyncClient, scheduler}
+  import gRPCExtensionClient.{scheduler, wavesBalancesAsyncClient, wavesBlockchainSyncClient}
 
   private val time = new NTP(settings.ntpServer)
 
@@ -308,7 +308,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             Props(
               new AddressActor(
                 address,
-                wavesBlockchainSyncClient.spendableBalance(address, _), // TODO change to balancesCache.get
+                asset => balancesCache.get(address -> asset),
                 5.seconds,
                 time,
                 orderDb,

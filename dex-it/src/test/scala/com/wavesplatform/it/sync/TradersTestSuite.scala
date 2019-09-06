@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.NewMatcherSuiteBase
@@ -87,7 +86,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           }
 
           withClue("Cleanup\n") {
-            wavesNode1Api.waitForTransaction(transferTx.id.value)
+            wavesNode1Api.waitForTransaction(transferTx)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
             broadcastAndAwait(mkTransfer(alice, bob, transferAmount, WctAsset))
@@ -113,7 +112,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           }
 
           withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(lease.id.value)
+            wavesNode1Api.waitForTransaction(lease)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
             broadcastAndAwait(mkLeaseCancel(bob, lease.id.value))
@@ -139,7 +138,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           }
 
           withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(transferTx.id.value)
+            wavesNode1Api.waitForTransaction(transferTx)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
             broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
@@ -166,7 +165,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           }
 
           withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(lease.id.value)
+            wavesNode1Api.waitForTransaction(lease)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
             broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
@@ -188,7 +187,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           }
 
           withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(lease.id.value)
+            wavesNode1Api.waitForTransaction(lease)
             broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
           }
         }

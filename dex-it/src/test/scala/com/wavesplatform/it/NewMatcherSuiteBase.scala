@@ -255,7 +255,7 @@ trait TestUtils {
 
   protected def broadcastAndAwait(txs: transaction.Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
-    txs.foreach(tx => wavesNode1Api.waitForTransaction { tx.id.value })
+    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx))
   }
 
   protected def restartContainer(container: DockerContainer, api: HasWaitReady[cats.Id]): Unit = {

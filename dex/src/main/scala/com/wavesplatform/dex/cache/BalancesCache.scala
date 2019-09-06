@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.Asset
+import scala.collection.JavaConverters._
 
 class BalancesCache(getFromBlockchain: (Address, Asset) => Long) {
 
@@ -11,7 +12,7 @@ class BalancesCache(getFromBlockchain: (Address, Asset) => Long) {
 
   def get(key: (Address, Asset)): Long = if (balancesCache containsKey key) balancesCache get key else getFromBlockchain(key._1, key._2)
 
-  def updateAllValues(): Unit = balancesCache.keySet forEach (_ => getFromBlockchain)
+  def updateAllValues(): Unit = balancesCache.keySet.asScala.foreach(_ => getFromBlockchain)
 
   def upsert(key: (Address, Asset), value: Long): Unit = balancesCache.put(key, value)
 

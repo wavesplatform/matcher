@@ -45,6 +45,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def rawTransactionInfo(id: ByteStr): F[Option[JsValue]]
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForHeightArise(): F[Unit]
+  def waitForHeight(height: Int): F[Unit]
 
   def config: F[Config]
 }
@@ -144,13 +145,14 @@ object NodeApi {
 
       override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(transactionInfo(id), 1.second)(_.nonEmpty).map(_ => ())
 
-      override def waitForHeightArise(): F[Unit] = {
+      override def waitForHeightArise(): F[Unit] =
         currentHeight
           .flatMap { origHeight =>
             repeatUntil(currentHeight, 1.second)(_ > origHeight)
           }
           .map(_ => ())
-      }
+
+      override def waitForHeight(height: Int): F[Unit] = FOps[F].repeatUntil(currentHeight, 1.second)(_ >= height).map(_ => ())
 
       override def config: F[Config] = {
         val req = sttp.get(uri"$apiUri/blocks/height").response(asString("UTF-8"))

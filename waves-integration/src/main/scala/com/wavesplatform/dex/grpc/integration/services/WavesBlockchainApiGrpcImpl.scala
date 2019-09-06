@@ -8,6 +8,7 @@ import com.wavesplatform.dex.grpc.integration.error
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.{EitherVEExt, StreamObserverMonixOps}
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
+import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
@@ -25,6 +26,7 @@ import shapeless.Coproduct
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
+import com.wavesplatform.features.FeatureProvider._
 
 class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcastTransaction: VanillaTransaction => Unit)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
@@ -63,7 +65,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
   }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
-    IsFeatureActivatedResponse(isActivated = blockchain.activatedFeatures.contains(request.featureId.toShort))
+    IsFeatureActivatedResponse(blockchain.featureStatus(request.featureId.toShort, blockchain.height) == BlockchainFeatureStatus.Activated)
   }
 
   override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {
@@ -91,7 +93,6 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     import RunScriptResponse._
 
     val asset = IssuedAsset(request.assetId.toVanilla)
-
     val r = blockchain.assetScript(asset) match {
       case None => Result.Empty
       case Some(script) =>
@@ -138,7 +139,7 @@ class WavesBlockchainApiGrpcImpl(blockchain: Blockchain, utx: UtxPool, broadcast
     ForgedOrderResponse(isForged = seen)
   }
 
-  private def parseScriptResult(raw: Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
+  private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
     try raw match {
       case Left(execError) => Result.ScriptError(execError)

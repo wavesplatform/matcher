@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 class CancelOrderTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
   }
 
   "Order can be canceled" - {

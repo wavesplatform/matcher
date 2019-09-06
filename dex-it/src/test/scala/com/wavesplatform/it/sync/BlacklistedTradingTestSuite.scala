@@ -20,7 +20,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
   }
 
   "When blacklists are empty" in {

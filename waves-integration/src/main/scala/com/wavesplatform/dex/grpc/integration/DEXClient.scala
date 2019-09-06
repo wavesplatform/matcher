@@ -1,10 +1,13 @@
 package com.wavesplatform.dex.grpc.integration
 
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesGrpcAsyncClient
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainGrpcSyncClient
 import io.grpc._
 import io.grpc.internal.DnsNameResolverProvider
+import monix.execution.Scheduler
+import monix.execution.Scheduler.Implicits.global
 
-class DEXClient(target: String) {
+class DEXClient(target: String, val scheduler: Scheduler = global) {
 
   private val channel =
     ManagedChannelBuilder
@@ -14,5 +17,6 @@ class DEXClient(target: String) {
       .usePlaintext()
       .build
 
-  lazy val balancesServiceClient = new BalancesServiceClient(channel)
+  lazy val wavesBlockchainSyncClient = new WavesBlockchainGrpcSyncClient(channel)
+  lazy val wavesBalancesAsyncClient  = new WavesBalancesGrpcAsyncClient(channel)(scheduler)
 }

@@ -10,7 +10,6 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalance
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
@@ -104,8 +103,8 @@ class AddressActor(owner: Address,
 
   private def handleCommands: Receive = {
 
-    case BalanceUpdated(changedAssetBalances) =>
-      getOrdersToCancel(changedAssetBalances) |> { toCancel =>
+    case BalanceUpdated(actualBalance) =>
+      getOrdersToCancel(actualBalance) |> { toCancel =>
         if (toCancel.nonEmpty) {
           log.debug(s"Canceling: $toCancel")
           toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
@@ -293,33 +292,35 @@ class AddressActor(owner: Address,
 
   def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
 
-  private def getOrdersToCancel(changedBalances: SpendableBalance): Queue[QueueEvent.Canceled] = {
+  private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[QueueEvent.Canceled] = {
     // Now a user can have 100 active transaction maximum - easy to traverse.
     activeOrders.values.toSeq
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .view
-      .map(ao => (ao.order.id.value, ao.order.assetPair, ao.requiredBalance filterKeys changedBalances.contains))
-      .foldLeft { (changedBalances, Queue.empty[QueueEvent.Canceled]) } {
-        case ((restBalance, toCancel), (id, assetPair, requiredBalance)) =>
-          remove(restBalance, requiredBalance) match {
-            case Some(updatedRestBalance) => updatedRestBalance -> toCancel
+      .map(ao => (ao.order.id.value, ao.order.assetPair, ao.requiredBalance filterKeys actualBalance.contains))
+      .foldLeft { (actualBalance, Queue.empty[QueueEvent.Canceled]) } {
+        case ((currentBalance, ordersToCancel), (id, assetPair, requiredBalance)) =>
+          subtract(currentBalance, requiredBalance) match {
+            case Some(updatedCurrentBalances) => updatedCurrentBalances -> ordersToCancel
             case None =>
-              val updatedToDelete = if (pendingCancellation contains id) toCancel else toCancel enqueue QueueEvent.Canceled(assetPair, id)
-              restBalance -> updatedToDelete
+              currentBalance -> {
+                if (pendingCancellation contains id) ordersToCancel else ordersToCancel enqueue QueueEvent.Canceled(assetPair, id)
+              }
           }
       }
       ._2
   }
 
-  private def remove(from: SpendableBalance, xs: SpendableBalance): Option[SpendableBalance] =
-    xs.foldLeft[Option[SpendableBalance]](Some(from)) {
-      case (None, _)      => None
-      case (curr, (_, 0)) => curr
-      case (Some(curr), (assetId, amount)) =>
-        val updatedAmount = curr.getOrElse(assetId, 0L) - amount
+  private def subtract(currentBalance: Map[Asset, Long], requiredBalance: Map[Asset, Long]): Option[Map[Asset, Long]] = {
+    requiredBalance.foldLeft[Option[Map[Asset, Long]]] { Some(currentBalance) } {
+      case (None, _)                => None
+      case (currentBalance, (_, 0)) => currentBalance
+      case (Some(currentBalance), (assetId, requiredAmount)) =>
+        val updatedAmount = currentBalance.getOrElse(assetId, 0L) - requiredAmount
         if (updatedAmount < 0) None
-        else Some(curr.updated(assetId, updatedAmount))
+        else Some { currentBalance.updated(assetId, updatedAmount) }
     }
+  }
 }
 
 object AddressActor {
@@ -352,7 +353,7 @@ object AddressActor {
 
   case class CancelOrder(orderId: ByteStr)                             extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-  case class BalanceUpdated(changedAssets: SpendableBalance)           extends Command
+  case class BalanceUpdated(actualBalance: Map[Asset, Long])           extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 }

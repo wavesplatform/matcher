@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicReference
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -34,10 +33,11 @@ object DexTestConfig {
   }
 
   private val containerConfigCache = new AtomicReference[Map[String, Config]](Map.empty)
-  def containerConfig(name: String): Config =
+
+  def containerConfig(name: String): Config = {
     containerConfigCache
       .updateAndGet { prev: Map[String, Config] =>
-        if (prev.isDefinedAt(name)) prev
+        if (prev isDefinedAt name) prev
         else
           prev.updated(
             name, {
@@ -47,13 +47,16 @@ object DexTestConfig {
           )
       }
       .apply(name)
+  }
 
-  val genesisConfig = genesisOverride
+  val genesisConfig: Config = genesisOverride
 
   val accounts: Map[String, KeyPair] = {
+
     val config           = ConfigFactory.parseResources("genesis.conf")
     val distributionsKey = "genesis-generator.distributions"
     val distributions    = config.getObject(distributionsKey)
+
     distributions
       .keySet()
       .asScala

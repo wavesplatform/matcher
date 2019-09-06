@@ -29,6 +29,7 @@ import scala.util.control.NonFatal
 
 case class MatcherError(error: Int, message: String, status: String, params: Option[MatcherError.Params])
 object MatcherError {
+
   implicit val format: Format[MatcherError] = Json.format[MatcherError]
 
   case class Params(assetId: Option[String] = None, address: Option[String] = None) {
@@ -36,6 +37,7 @@ object MatcherError {
   }
 
   object Params {
+
     implicit val format: Format[Params] = Json.format[Params]
 
     private object containsPoly extends Poly1 {
@@ -63,6 +65,7 @@ object OrderStatusResponse {
 }
 
 trait DexApi[F[_]] extends HasWaitReady[F] {
+
   def publicKey: F[PublicKey]
 
   def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]]

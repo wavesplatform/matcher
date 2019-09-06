@@ -7,6 +7,7 @@ import cats.{Id, ~>}
 import scala.util.Try
 
 package object fp {
+
   implicit val tryToId: Try ~> Id = new FunctionK[Try, Id] {
     def apply[A](fa: Try[A]): Id[A] = fa.get
   }

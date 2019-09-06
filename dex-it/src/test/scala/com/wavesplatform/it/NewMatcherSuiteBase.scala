@@ -54,8 +54,9 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   // Waves miner node
 
   protected def wavesNode1Config: Config = DexTestConfig.containerConfig("waves-1")
+
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve())
+    dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve)
   }
 
   // TODO move to container
@@ -64,13 +65,16 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
-  protected def wavesNode1NetworkApiAddress: InetSocketAddress =
+  protected def wavesNode1NetworkApiAddress: InetSocketAddress = {
     dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))
+  }
 
-  // D3X server
+  // d3x server
 
-  protected def dex1Config: Config                 = DexTestConfig.containerConfig("dex-1")
+  protected def dex1Config: Config = DexTestConfig.containerConfig("dex-1")
+
   protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
+
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
     val grpcAddr = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
     val wavesNodeGrpcConfig = ConfigFactory
@@ -98,14 +102,14 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected def allApis: List[HasWaitReady[cats.Id]] = List(wavesNode1Api, dex1Api)
 
   override protected def beforeAll(): Unit = {
-    log.debug(s"Doing beforeAll")
+    log.debug(s"Perform beforeAll")
     super.beforeAll()
     allContainers.foreach(dockerClient().start)
     allApis.foreach(_.waitReady)
   }
 
   override protected def afterAll(): Unit = {
-    log.debug(s"Doing afterAll")
+    log.debug(s"Perform afterAll")
     dockerClient().close()
     futureHttpBackend.close()
     tryHttpBackend.close()

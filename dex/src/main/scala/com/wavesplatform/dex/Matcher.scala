@@ -95,10 +95,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     new Observer[SpendableBalanceChanges] {
       override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
       override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
-      override def onError(ex: Throwable): Unit = {
-        log.warn(s"Error while listening to the balance changes stream occurred, all balances cache values will be updated! ${ex.getMessage}")
-        balancesCache.updateAllValues()
-      }
+      override def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
     }
   }(scheduler)
 

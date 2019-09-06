@@ -71,9 +71,9 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
   }
 
-  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
+  def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
-  private val network: Coeval[Network] = Coeval.evalOnce {
+  val network: Coeval[Network] = Coeval.evalOnce {
     val id          = Random.nextInt(Int.MaxValue)
     val networkName = s"waves-$id"
 

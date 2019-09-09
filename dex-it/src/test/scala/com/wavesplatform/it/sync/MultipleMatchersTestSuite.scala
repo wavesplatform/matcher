@@ -26,7 +26,7 @@ class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
       |}""".stripMargin)
 
   protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient().createDex("dex-2", dexRunConfig(), suiteInitialWavesNodeConfig)
+    dockerClient().createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
   }
 
   private def dex2ApiAddress                 = dockerClient().getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)

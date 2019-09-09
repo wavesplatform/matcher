@@ -8,10 +8,11 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import org.scalatest.concurrent.Eventually
 
 import scala.math.BigDecimal.RoundingMode
 
-class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
+class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase with Eventually {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueWctTx)
@@ -198,8 +199,10 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
 
       dex1Api.reservedBalance(bob)(wct) shouldBe expectedReservedBobWct
       // 999999999652 = 999999999999 - 142 - 205
-      dex1Api.tradableBalance(bob, wctUsdPair)(wct) shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
-      dex1Api.tradableBalance(bob, wctUsdPair)(usd) shouldBe bobUsdBalance + bobReceiveUsdAmount
+      eventually {
+        dex1Api.tradableBalance(bob, wctUsdPair)(wct) shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
+        dex1Api.tradableBalance(bob, wctUsdPair)(usd) shouldBe bobUsdBalance + bobReceiveUsdAmount
+      }
 
       dex1Api.reservedBalance(alice) shouldBe empty
       dex1Api.tradableBalance(alice, wctUsdPair)(usd) shouldBe aliceUsdBalance - bobReceiveUsdAmount
@@ -241,7 +244,6 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
     val wctWavesSellAmount = 2
     val wctWavesPrice      = 11234560000000L
 
-    // TODO requires balance changes
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = wavesNode1Api.balance(bob, Waves) - leasingFee - matcherFee / 2
       val leaseTx       = mkLease(bob, matcher, leasingAmount)
@@ -254,9 +256,7 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
       dex1Api.tradableBalance(bob, wctWavesPair)(Waves) shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
       dex1Api.cancel(bob, bobOrder)
 
-      // TODO fix
-      dex1Api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(0)
-      //"Not enough tradable balance"
+      dex1Api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270)
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }

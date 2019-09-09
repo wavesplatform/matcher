@@ -56,11 +56,6 @@ object OrderValidator extends ScorexLogging {
 
   private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order): Result[Unit] =
     if (blockchain.hasScript(address)) {
-      println(
-        s"""isFeatureActivated(BlockchainFeatures.SmartAccountTrading): ${blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)}
-           |order.id: ${order.id()}
-           |order.version: ${order.version}
-           |""".stripMargin)
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id))
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
@@ -167,15 +162,6 @@ object OrderValidator extends ScorexLogging {
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
         val minFee = ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript)
-        println(
-          s"""
-             |id: ${order.id()}
-             |minFee: $minFee
-             |baseFee: $baseFee
-             |matcherAddress: hasScript: ${blockchain.hasScript(matcherAddress)}
-             |${order.assetPair.amountAssetStr}: hasScript: ${order.assetPair.amountAsset.fold(false)(blockchain.hasScript)}
-             |${order.assetPair.priceAssetStr}: hasScript: ${order.assetPair.priceAsset.fold(false)(blockchain.hasScript)}
-             |""".stripMargin)
         val mof =
           multiplyFeeByDouble(
             minFee,

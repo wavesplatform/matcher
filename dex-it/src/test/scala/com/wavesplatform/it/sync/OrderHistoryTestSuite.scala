@@ -24,6 +24,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 
+import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.{Failure, Try}
 
@@ -201,9 +202,9 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
-      .foreach { _ =>
-        dex1Api.place(mkOrder(alice, wctUsdPair, BUY, 1, price))
-        dex1Api.place(mkOrder(bob, wctUsdPair, SELL, 1, price))
+      .foreach { i =>
+        dex1Api.place(mkOrder(alice, wctUsdPair, BUY, 1, price, ttl = 1.day + i.seconds))
+        dex1Api.place(mkOrder(bob, wctUsdPair, SELL, 1, price, ttl = 1.day + i.seconds))
       }
 
     retry(10, batchLingerMs) {
@@ -219,7 +220,7 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     dex1Api.place(buyOrder)
 
     val sellOrder1 = mkSellOrder
-    dex1Api.place(mkSellOrder)
+    dex1Api.place(sellOrder1)
 
     dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
     dex1Api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
@@ -313,7 +314,7 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
       val orders = Seq(
         mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.97).toLong),
         mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong),
-        mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong)
+        mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong, ttl = 1.day)
       )
       orders.foreach(dex1Api.place)
       orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))

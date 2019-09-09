@@ -8,9 +8,9 @@ import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms

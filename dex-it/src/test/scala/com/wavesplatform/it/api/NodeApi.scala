@@ -10,6 +10,7 @@ import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
@@ -19,6 +20,7 @@ import com.wavesplatform.{account, transaction}
 import play.api.libs.json._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 case class ConnectedPeersResponse(peers: List[PeerInfo])
@@ -31,6 +33,11 @@ object PeerInfo {
   implicit val format: Format[PeerInfo] = Json.format[PeerInfo]
 }
 
+case class ErrorResponse(error: Int, message: String)
+object ErrorResponse {
+  implicit val format: Format[ErrorResponse] = Json.format[ErrorResponse]
+}
+
 trait NodeApi[F[_]] extends HasWaitReady[F] {
 
   def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]
@@ -41,12 +48,19 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
 
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
+  def tryBroadcast(tx: transaction.Transaction): F[Either[ErrorResponse, Unit]]
   def broadcast(tx: transaction.Transaction): F[Unit]
+
+  def transactionInfo(id: ByteStr): F[Option[Transaction]]
+  def rawTransactionInfo(id: ByteStr): F[Option[JsValue]]
 
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForTransaction(tx: transaction.Transaction): F[Unit] = waitForTransaction(tx.id.value)
 
   def waitForHeightArise(): F[Unit]
+  def waitForHeight(height: Int): F[Unit]
+
+  def config: F[Config]
 }
 
 object NodeApi {
@@ -112,6 +126,10 @@ object NodeApi {
         repeatUntil(connected, 1.second)(_.peers.exists(p => p.address.contains(hostName))).map(_ => ())
       }
 
+      override def tryBroadcast(tx: transaction.Transaction): F[Either[ErrorResponse, Unit]] = try_ {
+        sttp.post(uri"$apiUri/transactions/broadcast").body(tx).mapResponse(_ => ())
+      }
+
       override def broadcast(tx: transaction.Transaction): F[Unit] = {
         val req = sttp.post(uri"$apiUri/transactions/broadcast").body(tx).mapResponse(_ => ())
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
@@ -120,9 +138,7 @@ object NodeApi {
         }
       }
 
-      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(transactionInfo(id), 1.second)(_.nonEmpty).map(_ => ())
-
-      def transactionInfo(id: ByteStr): F[Option[Transaction]] = {
+      override def transactionInfo(id: ByteStr): F[Option[Transaction]] = {
         val req = sttp.get(uri"$apiUri/transactions/info/$id").response(asJson[Transaction])
         repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
           resp.rawErrorBody match {
@@ -133,12 +149,36 @@ object NodeApi {
         }
       }
 
-      override def waitForHeightArise(): F[Unit] = {
+      override def rawTransactionInfo(id: ByteStr): F[Option[JsValue]] = {
+        val req = sttp.get(uri"$apiUri/transactions/info/$id").response(asJson[JsValue])
+        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.code == StatusCodes.Ok || resp.code == StatusCodes.NotFound).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_)            => M.pure(None)
+            case Right(Left(error)) => M.raiseError[Option[JsValue]](new RuntimeException(s"Can't parse the response: $error"))
+            case Right(Right(r))    => M.pure(Some(r))
+          }
+        }
+      }
+
+      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(transactionInfo(id), 1.second)(_.nonEmpty).map(_ => ())
+
+      override def waitForHeightArise(): F[Unit] =
         currentHeight
           .flatMap { origHeight =>
             repeatUntil(currentHeight, 1.second)(_ > origHeight)
           }
           .map(_ => ())
+
+      override def waitForHeight(height: Int): F[Unit] = FOps[F].repeatUntil(currentHeight, 1.second)(_ >= height).map(_ => ())
+
+      override def config: F[Config] = {
+        val req = sttp.get(uri"$apiUri/blocks/height").response(asString("UTF-8"))
+        httpBackend.send(req).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_)        => M.raiseError[Config](new RuntimeException(s"The server returned an error: ${resp.code}"))
+            case Right(content) => M.fromTry(Try(ConfigFactory.parseString(content)))
+          }
+        }
       }
 
       def currentHeight: F[Int] = {
@@ -190,6 +230,9 @@ object NodeApi {
 //            case Right(Right(r))    => M.pure(r)
 //          }
 //        }
+
+      private def try_(req: RequestT[Id, Unit, Nothing]): F[Either[ErrorResponse, Unit]] =
+        httpBackend.send(req).flatMap(FOps[F].parseTryResponse[ErrorResponse, Unit])
     }
 
   case class HeightResponse(height: Int)

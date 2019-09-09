@@ -10,14 +10,13 @@ import org.scalacheck.Gen
 import scala.util.Random
 
 class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
-  override protected def dex1Config: Config = ConfigFactory.parseString("waves.dex.snapshots-interval = 51").withFallback(super.dex1Config)
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.snapshots-interval = 51")
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
 
   private val assetPairs = List(ethUsdPair, wavesUsdPair, ethWavesPair)
   private val orders     = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
-  private val lastOrder  = orderGen(matcher, alice, assetPairs).sample.get
 
   private var successfulCommandsNumber = 0
 
@@ -25,7 +24,6 @@ class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
     val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
     val commands = Random.shuffle(orders.map(MatcherCommand.Place(dex1AsyncApi, _))) ++ cancels.map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
     successfulCommandsNumber += executeCommands(commands)
-    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1AsyncApi, lastOrder)))
   }
 
   "Wait until all requests are processed - 1" in {

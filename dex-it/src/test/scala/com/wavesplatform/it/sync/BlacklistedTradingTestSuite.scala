@@ -16,7 +16,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
   import BlacklistedTradingTestSuite._
 
-  override protected def dex1Config: Config = configWithBlacklisted().withFallback(super.dex1Config)
+  override protected def suiteInitialDexConfig: Config = configWithBlacklisted()
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -27,15 +27,15 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     val (dec2, dec8) = (1000L, 1000000000L)
 
     Then("Place some orders")
-    val usdOrder  = mkOrder(alice, matcher, wavesUsdPair, BUY, dec8, dec2)
-    val wctOrder  = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
-    val ethOrder  = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
-    val btcOrder1 = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val usdOrder  = mkOrder(alice, wavesUsdPair, BUY, dec8, dec2)
+    val wctOrder  = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
+    val ethOrder  = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder1 = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
     List(usdOrder, wctOrder, ethOrder, btcOrder1).foreach(dex1Api.place)
     dex1Api.waitForOrderStatus(btcOrder1, OrderStatus.Accepted)
 
     Then("We blacklist some assets and addresses and restart the node")
-    replaceLocalConfig(
+    replaceSuiteConfig(
       dex1Container(),
       configWithBlacklisted(
         assets = Array(WctId.toString),
@@ -49,10 +49,10 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     testOrderStatusDenied(wctOrder, IssuedAsset(WctId))
     testOrderStatusDenied(ethOrder, IssuedAsset(EthId))
 
-    testOrderPlacementDenied(mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8), IssuedAsset(WctId))
-    testOrderPlacementDenied(mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8), IssuedAsset(EthId))
+    testOrderPlacementDenied(mkOrder(alice, wctWavesPair, BUY, dec2, dec8), IssuedAsset(WctId))
+    testOrderPlacementDenied(mkOrder(alice, ethWavesPair, SELL, dec8, dec8), IssuedAsset(EthId))
 
-    testOrderPlacementDenied(mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8), bob)
+    testOrderPlacementDenied(mkOrder(bob, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
     dex1Api.orderStatus(btcOrder1).status shouldBe OrderStatus.Accepted
@@ -85,12 +85,12 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
-    val btcOrder2 = mkOrder(alice, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
     dex1Api.place(btcOrder2)
     dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
 
     And("now if all blacklists are cleared")
-    replaceLocalConfig(dex1Container(), configWithBlacklisted())
+    replaceSuiteConfig(dex1Container(), configWithBlacklisted())
     restartContainer(dex1Container(), dex1Api)
 
     Then("OrderBook for blacklisted assets is available again")
@@ -102,9 +102,9 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
     dex1Api.orderStatus(ethOrder).status shouldBe OrderStatus.Accepted
 
     And("new orders can be placed")
-    val newWctOrder = mkOrder(alice, matcher, wctWavesPair, BUY, dec2, dec8)
-    val newEthOrder = mkOrder(alice, matcher, ethWavesPair, SELL, dec8, dec8)
-    val btcOrder3   = mkOrder(bob, matcher, wavesBtcPair, SELL, dec8, dec8)
+    val newWctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
+    val newEthOrder = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
+    val btcOrder3   = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
     val newOrders   = List(newWctOrder, newEthOrder, btcOrder3)
     newOrders.foreach(dex1Api.place)
     newOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
@@ -132,10 +132,10 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
 object BlacklistedTradingTestSuite {
 
-  def configWithBlacklisted(assets: Array[String] = Array.empty,
-                            names: Array[String] = Array.empty,
-                            addresses: Array[String] = Array.empty,
-                            allowedAssetPairs: Array[String] = Array.empty): Config = {
+  private def configWithBlacklisted(assets: Array[String] = Array.empty,
+                                    names: Array[String] = Array.empty,
+                                    addresses: Array[String] = Array.empty,
+                                    allowedAssetPairs: Array[String] = Array.empty): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
                 |waves.dex {

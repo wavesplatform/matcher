@@ -161,10 +161,11 @@ object OrderValidator extends ScorexLogging {
     /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
+        val minFee = ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript)
         val mof =
           multiplyFeeByDouble(
-            ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript),
-            rateCache.getRate(order.matcherFeeAssetId).get
+            minFee,
+            rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
           )
         Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
       case _ => lift(order)
@@ -213,8 +214,11 @@ object OrderValidator extends ScorexLogging {
                                              multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
-      case DynamicSettings(dynamicBaseFee) => multiplyFeeByDouble(dynamicBaseFee, rateCache.getRate(order.matcherFeeAssetId).get)
-      case FixedSettings(_, fixedMinFee)   => fixedMinFee
+      case DynamicSettings(dynamicBaseFee) =>
+        multiplyFeeByDouble(
+          dynamicBaseFee,
+          rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}")))
+      case FixedSettings(_, fixedMinFee) => fixedMinFee
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
         lazy val spentAmount   = order.getSpendAmount(order.amount, matchPrice).explicitGet()
@@ -233,7 +237,6 @@ object OrderValidator extends ScorexLogging {
   private def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
     if (order.version < 3) lift(order)
     else {
-
       lazy val requiredFeeAssetIds = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
       lazy val requiredFee         = getMinValidFeeForSettings(order, orderFeeSettings, order.price, rateCache)
 

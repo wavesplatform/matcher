@@ -1,11 +1,11 @@
+// TODO DEX-390
 //package com.wavesplatform.it.async
 //
 //import com.typesafe.config.{Config, ConfigFactory}
 //import com.wavesplatform.account.KeyPair
 //import com.wavesplatform.common.utils.EitherExt2
 //import com.wavesplatform.it._
-//import com.wavesplatform.it.api.AsyncMatcherHttpApi._
-//import com.wavesplatform.it.api.UnexpectedStatusCodeException
+//import com.wavesplatform.it.api.{OrderStatus, UnexpectedStatusCodeException}
 //import com.wavesplatform.it.async.CorrectStatusAfterPlaceTestSuite._
 //import com.wavesplatform.it.config.DexTestConfig._
 //import com.wavesplatform.it.util._
@@ -18,23 +18,18 @@
 //import scala.concurrent.{Await, Future}
 //import scala.util.Random
 //
-//class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
-//
-//  private val matcherConfig = ConfigFactory.parseString(
-//    s"""waves {
-//       |  dex {
-//       |    price-assets = ["${Asset1.id()}", "${Asset2.id()}"]
-//       |    rest-order-limit = 100
-//       |    events-queue {
-//       |      local {
-//       |        polling-interval = 1s
-//       |        max-elements-per-poll = 100
-//       |      }
-//       |
-//       |      kafka.consumer {
-//       |        buffer-size = 100
-//       |      }
+//class CorrectStatusAfterPlaceTestSuite extends NewMatcherSuiteBase {
+//  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+//    s"""waves.dex {
+//       |  price-assets = ["${issueAsset1Tx.id()}", "${issueAsset2Tx.id()}"]
+//       |  rest-order-limit = 100
+//       |  events-queue {
+//       |    local {
+//       |      polling-interval = 1s
+//       |      max-elements-per-poll = 100
 //       |    }
+//       |
+//       |    kafka.consumer.buffer-size = 100
 //       |  }
 //       |}
 //       |
@@ -42,64 +37,31 @@
 //  )
 //
 //  private val pairs = Seq(
-//    AssetPair(Waves, IssuedAsset(Asset1.id())),
-//    AssetPair(Waves, IssuedAsset(Asset2.id())),
-//    AssetPair(IssuedAsset(Asset2.id()), IssuedAsset(Asset1.id())),
+//    AssetPair(Waves, IssuedAsset(issueAsset1Tx.id())),
+//    AssetPair(Waves, IssuedAsset(issueAsset2Tx.id())),
+//    AssetPair(IssuedAsset(issueAsset2Tx.id()), IssuedAsset(issueAsset1Tx.id())),
 //  )
-//
-//  override protected val nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
 //
 //  private val traders: Seq[KeyPair] = (1 to 10).map(_ => KeyPair(Random.nextString(20).getBytes))
 //
 //  override protected def beforeAll(): Unit = {
 //    super.beforeAll()
 //
-//    val startTs    = System.currentTimeMillis()
 //    val sendAmount = Long.MaxValue / (traders.size + 1)
-//    val issueAndDistribute = for {
-//      // distribute waves
-//      transferWavesTx <- {
-//        val transferTx = MassTransferTransaction
-//          .selfSigned(
-//            sender = bob,
-//            assetId = Waves,
-//            transfers = traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, 100.waves)).toList,
-//            timestamp = startTs,
-//            feeAmount = 0.006.waves,
-//            attachment = Array.emptyByteArray
-//          )
-//          .explicitGet()
 //
-//        node.broadcastRequest(transferTx.json())
-//      }
+//    val transferWavesTx =
+//      mkMassTransfer(bob, Waves, traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, 100.waves))(collection.breakOut))
+//    wavesNode1Api.broadcast(transferWavesTx)
 //
-//      // issue
-//      issueTxs <- Future.traverse(Assets)(asset => node.broadcastRequest(asset.json()))
-//      _        <- Future.traverse(issueTxs)(tx => node.waitForTransaction(tx.id))
+//    broadcastAndAwait(issueAssetTxs: _*)
+//    val transferAssetsTxs = issueAssetTxs.map { issueTx =>
+//      mkMassTransfer(issuer,
+//                     IssuedAsset(issueTx.id()),
+//                     traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, sendAmount))(collection.breakOut))
+//    }
+//    broadcastAndAwait(transferAssetsTxs: _*)
 //
-//      // distribute assets
-//      transferAssetsTxs <- Future.sequence {
-//        Assets.map { issueTx =>
-//          val transferTx = MassTransferTransaction
-//            .selfSigned(
-//              sender = Issuer,
-//              assetId = IssuedAsset(issueTx.id()),
-//              transfers = traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, sendAmount)).toList,
-//              timestamp = startTs,
-//              feeAmount = 0.006.waves,
-//              attachment = Array.emptyByteArray
-//            )
-//            .explicitGet()
-//
-//          node.broadcastRequest(transferTx.json())
-//        }
-//      }
-//
-//      _ <- node.waitForTransaction(transferWavesTx.id)
-//      _ <- Future.traverse(transferAssetsTxs)(tx => node.waitForTransaction(tx.id))
-//    } yield ()
-//
-//    Await.result(issueAndDistribute, 5.minute)
+//    wavesNode1Api.waitForTransaction(transferWavesTx.id())
 //  }
 //
 //  "place orders and check their statuses" in {
@@ -109,31 +71,31 @@
 //      account <- traders
 //      pair    <- pairs
 //      i       <- 1 to 60
-//    } yield node.prepareOrder(account, pair, OrderType.SELL, 100000L, 10000L, 0.003.waves, 1, timestamp = ts + i)
+//    } yield mkOrder(account, pair, OrderType.SELL, 100000L, 10000L, ts = ts + i)
 //
 //    val r = Await.result(Future.traverse(orders.grouped(orders.size / 5))(requests), 5.minutes).flatten
 //    r.foreach {
-//      case (id, status) => withClue(id)(status should not be "NotFound")
+//      case (id, status) => withClue(s"$id")(status should not be OrderStatus.NotFound)
 //    }
 //  }
 //
-//  private def request(order: Order): Future[(String, String)] =
+//  private def request(order: Order): Future[(Order.Id, OrderStatus)] =
 //    for {
-//      _ <- node.placeOrder(order).recover {
+//      _ <- dex1AsyncApi.place(order).recover {
 //        case e: UnexpectedStatusCodeException if e.statusCode == 503 || e.responseBody.contains("has already been placed") => // Acceptable
 //      }
-//      status <- node.orderStatus(order.idStr(), order.assetPair, waitForStatus = false)
-//    } yield (order.idStr(), status.status)
+//      status <- dex1AsyncApi.orderStatus(order)
+//    } yield (order.id(), status.status)
 //
-//  private def requests(orders: Seq[Order]): Future[Seq[(String, String)]] = Future.traverse(orders)(request)
+//  private def requests(orders: Seq[Order]): Future[Seq[(Order.Id, OrderStatus)]] = Future.traverse(orders)(request)
 //}
 //
 //object CorrectStatusAfterPlaceTestSuite {
-//  private val Issuer = alice
+//  private val issuer = alice
 //
-//  private val Asset1 = IssueTransactionV1
+//  private val issueAsset1Tx = IssueTransactionV1
 //    .selfSigned(
-//      sender = Issuer,
+//      sender = issuer,
 //      name = "asset1".getBytes,
 //      description = Array.emptyByteArray,
 //      quantity = Long.MaxValue,
@@ -144,9 +106,9 @@
 //    )
 //    .explicitGet()
 //
-//  private val Asset2 = IssueTransactionV1
+//  private val issueAsset2Tx = IssueTransactionV1
 //    .selfSigned(
-//      sender = Issuer,
+//      sender = issuer,
 //      name = "asset2".getBytes,
 //      description = Array.emptyByteArray,
 //      quantity = Long.MaxValue,
@@ -157,5 +119,5 @@
 //    )
 //    .explicitGet()
 //
-//  private val Assets = List(Asset1, Asset2)
+//  private val issueAssetTxs = List(issueAsset1Tx, issueAsset2Tx)
 //}

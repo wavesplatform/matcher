@@ -18,29 +18,38 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherError, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction, TransferTransactionV2}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.Matcher
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
-abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
+abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with Eventually with TestUtils with ScorexLogging {
 
-  AddressScheme.current = new AddressScheme { override val chainId: Byte = 'Y'.toByte }
+  protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
+  protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
+
+  AddressScheme.current = new AddressScheme {
+    override val chainId: Byte = 'Y'.toByte
+  }
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
@@ -52,47 +61,34 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce { docker.Docker(getClass) }
 
   // Waves miner node
+  protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(DexTestConfig.genesisConfig)
 
-  protected def wavesNode1Config: Config = DexTestConfig.containerConfig("waves-1")
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-1", wavesNode1Config.resolve())
+    dockerClient().createWavesNode("waves-1", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
   }
 
-  // TODO move to container
   protected def wavesNode1Api: NodeApi[cats.Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.rest-api.port"))
+    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
   protected def wavesNode1NetworkApiAddress: InetSocketAddress =
-    dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Config.getInt("waves.network.port"))
+    dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
 
-  // D3X server
+  // Dex server
+  protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
+    dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
+      .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
+      .withFallback(DexTestConfig.updatedMatcherConfig)
+  }
 
-  protected def dex1Config: Config                 = DexTestConfig.containerConfig("dex-1")
-  protected def dex1NodeContainer: DockerContainer = wavesNode1Container()
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    val grpcAddr = dockerClient().getInternalSocketAddress(dex1NodeContainer, dex1NodeContainer.config.getInt("waves.dex.grpc.integration.port"))
-    val wavesNodeGrpcConfig = ConfigFactory
-      .parseString(s"""waves.dex.waves-node-grpc {
-                      |  host = ${grpcAddr.getAddress.getHostAddress}
-                      |  port = ${grpcAddr.getPort}
-                      |}""".stripMargin)
-    // TODO Has a greater priority than local.conf!
-    val config = DexTestConfig.updatedMatcherConfig.withFallback(wavesNodeGrpcConfig).withFallback(dex1Config).resolve()
-    dockerClient().createDex("dex-1", config)
+    dockerClient().createDex("dex-1", dexRunConfig(), suiteInitialDexConfig)
   }
 
-  // TODO val
-  protected def dex1AsyncApi: DexApi[Future] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
-    DexApi[Future]("integration-test-rest-api", apiAddress)
-  }
-
-  protected def dex1Api: DexApi[Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(dex1Container(), dex1Config.getInt("waves.dex.rest-api.port"))
-    fp.sync(DexApi[Try]("integration-test-rest-api", apiAddress))
-  }
+  private def dex1ApiAddress                 = dockerClient().getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
+  protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
+  protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
 
   protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())
   protected def allApis: List[HasWaitReady[cats.Id]] = List(wavesNode1Api, dex1Api)
@@ -100,8 +96,22 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def beforeAll(): Unit = {
     log.debug(s"Doing beforeAll")
     super.beforeAll()
-    allContainers.foreach(dockerClient().start)
-    allApis.foreach(_.waitReady)
+
+    val (waves, dex) = allContainers.partition {
+      case _: WavesNodeContainer => true
+      case _                     => false
+    }
+
+    val (wavesApi, dexApi) = allApis.partition {
+      case _: NodeApi[Id] => true
+      case _              => false
+    }
+
+    waves.foreach(dockerClient().start)
+    wavesApi.foreach(_.waitReady)
+
+    dex.foreach(dockerClient().start)
+    dexApi.foreach(_.waitReady)
   }
 
   override protected def afterAll(): Unit = {
@@ -115,7 +125,10 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")
     val r = super.runTest(testName, args)
-    print(s"Test '$testName' ${if (r.succeeds()) "succeeded" else "failed"}")
+    r.whenCompleted {
+      case Success(r) => print(s"Test '$testName' ${if (r) "succeeded" else "failed"}")
+      case Failure(e) => print(s"Test '$testName' failed with exception '${e.getClass.getSimpleName}'")
+    }
     r
   }
 
@@ -128,6 +141,26 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     }
   }
 
+  protected def dexQueueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
+    ConfigFactory.parseString(s"""waves.dex.events-queue {
+                                 |  type = kafka
+                                 |  kafka {
+                                 |    servers = "$kafkaServer"
+                                 |    topic = "dex-$queueId"
+                                 |  }
+                                 |}""".stripMargin)
+  }
+
+  protected def dexWavesGrpcConfig(target: WavesNodeContainer): Config = {
+    val grpcAddr = dockerClient().getInternalSocketAddress(target, target.grpcApiPort)
+    ConfigFactory
+      .parseString(s"""waves.dex {
+                      |  waves-node-grpc {
+                      |    host = ${grpcAddr.getAddress.getHostAddress}
+                      |    port = ${grpcAddr.getPort}
+                      |  }
+                      |}""".stripMargin)
+  }
 }
 
 trait TestUtils {
@@ -135,20 +168,22 @@ trait TestUtils {
 
   protected def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
+  // TODO move to other trait and make available from object too
+
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
   protected def mkOrder(owner: KeyPair,
-                        matcher: PublicKey,
                         pair: AssetPair,
                         orderType: OrderType,
                         amount: Long,
                         price: Long,
                         matcherFee: Long = matcherFee,
                         matcherFeeAssetId: Asset = Waves,
-                        timestamp: Long = System.currentTimeMillis(),
-                        timeToLive: Duration = 30.days - 1.seconds,
-                        version: Byte = orderVersion): Order = {
+                        ts: Long = System.currentTimeMillis(),
+                        ttl: Duration = 30.days - 1.seconds,
+                        version: Byte = orderVersion,
+                        matcher: PublicKey = DexTestConfig.matcher): Order =
     if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,
@@ -157,10 +192,10 @@ trait TestUtils {
         orderType = orderType,
         amount = amount,
         price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
+        timestamp = ts,
+        expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
-        version = math.min(version, 2).toByte,
+        version = version,
       )
     else
       Order(
@@ -170,13 +205,12 @@ trait TestUtils {
         orderType = orderType,
         amount = amount,
         price = price,
-        timestamp = timestamp,
-        expiration = timestamp + timeToLive.toMillis,
+        timestamp = ts,
+        expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
-        version = version,
+        version = 3,
         matcherFeeAssetId = matcherFeeAssetId
       )
-  }
 
   protected def mkTransfer(sender: KeyPair,
                            recipient: Address,
@@ -184,8 +218,8 @@ trait TestUtils {
                            asset: Asset,
                            feeAmount: Long = minFee,
                            feeAsset: Asset = Waves,
-                           timestamp: Long = System.currentTimeMillis()): TransferTransaction = {
-    TransferTransactionV1
+                           timestamp: Long = System.currentTimeMillis()): TransferTransaction =
+    TransferTransactionV2
       .selfSigned(
         assetId = asset,
         sender = sender,
@@ -197,14 +231,29 @@ trait TestUtils {
         attachment = Array.emptyByteArray
       )
       .explicitGet()
-  }
+
+  protected def mkMassTransfer(sender: KeyPair,
+                               asset: Asset,
+                               transfers: List[ParsedTransfer],
+                               fee: Long = setScriptFee,
+                               ts: Long = System.currentTimeMillis()): MassTransferTransaction =
+    MassTransferTransaction
+      .selfSigned(
+        sender = sender,
+        assetId = asset,
+        transfers = transfers,
+        timestamp = ts,
+        feeAmount = fee,
+        attachment = Array.emptyByteArray
+      )
+      .explicitGet()
 
   protected def mkLease(sender: KeyPair,
                         recipient: Address,
                         amount: Long,
                         fee: Long = leasingFee,
-                        timestamp: Long = System.currentTimeMillis()): LeaseTransaction = {
-    LeaseTransactionV1
+                        timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
+    LeaseTransactionV2
       .selfSigned(
         sender = sender,
         amount = amount,
@@ -213,47 +262,94 @@ trait TestUtils {
         recipient = recipient
       )
       .explicitGet()
-  }
 
   protected def mkLeaseCancel(sender: KeyPair,
                               leaseId: ByteStr,
                               fee: Long = leasingFee,
-                              timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction = {
-    LeaseCancelTransactionV1
+                              timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
+    LeaseCancelTransactionV2
       .selfSigned(
+        chainId = AddressScheme.current.chainId,
         sender = sender,
         leaseId = leaseId,
         fee = fee,
         timestamp = timestamp
       )
       .explicitGet()
-  }
 
   protected def mkIssue(issuer: KeyPair,
                         name: String,
                         quantity: Long,
                         decimals: Int = 8,
-                        reissuable: Boolean = false,
-                        script: Option[Script] = None,
                         fee: Long = issueFee,
-                        timestamp: Long = System.currentTimeMillis()): IssueTransaction = {
+                        script: Option[Script] = None,
+                        reissuable: Boolean = false,
+                        timestamp: Long = System.currentTimeMillis()): IssueTransaction =
     IssueTransactionV2
       .selfSigned(
-        AddressScheme.current.chainId,
+        chainId = AddressScheme.current.chainId,
         sender = issuer,
         name = name.getBytes(),
         description = s"$name asset".getBytes(StandardCharsets.UTF_8),
         quantity = quantity,
         decimals = decimals.toByte,
         reissuable = false,
-        script = None,
+        script = script,
         fee = fee,
         timestamp = timestamp
       )
       .explicitGet()
+
+  protected def mkSetAccountScript(accountOwner: KeyPair,
+                                   script: Option[Script],
+                                   fee: Long = setScriptFee,
+                                   ts: Long = System.currentTimeMillis()): SetScriptTransaction =
+    SetScriptTransaction
+      .selfSigned(
+        sender = accountOwner,
+        script = script,
+        fee = fee,
+        timestamp = ts
+      )
+      .explicitGet()
+
+  protected def mkSetAccountScriptText(accountOwner: KeyPair,
+                                       scriptText: Option[String],
+                                       fee: Long = setScriptFee,
+                                       ts: Long = System.currentTimeMillis()): SetScriptTransaction = {
+    val script = scriptText.map { x =>
+      ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
+    }
+
+    mkSetAccountScript(accountOwner, script, fee, ts)
   }
 
-  protected def broadcastAndAwait(txs: transaction.Transaction*): Unit = {
+  protected def mkSetAssetScript(assetOwner: KeyPair,
+                                 asset: IssuedAsset,
+                                 script: Option[Script],
+                                 fee: Long = setAssetScriptFee,
+                                 ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction =
+    SetAssetScriptTransaction
+      .selfSigned(
+        chainId = AddressScheme.current.chainId,
+        sender = assetOwner,
+        asset = asset,
+        script = script,
+        fee = fee,
+        timestamp = ts
+      )
+      .explicitGet()
+
+  protected def mkSetAssetScriptText(assetOwner: KeyPair,
+                                     asset: IssuedAsset,
+                                     scriptText: String,
+                                     fee: Long = setAssetScriptFee,
+                                     ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction = {
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
+    mkSetAssetScript(assetOwner, asset, Some(script), fee, ts)
+  }
+
+  protected def broadcastAndAwait(txs: Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
     txs.foreach(tx => wavesNode1Api.waitForTransaction(tx))
   }
@@ -264,8 +360,8 @@ trait TestUtils {
     api.waitReady
   }
 
-  protected def replaceLocalConfig(container: DockerContainer, config: Config): Unit = {
-    replaceLocalConfig(
+  protected def replaceSuiteConfig(container: DockerContainer, config: Config): Unit =
+    replaceSuiteConfig(
       container,
       config
         .resolve()
@@ -279,10 +375,9 @@ trait TestUtils {
             .setJson(false)
         )
     )
-  }
 
-  protected def replaceLocalConfig(container: DockerContainer, content: String): Unit = {
-    val path = Paths.get(container.basePath, "local.conf")
+  protected def replaceSuiteConfig(container: DockerContainer, content: String): Unit = {
+    val path = Paths.get(container.basePath, "suite.conf")
     log.trace(s"Replacing '$path' of $container by:\n$content")
     dockerClient().writeFile(container, path, content)
   }
@@ -338,10 +433,8 @@ trait TestUtils {
   private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
   private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 
-  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                  = new FailWith(errorCode)
-  def failWith(errorCode: Int, message: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(message))
-
-  def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] = {
+  def failWith(errorCode: Int): Matcher[Either[MatcherError, Any]]                      = new FailWith(errorCode)
+  def failWith(errorCode: Int, messagePart: String): Matcher[Either[MatcherError, Any]] = new FailWith(errorCode, Some(messagePart))
+  def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] =
     new FailWith(errorCode, None, containsParams)
-  }
 }

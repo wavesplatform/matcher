@@ -87,7 +87,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Put(routePath(s"/settings/rates/${smartAssetTx.id()}"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.Created
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate $rate for the asset ${smartAssetTx.id()} added"
+          message.value shouldEqual s"The rate $rate for the asset ${smartAssetTx.id()} added"
           rateCache.getAllRates(IssuedAsset(smartAssetTx.id())) shouldBe rate
         }
       },
@@ -100,7 +100,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Put(routePath(s"/settings/rates/${smartAssetTx.id()}"), updatedRate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate for the asset ${smartAssetTx.id()} updated, old value = $rate, new value = $updatedRate"
+          message.value shouldEqual s"The rate for the asset ${smartAssetTx.id()} updated, old value = $rate, new value = $updatedRate"
           rateCache.getAllRates(IssuedAsset(smartAssetTx.id())) shouldBe updatedRate
         }
       },
@@ -113,7 +113,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Delete(routePath(s"/settings/rates/${smartAssetTx.id()}")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate for the asset ${smartAssetTx.id()} deleted, old value = $updatedRate"
+          message.value shouldEqual s"The rate for the asset ${smartAssetTx.id()} deleted, old value = $updatedRate"
           rateCache.getAllRates.keySet should not contain IssuedAsset(smartAssetTx.id())
         }
       },
@@ -126,7 +126,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Rate for Waves cannot be changed"
+          message.value shouldEqual "The rate for WAVES cannot be changed"
         }
       },
       apiKey
@@ -159,7 +159,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Rate for Waves cannot be deleted"
+          message.value shouldEqual "The rate for WAVES cannot be changed"
         }
       },
       apiKey

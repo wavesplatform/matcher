@@ -5,8 +5,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 

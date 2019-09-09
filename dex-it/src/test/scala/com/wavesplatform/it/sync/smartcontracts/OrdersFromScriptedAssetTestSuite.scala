@@ -1,7 +1,5 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
@@ -89,10 +87,10 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
-    val allowAsset2 = mkAllowAsset()
-    broadcastAndAwait(allowAsset2)
+    val allowAsset100 = mkAllowAsset(100)
+    broadcastAndAwait(allowAsset100)
 
-    val pair = AssetPair(IssuedAsset(allowAsset2.id()), allowAsset)
+    val pair = AssetPair(IssuedAsset(allowAsset100.id()), allowAsset)
 
     info("place a counter order")
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
@@ -116,7 +114,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 
     info("update a script")
-    val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, Some(DenyBigAmountScript))
+    val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, DenyBigAmountScript)
     broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
@@ -144,7 +142,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
 
     info("update a script")
-    val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, Some(DenyBigAmountScript))
+    val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, DenyBigAmountScript)
     broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")
@@ -183,7 +181,7 @@ object OrdersFromScriptedAssetTestSuite {
 
   private val unscriptedAsset = IssuedAsset(issueUnscriptedAssetTx.id())
 
-  private def mkAllowAsset(id: Int = ThreadLocalRandom.current().nextInt(1000) + 1): IssueTransactionV2 = {
+  private def mkAllowAsset(id: Int): IssueTransactionV2 = {
     IssueTransactionV2
       .selfSigned(
         AddressScheme.current.chainId,
@@ -206,7 +204,7 @@ object OrdersFromScriptedAssetTestSuite {
   private val issueAllowAsset2Tx = mkAllowAsset(1)
   private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.id())
 
-  private val issueAllowAsset3Tx = mkAllowAsset(1)
+  private val issueAllowAsset3Tx = mkAllowAsset(2)
   private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
 
   private val issueDenyAssetTx = IssueTransactionV2

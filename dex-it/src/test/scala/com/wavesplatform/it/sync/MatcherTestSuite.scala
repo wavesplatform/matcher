@@ -95,9 +95,10 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
         dex1Api.orderHistory(bob).map(_.id) should contain(order2.id())
 
         waitForOrderAtNode(order2.id())
-
-        // Bob checks that asset on his balance
-        wavesNode1Api.balance(bob, aliceAsset) shouldBe 200
+        eventually {
+          // Bob checks that asset on his balance
+          wavesNode1Api.balance(bob, aliceAsset) shouldBe 200
+        }
 
         // Alice checks that part of her order still in the order book
         val orders = dex1Api.orderBook(aliceWavesPair)
@@ -156,12 +157,14 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 
         // Check balances
         waitForOrderAtNode(order4.id())
-        wavesNode1Api.balance(alice, aliceAsset) shouldBe 950
-        wavesNode1Api.balance(bob, aliceAsset) shouldBe 50
+        eventually {
+          wavesNode1Api.balance(alice, aliceAsset) shouldBe 950
+          wavesNode1Api.balance(bob, aliceAsset) shouldBe 50
 
-        val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
-        updatedMatcherBalance should be(
-          matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
+          val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
+          updatedMatcherBalance should be(
+            matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
+        }
 
         val updatedBobBalance = wavesNode1Api.balance(bob, Waves)
         updatedBobBalance should be(bobBalance - matcherFee + 150 * 1900)
@@ -206,11 +209,13 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 
         // Check balances
         waitForOrderAtNode(order5.id())
-        wavesNode1Api.balance(alice, aliceAsset) shouldBe 850
-        wavesNode1Api.balance(bob, aliceAsset) shouldBe 150
+        eventually {
+          wavesNode1Api.balance(alice, aliceAsset) shouldBe 850
+          wavesNode1Api.balance(bob, aliceAsset) shouldBe 150
 
-        val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
-        updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
+          val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
+          updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
+        }
 
         val updatedBobBalance = wavesNode1Api.balance(bob, Waves)
         updatedBobBalance should be(bobBalance - (matcherFee * 100.0 / 130.0).toLong - 100 * 2000)

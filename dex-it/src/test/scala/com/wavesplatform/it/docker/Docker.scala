@@ -271,7 +271,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
     val exec    = client.execStart(id)
     try exec.readFully()
-    catch { case NonFatal(e) => log.error(s"Can't print a debug message for $container", e) } finally exec.close()
+    catch { case NonFatal(e) => /* ignore */ } finally exec.close()
   }
 
   private def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {

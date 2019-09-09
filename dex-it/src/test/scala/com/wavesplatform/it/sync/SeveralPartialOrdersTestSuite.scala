@@ -40,8 +40,10 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1.id())
-      dex1Api.reservedBalance(bob) shouldBe empty
-      dex1Api.reservedBalance(alice) shouldBe empty
+      eventually {
+        dex1Api.reservedBalance(bob) shouldBe empty
+        dex1Api.reservedBalance(alice) shouldBe empty
+      }
 
       // Previously cancelled order should not affect new orders
       val orderBook1 = dex1Api.orderBook(wavesUsdPair)
@@ -79,8 +81,10 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1.id())
-      dex1Api.reservedBalance(bob) shouldBe empty
-      dex1Api.reservedBalance(alice) shouldBe empty
+      eventually {
+        dex1Api.reservedBalance(bob) shouldBe empty
+        dex1Api.reservedBalance(alice) shouldBe empty
+      }
 
       // Previously cancelled order should not affect new orders
       val orderBook1 = dex1Api.orderBook(wavesUsdPair)

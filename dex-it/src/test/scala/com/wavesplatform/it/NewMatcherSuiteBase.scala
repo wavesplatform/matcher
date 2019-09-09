@@ -34,6 +34,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.Matcher
 
 import scala.collection.immutable.TreeMap
@@ -41,7 +42,7 @@ import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with TestUtils with ScorexLogging {
+abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with Eventually with TestUtils with ScorexLogging {
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
@@ -341,14 +342,11 @@ trait TestUtils {
 
   protected def mkSetAssetScriptText(assetOwner: KeyPair,
                                      asset: IssuedAsset,
-                                     scriptText: Option[String],
+                                     scriptText: String,
                                      fee: Long = setAssetScriptFee,
                                      ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction = {
-    val script = scriptText.map { x =>
-      ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
-    }
-
-    mkSetAssetScript(assetOwner, asset, script, fee, ts)
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
+    mkSetAssetScript(assetOwner, asset, Some(script), fee, ts)
   }
 
   protected def broadcastAndAwait(txs: Transaction*): Unit = {

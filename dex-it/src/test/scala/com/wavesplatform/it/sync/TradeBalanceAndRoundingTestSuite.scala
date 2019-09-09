@@ -8,11 +8,10 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import org.scalatest.concurrent.Eventually
 
 import scala.math.BigDecimal.RoundingMode
 
-class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase with Eventually {
+class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueWctTx)
@@ -197,9 +196,9 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase with Eventual
       val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 
-      dex1Api.reservedBalance(bob)(wct) shouldBe expectedReservedBobWct
-      // 999999999652 = 999999999999 - 142 - 205
       eventually {
+        dex1Api.reservedBalance(bob)(wct) shouldBe expectedReservedBobWct
+        // 999999999652 = 999999999999 - 142 - 205
         dex1Api.tradableBalance(bob, wctUsdPair)(wct) shouldBe bobWctInitBalance - executedAmount - expectedReservedBobWct
         dex1Api.tradableBalance(bob, wctUsdPair)(usd) shouldBe bobUsdBalance + bobReceiveUsdAmount
       }
@@ -224,8 +223,10 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase with Eventual
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
       waitForOrderAtNode(bobOrder.id())
-      dex1Api.reservedBalance(alice) shouldBe empty
-      dex1Api.reservedBalance(bob) shouldBe empty
+      eventually {
+        dex1Api.reservedBalance(alice) shouldBe empty
+        dex1Api.reservedBalance(bob) shouldBe empty
+      }
     }
   }
 
@@ -280,7 +281,9 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase with Eventual
       dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
 
       waitForOrderAtNode(submitted.id())
-      dex1Api.reservedBalance(bob) shouldBe empty
+      eventually {
+        dex1Api.reservedBalance(bob) shouldBe empty
+      }
       dex1Api.cancel(alice, counter2)
     }
   }

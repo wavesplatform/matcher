@@ -5,9 +5,8 @@ import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import org.scalatest.concurrent.Eventually
 
-class MatcherRestartTestSuite extends NewMatcherSuiteBase with Eventually {
+class MatcherRestartTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueEthTx)

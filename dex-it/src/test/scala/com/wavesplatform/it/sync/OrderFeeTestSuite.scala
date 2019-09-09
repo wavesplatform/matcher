@@ -131,7 +131,9 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
           matcherFeeAssetId = eth
         ))
       waitForOrderAtNode(bobOrder.id())
-      wavesNode1Api.balance(bob, eth) shouldBe (100000000L - 1920L)
+      eventually {
+        wavesNode1Api.balance(bob, eth) shouldBe (100000000L - 1920L)
+      }
       dex1Api.deleteRate(eth)
     }
   }
@@ -161,9 +163,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(mkAliceOrder)
       dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
       waitForOrderAtNode(order.id())
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
-      wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      }
       dex1Api.deleteRate(eth)
     }
 
@@ -187,11 +191,12 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(mkBobOrder)
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.PartiallyFilled)
       waitForOrderAtNode(aliceOrder.id())
-
-      dex1Api.reservedBalance(alice)(eth) shouldBe 960L
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
-      wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+      eventually {
+        dex1Api.reservedBalance(alice)(eth) shouldBe 960L
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+      }
 
       dex1Api.deleteRate(eth)
 
@@ -199,9 +204,11 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(bobSecondOrder)
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
       waitForOrderAtNode(bobSecondOrder.id())
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 300L - 100000L)
-      wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 100000L)
-      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 300L - 100000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 100000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      }
       dex1Api.deleteRate(btc)
     }
 
@@ -216,7 +223,9 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       dex1Api.reservedBalance(bob)(btc) shouldBe 50150L
       dex1Api.place(mkAliceOrder)
       waitForOrderAtNode(bobOrder.id())
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+      }
       List(btc, eth).foreach(dex1Api.deleteRate)
     }
   }
@@ -246,13 +255,15 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       List(bobOrder, aliceOrder).foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Filled))
       List(bobOrder, aliceOrder).foreach(o => waitForOrderAtNode(o.id()))
 
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-      wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
-      wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 1920L)
-      wavesNode1Api.balance(matcher, btc) shouldBe (matcherBtcBalance + 150L)
-      wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
-      wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+        wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 1920L)
+        wavesNode1Api.balance(matcher, btc) shouldBe (matcherBtcBalance + 150L)
+        wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
+      }
       List(btc, eth).foreach(dex1Api.deleteRate)
     }
 
@@ -280,10 +291,12 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
       Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1Api.waitForOrderStatus))
       List(bobOrder, aliceOrder).foreach(o => waitForOrderAtNode(o.id()))
 
-      wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-      wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
-      wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 960L)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+        wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 960L)
+      }
 
       dex1Api.cancelAll(alice)
       List(btc, eth).foreach(dex1Api.deleteRate)
@@ -319,12 +332,14 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
         Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1Api.waitForOrderStatus))
         List(bobOrder, aliceOrder).foreach(o => waitForOrderAtNode(o.id()))
 
-        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
-        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
-        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - aliceBalanceDiff)
-        wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + aliceBalanceDiff)
-        wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
-        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
+        eventually {
+          wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+          wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+          wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - aliceBalanceDiff)
+          wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + aliceBalanceDiff)
+          wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
+          wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
+        }
 
         dex1Api.cancelAll(alice)
         List(btc, eth).foreach(dex1Api.deleteRate)

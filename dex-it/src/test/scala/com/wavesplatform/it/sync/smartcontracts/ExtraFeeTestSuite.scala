@@ -80,10 +80,11 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
         val submitted = mkOrder(bob, oneSmartPair, BUY, amount, price, expectedFee, version = 2)
         dex1Api.place(submitted)
         waitForOrderAtNode(submitted.id())
-
-        wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
-        wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
-        wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
+        eventually {
+          wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
+          wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
+          wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
+        }
       }
     }
 
@@ -116,10 +117,11 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
           val submitted = mkOrder(bob, bothSmartPair, BUY, amount, price, expectedFee, version = 2)
           dex1Api.place(submitted)
           waitForOrderAtNode(submitted.id())
-
-          wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
-          wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
-          wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
+          eventually {
+            wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
+            wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
+            wavesNode1Api.balance(matcher, Waves) shouldBe matcherInitBalance + expectedFee
+          }
         }
       }
     }
@@ -145,9 +147,10 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
       val submitted = mkOrder(alice, oneSmartPair, BUY, amount, price, expectedWavesFee, version = 2)
       dex1Api.place(submitted)
       waitForOrderAtNode(submitted.id())
-
-      wavesNode1Api.balance(bob, feeAsset) shouldBe (bobInitBalance - expectedFee)
-      wavesNode1Api.balance(matcher, feeAsset) shouldBe (matcherInitBalance + expectedFee)
+      eventually {
+        wavesNode1Api.balance(bob, feeAsset) shouldBe (bobInitBalance - expectedFee)
+        wavesNode1Api.balance(matcher, feeAsset) shouldBe (matcherInitBalance + expectedFee)
+      }
     }
 
     "with asset fee assigned false script" in {

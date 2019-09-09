@@ -54,7 +54,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
 
     "scenarios of order placement" - {
       "set contracts with only BUY type and then place order" in {
-        setAliceScript(sco1)
+        setAliceScriptText(sco1)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         dex1Api.place(aliceOrd1)
@@ -70,7 +70,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
       }
 
       "set contracts with only SELL type and then place order" in {
-        setAliceScript(sco2)
+        setAliceScriptText(sco2)
 
         dex1Api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522,
@@ -86,7 +86,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
       }
 
       "set contracts with both SELL/BUY types and then place order" in {
-        setAliceScript(sco3)
+        setAliceScriptText(sco3)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         dex1Api.place(aliceOrd1)
@@ -110,7 +110,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         dex1Api.place(aliceOrd2)
         dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
 
-        setAliceScript(sco1)
+        setAliceScriptText(sco1)
 
         val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
         dex1Api.place(bobOrd1)
@@ -133,6 +133,6 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def setAliceScript(scriptText: String): Unit = broadcast(mkSetAccountScriptText(alice, Some(scriptText)))
-  private def resetAliceAccountScript(): Unit          = broadcast(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScriptText(scriptText: String): Unit = broadcast(mkSetAccountScriptText(alice, Some(scriptText)))
+  private def resetAliceAccountScript(): Unit              = broadcast(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
 }

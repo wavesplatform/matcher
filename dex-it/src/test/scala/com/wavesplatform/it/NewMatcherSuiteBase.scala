@@ -18,17 +18,17 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherError, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee, setScriptFee, setAssetScriptFee}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV2}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
@@ -214,7 +214,7 @@ trait TestUtils {
                            feeAmount: Long = minFee,
                            feeAsset: Asset = Waves,
                            timestamp: Long = System.currentTimeMillis()): TransferTransaction =
-    TransferTransactionV1
+    TransferTransactionV2
       .selfSigned(
         assetId = asset,
         sender = sender,
@@ -232,7 +232,7 @@ trait TestUtils {
                         amount: Long,
                         fee: Long = leasingFee,
                         timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
-    LeaseTransactionV1
+    LeaseTransactionV2
       .selfSigned(
         sender = sender,
         amount = amount,
@@ -246,8 +246,9 @@ trait TestUtils {
                               leaseId: ByteStr,
                               fee: Long = leasingFee,
                               timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
-    LeaseCancelTransactionV1
+    LeaseCancelTransactionV2
       .selfSigned(
+        chainId = AddressScheme.current.chainId,
         sender = sender,
         leaseId = leaseId,
         fee = fee,

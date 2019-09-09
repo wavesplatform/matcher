@@ -260,7 +260,7 @@ trait TestUtils {
   protected def mkIssue(issuer: KeyPair,
                         name: String,
                         quantity: Long,
-                        decimals: StatusCode = 8,
+                        decimals: Int = 8,
                         fee: Long = issueFee,
                         script: Option[Script] = None,
                         reissuable: Boolean = false,

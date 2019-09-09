@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
@@ -22,15 +23,15 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
   private val aliceAsset        = IssuedAsset(aliceAssetId)
   private val aliceWavesPair    = AssetPair(aliceAsset, Waves)
 
-  private val issueBob1Asset1Tx = mkIssue(alice, "Bob-1-X", someAssetAmount, 5)
-//  private val bobAsset1Id       = issueBob1Asset1Tx.id()
-//  private val bobAsset1         = IssuedAsset(bobAsset1Id)
-//  private val bob1WavesPair     = AssetPair(bobAsset1, Waves)
+  private val issueBob1Asset1Tx = mkIssue(bob, "Bob-1-X", someAssetAmount, 5)
+  private val bobAsset1Id       = issueBob1Asset1Tx.id()
+  private val bobAsset1         = IssuedAsset(bobAsset1Id)
+  private val bob1WavesPair     = AssetPair(bobAsset1, Waves)
 
-  private val issueBob2Asset2Tx = mkIssue(alice, "Bob-2-X", someAssetAmount, 0)
-//  private val bobAsset2Id       = issueBob2Asset2Tx.id()
-//  private val bobAsset2         = IssuedAsset(bobAsset2Id)
-//  private val bob2WavesPair     = AssetPair(bobAsset2, Waves)
+  private val issueBob2Asset2Tx = mkIssue(bob, "Bob-2-X", someAssetAmount, 0)
+  private val bobAsset2Id       = issueBob2Asset2Tx.id()
+  private val bobAsset2         = IssuedAsset(bobAsset2Id)
+  private val bob2WavesPair     = AssetPair(bobAsset2, Waves)
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 2.minutes) // TTL?
 
@@ -224,155 +225,153 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
           MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
       }
 
-//      "should consider UTX pool when checking the balance" in {
-//        wavesNode1Api.balance(alice, bobAsset1) shouldBe 0
-//        wavesNode1Api.balance(matcher, bobAsset1) shouldBe 0
-//        wavesNode1Api.balance(bob, bobAsset1) shouldBe someAssetAmount
-//
-//        val order6 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 0.005.waves)
-//        dex1Api.place(order6)
-//        dex1Api.waitForOrderStatus(order6, OrderStatus.Accepted)
-//
-//        // Alice wants to buy all Bob's assets for 1 Wave
-//        val order7 = mkOrder(alice, bob2WavesPair, BUY, someAssetAmount, 0.005.waves)
-//        dex1Api.place(order7)
-//        dex1Api.waitForOrderStatus(order7, OrderStatus.Filled)
-//
-//        waitForOrderAtNode(order7.id())
-//        // Bob tries to do the same operation, but at now he have no assets
-//        dex1Api.tryPlace(order6) should failWith(100) // hehe
-//      }
-//
-//      "trader can buy waves for assets with order without having waves" in {
-//        val bobBalance = wavesNode1Api.balance(bob, Waves)
-//        wavesNode1Api.balance(alice, bobAsset2) shouldBe 0
-//        wavesNode1Api.balance(matcher, bobAsset2) shouldBe 0
-//        wavesNode1Api.balance(bob, bobAsset2) shouldBe someAssetAmount
-//
-//        // Bob wants to sell all own assets for 1 Wave
-//        val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-//        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
-//
-//        // Bob moves all waves to Alice
-//        val transferAmount = bobBalance - minFee
-//        wavesNode1Api.broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
-//
-//        wavesNode1Api.balance(bob, Waves) shouldBe 0
-//
-//        // Order should stay accepted
-//        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
-//
-//        // Cleanup
-//        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
-//        wavesNode1Api.broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
-//      }
-//
-//      "market status" in {
-//        val ask       = 5.waves
-//        val askAmount = 5000000
-//
-//        val bid       = 10.waves
-//        val bidAmount = 10000000
-//
-//        dex1Api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
-//
-//        val resp1 = dex1Api.orderBookStatus(bob2WavesPair)
-//        resp1.lastPrice shouldBe None
-//        resp1.lastSide shouldBe None
-//        resp1.bid shouldBe None
-//        resp1.bidAmount shouldBe None
-//        resp1.ask shouldBe Some(ask)
-//        resp1.askAmount shouldBe Some(askAmount)
-//
-//        dex1Api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
-//
-//        val resp2 = dex1Api.orderBookStatus(bob2WavesPair)
-//        resp2.lastPrice shouldBe Some(ask)
-//        resp2.lastSide shouldBe Some(OrderType.BUY.toString)
-//        resp2.bid shouldBe Some(bid)
-//        resp2.bidAmount shouldBe Some(bidAmount - askAmount)
-//        resp2.ask shouldBe None
-//        resp2.askAmount shouldBe None
-//      }
+      "should consider UTX pool when checking the balance" in {
+        wavesNode1Api.balance(alice, bobAsset1) shouldBe 0
+        wavesNode1Api.balance(matcher, bobAsset1) shouldBe 0
+        wavesNode1Api.balance(bob, bobAsset1) shouldBe someAssetAmount
+
+        def mkBobOrder = mkOrder(bob, bob1WavesPair, SELL, someAssetAmount, 0.005.waves)
+
+        val order6 = mkBobOrder
+        dex1Api.place(order6)
+        dex1Api.waitForOrderStatus(order6, OrderStatus.Accepted)
+
+        // Alice wants to buy all Bob's assets for 1 Wave
+        val order7 = mkOrder(alice, bob1WavesPair, BUY, someAssetAmount, 0.005.waves)
+        dex1Api.place(order7)
+        dex1Api.waitForOrderStatus(order7, OrderStatus.Filled)
+
+        waitForOrderAtNode(order7.id())
+        // Bob tries to do the same operation, but at now he have no assets
+        dex1Api.tryPlace(mkBobOrder) should failWith(3147270)
+      }
+
+      "trader can buy waves for assets with order without having waves" in {
+        val bobWavesBalance = wavesNode1Api.balance(bob, Waves)
+        wavesNode1Api.balance(alice, bobAsset2) shouldBe 0
+        wavesNode1Api.balance(matcher, bobAsset2) shouldBe 0
+        wavesNode1Api.balance(bob, bobAsset2) shouldBe someAssetAmount
+
+        // Bob wants to sell all own assets for 1 Wave
+        val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
+        dex1Api.place(order8)
+        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
+
+        // Bob moves all waves to Alice
+        val transferAmount = bobWavesBalance - minFee
+        broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
+
+        wavesNode1Api.balance(bob, Waves) shouldBe 0
+
+        // Order should stay accepted
+        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
+
+        // Cleanup
+        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
+        wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
+      }
+
+      "market status" in {
+        val ask       = 5.waves
+        val askAmount = 5000000
+
+        val bid       = 10.waves
+        val bidAmount = 10000000
+
+        dex1Api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
+
+        val resp1 = dex1Api.orderBookStatus(bob2WavesPair)
+        resp1.lastPrice shouldBe None
+        resp1.lastSide shouldBe None
+        resp1.bid shouldBe None
+        resp1.bidAmount shouldBe None
+        resp1.ask shouldBe Some(ask)
+        resp1.askAmount shouldBe Some(askAmount)
+
+        dex1Api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
+
+        val resp2 = dex1Api.orderBookStatus(bob2WavesPair)
+        resp2.lastPrice shouldBe Some(ask)
+        resp2.lastSide shouldBe Some(OrderType.BUY.toString)
+        resp2.bid shouldBe Some(bid)
+        resp2.bidAmount shouldBe Some(bidAmount - askAmount)
+        resp2.ask shouldBe None
+        resp2.askAmount shouldBe None
+      }
     }
   }
 
-//  "Max 8 price decimals allowed to be non zero" - {
-//    val ap28 = issueAssetPair(alice, 2, 8)
-//    val ap34 = issueAssetPair(alice, 3, 4)
-//    val ap08 = issueAssetPair(alice, 0, 8)
-//
-//    {
-//      val xs = Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(_.json()).map(wavesNode1Api.broadcastAndAwait(_))
-//      xs.foreach(x => wavesNode1Api.waitForTransaction(x.id))
-//    }
-//
-//    val assets =
-//      Table(
-//        ("pair", "amountDecimals", "priceDecimals"),
-//        (ap28._3, 2, 8),
-//        (ap34._3, 3, 4),
-//        (ap08._3, 0, 8),
-//      )
-//
-//    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
-//      s"Not able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
-//        val amount     = BigDecimal(10).pow(amountDecimals).toLong
-//        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
-//        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
-//        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
-//        val o1         = mkOrder(alice,pair, SELL, amount, minInvalid)
-//        val o2         = mkOrder(alice,pair, SELL, amount, maxInvalid)
-//
-//        node.expectIncorrectOrderPlacement(o1, 400, "OrderRejected", Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
-//        node.expectIncorrectOrderPlacement(o2, 400, "OrderRejected", Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
-//      }
-//    }
-//
-//    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
-//      s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
-//        val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
-//        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
-//        val o1                = dex1Api.place(mkOrder(alice,pair, BUY, amount, minNonZeroInvalid))
-//        o1.status shouldBe "OrderAccepted"
-//      }
-//    }
-//  }
+  "Max 8 price decimals allowed to be non zero" - {
+    val ap28 = issueAssetPair(alice, 2, 8)
+    val ap34 = issueAssetPair(alice, 3, 4)
+    val ap08 = issueAssetPair(alice, 0, 8)
 
-//  "Order statuses for old orders" in {
-//    val (amountAssetTx, priceAssetTx, pair) = issueAssetPair(alice, 2, 8)
-//
-//    def placeOrder(i: Int, tpe: OrderType) = dex1Api.place(mkOrder(alice,pair, tpe, 100L + i, Order.PriceConstant))
-//
-//    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(wavesNode1Api.broadcastAndAwait(_)).map(_.id)
-//    txIds.foreach(wavesNode1Api.waitForTransaction(_))
-//
-//    val ids = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
-//      List(
-//        placeOrder(i, OrderType.BUY).message.id,
-//        placeOrder(i, OrderType.SELL).message.id
-//      )
-//    }
-//
-//    ids.foreach { id =>
-//      val status = dex1Api.orderStatus(id).status
-//      withClue(id)(status should not be "NotFound")
-//    }
-//  }
-//
-//  "Debug information was updated" in {
-//    val currentOffset = node.getCurrentOffset
-//    currentOffset should be > 0L
-//
-//    val oldestSnapshotOffset = node.getOldestSnapshotOffset
-//    oldestSnapshotOffset should be <= currentOffset
-//
-//    val snapshotOffsets = dex1Api.allSnapshotOffsets
-//    snapshotOffsets.foreach {
-//      case (assetPair, offset) =>
-//        withClue(assetPair) {
-//          offset should be <= currentOffset
-//        }
-//    }
-//  }
+    val assets =
+      Table(
+        ("pair", "amountDecimals", "priceDecimals"),
+        (ap28._3, 2, 8),
+        (ap34._3, 3, 4),
+        (ap08._3, 0, 8),
+      )
+
+    "issue assets" in broadcastAndAwait(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2)
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Not able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount     = BigDecimal(10).pow(amountDecimals).toLong
+        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
+        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
+        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
+        val o1         = mkOrder(alice, pair, SELL, amount, minInvalid)
+        val o2         = mkOrder(alice, pair, SELL, amount, maxInvalid)
+
+        dex1Api.tryPlace(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6)))
+        dex1Api.tryPlace(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6)))
+      }
+    }
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
+        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
+        dex1Api.place(mkOrder(alice, pair, BUY, amount, minNonZeroInvalid)).status shouldBe "OrderAccepted"
+      }
+    }
+  }
+
+  "Order statuses for old orders" in {
+    val (amountAssetTx, priceAssetTx, pair) = issueAssetPair(alice, 2, 8)
+    broadcastAndAwait(amountAssetTx, priceAssetTx)
+
+    def mkAliceOrder(i: Int, tpe: OrderType) = mkOrder(alice, pair, tpe, 100L + i, Order.PriceConstant)
+
+    val orders = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+      List(
+        mkAliceOrder(i, OrderType.BUY),
+        mkAliceOrder(i, OrderType.SELL)
+      )
+    }
+
+    orders.foreach(dex1Api.place)
+    orders.foreach { order =>
+      val status = dex1Api.orderStatus(order).status
+      withClue(order.idStr())(status should not be OrderStatus.NotFound)
+    }
+  }
+
+  "Debug information was updated" in {
+    val currentOffset = dex1Api.currentOffset
+    currentOffset should be > 0L
+
+    val oldestSnapshotOffset = dex1Api.oldestSnapshotOffset
+    oldestSnapshotOffset should be <= currentOffset
+
+    val snapshotOffsets = dex1Api.allSnapshotOffsets
+    snapshotOffsets.foreach {
+      case (assetPair, offset) =>
+        withClue(assetPair) {
+          offset should be <= currentOffset
+        }
+    }
+  }
 }

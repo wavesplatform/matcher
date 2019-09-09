@@ -33,7 +33,7 @@ object MatcherError {
 
   implicit val format: Format[MatcherError] = Json.format[MatcherError]
 
-  case class Params(assetId: Option[String] = None, address: Option[String] = None) {
+  case class Params(assetId: Option[String] = None, address: Option[String] = None, insignificantDecimals: Option[Int] = None) {
     def isEmpty: Boolean = assetId.isEmpty && address.isEmpty
   }
 
@@ -126,6 +126,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def currentOffset: F[Long]
   def lastOffset: F[Long]
+  def oldestSnapshotOffset: F[Long]
   def allSnapshotOffsets: F[Map[String, Long]] // TODO Map[AssetPair, Long]
 
   // TODO move
@@ -487,6 +488,24 @@ object DexApi {
       override def lastOffset: F[Long] = {
         val req = sttp
           .get(uri"$apiUri/debug/lastOffset")
+          .headers(apiKeyHeaders)
+          .response(asString("UTF-8"))
+          .tag("requestId", UUID.randomUUID())
+
+        repeatUntil(httpBackend.send(req), 1.second)(resp => resp.isSuccess || resp.isClientError).flatMap { resp =>
+          resp.rawErrorBody match {
+            case Left(_) => M.raiseError[Long](new RuntimeException(s"The server returned an error: ${resp.code}"))
+            case Right(raw) =>
+              val r = Longs.tryParse(raw)
+              if (r == null) M.raiseError[Long](new RuntimeException(s"Can't parse the response as Long: $raw"))
+              else M.pure(r)
+          }
+        }
+      }
+
+      override def oldestSnapshotOffset: F[Long] = {
+        val req = sttp
+          .get(uri"$apiUri/debug/oldestSnapshotOffset")
           .headers(apiKeyHeaders)
           .response(asString("UTF-8"))
           .tag("requestId", UUID.randomUUID())

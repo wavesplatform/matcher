@@ -18,13 +18,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.{DexApi, HasWaitReady, LoggingSttpBackend, MatcherError, MatcherState, NodeApi, OrderBookHistoryItem}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee, setScriptFee}
+import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee, setScriptFee, setAssetScriptFee}
 import com.wavesplatform.it.test.FailWith
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransaction, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -265,7 +265,7 @@ trait TestUtils {
                         timestamp: Long = System.currentTimeMillis()): IssueTransaction =
     IssueTransactionV2
       .selfSigned(
-        AddressScheme.current.chainId,
+        chainId = AddressScheme.current.chainId,
         sender = issuer,
         name = name.getBytes(),
         description = s"$name asset".getBytes(StandardCharsets.UTF_8),
@@ -278,10 +278,10 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def mkSetScript(accountOwner: KeyPair,
-                            script: Option[Script],
-                            fee: Long = setScriptFee,
-                            ts: Long = System.currentTimeMillis()): SetScriptTransaction =
+  protected def mkSetAccountScript(accountOwner: KeyPair,
+                                   script: Option[Script],
+                                   fee: Long = setScriptFee,
+                                   ts: Long = System.currentTimeMillis()): SetScriptTransaction =
     SetScriptTransaction
       .selfSigned(
         sender = accountOwner,
@@ -291,15 +291,43 @@ trait TestUtils {
       )
       .explicitGet()
 
-  protected def mkSetScriptText(accountOwner: KeyPair,
-                                scriptText: Option[String],
-                                fee: Long = setScriptFee,
-                                ts: Long = System.currentTimeMillis()): SetScriptTransaction = {
+  protected def mkSetAccountScriptText(accountOwner: KeyPair,
+                                       scriptText: Option[String],
+                                       fee: Long = setScriptFee,
+                                       ts: Long = System.currentTimeMillis()): SetScriptTransaction = {
     val script = scriptText.map { x =>
       ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
     }
 
-    mkSetScript(accountOwner, script, fee, ts)
+    mkSetAccountScript(accountOwner, script, fee, ts)
+  }
+
+  protected def mkSetAssetScript(assetOwner: KeyPair,
+                                 asset: IssuedAsset,
+                                 script: Option[Script],
+                                 fee: Long = setAssetScriptFee,
+                                 ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction =
+    SetAssetScriptTransaction
+      .selfSigned(
+        chainId = AddressScheme.current.chainId,
+        sender = assetOwner,
+        asset = asset,
+        script = script,
+        fee = fee,
+        timestamp = ts
+      )
+      .explicitGet()
+
+  protected def mkSetAssetScriptText(assetOwner: KeyPair,
+                                     asset: IssuedAsset,
+                                     scriptText: Option[String],
+                                     fee: Long = setAssetScriptFee,
+                                     ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction = {
+    val script = scriptText.map { x =>
+      ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
+    }
+
+    mkSetAssetScript(assetOwner, asset, script, fee, ts)
   }
 
   protected def broadcast(txs: Transaction*): Unit = {

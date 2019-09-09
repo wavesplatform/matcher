@@ -56,6 +56,11 @@ object OrderValidator extends ScorexLogging {
 
   private def verifyOrderByAccountScript(blockchain: WavesBlockchainContext, address: Address, order: Order): Result[Unit] =
     if (blockchain.hasScript(address)) {
+      println(
+        s"""isFeatureActivated(BlockchainFeatures.SmartAccountTrading): ${blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)}
+           |order.id: ${order.id()}
+           |order.version: ${order.version}
+           |""".stripMargin)
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id))
         error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
       else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
@@ -161,9 +166,19 @@ object OrderValidator extends ScorexLogging {
     /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
+        val minFee = ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript)
+        println(
+          s"""
+             |id: ${order.id()}
+             |minFee: $minFee
+             |baseFee: $baseFee
+             |matcherAddress: hasScript: ${blockchain.hasScript(matcherAddress)}
+             |${order.assetPair.amountAssetStr}: hasScript: ${order.assetPair.amountAsset.fold(false)(blockchain.hasScript)}
+             |${order.assetPair.priceAssetStr}: hasScript: ${order.assetPair.priceAsset.fold(false)(blockchain.hasScript)}
+             |""".stripMargin)
         val mof =
           multiplyFeeByDouble(
-            ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript),
+            minFee,
             rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
           )
         Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))

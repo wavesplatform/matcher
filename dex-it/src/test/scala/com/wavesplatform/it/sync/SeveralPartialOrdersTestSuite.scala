@@ -4,10 +4,7 @@ import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-
-import scala.math.BigDecimal.RoundingMode
+import com.wavesplatform.transaction.assets.exchange.OrderType
 
 class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
@@ -99,13 +96,4 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
       orderBook2.bids shouldBe empty
     }
   }
-
-  private def correctAmount(a: Long, price: Long): Long = {
-    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
-  }
-
-  private def receiveAmount(ot: OrderType, matchAmount: Long, matchPrice: Long): Long =
-    if (ot == BUY) correctAmount(matchAmount, matchPrice)
-    else (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()
 }

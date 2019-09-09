@@ -51,7 +51,7 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset1, 0.009.waves),
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
-    broadcast(mkSetScriptText(alice, Some("true")))
+    broadcast(mkSetAccountScriptText(alice, Some("true")))
   }
 
   "When matcher executes orders" - {
@@ -90,7 +90,7 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
     "with one Smart Account, two Smart Assets and scripted Matcher" - {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
-          broadcast(mkSetScriptText(matcher, Some("true")))
+          broadcast(mkSetAccountScriptText(matcher, Some("true")))
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 

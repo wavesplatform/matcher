@@ -33,6 +33,11 @@ object PeerInfo {
   implicit val format: Format[PeerInfo] = Json.format[PeerInfo]
 }
 
+case class ErrorResponse(error: Int, message: String)
+object ErrorResponse {
+  implicit val format: Format[ErrorResponse] = Json.format[ErrorResponse]
+}
+
 trait NodeApi[F[_]] extends HasWaitReady[F] {
   def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]
 
@@ -40,6 +45,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def connected: F[ConnectedPeersResponse]
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
+  def tryBroadcast(tx: transaction.Transaction): F[Either[ErrorResponse, Unit]]
   def broadcast(tx: transaction.Transaction): F[Unit]
   def transactionInfo(id: ByteStr): F[Option[Transaction]]
   def rawTransactionInfo(id: ByteStr): F[Option[JsValue]]
@@ -111,6 +117,10 @@ object NodeApi {
       override def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit] = {
         val hostName = toNode.getHostName
         repeatUntil(connected, 1.second)(_.peers.exists(p => p.address.contains(hostName))).map(_ => ())
+      }
+
+      override def tryBroadcast(tx: transaction.Transaction): F[Either[ErrorResponse, Unit]] = try_ {
+        sttp.post(uri"$apiUri/transactions/broadcast").body(tx).mapResponse(_ => ())
       }
 
       override def broadcast(tx: transaction.Transaction): F[Unit] = {
@@ -213,6 +223,9 @@ object NodeApi {
 //            case Right(Right(r))    => M.pure(r)
 //          }
 //        }
+
+      private def try_(req: RequestT[Id, Unit, Nothing]): F[Either[ErrorResponse, Unit]] =
+        httpBackend.send(req).flatMap(FOps[F].parseTryResponse[ErrorResponse, Unit])
     }
 
   case class HeightResponse(height: Int)

@@ -9,6 +9,7 @@ import "waves/amount.proto";
 import "google/protobuf/empty.proto";
 
 service WavesBlockchainApi {
+
     rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
 
     rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);

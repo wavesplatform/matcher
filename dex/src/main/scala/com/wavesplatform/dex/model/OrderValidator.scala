@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -54,7 +54,7 @@ object OrderValidator extends ScorexLogging {
         _ => ()
       )
 
-  private def verifyOrderByAccountScript(blockchain: WavesBlockchainContext, address: Address, order: Order): Result[Unit] =
+  private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order): Result[Unit] =
     if (blockchain.hasScript(address)) {
       println(
         s"""isFeatureActivated(BlockchainFeatures.SmartAccountTrading): ${blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)}
@@ -74,7 +74,7 @@ object OrderValidator extends ScorexLogging {
         }
     } else verifySignature(order)
 
-  private def verifySmartToken(blockchain: WavesBlockchainContext, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
+  private def verifySmartToken(blockchain: WavesBlockchainClient, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
     if (blockchain.hasScript(asset)) {
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets.id))
         error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
@@ -88,12 +88,12 @@ object OrderValidator extends ScorexLogging {
         }
     } else ().asRight
 
-  private def decimals(blockchain: WavesBlockchainContext, assetId: Asset): Result[Int] =
+  private def decimals(blockchain: WavesBlockchainClient, assetId: Asset): Result[Int] =
     assetId.fold(lift(8)) { aid =>
       blockchain.assetDescription(aid).map(_.decimals).toRight(error.AssetNotFound(aid))
     }
 
-  private def validateDecimals(blockchain: WavesBlockchainContext, o: Order): Result[(Int, Int)] =
+  private def validateDecimals(blockchain: WavesBlockchainClient, o: Order): Result[(Int, Int)] =
     for {
       pd <- decimals(blockchain, o.assetPair.priceAsset)
       ad <- decimals(blockchain, o.assetPair.amountAsset)
@@ -128,7 +128,7 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  private[dex] def checkOrderVersion(version: Byte, blockchain: WavesBlockchainContext): Result[Unit] = version match {
+  private[dex] def checkOrderVersion(version: Byte, blockchain: WavesBlockchainClient): Result[Unit] = version match {
     case 1 => success
     case 2 =>
       if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)) success
@@ -139,7 +139,7 @@ object OrderValidator extends ScorexLogging {
     case _ => Left(error.UnsupportedOrderVersion(version))
   }
 
-  def blockchainAware(blockchain: WavesBlockchainContext,
+  def blockchainAware(blockchain: WavesBlockchainClient,
                       transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
                       matcherAddress: Address,
                       time: Time,

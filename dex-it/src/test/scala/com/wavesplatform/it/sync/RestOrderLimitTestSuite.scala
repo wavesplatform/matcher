@@ -43,7 +43,7 @@ class RestOrderLimitTestSuite extends NewMatcherSuiteBase {
     val issueBobAssetTx = mkIssue(bob, "BobCoin", someAssetAmount, 0)
     val bobAsset        = IssuedAsset(issueBobAssetTx.id())
 
-    broadcast(issueAliceAssetTx, issueBobAssetTx)
+    broadcastAndAwait(issueAliceAssetTx, issueBobAssetTx)
 
     val alicePair = AssetPair(aliceAsset, Waves)
     val bobPair   = AssetPair(bobAsset, Waves)

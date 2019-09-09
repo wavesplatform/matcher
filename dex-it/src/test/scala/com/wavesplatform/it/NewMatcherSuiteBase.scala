@@ -49,13 +49,14 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
     override val chainId: Byte = 'Y'.toByte
   }
 
-  protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(
-    Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build()))
+  protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
+    Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
+  }
 
   protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](AsyncHttpClientFutureBackend())
   protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
-  protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce(docker.Docker(getClass))
+  protected val dockerClient: Coeval[docker.Docker] = Coeval.evalOnce { docker.Docker(getClass) }
 
   // Waves miner node
   protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(DexTestConfig.genesisConfig)
@@ -163,7 +164,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
 trait TestUtils {
   this: NewMatcherSuiteBase =>
 
-  protected def orderVersion = (ThreadLocalRandom.current().nextInt(3) + 1).toByte
+  protected def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
@@ -331,9 +332,9 @@ trait TestUtils {
     mkSetAssetScript(assetOwner, asset, script, fee, ts)
   }
 
-  protected def broadcast(txs: Transaction*): Unit = {
+  protected def broadcastAndAwait(txs: Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
-    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx.id()))
+    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx))
   }
 
   protected def restartContainer(container: DockerContainer, api: HasWaitReady[cats.Id]): Unit = {
@@ -376,6 +377,7 @@ trait TestUtils {
                              orders: IndexedSeq[Order],
                              accounts: Seq[KeyPair],
                              dexApi: DexApi[Id] = dex1Api): Id[MatcherState] = {
+
     val offset               = dexApi.currentOffset
     val snapshots            = dexApi.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))

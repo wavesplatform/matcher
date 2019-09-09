@@ -3,7 +3,7 @@ package com.wavesplatform.dex
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.BalancesServiceClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.settings.MatcherSettings

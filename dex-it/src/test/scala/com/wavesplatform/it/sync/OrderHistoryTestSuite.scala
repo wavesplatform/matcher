@@ -125,7 +125,7 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
 
     super.beforeAll()
 
-    broadcast(IssueUsdTx, IssueWctTx, IssueEthTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx)
     dex1Api.upsertRate(ethAsset, 1.0)._1 shouldBe StatusCodes.Created
   }
 

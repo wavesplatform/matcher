@@ -41,7 +41,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(issueUnscriptedAssetTx, issueAllowAssetTx, issueAllowAsset2Tx, issueAllowAsset3Tx, issueDenyAssetTx)
+    broadcastAndAwait(issueUnscriptedAssetTx, issueAllowAssetTx, issueAllowAsset2Tx, issueAllowAsset3Tx, issueDenyAssetTx)
   }
 
   "can match orders when SmartAccTrading is still not activated" in {
@@ -90,7 +90,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
   "can execute against scripted, if both scripts returns TRUE" in {
     val allowAsset2 = mkAllowAsset()
-    broadcast(allowAsset2)
+    broadcastAndAwait(allowAsset2)
 
     val pair = AssetPair(IssuedAsset(allowAsset2.id()), allowAsset)
 
@@ -117,7 +117,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
     info("update a script")
     val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, Some(DenyBigAmountScript))
-    broadcast(setAssetScript)
+    broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
     dex1Api.orderStatus(counter).status shouldBe OrderStatus.Accepted
@@ -145,7 +145,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
     info("update a script")
     val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, Some(DenyBigAmountScript))
-    broadcast(setAssetScriptTx)
+    broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")
     dex1Api.orderStatus(counter).status shouldBe OrderStatus.Accepted

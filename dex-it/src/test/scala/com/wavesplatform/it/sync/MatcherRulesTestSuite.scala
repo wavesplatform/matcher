@@ -20,7 +20,7 @@ class MatcherRulesTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueWctTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx)
   }
 
   private val (amount, price) = (1000L, PriceConstant)

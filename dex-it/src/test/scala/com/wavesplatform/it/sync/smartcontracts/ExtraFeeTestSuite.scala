@@ -45,13 +45,13 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(asset0Tx, asset1Tx, asset2Tx, feeAssetTx, falseFeeAssetTx, IssueBtcTx)
-    broadcast(
+    broadcastAndAwait(asset0Tx, asset1Tx, asset2Tx, feeAssetTx, falseFeeAssetTx, IssueBtcTx)
+    broadcastAndAwait(
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset0, 0.005.waves),
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset1, 0.009.waves),
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
-    broadcast(mkSetAccountScriptText(alice, Some("true")))
+    broadcastAndAwait(mkSetAccountScriptText(alice, Some("true")))
   }
 
   "When matcher executes orders" - {
@@ -90,7 +90,7 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
     "with one Smart Account, two Smart Assets and scripted Matcher" - {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
-          broadcast(mkSetAccountScriptText(matcher, Some("true")))
+          broadcastAndAwait(mkSetAccountScriptText(matcher, Some("true")))
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 

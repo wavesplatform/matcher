@@ -38,7 +38,7 @@ class OrderBookTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueWctTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx)
   }
 
   "Place orders and delete the order book" in {

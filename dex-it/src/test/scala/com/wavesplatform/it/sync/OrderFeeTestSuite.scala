@@ -21,7 +21,7 @@ class OrderFeeTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueEthTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueBtcTx)
   }
 
   private def mkBobOrder: Order = mkOrder(

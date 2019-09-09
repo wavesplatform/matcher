@@ -34,7 +34,7 @@ class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueBtcTx)
+    broadcastAndAwait(IssueBtcTx)
   }
 
   "buy orders price is" - {

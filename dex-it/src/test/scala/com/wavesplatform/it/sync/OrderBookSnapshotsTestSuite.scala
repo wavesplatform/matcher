@@ -34,7 +34,7 @@ class OrderBookSnapshotsTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueEthTx, IssueUsdTx)
+    broadcastAndAwait(IssueEthTx, IssueUsdTx)
   }
 
   "Order books are created with right offsets" in {

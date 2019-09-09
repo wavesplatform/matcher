@@ -23,7 +23,7 @@ class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(issueAliceAssetTx, IssueUsdTx)
+    broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
   }
 
   "Proofs and AssetPairs verification with SmartContracts" - {
@@ -209,7 +209,7 @@ class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
 
       "place order and then set contract with many proofs" in {
         setAliceScript("true")
-        broadcast(mkTransfer(alice, bob, 1000, aliceAsset, 0.005.waves))
+        broadcastAndAwait(mkTransfer(alice, bob, 1000, aliceAsset, 0.005.waves))
 
         for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {
           markup(s"$i")
@@ -334,6 +334,6 @@ class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def setAliceScript(scriptText: String): Unit = broadcast(mkSetAccountScriptText(alice, Some(scriptText), fee = setScriptFee + smartFee))
-  private def resetAliceAccountScript(): Unit          = broadcast(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScript(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText), fee = setScriptFee + smartFee))
+  private def resetAliceAccountScript(): Unit          = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
 }

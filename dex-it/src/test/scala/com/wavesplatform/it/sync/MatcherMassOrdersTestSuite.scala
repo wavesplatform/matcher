@@ -17,7 +17,7 @@ class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     val assets = List(IssueUsdTx, IssueEthTx)
-    broadcast(assets: _*)
+    broadcastAndAwait(assets: _*)
     assets
       .map(tx => mkTransfer(alice, bob, tx.quantity / 2, IssuedAsset(tx.id())))
       .foreach(wavesNode1Api.broadcast)

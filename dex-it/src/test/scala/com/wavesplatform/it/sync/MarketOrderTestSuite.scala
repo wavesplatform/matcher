@@ -18,7 +18,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueEthTx)
+    broadcastAndAwait(IssueUsdTx, IssueEthTx)
   }
 
   "Sunny day tests for market orders" in {

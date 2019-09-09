@@ -2,7 +2,7 @@ package com.wavesplatform.dex.grpc.integration.protobuf
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.{Asset, Proofs}
 
 object ToVanillaConversions {
+
   implicit class PbSignedExchangeTransactionOps(val self: SignedExchangeTransaction) extends AnyVal {
     def toVanilla: Either[ValidationError, exchange.ExchangeTransaction] =
       for {
@@ -85,8 +86,9 @@ object ToVanillaConversions {
   }
 
   implicit class PbByteStringOps(val self: ByteString) extends AnyVal {
-    def toVanilla: ByteStr    = ByteStr(self.toByteArray)
-    def toVanillaAsset: Asset = if (self.isEmpty) Asset.Waves else Asset.IssuedAsset(self.toVanilla)
+    def toVanilla: ByteStr        = ByteStr(self.toByteArray)
+    def toVanillaAsset: Asset     = if (self.isEmpty) Asset.Waves else Asset.IssuedAsset(self.toVanilla)
+    def toVanillaAddress: Address = Address.fromBytes { self.toByteArray } explicitGetErr()
   }
 
   implicit class PbMaybeDescriptionOps(val self: MaybeDescription) extends AnyVal {
@@ -98,7 +100,8 @@ object ToVanillaConversions {
             name = value.name.toVanilla,
             decimals = value.decimals,
             hasScript = value.hasScript
-          ))
+          )
+        )
     }
   }
 }

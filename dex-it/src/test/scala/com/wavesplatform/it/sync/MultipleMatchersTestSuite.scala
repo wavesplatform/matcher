@@ -50,8 +50,8 @@ class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueEthTx, IssueWctTx)
-    broadcast(
+    broadcastAndAwait(IssueEthTx, IssueWctTx)
+    broadcastAndAwait(
       mkTransfer(alice, bob, IssueEthTx.quantity / 2, eth),
       mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
     )

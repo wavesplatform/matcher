@@ -11,7 +11,7 @@ class OrderV3TestSuite extends NewMatcherSuiteBase with NTPTime {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
   }
 
   "settings of allowing orderV3" - {

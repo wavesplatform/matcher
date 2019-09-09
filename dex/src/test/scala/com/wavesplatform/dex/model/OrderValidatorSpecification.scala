@@ -7,8 +7,8 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext
-import com.wavesplatform.dex.grpc.integration.client.WavesBlockchainContext.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
@@ -52,7 +52,7 @@ class OrderValidatorSpecification
 
   private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDecimals
 
-  val wavesBtcPairDecimals, ethWavesPairDecimals = new AssetPairDecimals(defaultAssetDecimals.toByte, defaultAssetDecimals.toByte)
+  val wavesBtcPairDecimals, ethWavesPairDecimals = AssetPairDecimals(defaultAssetDecimals.toByte, defaultAssetDecimals.toByte)
 
   implicit class DoubleOps(value: Double) {
     val waves: Long = wavesBtcPairDecimals.amount(value)
@@ -692,7 +692,7 @@ class OrderValidatorSpecification
 //        ov(o) should produce("AssetScriptDeniedOrder")
 //      }
 //
-//      def test(f: (Order => OrderValidator.Result[Order], WavesBlockchainContext, Order) => Any): Unit = (1 to 2).foreach { version =>
+//      def test(f: (Order => OrderValidator.Result[Order], WavesBlockchainClient, Order) => Any): Unit = (1 to 2).foreach { version =>
 //        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
 //          val features = Seq(BlockchainFeatures.SmartAssets) ++ {
 //            if (version == 1) Seq.empty else Seq(BlockchainFeatures.SmartAccountTrading)
@@ -753,15 +753,15 @@ class OrderValidatorSpecification
     case (order, _, orderFeeSettings) => validateByMatcherSettings(orderFeeSettings)(order) shouldBe 'right
   }
 
-  private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.Result[Order], WavesBlockchainContext) => Any): Unit = {
-    val bc = stub[WavesBlockchainContext]
+  private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.Result[Order], WavesBlockchainClient) => Any): Unit = {
+    val bc = stub[WavesBlockchainClient]
     val tc = exchangeTransactionCreator(bc)
     val ov = mkOrderValidator(bc, tc)
     f(ov, bc)
   }
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = {
-    val bc = stub[WavesBlockchainContext]
+    val bc = stub[WavesBlockchainClient]
     val pk = KeyPair(randomBytes())
 
     activate(bc, _ == BlockchainFeatures.SmartAccountTrading.id)
@@ -804,13 +804,13 @@ class OrderValidatorSpecification
       version = version
     )
 
-//  private def activate(bc: WavesBlockchainContext, isActive: PartialFunction[Short, Boolean]): Unit =
+//  private def activate(bc: WavesBlockchainClient, isActive: PartialFunction[Short, Boolean]): Unit =
 //    activate(bc, isActive.lift(_).getOrElse(false))
 
-  private def activate(bc: WavesBlockchainContext, isActive: Function[Short, Boolean]): Unit =
+  private def activate(bc: WavesBlockchainClient, isActive: Function[Short, Boolean]): Unit =
     (bc.isFeatureActivated _).when(*).onCall(isActive)
 
-  private def mkOrderValidator(bc: WavesBlockchainContext, tc: ExchangeTransactionCreator) =
+  private def mkOrderValidator(bc: WavesBlockchainClient, tc: ExchangeTransactionCreator) =
     OrderValidator.blockchainAware(bc,
                                    tc.createTransaction,
                                    MatcherAccount,
@@ -821,7 +821,7 @@ class OrderValidatorSpecification
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: WavesBlockchainContext) =
+  private def exchangeTransactionCreator(blockchain: WavesBlockchainClient) =
     new ExchangeTransactionCreator(MatcherAccount,
                                    matcherSettings,
                                    blockchain.hasScript(MatcherAccount),
@@ -874,7 +874,7 @@ class OrderValidatorSpecification
       priceAssetDecimals: Int = defaultAssetDecimals,
       matcherFeeAssetDecimals: Int = defaultAssetDecimals)(order: Order): OrderValidator.Result[Order] = {
 
-    val blockchain = stub[WavesBlockchainContext]
+    val blockchain = stub[WavesBlockchainClient]
 
     activate(
       blockchain,
@@ -928,32 +928,32 @@ class OrderValidatorSpecification
     )
   }
 
-  private def assignScript(bc: WavesBlockchainContext, address: Address, result: RunScriptResult): Unit = {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: RunScriptResult): Unit = {
     (bc.hasScript(_: Address)).when(address).returns(true)
     (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => result)
   }
 
-  private def assignScript(bc: WavesBlockchainContext, address: Address, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, address: Address, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: Address)).when(address).returns(false)
     case Some(r) =>
       (bc.hasScript(_: Address)).when(address).returns(true)
       (bc.runScript(_: Address, _: Order)).when(address, *).onCall((_, _) => r)
   }
 
-  private def assignScript(bc: WavesBlockchainContext, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
+  private def assignScript(bc: WavesBlockchainClient, asset: IssuedAsset, result: Option[RunScriptResult]): Unit = result match {
     case None => (bc.hasScript(_: IssuedAsset)).when(asset).returns(false)
     case Some(r) =>
       (bc.hasScript(_: IssuedAsset)).when(asset).returns(true)
       (bc.runScript(_: IssuedAsset, _: ExchangeTransaction)).when(asset, *).onCall((_, _) => r)
   }
 
-  private def assignNoScript(bc: WavesBlockchainContext, address: Address): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, address: Address): Unit =
     (bc.hasScript(_: Address)).when(address).returns(false)
 
-  private def assignNoScript(bc: WavesBlockchainContext, asset: IssuedAsset): Unit =
+  private def assignNoScript(bc: WavesBlockchainClient, asset: IssuedAsset): Unit =
     (bc.hasScript(_: IssuedAsset)).when(asset).returns(false)
 
-  private def assignAssetDescription(bc: WavesBlockchainContext, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
+  private def assignAssetDescription(bc: WavesBlockchainClient, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach {
       case (asset, desc) =>
         (bc.assetDescription _).when(asset).onCall { (x: IssuedAsset) =>

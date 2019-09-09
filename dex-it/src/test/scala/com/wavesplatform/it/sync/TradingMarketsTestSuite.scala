@@ -10,7 +10,7 @@ class TradingMarketsTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueWctTx)
+    broadcastAndAwait(IssueWctTx)
   }
 
   "When some orders were placed and matcher was restarted" - {

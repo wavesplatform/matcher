@@ -36,7 +36,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
   }
 
   "Check cross ordering between Alice and Bob" - {
@@ -255,7 +255,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //
 //        // Bob moves all waves to Alice
 //        val transferAmount = bobBalance - minFee
-//        wavesNode1Api.broadcast(mkTransfer(bob, alice, transferAmount, Waves))
+//        wavesNode1Api.broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
 //
 //        wavesNode1Api.balance(bob, Waves) shouldBe 0
 //
@@ -264,7 +264,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //
 //        // Cleanup
 //        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
-//        wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
+//        wavesNode1Api.broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
 //      }
 //
 //      "market status" in {
@@ -303,7 +303,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //    val ap08 = issueAssetPair(alice, 0, 8)
 //
 //    {
-//      val xs = Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(_.json()).map(wavesNode1Api.broadcast(_))
+//      val xs = Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(_.json()).map(wavesNode1Api.broadcastAndAwait(_))
 //      xs.foreach(x => wavesNode1Api.waitForTransaction(x.id))
 //    }
 //
@@ -344,7 +344,7 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
 //
 //    def placeOrder(i: Int, tpe: OrderType) = dex1Api.place(mkOrder(alice,pair, tpe, 100L + i, Order.PriceConstant))
 //
-//    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(wavesNode1Api.broadcast(_)).map(_.id)
+//    val txIds = List(amountAssetTx, priceAssetTx).map(_.json()).map(wavesNode1Api.broadcastAndAwait(_)).map(_.id)
 //    txIds.foreach(wavesNode1Api.waitForTransaction(_))
 //
 //    val ids = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>

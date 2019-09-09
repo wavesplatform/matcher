@@ -14,7 +14,7 @@ import scala.math.BigDecimal.RoundingMode
 class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueEthTx, IssueWctTx)
+    broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueWctTx)
   }
 
   "Alice and Bob trade WAVES-USD" - {
@@ -245,7 +245,7 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = wavesNode1Api.balance(bob, Waves) - leasingFee - matcherFee / 2
       val leaseTx       = mkLease(bob, matcher, leasingAmount)
-      broadcast(leaseTx)
+      broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
       dex1Api.place(bobOrder)
@@ -258,7 +258,7 @@ class TradeBalanceAndRoundingTestSuite extends NewMatcherSuiteBase {
       dex1Api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(0)
       //"Not enough tradable balance"
 
-      broadcast(mkLeaseCancel(bob, leaseTx.id()))
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }
   }
 

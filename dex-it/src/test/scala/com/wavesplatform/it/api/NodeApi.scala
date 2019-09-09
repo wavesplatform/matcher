@@ -39,17 +39,24 @@ object ErrorResponse {
 }
 
 trait NodeApi[F[_]] extends HasWaitReady[F] {
+
   def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]
 
   def connect(toNode: InetSocketAddress): F[Unit]
+
   def connected: F[ConnectedPeersResponse]
+
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
 
   def tryBroadcast(tx: transaction.Transaction): F[Either[ErrorResponse, Unit]]
   def broadcast(tx: transaction.Transaction): F[Unit]
+
   def transactionInfo(id: ByteStr): F[Option[Transaction]]
   def rawTransactionInfo(id: ByteStr): F[Option[JsValue]]
+
   def waitForTransaction(id: ByteStr): F[Unit]
+  def waitForTransaction(tx: transaction.Transaction): F[Unit] = waitForTransaction(tx.id.value)
+
   def waitForHeightArise(): F[Unit]
   def waitForHeight(height: Int): F[Unit]
 

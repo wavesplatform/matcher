@@ -20,7 +20,6 @@ trait ItTestSuiteBase extends FreeSpec with Matchers with CancelAfterFailure wit
 
   protected def node: Docker.DockerNode  = dockerNodes().head
   protected def nodeConfigs: Seq[Config] = Seq(baseConfig)
-
 }
 
 object ItTestSuiteBase {

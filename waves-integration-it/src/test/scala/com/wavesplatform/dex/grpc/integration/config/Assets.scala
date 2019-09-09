@@ -121,5 +121,4 @@ object Assets {
     amountAsset = Waves,
     priceAsset = IssuedAsset(BtcId)
   )
-
 }

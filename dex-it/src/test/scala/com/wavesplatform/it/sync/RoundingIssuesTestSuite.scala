@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 class RoundingIssuesTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueEthTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueBtcTx)
   }
 
   "should correctly fill an order with small amount" in {

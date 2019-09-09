@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx)
   }
 
   "Alice and Bob trade WAVES-USD" - {

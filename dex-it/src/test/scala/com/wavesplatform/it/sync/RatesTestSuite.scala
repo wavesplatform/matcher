@@ -42,8 +42,8 @@ class RatesTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueWctTx, IssueBtcTx)
-    broadcast(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    broadcastAndAwait(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
   }
 
   private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset, version = 3)

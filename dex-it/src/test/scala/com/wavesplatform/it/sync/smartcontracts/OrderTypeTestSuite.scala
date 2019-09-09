@@ -18,7 +18,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(issueAliceAssetTx, IssueUsdTx)
+    broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
   }
 
   "Order types verification with SmartContracts" - {
@@ -133,6 +133,6 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def setAliceScriptText(scriptText: String): Unit = broadcast(mkSetAccountScriptText(alice, Some(scriptText)))
-  private def resetAliceAccountScript(): Unit              = broadcast(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText)))
+  private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
 }

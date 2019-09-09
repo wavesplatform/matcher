@@ -1,17 +1,18 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.order.{AssetPair, Order}
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData
-import com.wavesplatform.protobuf.transaction.Recipient.Recipient.Address
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.{exchange => ve}
 import com.wavesplatform.{account => va}
 
 object ToPbConversions {
+
   implicit class VanillaExchangeTransactionOps(tx: ve.ExchangeTransaction) {
     def toPB: SignedExchangeTransaction =
       SignedExchangeTransaction(
@@ -42,31 +43,32 @@ object ToPbConversions {
     }
   }
 
+  implicit class VanillaAddressOps(self: Address) {
+    def toPB: ByteString = self.bytes.toPB
+  }
+
   implicit class VanillaOrderOps(order: ve.Order) {
-    def toPB: Order = Order(
-      chainId = va.AddressScheme.current.chainId.toInt,
-      senderPublicKey = order.senderPublicKey.toPB,
-      matcherPublicKey = order.matcherPublicKey.toPB,
-      assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
-      orderSide = order.orderType match {
-        case ve.OrderType.BUY  => Order.Side.BUY
-        case ve.OrderType.SELL => Order.Side.SELL
-      },
-      amount = order.amount,
-      price = order.price,
-      timestamp = order.timestamp,
-      expiration = order.expiration,
-      matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee)),
-      version = order.version,
-      proofs = order.proofs.map(_.toPB)
-    )
+    def toPB: Order =
+      Order(
+        chainId = va.AddressScheme.current.chainId.toInt,
+        senderPublicKey = order.senderPublicKey.toPB,
+        matcherPublicKey = order.matcherPublicKey.toPB,
+        assetPair = Some(AssetPair(order.assetPair.amountAsset.toPB, order.assetPair.priceAsset.toPB)),
+        orderSide = order.orderType match {
+          case ve.OrderType.BUY  => Order.Side.BUY
+          case ve.OrderType.SELL => Order.Side.SELL
+        },
+        amount = order.amount,
+        price = order.price,
+        timestamp = order.timestamp,
+        expiration = order.expiration,
+        matcherFee = Some(Amount(order.matcherFeeAssetId.toPB, order.matcherFee)),
+        version = order.version,
+        proofs = order.proofs.map(_.toPB)
+      )
   }
 
   implicit class VanillaByteStrOps(val self: ByteStr) extends AnyVal {
     def toPB: ByteString = ByteString.copyFrom(self.arr)
-  }
-
-  implicit class VanillaAddressOps(val self: va.Address) extends AnyVal {
-    def toPB: ByteString = self.bytes.toPB
   }
 }

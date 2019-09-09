@@ -13,7 +13,7 @@ class MatcherTickerTestSuite extends NewMatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcast(IssueUsdTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueBtcTx)
   }
 
   private val btcUsdPair = AssetPair(

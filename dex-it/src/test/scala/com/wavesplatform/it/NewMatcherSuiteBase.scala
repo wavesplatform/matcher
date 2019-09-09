@@ -28,7 +28,8 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV2}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction, TransferTransactionV2}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
@@ -166,6 +167,8 @@ trait TestUtils {
 
   protected def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
+  // TODO move to other trait and make available from object too
+
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
     */
@@ -224,6 +227,22 @@ trait TestUtils {
         timestamp = timestamp,
         feeAssetId = feeAsset,
         feeAmount = feeAmount,
+        attachment = Array.emptyByteArray
+      )
+      .explicitGet()
+
+  protected def mkMassTransfer(sender: KeyPair,
+                               asset: Asset,
+                               transfers: List[ParsedTransfer],
+                               fee: Long = setScriptFee,
+                               ts: Long = System.currentTimeMillis()): MassTransferTransaction =
+    MassTransferTransaction
+      .selfSigned(
+        sender = sender,
+        assetId = asset,
+        transfers = transfers,
+        timestamp = ts,
+        feeAmount = fee,
         attachment = Array.emptyByteArray
       )
       .explicitGet()

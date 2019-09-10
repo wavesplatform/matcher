@@ -17,7 +17,7 @@ import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -82,7 +82,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
           getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
           historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-          upsertRate ~ deleteRate
+          upsertRate ~ deleteRate ~ saveSnapshots
       }
   }
 
@@ -676,6 +676,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
         StatusCodes.OK -> js
       }
+    }
+  }
+
+  @Path("/debug/saveSnapshots")
+  @ApiOperation(value = "Saves snapshots for all order books", notes = "", httpMethod = "POST")
+  def saveSnapshots: Route = (path("debug" / "saveSnapshots") & post & withAuth) {
+    complete {
+      matcher ! ForceSaveSnapshots
+      SimpleResponse(StatusCodes.OK, "Saving started")
     }
   }
 

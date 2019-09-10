@@ -19,6 +19,8 @@ To build and test it your own, you will need to follow these steps:
 
 ### 1.1. Installing Java
 
+Use Java 8 to build artifacts. To run them you are able to use either Java 8 or Java 11. 
+
 **Debian/Ubuntu**:
 
 ```
@@ -32,7 +34,7 @@ homebrew is preferable choice. You can install java and sbt with:
 
 ```
 brew tap AdoptOpenJDK/openjdk
-brew cask install adoptopenjdk11 sbt@1
+brew cask install adoptopenjdk8 sbt@1
 ```
 
 **Windows**:

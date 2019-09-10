@@ -59,9 +59,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     )
 
     "assert addresses balances" in {
-      node.assertAssetBalance(alice.address, aliceAsset, AssetQuantity)
-      node.assertAssetBalance(matcher.address, aliceAsset, 0)
-      node.assertAssetBalance(bob.address, aliceAsset, 0)
+      node.assertAssetBalance(alice.toAddress.toString, aliceAsset, AssetQuantity)
+      node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
+      node.assertAssetBalance(bob.toAddress.toString, aliceAsset, 0)
     }
 
     "matcher should respond with Public key" in {
@@ -103,9 +103,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "and should match with buy order" in {
-        val bobBalance     = node.accountBalances(bob.address)._1
-        val matcherBalance = node.accountBalances(matcher.address)._1
-        val aliceBalance   = node.accountBalances(alice.address)._1
+        val bobBalance     = node.accountBalances(bob.toAddress.toString)._1
+        val matcherBalance = node.accountBalances(matcher.toAddress.toString)._1
+        val aliceBalance   = node.accountBalances(alice.toAddress.toString)._1
 
         // Bob places a buy order
         val order2 = node.placeOrder(bob, aliceWavesPair, BUY, 200, 2.waves * Order.PriceConstant, matcherFee, orderVersion)
@@ -120,7 +120,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         node.waitOrderInBlockchain(order2.message.id)
 
         // Bob checks that asset on his balance
-        node.assertAssetBalance(bob.address, aliceAsset, 200)
+        node.assertAssetBalance(bob.toAddress.toString, aliceAsset, 200)
 
         // Alice checks that part of her order still in the order book
         val orders = node.orderBook(aliceWavesPair)
@@ -128,18 +128,18 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         orders.asks.head.price shouldBe 2000.waves
 
         // Alice checks that she sold some assets
-        node.assertAssetBalance(alice.address, aliceAsset, 800)
+        node.assertAssetBalance(alice.toAddress.toString, aliceAsset, 800)
 
         // Bob checks that he spent some Waves
-        val updatedBobBalance = node.accountBalances(bob.address)._1
+        val updatedBobBalance = node.accountBalances(bob.toAddress.toString)._1
         updatedBobBalance shouldBe (bobBalance - 2000 * 200 - matcherFee)
 
         // Alice checks that she received some Waves
-        val updatedAliceBalance = node.accountBalances(alice.address)._1
+        val updatedAliceBalance = node.accountBalances(alice.toAddress.toString)._1
         updatedAliceBalance shouldBe (aliceBalance + 2000 * 200 - (matcherFee * 200.0 / 500.0).toLong)
 
         // Matcher checks that it earn fees
-        val updatedMatcherBalance = node.accountBalances(matcher.address)._1
+        val updatedMatcherBalance = node.accountBalances(matcher.toAddress.toString)._1
         updatedMatcherBalance shouldBe (matcherBalance + matcherFee + (matcherFee * 200.0 / 500.0).toLong - exTxFee)
       }
 
@@ -165,9 +165,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "buy order should match on few price levels" in {
-        val matcherBalance = node.accountBalances(matcher.address)._1
-        val aliceBalance   = node.accountBalances(alice.address)._1
-        val bobBalance     = node.accountBalances(bob.address)._1
+        val matcherBalance = node.accountBalances(matcher.toAddress.toString)._1
+        val aliceBalance   = node.accountBalances(alice.toAddress.toString)._1
+        val bobBalance     = node.accountBalances(bob.toAddress.toString)._1
 
         // Alice places a buy order
         val order4 =
@@ -179,17 +179,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Check balances
         node.waitOrderInBlockchain(order4.message.id)
-        node.assertAssetBalance(alice.address, aliceAsset, 950)
-        node.assertAssetBalance(bob.address, aliceAsset, 50)
+        node.assertAssetBalance(alice.toAddress.toString, aliceAsset, 950)
+        node.assertAssetBalance(bob.toAddress.toString, aliceAsset, 50)
 
-        val updatedMatcherBalance = node.accountBalances(matcher.address)._1
+        val updatedMatcherBalance = node.accountBalances(matcher.toAddress.toString)._1
         updatedMatcherBalance should be(
           matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
 
-        val updatedBobBalance = node.accountBalances(bob.address)._1
+        val updatedBobBalance = node.accountBalances(bob.toAddress.toString)._1
         updatedBobBalance should be(bobBalance - matcherFee + 150 * 1900)
 
-        val updatedAliceBalance = node.accountBalances(alice.address)._1
+        val updatedAliceBalance = node.accountBalances(alice.toAddress.toString)._1
         updatedAliceBalance should be(
           aliceBalance - (matcherFee * 200.0 / 350.0).toLong - (matcherFee * 150.0 / 350.0).toLong - (matcherFee * 200.0 / 500.0).toLong - 1900 * 150)
       }
@@ -214,9 +214,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
-        val matcherBalance = node.accountBalances(matcher.address)._1
-        val aliceBalance   = node.accountBalances(alice.address)._1
-        val bobBalance     = node.accountBalances(bob.address)._1
+        val matcherBalance = node.accountBalances(matcher.toAddress.toString)._1
+        val aliceBalance   = node.accountBalances(alice.toAddress.toString)._1
+        val bobBalance     = node.accountBalances(bob.toAddress.toString)._1
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = node.placeOrder(bob, aliceWavesPair, BUY, 130, 2000.waves, matcherFee, orderVersion)
@@ -230,16 +230,16 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Check balances
         node.waitOrderInBlockchain(order5.message.id)
-        node.assertAssetBalance(alice.address, aliceAsset, 850)
-        node.assertAssetBalance(bob.address, aliceAsset, 150)
+        node.assertAssetBalance(alice.toAddress.toString, aliceAsset, 850)
+        node.assertAssetBalance(bob.toAddress.toString, aliceAsset, 150)
 
-        val updatedMatcherBalance = node.accountBalances(matcher.address)._1
+        val updatedMatcherBalance = node.accountBalances(matcher.toAddress.toString)._1
         updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
 
-        val updatedBobBalance = node.accountBalances(bob.address)._1
+        val updatedBobBalance = node.accountBalances(bob.toAddress.toString)._1
         updatedBobBalance should be(bobBalance - (matcherFee * 100.0 / 130.0).toLong - 100 * 2000)
 
-        val updatedAliceBalance = node.accountBalances(alice.address)._1
+        val updatedAliceBalance = node.accountBalances(alice.toAddress.toString)._1
         updatedAliceBalance should be(aliceBalance - matcherFee + 2000 * 100)
       }
 
@@ -250,9 +250,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "should consider UTX pool when checking the balance" in {
 
-        node.assertAssetBalance(alice.address, bobAsset, 0)
-        node.assertAssetBalance(matcher.address, bobAsset, 0)
-        node.assertAssetBalance(bob.address, bobAsset, someAssetAmount)
+        node.assertAssetBalance(alice.toAddress.toString, bobAsset, 0)
+        node.assertAssetBalance(matcher.toAddress.toString, bobAsset, 0)
+        node.assertAssetBalance(bob.toAddress.toString, bobAsset, someAssetAmount)
         val bobWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(bobAsset).get), Waves)
 
         def bobOrder = node.prepareOrder(bob, bobWavesPair, SELL, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
@@ -270,10 +270,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "trader can buy waves for assets with order without having waves" in {
-        val bobBalance = node.accountBalances(bob.address)._1
-        node.assertAssetBalance(alice.address, bobAsset2, 0)
-        node.assertAssetBalance(matcher.address, bobAsset2, 0)
-        node.assertAssetBalance(bob.address, bobAsset2, someAssetAmount)
+        val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+        node.assertAssetBalance(alice.toAddress.toString, bobAsset2, 0)
+        node.assertAssetBalance(matcher.toAddress.toString, bobAsset2, 0)
+        node.assertAssetBalance(bob.toAddress.toString, bobAsset2, someAssetAmount)
 
         // Bob wants to sell all own assets for 1 Wave
         def bobOrder =
@@ -285,17 +285,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob moves all waves to Alice
         val transferAmount = bobBalance - minFee
-        node.broadcastTransfer(bob, alice.address, transferAmount, minFee, None, None, waitForTx = true).id
+        node.broadcastTransfer(bob, alice.toAddress.toString, transferAmount, minFee, None, None, waitForTx = true).id
         node.reservedBalance(bob)
 
-        node.accountBalances(bob.address)._1 shouldBe 0
+        node.accountBalances(bob.toAddress.toString)._1 shouldBe 0
 
         // Order should stay accepted
         node.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
 
         // Cleanup
         node.cancelOrder(bob, bobWavesPair, order8.message.id).status should be("OrderCanceled")
-        node.broadcastTransfer(alice, bob.address, transferAmount, minFee, None, None, waitForTx = true)
+        node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, minFee, None, None, waitForTx = true)
       }
 
       "market status" in {

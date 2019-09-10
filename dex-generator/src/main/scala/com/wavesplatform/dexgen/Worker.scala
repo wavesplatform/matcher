@@ -104,7 +104,7 @@ class Worker(workerSettings: Settings,
   }
 
   def cancelAllOrders(fakeAccounts: Seq[KeyPair])(implicit tag: String): Future[Seq[MatcherStatusResponse]] = {
-    log.info(s"[$tag] Cancel orders of accounts: ${fakeAccounts.map(_.address).mkString(", ")}")
+    log.info(s"[$tag] Cancel orders of accounts: ${fakeAccounts.map(_.toAddress.toString).mkString(", ")}")
     def cancelOrdersOf(account: KeyPair): Future[Seq[MatcherStatusResponse]] = {
       orderHistory(account).flatMap { orders =>
         Future.sequence {
@@ -125,13 +125,13 @@ class Worker(workerSettings: Settings,
 
   def transfer(i: Long, sender: KeyPair, assetId: Asset, recipient: KeyPair, halfBalance: Boolean)(
       implicit tag: String): Future[Transaction] =
-    to(endpoint).balance(sender.address, assetId).flatMap { balance =>
+    to(endpoint).balance(sender.toAddress.toString, assetId).flatMap { balance =>
       val halfAmount     = if (halfBalance) balance / 2 else balance
       val transferAmount = assetId.fold(halfAmount - 0.001.waves)(_ => halfAmount)
 
       TransferTransactionV1.selfSigned(assetId,
                                        sender,
-                                       AddressOrAlias.fromString(recipient.publicKey.address).right.get,
+                                       AddressOrAlias.fromString(recipient.publicKey.toAddress.toString).right.get,
                                        transferAmount,
                                        now + i,
                                        Waves,
@@ -140,7 +140,7 @@ class Worker(workerSettings: Settings,
         case Left(e) => throw new RuntimeException(s"[$tag] Generated transaction is wrong: $e")
         case Right(txRequest) =>
           log.info(
-            s"[$tag] ${assetId.compatId.fold("Waves")(_.toString)} balance of ${sender.address}: $balance, sending $transferAmount to ${recipient.address}")
+            s"[$tag] ${assetId.compatId.fold("Waves")(_.toString)} balance of ${sender.toAddress.toString}: $balance, sending $transferAmount to ${recipient.toAddress.toString}")
           val signedTx = createSignedTransferRequest(txRequest)
           to(endpoint).broadcastRequest(signedTx).flatMap { tx =>
             to(endpoint).waitForTransaction(tx.id)

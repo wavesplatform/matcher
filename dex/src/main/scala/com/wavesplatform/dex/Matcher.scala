@@ -15,7 +15,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db._
+import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
@@ -146,7 +146,12 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private def validateOrder(o: Order) =
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
+                                               blacklistedAddresses,
+                                               blacklistedAssets,
+                                               settings,
+                                               rateCache,
+                                               assetDecimalsCache.get)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
@@ -161,12 +166,10 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = assetDecimalsCache.get(asset)
-  }
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+    val keyHashStr = context.settings.config.getString("waves.rest-api.api-key-hash")
 
     Seq(
       MatcherApiRoute(
@@ -196,7 +199,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-        keyHash,
+        keyHashStr,
         rateCache,
         settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
       ),
@@ -204,7 +207,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHash
+        keyHashStr,
+        settings
       )
     )
   }
@@ -347,7 +351,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           context.time,
           tx => context.utx.putIfNew(tx).resultE.isRight,
           context.blockchain.containsTransaction(_),
-          txs => txs.foreach(context.broadcastTx)
+          txs => txs.foreach(context.broadcastTransaction)
         ),
       "exchange-transaction-broadcast"
     )

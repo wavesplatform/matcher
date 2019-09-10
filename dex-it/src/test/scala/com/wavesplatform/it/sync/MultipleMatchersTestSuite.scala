@@ -60,7 +60,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
   // Share assets with Bob
   {
-    val xs = assetIds.map { case (id, info) => node.broadcastTransfer(alice, bob.address, info.quantity / 2, minFee, Some(id), None).id }
+    val xs = assetIds.map { case (id, info) => node.broadcastTransfer(alice, bob.toAddress.toString, info.quantity / 2, minFee, Some(id), None).id }
     xs.foreach(nodes.waitForTransaction)
   }
 

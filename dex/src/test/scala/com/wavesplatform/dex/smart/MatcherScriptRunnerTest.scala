@@ -7,6 +7,7 @@ import com.wavesplatform.dex.error.ProduceError.produce
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType, OrderV1}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -54,7 +55,8 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |      case _ => false
             |    }
             |}
-            |""".stripMargin
+            |""".stripMargin,
+        ScriptEstimatorV2
       )
       .explicitGet()
       ._1
@@ -73,7 +75,8 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |      case _ => false
             |    }
             |}
-            |""".stripMargin
+            |""".stripMargin,
+        ScriptEstimatorV2
       )
       .explicitGet()
       ._1

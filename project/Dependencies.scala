@@ -23,6 +23,7 @@ object Dependencies {
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val mouse                      = "org.typelevel" %% "mouse" % "0.22"
 
   private val catsEffect = catsModule("effect", "1.2.0")
   private val catsCore   = catsModule("core")
@@ -95,7 +96,8 @@ object Dependencies {
     akkaModule("persistence-query"),
     akkaHttp,
     "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
-    janino
+    janino,
+    mouse
   ) ++ Seq(
     akkaModule("testkit"),
     akkaModule("persistence-tck"),

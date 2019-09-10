@@ -171,8 +171,6 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   def createDex(name: String, config: Config): DexContainer = {
     val number = getNumber(name)
-//    val grpc   = config.as[GRPCSettings]("waves.dex.waves-node-grpc")
-
     val allowedKeysPrefixes = List(
       "waves-node-grpc",
       "blacklisted",
@@ -205,6 +203,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     r
   }
 
+  def start(container: Coeval[DockerContainer]): Unit = start { container() }
+
   def start(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Starting ...")
     try client.startContainer(container.id)
@@ -214,6 +214,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         throw e
     }
   }
+
+  def stop(container: Coeval[DockerContainer]): Unit = stop { container() }
 
   def stop(container: DockerContainer): Unit = {
     val containerInfo = client.inspectContainer(container.id)
@@ -234,11 +236,15 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     saveLog(container)
   }
 
+  def disconnectFromNetwork(container: Coeval[DockerContainer]): Unit = disconnectFromNetwork { container() }
+
   def disconnectFromNetwork(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Disconnecting from network '${network().name()}' ...")
     client.disconnectFromNetwork(container.id, network().id())
     log.info(s"${prefix(container)} Disconnected from network '${network().name()}'")
   }
+
+  def connectToNetwork(container: Coeval[DockerContainer], netAlias: Option[String]): Unit = connectToNetwork(container(), netAlias)
 
   def connectToNetwork(container: DockerContainer, netAlias: Option[String] = None): Unit = {
     log.debug(s"${prefix(container)} Connecting to network '${network().name()}' ...")

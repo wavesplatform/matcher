@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import cats.Functor
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
@@ -10,12 +11,17 @@ import play.api.libs.json.JsError
 
 import scala.concurrent.duration.FiniteDuration
 
-class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
-  def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] =
-    f.flatMap {
-      _.tailRecM[F, T] { x =>
-        if (pred(x)) M.pure(x.asRight)
-        else W.wait(delay).productR(f).map(_.asLeft)
+class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F], functor: Functor[F]) {
+
+  def repeatUntil[T](f: => F[T], delay: FiniteDuration, maxAttempts: Int = 15)(pred: T => Boolean): F[T] =
+    f.flatMap { r =>
+      (r, maxAttempts).tailRecM[F, T] {
+        case (x, attempts) =>
+          (pred(x), attempts) match {
+            case (true, _)           => M.pure { x.asRight }
+            case (false, a) if a > 0 => W.wait(delay).productR(f).map(t => (t, attempts - 1).asLeft)
+            case (false, _)          => M.raiseError(new RuntimeException(s"Max number of attempts ($maxAttempts) has been exceeded"))
+          }
       }
     }
 

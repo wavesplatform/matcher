@@ -22,8 +22,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
 
   "Check no commands are written to queue" - {
     "check assets's balances" in {
-      wavesNode1Api.balance(alice, EthAsset) shouldBe IssueEthTx.quantity
-      wavesNode1Api.balance(matcher, EthAsset) shouldBe 0L
+      wavesNode1Api.balance(alice, eth) shouldBe IssueEthTx.quantity
+      wavesNode1Api.balance(matcher, eth) shouldBe 0L
     }
 
     "place an order and wait some time" in {

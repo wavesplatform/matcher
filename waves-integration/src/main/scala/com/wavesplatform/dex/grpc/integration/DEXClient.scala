@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.grpc.integration
 
+import java.util.concurrent.TimeUnit
+
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesGrpcAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainGrpcSyncClient
 import io.grpc._
@@ -12,8 +14,12 @@ class DEXClient(target: String, val scheduler: Scheduler = global) {
   private val channel =
     ManagedChannelBuilder
       .forTarget(target)
+      .keepAliveWithoutCalls(true)
+      .keepAliveTime(1, TimeUnit.SECONDS)
+      .keepAliveTimeout(2, TimeUnit.SECONDS)
+      //      .idleTimeout(3, TimeUnit.SECONDS)
       .nameResolverFactory(new DnsNameResolverProvider)
-      .defaultLoadBalancingPolicy("round_robin")
+      .defaultLoadBalancingPolicy("pick_first")
       .usePlaintext()
       .build
 

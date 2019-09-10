@@ -17,6 +17,7 @@ sealed abstract class OrderStatus(val isActive: Boolean) extends Product with Se
 }
 
 object OrderStatus {
+
   case object Accepted        extends OrderStatus(true)
   case object NotFound        extends OrderStatus(false)
   case object PartiallyFilled extends OrderStatus(true)

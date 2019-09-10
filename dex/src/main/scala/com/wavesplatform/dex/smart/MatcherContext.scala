@@ -105,6 +105,13 @@ object MatcherContext {
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")
     override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]                = kill("collectActiveLeases")
+
+    /** Block reward related */
+    override def blockReward(height: Int): Option[Long] = kill("blockReward")
+    override def lastBlockReward: Option[Long] = kill("lastBlockReward")
+    override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
+
+    override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
   }
 
 }

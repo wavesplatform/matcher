@@ -24,12 +24,12 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2",
+    dockerClient.createWavesNode("waves-2",
                                    wavesNodeRunConfig(),
                                    ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
   }
   protected def wavesNode2Api: NodeApi[Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
+    def apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
@@ -43,7 +43,7 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
   "BroadcastUntilConfirmed" in {
     markup("Disconnect a miner node from the network")
-    dockerClient().disconnectFromNetwork(wavesNode1Container())
+    dockerClient.disconnectFromNetwork(wavesNode1Container())
 
     markup("Place orders, those should match")
     dex1Api.place(aliceOrder)
@@ -51,10 +51,10 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1Api.waitForTransactionsByOrder(aliceOrder.id(), 1).head.id()
+    val exchangeTxId = dex1Api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
 
     markup("Connect the miner node to the network")
-    dockerClient().connectToNetwork(wavesNode1Container())
+    dockerClient.connectToNetwork(wavesNode1Container())
 
     markup("Wait until it receives the transaction")
     wavesNode2Api.waitForTransaction(exchangeTxId)

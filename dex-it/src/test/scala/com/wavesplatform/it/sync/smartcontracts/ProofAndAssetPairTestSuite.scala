@@ -315,12 +315,12 @@ class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
           dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
           dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-          val aliceOrd1Txs = dex1Api.waitForTransactionsByOrder(aliceOrd1.id(), 1)
+          val aliceOrd1Txs = dex1Api.waitForTransactionsByOrder(aliceOrd1, 1)
           val r1           = wavesNode1Api.tryBroadcast(aliceOrd1Txs.head)
           r1 shouldBe 'left
           r1.left.get.error shouldBe TransactionNotAllowedByAccountScript.ErrorCode
 
-          val aliceOrd2Txs = dex1Api.waitForTransactionsByOrder(aliceOrd2.id(), 1)
+          val aliceOrd2Txs = dex1Api.waitForTransactionsByOrder(aliceOrd2, 1)
           val r2           = wavesNode1Api.tryBroadcast(aliceOrd2Txs.head)
           r2 shouldBe 'left
           r2.left.get.error shouldBe TransactionNotAllowedByAccountScript.ErrorCode

@@ -18,7 +18,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      dex1Api.cancel(bob, order.assetPair, order.id())
+      dex1Api.cancel(bob, order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
@@ -31,7 +31,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       dex1Api.place(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
 
-      dex1Api.cancelWithApiKey(order.id())
+      dex1Api.cancelWithApiKey(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled

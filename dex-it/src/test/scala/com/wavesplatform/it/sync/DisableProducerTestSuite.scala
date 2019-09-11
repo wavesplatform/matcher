@@ -41,8 +41,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
     }
 
     "Commands aren't written to queue after restart" in {
-      dockerClient().stop(dex1Container())
-      dockerClient().start(dex1Container())
+      dockerClient.stop(dex1Container())
+      dockerClient.start(dex1Container())
       dex1Api.waitReady
 
       dex1Api.currentOffset should be(-1)

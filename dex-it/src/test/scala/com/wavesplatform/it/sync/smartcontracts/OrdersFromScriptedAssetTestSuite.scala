@@ -128,7 +128,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
     dex1Api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
 
-    val txs = dex1Api.waitForTransactionsByOrder(submitted.id(), 1)
+    val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1Api.tryBroadcast(txs.head)
     r shouldBe 'left
     r.left.get.error shouldBe TransactionNotAllowedByAssetScript.ErrorCode
@@ -156,7 +156,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
     dex1Api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
 
-    val txs = dex1Api.waitForTransactionsByOrder(submitted.id(), 1)
+    val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1Api.tryBroadcast(txs.head)
     r shouldBe 'left
     r.left.get.error should ===(TransactionNotAllowedByAssetScript.ErrorCode)

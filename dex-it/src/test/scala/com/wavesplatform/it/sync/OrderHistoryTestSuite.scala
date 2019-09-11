@@ -43,7 +43,7 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
   private val postgresPassword                = "docker"
   private val postgresEnv                     = s"POSTGRES_PASSWORD=$postgresPassword"
   private val postgresContainerPort           = "5432"
-  private val postgresContainerIp             = dockerClient().ipForNode(10)
+  private val postgresContainerIp             = dockerClient.ipForNode(10)
 
   private val postgresContainerLauncher =
     new DockerContainerLauncher(
@@ -52,7 +52,7 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
       containerIp = postgresContainerIp,
       containerPort = postgresContainerPort,
       env = postgresEnv,
-      networkName = dockerClient().network().name,
+      networkName = dockerClient.network().name,
       imageTag = "10"
     )
 

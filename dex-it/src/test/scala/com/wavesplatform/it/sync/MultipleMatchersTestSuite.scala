@@ -26,10 +26,10 @@ class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
       |}""".stripMargin)
 
   protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient().createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
+    dockerClient.createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
   }
 
-  private def dex2ApiAddress                 = dockerClient().getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
+  private def dex2ApiAddress                 = dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
   protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex2ApiAddress)
   protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex2ApiAddress))
 

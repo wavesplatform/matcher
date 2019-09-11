@@ -125,7 +125,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
 
         waitForOrderAtNode(bobOrd1.id())
 
-        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2.id(), 1)
+        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1Api.tryBroadcast(txs.head)
         r shouldBe 'left
         r.left.get.error shouldBe TransactionNotAllowedByAccountScript.ErrorCode

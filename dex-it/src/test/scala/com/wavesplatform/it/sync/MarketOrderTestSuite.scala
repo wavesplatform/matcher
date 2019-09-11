@@ -18,18 +18,13 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
     def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {
       val orders = amountPrices.map {
-        case (amount, price) => mkOrder(sender, pair, ordersType, amount, price, 0.003.waves)
+        case (amount, price) => mkOrder(sender, pair, ordersType, amount, price)
       }
-      orders.foreach { order =>
-        dex1Api.place(order)
-        dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
-      }
+      orders.foreach(placeAndAwait(_))
     }
 
     def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse = {
-      val order = mkOrder(sender, pair, orderType, amount, price, 0.003.waves)
-      dex1Api.placeMarket(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
+      placeAndAwait(mkOrder(sender, pair, orderType, amount, price), OrderStatus.Filled)
     }
 
     withClue("BIG BUY market order executed partially (buy whole counter side):\n") {

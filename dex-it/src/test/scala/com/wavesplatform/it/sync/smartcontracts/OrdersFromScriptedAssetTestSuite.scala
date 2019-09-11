@@ -43,14 +43,12 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     val pair = AssetPair(Waves, allowAsset)
 
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(counter)
 
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    dex1Api.place(submitted)
-    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
+    placeAndAwait(submitted, OrderStatus.Filled)
 
-    waitForOrderAtNode(submitted.id())
+    waitForOrderAtNode(submitted)
   }
 
   "wait activation" in wavesNode1Api.waitForHeight(activationHeight)
@@ -58,8 +56,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
   "can place if the script returns TRUE" in {
     val pair    = AssetPair(unscriptedAsset, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(counter)
     dex1Api.cancel(matcher, counter)
   }
 
@@ -73,14 +70,10 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     val pair = AssetPair(unscriptedAsset, allowAsset)
 
     info("place counter")
-    val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee))
 
     info("place a submitted order")
-    val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    dex1Api.place(submitted)
-    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
+    placeAndAwait(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee), OrderStatus.Filled)
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
@@ -91,8 +84,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
     info("place a counter order")
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(counter)
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
@@ -107,8 +99,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     info("place a counter order")
     val pair    = AssetPair(allowAsset2, unscriptedAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(counter)
 
     info("update a script")
     val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, DenyBigAmountScript)
@@ -135,8 +126,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     info("place a counter order")
     val pair    = AssetPair(allowAsset3, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    dex1Api.place(counter)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+    placeAndAwait(counter)
 
     info("update a script")
     val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, DenyBigAmountScript)

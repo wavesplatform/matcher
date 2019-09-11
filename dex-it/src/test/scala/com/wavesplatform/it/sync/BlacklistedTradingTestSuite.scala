@@ -86,8 +86,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
     And("order can be placed on allowed pair with blacklisted asset")
     val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
-    dex1Api.place(btcOrder2)
-    dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
+    placeAndAwait(btcOrder2)
 
     And("now if all blacklists are cleared")
     replaceSuiteConfig(dex1Container(), configWithBlacklisted())

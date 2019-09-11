@@ -55,8 +55,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         setAliceScriptText(sco1)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         dex1Api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522,
@@ -76,8 +75,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         )
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
@@ -87,12 +85,10 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         setAliceScriptText(sco3)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
         dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
@@ -101,12 +97,10 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
 
       "place order and then set contract on BUY type" in {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         setAliceScriptText(sco1)
 
@@ -121,7 +115,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
         dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-        waitForOrderAtNode(bobOrd1.id())
+        waitForOrderAtNode(bobOrd1)
 
         val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1Api.tryBroadcast(txs.head)

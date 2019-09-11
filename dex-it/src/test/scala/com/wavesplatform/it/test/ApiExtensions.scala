@@ -2,7 +2,7 @@ package com.wavesplatform.it.test
 
 import cats.Id
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.api.{DexApi, MatcherState, NodeApi, OrderBookHistoryItem}
+import com.wavesplatform.it.api.{DexApi, MatcherState, NodeApi, OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.{NewMatcherSuiteBase, api}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
@@ -17,9 +17,19 @@ trait ApiExtensions {
     txs.foreach(tx => wavesNode1Api.waitForTransaction(tx))
   }
 
-  protected def waitForOrderAtNode(orderId: Order.Id,
+  protected def placeAndAwait(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted): OrderStatusResponse = {
+    dex1Api.place(order)
+    dex1Api.waitForOrderStatus(order, expectedStatus)
+  }
+
+  protected def waitForOrderAtNode(order: Order,
                                    dexApi: DexApi[Id] = dex1Api,
-                                   wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] = {
+                                   wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] =
+    waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
+
+  protected def waitForOrderAtNode(orderId: Order.Id,
+                                   dexApi: DexApi[Id],
+                                   wavesNodeApi: NodeApi[Id]): Id[ExchangeTransaction] = {
     val tx = dexApi.waitForTransactionsByOrder(orderId, 1).head
     wavesNodeApi.waitForTransaction(tx.id())
     tx

@@ -26,7 +26,7 @@ class RoundingIssuesTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(filledAmount)))
     dex1Api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(filledAmount)))
 
-    val tx = waitForOrderAtNode(counter.id())
+    val tx = waitForOrderAtNode(counter)
     dex1Api.cancel(alice, counter)
     val rawExchangeTx = wavesNode1Api.rawTransactionInfo(tx.id()).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.id()}'"))
 
@@ -55,7 +55,7 @@ class RoundingIssuesTestSuite extends NewMatcherSuiteBase {
 
     withClue("Alice's reserved balance before cancel")(dex1Api.reservedBalance(alice) shouldBe empty)
 
-    waitForOrderAtNode(counter.id())
+    waitForOrderAtNode(counter)
     dex1Api.cancel(bob, counter)
 
     withClue("Bob's reserved balance after cancel")(dex1Api.reservedBalance(bob) shouldBe empty)

@@ -44,8 +44,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
       )
 
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      dex1Api.place(correctBobOrder)
-      dex1Api.waitForOrderStatus(correctBobOrder, OrderStatus.Accepted)
+      placeAndAwait(correctBobOrder)
 
       val markets = dex1Api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
 
@@ -218,15 +217,13 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
   private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
     val r = mkOrder(bob, assetPair, OrderType.BUY, amount, price)
-    dex1Api.place(r)
-    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
+    placeAndAwait(r)
     r
   }
 
   private def bobPlacesSellWctOrder(bobCoinAmount: Int): Order = {
     val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
-    dex1Api.place(r)
-    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
+    placeAndAwait(r)
     r
   }
 }

@@ -40,8 +40,7 @@ class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
   "buy orders price is" - {
     "in deviation bounds" in {
       /*val bestAskOrder = mkOrder(alice, wavesBtcPair, SELL, 1000.waves, 500000)
-      dex1Api.place(bestAskOrder)
-      dex1Api.waitForOrderStatus(bestAskOrder, OrderStatus.Accepted)
+      placeAndAwait(bestAskOrder)
       dex1Api.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
       val bestBidOrder = mkOrder(bob, wavesBtcPair, BUY, 1000.waves, 400000)

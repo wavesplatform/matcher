@@ -4,7 +4,7 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.api.MatcherError
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -88,8 +88,7 @@ class RatesTestSuite extends NewMatcherSuiteBase {
 
     // place order with admissible fee (according to btc rate = 1)
     val order1 = newOrder
-    dex1Api.place(order1)
-    dex1Api.waitForOrderStatus(order1, OrderStatus.Accepted)
+    placeAndAwait(order1)
 
     // slightly increase rate for btc
     dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Ok
@@ -100,9 +99,7 @@ class RatesTestSuite extends NewMatcherSuiteBase {
     // return previous rate for btc
     dex1Api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Ok
 
-    val order2 = newOrder
-    dex1Api.place(order2)
-    dex1Api.waitForOrderStatus(order2, OrderStatus.Accepted)
+    placeAndAwait(newOrder)
 
     dex1Api.deleteRate(btcAsset)
   }

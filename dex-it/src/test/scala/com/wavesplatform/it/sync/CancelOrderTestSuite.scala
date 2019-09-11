@@ -14,8 +14,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
   "Order can be canceled" - {
     "by sender" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
       dex1Api.cancel(bob, order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
@@ -27,8 +26,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
 
     "with API key" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
       dex1Api.cancelWithApiKey(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
@@ -45,8 +43,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
   "Cancel is rejected" - {
     "when request sender is not the sender of and order" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
       val r = dex1Api.tryCancel(matcher, order)
       r shouldBe 'left
@@ -62,11 +59,11 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
     "all orders placed by an address" in {
       val orders = mkBobOrders(wavesUsdPair) ::: mkBobOrders(wavesBtcPair)
       orders.foreach(dex1Api.place)
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
 
       dex1Api.cancelAll(bob)
 
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Cancelled))
     }
 
     "a pair" in {
@@ -74,12 +71,12 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       val wavesBtcOrders = mkBobOrders(wavesBtcPair)
       val orders         = wavesUsdOrders ::: wavesBtcOrders
       orders.foreach(dex1Api.place)
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
 
       dex1Api.cancelAllByPair(bob, wavesBtcPair)
 
-      wavesBtcOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
-      wavesUsdOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      wavesBtcOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Cancelled))
+      wavesUsdOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
     }
   }
 

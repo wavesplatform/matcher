@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
@@ -15,11 +14,7 @@ class TradingMarketsTestSuite extends NewMatcherSuiteBase {
 
   "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
-      val order = mkOrder(alice, wctWavesPair, BUY, amount, price)
-
-      // TODO utility method for combination
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
       restartContainer(dex1Container(), dex1Api)
 

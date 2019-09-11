@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -129,14 +129,14 @@ trait MkWavesEntities {
       )
       .explicitGet()
 
-  def mk(issuer: KeyPair,
-         name: String,
-         quantity: Long,
-         decimals: Int = 8,
-         fee: Long = issueFee,
-         script: Option[Script] = None,
-         reissuable: Boolean = false,
-         timestamp: Long = System.currentTimeMillis()): IssueTransaction =
+  def mkIssue(issuer: KeyPair,
+              name: String,
+              quantity: Long,
+              decimals: Int = 8,
+              fee: Long = issueFee,
+              script: Option[Script] = None,
+              reissuable: Boolean = false,
+              timestamp: Long = System.currentTimeMillis()): IssueTransaction =
     IssueTransactionV2
       .selfSigned(
         chainId = AddressScheme.current.chainId,
@@ -199,6 +199,31 @@ trait MkWavesEntities {
                            ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction = {
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     mkSetAssetScript(assetOwner, asset, Some(script), fee, ts)
+  }
+
+  def mkExchange(buyOrderOwner: KeyPair,
+                 sellOrderOwner: KeyPair,
+                 pair: AssetPair,
+                 amount: Long,
+                 price: Long,
+                 matcherFee: Long = matcherFee,
+                 ts: Long = System.currentTimeMillis(),
+                 matcher: KeyPair): ExchangeTransaction = {
+    val buyOrder  = mkOrder(buyOrderOwner, pair, OrderType.BUY, amount, price, matcherFee, matcher = matcher)
+    val sellOrder = mkOrder(sellOrderOwner, pair, OrderType.SELL, amount, price, matcherFee, matcher = matcher)
+    ExchangeTransactionV2
+      .create(
+        matcher = matcher,
+        buyOrder = buyOrder,
+        sellOrder = sellOrder,
+        amount = amount,
+        price = price,
+        buyMatcherFee = buyOrder.matcherFee,
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = matcherFee,
+        timestamp = ts
+      )
+      .explicitGet()
   }
 }
 

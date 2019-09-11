@@ -1,8 +1,8 @@
-package com.wavesplatform.it
+package com.wavesplatform.dex.it
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import play.api.libs.json.{Format, JsError, JsString, JsSuccess, Json, Reads, Writes}
+import play.api.libs.json._
 
 import scala.util.{Failure, Success}
 

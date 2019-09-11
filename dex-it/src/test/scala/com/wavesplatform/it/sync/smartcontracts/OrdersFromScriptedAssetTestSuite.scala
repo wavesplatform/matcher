@@ -152,12 +152,12 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
 object OrdersFromScriptedAssetTestSuite {
 
-  import MkWavesEntities.mk
+  import MkWavesEntities.mkIssue
   import com.wavesplatform.dex.it.waves.WavesFeeConstants.smartIssueFee
 
-  private def mkAllow(id: Int) = mk(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
+  private def mkAllow(id: Int) = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
 
-  private val issueUnscriptedAssetTx = mk(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
+  private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
   private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.id())
 
   private val issueAllowAssetTx = mkAllow(0)
@@ -169,7 +169,7 @@ object OrdersFromScriptedAssetTestSuite {
   private val issueAllowAsset3Tx = mkAllow(2)
   private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
 
-  private val issueDenyAssetTx = mk(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.FALSE).explicitGet()))
+  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.FALSE).explicitGet()))
   private val denyAsset        = IssuedAsset(issueDenyAssetTx.id())
 
   private val DenyBigAmountScript: String =

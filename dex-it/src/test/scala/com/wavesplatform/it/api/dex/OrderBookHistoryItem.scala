@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api.dex
 
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.it.json._
+import com.wavesplatform.dex.it.json._
 import play.api.libs.json.{Format, Json}
 
 case class OrderBookHistoryItem(id: Order.Id,

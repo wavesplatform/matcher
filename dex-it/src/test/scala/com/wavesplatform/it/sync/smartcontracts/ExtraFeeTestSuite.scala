@@ -25,19 +25,19 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   private val amount      = 1L
   private val price       = 100000000L
 
-  private val asset0Tx = mk(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
+  private val asset0Tx = mkIssue(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
   private val asset0   = IssuedAsset(asset0Tx.id())
 
-  private val asset1Tx = mk(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val asset1Tx = mkIssue(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
   private val asset1   = IssuedAsset(asset1Tx.id())
 
-  private val asset2Tx = mk(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val asset2Tx = mkIssue(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
   private val asset2   = IssuedAsset(asset2Tx.id())
 
-  private val feeAssetTx = mk(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, trueScript)
+  private val feeAssetTx = mkIssue(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, trueScript)
   private val feeAsset   = IssuedAsset(feeAssetTx.id())
 
-  private val falseFeeAssetTx = mk(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, falseScript)
+  private val falseFeeAssetTx = mkIssue(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, falseScript)
   private val falseFeeAsset   = IssuedAsset(falseFeeAssetTx.id())
 
   override protected def beforeAll(): Unit = {

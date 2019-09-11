@@ -3,13 +3,14 @@ package com.wavesplatform.dex.grpc.integration
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.grpc.integration.ItTestSuiteBase._
 import com.wavesplatform.dex.grpc.integration.config.SetupAddressScheme
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Docker, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext
 
-trait ItTestSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with ReportingTestName with NodesFromDocker {
+trait ItTestSuiteBase extends FreeSpec with Matchers with CancelAfterFailure with BeforeAndAfterAll with ReportingTestName with NodesFromDocker with MkWavesEntities with WavesFeeConstants {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 

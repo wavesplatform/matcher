@@ -36,10 +36,10 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
   "Order History REST API methods should have limit for orders in response" in {
     val now = System.currentTimeMillis()
 
-    val issueAliceAssetTx = mk(alice, "AliceCoin", someAssetAmount, 0)
+    val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
     val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
-    val issueBobAssetTx = mk(bob, "BobCoin", someAssetAmount, 0)
+    val issueBobAssetTx = mkIssue(bob, "BobCoin", someAssetAmount, 0)
     val bobAsset        = IssuedAsset(issueBobAssetTx.id())
 
     broadcastAndAwait(issueAliceAssetTx, issueBobAssetTx)

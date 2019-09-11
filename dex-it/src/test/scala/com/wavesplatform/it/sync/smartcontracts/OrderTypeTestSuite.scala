@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
-  private val issueAliceAssetTx = mk(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
+  private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair

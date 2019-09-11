@@ -21,7 +21,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
-  private val aliceAssetTx   = mk(alice, "AliceCoin", someAssetAmount, 0)
+  private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 

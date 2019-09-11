@@ -18,7 +18,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
-import com.wavesplatform.it.json._
+import com.wavesplatform.dex.it.json._
 import com.wavesplatform.it.api.dex._
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

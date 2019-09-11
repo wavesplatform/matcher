@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import scala.concurrent.duration._
 
 class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
-  private val issueAliceAssetTx = mk(alice, "AliceCoin", someAssetAmount, 0)
+  private val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair

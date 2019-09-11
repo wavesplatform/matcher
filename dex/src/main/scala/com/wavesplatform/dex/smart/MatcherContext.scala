@@ -106,12 +106,15 @@ object MatcherContext {
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")
 
     /** Block reward related */
-    override def blockReward(height: Int): Option[Long]                                                              = kill("blockReward")
-    override def lastBlockReward: Option[Long]                                                                       = kill("lastBlockReward")
-    override def blockRewardVotes(height: Int): Seq[Long]                                                            = kill("blockRewardVotes")
-    override def wavesAmount(height: Int): BigInt                                                                    = kill("wavesAmount")
-    override def accountScriptWithComplexity(address: Address): Option[(Script, Long)]                               = kill("accountScriptWithComplexity")
-    override def assetScriptWithComplexity(id: Asset.IssuedAsset): Option[(Script, Long)]                            = kill("assetScriptWithComplexity")
+    override def blockReward(height: Int): Option[Long] = kill("blockReward")
+    override def lastBlockReward: Option[Long] = kill("lastBlockReward")
+    override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
+
+    override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
+
+    override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = kill("accountScriptWithComplexity")
+    override def assetScriptWithComplexity(id: Asset.IssuedAsset): Option[(Script, Long)] = kill("assetScriptWithComplexity")
     override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = kill("collectActiveLeases")
   }
+
 }

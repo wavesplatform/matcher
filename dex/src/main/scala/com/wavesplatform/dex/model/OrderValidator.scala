@@ -19,7 +19,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{CommonValidation, FeeValidation}
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._

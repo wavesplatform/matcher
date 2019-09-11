@@ -11,7 +11,7 @@ import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.it.api.{CanExtract, DexApi, DexOps, HasWaitReady, LoggingSttpBackend, NodeApi}
+import com.wavesplatform.it.api.{CanExtract, DexApi, DexOps, FeeConstants, HasWaitReady, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.blockchain.MkEntities
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.dex.DoubleOps
@@ -36,6 +36,7 @@ abstract class NewMatcherSuiteBase
     with ItMatchers
     with DockerExtensions
     with DoubleOps
+    with FeeConstants
     with ScorexLogging {
 
   protected implicit def toDexExplicitGetOps[F[_]](self: DexApi[F])(implicit E: CanExtract[F]) = new DexOps.ExplicitGetOps[F](self)

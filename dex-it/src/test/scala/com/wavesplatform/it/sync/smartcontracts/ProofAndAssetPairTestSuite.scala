@@ -4,7 +4,6 @@ import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

@@ -4,7 +4,6 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.lang.script.v1.ExprScript

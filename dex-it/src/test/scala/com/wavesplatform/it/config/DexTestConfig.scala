@@ -10,7 +10,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.dex.{AssetPairBuilder, AssetPairDecimals}
+import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.dex.DoubleOps._
 import com.wavesplatform.settings.GenesisSettings

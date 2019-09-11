@@ -14,6 +14,7 @@ import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset

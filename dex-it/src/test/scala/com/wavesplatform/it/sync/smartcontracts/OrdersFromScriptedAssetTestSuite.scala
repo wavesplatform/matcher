@@ -1,20 +1,18 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.blockchain.MkEntities
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 
 /**
   * Rules:
@@ -87,7 +85,7 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
-    val allowAsset100 = mkAllowAsset(100)
+    val allowAsset100 = mkAllow(100)
     broadcastAndAwait(allowAsset100)
 
     val pair = AssetPair(IssuedAsset(allowAsset100.id()), allowAsset)
@@ -159,70 +157,29 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
     val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1Api.tryBroadcast(txs.head)
     r shouldBe 'left
-    r.left.get.error should ===(TransactionNotAllowedByAssetScript.ErrorCode)
+    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.ErrorCode
   }
 }
 
 object OrdersFromScriptedAssetTestSuite {
 
-  // TODO
-  private val issueUnscriptedAssetTx = IssueTransactionV1
-    .selfSigned(
-      sender = matcher,
-      name = "UnscriptedAsset".getBytes(),
-      description = "unscripted".getBytes(),
-      quantity = Int.MaxValue / 3,
-      decimals = 0,
-      reissuable = false,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .explicitGet()
+  import MkEntities.mk
+  private def mkAllow(id: Int) = mk(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
 
-  private val unscriptedAsset = IssuedAsset(issueUnscriptedAssetTx.id())
+  private val issueUnscriptedAssetTx = mk(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
+  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.id())
 
-  private def mkAllowAsset(id: Int): IssueTransactionV2 = {
-    IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        sender = matcher,
-        name = s"AllowAsset-$id".getBytes(),
-        description = s"AllowAsset-$id".getBytes(),
-        quantity = Int.MaxValue / 3,
-        decimals = 0,
-        reissuable = false,
-        script = Some(ExprScript(Terms.TRUE).explicitGet()),
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
-  }
-
-  private val issueAllowAssetTx = mkAllowAsset(0)
+  private val issueAllowAssetTx = mkAllow(0)
   private val allowAsset        = IssuedAsset(issueAllowAssetTx.id())
 
-  private val issueAllowAsset2Tx = mkAllowAsset(1)
+  private val issueAllowAsset2Tx = mkAllow(1)
   private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.id())
 
-  private val issueAllowAsset3Tx = mkAllowAsset(2)
+  private val issueAllowAsset3Tx = mkAllow(2)
   private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
 
-  private val issueDenyAssetTx = IssueTransactionV2
-    .selfSigned(
-      AddressScheme.current.chainId,
-      sender = matcher,
-      name = "DenyAsset".getBytes(),
-      description = "DenyAsset".getBytes(),
-      quantity = Int.MaxValue / 3,
-      decimals = 0,
-      reissuable = false,
-      script = Some(ExprScript(Terms.FALSE).explicitGet()),
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .explicitGet()
-
-  private val denyAsset = IssuedAsset(issueDenyAssetTx.id())
+  private val issueDenyAssetTx = mk(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.FALSE).explicitGet()))
+  private val denyAsset        = IssuedAsset(issueDenyAssetTx.id())
 
   private val DenyBigAmountScript: String =
     s"""{-# STDLIB_VERSION 2 #-}
@@ -231,5 +188,5 @@ object OrdersFromScriptedAssetTestSuite {
        | case other => true
        |}""".stripMargin
 
-  val activationHeight = 5
+  private val activationHeight = 5
 }

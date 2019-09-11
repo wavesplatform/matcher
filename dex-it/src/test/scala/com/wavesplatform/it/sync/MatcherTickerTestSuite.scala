@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 

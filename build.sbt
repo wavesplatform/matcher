@@ -18,14 +18,13 @@ lazy val `dex-common` = project
 lazy val dex = project.dependsOn(
   `waves-integration`,
   `dex-common`,
-  node % "compile;test->test;runtime->provided",
+  node % "compile;test->test;runtime->provided"
 )
 
 lazy val `dex-it-tools` = project
 
 lazy val `dex-it` = project.dependsOn(
-  dex       % "compile;test->test",
-  `node-it` % "compile;test->test",
+  dex % "compile;test->test",
   `waves-integration-it`,
   `dex-it-tools`,
   `dex-common`

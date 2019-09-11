@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.it.util.DoubleExt
+import com.wavesplatform.it.dex.DoubleOps._
 
 object FeeConstants {
   val smartFee: Long                   = 0.004.waves

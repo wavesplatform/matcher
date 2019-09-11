@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
@@ -18,17 +18,17 @@ class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyCheck
   private val exTxFee         = matcherFee
 
   private val aliceAssetName    = "Alice-X"
-  private val issueAliceAssetTx = mkIssue(alice, aliceAssetName, 1000, 0)
+  private val issueAliceAssetTx = mk(alice, aliceAssetName, 1000, 0)
   private val aliceAssetId      = issueAliceAssetTx.id()
   private val aliceAsset        = IssuedAsset(aliceAssetId)
   private val aliceWavesPair    = AssetPair(aliceAsset, Waves)
 
-  private val issueBob1Asset1Tx = mkIssue(bob, "Bob-1-X", someAssetAmount, 5)
+  private val issueBob1Asset1Tx = mk(bob, "Bob-1-X", someAssetAmount, 5)
   private val bobAsset1Id       = issueBob1Asset1Tx.id()
   private val bobAsset1         = IssuedAsset(bobAsset1Id)
   private val bob1WavesPair     = AssetPair(bobAsset1, Waves)
 
-  private val issueBob2Asset2Tx = mkIssue(bob, "Bob-2-X", someAssetAmount, 0)
+  private val issueBob2Asset2Tx = mk(bob, "Bob-2-X", someAssetAmount, 0)
   private val bobAsset2Id       = issueBob2Asset2Tx.id()
   private val bobAsset2         = IssuedAsset(bobAsset2Id)
   private val bob2WavesPair     = AssetPair(bobAsset2, Waves)

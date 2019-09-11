@@ -9,13 +9,6 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
-  // TODO move to base class
-  private implicit class DoubleOps(value: Double) {
-    val waves: Long = wavesUsdPairDecimals.amount(value)
-    val usd: Long   = wavesUsdPairDecimals.price(value)
-    val eth: Long   = ethWavesPairDecimals.amount(value)
-  }
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueEthTx)

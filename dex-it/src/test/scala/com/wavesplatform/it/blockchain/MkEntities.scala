@@ -5,23 +5,22 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.config.DexTestConfig
-import com.wavesplatform.it.sync.{issueFee, leasingFee, matcherFee, minFee, setAssetScriptFee, setScriptFee}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction, TransferTransactionV2}
-import com.wavesplatform.common.utils.EitherExt2
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Duration, DurationInt}
 
 trait MkEntities {
 
@@ -131,14 +130,14 @@ trait MkEntities {
       )
       .explicitGet()
 
-  def mkIssue(issuer: KeyPair,
-              name: String,
-              quantity: Long,
-              decimals: Int = 8,
-              fee: Long = issueFee,
-              script: Option[Script] = None,
-              reissuable: Boolean = false,
-              timestamp: Long = System.currentTimeMillis()): IssueTransaction =
+  def mk(issuer: KeyPair,
+         name: String,
+         quantity: Long,
+         decimals: Int = 8,
+         fee: Long = issueFee,
+         script: Option[Script] = None,
+         reissuable: Boolean = false,
+         timestamp: Long = System.currentTimeMillis()): IssueTransaction =
     IssueTransactionV2
       .selfSigned(
         chainId = AddressScheme.current.chainId,

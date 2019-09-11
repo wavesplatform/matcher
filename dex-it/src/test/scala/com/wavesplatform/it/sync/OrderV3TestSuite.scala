@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.{NTPTime, NewMatcherSuiteBase}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
-class OrderV3TestSuite extends NewMatcherSuiteBase with NTPTime {
+class OrderV3TestSuite extends NewMatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = allowedOrderVersion(1, 2)
 
   override protected def beforeAll(): Unit = {

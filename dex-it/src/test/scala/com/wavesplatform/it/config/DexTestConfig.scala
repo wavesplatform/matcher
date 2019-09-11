@@ -9,10 +9,10 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.{AssetPairDecimals, AssetPairBuilder}
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
-import com.wavesplatform.it.util._
+import com.wavesplatform.dex.{AssetPairBuilder, AssetPairDecimals}
+import com.wavesplatform.it.api.FeeConstants._
+import com.wavesplatform.it.dex.DoubleOps._
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -152,9 +152,6 @@ object DexTestConfig {
   val eth = IssuedAsset(EthId)
   val usd = IssuedAsset(UsdId)
   val wct = IssuedAsset(WctId)
-
-  val ethWavesPairDecimals = new AssetPairDecimals(8, 8)
-  val wavesUsdPairDecimals = new AssetPairDecimals(8, 2)
 
   val BtcAsset = IssuedAsset(BtcId)
   val EthAsset = IssuedAsset(EthId)

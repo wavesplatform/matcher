@@ -6,7 +6,6 @@ import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -23,7 +22,7 @@ class OrdersFromScriptedAccTestSuite extends NewMatcherSuiteBase {
        |}""".stripMargin
   )
 
-  private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
+  private val aliceAssetTx   = mk(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 

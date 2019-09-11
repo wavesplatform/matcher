@@ -28,6 +28,73 @@ import shapeless.{Generic, HList, HNil, _}
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 
+case class AssetDecimalsInfo(decimals: Byte)
+object AssetDecimalsInfo {
+  implicit val assetDecimalsInfoResponseFormat: Format[AssetDecimalsInfo] = Json.format
+}
+
+case class MatcherMessage(id: String)
+object MatcherMessage {
+  implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
+}
+
+case class MarketData(amountAsset: String,
+                      amountAssetName: String,
+                      priceAsset: String,
+                      priceAssetName: String,
+                      created: Long,
+                      amountAssetInfo: Option[AssetDecimalsInfo],
+                      priceAssetInfo: Option[AssetDecimalsInfo])
+object MarketData {
+  implicit val marketData: Format[MarketData] = Json.format
+}
+
+case class PairResponse(amountAsset: String, priceAsset: String)
+object PairResponse {
+  implicit val pairResponseFormat: Format[PairResponse] = Json.format
+}
+
+case class LevelResponse(amount: Long, price: Long)
+object LevelResponse {
+  implicit val levelResponseFormat: Format[LevelResponse] = Json.format
+}
+
+
+case class MatcherResponse(status: String, message: MatcherMessage)
+object MatcherResponse {
+  implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
+}
+
+case class MatcherStatusResponse(status: String, filledAmount: Option[Long])
+object MatcherStatusResponse {
+  implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
+}
+
+case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
+object MarketDataInfo {
+  implicit val marketDataInfoResponseFormat: Format[MarketDataInfo] = Json.format
+}
+
+case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
+object OrderBookResponse {
+  implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
+}
+
+case class MarketStatusResponse(lastPrice: Option[Long],
+                                lastSide: Option[String],
+                                bid: Option[Long],
+                                bidAmount: Option[Long],
+                                ask: Option[Long],
+                                askAmount: Option[Long])
+object MarketStatusResponse {
+  implicit val marketResponseFormat: Format[MarketStatusResponse] = Json.format
+}
+
+case class RatesResponse(message: String)
+object RatesResponse {
+  implicit val format: Format[RatesResponse] = Json.format
+}
+
 case class MatcherError(error: Int, message: String, status: String, params: Option[MatcherError.Params])
 object MatcherError {
 
@@ -455,4 +522,10 @@ object DexApi {
       if (r == null) Left(DeserializationError[JsError](string, JsError("Can't parse Long"), "Can't parse Long"))
       else Right(r)
     }
+
+  implicit val rateMapReads: Reads[Map[Asset, Double]] = Reads { json =>
+    json.validate[Map[String, Double]].map { rate =>
+      rate.map { case (assetStr, rateValue) => AssetPair.extractAssetId(assetStr).get -> rateValue }
+    }
+  }
 }

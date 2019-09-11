@@ -38,6 +38,21 @@ object ErrorResponse {
   implicit val format: Format[ErrorResponse] = Json.format[ErrorResponse]
 }
 
+case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
+object Transaction {
+  implicit val transactionFormat: Format[Transaction] = Json.format
+}
+
+case class AssetBalance(address: String, assetId: String, balance: Long)
+object AssetBalance {
+  implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
+}
+
+case class Balance(address: String, confirmations: Int, balance: Long)
+object Balance {
+  implicit val balanceFormat: Format[Balance] = Json.format
+}
+
 trait NodeApi[F[_]] extends HasWaitReady[F] {
 
   def balance(address: com.wavesplatform.account.Address, asset: Asset): F[Long]

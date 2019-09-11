@@ -14,6 +14,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.{CanExtract, DexApi, DexOps, HasWaitReady, LoggingSttpBackend, NodeApi}
 import com.wavesplatform.it.blockchain.MkEntities
 import com.wavesplatform.it.config.DexTestConfig
+import com.wavesplatform.it.dex.DoubleOps
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, DockerExtensions, WavesNodeContainer}
 import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
 import com.wavesplatform.utils.ScorexLogging
@@ -34,6 +35,7 @@ abstract class NewMatcherSuiteBase
     with ApiExtensions
     with ItMatchers
     with DockerExtensions
+    with DoubleOps
     with ScorexLogging {
 
   protected implicit def toDexExplicitGetOps[F[_]](self: DexApi[F])(implicit E: CanExtract[F]) = new DexOps.ExplicitGetOps[F](self)

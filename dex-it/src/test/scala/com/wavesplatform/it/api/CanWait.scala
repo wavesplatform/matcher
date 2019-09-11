@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
+import com.wavesplatform.it.time.GlobalTimer
+import com.wavesplatform.it.time.TimerOps._
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

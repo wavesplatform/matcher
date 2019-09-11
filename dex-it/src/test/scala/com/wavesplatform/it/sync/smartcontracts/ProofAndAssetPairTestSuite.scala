@@ -7,7 +7,6 @@ import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.it.api.FeeConstants._
 import com.wavesplatform.it.api.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
@@ -15,7 +14,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import scala.concurrent.duration._
 
 class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
-  private val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
+  private val issueAliceAssetTx = mk(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair

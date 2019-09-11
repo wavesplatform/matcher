@@ -91,6 +91,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
   private val balancesCache      = new BalancesCache(wavesBlockchainSyncClient.spendableBalance)
 
+  /** Updates balances cache by balances stream */
   wavesBalancesAsyncClient.spendableBalanceChanges.subscribe {
     new Observer[SpendableBalanceChanges] {
       override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }

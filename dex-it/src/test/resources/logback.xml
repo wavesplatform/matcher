@@ -20,7 +20,7 @@
     <logger name="sun.rmi" level="INFO"/>
     <logger name="javax.management" level="INFO"/>
 
-    <logger name="io.grpc.netty" level="TRACE"/>
+    <logger name="io.grpc.netty" level="WARN"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>

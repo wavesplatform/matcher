@@ -31,8 +31,6 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
         .forAddress(bindAddress)
         .permitKeepAliveWithoutCalls(true)
         .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
-        .keepAliveTime(1, TimeUnit.SECONDS)
-        .keepAliveTimeout(2, TimeUnit.SECONDS)
         .addService(WavesBalancesApiGrpc.bindService(new WavesBalancesApiGrpcServer(context, settings.balanceChangesBatchLinger), apiScheduler))
         .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcServer(context), apiScheduler))
         .build()

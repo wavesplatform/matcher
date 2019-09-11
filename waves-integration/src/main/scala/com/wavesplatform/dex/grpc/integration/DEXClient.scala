@@ -17,7 +17,6 @@ class DEXClient(target: String, val scheduler: Scheduler = global) {
       .keepAliveWithoutCalls(true)
       .keepAliveTime(1, TimeUnit.SECONDS)
       .keepAliveTimeout(2, TimeUnit.SECONDS)
-      //      .idleTimeout(3, TimeUnit.SECONDS)
       .nameResolverFactory(new DnsNameResolverProvider)
       .defaultLoadBalancingPolicy("pick_first")
       .usePlaintext()

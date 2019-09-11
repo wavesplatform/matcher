@@ -1,6 +1,5 @@
 package com.wavesplatform.it.api
 
-import cats.Functor
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.flatMap._
@@ -11,7 +10,7 @@ import play.api.libs.json.JsError
 
 import scala.concurrent.duration.FiniteDuration
 
-class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F], functor: Functor[F]) {
+class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 
   def repeatUntil[T](f: => F[T], delay: FiniteDuration, maxAttempts: Int = 15)(pred: T => Boolean): F[T] =
     f.flatMap { r =>

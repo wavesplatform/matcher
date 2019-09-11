@@ -43,7 +43,7 @@ object OrderValidator extends ScorexLogging {
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200
 
-  val exchangeTransactionCreationFee: Long = FeeValidation.OldFeeUnits(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
+  val exchangeTransactionCreationFee: Long = FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
@@ -394,6 +394,12 @@ object OrderValidator extends ScorexLogging {
         .ensure(error.OrderDuplicate(order.id()))(o => !orderExists(o.id()))
       _ <- validateBalance(order, tradableBalance)
     } yield order
+
+  def tickSizeAware(actualNormalizedTickSize: Long)(order: Order): Result[Order] = {
+    lift(order).ensure { error.OrderInvalidPriceLevel(order, actualNormalizedTickSize) } { o =>
+      o.orderType == OrderType.SELL || OrderBook.correctPriceByTickSize(o.price, o.orderType, actualNormalizedTickSize) > 0
+    }
+  }
 
   private def lift[T](x: T): Result[T] = x.asRight[MatcherError]
   private def success: Result[Unit]    = lift(())

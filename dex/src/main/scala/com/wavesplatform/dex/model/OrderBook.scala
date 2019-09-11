@@ -221,7 +221,7 @@ object OrderBook {
     * Corrects order price by the tick size in favor of the client.
     * Buy order prices are rounded '''down''', sell order prices are rounded '''upwards'''
     */
-  private def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Long): Price =
+  def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Long): Price =
     if (price % normalizedTickSize == 0) price
     else
       orderType match {

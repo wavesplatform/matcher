@@ -306,7 +306,7 @@ case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings
       denied,
       e"""The order's amount
                      |${'amount -> Amount(ord.assetPair.amountAsset, ord.amount)}
-                     |does not meet matcher requirements:
+                     |does not meet matcher's requirements:
                      |max amount = ${'max -> amtSettings.maxAmount},
                      |min amount = ${'min -> amtSettings.minAmount},
                      |step amount = ${'step -> amtSettings.stepAmount}"""
@@ -322,10 +322,22 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
       denied,
       e"""The order's price
                    |${'price -> Price(ord.assetPair, ord.price)}
-                   |does not meet matcher requirements:
+                   |does not meet matcher's requirements:
                    |max price = ${'max -> prcSettings.maxPrice},
                    |min price = ${'min -> prcSettings.minPrice},
                    |step price = ${'step -> prcSettings.stepPrice}"""
+    )
+
+case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
+    extends MatcherError(
+      order,
+      price,
+      notEnough,
+      e"""The buy order's price
+       |${'price -> Price(ord.assetPair, ord.price)}
+       |does not meet matcher's requirements:
+       |price >= ${'tickSize -> Price(ord.assetPair, tickSize)} (actual tick size).
+       |Orders can not be placed into level with price 0"""
     )
 
 sealed abstract class Entity(val code: Int)

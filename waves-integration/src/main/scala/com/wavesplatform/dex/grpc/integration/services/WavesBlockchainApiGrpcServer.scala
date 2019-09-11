@@ -9,6 +9,8 @@ import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.{EitherVEExt, StreamObserverMonixOps}
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.extensions.{Context => ExtensionContext}
+import com.wavesplatform.features.BlockchainFeatureStatus
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
@@ -61,7 +63,8 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
   }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
-    IsFeatureActivatedResponse(isActivated = context.blockchain.activatedFeatures.contains(request.featureId.toShort))
+    IsFeatureActivatedResponse(
+      context.blockchain.featureStatus(request.featureId.toShort, context.blockchain.height) == BlockchainFeatureStatus.Activated)
   }
 
   override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {
@@ -89,7 +92,6 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
     import RunScriptResponse._
 
     val asset = IssuedAsset(request.assetId.toVanilla)
-
     val r = context.blockchain.assetScript(asset) match {
       case None => Result.Empty
       case Some(script) =>
@@ -136,7 +138,7 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
     ForgedOrderResponse(isForged = seen)
   }
 
-  private def parseScriptResult(raw: Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
+  private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
     try raw match {
       case Left(execError) => Result.ScriptError(execError)

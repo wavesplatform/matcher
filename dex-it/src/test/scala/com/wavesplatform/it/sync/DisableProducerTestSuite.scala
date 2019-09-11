@@ -8,12 +8,12 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class DisableProducerTestSuite extends NewMatcherSuiteBase {
-  private def disabledProducerConfig = ConfigFactory.parseString(s"""waves.dex.events-queue {
-       |  local.enable-storing  = no
-       |  kafka.producer.enable = no
-       |}""".stripMargin)
-
-  override protected def dex1Config: Config = disabledProducerConfig.withFallback(super.dex1Config)
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    """waves.dex.events-queue {
+      |  local.enable-storing  = no
+      |  kafka.producer.enable = no
+      |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -30,8 +30,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
       def test(order: Order): Unit = dex1Api.tryPlace(order) should failWith(528) // FeatureDisabled
 
       List(
-        mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
-        mkOrder(alice, matcher, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee)
+        mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
+        mkOrder(alice, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant)
       ).foreach(test)
 
       Thread.sleep(5000)

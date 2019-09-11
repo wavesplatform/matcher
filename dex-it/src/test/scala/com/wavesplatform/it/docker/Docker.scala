@@ -1,33 +1,30 @@
 package com.wavesplatform.it.docker
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileNotFoundException, FileOutputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Collections._
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.instances.map._
 import cats.instances.string._
 import cats.kernel.Monoid
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.shaded.com.google.common.collect.ImmutableList
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 
 import scala.collection.JavaConverters._
+import scala.io.Source
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
@@ -75,9 +72,9 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
   }
 
-  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
+  def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
-  private val network: Coeval[Network] = Coeval.evalOnce {
+  val network: Coeval[Network] = Coeval.evalOnce {
     val id          = Random.nextInt(Int.MaxValue)
     val networkName = s"waves-$id"
 
@@ -146,7 +143,10 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     finally is.close()
   }
 
-  def createWavesNode(name: String, config: Config, netAlias: Option[String] = Some(wavesNodesNetworkAlias)): WavesNodeContainer = {
+  def createWavesNode(name: String,
+                      runConfig: Config,
+                      initialSuiteConfig: Config,
+                      netAlias: Option[String] = Some(wavesNodesNetworkAlias)): WavesNodeContainer = {
     val number   = getNumber(name)
     val basePath = "/opt/waves"
 
@@ -162,30 +162,32 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         netAlias
       )
 
-    val r = new WavesNodeContainer(id, number, name, config, basePath)
-    // Could not work in Windows
-    writeFile(r, Paths.get(s"$basePath/$name.conf"), config.resolve().root().render())
+    val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
+      .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
+      .mkString
+
+    val baseConfig = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory.parseString(rawBaseConfig)).resolve()
+    val r = new WavesNodeContainer(
+      id = id,
+      number = number,
+      name = name,
+      basePath = basePath,
+      restApiPort = baseConfig.getInt("waves.rest-api.port"),
+      networkApiPort = baseConfig.getInt("waves.network.port"),
+      grpcApiPort = baseConfig.getInt("waves.dex.grpc.integration.port")
+    )
+    Map(
+      s"$name.conf" -> rawBaseConfig,
+      "run.conf"    -> runConfig.resolve().root().render(),
+      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
+    ).foreach { case (fileName, content) => writeFile(r, Paths.get(basePath, fileName), content) }
+
     knownContainers.add(r)
     r
   }
 
-  def createDex(name: String, config: Config): DexContainer = {
-    val number = getNumber(name)
-    val allowedKeysPrefixes = List(
-      "waves-node-grpc",
-      "blacklisted",
-      "allowed",
-      "white-list-only",
-      "price-assets",
-      "rest-order-limit",
-      "events-queue",
-      "snapshots-interval",
-      "matching-rules"
-    )
-    val props = renderProperties(asProperties(config.getConfig("waves.dex")).asScala.collect {
-      case (key, v) if allowedKeysPrefixes.exists(key.startsWith) => s"waves.dex.$key" -> v
-    }.toMap)
-
+  def createDex(name: String, runConfig: Config, initialSuiteConfig: Config): DexContainer = {
+    val number   = getNumber(name)
     val basePath = "/opt/waves-dex"
     val id = create(
       number,
@@ -193,12 +195,28 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       dexImage,
       Map(
         "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
-        // -Dwaves.dex.waves-node-grpc.host=${grpc.host} -Dwaves.dex.waves-node-grpc.port=${grpc.port}
-        "WAVES_DEX_OPTS" -> s"$props -Dlogback.configurationFile=$basePath/logback.xml"
+        "WAVES_DEX_OPTS"       -> s"-Dlogback.configurationFile=$basePath/logback.xml"
       )
     )
 
-    val r = new DexContainer(id, number, name, config, basePath)
+    val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
+      .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
+      .mkString
+
+    val baseConfig = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory.parseString(rawBaseConfig)).resolve()
+    val r = new DexContainer(
+      id = id,
+      number = number,
+      name = name,
+      basePath = basePath,
+      restApiPort = baseConfig.getInt("waves.dex.rest-api.port")
+    )
+    Map(
+      s"$name.conf" -> rawBaseConfig,
+      "run.conf"    -> runConfig.resolve().root().render(),
+      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
+    ).foreach { case (fileName, content) => writeFile(r, Paths.get(basePath, fileName), content) }
+
     knownContainers.add(r)
     r
   }
@@ -268,7 +286,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
     val exec    = client.execStart(id)
     try exec.readFully()
-    catch { case NonFatal(e) => log.error(s"Can't print a debug message", e) } finally exec.close()
+    catch { case NonFatal(e) => /* ignore */ } finally exec.close()
   }
 
   private def create(number: Int, name: String, imageName: String, env: Map[String, String], netAlias: Option[String] = None): String = {
@@ -416,24 +434,5 @@ object Docker {
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
 
-  private val jsonMapper  = new ObjectMapper
-  private val propsMapper = new JavaPropsMapper
-
-  val configTemplate: Config = parseResources("template.conf")
-
   def apply(owner: Class[_]): Docker = new Docker(suiteName = owner.getSimpleName)
-
-  private def asProperties(config: Config): Properties = {
-    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
-    propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
-  }
-
-  private def renderProperties(p: Map[String, String]): String = {
-    p.map {
-        case (k, v) if v.contains(" ") => k -> s""""$v""""
-        case x                         => x
-      }
-      .map { case (k, v) => s"-D$k=$v" }
-      .mkString(" ")
-  }
 }

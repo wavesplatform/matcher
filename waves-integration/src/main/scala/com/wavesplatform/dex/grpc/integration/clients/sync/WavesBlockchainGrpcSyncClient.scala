@@ -40,31 +40,31 @@ class WavesBlockchainGrpcSyncClient(channel: ManagedChannel) extends WavesBlockc
   }
 
   override def hasScript(asset: IssuedAsset): Boolean = {
-    blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.id.toPB) }.has
+    blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.has
   }
 
   override def runScript(asset: IssuedAsset, input: ve.ExchangeTransaction): RunScriptResult = {
     parse {
       blockchainService.runAssetScript {
-        RunAssetScriptRequest(assetId = asset.id.toPB, transaction = Some(input.toPB))
+        RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB))
       }
     }
   }
 
   override def hasScript(address: Address): Boolean = {
-    blockchainService.hasAddressScript { HasAddressScriptRequest(address = address.bytes.toPB) }.has
+    blockchainService.hasAddressScript { HasAddressScriptRequest(address = address.toPB) }.has
   }
 
   override def runScript(address: Address, input: ve.Order): RunScriptResult = {
     parse {
       blockchainService.runAddressScript {
-        RunAddressScriptRequest(address = address.bytes.toPB, order = Some(input.toPB))
+        RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB))
       }
     }
   }
 
   override def spendableBalance(address: Address, asset: Asset): Long = {
-    blockchainService.spendableAssetBalance { SpendableAssetBalanceRequest(address = address.bytes.toPB, assetId = asset.toPB) }.balance
+    blockchainService.spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }.balance
   }
 
   override def forgedOrder(orderId: ByteStr): Boolean = {

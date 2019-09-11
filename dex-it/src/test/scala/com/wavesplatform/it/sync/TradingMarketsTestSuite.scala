@@ -15,7 +15,7 @@ class TradingMarketsTestSuite extends NewMatcherSuiteBase {
 
   "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
-      val order = mkOrder(alice, matcher, wctWavesPair, BUY, amount, price)
+      val order = mkOrder(alice, wctWavesPair, BUY, amount, price)
 
       // TODO utility method for combination
       dex1Api.place(order)

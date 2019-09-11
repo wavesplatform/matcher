@@ -84,6 +84,6 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
     }
   }
 
-  private def mkBobOrder                        = mkOrder(bob, matcher, wavesUsdPair, OrderType.SELL, 100.waves, 800)
-  private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => mkOrder(bob, matcher, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
+  private def mkBobOrder                        = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
+  private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => mkOrder(bob, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
 }

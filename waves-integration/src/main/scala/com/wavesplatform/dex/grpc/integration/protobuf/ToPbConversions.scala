@@ -43,8 +43,8 @@ object ToPbConversions {
     }
   }
 
-  implicit class VanillaAddressOps(address: Address) {
-    def toPB: ByteString = ByteString.copyFrom(address.bytes.arr)
+  implicit class VanillaAddressOps(self: Address) {
+    def toPB: ByteString = self.bytes.toPB
   }
 
   implicit class VanillaOrderOps(order: ve.Order) {

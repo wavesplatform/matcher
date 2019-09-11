@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
 class MatcherRulesTestSuite extends NewMatcherSuiteBase {
-  override protected def dex1Config: Config = ConfigFactory.parseString(s"""
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""
        |waves.dex.matching-rules.$wctUsdPair = [
        |  {
        |    start-offset = 2
@@ -16,28 +16,28 @@ class MatcherRulesTestSuite extends NewMatcherSuiteBase {
        |    tick-size    = 5
        |  }
        |]
-       """.stripMargin).withFallback(super.dex1Config)
+       """.stripMargin)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueWctTx)
   }
 
-  val (amount, price) = (1000L, PriceConstant)
+  private val (amount, price) = (1000L, PriceConstant)
 
   "Orders should be cancelled correctly when matcher rules are changed" in {
     // here tick size is disabled (offset = 0)
-    val buyOrder1 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder1 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder1)
     dex1Api.waitForOrderStatus(buyOrder1, OrderStatus.Accepted)
 
     // here tick size is disabled (offset = 1)
-    val buyOrder2 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder2 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder2)
     dex1Api.waitForOrderStatus(buyOrder2, OrderStatus.Accepted)
 
     // here tick size = 5 (offset = 2), hence new order is placed into corrected price level 5, not 7
-    val buyOrder3 = mkOrder(alice, matcher, wctUsdPair, BUY, amount, 7 * price)
+    val buyOrder3 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price)
     dex1Api.place(buyOrder3)
     dex1Api.waitForOrderStatus(buyOrder3, OrderStatus.Accepted)
 

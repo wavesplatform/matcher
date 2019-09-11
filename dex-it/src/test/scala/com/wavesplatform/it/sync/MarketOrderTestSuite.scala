@@ -9,7 +9,8 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
-  implicit class DoubleOps(value: Double) {
+  // TODO move to base class
+  private implicit class DoubleOps(value: Double) {
     val waves: Long = wavesUsdPairDecimals.amount(value)
     val usd: Long   = wavesUsdPairDecimals.price(value)
     val eth: Long   = ethWavesPairDecimals.amount(value)
@@ -24,7 +25,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
 
     def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {
       val orders = amountPrices.map {
-        case (amount, price) => mkOrder(sender, matcher, pair, ordersType, amount, price, 0.003.waves)
+        case (amount, price) => mkOrder(sender, pair, ordersType, amount, price, 0.003.waves)
       }
       orders.foreach { order =>
         dex1Api.place(order)
@@ -33,7 +34,7 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
     }
 
     def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse = {
-      val order = mkOrder(sender, matcher, pair, orderType, amount, price, 0.003.waves)
+      val order = mkOrder(sender, pair, orderType, amount, price, 0.003.waves)
       dex1Api.placeMarket(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
     }

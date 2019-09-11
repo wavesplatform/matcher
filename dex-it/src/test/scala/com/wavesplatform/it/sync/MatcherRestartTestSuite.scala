@@ -5,9 +5,8 @@ import com.wavesplatform.it.api.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import org.scalatest.concurrent.Eventually
 
-class MatcherRestartTestSuite extends NewMatcherSuiteBase with Eventually {
+class MatcherRestartTestSuite extends NewMatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueEthTx)
@@ -16,7 +15,7 @@ class MatcherRestartTestSuite extends NewMatcherSuiteBase with Eventually {
   "check order execution" - {
     "make order and after matcher's restart try to cancel it" in {
       // Alice places sell order
-      val aliceOrder = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant)
+      val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant)
       dex1Api.place(aliceOrder)
       dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
 
@@ -38,7 +37,7 @@ class MatcherRestartTestSuite extends NewMatcherSuiteBase with Eventually {
       orders1.asks.head.amount shouldBe 500
       orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      val aliceSecondOrder = mkOrder(alice, matcher, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant)
+      val aliceSecondOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant)
       dex1Api.place(aliceSecondOrder)
       dex1Api.waitForOrderStatus(aliceSecondOrder, OrderStatus.Accepted)
 

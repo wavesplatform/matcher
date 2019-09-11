@@ -3,9 +3,8 @@ package com.wavesplatform.it.sync
 import java.net.InetSocketAddress
 
 import cats.instances.try_._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.it.api.{NodeApi, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DexContainer, Docker, WavesNodeContainer}
 import com.wavesplatform.it.util._
@@ -18,34 +17,28 @@ import scala.util.Try
 class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
 
   override val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    val config =
-      DexTestConfig.updatedMatcherConfig
-        .withFallback {
-          ConfigFactory
-            .parseString(s"""waves.dex.waves-node-grpc {
-                          |  host = ${Docker.wavesNodesNetworkAlias}
-                          |  port = 6887
-                          |}""".stripMargin)
-        }
-        .withFallback(dex1Config)
-        .resolve
-
-    dockerClient().createDex("dex-1", config)
+    dockerClient().createDex(
+      "dex-1",
+      ConfigFactory
+        .parseString(s"""waves.dex.waves-node-grpc {
+                        |  host = ${Docker.wavesNodesNetworkAlias}
+                        |  port = 6887
+                        |}""".stripMargin)
+        .withFallback { dexRunConfig() },
+      suiteInitialDexConfig
+    )
   }
-
-  def wavesNode2Config: Config = DexTestConfig.containerConfig("waves-2")
 
   val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2", wavesNode1Config.resolve)
-  }
-
-  def wavesNode2Api: NodeApi[cats.Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Config.getInt("waves.rest-api.port"))
-    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+    dockerClient().createWavesNode("waves-2", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
   }
 
   def wavesNode2NetworkApiAddress: InetSocketAddress = {
-    dockerClient().getInternalSocketAddress(wavesNode2Container(), wavesNode2Config.getInt("waves.network.port"))
+    dockerClient().getInternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
+  }
+
+  def wavesNode2Api: NodeApi[cats.Id] = {
+    fp.sync(NodeApi[Try]("integration-test-rest-api", wavesNode2NetworkApiAddress))
   }
 
   override protected def beforeAll(): Unit = {
@@ -59,8 +52,8 @@ class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
     // also works for the cases when nodes are disconnected from the network (not stopped),
     // in these cases some delays after disconnections are required
 
-    val aliceBuyOrder = mkOrder(alice, matcher, wavesUsdPair, OrderType.BUY, 1.waves, 300)
-    val bobBuyOrder   = mkOrder(bob, matcher, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+    val aliceBuyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+    val bobBuyOrder   = mkOrder(bob, wavesUsdPair, OrderType.BUY, 1.waves, 300)
 
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode2Api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1Api.balance(bob, usd), asset = usd)
@@ -126,7 +119,7 @@ class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
 
   "DEXClient should works correctly despite of the short connection losses" in {
 
-    val aliceBuyOrder            = mkOrder(alice, matcher, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+    val aliceBuyOrder            = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode1Api.balance(alice, usd), asset = usd)
 
     withClue("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1\n") {
@@ -142,6 +135,8 @@ class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
 
       wavesNode1Api.balance(alice, usd) shouldBe 0
       wavesNode1Api.balance(bob, usd) shouldBe defaultAssetQuantity
+
+      Thread.sleep(2000)
     }
 
     withClue("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order\n") {

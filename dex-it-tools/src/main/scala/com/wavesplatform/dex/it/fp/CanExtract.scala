@@ -1,4 +1,4 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.fp
 
 import cats.{Id, MonadError}
 

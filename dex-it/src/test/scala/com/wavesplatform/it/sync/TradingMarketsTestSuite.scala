@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class TradingMarketsTestSuite extends NewMatcherSuiteBase {
+class TradingMarketsTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, 1000000000L)
 
   override protected def beforeAll(): Unit = {

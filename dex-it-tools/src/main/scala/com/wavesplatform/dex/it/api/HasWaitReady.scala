@@ -1,4 +1,4 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.api
 
 import com.typesafe.config.Config
 

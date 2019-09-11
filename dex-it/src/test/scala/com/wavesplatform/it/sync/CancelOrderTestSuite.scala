@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
-class CancelOrderTestSuite extends NewMatcherSuiteBase {
+class CancelOrderTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)

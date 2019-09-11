@@ -1,4 +1,4 @@
-package com.wavesplatform.it.time
+package com.wavesplatform.dex.it.time
 
 import io.netty.util.Timer
 
@@ -7,7 +7,7 @@ import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 
 object TimerOps {
-  implicit class Ops(val timer: Timer) extends AnyVal {
+  implicit class TimerOpsImplicits(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
       val p = Promise[A]
       try {

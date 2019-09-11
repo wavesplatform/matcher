@@ -21,7 +21,9 @@ lazy val dex = project.dependsOn(
   node % "compile;test->test;runtime->provided"
 )
 
-lazy val `dex-it-tools` = project
+lazy val `dex-it-tools` = project.dependsOn(
+  node % "compile;runtime->provided"
+)
 
 lazy val `dex-it` = project.dependsOn(
   dex % "compile;test->test",

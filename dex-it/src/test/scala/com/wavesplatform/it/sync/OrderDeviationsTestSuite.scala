@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NewMatcherSuiteBase
-//import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
+//import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 //import com.wavesplatform.it.util.DoubleExt
 //import com.wavesplatform.protobuf.order.Order.Side.SELL
@@ -19,7 +19,7 @@ import com.wavesplatform.it.config.DexTestConfig._
   *   best bid = highest price of buy
   *   best ask = lowest price of sell
   */
-class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
+class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     """waves.dex {

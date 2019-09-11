@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 
 import scala.concurrent.duration._
 
-class ProofAndAssetPairTestSuite extends NewMatcherSuiteBase {
+class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   private val issueAliceAssetTx = mk(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 

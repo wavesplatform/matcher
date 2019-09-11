@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 
 import scala.util.Random
 
-class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
+class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.snapshots-interval = 51")
 
   private val placesNumber  = 200

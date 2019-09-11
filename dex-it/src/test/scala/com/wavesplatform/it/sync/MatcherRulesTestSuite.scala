@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class MatcherRulesTestSuite extends NewMatcherSuiteBase {
+class MatcherRulesTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""
        |waves.dex.matching-rules.$wctUsdPair = [
        |  {

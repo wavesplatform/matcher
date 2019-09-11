@@ -3,10 +3,10 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
-import com.wavesplatform.it.blockchain.MkEntities
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
   * 1. If the script fails during placing, the matcher must reject an order
   * 2. If the script fails during execution, the matcher must cancel both orders (submitted and counter)
   */
-class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
+class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAssetTestSuite._
 
@@ -152,8 +152,8 @@ class OrdersFromScriptedAssetTestSuite extends NewMatcherSuiteBase {
 
 object OrdersFromScriptedAssetTestSuite {
 
-  import MkEntities.mk
-  import com.wavesplatform.it.api.FeeConstants.smartIssueFee
+  import MkWavesEntities.mk
+  import com.wavesplatform.dex.it.waves.WavesFeeConstants.smartIssueFee
 
   private def mkAllow(id: Int) = mk(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
 

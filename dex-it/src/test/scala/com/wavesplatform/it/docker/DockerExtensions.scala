@@ -3,7 +3,7 @@ package com.wavesplatform.it.docker
 import java.nio.file.Paths
 
 import com.typesafe.config.{Config, ConfigRenderOptions}
-import com.wavesplatform.it.api.HasWaitReady
+import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.utils.ScorexLogging
 
 trait DockerExtensions extends ScorexLogging {

@@ -11,8 +11,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.dex.AssetPairBuilder
-import com.wavesplatform.it.api.FeeConstants._
-import com.wavesplatform.it.dex.DoubleOps._
+import com.wavesplatform.dex.it.waves.WavesFeeConstants._
+import com.wavesplatform.dex.it.assets.DoubleOps._
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

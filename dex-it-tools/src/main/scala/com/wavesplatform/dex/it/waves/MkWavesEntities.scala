@@ -1,4 +1,4 @@
-package com.wavesplatform.it.blockchain
+package com.wavesplatform.dex.it.waves
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
@@ -6,8 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.FeeConstants._
-import com.wavesplatform.it.config.DexTestConfig
+import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
@@ -22,7 +21,7 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 
 import scala.concurrent.duration.{Duration, DurationInt}
 
-trait MkEntities {
+trait MkWavesEntities {
 
   def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
@@ -39,7 +38,7 @@ trait MkEntities {
               ts: Long = System.currentTimeMillis(),
               ttl: Duration = 30.days - 1.seconds,
               version: Byte = orderVersion,
-              matcher: PublicKey = DexTestConfig.matcher): Order =
+              matcher: PublicKey): Order =
     if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,
@@ -203,4 +202,4 @@ trait MkEntities {
   }
 }
 
-object MkEntities extends MkEntities
+object MkWavesEntities extends MkWavesEntities

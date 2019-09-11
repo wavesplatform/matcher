@@ -1,4 +1,4 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.fp
 
 trait Logger[F[_]] {
   def error(msg: => String): F[Unit]

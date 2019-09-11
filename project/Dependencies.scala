@@ -41,6 +41,8 @@ object Dependencies {
     "io.getquill"    %% "quill-jdbc" % "3.1.0"
   )
 
+  val config = "com.typesafe" % "config" % "1.3.3"
+
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
   val enforcedVersions = Def.setting(
@@ -59,7 +61,7 @@ object Dependencies {
       jacksonModule("jaxrs", "jaxrs-base"),
       jacksonModule("jaxrs", "jaxrs-json-provider"),
       kamonCore,
-      "com.typesafe" % "config" % "1.3.3",
+      config,
       machinist,
       "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
       "com.squareup.okio"    % "okio"        % "1.14.0",
@@ -83,15 +85,23 @@ object Dependencies {
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
   )
 
+  lazy val itTestCommon = Def.setting(
+    Seq(
+      config,
+      spotify,
+      catsCore.value,
+      mouse,
+      "com.softwaremill.sttp" %% "core"                             % "1.6.4",
+      "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
+      "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
+      "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
+    ))
+
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     spotify,
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.scalacheck"        %% "scalacheck"                       % "1.14.0",
-    "com.softwaremill.sttp" %% "core"                             % "1.6.4",
-    "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
-    "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
-    "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(

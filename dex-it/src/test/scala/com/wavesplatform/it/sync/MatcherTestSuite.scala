@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
@@ -11,7 +11,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
-class MatcherTestSuite extends NewMatcherSuiteBase with TableDrivenPropertyChecks {
+class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   private val aliceSellAmount = 500
   private val exTxFee         = matcherFee

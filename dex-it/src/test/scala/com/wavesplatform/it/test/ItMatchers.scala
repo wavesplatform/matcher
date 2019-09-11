@@ -1,6 +1,6 @@
 package com.wavesplatform.it.test
 
-import com.wavesplatform.it.api.MatcherError
+import com.wavesplatform.it.api.dex.MatcherError
 import org.scalatest.matchers.Matcher
 
 trait ItMatchers {

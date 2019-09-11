@@ -10,33 +10,41 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.it.api.{CanExtract, DexApi, DexOps, FeeConstants, HasWaitReady, LoggingSttpBackend, NodeApi}
-import com.wavesplatform.it.blockchain.MkEntities
+import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
+import com.wavesplatform.dex.it.assets.DoubleOps
+import com.wavesplatform.dex.it.fp
+import com.wavesplatform.dex.it.fp.CanExtract
+import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.it.api.{DexApi, DexOps}
 import com.wavesplatform.it.config.DexTestConfig
-import com.wavesplatform.it.dex.DoubleOps
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, DockerExtensions, WavesNodeContainer}
 import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-abstract class NewMatcherSuiteBase
+abstract class MatcherSuiteBase
     extends FreeSpec
     with Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll
     with Eventually
-    with MkEntities
+    with MkWavesEntities
     with ApiExtensions
     with ItMatchers
     with DockerExtensions
     with DoubleOps
-    with FeeConstants
+    with WavesFeeConstants
     with ScorexLogging {
 
   protected implicit def toDexExplicitGetOps[F[_]](self: DexApi[F])(implicit E: CanExtract[F]) = new DexOps.ExplicitGetOps[F](self)
@@ -159,4 +167,17 @@ abstract class NewMatcherSuiteBase
                       |  }
                       |}""".stripMargin)
   }
+
+  override def mkOrder(owner: KeyPair,
+                       pair: AssetPair,
+                       orderType: OrderType,
+                       amount: Long,
+                       price: Long,
+                       matcherFee: Long = matcherFee,
+                       matcherFeeAssetId: Asset = Waves,
+                       ts: Long = System.currentTimeMillis(),
+                       ttl: Duration = 30.days - 1.seconds,
+                       version: Byte = orderVersion,
+                       matcher: PublicKey = DexTestConfig.matcher): Order =
+    super.mkOrder(owner, pair, orderType, amount, price, matcherFee, matcherFeeAssetId, ts, ttl, version, matcher)
 }

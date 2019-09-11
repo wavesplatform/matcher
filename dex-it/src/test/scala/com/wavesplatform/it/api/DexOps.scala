@@ -2,12 +2,14 @@ package com.wavesplatform.it.api
 
 import com.softwaremill.sttp.StatusCode
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.it.fp.CanExtract
+import com.wavesplatform.it.api.dex._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 object DexOps {
-  // TODO replace by macros
+  // TODO replace by a macros
   final implicit class ExplicitGetOps[F[_]](val self: DexApi[F])(implicit E: CanExtract[F]) {
     import E.{extract => explicitGet}
 

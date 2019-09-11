@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.Address
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
-class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen {
+class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
   import BlacklistedTradingTestSuite._
 

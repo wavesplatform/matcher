@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{LevelResponse, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
-class RoundingIssuesTestSuite extends NewMatcherSuiteBase {
+class RoundingIssuesTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueBtcTx)

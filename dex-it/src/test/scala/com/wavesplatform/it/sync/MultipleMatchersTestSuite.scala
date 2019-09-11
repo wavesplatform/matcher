@@ -5,8 +5,11 @@ import cats.instances.future._
 import cats.instances.try_._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.api.HasWaitReady
+import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.{DexApi, HasWaitReady, MatcherCommand, MatcherState, OrderStatus}
+import com.wavesplatform.it.api.dex.OrderStatus
+import com.wavesplatform.it.api.{DexApi, MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer}
 import com.wavesplatform.it.tags.DexItKafkaRequired
@@ -19,7 +22,7 @@ import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
 @DexItKafkaRequired
-class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
+class MultipleMatchersTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig = ConfigFactory.parseString("""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = 51

@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{LevelResponse, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
-class MarketOrderTestSuite extends NewMatcherSuiteBase {
+class MarketOrderTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -23,9 +23,8 @@ class MarketOrderTestSuite extends NewMatcherSuiteBase {
       orders.foreach(placeAndAwait(_))
     }
 
-    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse = {
+    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse =
       placeAndAwait(mkOrder(sender, pair, orderType, amount, price), OrderStatus.Filled)
-    }
 
     withClue("BIG BUY market order executed partially (buy whole counter side):\n") {
       placeCounterOrders(alice, ethWavesPair, SELL)(

@@ -3,14 +3,14 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
-class ExtraFeeTestSuite extends NewMatcherSuiteBase {
+class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex.order-fee {

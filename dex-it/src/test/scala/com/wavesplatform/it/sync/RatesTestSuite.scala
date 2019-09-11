@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.MatcherError
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.MatcherError
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class RatesTestSuite extends NewMatcherSuiteBase {
+class RatesTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  allowed-order-versions = [1, 2, 3]

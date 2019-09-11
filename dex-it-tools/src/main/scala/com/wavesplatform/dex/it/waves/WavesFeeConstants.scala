@@ -1,9 +1,9 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.waves
 
-import com.wavesplatform.it.dex.DoubleOps._
+import com.wavesplatform.dex.it.assets.DoubleOps.DoubleOpsImplicits
 
-object FeeConstants extends FeeConstants
-trait FeeConstants {
+object WavesFeeConstants extends WavesFeeConstants
+trait WavesFeeConstants {
   val smartFee: Long                   = 0.004.waves
   val minFee: Long                     = 0.001.waves
   val leasingFee: Long                 = 0.002.waves

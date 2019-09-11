@@ -2,15 +2,17 @@ package com.wavesplatform.it.test
 
 import cats.Id
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.api.{DexApi, MatcherState, NodeApi, OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
-import com.wavesplatform.it.{NewMatcherSuiteBase, api}
+import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.it.api.dex._
+import com.wavesplatform.it.api.{DexApi, MatcherState}
+import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 
 import scala.collection.immutable.TreeMap
 
 trait ApiExtensions {
-  this: NewMatcherSuiteBase =>
+  this: MatcherSuiteBase =>
 
   protected def broadcastAndAwait(txs: Transaction*): Unit = {
     txs.map(wavesNode1Api.broadcast)
@@ -22,14 +24,10 @@ trait ApiExtensions {
     dex1Api.waitForOrderStatus(order, expectedStatus)
   }
 
-  protected def waitForOrderAtNode(order: Order,
-                                   dexApi: DexApi[Id] = dex1Api,
-                                   wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] =
+  protected def waitForOrderAtNode(order: Order, dexApi: DexApi[Id] = dex1Api, wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] =
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
-  protected def waitForOrderAtNode(orderId: Order.Id,
-                                   dexApi: DexApi[Id],
-                                   wavesNodeApi: NodeApi[Id]): Id[ExchangeTransaction] = {
+  protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Id[ExchangeTransaction] = {
     val tx = dexApi.waitForTransactionsByOrder(orderId, 1).head
     wavesNodeApi.waitForTransaction(tx.id())
     tx

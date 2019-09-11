@@ -1,7 +1,7 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.fp
 
-import com.wavesplatform.it.time.GlobalTimer
-import com.wavesplatform.it.time.TimerOps._
+import com.wavesplatform.dex.it.time.GlobalTimer
+import com.wavesplatform.dex.it.time.TimerOps.TimerOpsImplicits
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -12,7 +12,7 @@ trait CanWait[F[_]] {
 }
 
 object CanWait {
-  implicit val futureCanWait = new CanWait[Future] {
+  implicit val future = new CanWait[Future] {
     override def wait(duration: FiniteDuration): Future[Unit] = GlobalTimer.instance.sleep(duration)
   }
 

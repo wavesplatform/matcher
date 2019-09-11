@@ -1,4 +1,4 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.fp
 
 import java.nio.charset.StandardCharsets
 
@@ -7,7 +7,6 @@ import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import com.softwaremill.sttp.{DeserializationError, Response}
-import com.wavesplatform.it.api.dex.ThrowableMonadError
 import play.api.libs.json.{JsError, JsSuccess, Json, Reads}
 
 import scala.concurrent.duration.FiniteDuration
@@ -17,6 +16,7 @@ case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempt
   def decreaseAttempts: RepeatRequestOptions = copy(maxAttempts = maxAttempts - 1)
 }
 
+// TODO Rename to Repeated
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
   def repeatUntil[T](f: => F[T], options: RepeatRequestOptions)(stopCond : T => Boolean): F[T] =
     f.flatMap { firstResp =>

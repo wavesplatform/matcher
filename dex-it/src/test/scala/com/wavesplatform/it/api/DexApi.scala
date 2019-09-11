@@ -16,121 +16,17 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
-import com.wavesplatform.it.api.OrderBookHistoryItem.byteStrFormat
-import com.wavesplatform.it.api.dex.ThrowableMonadError
+import com.wavesplatform.dex.it.api.HasWaitReady
+import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
+import com.wavesplatform.it.json._
+import com.wavesplatform.it.api.dex._
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json._
-import shapeless.ops.hlist.{Mapper, ToTraversable, Zip}
-import shapeless.{Generic, HList, HNil, _}
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
-
-case class AssetDecimalsInfo(decimals: Byte)
-object AssetDecimalsInfo {
-  implicit val assetDecimalsInfoResponseFormat: Format[AssetDecimalsInfo] = Json.format
-}
-
-case class MatcherMessage(id: String)
-object MatcherMessage {
-  implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
-}
-
-case class MarketData(amountAsset: String,
-                      amountAssetName: String,
-                      priceAsset: String,
-                      priceAssetName: String,
-                      created: Long,
-                      amountAssetInfo: Option[AssetDecimalsInfo],
-                      priceAssetInfo: Option[AssetDecimalsInfo])
-object MarketData {
-  implicit val marketData: Format[MarketData] = Json.format
-}
-
-case class PairResponse(amountAsset: String, priceAsset: String)
-object PairResponse {
-  implicit val pairResponseFormat: Format[PairResponse] = Json.format
-}
-
-case class LevelResponse(amount: Long, price: Long)
-object LevelResponse {
-  implicit val levelResponseFormat: Format[LevelResponse] = Json.format
-}
-
-
-case class MatcherResponse(status: String, message: MatcherMessage)
-object MatcherResponse {
-  implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
-}
-
-case class MatcherStatusResponse(status: String, filledAmount: Option[Long])
-object MatcherStatusResponse {
-  implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
-}
-
-case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
-object MarketDataInfo {
-  implicit val marketDataInfoResponseFormat: Format[MarketDataInfo] = Json.format
-}
-
-case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
-object OrderBookResponse {
-  implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
-}
-
-case class MarketStatusResponse(lastPrice: Option[Long],
-                                lastSide: Option[String],
-                                bid: Option[Long],
-                                bidAmount: Option[Long],
-                                ask: Option[Long],
-                                askAmount: Option[Long])
-object MarketStatusResponse {
-  implicit val marketResponseFormat: Format[MarketStatusResponse] = Json.format
-}
-
-case class RatesResponse(message: String)
-object RatesResponse {
-  implicit val format: Format[RatesResponse] = Json.format
-}
-
-case class MatcherError(error: Int, message: String, status: String, params: Option[MatcherError.Params])
-object MatcherError {
-
-  implicit val format: Format[MatcherError] = Json.format[MatcherError]
-
-  case class Params(assetId: Option[String] = None, address: Option[String] = None, insignificantDecimals: Option[Int] = None) {
-    def isEmpty: Boolean = assetId.isEmpty && address.isEmpty
-  }
-
-  object Params {
-
-    implicit val format: Format[Params] = Json.format[Params]
-
-    private object containsPoly extends Poly1 {
-      implicit def contains[T: Ordering] = at[(Option[T], Option[T])] {
-        case (Some(l), Some(r)) => l == r
-        case (None, None)       => true
-        case _                  => false
-      }
-    }
-
-    private def internalContains[HParams <: HList, ZHParams <: HList, Booleans <: HList](obj: Params, part: Params)(
-        implicit gen: Generic.Aux[Params, HParams],
-        zip: Zip.Aux[HParams :: HParams :: HNil, ZHParams],
-        mapper: Mapper.Aux[containsPoly.type, ZHParams, Booleans],
-        toList: ToTraversable.Aux[Booleans, List, Boolean]): Boolean =
-      gen.to(obj).zip(gen.to(part))(zip).map(containsPoly).toList[Boolean](toList).forall(identity)
-
-    def contains(obj: Params, part: Params): Boolean = internalContains(obj, part)
-  }
-}
-
-case class OrderStatusResponse(status: OrderStatus, filledAmount: Option[Long])
-object OrderStatusResponse {
-  implicit val format: Format[OrderStatusResponse] = Json.format[OrderStatusResponse]
-}
 
 trait DexApi[F[_]] extends HasWaitReady[F] {
   // Won't work with type TryF[T] = F[Either[MatcherError, T]]

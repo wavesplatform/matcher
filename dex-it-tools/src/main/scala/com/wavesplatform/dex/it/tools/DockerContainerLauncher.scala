@@ -11,6 +11,7 @@ import mouse.any._
 import scala.collection.JavaConverters._
 import scala.util.Try
 
+// TODO rename package to docker
 class DockerContainerLauncher(imageName: String,
                               containerName: String,
                               containerIp: String,

@@ -13,8 +13,8 @@ import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{OrderStatus, OrderStatusResponse}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -28,7 +28,7 @@ import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.{Failure, Try}
 
-class OrderHistoryTestSuite extends NewMatcherSuiteBase {
+class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   // scenario:
   //  1. create node network

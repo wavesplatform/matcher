@@ -3,16 +3,18 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.{HasWaitReady, NodeApi, OrderStatus}
+import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
+import com.wavesplatform.dex.it.fp
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.{NewMatcherSuiteBase, fp}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import monix.eval.Coeval
 
 import scala.util.Try
 
-class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
+class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
   override protected def suiteInitialDexConfig: Config =
     ConfigFactory
@@ -25,8 +27,8 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
     dockerClient.createWavesNode("waves-2",
-                                   wavesNodeRunConfig(),
-                                   ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
+                                 wavesNodeRunConfig(),
+                                 ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
   }
   protected def wavesNode2Api: NodeApi[Id] = {
     def apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)

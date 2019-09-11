@@ -1,4 +1,4 @@
-package com.wavesplatform.it.api
+package com.wavesplatform.dex.it.api
 
 import java.net.{InetSocketAddress, SocketException}
 
@@ -13,11 +13,12 @@ import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.it.fp.{CanWait, FOps}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{account, transaction}
-import play.api.libs.json._
+import play.api.libs.json.{Format, JsValue, Json, Writes}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Try
@@ -236,15 +237,15 @@ object NodeApi {
           }
         }
 
-//      def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
-//          pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =
-//        repeatUntil(f, delay)(pred).flatMap { resp =>
-//          resp.rawErrorBody match {
-//            case Left(_)            => M.raiseError[T](new RuntimeException(s"The server returned an error: ${resp.code}"))
-//            case Right(Left(error)) => M.raiseError[T](new RuntimeException(s"Can't parse the response: $error"))
-//            case Right(Right(r))    => M.pure(r)
-//          }
-//        }
+      //      def repeatUntilResponse[T](f: => F[Response[Either[DeserializationError[JsError], T]]], delay: FiniteDuration)(
+      //          pred: Response[Either[DeserializationError[JsError], T]] => Boolean): F[T] =
+      //        repeatUntil(f, delay)(pred).flatMap { resp =>
+      //          resp.rawErrorBody match {
+      //            case Left(_)            => M.raiseError[T](new RuntimeException(s"The server returned an error: ${resp.code}"))
+      //            case Right(Left(error)) => M.raiseError[T](new RuntimeException(s"Can't parse the response: $error"))
+      //            case Right(Right(r))    => M.pure(r)
+      //          }
+      //        }
 
       private def try_(req: RequestT[Id, Unit, Nothing]): F[Either[ErrorResponse, Unit]] =
         httpBackend.send(req).flatMap(FOps[F].parseTryResponse[ErrorResponse, Unit])

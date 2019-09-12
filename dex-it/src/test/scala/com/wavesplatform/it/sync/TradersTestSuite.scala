@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -23,14 +22,14 @@ class TradersTestSuite extends MatcherSuiteBase {
     "AssetPair BOB/WAVES vs BOB/NULL" in {
 
       val trickyBobWavesPairWB58 = AssetPair(
-        amountAsset = WctAsset,
+        amountAsset = wct,
         priceAsset = IssuedAsset { ByteStr.decodeBase58("WAVES").get }
       )
 
       trickyBobWavesPairWB58.key shouldBe wctWavesPair.key
 
       val trickyBobWavesPairWS = AssetPair(
-        amountAsset = WctAsset,
+        amountAsset = wct,
         priceAsset = IssuedAsset { ByteStr("WAVES".getBytes) }
       )
 
@@ -76,7 +75,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount)
 
           // Transfer all coins except required for one order
-          val transferTx = mkTransfer(bob, alice, transferAmount, WctAsset)
+          val transferTx = mkTransfer(bob, alice, transferAmount, wct)
           wavesNode1Api.broadcast(transferTx)
 
           withClue(s"The newest order '${newestOrder.idStr()}' was cancelled\n") {
@@ -91,7 +90,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1Api.waitForTransaction(transferTx)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, WctAsset))
+            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
           }
         }
 

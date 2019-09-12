@@ -3,21 +3,16 @@ package com.wavesplatform.it.test
 import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.test.WavesNodeApiExtensions
 import com.wavesplatform.it.api.dex._
 import com.wavesplatform.it.api.{DexApi, MatcherState}
 import com.wavesplatform.it.{MatcherSuiteBase, api}
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 
 import scala.collection.immutable.TreeMap
 
-trait ApiExtensions {
+trait ApiExtensions extends WavesNodeApiExtensions {
   this: MatcherSuiteBase =>
-
-  protected def broadcastAndAwait(txs: Transaction*): Unit = {
-    txs.map(wavesNode1Api.broadcast)
-    txs.foreach(tx => wavesNode1Api.waitForTransaction(tx))
-  }
 
   protected def placeAndAwait(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted): OrderStatusResponse = {
     dex1Api.place(order)

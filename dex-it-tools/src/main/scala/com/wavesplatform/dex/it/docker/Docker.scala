@@ -1,6 +1,6 @@
-package com.wavesplatform.it.docker
+package com.wavesplatform.dex.it.docker
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileNotFoundException, FileOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, FileOutputStream}
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
@@ -17,15 +17,13 @@ import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 
 import scala.collection.JavaConverters._
-import scala.io.Source
+import scala.util.Random
 import scala.util.control.NonFatal
-import scala.util.{Random, Try}
 
 class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
@@ -126,6 +124,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def writeFile(container: DockerContainer, to: Path, content: String): Unit = {
+    log.trace(s"${prefix(container)} Write to '$to':\n$content")
     val os    = new ByteArrayOutputStream()
     val s     = new TarArchiveOutputStream(os)
     val bytes = content.getBytes(StandardCharsets.UTF_8)
@@ -140,78 +139,6 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
     try client.copyToContainer(is, container.id, s"${to.getParent.toString}")
     finally is.close()
-  }
-
-  def createWavesNode(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer = {
-    val number   = getNumber(name)
-    val basePath = "/opt/waves"
-    val id = create(
-      number,
-      name,
-      wavesNodeImage,
-      Map(
-        "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
-      )
-    )
-
-    val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
-      .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
-      .mkString
-
-    val baseConfig = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory.parseString(rawBaseConfig)).resolve()
-    val r = new WavesNodeContainer(
-      id = id,
-      number = number,
-      name = name,
-      basePath = basePath,
-      restApiPort = baseConfig.getInt("waves.rest-api.port"),
-      networkApiPort = baseConfig.getInt("waves.network.port"),
-      grpcApiPort = baseConfig.getInt("waves.dex.grpc.integration.port")
-    )
-    Map(
-      s"$name.conf" -> rawBaseConfig,
-      "run.conf"    -> runConfig.resolve().root().render(),
-      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
-    ).foreach { case (fileName, content) => writeFile(r, Paths.get(basePath, fileName), content) }
-
-    knownContainers.add(r)
-    r
-  }
-
-  def createDex(name: String, runConfig: Config, initialSuiteConfig: Config): DexContainer = {
-    val number   = getNumber(name)
-    val basePath = "/opt/waves-dex"
-    val id = create(
-      number,
-      name,
-      dexImage,
-      Map(
-        "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_DEX_OPTS"       -> s"-Dlogback.configurationFile=$basePath/logback.xml"
-      )
-    )
-
-    val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
-      .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
-      .mkString
-
-    val baseConfig = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory.parseString(rawBaseConfig)).resolve()
-    val r = new DexContainer(
-      id = id,
-      number = number,
-      name = name,
-      basePath = basePath,
-      restApiPort = baseConfig.getInt("waves.dex.rest-api.port")
-    )
-    Map(
-      s"$name.conf" -> rawBaseConfig,
-      "run.conf"    -> runConfig.resolve().root().render(),
-      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
-    ).foreach { case (fileName, content) => writeFile(r, Paths.get(basePath, fileName), content) }
-
-    knownContainers.add(r)
-    r
   }
 
   def start(container: DockerContainer): Unit = {
@@ -274,7 +201,9 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     catch { case NonFatal(e) => /* ignore */ } finally exec.close()
   }
 
-  private def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {
+  def addKnownContainer(container: DockerContainer): Unit = knownContainers.add(container)
+
+  def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {
     val ip            = ipForNode(number)
     val containerName = s"${network().name()}-$name"
 
@@ -386,19 +315,6 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   private def prefix(container: DockerContainer): String = s"[name='${container.name}', id=${container.id}]"
 
-  private def getNumber(name: String): Int = {
-    val raw = name
-      .split('-')
-      .lastOption
-      .flatMap(x => Try(x.toInt).toOption)
-      .getOrElse(throw new IllegalArgumentException(s"Can't parse the container's number: '$name'. It should have a form: <name>-<number>"))
-
-    if (raw >= 5) throw new IllegalArgumentException("All slots are filled")
-    else if (name.startsWith("dex-")) raw
-    else if (name.startsWith("waves-")) raw + 5
-    else throw new IllegalArgumentException(s"Can't parse number from '$name'. Know 'dex-' and 'waves-' only")
-  }
-
   dumpContainers(client.listContainers())
   sys.addShutdownHook {
     log.debug("Shutdown hook")
@@ -407,9 +323,6 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 }
 
 object Docker {
-  private val wavesNodeImage = "com.wavesplatform/waves-integration-it:latest"
-  private val dexImage       = "com.wavesplatform/dex-it:latest"
-
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
 
   def apply(owner: Class[_]): Docker = new Docker(suiteName = owner.getSimpleName)

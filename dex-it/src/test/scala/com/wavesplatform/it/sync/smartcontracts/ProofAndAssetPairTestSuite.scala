@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
@@ -322,6 +321,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def setAliceScript(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText), fee = setScriptFee + smartFee))
-  private def resetAliceAccountScript(): Unit          = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScript(scriptText: String): Unit =
+    broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText), fee = setScriptFee + smartFee))
+  private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
 }

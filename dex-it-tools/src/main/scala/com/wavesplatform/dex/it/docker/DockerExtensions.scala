@@ -1,4 +1,4 @@
-package com.wavesplatform.it.docker
+package com.wavesplatform.dex.it.docker
 
 import java.nio.file.Paths
 

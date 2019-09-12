@@ -8,5 +8,4 @@ package object smartcontracts {
        | case s : SetScriptTransaction => true
        | case _ => false
        |}""".stripMargin
-
 }

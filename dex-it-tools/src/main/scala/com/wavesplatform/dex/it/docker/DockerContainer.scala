@@ -1,4 +1,4 @@
-package com.wavesplatform.it.docker
+package com.wavesplatform.dex.it.docker
 
 abstract class DockerContainer {
   def id: String
@@ -17,13 +17,4 @@ class WavesNodeContainer(override val id: String,
                          val grpcApiPort: Int)
     extends DockerContainer {
   override def toString: String = s"WavesNodeContainer(name=$name, id=$id)"
-}
-
-class DexContainer(override val id: String,
-                   override val number: Int,
-                   override val name: String,
-                   override val basePath: String,
-                   override val restApiPort: Int)
-    extends DockerContainer {
-  override def toString: String = s"DexContainer(name=$name, id=$id)"
 }

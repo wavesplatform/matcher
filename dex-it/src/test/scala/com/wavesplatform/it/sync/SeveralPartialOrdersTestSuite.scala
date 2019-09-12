@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 

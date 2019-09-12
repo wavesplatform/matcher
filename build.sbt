@@ -40,7 +40,6 @@ lazy val `waves-integration` = project.dependsOn(
 lazy val `waves-integration-it` = project
   .dependsOn(
     `waves-integration`,
-    `node-it` % "compile;test->test",
     `dex-it-tools`
   )
 

@@ -7,7 +7,6 @@ import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -153,6 +152,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 object OrdersFromScriptedAssetTestSuite {
 
   import MkWavesEntities.mkIssue
+  import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
   import com.wavesplatform.dex.it.waves.WavesFeeConstants.smartIssueFee
 
   private def mkAllow(id: Int) = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))

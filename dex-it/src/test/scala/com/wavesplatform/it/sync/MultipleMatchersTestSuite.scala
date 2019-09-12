@@ -6,12 +6,13 @@ import cats.instances.try_._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.HasWaitReady
+import com.wavesplatform.dex.it.docker.DockerContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.it.api.{DexApi, MatcherCommand, MatcherState}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.docker.{DexContainer, DockerContainer}
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
+import com.wavesplatform.it.docker.DexContainer
 import com.wavesplatform.it.tags.DexItKafkaRequired
 import com.wavesplatform.transaction.assets.exchange.Order
 import monix.eval.Coeval
@@ -29,7 +30,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       |}""".stripMargin)
 
   protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient.createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
+    createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
   }
 
   private def dex2ApiAddress                 = dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)

@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
@@ -38,7 +39,7 @@ trait MkWavesEntities {
               ts: Long = System.currentTimeMillis(),
               ttl: Duration = 30.days - 1.seconds,
               version: Byte = orderVersion,
-              matcher: PublicKey): Order =
+              matcher: PublicKey = matcher): Order =
     if (matcherFeeAssetId == Waves)
       Order(
         sender = owner,

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen

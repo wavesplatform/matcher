@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 

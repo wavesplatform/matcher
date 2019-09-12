@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
 class TradingMarketsTestSuite extends MatcherSuiteBase {

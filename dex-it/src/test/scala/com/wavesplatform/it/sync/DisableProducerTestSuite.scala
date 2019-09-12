@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class DisableProducerTestSuite extends MatcherSuiteBase {
@@ -20,8 +19,8 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
   "Check no commands are written to queue" - {
     "check assets's balances" in {
-      wavesNode1Api.balance(alice, EthAsset) shouldBe IssueEthTx.quantity
-      wavesNode1Api.balance(matcher, EthAsset) shouldBe 0L
+      wavesNode1Api.balance(alice, eth) shouldBe IssueEthTx.quantity
+      wavesNode1Api.balance(matcher, eth) shouldBe 0L
     }
 
     "place an order and wait some time" in {

@@ -6,13 +6,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.config.Accounts._
-import com.wavesplatform.dex.grpc.integration.config.Assets._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -23,27 +19,22 @@ import scala.util.Random
 
 class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
 
-  private val target               = s"${node.networkAddress.getHostString}:${nodes.head.nodeExternalPort(6887)}"
-  private lazy val wavesSyncClient = new DEXClient(target).wavesBlockchainSyncClient
+  private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget).wavesBlockchainSyncClient
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    node.signedBroadcast(IssueEthTx.json())
-    node.waitForTransaction(IssueEthTx.id().toString)
+    wavesNode1Api.broadcast(IssueEthTx)
+    wavesNode1Api.waitForTransaction(IssueEthTx.id())
   }
 
   "wasForged" - {
-    val tx = IssueBtcTx
-    val id = tx.id()
-
     "false for unknown tx" in {
-      wavesSyncClient.wasForged(id) shouldBe false
+      wavesSyncClient.wasForged(BtcId) shouldBe false
     }
 
     "true for forged tx" in {
-      node.signedBroadcast(tx.json())
-      node.waitForTransaction(id.toString)
-      wavesSyncClient.wasForged(id) shouldBe true
+      broadcastAndAwait(IssueBtcTx)
+      wavesSyncClient.wasForged(BtcId) shouldBe true
     }
   }
 
@@ -53,7 +44,7 @@ class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
       val exchangeTx = mkExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
       wavesSyncClient.broadcastTx(exchangeTx) shouldBe true
-      node.waitForTransaction(exchangeTx.id().toString)
+      wavesNode1Api.waitForTransaction(exchangeTx.id())
     }
 
     "returns false if the transaction didn't pass the validation" in {
@@ -118,8 +109,7 @@ class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
       val issueTx = mkIssue(bob, "SmartCoin", defaultAssetQuantity, 8, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
 
       withClue("issue scripted asset") {
-        node.broadcastRequest(issueTx.json())
-        node.waitForTransaction(issueTx.id().toString)
+        broadcastAndAwait(issueTx)
 
         wavesSyncClient.hasScript(IssuedAsset(issueTx.id())) shouldBe true
       }
@@ -142,15 +132,12 @@ class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
       val receiver = KeyPair("receiver".getBytes(StandardCharsets.UTF_8))
 
       withClue("transfer") {
-        val transferTx = mkTransfer(alice, receiver, 5.waves, Waves)
-        node.broadcastRequest(transferTx.json())
-        node.waitForTransaction(transferTx.id().toString)
+        broadcastAndAwait(mkTransfer(alice, receiver, 5.waves, Waves))
       }
 
       withClue("set script") {
         val setScriptTx = mkSetAccountScript(receiver, script = Some(ExprScript(Terms.TRUE).explicitGet()))
-        node.broadcastRequest(setScriptTx.json())
-        node.waitForTransaction(setScriptTx.id().toString)
+        broadcastAndAwait(setScriptTx)
 
         wavesSyncClient.hasScript(receiver) shouldBe true
       }
@@ -179,8 +166,7 @@ class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
       val pair       = AssetPair.createAssetPair(IssueEthTx.id().toString, "WAVES").get
       val exchangeTx = mkExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
-      node.broadcastRequest(exchangeTx.json())
-      node.waitForTransaction(exchangeTx.id().toString)
+      broadcastAndAwait(exchangeTx)
 
       wavesSyncClient.forgedOrder(exchangeTx.buyOrder.id()) shouldBe true
       wavesSyncClient.forgedOrder(exchangeTx.sellOrder.id()) shouldBe true

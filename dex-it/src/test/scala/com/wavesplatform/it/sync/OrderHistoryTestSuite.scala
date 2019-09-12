@@ -8,16 +8,13 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
-import com.wavesplatform.dex.it.tools.DockerContainerLauncher
+import com.wavesplatform.dex.it.docker.DockerContainerLauncher
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -57,8 +54,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     )
 
   private val batchLingerMs: Int  = OrderHistorySettings.defaultBatchLingerMs
-  private val ethAsset: Asset     = IssuedAsset(EthId)
-  private val ethAssetStr: String = AssetPair.assetIdStr(ethAsset)
+  private val ethAssetStr: String = AssetPair.assetIdStr(eth)
 
   private def getPostgresContainerHostPort: String = postgresContainerLauncher.getHostPort.explicitGet()
 
@@ -127,7 +123,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     super.beforeAll()
 
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx)
-    dex1Api.upsertRate(ethAsset, 1.0)._1 shouldBe StatusCodes.Created
+    dex1Api.upsertRate(eth, 1.0)._1 shouldBe StatusCodes.Created
   }
 
   override protected def afterAll(): Unit = {
@@ -194,9 +190,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       .toSet
 
   private val (amount, price) = (1000L, PriceConstant)
-  private val dAmount: Double = Denormalization.denormalizeAmountAndFee(amount, Decimals)
-  private val dPrice: Double  = Denormalization.denormalizePrice(price, Decimals, Decimals)
-  private val dFee: Double    = Denormalization.denormalizeAmountAndFee(matcherFee, Decimals)
+
+  // Because orders on wctUsdPair
+  private val dAmount: Double = Denormalization.denormalizeAmountAndFee(amount, 2) // IssueWctTx.decimals)
+  private val dPrice: Double  = Denormalization.denormalizePrice(price, 2, 2) //IssueWctTx.decimals, IssueUsdTx.decimals)
+  private val dFee: Double    = Denormalization.denormalizeAmountAndFee(matcherFee, 2) //8)
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
@@ -292,7 +290,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     dex1Api.cancelAll(bob)
     dex1Api.cancelAll(alice)
 
-    def mkBigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = ethAsset)
+    def mkBigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = eth)
 
     withClue("place buy market order into empty order book") {
       val unmatchableMarketBuyOrder = mkBigBuyOrder

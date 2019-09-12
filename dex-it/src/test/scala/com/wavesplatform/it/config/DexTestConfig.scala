@@ -153,13 +153,8 @@ object DexTestConfig {
   val usd = IssuedAsset(UsdId)
   val wct = IssuedAsset(WctId)
 
-  val ethWavesPairDecimals = new AssetPairDecimals(8, 8)
-  val wavesUsdPairDecimals = new AssetPairDecimals(8, 2)
-
-  val BtcAsset = IssuedAsset(BtcId)
-  val EthAsset = IssuedAsset(EthId)
-  val UsdAsset = IssuedAsset(UsdId)
-  val WctAsset = IssuedAsset(WctId)
+  val ethWavesPairDecimals = AssetPairDecimals(8, 8)
+  val wavesUsdPairDecimals = AssetPairDecimals(8, 2)
 
   val wctUsdPair = AssetPair(
     amountAsset = wct,

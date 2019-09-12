@@ -16,6 +16,7 @@ import cats.kernel.Monoid
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
+import com.spotify.docker.client.shaded.com.google.common.collect.ImmutableList
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.utils.ScorexLogging
@@ -142,18 +143,24 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     finally is.close()
   }
 
-  def createWavesNode(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer = {
+  def createWavesNode(name: String,
+                      runConfig: Config,
+                      initialSuiteConfig: Config,
+                      netAlias: Option[String] = Some(wavesNodesNetworkAlias)): WavesNodeContainer = {
     val number   = getNumber(name)
     val basePath = "/opt/waves"
-    val id = create(
-      number,
-      name,
-      wavesNodeImage,
-      Map(
-        "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
+
+    val id =
+      create(
+        number,
+        name,
+        wavesNodeImage,
+        Map(
+          "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
+          "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
+        ),
+        netAlias
       )
-    )
 
     val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
       .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
@@ -214,6 +221,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     r
   }
 
+  def start(container: Coeval[DockerContainer]): Unit = start { container() }
+
   def start(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Starting ...")
     try client.startContainer(container.id)
@@ -223,6 +232,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         throw e
     }
   }
+
+  def stop(container: Coeval[DockerContainer]): Unit = stop { container() }
 
   def stop(container: DockerContainer): Unit = {
     val containerInfo = client.inspectContainer(container.id)
@@ -243,20 +254,24 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     saveLog(container)
   }
 
+  def disconnectFromNetwork(container: Coeval[DockerContainer]): Unit = disconnectFromNetwork { container() }
+
   def disconnectFromNetwork(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Disconnecting from network '${network().name()}' ...")
     client.disconnectFromNetwork(container.id, network().id())
     log.info(s"${prefix(container)} Disconnected from network '${network().name()}'")
   }
 
-  def connectToNetwork(container: DockerContainer): Unit = {
+  def connectToNetwork(container: Coeval[DockerContainer], netAlias: Option[String]): Unit = connectToNetwork(container(), netAlias)
+
+  def connectToNetwork(container: DockerContainer, netAlias: Option[String] = None): Unit = {
     log.debug(s"${prefix(container)} Connecting to network '${network().name()}' ...")
     try client.connectToNetwork(
       network().id(),
       NetworkConnection
         .builder()
         .containerId(container.id)
-        .endpointConfig(endpointConfigFor(container.number))
+        .endpointConfig(endpointConfigFor(container.number, netAlias))
         .build()
     )
     catch {
@@ -274,7 +289,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     catch { case NonFatal(e) => /* ignore */ } finally exec.close()
   }
 
-  private def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {
+  private def create(number: Int, name: String, imageName: String, env: Map[String, String], netAlias: Option[String] = None): String = {
     val ip            = ipForNode(number)
     val containerName = s"${network().name()}-$name"
 
@@ -301,7 +316,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number)).asJava))
+        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number, netAlias)).asJava))
         .hostConfig(hostConfig)
         .env(fixedEnv.map { case (k, v) => s"$k=$v" }.toList.asJava)
         .build()
@@ -362,12 +377,16 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     }
   }
 
-  private def endpointConfigFor(number: Int): EndpointConfig = {
-    val ip = ipForNode(number)
+  private def endpointConfigFor(number: Int, netAlias: Option[String]): EndpointConfig = {
+
+    val ip        = ipForNode(number)
+    val aliasList = new ImmutableList.Builder[String].addAll(netAlias.toList.asJava).build()
+
     EndpointConfig
       .builder()
       .ipAddress(ip)
       .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+      .aliases(aliasList)
       .build()
   }
 
@@ -407,8 +426,11 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 }
 
 object Docker {
+
   private val wavesNodeImage = "com.wavesplatform/waves-integration-it:latest"
   private val dexImage       = "com.wavesplatform/dex-it:latest"
+
+  val wavesNodesNetworkAlias = "waves.nodes"
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
 

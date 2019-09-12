@@ -75,7 +75,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected def wavesNode1NetworkApiAddress: InetSocketAddress =
     dockerClient().getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
 
-  // Dex server
+  // d3x server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
     dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
       .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
@@ -94,7 +94,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   protected def allApis: List[HasWaitReady[cats.Id]] = List(wavesNode1Api, dex1Api)
 
   override protected def beforeAll(): Unit = {
-    log.debug(s"Doing beforeAll")
+    log.debug(s"Perform beforeAll")
     super.beforeAll()
 
     val (waves, dex) = allContainers.partition {
@@ -115,7 +115,7 @@ abstract class NewMatcherSuiteBase extends FreeSpec with Matchers with CancelAft
   }
 
   override protected def afterAll(): Unit = {
-    log.debug(s"Doing afterAll")
+    log.debug(s"Perform afterAll")
     dockerClient().close()
     futureHttpBackend.close()
     tryHttpBackend.close()

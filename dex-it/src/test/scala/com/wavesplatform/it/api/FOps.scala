@@ -14,6 +14,22 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
+
+  case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempts: Int) {
+    def decreaseAttempts: RepeatRequestOptions = copy(maxAttempts = maxAttempts - 1)
+  }
+
+  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions)(stopCond : T => Boolean): F[T] =
+    f.flatMap { firstResp =>
+      (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
+        case (resp, currOptions) =>
+          if (stopCond(resp)) M.pure((resp, currOptions).asRight)
+          else if (currOptions.maxAttempts <= 0) M.raiseError(new RuntimeException("All attempts are out!"))
+          else W.wait(options.delayBetweenRequests).productR(f).map(x => (x, currOptions.decreaseAttempts).asLeft)
+      }
+    }
+      .map(_._1)
+
   def repeatUntil[T](f: => F[T], delay: FiniteDuration)(pred: T => Boolean): F[T] =
     f.flatMap {
       _.tailRecM[F, T] { x =>

@@ -24,14 +24,14 @@ class TradersTestSuite extends NewMatcherSuiteBase {
     "AssetPair BOB/WAVES vs BOB/NULL" in {
 
       val trickyBobWavesPairWB58 = AssetPair(
-        amountAsset = WctAsset,
+        amountAsset = wct,
         priceAsset = IssuedAsset { ByteStr.decodeBase58("WAVES").get }
       )
 
       trickyBobWavesPairWB58.key shouldBe wctWavesPair.key
 
       val trickyBobWavesPairWS = AssetPair(
-        amountAsset = WctAsset,
+        amountAsset = wct,
         priceAsset = IssuedAsset { ByteStr("WAVES".getBytes) }
       )
 
@@ -78,7 +78,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
           val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount)
 
           // Transfer all coins except required for one order
-          val transferTx = mkTransfer(bob, alice, transferAmount, WctAsset)
+          val transferTx = mkTransfer(bob, alice, transferAmount, wct)
           wavesNode1Api.broadcast(transferTx)
 
           withClue(s"The newest order '${newestOrder.idStr()}' was cancelled\n") {
@@ -93,7 +93,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
             wavesNode1Api.waitForTransaction(transferTx)
             dex1Api.cancel(bob, oldestOrder)
             dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, WctAsset))
+            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
           }
         }
 

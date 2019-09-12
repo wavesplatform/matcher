@@ -1,8 +1,9 @@
 package com.wavesplatform.dex.grpc.integration
 
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.dex.grpc.integration.services.{WavesBalancesApiGrpc, WavesBalancesApiGrpcServer, WavesBlockchainApiGrpc, WavesBlockchainApiGrpcServer}
+import com.wavesplatform.dex.grpc.integration.services._
 import com.wavesplatform.dex.grpc.integration.settings.DEXExtensionSettings
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
@@ -28,6 +29,8 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     new InetSocketAddress(settings.host, settings.port) |> { bindAddress =>
       NettyServerBuilder
         .forAddress(bindAddress)
+        .permitKeepAliveWithoutCalls(true)
+        .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
         .addService(WavesBalancesApiGrpc.bindService(new WavesBalancesApiGrpcServer(context, settings.balanceChangesBatchLinger), apiScheduler))
         .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcServer(context), apiScheduler))
         .build()

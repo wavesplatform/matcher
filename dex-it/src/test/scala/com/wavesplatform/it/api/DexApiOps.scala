@@ -8,9 +8,9 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
-object DexOps {
+object DexApiOps {
   // TODO replace by a macros
-  final implicit class ExplicitGetOps[F[_]](val self: DexApi[F])(implicit E: CanExtract[F]) {
+  final implicit class ExplicitGetDexApiOps[F[_]](val self: DexApi[F])(implicit E: CanExtract[F]) {
     import E.{extract => explicitGet}
 
     def publicKey: F[PublicKey] = explicitGet(self.tryPublicKey)

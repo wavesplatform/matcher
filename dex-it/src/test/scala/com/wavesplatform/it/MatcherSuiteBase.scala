@@ -3,21 +3,21 @@ package com.wavesplatform.it
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
-import cats.Id
 import cats.instances.future._
 import cats.instances.try_._
+import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
-import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
+import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi, NodeApiOps}
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.fp.CanExtract
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
-import com.wavesplatform.it.api.{DexApi, DexOps}
+import com.wavesplatform.it.api.{DexApi, DexApiOps}
 import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DockerContainer, DockerExtensions, WavesNodeContainer}
 import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
@@ -47,7 +47,8 @@ abstract class MatcherSuiteBase
     with WavesFeeConstants
     with ScorexLogging {
 
-  protected implicit def toDexExplicitGetOps[F[_]](self: DexApi[F])(implicit E: CanExtract[F]) = new DexOps.ExplicitGetOps[F](self)
+  protected implicit def toDexExplicitGetOps[F[_]: CanExtract](self: DexApi[F])            = new DexApiOps.ExplicitGetDexApiOps[F](self)
+  protected implicit def toNodeExplicitGetOps[F[_]: Functor: CanExtract](self: NodeApi[F]) = new NodeApiOps.ExplicitGetNodeApiOps[F](self)
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()

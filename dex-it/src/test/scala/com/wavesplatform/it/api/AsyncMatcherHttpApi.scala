@@ -15,6 +15,7 @@ import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
@@ -263,10 +264,11 @@ object AsyncMatcherHttpApi extends Assertions {
                      fee: Long,
                      version: Byte,
                      timestamp: Long = System.currentTimeMillis(),
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     timeToLive: Duration = 30.days - 1.seconds,
+                     feeAsset: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
       val unsigned =
-        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version, feeAsset)
       Order.sign(unsigned, sender)
     }
 
@@ -280,8 +282,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    price: Long,
                    fee: Long,
                    version: Byte,
-                   timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive)
+                   timeToLive: Duration = 30.days - 1.seconds,
+                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 

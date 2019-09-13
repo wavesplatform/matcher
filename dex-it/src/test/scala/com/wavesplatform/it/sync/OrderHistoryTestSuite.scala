@@ -3,21 +3,25 @@ package com.wavesplatform.it.sync
 import java.net.InetAddress
 import java.sql.{Connection, DriverManager}
 
+import akka.http.scaladsl.model.StatusCodes
 import com.google.common.primitives.Ints
 import com.spotify.docker.client.messages.Network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.history.HistoryRouter._
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.util._
+import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 
@@ -107,7 +111,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
        |    orders-batch-entries = 10000
        |    events-batch-linger-ms = $batchLingerMs
        |    events-batch-entries = 10000
-       |  }
+       |  },
+       |  allowed-order-versions = [1, 2, 3]
        |}
     """.stripMargin
 
@@ -124,7 +129,12 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     postgresContainerLauncher.startContainer()
     createTables(s"localhost:$getPostgresContainerHostPort")
 
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach(tx => node.waitForTransaction(tx.id))
+    Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).foreach { tx =>
+      node.waitForTransaction { node.broadcastRequest(tx.json.value).id }
+    }
+
+    node.upsertRate(eth, 0.00567593, expectedStatusCode = StatusCodes.Created)
+    node.upsertRate(btc, 0.00009855, expectedStatusCode = StatusCodes.Created)
   }
 
   override protected def afterAll(): Unit = {
@@ -146,49 +156,72 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   def getOrdersCount: Long = ctx.run(querySchema[OrderRecord]("orders", _.id      -> "id").size)
   def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
-  case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: Double, amount: Double)
-  case class EventShortenedInfo(orderId: String, eventType: Byte, filled: Double, totalFilled: Double, status: Byte)
+  case class OrderBriefInfo(id: String,
+                            senderPublicKey: String,
+                            side: Byte,
+                            amountAsset: String,
+                            priceAsset: String,
+                            feeAsset: String,
+                            amount: Double,
+                            price: Double,
+                            fee: Double)
 
-  def getOrderInfoById(orderId: String): Option[OrderShortenedInfo] =
+  case class EventBriefInfo(orderId: String,
+                            eventType: Byte,
+                            filled: Double,
+                            totalFilled: Double,
+                            feeFilled: Double,
+                            feeTotalFilled: Double,
+                            status: Byte)
+
+  def getOrderInfoById(orderId: String): Option[OrderBriefInfo] =
     ctx
       .run(
-        querySchema[OrderShortenedInfo](
+        querySchema[OrderBriefInfo](
           "orders",
           _.id              -> "id",
           _.senderPublicKey -> "sender_public_key",
           _.side            -> "side",
+          _.amountAsset     -> "amount_asset_id",
+          _.priceAsset      -> "price_asset_id",
+          _.feeAsset        -> "fee_asset_id",
+          _.amount          -> "amount",
           _.price           -> "price",
-          _.amount          -> "amount"
+          _.fee             -> "fee"
         ).filter(_.id == lift(orderId))
       )
       .headOption
 
-  def getEventsInfoByOrderId(orderId: String): Set[EventShortenedInfo] =
+  def getEventsInfoByOrderId(orderId: String): Set[EventBriefInfo] =
     ctx
       .run(
-        querySchema[EventShortenedInfo](
+        querySchema[EventBriefInfo](
           "events",
-          _.eventType   -> "event_type",
-          _.filled      -> "filled",
-          _.totalFilled -> "total_filled",
-          _.status      -> "status"
+          _.eventType      -> "event_type",
+          _.filled         -> "filled",
+          _.totalFilled    -> "total_filled",
+          _.feeFilled      -> "fee_filled",
+          _.feeTotalFilled -> "fee_total_filled",
+          _.status         -> "status"
         ).filter(_.orderId == lift(orderId))
       )
       .toSet
 
-  import com.wavesplatform.dex.history.HistoryRouter._
+  implicit class DoubleOps(value: Double) {
+    val wct: Long      = Normalization.normalizeAmountAndFee(value, Decimals)
+    val price: Long    = Normalization.normalizePrice(value, Decimals, Decimals)
+    val eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+  }
 
-  val (amount, price)            = (1000L, PriceConstant)
-  val denormalizedAmount: Double = Denormalization.denormalizeAmountAndFee(amount, Decimals)
-  val denormalizedPrice: Double  = Denormalization.denormalizePrice(price, Decimals, Decimals)
+  def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
       .foreach { _ =>
-        node.placeOrder(alice, wctUsdPair, BUY, 1, price, matcherFee)
-        node.placeOrder(bob, wctUsdPair, SELL, 1, price, matcherFee)
+        node.placeOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.price, 0.003.waves)
+        node.placeOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.price, 0.003.waves)
       }
 
     retry(10, batchLingerMs) {
@@ -197,15 +230,17 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events for the big buy order" in {
+  "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
-    val buyOrder   = node.placeOrder(alice, wctUsdPair, BUY, 3 * amount, price, matcherFee).message.id
-    val sellOrder1 = node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
+    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, matcherFeeAssetId = btc, version = 3)
+    val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
+
+    val sellOrder1 = node.placeOrder(sellOrder).message.id
 
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder1, "Filled")
 
-    val sellOrder2 = node.placeOrder(bob, wctUsdPair, SELL, amount, price, matcherFee).message.id
+    val sellOrder2 = node.placeOrder(sellOrder).message.id
 
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder2, "Filled")
@@ -213,36 +248,58 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     node.cancelOrder(alice, wctUsdPair, buyOrder)
 
     retry(10, batchLingerMs) {
-      getEventsInfoByOrderId(buyOrder) shouldBe
-        Set(
-          EventShortenedInfo(buyOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusPartiallyFilled),
-          EventShortenedInfo(buyOrder, eventTrade, denormalizedAmount, 2 * denormalizedAmount, statusPartiallyFilled),
-          EventShortenedInfo(buyOrder, eventCancel, 0, 2 * denormalizedAmount, statusCancelled)
-        )
+
+      withClue("checking info for 2 small submitted orders\n") {
+
+        Set(sellOrder1, sellOrder2).foreach { orderId =>
+          getOrderInfoById(orderId).get shouldBe
+            OrderBriefInfo(orderId, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 100, 0.35, 0.00000030)
+
+          getEventsInfoByOrderId(orderId) shouldBe Set { EventBriefInfo(orderId, eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled) }
+        }
+      }
+
+      withClue("checking info for 1 big counter order\n") {
+        getOrderInfoById(buyOrder).get shouldBe
+          OrderBriefInfo(buyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
+
+        getEventsInfoByOrderId(buyOrder) shouldBe
+          Set(
+            EventBriefInfo(buyOrder, eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled),
+            EventBriefInfo(buyOrder, eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled),
+            EventBriefInfo(buyOrder, eventCancel, 0, 200, 0, 0.00001134, statusCancelled)
+          )
+      }
     }
   }
 
-  "Order history should correctly save events for small and big orders" in {
+  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
 
-    val smallBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, amount, price, matcherFee).message.id
-    val bigSellOrder  = node.placeOrder(bob, wctUsdPair, SELL, 5 * amount, price, matcherFee).message.id
+    val smallBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
+    val bigSellOrder  = node.placeOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.price, fee = 0.00000030.btc, feeAsset = btc, version = 3).message.id
 
     node.waitOrderStatus(wctUsdPair, smallBuyOrder, "Filled")
     node.waitOrderStatus(wctUsdPair, bigSellOrder, "PartiallyFilled")
 
-    retry(15, batchLingerMs) {
+    retry(20, batchLingerMs) {
 
-      getOrderInfoById(smallBuyOrder) shouldBe
-        Some(OrderShortenedInfo(smallBuyOrder, alice.publicKey.toString, buySide, denormalizedPrice, denormalizedAmount))
+      withClue("checking info for small counter order\n") {
+        getOrderInfoById(smallBuyOrder).get shouldBe
+          OrderBriefInfo(smallBuyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
 
-      getOrderInfoById(bigSellOrder) shouldBe
-        Some(OrderShortenedInfo(bigSellOrder, bob.publicKey.toString, sellSide, denormalizedPrice, 5 * denormalizedAmount))
+        getEventsInfoByOrderId(smallBuyOrder) shouldBe Set {
+          EventBriefInfo(smallBuyOrder, eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
+        }
+      }
 
-      getEventsInfoByOrderId(smallBuyOrder).head shouldBe
-        EventShortenedInfo(smallBuyOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusFilled)
+      withClue("checking info for big submitted order\n") {
+        getOrderInfoById(bigSellOrder).get shouldBe
+          OrderBriefInfo(bigSellOrder, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 900, 0.35, 0.00000030)
 
-      getEventsInfoByOrderId(bigSellOrder).head shouldBe
-        EventShortenedInfo(bigSellOrder, eventTrade, denormalizedAmount, denormalizedAmount, statusPartiallyFilled)
+        getEventsInfoByOrderId(bigSellOrder) shouldBe Set {
+          EventBriefInfo(bigSellOrder, eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled)
+        }
+      }
     }
   }
 }

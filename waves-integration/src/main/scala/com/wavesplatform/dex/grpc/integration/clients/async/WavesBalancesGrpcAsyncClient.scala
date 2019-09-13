@@ -7,14 +7,14 @@ import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.services.{BalanceChangesResponse, WavesBalancesApiGrpc}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.Channel
+import io.grpc.ManagedChannel
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import mouse.any._
 
-class WavesBalancesGrpcAsyncClient(channel: Channel)(implicit scheduler: Scheduler) extends ScorexLogging {
+class WavesBalancesGrpcAsyncClient(channel: ManagedChannel)(implicit scheduler: Scheduler) extends ScorexLogging {
 
   private val balancesService                = WavesBalancesApiGrpc.stub(channel)
   private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges]
@@ -36,9 +36,13 @@ class WavesBalancesGrpcAsyncClient(channel: Channel)(implicit scheduler: Schedul
 
   private val balanceChangesObserver: StreamObserver[BalanceChangesResponse] =
     new StreamObserver[BalanceChangesResponse] {
-      override def onError(t: Throwable): Unit                 = log.warn(s"Error while listening to the balance changes stream was occurred: ${t.getMessage}")
       override def onCompleted(): Unit                         = log.info("Balance changes stream completed!")
       override def onNext(value: BalanceChangesResponse): Unit = groupByAddress(value) |> spendableBalanceChangesSubject.onNext
+      override def onError(t: Throwable): Unit = {
+        log.warn(s"Error while listening to the balance changes stream occurred: ${t.getMessage}. New RPC call will be performed")
+        channel.resetConnectBackoff()
+        requestBalanceChanges()
+      }
     }
 
   /** Performs new gRPC call for receiving of the spendable balance changes stream */

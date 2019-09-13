@@ -39,7 +39,6 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private var matcher: Matcher = _
 
   def run(): Unit = {
-
     val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}", scheduler)
     matcher = new Matcher(settings, gRPCExtensionClient)
     matcher.start()
@@ -73,6 +72,7 @@ object Application {
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
+    System.setProperty("networkaddress.cache.ttl", "0")
 
     val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 

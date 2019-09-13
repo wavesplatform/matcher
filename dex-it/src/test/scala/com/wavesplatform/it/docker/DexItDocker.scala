@@ -37,11 +37,12 @@ object DexItDocker {
       basePath = basePath,
       restApiPort = baseConfig.getInt("waves.dex.rest-api.port")
     )
-    Map(
-      s"$name.conf" -> rawBaseConfig,
-      "run.conf"    -> runConfig.resolve().root().render(),
-      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
-    ).foreach { case (fileName, content) => client.writeFile(r, Paths.get(basePath, fileName), content) }
+
+    Seq(
+      (s"$name.conf", rawBaseConfig, false),
+      ("run.conf", runConfig.resolve().root().render(), true),
+      ("suite.conf", initialSuiteConfig.resolve().root().render(), true)
+    ).foreach { case (fileName, content, logContent) => client.writeFile(r, Paths.get(basePath, fileName), content, logContent) }
 
     client.addKnownContainer(r)
     r

@@ -10,7 +10,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
+import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.docker._
@@ -68,14 +68,16 @@ abstract class MatcherSuiteBase
   override protected def dockerClient: com.wavesplatform.dex.it.docker.Docker = internalDockerClient()
 
   // Waves miner node
+  protected val wavesNodesDomain = "waves.nodes"
+
   protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(GenesisConfig.config)
 
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-1", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
+    createWavesNode("waves-1")
   }
 
   protected def wavesNode1Api: NodeApi[Id] = {
-    def apiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
+    val apiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
     // MonadError can't be implemented for Id
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
@@ -97,40 +99,27 @@ abstract class MatcherSuiteBase
       )
   }
 
-  protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    createDex("dex-1", dexRunConfig(), suiteInitialDexConfig)
+  protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
+  private def dex1ApiAddress                        = dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
+  protected def dex1AsyncApi: DexApi[Future]        = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
+  protected def dex1Api: DexApi[Id]                 = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
+
+  protected def initializeContainers(): Unit = {
+    dockerClient.start(wavesNode1Container())
+    wavesNode1Api.waitReady
+
+    dockerClient.start(dex1Container())
+    dex1Api.waitReady
   }
 
-  private def dex1ApiAddress                 = dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
-  protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
-  protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
-
-  protected def allContainers: List[DockerContainer] = List(wavesNode1Container, dex1Container).map(x => x())
-  protected def allApis: List[HasWaitReady[Id]]      = List(wavesNode1Api, dex1Api)
-
   override protected def beforeAll(): Unit = {
-    log.debug(s"Doing beforeAll")
+    log.debug(s"Perform beforeAll")
     super.beforeAll()
-
-    val (waves, dex) = allContainers.partition {
-      case _: WavesNodeContainer => true
-      case _                     => false
-    }
-
-    val (wavesApi, dexApi) = allApis.partition {
-      case _: NodeApi[Id] => true
-      case _              => false
-    }
-
-    waves.foreach(dockerClient.start)
-    wavesApi.foreach(_.waitReady)
-
-    dex.foreach(dockerClient.start)
-    dexApi.foreach(_.waitReady)
+    initializeContainers()
   }
 
   override protected def afterAll(): Unit = {
-    log.debug(s"Doing afterAll")
+    log.debug(s"Perform afterAll")
     dockerClient.close()
     futureHttpBackend.close()
     tryHttpBackend.close()
@@ -150,17 +139,16 @@ abstract class MatcherSuiteBase
   private def print(text: String): Unit = {
     val formatted = s"---------- $text ----------"
     log.debug(formatted)
-    try allContainers.foreach(x => dockerClient.printDebugMessage(x, formatted))
-    catch {
-      case _: Throwable => ()
-    }
+    dockerClient.printDebugMessage(formatted)
   }
 
-  protected def createDex(name: String, runConfig: Config, initialSuiteConfig: Config): DexContainer =
-    DexItDocker.createContainer(dockerClient)(name, runConfig, initialSuiteConfig)
+  protected def createDex(name: String, runConfig: Config = dexRunConfig(), suiteInitialConfig: Config = suiteInitialDexConfig): DexContainer =
+    DexItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig)
 
-  protected def createWavesNode(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer =
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, initialSuiteConfig)
+  protected def createWavesNode(name: String,
+                                runConfig: Config = wavesNodeRunConfig(),
+                                suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer =
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(wavesNodesDomain))
 
   protected def dexQueueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
     ConfigFactory.parseString(s"""waves.dex.events-queue {

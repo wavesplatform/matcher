@@ -122,6 +122,7 @@ object DexApi {
     req.copy(signature = signature)
   }
 
+  // noinspection ScalaStyle
   def apply[F[_]](apiKey: String,
                   host: => InetSocketAddress)(implicit M: ThrowableMonadError[F], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): DexApi[F] =
     new DexApi[F] {

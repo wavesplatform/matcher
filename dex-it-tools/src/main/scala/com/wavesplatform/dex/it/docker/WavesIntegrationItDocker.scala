@@ -11,7 +11,8 @@ import scala.util.Try
 object WavesIntegrationItDocker {
   private val wavesNodeImage = "com.wavesplatform/waves-integration-it:latest"
 
-  def createContainer(client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer = {
+  def createContainer(
+      client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config, netAlias: Option[String] = None): WavesNodeContainer = {
     val number   = getNumber(name)
     val basePath = "/opt/waves"
     val id = client.create(
@@ -21,7 +22,8 @@ object WavesIntegrationItDocker {
       Map(
         "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
         "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
-      )
+      ),
+      netAlias
     )
 
     val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
@@ -38,11 +40,12 @@ object WavesIntegrationItDocker {
       networkApiPort = baseConfig.getInt("waves.network.port"),
       grpcApiPort = baseConfig.getInt("waves.dex.grpc.integration.port")
     )
-    Map(
-      s"$name.conf" -> rawBaseConfig,
-      "run.conf"    -> runConfig.resolve().root().render(),
-      "suite.conf"  -> initialSuiteConfig.resolve().root().render()
-    ).foreach { case (fileName, content) => client.writeFile(r, Paths.get(basePath, fileName), content) }
+
+    Seq(
+      (s"$name.conf", rawBaseConfig, false),
+      ("run.conf", runConfig.resolve().root().render(), true),
+      ("suite.conf", initialSuiteConfig.resolve().root().render(), true)
+    ).foreach { case (fileName, content, logContent) => client.writeFile(r, Paths.get(basePath, fileName), content, logContent) }
 
     client.addKnownContainer(r)
     r

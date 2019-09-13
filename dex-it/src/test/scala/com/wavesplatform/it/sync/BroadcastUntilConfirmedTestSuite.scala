@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
-import com.wavesplatform.dex.it.docker.{DockerContainer, WavesNodeContainer}
+import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
@@ -25,17 +25,12 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-2", wavesNodeRunConfig(), ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
+    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
   }
   protected def wavesNode2Api: NodeApi[Id] = {
     def apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
-
-  // Must start before DEX, otherwise DEX will fail to start.
-  // DEX needs to know activated features to know which order versions should be enabled.
-  override protected def allContainers: List[DockerContainer] = wavesNode2Container() :: super.allContainers
-  override protected def allApis: List[HasWaitReady[Id]]      = wavesNode2Api :: super.allApis
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder   = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
@@ -59,10 +54,14 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     wavesNode2Api.waitForTransaction(exchangeTxId)
   }
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override protected def initializeContainers(): Unit = {
+    dockerClient.start(wavesNode2Container)
+
+    super.initializeContainers()
+
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
+
     broadcastAndAwait(IssueEthTx)
   }
 }

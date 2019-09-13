@@ -16,6 +16,7 @@ import cats.kernel.Monoid
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
+import com.spotify.docker.client.shaded.com.google.common.collect.ImmutableList
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
@@ -123,8 +124,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     attempt(5)
   }
 
-  def writeFile(container: DockerContainer, to: Path, content: String): Unit = {
-    log.trace(s"${prefix(container)} Write to '$to':\n$content")
+  def writeFile(container: DockerContainer, to: Path, content: String, logContent: Boolean = false): Unit = {
+    if (logContent) log.trace(s"${prefix(container)} Write to '$to':\n$content")
     val os    = new ByteArrayOutputStream()
     val s     = new TarArchiveOutputStream(os)
     val bytes = content.getBytes(StandardCharsets.UTF_8)
@@ -141,6 +142,9 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     finally is.close()
   }
 
+  // TODO remove
+  def start(container: Coeval[DockerContainer]): Unit = start { container() }
+
   def start(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Starting ...")
     try client.startContainer(container.id)
@@ -150,6 +154,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         throw e
     }
   }
+
+  def stop(container: Coeval[DockerContainer]): Unit = stop { container() }
 
   def stop(container: DockerContainer): Unit = {
     val containerInfo = client.inspectContainer(container.id)
@@ -170,20 +176,24 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     saveLog(container)
   }
 
+  def disconnectFromNetwork(container: Coeval[DockerContainer]): Unit = disconnectFromNetwork { container() }
+
   def disconnectFromNetwork(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Disconnecting from network '${network().name()}' ...")
     client.disconnectFromNetwork(container.id, network().id())
     log.info(s"${prefix(container)} Disconnected from network '${network().name()}'")
   }
 
-  def connectToNetwork(container: DockerContainer): Unit = {
+  def connectToNetwork(container: Coeval[DockerContainer], netAlias: Option[String]): Unit = connectToNetwork(container(), netAlias)
+
+  def connectToNetwork(container: DockerContainer, netAlias: Option[String] = None): Unit = {
     log.debug(s"${prefix(container)} Connecting to network '${network().name()}' ...")
     try client.connectToNetwork(
       network().id(),
       NetworkConnection
         .builder()
         .containerId(container.id)
-        .endpointConfig(endpointConfigFor(container.number))
+        .endpointConfig(endpointConfigFor(container.number, netAlias))
         .build()
     )
     catch {
@@ -193,17 +203,22 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     }
   }
 
-  def printDebugMessage(container: DockerContainer, text: String): Unit = {
-    val escaped = text.replace('\'', '\"')
-    val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
-    val exec    = client.execStart(id)
-    try exec.readFully()
-    catch { case NonFatal(e) => /* ignore */ } finally exec.close()
-  }
+  def printDebugMessage(container: DockerContainer, text: String): Unit =
+    if (client.inspectContainer(container.id).state().running()) {
+      val escaped = text.replace('\'', '\"')
+      val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
+      val exec    = client.execStart(id)
+      try exec.readFully()
+      catch {
+        case NonFatal(e) => /* ignore */
+      } finally exec.close()
+    }
+
+  def printDebugMessage(text: String): Unit = knownContainers.asScala.foreach(printDebugMessage(_, text))
 
   def addKnownContainer(container: DockerContainer): Unit = knownContainers.add(container)
 
-  def create(number: Int, name: String, imageName: String, env: Map[String, String]): String = {
+  def create(number: Int, name: String, imageName: String, env: Map[String, String], netAlias: Option[String] = None): String = {
     val ip            = ipForNode(number)
     val containerName = s"${network().name()}-$name"
 
@@ -230,7 +245,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number)).asJava))
+        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number, netAlias)).asJava))
         .hostConfig(hostConfig)
         .env(fixedEnv.map { case (k, v) => s"$k=$v" }.toList.asJava)
         .build()
@@ -291,12 +306,16 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     }
   }
 
-  private def endpointConfigFor(number: Int): EndpointConfig = {
-    val ip = ipForNode(number)
+  private def endpointConfigFor(number: Int, netAlias: Option[String]): EndpointConfig = {
+
+    val ip        = ipForNode(number)
+    val aliasList = new ImmutableList.Builder[String].addAll(netAlias.toList.asJava).build()
+
     EndpointConfig
       .builder()
       .ipAddress(ip)
       .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+      .aliases(aliasList)
       .build()
   }
 

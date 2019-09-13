@@ -78,7 +78,8 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros").value,
-      shapeless.value
+      shapeless.value,
+      "io.grpc" % "grpc-netty" % "1.20.0"
     ))
 
   lazy val common = Seq(
@@ -115,9 +116,11 @@ object Dependencies {
   lazy val dex =
     Seq(
       kindProjector,
-      "com.github.scopt" %% "scopt" % "4.0.0-RC2",
+      logback,
+      "com.github.scopt" %% "scopt"    % "4.0.0-RC2",
       akkaModule("actor"),
       akkaModule("persistence-query"),
+      akkaModule("slf4j"),
       akkaHttp,
       "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
       janino,
@@ -128,6 +131,13 @@ object Dependencies {
       akkaModule("persistence-tck"),
       "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
     ).map(_ % Test) ++ test ++ quill
+
+  lazy val wavesIntegration = Dependencies.grpc ++
+    Seq(
+      Dependencies.mouse,
+      akkaModule("slf4j"),
+      "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto" // for teamcity probably remove
+    )
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,

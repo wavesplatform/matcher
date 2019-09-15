@@ -86,6 +86,8 @@ object Dependencies {
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
   )
 
+  lazy val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto") % "protobuf" // for teamcity
+
   lazy val itTestCommon = Def.setting(
     Seq(
       config,
@@ -125,7 +127,8 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
       janino,
       mouse,
-      "org.typelevel" %% "cats-tagless-macros" % "0.9"
+      "org.typelevel" %% "cats-tagless-macros" % "0.9",
+      wavesProtobufSchemas
     ) ++ Seq(
       akkaModule("testkit"),
       akkaModule("persistence-tck"),
@@ -136,7 +139,7 @@ object Dependencies {
     Seq(
       Dependencies.mouse,
       akkaModule("slf4j"),
-      "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto" // for teamcity probably remove
+      wavesProtobufSchemas
     )
 
   lazy val grpc: Seq[ModuleID] = Seq(

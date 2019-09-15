@@ -28,6 +28,7 @@ trait MkWavesEntities {
 
   /**
     * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
+    * TODO make ttl random by default to solve issue of creating multiple orders in a loop
     */
   def mkOrder(owner: KeyPair,
               pair: AssetPair,

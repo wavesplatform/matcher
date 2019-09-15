@@ -1,9 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NewMatcherSuiteBase
-//import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.MatcherSuiteBase
+//import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 //import com.wavesplatform.it.util.DoubleExt
 //import com.wavesplatform.protobuf.order.Order.Side.SELL
 //import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
@@ -19,7 +18,7 @@ import com.wavesplatform.it.config.DexTestConfig._
   *   best bid = highest price of buy
   *   best ask = lowest price of sell
   */
-class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
+class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     """waves.dex {
@@ -40,8 +39,7 @@ class OrderDeviationsTestSuite extends NewMatcherSuiteBase {
   "buy orders price is" - {
     "in deviation bounds" in {
       /*val bestAskOrder = mkOrder(alice, wavesBtcPair, SELL, 1000.waves, 500000)
-      dex1Api.place(bestAskOrder)
-      dex1Api.waitForOrderStatus(bestAskOrder, OrderStatus.Accepted)
+      placeAndAwait(bestAskOrder)
       dex1Api.orderBook(wavesBtcPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
       val bestBidOrder = mkOrder(bob, wavesBtcPair, BUY, 1000.waves, 400000)

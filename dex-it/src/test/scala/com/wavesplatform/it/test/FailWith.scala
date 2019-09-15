@@ -1,7 +1,7 @@
 package com.wavesplatform.it.test
 
-import com.wavesplatform.it.api.MatcherError
-import com.wavesplatform.it.api.MatcherError.Params
+import com.wavesplatform.it.api.dex.MatcherError
+import com.wavesplatform.it.api.dex.MatcherError.Params
 import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.util.{Left, Right}

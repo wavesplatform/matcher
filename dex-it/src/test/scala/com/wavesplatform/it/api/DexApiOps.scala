@@ -1,0 +1,71 @@
+package com.wavesplatform.it.api
+
+import com.softwaremill.sttp.StatusCode
+import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.it.fp.CanExtract
+import com.wavesplatform.it.api.dex._
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.exchange
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+
+object DexApiOps {
+  // TODO replace by a macros
+  final implicit class ExplicitGetDexApiOps[F[_]](val self: DexApi[F])(implicit E: CanExtract[F]) {
+    import E.{extract => explicitGet}
+
+    def publicKey: F[PublicKey] = explicitGet(self.tryPublicKey)
+
+    def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] =
+      explicitGet(self.tryReservedBalance(of, timestamp))
+
+    def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] =
+      explicitGet(self.tryTradableBalance(of, assetPair, timestamp))
+
+    def place(order: Order): F[MatcherResponse]       = explicitGet(self.tryPlace(order))
+    def placeMarket(order: Order): F[MatcherResponse] = explicitGet(self.tryPlaceMarket(order))
+
+    def cancel(owner: KeyPair, order: Order): F[MatcherStatusResponse]                       = cancel(owner, order.assetPair, order.id())
+    def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse] = explicitGet(self.tryCancel(owner, assetPair, id))
+
+    def cancelWithApiKey(order: Order): F[MatcherStatusResponse] = cancelWithApiKey(order.id())
+    def cancelWithApiKey(id: Order.Id): F[MatcherStatusResponse] = explicitGet(self.tryCancelWithApiKey(id))
+
+    def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Unit] = explicitGet(self.tryCancelAll(owner, timestamp))
+    def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Unit] =
+      explicitGet(self.tryCancelAllByPair(owner, assetPair, timestamp))
+
+    def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
+    def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
+
+    def transactionsByOrder(order: Order): F[List[exchange.ExchangeTransaction]] = transactionsByOrder(order.id())
+    def transactionsByOrder(id: Order.Id): F[List[exchange.ExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
+
+    def orderHistory(owner: KeyPair,
+                     activeOnly: Option[Boolean] = None,
+                     timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
+      explicitGet(self.tryOrderHistory(owner, activeOnly, timestamp))
+
+    def orderHistoryWithApiKey(owner: com.wavesplatform.account.Address, activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] =
+      explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly))
+
+    def orderHistoryByPair(owner: KeyPair,
+                           assetPair: AssetPair,
+                           activeOnly: Option[Boolean] = None,
+                           timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
+      explicitGet(self.tryOrderHistoryByPair(owner, assetPair, activeOnly, timestamp))
+
+    def allOrderBooks: F[MarketDataInfo] = explicitGet(self.tryAllOrderBooks)
+
+    def orderBook(assetPair: AssetPair): F[OrderBookResponse]          = explicitGet(self.tryOrderBook(assetPair))
+    def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse] = explicitGet(self.tryOrderBookStatus(assetPair))
+
+    def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = explicitGet(self.tryUpsertRate(asset, rate))
+    def deleteRate(asset: Asset): F[RatesResponse]                             = explicitGet(self.tryDeleteRate(asset))
+    def rates: F[Map[Asset, Double]]                                           = explicitGet(self.tryRates)
+
+    def currentOffset: F[Long]                   = explicitGet(self.tryCurrentOffset)
+    def lastOffset: F[Long]                      = explicitGet(self.tryLastOffset)
+    def oldestSnapshotOffset: F[Long]            = explicitGet(self.tryOldestSnapshotOffset)
+    def allSnapshotOffsets: F[Map[String, Long]] = explicitGet(self.tryAllSnapshotOffsets)
+  }
+}

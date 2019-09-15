@@ -1,12 +1,11 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{LevelResponse, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
-class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
+class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
@@ -22,24 +21,21 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
       val bobWavesBalanceBefore = wavesNode1Api.balance(bob, Waves)
 
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      dex1Api.place(bobOrder1)
-      dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Accepted)
+      placeAndAwait(bobOrder1)
       dex1Api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
       dex1Api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      dex1Api.place(aliceOrder)
-      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+      placeAndAwait(aliceOrder, OrderStatus.Filled)
 
       val aliceOrder2 = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      dex1Api.place(aliceOrder2)
-      dex1Api.waitForOrderStatus(aliceOrder2, OrderStatus.Filled)
+      placeAndAwait(aliceOrder2, OrderStatus.Filled)
 
       // Bob wants to buy some USD
       dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
 
       // Each side get fair amount of assets
-      waitForOrderAtNode(bobOrder1.id())
+      waitForOrderAtNode(bobOrder1)
       eventually {
         dex1Api.reservedBalance(bob) shouldBe empty
         dex1Api.reservedBalance(alice) shouldBe empty
@@ -51,8 +47,7 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      dex1Api.place(bobOrder2)
-      dex1Api.waitForOrderStatus(bobOrder2, OrderStatus.Accepted)
+      placeAndAwait(bobOrder2)
 
       val orderBook2 = dex1Api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
@@ -80,7 +75,7 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
       dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
 
       // Each side get fair amount of assets
-      waitForOrderAtNode(bobOrder1.id())
+      waitForOrderAtNode(bobOrder1)
       eventually {
         dex1Api.reservedBalance(bob) shouldBe empty
         dex1Api.reservedBalance(alice) shouldBe empty
@@ -92,8 +87,7 @@ class SeveralPartialOrdersTestSuite extends NewMatcherSuiteBase {
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      dex1Api.place(bobOrder2)
-      dex1Api.waitForOrderStatus(bobOrder2, OrderStatus.Accepted)
+      placeAndAwait(bobOrder2)
 
       val orderBook2 = dex1Api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))

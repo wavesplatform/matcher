@@ -3,13 +3,12 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
 import scala.util.Random
 
-class MatcherRecoveryTestSuite extends NewMatcherSuiteBase {
+class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.snapshots-interval = 51")
 
   private val placesNumber  = 200

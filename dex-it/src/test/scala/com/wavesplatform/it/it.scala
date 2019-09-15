@@ -1,8 +1,8 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalacheck.Gen
 

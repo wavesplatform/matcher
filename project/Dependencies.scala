@@ -41,6 +41,8 @@ object Dependencies {
     "io.getquill"    %% "quill-jdbc" % "3.1.0"
   )
 
+  val config = "com.typesafe" % "config" % "1.3.3"
+
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
   val enforcedVersions = Def.setting(
@@ -59,7 +61,7 @@ object Dependencies {
       jacksonModule("jaxrs", "jaxrs-base"),
       jacksonModule("jaxrs", "jaxrs-json-provider"),
       kamonCore,
-      "com.typesafe" % "config" % "1.3.3",
+      config,
       machinist,
       "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
       "com.squareup.okio"    % "okio"        % "1.14.0",
@@ -76,22 +78,33 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros").value,
-      shapeless.value
+      shapeless.value,
+      "io.grpc" % "grpc-netty" % "1.20.0"
     ))
 
   lazy val common = Seq(
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
   )
 
+  lazy val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto") % "protobuf" // for teamcity
+
+  lazy val itTestCommon = Def.setting(
+    Seq(
+      config,
+      spotify,
+      catsCore.value,
+      mouse,
+      "com.softwaremill.sttp" %% "core"                             % "1.6.4",
+      "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
+      "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
+      "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
+    ))
+
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     spotify,
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.scalacheck"        %% "scalacheck"                       % "1.14.0",
-    "com.softwaremill.sttp" %% "core"                             % "1.6.4",
-    "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
-    "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
-    "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -105,19 +118,29 @@ object Dependencies {
   lazy val dex =
     Seq(
       kindProjector,
-      "com.github.scopt" %% "scopt" % "4.0.0-RC2",
+      logback,
+      "com.github.scopt" %% "scopt"    % "4.0.0-RC2",
       akkaModule("actor"),
       akkaModule("persistence-query"),
+      akkaModule("slf4j"),
       akkaHttp,
       "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
       janino,
       mouse,
-      "org.typelevel" %% "cats-tagless-macros" % "0.9"
+      "org.typelevel" %% "cats-tagless-macros" % "0.9",
+      wavesProtobufSchemas
     ) ++ Seq(
       akkaModule("testkit"),
       akkaModule("persistence-tck"),
       "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
     ).map(_ % Test) ++ test ++ quill
+
+  lazy val wavesIntegration = Dependencies.grpc ++
+    Seq(
+      Dependencies.mouse,
+      akkaModule("slf4j"),
+      wavesProtobufSchemas
+    )
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,

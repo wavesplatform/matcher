@@ -3,17 +3,14 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.FeeConstants._
-import com.wavesplatform.it.api.OrderStatus
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
-class ExtraFeeTestSuite extends NewMatcherSuiteBase {
+class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex.order-fee {
@@ -70,16 +67,14 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
           9441542,
           "Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
 
-        val counter = mkOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, version = 2)
-        dex1Api.place(counter)
-        dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+        placeAndAwait(mkOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, version = 2))
 
         info("expected fee should be reserved")
         dex1Api.reservedBalance(alice)(Waves) shouldBe expectedFee
 
         val submitted = mkOrder(bob, oneSmartPair, BUY, amount, price, expectedFee, version = 2)
         dex1Api.place(submitted)
-        waitForOrderAtNode(submitted.id())
+        waitForOrderAtNode(submitted)
         eventually {
           wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
           wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
@@ -107,16 +102,14 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
             "Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES"
           )
 
-          val counter = mkOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, version = 2)
-          dex1Api.place(counter)
-          dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+          placeAndAwait(mkOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, version = 2))
 
           info("expected fee should be reserved")
           dex1Api.reservedBalance(alice)(Waves) shouldBe expectedFee
 
           val submitted = mkOrder(bob, bothSmartPair, BUY, amount, price, expectedFee, version = 2)
           dex1Api.place(submitted)
-          waitForOrderAtNode(submitted.id())
+          waitForOrderAtNode(submitted)
           eventually {
             wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
             wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
@@ -137,16 +130,14 @@ class ExtraFeeTestSuite extends NewMatcherSuiteBase {
 
       val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
       val expectedFee      = 550L // 1 x "smart asset" and 1 x "matcher script"
-      val counter          = mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, matcherFeeAssetId = feeAsset)
-      dex1Api.place(counter)
-      dex1Api.waitForOrderStatus(counter, OrderStatus.Accepted)
+      placeAndAwait(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, matcherFeeAssetId = feeAsset))
 
       info("expected fee should be reserved")
       dex1Api.reservedBalance(bob)(feeAsset) shouldBe expectedFee
 
       val submitted = mkOrder(alice, oneSmartPair, BUY, amount, price, expectedWavesFee, version = 2)
       dex1Api.place(submitted)
-      waitForOrderAtNode(submitted.id())
+      waitForOrderAtNode(submitted)
       eventually {
         wavesNode1Api.balance(bob, feeAsset) shouldBe (bobInitBalance - expectedFee)
         wavesNode1Api.balance(matcher, feeAsset) shouldBe (matcherInitBalance + expectedFee)

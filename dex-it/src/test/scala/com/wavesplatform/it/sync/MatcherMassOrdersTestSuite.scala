@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import scala.concurrent.duration._
 import scala.util.Random
 
-class MatcherMassOrdersTestSuite extends NewMatcherSuiteBase {
+class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"waves.dex.rest-order-limit = $orderLimit")
 
   override protected def beforeAll(): Unit = {

@@ -3,14 +3,12 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Price
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-class TradersTestSuite extends NewMatcherSuiteBase {
+class TradersTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "Aqy7PRU", "$UsdId", "WAVES" ]""".stripMargin)
@@ -45,8 +43,7 @@ class TradersTestSuite extends NewMatcherSuiteBase {
       )
 
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
-      dex1Api.place(correctBobOrder)
-      dex1Api.waitForOrderStatus(correctBobOrder, OrderStatus.Accepted)
+      placeAndAwait(correctBobOrder)
 
       val markets = dex1Api.allOrderBooks.markets.map(x => s"${x.amountAsset}-${x.priceAsset}").toSet
 
@@ -219,15 +216,13 @@ class TradersTestSuite extends NewMatcherSuiteBase {
 
   private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
     val r = mkOrder(bob, assetPair, OrderType.BUY, amount, price)
-    dex1Api.place(r)
-    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
+    placeAndAwait(r)
     r
   }
 
   private def bobPlacesSellWctOrder(bobCoinAmount: Int): Order = {
     val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
-    dex1Api.place(r)
-    dex1Api.waitForOrderStatus(r, OrderStatus.Accepted)
+    placeAndAwait(r)
     r
   }
 }

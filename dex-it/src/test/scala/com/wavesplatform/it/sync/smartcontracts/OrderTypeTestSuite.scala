@@ -1,15 +1,12 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.FeeConstants._
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-class OrderTypeTestSuite extends NewMatcherSuiteBase {
+class OrderTypeTestSuite extends MatcherSuiteBase {
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
@@ -57,8 +54,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         setAliceScriptText(sco1)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         dex1Api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522,
@@ -78,8 +74,7 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         )
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
@@ -89,12 +84,10 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         setAliceScriptText(sco3)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
         dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
@@ -103,12 +96,10 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
 
       "place order and then set contract on BUY type" in {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd1)
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        dex1Api.place(aliceOrd2)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Accepted)
+        placeAndAwait(aliceOrd2)
 
         setAliceScriptText(sco1)
 
@@ -123,9 +114,9 @@ class OrderTypeTestSuite extends NewMatcherSuiteBase {
         dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
         dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-        waitForOrderAtNode(bobOrd1.id())
+        waitForOrderAtNode(bobOrd1)
 
-        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2.id(), 1)
+        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1Api.tryBroadcast(txs.head)
         r shouldBe 'left
         r.left.get.error shouldBe TransactionNotAllowedByAccountScript.ErrorCode

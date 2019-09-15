@@ -5,10 +5,12 @@ import cats.instances.future._
 import cats.instances.try_._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.{DexApi, HasWaitReady, MatcherCommand, MatcherState, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.docker.{DexContainer, DockerContainer}
+import com.wavesplatform.it.api.dex.OrderStatus
+import com.wavesplatform.it.api.{DexApi, MatcherCommand, MatcherState}
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
+import com.wavesplatform.it.docker.DexContainer
 import com.wavesplatform.it.tags.DexItKafkaRequired
 import com.wavesplatform.transaction.assets.exchange.Order
 import monix.eval.Coeval
@@ -19,22 +21,19 @@ import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
 @DexItKafkaRequired
-class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
+class MultipleMatchersTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig = ConfigFactory.parseString("""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = 51
       |}""".stripMargin)
 
   protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient().createDex("dex-2", dexRunConfig(), suiteInitialDexConfig)
+    createDex("dex-2")
   }
 
-  private def dex2ApiAddress                 = dockerClient().getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
+  private def dex2ApiAddress                 = dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
   protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex2ApiAddress)
   protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex2ApiAddress))
-
-  override protected def allContainers: List[DockerContainer] = dex2Container() :: super.allContainers
-  override protected def allApis: List[HasWaitReady[Id]]      = dex2Api :: super.allApis
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
@@ -47,6 +46,12 @@ class MultipleMatchersTestSuite extends NewMatcherSuiteBase {
   private val lastOrder   = orderGen(matcher, alice, assetPairs).sample.get
 
   private var successfulCommandsNumber = 0
+
+  override protected def initializeContainers(): Unit = {
+    super.initializeContainers()
+    dockerClient.start(dex2Container)
+    dex2Api.waitReady
+  }
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

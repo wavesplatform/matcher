@@ -2,15 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
-class RestOrderLimitTestSuite extends NewMatcherSuiteBase {
+class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString("waves.dex.rest-order-limit = 8".stripMargin)
 

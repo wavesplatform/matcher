@@ -38,7 +38,7 @@ object OrderValidator extends ScorexLogging {
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200
 
-  val exchangeTransactionCreationFee: Long = FeeValidation.OldFeeUnits(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
+  val exchangeTransactionCreationFee: Long = FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
 
@@ -158,7 +158,7 @@ object OrderValidator extends ScorexLogging {
       else verifyAssetScript(matcherFeeAsset)
     }
 
-    /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
+    // Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
         val minFee = ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript)
@@ -362,14 +362,14 @@ object OrderValidator extends ScorexLogging {
                               tradableBalance: Asset => Long,
                               orderBookCache: AssetPair => OrderBook.AggregatedSnapshot): Result[AcceptedOrder] = {
 
-    /**
-      * According to the current market state calculates cost for buy market orders or amount for sell market orders
-      * that should be covered by tradable balance of the order's owner.
-      * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
-      */
+    /*
+     * According to the current market state calculates cost for buy market orders or amount for sell market orders
+     * that should be covered by tradable balance of the order's owner.
+     * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
+     */
     def getMarketOrderValue: Result[Long] = {
 
-      /** Adds value of level to the current value of the market order */
+      // Adds value of level to the current value of the market order
       def accumulateLevel(level: LevelAgg, moValue: Result[Long], remainToExecute: Long): (Result[Long], Long) = {
         val levelValue: Long => Long = amount => if (acceptedOrder.isBuyOrder) MatcherModel.getCost(amount, level.price) else amount
         if (remainToExecute >= level.amount) moValue.map { _ + levelValue(level.amount) } -> (remainToExecute - level.amount)

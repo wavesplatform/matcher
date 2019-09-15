@@ -1,9 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType._
@@ -11,7 +10,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType._
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
-class OrderBookTestSuite extends NewMatcherSuiteBase {
+class OrderBookTestSuite extends MatcherSuiteBase {
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {

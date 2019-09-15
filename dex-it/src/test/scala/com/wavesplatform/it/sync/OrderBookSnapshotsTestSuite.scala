@@ -2,12 +2,12 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.{NewMatcherSuiteBase, orderGen}
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
+import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
-class OrderBookSnapshotsTestSuite extends NewMatcherSuiteBase {
+class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   private val interval = 50L
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(

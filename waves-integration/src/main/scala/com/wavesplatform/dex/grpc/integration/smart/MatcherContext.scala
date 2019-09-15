@@ -94,7 +94,6 @@ object MatcherContext {
     override def hasScript(address: Address): Boolean                                             = kill("hasScript")
     override def assetScript(id: Asset.IssuedAsset): Option[Script]                               = kill("assetScript")
     override def hasAssetScript(id: Asset.IssuedAsset): Boolean                                   = kill("hasAssetScript")
-    override def accountDataKeys(address: Address): Seq[String]                                   = kill("accountDataKeys")
     override def accountData(acc: Address, key: String): Option[DataEntry[_]]                     = kill("accountData")
     override def accountData(acc: Address): AccountDataInfo                                       = kill("accountData")
     override def leaseBalance(address: Address): LeaseBalance                                     = kill("leaseBalance")
@@ -108,5 +107,12 @@ object MatcherContext {
     override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]    = kill("invokeScriptResult")
     override def transferById(id: BlockId): Option[(Int, TransferTransaction)]                           = kill("transferById")
     override def collectActiveLeases[T](pf: PartialFunction[LeaseTransaction, T]): Seq[T]                = kill("collectActiveLeases")
+
+    /** Block reward related */
+    override def blockReward(height: Int): Option[Long]         = kill("blockReward")
+    override def lastBlockReward: Option[Long]                  = kill("lastBlockReward")
+    override def blockRewardVotes(height: Int): Seq[Long]       = kill("blockRewardVotes")
+    override def wavesAmount(height: Int): BigInt               = kill("wavesAmount")
+    override def accountDataKeys(address: Address): Set[String] = kill("accountDataKeys")
   }
 }

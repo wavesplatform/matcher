@@ -1,12 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.{NTPTime, NewMatcherSuiteBase}
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
-class OrderV3TestSuite extends NewMatcherSuiteBase with NTPTime {
+class OrderV3TestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = allowedOrderVersion(1, 2)
 
   override protected def beforeAll(): Unit = {
@@ -24,8 +23,7 @@ class OrderV3TestSuite extends NewMatcherSuiteBase with NTPTime {
 
     "matching orderV1 and orderV3" in {
       val orderV1 = mkOrder(alice, wavesUsdPair, OrderType.BUY, 3, price, version = 1)
-      dex1Api.place(orderV1)
-      dex1Api.waitForOrderStatus(orderV1, OrderStatus.Accepted)
+      placeAndAwait(orderV1)
 
       replaceSuiteConfig(dex1Container(), allowedOrderVersion(1, 2, 3))
       restartContainer(dex1Container(), dex1Api)

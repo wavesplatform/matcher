@@ -1,50 +1,66 @@
 package com.wavesplatform.it.sync
 
-import java.net.InetSocketAddress
-
+import cats.Id
 import cats.instances.try_._
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.it.api.{NodeApi, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.docker.{DexContainer, Docker, WavesNodeContainer}
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.{NewMatcherSuiteBase, fp}
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.fp
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import monix.eval.Coeval
 
 import scala.util.Try
 
-class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
+class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
-  override val dex1Container: Coeval[DexContainer] = Coeval.evalOnce {
-    dockerClient().createDex(
-      "dex-1",
-      ConfigFactory
-        .parseString(s"""waves.dex.waves-node-grpc {
-                        |  host = ${Docker.wavesNodesNetworkAlias}
-                        |  port = 6887
-                        |}""".stripMargin)
-        .withFallback { dexRunConfig() },
-      suiteInitialDexConfig
-    )
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex.waves-node-grpc {
+      |  host = $wavesNodesDomain
+      |  port = 6887
+      |}""".stripMargin
+  )
+
+  private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
+    createWavesNode("waves-2")
   }
 
-  val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
-  }
-
-  def wavesNode2NetworkApiAddress: InetSocketAddress = {
-    dockerClient().getInternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
-  }
-
-  def wavesNode2Api: NodeApi[cats.Id] = {
-    fp.sync(NodeApi[Try]("integration-test-rest-api", wavesNode2NetworkApiAddress))
+  private def wavesNode2Api: NodeApi[Id] = {
+    val apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
+    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    System.setProperty("networkaddress.cache.ttl", "0")
+  }
+
+  "DEXClient should works correctly despite of the short connection losses" in {
+    val aliceBuyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+
+    lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode1Api.balance(alice, usd), asset = usd)
+    lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1Api.balance(bob, usd), asset = usd)
+
+    markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
+    dex1Api.place(aliceBuyOrder)
+    dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
+
+    markup(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
+    dockerClient.disconnectFromNetwork(dex1Container)
+
+    broadcastAndAwait(wavesNode1Api, alice2BobTransferTx)
+    usdBalancesShouldBe(wavesNode1Api, 0, defaultAssetQuantity)
+
+    Thread.sleep(2000)
+
+    markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
+    dockerClient.connectToNetwork(dex1Container, None)
+    dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
+
+    withClue("Cleanup") {
+      broadcastAndAwait(wavesNode1Api, bob2AliceTransferTx)
+    }
   }
 
   "DEXClient should switch nodes if connection to one of them was lost due to node shutdown" in {
@@ -58,90 +74,53 @@ class DEXClientFaultToleranceTestSuite extends NewMatcherSuiteBase {
     lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode2Api.balance(alice, usd), asset = usd)
     lazy val bob2AliceTransferTx = mkTransfer(bob, alice, amount = wavesNode1Api.balance(bob, usd), asset = usd)
 
-    withClue("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1\n") {
-      dex1Api.place(aliceBuyOrder)
-      dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
-    }
+    markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
+    dex1Api.place(aliceBuyOrder)
+    dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
 
-    withClue("Up node 2\n") {
-      dockerClient().start(wavesNode2Container)
-      wavesNode2Api.waitReady
+    markup("Up node 2")
+    dockerClient.start(wavesNode2Container)
+    wavesNode2Api.waitReady // waitReady(wavesNode2ApiAddress)
 
-      wavesNode2Api.connect(wavesNode1NetworkApiAddress)
-      wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
+    wavesNode2Api.connect(wavesNode1NetworkApiAddress)
+    wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
 
-      wavesNode2Api.waitForTransaction(IssueUsdTx)
-    }
+    wavesNode2Api.waitForTransaction(IssueUsdTx)
 
-    withClue(s"Stop node 1 and perform USD transfer from Alice to Bob\n") {
-      dockerClient().stop(wavesNode1Container)
+    markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
+    dockerClient.stop(wavesNode1Container)
 
-      wavesNode2Api.broadcast(alice2BobTransferTx)
-      wavesNode2Api.waitForTransaction(alice2BobTransferTx)
+    broadcastAndAwait(wavesNode2Api, alice2BobTransferTx)
+    usdBalancesShouldBe(wavesNode2Api, 0, defaultAssetQuantity)
 
-      wavesNode2Api.balance(alice, usd) shouldBe 0
-      wavesNode2Api.balance(bob, usd) shouldBe defaultAssetQuantity
-    }
+    markup("Now DEX receives balances stream from the node 2 and cancels Alice's order")
+    dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
 
-    withClue("Now DEX receives balances stream from the node 2 and cancels Alice's order\n") {
-      dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
-    }
+    markup("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2")
+    dex1Api.place(bobBuyOrder)
+    dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Accepted)
 
-    withClue("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2\n") {
-      dex1Api.place(bobBuyOrder)
-      dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Accepted)
-    }
+    markup("Up node 1")
+    dockerClient.start(wavesNode1Container)
+    wavesNode1Api.waitReady
+    wavesNode2Api.connect(wavesNode1NetworkApiAddress)
+    wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
+    wavesNode1Api.waitForTransaction(alice2BobTransferTx)
 
-    withClue("Up node 1\n") {
-      dockerClient().start(wavesNode1Container)
-      wavesNode1Api.waitReady
-      wavesNode1Api.connect(wavesNode2NetworkApiAddress)
-      wavesNode1Api.waitForConnectedPeer(wavesNode2NetworkApiAddress)
-      wavesNode1Api.waitForTransaction(alice2BobTransferTx)
-    }
+    markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
+    dockerClient.stop(wavesNode2Container)
 
-    withClue(s"Stop node 2 and perform USD transfer from Bob to Alice\n") {
-      dockerClient().stop(wavesNode2Container)
+    broadcastAndAwait(wavesNode1Api, bob2AliceTransferTx)
+    usdBalancesShouldBe(wavesNode1Api, defaultAssetQuantity, 0)
 
-      wavesNode1Api.broadcast(bob2AliceTransferTx)
-      wavesNode1Api.waitForTransaction(bob2AliceTransferTx)
+    markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
+    dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Cancelled)
 
-      wavesNode1Api.balance(alice, usd) shouldBe defaultAssetQuantity
-      wavesNode1Api.balance(bob, usd) shouldBe 0
-    }
-
-    withClue("Now DEX receives balances stream from the node 1 and cancels Bob's order\n") {
-      dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Cancelled)
-    }
-
-    dockerClient().stop(wavesNode2Container)
+    dockerClient.stop(wavesNode2Container)
   }
 
-  "DEXClient should works correctly despite of the short connection losses" in {
-
-    val aliceBuyOrder            = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
-    lazy val alice2BobTransferTx = mkTransfer(alice, bob, amount = wavesNode1Api.balance(alice, usd), asset = usd)
-
-    withClue("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1\n") {
-      dex1Api.place(aliceBuyOrder)
-      dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
-    }
-
-    withClue(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob\n") {
-      dockerClient().disconnectFromNetwork(dex1Container)
-
-      wavesNode1Api.broadcast(alice2BobTransferTx)
-      wavesNode1Api.waitForTransaction(alice2BobTransferTx)
-
-      wavesNode1Api.balance(alice, usd) shouldBe 0
-      wavesNode1Api.balance(bob, usd) shouldBe defaultAssetQuantity
-
-      Thread.sleep(2000)
-    }
-
-    withClue("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order\n") {
-      dockerClient().connectToNetwork(dex1Container, None)
-      dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
-    }
+  private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {
+    withClue("alice:")(wavesNodeApi.balance(alice, usd) shouldBe expectedAliceBalance)
+    withClue("bob:")(wavesNodeApi.balance(bob, usd) shouldBe expectedBobBalance)
   }
 }

@@ -7,7 +7,7 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "31dcd8a3e8a9274cd2b7e8e7c32481fe78263387"
+def nodeVersionTag: String = "9012fcef8e97941fdde5c88754d4c6f53a598b87"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
@@ -18,14 +18,15 @@ lazy val `dex-common` = project
 lazy val dex = project.dependsOn(
   `waves-integration`,
   `dex-common`,
-  node % "compile;test->test;runtime->provided",
+  node % "compile;test->test;runtime->provided"
 )
 
-lazy val `dex-it-tools` = project
+lazy val `dex-it-tools` = project.dependsOn(
+  node % "compile;runtime->provided"
+)
 
 lazy val `dex-it` = project.dependsOn(
-  dex       % "compile;test->test",
-  `node-it` % "compile;test->test",
+  dex % "compile;test->test",
   `waves-integration-it`,
   `dex-it-tools`,
   `dex-common`
@@ -39,7 +40,6 @@ lazy val `waves-integration` = project.dependsOn(
 lazy val `waves-integration-it` = project
   .dependsOn(
     `waves-integration`,
-    `node-it` % "compile;test->test",
     `dex-it-tools`
   )
 
@@ -75,7 +75,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.8",
+    scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),

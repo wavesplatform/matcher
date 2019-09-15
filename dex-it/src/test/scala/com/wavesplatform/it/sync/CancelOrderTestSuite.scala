@@ -1,12 +1,10 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
-class CancelOrderTestSuite extends NewMatcherSuiteBase {
+class CancelOrderTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
@@ -15,10 +13,9 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
   "Order can be canceled" - {
     "by sender" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
-      dex1Api.cancel(bob, order.assetPair, order.id())
+      dex1Api.cancel(bob, order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
@@ -28,10 +25,9 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
 
     "with API key" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
-      dex1Api.cancelWithApiKey(order.id())
+      dex1Api.cancelWithApiKey(order)
       dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1Api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
@@ -46,8 +42,7 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
   "Cancel is rejected" - {
     "when request sender is not the sender of and order" in {
       val order = mkBobOrder
-      dex1Api.place(order)
-      dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      placeAndAwait(order)
 
       val r = dex1Api.tryCancel(matcher, order)
       r shouldBe 'left
@@ -63,11 +58,11 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
     "all orders placed by an address" in {
       val orders = mkBobOrders(wavesUsdPair) ::: mkBobOrders(wavesBtcPair)
       orders.foreach(dex1Api.place)
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
 
       dex1Api.cancelAll(bob)
 
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Cancelled))
     }
 
     "a pair" in {
@@ -75,12 +70,12 @@ class CancelOrderTestSuite extends NewMatcherSuiteBase {
       val wavesBtcOrders = mkBobOrders(wavesBtcPair)
       val orders         = wavesUsdOrders ::: wavesBtcOrders
       orders.foreach(dex1Api.place)
-      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
 
       dex1Api.cancelAllByPair(bob, wavesBtcPair)
 
-      wavesBtcOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
-      wavesUsdOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+      wavesBtcOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Cancelled))
+      wavesUsdOrders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
     }
   }
 

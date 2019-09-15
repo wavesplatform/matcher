@@ -1,35 +1,23 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
-import java.nio.charset.StandardCharsets
-
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.common.utils.EitherExt2
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
-import com.wavesplatform.dex.grpc.integration.sync.WavesGrpcAsyncClientTestSuite._
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{issueFee, minFee, someAssetAmount}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.wallet.Wallet
 import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
 import mouse.any._
-import org.scalatest.concurrent.Eventually
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach with Eventually {
+class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
-  override protected def nodeConfigs: Seq[Config] =
-    super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0").withFallback)
+  override protected val suiteInitialWavesNodeConfig = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
 
   private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
@@ -45,8 +33,7 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    val target = s"${node.networkAddress.getHostString}:${nodes.head.nodeExternalPort(6887)}"
-    new DEXClient(target).wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() }.unsafeTap {
+    new DEXClient(wavesNode1GrpcApiTarget).wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() }.unsafeTap {
       _.spendableBalanceChanges.subscribe(eventsObserver)
     }
   }
@@ -57,30 +44,13 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
   }
 
   "WavesBalancesApiGrpcServer should send balance changes via gRPC" in {
+    val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
+    val bobInitialBalance   = wavesNode1Api.balance(bob, Waves)
 
-    val aliceInitialBalance = node.balanceDetails(alice.toAddress.stringRepr).available
-    val bobInitialBalance   = node.balanceDetails(bob.toAddress.stringRepr).available
+    val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
+    val issuedAsset  = IssuedAsset(issueAssetTx.id.value)
 
-    val issueAssetTx =
-      IssueTransactionV2
-        .selfSigned(
-          chainId = AddressScheme.current.chainId,
-          sender = alice,
-          name = "name".getBytes(StandardCharsets.UTF_8),
-          description = "description".getBytes(StandardCharsets.UTF_8),
-          quantity = someAssetAmount,
-          decimals = 2,
-          reissuable = false,
-          script = None,
-          fee = issueFee,
-          timestamp = System.currentTimeMillis
-        )
-        .explicitGet()
-    val issuedAsset = IssuedAsset(issueAssetTx.id.value)
-
-    node.broadcastRequest(issueAssetTx.json.value).id
-    nodes.waitForTransaction(issueAssetTx.id.value.toString)
-
+    broadcastAndAwait(issueAssetTx)
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(
@@ -90,22 +60,7 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
       )
     }
 
-    val transferTx = TransferTransactionV2
-      .selfSigned(
-        assetId = issuedAsset,
-        sender = alice,
-        recipient = bob,
-        amount = someAssetAmount,
-        timestamp = System.currentTimeMillis,
-        feeAssetId = Waves,
-        feeAmount = minFee,
-        attachment = Array.emptyByteArray
-      )
-      .explicitGet()
-
-    node.broadcastRequest(transferTx.json.value)
-    nodes.waitForTransaction(transferTx.id.value.toString)
-
+    broadcastAndAwait(mkTransfer(alice, bob, someAssetAmount, issuedAsset))
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(
@@ -119,28 +74,4 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
       )
     }
   }
-}
-
-object WavesGrpcAsyncClientTestSuite {
-
-  private val accounts: Map[String, KeyPair] = {
-
-    val config           = ConfigFactory.parseResources("genesis.conf")
-    val distributionsKey = "genesis-generator.distributions"
-    val distributions    = config.getObject(distributionsKey)
-
-    distributions
-      .keySet()
-      .asScala
-      .map { accountName =>
-        val prefix   = s"$distributionsKey.$accountName"
-        val seedText = config.getString(s"$prefix.seed-text")
-        val nonce    = config.getInt(s"$prefix.nonce")
-        accountName -> Wallet.generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
-      }
-      .toMap
-  }
-
-  private val alice: KeyPair = accounts("alice")
-  private val bob: KeyPair   = accounts("bob")
 }

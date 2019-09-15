@@ -1,13 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi.{sync => _}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
-class DisableProducerTestSuite extends NewMatcherSuiteBase {
+class DisableProducerTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     """waves.dex.events-queue {
       |  local.enable-storing  = no
@@ -41,8 +38,8 @@ class DisableProducerTestSuite extends NewMatcherSuiteBase {
     }
 
     "Commands aren't written to queue after restart" in {
-      dockerClient().stop(dex1Container())
-      dockerClient().start(dex1Container())
+      dockerClient.stop(dex1Container())
+      dockerClient.start(dex1Container())
       dex1Api.waitReady
 
       dex1Api.currentOffset should be(-1)

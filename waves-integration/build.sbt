@@ -5,14 +5,7 @@ import sbtassembly.MergeStrategy
 enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++=
-  Seq(
-    Dependencies.grpc,
-    Seq(
-      Dependencies.mouse,
-      ("com.wavesplatform" % "protobuf-schemas" % "1.0.0-SNAPSHOT" classifier "proto") % "protobuf" // for teamcity
-    )
-  ).flatten
+libraryDependencies ++= Dependencies.wavesIntegration
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

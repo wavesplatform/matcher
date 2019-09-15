@@ -8,6 +8,7 @@ import com.wavesplatform.dex.grpc.integration.settings.DEXExtensionSettings
 import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
+import io.grpc.internal.DnsNameResolverProvider
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
 import mouse.any._

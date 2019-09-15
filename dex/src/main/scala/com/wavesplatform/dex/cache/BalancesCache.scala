@@ -10,13 +10,10 @@ class BalancesCache(getFromBlockchain: (Address, Asset) => Long) {
 
   private val balancesCache = new ConcurrentHashMap[(Address, Asset), Long](1000, 0.9f, 10)
 
-  def get(key: (Address, Asset)): Long = {
-    if (balancesCache containsKey key) balancesCache get key
-    else {
-      val balance = getFromBlockchain(key._1, key._2)
-      upsert(key, balance)
-      balance
-    }
+  def get(key: (Address, Asset)): Long = Option(balancesCache.get(key)).getOrElse {
+    val balance = getFromBlockchain(key._1, key._2)
+    upsert(key, balance)
+    balance
   }
 
   def updateAllValues(): Unit = balancesCache.keySet.asScala.foreach(_ => getFromBlockchain)

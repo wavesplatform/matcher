@@ -3,16 +3,17 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.{HasWaitReady, NodeApi, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.it.docker.{DockerContainer, WavesNodeContainer}
-import com.wavesplatform.it.{NewMatcherSuiteBase, fp}
+import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.fp
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import monix.eval.Coeval
 
 import scala.util.Try
 
-class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
+class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
   override protected def suiteInitialDexConfig: Config =
     ConfigFactory
@@ -24,26 +25,19 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
 
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    dockerClient().createWavesNode("waves-2",
-                                   wavesNodeRunConfig(),
-                                   ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
+    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
   }
   protected def wavesNode2Api: NodeApi[Id] = {
-    def apiAddress = dockerClient().getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
+    def apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
-
-  // Must start before DEX, otherwise DEX will fail to start.
-  // DEX needs to know activated features to know which order versions should be enabled.
-  override protected def allContainers: List[DockerContainer] = wavesNode2Container() :: super.allContainers
-  override protected def allApis: List[HasWaitReady[Id]]      = wavesNode2Api :: super.allApis
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder   = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
 
   "BroadcastUntilConfirmed" in {
     markup("Disconnect a miner node from the network")
-    dockerClient().disconnectFromNetwork(wavesNode1Container())
+    dockerClient.disconnectFromNetwork(wavesNode1Container())
 
     markup("Place orders, those should match")
     dex1Api.place(aliceOrder)
@@ -51,19 +45,23 @@ class BroadcastUntilConfirmedTestSuite extends NewMatcherSuiteBase {
     dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1Api.waitForTransactionsByOrder(aliceOrder.id(), 1).head.id()
+    val exchangeTxId = dex1Api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
 
     markup("Connect the miner node to the network")
-    dockerClient().connectToNetwork(wavesNode1Container())
+    dockerClient.connectToNetwork(wavesNode1Container())
 
     markup("Wait until it receives the transaction")
     wavesNode2Api.waitForTransaction(exchangeTxId)
   }
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override protected def initializeContainers(): Unit = {
+    dockerClient.start(wavesNode2Container)
+
+    super.initializeContainers()
+
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
+
     broadcastAndAwait(IssueEthTx)
   }
 }

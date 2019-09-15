@@ -3,16 +3,15 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.Address
-import com.wavesplatform.it.NewMatcherSuiteBase
-import com.wavesplatform.it.api.{MatcherError, OrderStatus}
-import com.wavesplatform.it.config.DexTestConfig._
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
-class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen {
+class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
   import BlacklistedTradingTestSuite._
 
@@ -86,8 +85,7 @@ class BlacklistedTradingTestSuite extends NewMatcherSuiteBase with GivenWhenThen
 
     And("order can be placed on allowed pair with blacklisted asset")
     val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
-    dex1Api.place(btcOrder2)
-    dex1Api.waitForOrderStatus(btcOrder2, OrderStatus.Accepted)
+    placeAndAwait(btcOrder2)
 
     And("now if all blacklists are cleared")
     replaceSuiteConfig(dex1Container(), configWithBlacklisted())

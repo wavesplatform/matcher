@@ -9,14 +9,14 @@ import cats.tagless.{Derive, FunctorK}
 import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
+import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.it.api.HasWaitReady
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
+import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -309,14 +309,12 @@ object DexApi {
         tryParseJson(sttp.get(uri"$apiUri/debug/allSnapshotOffsets").headers(apiKeyHeaders))
 
       override def waitReady: F[Unit] = {
-        val req = sttp.get(uri"$apiUri").mapResponse(_ => ())
-
-        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
-          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
-          case NonFatal(e)        => M.raiseError(e)
+        def request = M.handleErrorWith(tryAllOrderBooks.map(_.isRight)) {
+          case _: SocketException | _: JsResultException => M.pure(false)
+          case NonFatal(e)                               => M.raiseError(e)
         }
 
-        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 30))(_ == true).map(_ => ())
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =

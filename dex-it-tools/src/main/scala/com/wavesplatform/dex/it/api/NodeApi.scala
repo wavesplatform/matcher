@@ -20,6 +20,7 @@ import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import play.api.libs.json.JsResultException
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
@@ -113,14 +114,13 @@ object NodeApi {
           .map(_ => ())
 
       override def waitReady: F[Unit] = {
-        val req = sttp.get(uri"$apiUri/blocks/height").mapResponse(_ => ())
-
-        def loop(): F[Response[Unit]] = M.handleErrorWith(httpBackend.send(req)) {
-          case _: SocketException => W.wait(1.second).flatMap(_ => loop())
-          case NonFatal(e)        => M.raiseError(e)
+        // TODO hack, replace with socket's waitReady
+        def request = M.handleErrorWith(tryCurrentHeight.map(_.isRight)) {
+          case _: SocketException | _: JsResultException => M.pure(false)
+          case NonFatal(e)                               => M.raiseError(e)
         }
 
-        repeatUntil(loop(), 1.second)(_.code == StatusCodes.Ok).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 30))(_ == true).map(_ => ())
       }
     }
 }

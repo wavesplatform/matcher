@@ -7,7 +7,7 @@ import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
 import com.softwaremill.sttp.{DeserializationError, Response}
-import play.api.libs.json.{JsError, JsSuccess, Json, Reads}
+import play.api.libs.json._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
@@ -18,7 +18,7 @@ case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempt
 
 // TODO Rename to Repeated
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
-  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions)(stopCond : T => Boolean): F[T] =
+  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions)(stopCond: T => Boolean): F[T] =
     f.flatMap { firstResp =>
         (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
           case (resp, currOptions) =>
@@ -55,9 +55,7 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
     case Left(bytes) =>
       try Json.parse(bytes).validate[E] match {
         case JsSuccess(x, _) => M.pure(Left(x))
-        case JsError(e) =>
-          M.raiseError[Either[E, T]](
-            new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError:\n${e.mkString("\n")}"))
+        case JsError(e)      => M.raiseError[Either[E, T]](JsResultException(e))
       } catch {
         case NonFatal(e) =>
           M.raiseError[Either[E, T]](new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))
@@ -70,9 +68,7 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
     case Left(bytes) =>
       try Json.parse(bytes).validate[E] match {
         case JsSuccess(x, _) => M.pure(Left(x))
-        case JsError(e) =>
-          M.raiseError[Either[E, T]](
-            new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError:\n${e.mkString("\n")}"))
+        case JsError(e)      => M.raiseError[Either[E, T]](JsResultException(e))
       } catch {
         case NonFatal(e) =>
           M.raiseError[Either[E, T]](new RuntimeException(s"The server returned an error: ${resp.code}, also can't parse as MatcherError", e))

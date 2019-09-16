@@ -48,21 +48,21 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     val aliceSecondWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceSecondAsset).get), Waves)
 
     withClue("Check balances on Alice's account") {
-      node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-      node.assertAssetBalance(alice.address, aliceSecondAsset, someAssetAmount)
-      node.assertAssetBalance(matcher.address, aliceAsset, 0)
+      node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
+      node.assertAssetBalance(alice.toAddress.toString, aliceSecondAsset, someAssetAmount)
+      node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
     }
 
     withClue("Distribute assets") {
       val xs = Seq(
-        node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceAsset), None),
-        node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceSecondAsset), None),
+        node.broadcastTransfer(alice, bob.toAddress.toString, someAssetAmount / 2, minFee, Some(aliceAsset), None),
+        node.broadcastTransfer(alice, bob.toAddress.toString, someAssetAmount / 2, minFee, Some(aliceSecondAsset), None),
       )
       xs.foreach(tx => node.waitForTransaction(tx.id))
     }
 
-    node.assertAssetBalance(bob.address, aliceAsset, someAssetAmount / 2)
-    node.assertAssetBalance(bob.address, aliceSecondAsset, someAssetAmount / 2)
+    node.assertAssetBalance(bob.toAddress.toString, aliceAsset, someAssetAmount / 2)
+    node.assertAssetBalance(bob.toAddress.toString, aliceSecondAsset, someAssetAmount / 2)
 
     // Alice places sell orders
     val aliceOrderIdFill = node

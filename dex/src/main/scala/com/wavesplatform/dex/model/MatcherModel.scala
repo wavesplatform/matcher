@@ -31,8 +31,8 @@ object MatcherModel {
   /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
   object Normalization {
 
-    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Long =
-      (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
+    def normalizeAmountAndFee(value: Double, assetDecimals: Int): Long =
+      (BigDecimal(value) * BigDecimal(10).pow(assetDecimals)).toLong
 
     def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Long =
       (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
@@ -46,23 +46,31 @@ object MatcherModel {
   /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
   object Denormalization {
 
-    def denormalizeAmountAndFee(value: Long, amountAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
+    def denormalizeAmountAndFee(value: Long, assetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(assetDecimals)).toDouble
 
-    def denormalizeAmountAndFee(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
-      getAssetDecimals(pair.amountAsset, blockchain).map(denormalizeAmountAndFee(value, _))
+    def denormalizeAmountAndFee(value: Long, asset: Asset, blockchain: Blockchain): Either[MatcherError, Double] =
+      getAssetDecimals(asset, blockchain).map(denormalizeAmountAndFee(value, _))
+
+    def denormalizeAmountAndFeeWithDefault(value: Long, asset: Asset, blockchain: Blockchain): Double =
+      denormalizeAmountAndFee(value, asset, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
 
     def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
-
-    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
-      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
 
     def denormalizePrice(value: Price, pair: AssetPair, decimals: (Int, Int)): Double = {
       val (amountAssetDecimals, priceAssetDecimals) = decimals
       denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
     }
+
+    def denormalizePrice(value: Price, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
+      getPairDecimals(pair, blockchain).map(denormalizePrice(value, pair, _))
+
+    def denormalizePriceWithDefault(value: Price, pair: AssetPair, blockchain: Blockchain): Double =
+      denormalizePrice(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
   }
+
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
 
   sealed trait DecimalsFormat
   final case object Denormalized extends DecimalsFormat
@@ -157,14 +165,14 @@ object OrderStatus {
     def json: JsObject = Json.obj("status" -> name)
 
     override def filledAmount: Long = 0
-    override def filledFee: Long = 0
+    override def filledFee: Long    = 0
   }
   case object NotFound extends Final {
     val name           = "NotFound"
     def json: JsObject = Json.obj("status" -> name, "message" -> "The limit order is not found")
 
     override def filledAmount: Long = 0
-    override def filledFee: Long = 0
+    override def filledFee: Long    = 0
   }
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
     val name           = "PartiallyFilled"
@@ -180,7 +188,7 @@ object OrderStatus {
   }
 
   def finalStatus(lo: LimitOrder, unmatchable: Boolean): Final = {
-    val filledAmount = lo.order.amount - lo.amount
+    val filledAmount     = lo.order.amount - lo.amount
     val filledMatcherFee = lo.order.matcherFee - lo.fee
     if (unmatchable && filledAmount > 0) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
   }

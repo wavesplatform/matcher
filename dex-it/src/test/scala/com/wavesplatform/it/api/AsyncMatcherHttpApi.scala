@@ -15,6 +15,7 @@ import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
@@ -228,7 +229,7 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
 
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
     def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
 
@@ -263,10 +264,11 @@ object AsyncMatcherHttpApi extends Assertions {
                      fee: Long,
                      version: Byte,
                      timestamp: Long = System.currentTimeMillis(),
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     timeToLive: Duration = 30.days - 1.seconds,
+                     feeAsset: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
       val unsigned =
-        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version, feeAsset)
       Order.sign(unsigned, sender)
     }
 
@@ -280,8 +282,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    price: Long,
                    fee: Long,
                    version: Byte,
-                   timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive)
+                   timeToLive: Duration = 30.days - 1.seconds,
+                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
@@ -311,7 +314,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      matcherGetWithApiKey(s"/matcher/orders/${sender.address}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
+      matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
     def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]

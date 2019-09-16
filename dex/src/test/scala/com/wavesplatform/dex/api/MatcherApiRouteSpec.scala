@@ -10,6 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -26,7 +27,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
   private val settings                       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair                 = KeyPair("matcher".getBytes("utf-8"))
-  private def getAssetDecimals(asset: Asset) = 8
 
   routePath("/balance/reserved/{publicKey}") - {
     val publicKey = matcherKeyPair.publicKey
@@ -62,9 +62,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
     }
   }
 
-  private def test[T](f: Route => T): T = {
+  private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
+
     val blockchain   = stub[Blockchain]
     val addressActor = TestProbe("address")
+
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.GetReservedBalance) => sender ! Map.empty[Asset, Long]
@@ -74,32 +76,31 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       TestActor.NoAutoPilot
     }
 
-    implicit val context = new com.wavesplatform.dex.error.ErrorFormatterContext {
-      override def assetDecimals(asset: Asset): Int = 8
-    }
+    implicit val context: ErrorFormatterContext = _ => 8
 
-    val route = MatcherApiRoute(
-      assetPairBuilder = new AssetPairBuilder(settings, blockchain, Set.empty),
-      matcherPublicKey = matcherKeyPair.publicKey,
-      matcher = ActorRef.noSender,
-      addressActor = addressActor.ref,
-      storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
-      orderBook = _ => None,
-      getMarketStatus = _ => None,
-      getActualTickSize = _ => 0.1,
-      orderValidator = _ => Left(error.FeatureNotImplemented),
-      orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, getAssetDecimals, _ => None),
-      matcherSettings = settings,
-      matcherStatus = () => Matcher.Status.Working,
-      db = db,
-      time = ntpTime,
-      currentOffset = () => 0L,
-      lastOffset = () => Future.successful(0L),
-      matcherAccountFee = 300000L,
-      apiKeyHash = None,
-      rateCache = RateCache.inMem,
-      validatedAllowedOrderVersions = Set(1, 2, 3)
-    ).route
+    val route =
+      MatcherApiRoute(
+        assetPairBuilder = new AssetPairBuilder(settings, blockchain, Set.empty),
+        matcherPublicKey = matcherKeyPair.publicKey,
+        matcher = ActorRef.noSender,
+        addressActor = addressActor.ref,
+        storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
+        orderBook = _ => None,
+        getMarketStatus = _ => None,
+        getActualTickSize = _ => 0.1,
+        orderValidator = _ => Left(error.FeatureNotImplemented),
+        orderBookSnapshot = new OrderBookSnapshotHttpCache(settings.orderBookSnapshotHttpCache, ntpTime, _ => 8, _ => None),
+        matcherSettings = settings,
+        matcherStatus = () => Matcher.Status.Working,
+        db = db,
+        time = ntpTime,
+        currentOffset = () => 0L,
+        lastOffset = () => Future.successful(0L),
+        matcherAccountFee = 300000L,
+        apiKeyHashStr = Base58.encode { crypto.secureHash(apiKey getBytes "UTF-8") },
+        rateCache = rateCache,
+        validatedAllowedOrderVersions = Set(1, 2, 3)
+      ).route
 
     f(route)
   }

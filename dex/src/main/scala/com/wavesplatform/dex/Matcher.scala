@@ -14,13 +14,13 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db._
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -72,9 +72,9 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
-  private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val actualMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRule]
-  private val assetDecimalsCache  = new AssetDecimalsCache(context.blockchain)
+  private val orderBooks                      = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val actualDenormalizedMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRule]
+  private val assetDecimalsCache              = new AssetDecimalsCache(context.blockchain)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -125,7 +125,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       transactionCreator.createTransaction,
       context.time,
       matchingRules = getRawMatchingRules(assetPair),
-      actualizeCurrentMatchingRules = actualMatchingRule => actualMatchingRules.put(assetPair, actualMatchingRule),
+      actualizeCurrentMatchingRules = actualMatchingRule => actualDenormalizedMatchingRules.put(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, context.blockchain),
     )
 
@@ -144,9 +144,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
   private val rateCache                                          = RateCache(db)
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
+                                               blacklistedAddresses,
+                                               blacklistedAssets,
+                                               settings,
+                                               rateCache,
+                                               assetDecimalsCache.get)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
@@ -159,14 +164,16 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         rateCache
       )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
+      _ <- OrderValidator.tickSizeAware(
+        Option { actualDenormalizedMatchingRules.get(o.assetPair) }
+          .map { _.normalize(o.assetPair, context.blockchain).normalizedTickSize } getOrElse MatchingRule.DefaultTickSize
+      )(o)
     } yield o
 
-  private implicit val errorContext = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = assetDecimalsCache.get(asset)
-  }
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+    val keyHashStr = context.settings.config.getString("waves.rest-api.api-key-hash")
 
     Seq(
       MatcherApiRoute(
@@ -185,7 +192,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               .leftMap(_ => RawMatchingRule.DefaultTickSize)
               .merge
 
-          Option { actualMatchingRules.get(assetPair) } map (_.tickSize) getOrElse defaultTickSize
+          Option { actualDenormalizedMatchingRules.get(assetPair) } map (_.tickSize) getOrElse defaultTickSize
         },
         validateOrder,
         orderBooksSnapshotCache,
@@ -196,7 +203,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-        keyHash,
+        keyHashStr,
         rateCache,
         settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
       ),
@@ -204,7 +211,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHash
+        keyHashStr,
+        settings
       )
     )
   }
@@ -347,7 +355,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           context.time,
           tx => context.utx.putIfNew(tx).resultE.isRight,
           context.blockchain.containsTransaction(_),
-          txs => txs.foreach(context.broadcastTx)
+          txs => txs.foreach(context.broadcastTransaction)
         ),
       "exchange-transaction-broadcast"
     )

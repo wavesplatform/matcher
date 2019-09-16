@@ -6,10 +6,12 @@ import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord, Record}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.model.OrderStatus.Filled
+import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 
@@ -28,9 +30,10 @@ object HistoryRouter {
   trait HistoryMsg {
 
     type R <: Record // mapping between domain objects and database rows
-    type Denormalize = (Long, AssetPair) => Double // how to convert amount, price fee to human-readable format
+    type DenormalizePrice        = (Long, AssetPair) => Double // how to convert price to the human-readable format
+    type DenormalizeAmountAndFee = (Long, Asset) => Double     // how to convert amount and fee fee to the human-readable format
 
-    def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R]
+    def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R]
     def toLocalDateTime(timestamp: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
   }
 
@@ -38,21 +41,22 @@ object HistoryRouter {
 
     type R = OrderRecord
 
-    def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R] = {
+    def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] = {
       val order = this.limitOrder.order
       Set(
         OrderRecord(
           id = order.id().toString,
-          senderAddress = order.sender.address,
+          senderAddress = order.sender.toAddress.toString,
           senderPublicKey = order.senderPublicKey.toString,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,
+          feeAssetId = AssetPair.assetIdStr(order.matcherFeeAssetId),
           side = if (order.orderType == OrderType.BUY) buySide else sellSide,
           price = denormalizePrice(order.price, order.assetPair),
-          amount = denormalizeAmountAndFee(order.amount, order.assetPair),
+          amount = denormalizeAmountAndFee(order.amount, order.assetPair.amountAsset),
           timestamp = toLocalDateTime(order.timestamp),
           expiration = toLocalDateTime(order.expiration),
-          fee = denormalizeAmountAndFee(order.matcherFee, order.assetPair),
+          fee = denormalizeAmountAndFee(order.matcherFee, order.matcherFeeAssetId),
           created = toLocalDateTime(this.timestamp)
         )
       )
@@ -63,36 +67,44 @@ object HistoryRouter {
 
     type R = EventRecord
 
-    def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R] = {
+    def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] = {
       this.event match {
         case _: OrderAdded => Set.empty[EventRecord]
 
         case e @ OrderExecuted(submitted, counter, timestamp) =>
           val assetPair = submitted.order.assetPair
 
-          Set(submitted -> e.submittedRemainingAmount, counter -> e.counterRemainingAmount) map {
-            case (limitOrder, remainingAmount) =>
+          Set(
+            (submitted, e.submittedRemainingAmount, e.submittedExecutedFee, e.submittedRemainingFee),
+            (counter, e.counterRemainingAmount, e.counterExecutedFee, e.counterRemainingFee)
+          ) map {
+            case (limitOrder, remainingAmount, executedFee, remainingFee) =>
               EventRecord(
                 orderId = limitOrder.order.id().toString,
                 eventType = eventTrade,
                 timestamp = toLocalDateTime(timestamp),
                 price = denormalizePrice(limitOrder.order.price, assetPair),
-                filled = denormalizeAmountAndFee(e.executedAmount, assetPair),
-                totalFilled = denormalizeAmountAndFee(limitOrder.order.amount - remainingAmount, assetPair),
+                filled = denormalizeAmountAndFee(e.executedAmount, assetPair.amountAsset),
+                totalFilled = denormalizeAmountAndFee(limitOrder.order.amount - remainingAmount, assetPair.amountAsset),
+                feeFilled = denormalizeAmountAndFee(executedFee, limitOrder.order.matcherFeeAssetId),
+                feeTotalFilled = denormalizeAmountAndFee(limitOrder.order.matcherFee - remainingFee, limitOrder.order.matcherFeeAssetId),
                 status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled
               )
           }
 
-        case OrderCanceled(submitted, _, timestamp) =>
+        case OrderCanceled(submitted, isSystemCancel, timestamp) =>
+          val assetPair = submitted.order.assetPair
           Set(
             EventRecord(
               orderId = submitted.order.id().toString,
               eventType = eventCancel,
               timestamp = toLocalDateTime(timestamp),
-              price = denormalizePrice(submitted.order.price, submitted.order.assetPair),
+              price = denormalizePrice(submitted.order.price, assetPair),
               filled = 0,
-              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, submitted.order.assetPair),
-              status = statusCancelled
+              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair.amountAsset),
+              feeFilled = 0,
+              feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, submitted.order.matcherFeeAssetId),
+              status = OrderStatus.finalStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
             )
           )
       }
@@ -104,11 +116,11 @@ object HistoryRouter {
 
 class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizeAmountAndFee(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+  private def denormalizeAmountAndFee(value: Long, asset: Asset): Double =
+    Denormalization.denormalizeAmountAndFeeWithDefault(value, asset, blockchain)
 
   private def denormalizePrice(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizePrice(value, pair, blockchain).getOrElse((value / BigDecimal(10).pow(8)).toDouble)
+    Denormalization.denormalizePriceWithDefault(value, pair, blockchain)
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._
 
@@ -129,6 +141,7 @@ class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnecti
                 _.senderPublicKey -> "sender_public_key",
                 _.amountAssetId   -> "amount_asset_id",
                 _.priceAssetId    -> "price_asset_id",
+                _.feeAssetId      -> "fee_asset_id",
                 _.side            -> "side",
                 _.price           -> "price",
                 _.amount          -> "amount",
@@ -156,13 +169,15 @@ class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnecti
             liftQuery(batchBuffer flatMap { _.createRecords(denormalizeAmountAndFee, denormalizePrice) }) foreach { eventRecord =>
               querySchema[EventRecord](
                 "events",
-                _.orderId     -> "order_id",
-                _.eventType   -> "event_type",
-                _.timestamp   -> "timestamp",
-                _.price       -> "price",
-                _.filled      -> "filled",
-                _.totalFilled -> "total_filled",
-                _.status      -> "status"
+                _.orderId        -> "order_id",
+                _.eventType      -> "event_type",
+                _.timestamp      -> "timestamp",
+                _.price          -> "price",
+                _.filled         -> "filled",
+                _.totalFilled    -> "total_filled",
+                _.feeFilled      -> "fee_filled",
+                _.feeTotalFilled -> "fee_total_filled",
+                _.status         -> "status"
               ).insert(eventRecord).onConflictIgnore
             }
           }

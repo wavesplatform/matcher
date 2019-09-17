@@ -73,10 +73,8 @@ class AddressActor(
 
   private def tradableBalance(assetId: Asset): Future[Long] = spendableBalance(assetId).map { _ - openVolume(assetId) }
 
-  private def tradableBalancesByAssets(assets: Set[Asset]): Future[Asset => Long] = {
-    assets.toList
-      .traverse(asset => tradableBalance(asset).map(balance => asset -> balance))
-      .map { _.toMap.apply }
+  private def tradableBalancesByAssets(assets: Set[Asset]): Future[Map[Asset, Long]] = {
+    assets.toList.traverse(asset => tradableBalance(asset).map(balance => asset -> balance)) map { _.toMap }
   }
 
   private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long): OrderValidator.Result[AcceptedOrder] = {
@@ -201,23 +199,24 @@ class AddressActor(
       log.trace(s"Loading ${if (onlyActive) "active" else "all"} ${maybePair.fold("")(_.toString + " ")}orders")
 
       val matchingActiveOrders = {
-        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield ao.order.id() ->
-          OrderInfo.v2(
-            ao.order.orderType,
-            ao.order.amount,
-            ao.order.price,
-            ao.order.matcherFee,
-            ao.order.matcherFeeAssetId,
-            ao.order.timestamp,
-            activeStatus(ao),
-            ao.order.assetPair
-          )
+        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield
+          ao.order.id() ->
+            OrderInfo.v2(
+              ao.order.orderType,
+              ao.order.amount,
+              ao.order.price,
+              ao.order.matcherFee,
+              ao.order.matcherFeeAssetId,
+              ao.order.timestamp,
+              activeStatus(ao),
+              ao.order.assetPair
+            )
       }.toSeq.sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")
       sender() ! (if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders))
 
-    case GetTradableBalance(pair) => sender() ! Set(pair.amountAsset, pair.priceAsset).map(id => id -> tradableBalance(id)).toMap
+    case GetTradableBalance(pair) => tradableBalancesByAssets { Set(pair.amountAsset, pair.priceAsset) } pipeTo sender
     case GetReservedBalance       => sender() ! openVolume.filter { case (_, reserved) => reserved > 0 }.toMap
   }
 

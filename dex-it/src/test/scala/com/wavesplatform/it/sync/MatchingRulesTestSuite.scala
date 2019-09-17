@@ -6,7 +6,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{wctUsdPair, _}
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.it.util._
@@ -88,9 +88,9 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   def assetBalance(owner: KeyPair, assetId: String): Long = {
     if (assetId == "WAVES")
-      node.accountBalances(owner.address)._1
+      node.accountBalances(owner.toAddress.toString)._1
     else {
-      node.assetBalance(owner.address, assetId).balance
+      node.assetBalance(owner.toAddress.toString, assetId).balance
     }
   }
 
@@ -128,8 +128,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     val buyOrder2 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder2, "Accepted")
 
-    val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
-    val aliceWctBalance = node.assetBalance(alice.address, WctId.toString).balance
+    val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+    val aliceWctBalance = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
 
     // here tick size = 5 (offset = 8), hence new order is placed into corrected price level 5, not 7
     val buyOrder3 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
@@ -145,8 +145,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.cancelOrder(alice, wctUsdPair, buyOrder3)
     node.waitOrderStatus(wctUsdPair, buyOrder3, "Cancelled")
 
-    node.assertAssetBalance(alice.address, UsdId.toString, aliceUsdBalance)
-    node.assertAssetBalance(alice.address, WctId.toString, aliceWctBalance)
+    node.assertAssetBalance(alice.toAddress.toString, UsdId.toString, aliceUsdBalance)
+    node.assertAssetBalance(alice.toAddress.toString, WctId.toString, aliceWctBalance)
     node.reservedBalance(alice)("WAVES") shouldBe matcherFee * 2
     node.reservedBalance(alice)(UsdId.toString) shouldBe amount * 2 * 7 * price / PriceConstant
 
@@ -156,12 +156,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   // offset is 12, after test - 16
   "Matching on the same price level" in {
-    val bobUsdBalance = node.assetBalance(bob.address, UsdId.toString).balance
-    val bobWctBalance = node.assetBalance(bob.address, WctId.toString).balance
-    val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
-    val aliceWctBalance = node.assetBalance(alice.address, WctId.toString).balance
-    val bobWavesBalance = node.accountBalances(bob.address)._1
-    val aliceWavesBalance = node.accountBalances(alice.address)._1
+    val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+    val bobWctBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
+    val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+    val aliceWctBalance = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
+    val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
+    val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
     val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 4 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, sellOrder, "Accepted")
@@ -177,24 +177,24 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
     node.orderBook(wctUsdPair).bids shouldBe Nil
 
-    node.assertAssetBalance(bob.address, UsdId.toString, bobUsdBalance + 4 * amount)
-    node.assertAssetBalance(bob.address, WctId.toString, bobWctBalance - amount)
-    node.assertAssetBalance(alice.address, UsdId.toString, aliceUsdBalance - 4 * amount)
-    node.assertAssetBalance(alice.address, WctId.toString, aliceWctBalance + amount)
-    node.assertBalances(bob.address, bobWavesBalance - matcherFee)
-    node.assertBalances(alice.address, aliceWavesBalance - matcherFee)
+    node.assertAssetBalance(bob.toAddress.toString, UsdId.toString, bobUsdBalance + 4 * amount)
+    node.assertAssetBalance(bob.toAddress.toString, WctId.toString, bobWctBalance - amount)
+    node.assertAssetBalance(alice.toAddress.toString, UsdId.toString, aliceUsdBalance - 4 * amount)
+    node.assertAssetBalance(alice.toAddress.toString, WctId.toString, aliceWctBalance + amount)
+    node.assertBalances(bob.toAddress.toString, bobWavesBalance - matcherFee)
+    node.assertBalances(alice.toAddress.toString, aliceWavesBalance - matcherFee)
 
     node.cancelOrder(bob, wctUsdPair, anotherSellOrder)
   }
 
   // offset is 16, after test - 19
   "Matching with old orders after tick size enabled" in {
-    val bobUsdBalance = node.assetBalance(bob.address, UsdId.toString).balance
-    val bobWctBalance = node.assetBalance(bob.address, WctId.toString).balance
-    val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
-    val aliceWctBalance = node.assetBalance(alice.address, WctId.toString).balance
-    val bobWavesBalance = node.accountBalances(bob.address)._1
-    val aliceWavesBalance = node.accountBalances(alice.address)._1
+    val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+    val bobWctBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
+    val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+    val aliceWctBalance = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
+    val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
+    val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
     val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 11 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, sellOrder, "Accepted")
@@ -205,12 +205,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, sellOrder, "Filled")
     node.waitOrderInBlockchain(buyOrder)
 
-    node.assertAssetBalance(bob.address, UsdId.toString, bobUsdBalance + 11 * amount)
-    node.assertAssetBalance(bob.address, WctId.toString, bobWctBalance - amount)
-    node.assertAssetBalance(alice.address, UsdId.toString, aliceUsdBalance - 11 * amount)
-    node.assertAssetBalance(alice.address, WctId.toString, aliceWctBalance + amount)
-    node.assertBalances(bob.address, bobWavesBalance - matcherFee)
-    node.assertBalances(alice.address, aliceWavesBalance - matcherFee / 2)
+    node.assertAssetBalance(bob.toAddress.toString, UsdId.toString, bobUsdBalance + 11 * amount)
+    node.assertAssetBalance(bob.toAddress.toString, WctId.toString, bobWctBalance - amount)
+    node.assertAssetBalance(alice.toAddress.toString, UsdId.toString, aliceUsdBalance - 11 * amount)
+    node.assertAssetBalance(alice.toAddress.toString, WctId.toString, aliceWctBalance + amount)
+    node.assertBalances(bob.toAddress.toString, bobWavesBalance - matcherFee)
+    node.assertBalances(alice.toAddress.toString, aliceWavesBalance - matcherFee / 2)
 
     withClue("partially filled order cancellation") {
       node.reservedBalance(alice)("WAVES") shouldBe matcherFee / 2
@@ -231,11 +231,22 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.cancelOrder(bob, wctUsdPair, bestBidOrderId)
   }
 
+  "Placing order on level 0" in {
+    assertBadRequestAndMessage(node.placeOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee),
+      "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0")
+  }
+
   "Matching orders with different decimals" in {
     Array((wctUsdPair, amount, price), (wctWavesPair, amount, price * 1000000L), (wavesUsdPair, 1.waves, 100L), (wavesBtcPair, amount, price)).foreach {
       case (pair: AssetPair, amount: Long, price: Long) =>
         withClue(pair) {
-          // TODO check balances
+          val aliceAmountBalance = assetBalance(alice, pair.amountAssetStr)
+          val bobAmountBalance = assetBalance(bob, pair.amountAssetStr)
+          val alicePriceBalance = assetBalance(alice, pair.priceAssetStr)
+          val bobPriceBalance = assetBalance(bob, pair.priceAssetStr)
+          val aliceWavesBalance = assetBalance(alice, "WAVES")
+          val bobWavesBalance = assetBalance(bob, "WAVES")
+
           val bestAskOrderId = node.placeOrder(alice, pair, SELL, amount, 17 * price, matcherFee).message.id
           node.orderBook(pair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
           val bestBidOrderId = node.placeOrder(bob, pair, BUY, amount, 17 * price, matcherFee).message.id
@@ -248,16 +259,36 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
           val partiallyFilledOrderId = node.placeOrder(alice, pair, SELL, 2 * amount, 17 * price, matcherFee).message.id
           node.waitOrderStatus(pair, filledOrderId, expectedStatus = "Filled")
           node.waitOrderStatus(pair, partiallyFilledOrderId, expectedStatus = "PartiallyFilled")
+          node.waitOrderInBlockchain(filledOrderId)
+
+          pair match {
+            case `wctUsdPair` =>
+              assetBalance(alice, pair.amountAssetStr) shouldBe aliceAmountBalance - amount
+              assetBalance(bob, pair.amountAssetStr) shouldBe bobAmountBalance + amount
+              assetBalance(alice, pair.priceAssetStr) shouldBe alicePriceBalance + 25000L
+              assetBalance(bob, pair.priceAssetStr) shouldBe bobPriceBalance - 25000L
+              assetBalance(alice, "WAVES") shouldBe aliceWavesBalance - matcherFee / 2
+              assetBalance(bob, "WAVES") shouldBe bobWavesBalance - matcherFee
+            case `wctWavesPair` =>
+              assetBalance(alice, pair.amountAssetStr) shouldBe aliceAmountBalance - amount
+              assetBalance(bob, pair.amountAssetStr) shouldBe bobAmountBalance + amount
+              assetBalance(alice, pair.priceAssetStr) shouldBe alicePriceBalance + 25000000000L - matcherFee / 2
+              assetBalance(bob, pair.priceAssetStr) shouldBe bobPriceBalance - 25000000000L - matcherFee
+            case `wavesUsdPair` =>
+              assetBalance(alice, pair.amountAssetStr) shouldBe aliceAmountBalance - amount - matcherFee / 2
+              assetBalance(bob, pair.amountAssetStr) shouldBe bobAmountBalance + amount - matcherFee
+              assetBalance(alice, pair.priceAssetStr) shouldBe alicePriceBalance + 2500L
+              assetBalance(bob, pair.priceAssetStr) shouldBe bobPriceBalance - 2500L
+            case `wavesBtcPair` =>
+              assetBalance(alice, pair.amountAssetStr) shouldBe aliceAmountBalance - amount - matcherFee / 2
+              assetBalance(bob, pair.amountAssetStr) shouldBe bobAmountBalance + amount - matcherFee
+              assetBalance(alice, pair.priceAssetStr) shouldBe alicePriceBalance + 25000L
+              assetBalance(bob, pair.priceAssetStr) shouldBe bobPriceBalance - 25000L
+            case _ => ???
+          }
 
           node.cancelOrder(alice, pair, partiallyFilledOrderId)
         }
     }
   }
-
-  "level 0" in {
-    pending
-    // node.placeOrder(alice, wctUsdPair, BUY, amount, 5 * price, matcherFee)
-    // node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 0))
-  }
-
 }

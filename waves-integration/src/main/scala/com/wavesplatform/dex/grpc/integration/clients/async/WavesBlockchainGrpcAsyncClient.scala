@@ -2,9 +2,15 @@ package com.wavesplatform.dex.grpc.integration.clients.async
 
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
-import com.wavesplatform.dex.grpc.integration.services.{BalanceChangesResponse, WavesBalancesApiGrpc}
+import com.wavesplatform.dex.grpc.integration.services.{
+  BalanceChangesResponse,
+  SpendableAssetBalanceRequest,
+  WavesBalancesApiGrpc,
+  WavesBlockchainApiGrpc
+}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -14,10 +20,16 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import mouse.any._
 
-class WavesBalancesGrpcAsyncClient(channel: ManagedChannel)(implicit scheduler: Scheduler) extends ScorexLogging {
+import scala.concurrent.{ExecutionContext, Future}
 
-  private val balancesService                = WavesBalancesApiGrpc.stub(channel)
-  private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges]
+class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Scheduler)(implicit grpcExecutionContext: ExecutionContext)
+    extends WavesBlockchainAsyncClient
+    with ScorexLogging {
+
+  private val balancesService   = WavesBalancesApiGrpc.stub(channel)
+  private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
+
+  private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges](monixScheduler)
 
   private def toVanilla(record: BalanceChangesResponse.Record): (Address, Asset, Long) = {
     (record.address.toVanillaAddress, record.asset.toVanillaAsset, record.balance)
@@ -50,4 +62,8 @@ class WavesBalancesGrpcAsyncClient(channel: ManagedChannel)(implicit scheduler: 
 
   /** Returns stream of the balance changes as a sequence of batches */
   def spendableBalanceChanges: Observable[SpendableBalanceChanges] = spendableBalanceChangesSubject
+
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = {
+    blockchainService.spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }.map(_.balance)
+  }
 }

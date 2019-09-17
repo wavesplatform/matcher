@@ -2,15 +2,16 @@ package com.wavesplatform.dex.grpc.integration
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesGrpcAsyncClient
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainGrpcAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainGrpcSyncClient
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc._
 import io.grpc.internal.DnsNameResolverProvider
 import monix.execution.Scheduler
-import monix.execution.Scheduler.Implicits.global
 
-class DEXClient(target: String, val scheduler: Scheduler = global) extends ScorexLogging {
+import scala.concurrent.ExecutionContext
+
+class DEXClient(target: String, val monixScheduler: Scheduler, val grpcExecutionContext: ExecutionContext) extends ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")
 
@@ -27,6 +28,6 @@ class DEXClient(target: String, val scheduler: Scheduler = global) extends Score
       .usePlaintext()
       .build
 
-  lazy val wavesBlockchainSyncClient = new WavesBlockchainGrpcSyncClient(channel)
-  lazy val wavesBalancesAsyncClient  = new WavesBalancesGrpcAsyncClient(channel)(scheduler)
+  lazy val wavesBlockchainSyncClient  = new WavesBlockchainGrpcSyncClient(channel)
+  lazy val wavesBlockchainAsyncClient = new WavesBlockchainGrpcAsyncClient(channel, monixScheduler)(grpcExecutionContext)
 }

@@ -34,12 +34,15 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
 
+  private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
   private var matcher: Matcher = _
 
   def run(): Unit = {
-    val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}", scheduler)
+
+    val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}", scheduler, grpcExecutionContext)
     matcher = new Matcher(settings, gRPCExtensionClient)
     matcher.start()
 

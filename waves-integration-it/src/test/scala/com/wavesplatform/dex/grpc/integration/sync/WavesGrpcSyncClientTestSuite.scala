@@ -19,7 +19,9 @@ import scala.util.Random
 
 class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
 
-  private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget).wavesBlockchainSyncClient
+  private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget,
+                                                   monix.execution.Scheduler.global,
+                                                   scala.concurrent.ExecutionContext.Implicits.global).wavesBlockchainSyncClient
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

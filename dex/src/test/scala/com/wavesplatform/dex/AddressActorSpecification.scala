@@ -186,18 +186,20 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          x => currentPortfolio.get().spendableBalanceOf(x),
+          x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
           1.day,
           ntpTime,
           EmptyOrderDB,
           _ => false,
           event => {
             eventsProbe.ref ! event
-            Future.successful(Some(QueueEventWithMeta(0, 0, event)))
+            Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
           _ => OrderBook.AggregatedSnapshot(),
           false
-        )))
+        )
+      )
+    )
     f(
       addressActor,
       eventsProbe,

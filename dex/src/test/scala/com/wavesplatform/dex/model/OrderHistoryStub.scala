@@ -23,12 +23,12 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
         Props(
           new AddressActor(
             ao.order.sender,
-            _ => 0L,
+            _ => Future.successful(0L),
             5.seconds,
             time,
             new TestOrderDB(100),
             _ => false,
-            e => Future.successful(Some(QueueEventWithMeta(0, 0, e))),
+            e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
             _ => OrderBook.AggregatedSnapshot(),
             true
           )

@@ -239,6 +239,8 @@ case class SellLimitOrder(amount: Long, fee: Long, order: Order) extends SellOrd
 }
 
 sealed trait MarketOrder extends AcceptedOrder {
+
+  /** Min between tradable balance of the order's owner and required balance of the order by spendable asset */
   val availableForSpending: Long
   def reservableBalance: Map[Asset, Long] = requiredBalance.updated(order.getSpendAssetId, availableForSpending)
   def partial(amount: Long, fee: Long, availableForSpending: Long): MarketOrder

@@ -98,9 +98,11 @@ object OrderValidator extends ScorexLogging {
       )
     } yield ad -> pd
 
-  private def validateAmountAndPrice(order: Order,
-                                     decimalsPair: (Int, Int),
-                                     orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]): Result[Order] = {
+  private def validateAmountAndPrice(
+      order: Order,
+      decimalsPair: (Int, Int),
+      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings]
+  ): Result[Order] = {
     if (!(orderRestrictions contains order.assetPair)) lift(order)
     else {
       val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
@@ -132,13 +134,15 @@ object OrderValidator extends ScorexLogging {
     case _ => Left(error.UnsupportedOrderVersion(version))
   }
 
-  def blockchainAware(blockchain: WavesBlockchainClient,
-                      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
-                      matcherAddress: Address,
-                      time: Time,
-                      orderFeeSettings: OrderFeeSettings,
-                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                      rateCache: RateCache)(order: Order): Result[Order] = timer.measure {
+  def blockchainAware(
+      blockchain: WavesBlockchainClient,
+      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
+      matcherAddress: Address,
+      time: Time,
+      orderFeeSettings: OrderFeeSettings,
+      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+      rateCache: RateCache
+  )(order: Order): Result[Order] = timer.measure {
 
     lazy val exchangeTx: Result[ExchangeTransaction] = {
       val fakeOrder: Order = order.updateType(order.orderType.opposite)
@@ -205,11 +209,13 @@ object OrderValidator extends ScorexLogging {
     * @param rateCache        assets rates (rate = cost of 1 Waves in asset)
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
-  private[dex] def getMinValidFeeForSettings(order: Order,
-                                             orderFeeSettings: OrderFeeSettings,
-                                             matchPrice: Long,
-                                             rateCache: RateCache,
-                                             multiplier: Double = 1): Long = {
+  private[dex] def getMinValidFeeForSettings(
+      order: Order,
+      orderFeeSettings: OrderFeeSettings,
+      matchPrice: Long,
+      rateCache: RateCache,
+      multiplier: Double = 1
+  ): Long = {
 
     orderFeeSettings match {
       case DynamicSettings(dynamicBaseFee) =>
@@ -245,11 +251,13 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def matcherSettingsAware(matcherPublicKey: PublicKey,
-                           blacklistedAddresses: Set[Address],
-                           blacklistedAssets: Set[IssuedAsset],
-                           matcherSettings: MatcherSettings,
-                           rateCache: RateCache)(order: Order): Result[Order] = {
+  def matcherSettingsAware(
+      matcherPublicKey: PublicKey,
+      blacklistedAddresses: Set[Address],
+      blacklistedAssets: Set[IssuedAsset],
+      matcherSettings: MatcherSettings,
+      rateCache: RateCache
+  )(order: Order): Result[Order] = {
 
     def validateBlacklistedAsset(assetId: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       assetId.fold(success)(x => cond(!blacklistedAssets(x), (), e(x)))
@@ -313,11 +321,13 @@ object OrderValidator extends ScorexLogging {
     *   best bid = highest price of buy
     *   best ask = lowest price of sell
     */
-  private def validateFeeDeviation(order: Order,
-                                   deviationSettings: DeviationsSettings,
-                                   orderFeeSettings: OrderFeeSettings,
-                                   marketStatus: Option[MarketStatus],
-                                   rateCache: RateCache): Result[Order] = {
+  private def validateFeeDeviation(
+      order: Order,
+      deviationSettings: DeviationsSettings,
+      orderFeeSettings: OrderFeeSettings,
+      marketStatus: Option[MarketStatus],
+      rateCache: RateCache
+  ): Result[Order] = {
 
     def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
       case percentSettings: PercentSettings =>
@@ -336,10 +346,12 @@ object OrderValidator extends ScorexLogging {
     Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
   }
 
-  def marketAware(orderFeeSettings: OrderFeeSettings,
-                  deviationSettings: DeviationsSettings,
-                  marketStatus: Option[MarketStatus],
-                  rateCache: RateCache)(order: Order): Result[Order] = {
+  def marketAware(
+      orderFeeSettings: OrderFeeSettings,
+      deviationSettings: DeviationsSettings,
+      marketStatus: Option[MarketStatus],
+      rateCache: RateCache
+  )(order: Order): Result[Order] = {
     if (deviationSettings.enabled) {
       for {
         _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
@@ -359,9 +371,11 @@ object OrderValidator extends ScorexLogging {
     } yield order
   }
 
-  private def validateBalance(acceptedOrder: AcceptedOrder,
-                              tradableBalance: Asset => Long,
-                              orderBookCache: AssetPair => OrderBook.AggregatedSnapshot): Result[AcceptedOrder] = {
+  private def validateBalance(
+      acceptedOrder: AcceptedOrder,
+      tradableBalance: Asset => Long,
+      orderBookCache: AssetPair => OrderBook.AggregatedSnapshot
+  ): Result[AcceptedOrder] = {
 
     /**
       * According to the current market state calculates cost for buy market orders or amount for sell market orders
@@ -411,11 +425,13 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def accountStateAware(sender: Address,
-                        tradableBalance: Asset => Long,
-                        activeOrderCount: => Int,
-                        orderExists: ByteStr => Boolean,
-                        orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(acceptedOrder: AcceptedOrder): Result[AcceptedOrder] =
+  def accountStateAware(
+      sender: Address,
+      tradableBalance: Asset => Long,
+      activeOrderCount: => Int,
+      orderExists: ByteStr => Boolean,
+      orderBookCache: AssetPair => OrderBook.AggregatedSnapshot
+  )(acceptedOrder: AcceptedOrder): Result[AcceptedOrder] =
     for {
       _ <- lift(acceptedOrder)
         .ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)

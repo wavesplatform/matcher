@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import mouse.any._
 import org.slf4j.LoggerFactory
+import cats.implicits._
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap}
@@ -28,16 +29,17 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class AddressActor(owner: Address,
-                   spendableBalance: Asset => Future[Long],
-                   cancelTimeout: FiniteDuration,
-                   time: Time,
-                   orderDB: OrderDB,
-                   hasOrder: Order.Id => Boolean,
-                   storeEvent: StoreEvent,
-                   orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
-                   var enableSchedules: Boolean)
-    extends Actor
+class AddressActor(
+    owner: Address,
+    spendableBalance: Asset => Future[Long],
+    cancelTimeout: FiniteDuration,
+    time: Time,
+    orderDB: OrderDB,
+    hasOrder: Order.Id => Boolean,
+    storeEvent: StoreEvent,
+    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
+    var enableSchedules: Boolean
+) extends Actor
     with WorkingStash
     with ScorexLogging {
 
@@ -74,8 +76,10 @@ class AddressActor(owner: Address,
 
   private def tradableBalance(assetId: Asset): Future[Long] = spendableBalance(assetId).map { _ - openVolume(assetId) }
 
-  private def tradableBalancesByAssets(assets: Set[Asset]): Future[Map[Asset, Long]] = {
-    assets.toList.traverse(asset => tradableBalance(asset).map(balance => asset -> balance)) map { _.toMap }
+  private def tradableBalancesByAssets(assets: Set[Asset]): Future[Asset => Long] = {
+    assets.toList
+      .traverse(asset => tradableBalance(asset).map(balance => asset -> balance))
+      .map { _.toMap.apply }
   }
 
   private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long): OrderValidator.Result[AcceptedOrder] = {
@@ -103,7 +107,6 @@ class AddressActor(owner: Address,
             case Right(ao)   => reserve(ao); storePlaced(ao)
           }
         }
-
       }(_.future)
       .pipeTo(self)(sender)
   }
@@ -196,18 +199,17 @@ class AddressActor(owner: Address,
       log.trace(s"Loading ${if (onlyActive) "active" else "all"} ${maybePair.fold("")(_.toString + " ")}orders")
 
       val matchingActiveOrders = {
-        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield
-          ao.order.id() ->
-            OrderInfo.v2(
-              ao.order.orderType,
-              ao.order.amount,
-              ao.order.price,
-              ao.order.matcherFee,
-              ao.order.matcherFeeAssetId,
-              ao.order.timestamp,
-              activeStatus(ao),
-              ao.order.assetPair
-            )
+        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield ao.order.id() ->
+          OrderInfo.v2(
+            ao.order.orderType,
+            ao.order.amount,
+            ao.order.price,
+            ao.order.matcherFee,
+            ao.order.matcherFeeAssetId,
+            ao.order.timestamp,
+            activeStatus(ao),
+            ao.order.assetPair
+          )
       }.toSeq.sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")

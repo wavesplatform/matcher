@@ -46,7 +46,6 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   }
 
   "WavesBlockchainAsyncClient should send balance changes via gRPC" in {
-
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
     val bobInitialBalance   = wavesNode1Api.balance(bob, Waves)
 

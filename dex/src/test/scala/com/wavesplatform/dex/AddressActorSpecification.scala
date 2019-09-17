@@ -203,20 +203,19 @@ class AddressActorSpecification
           new AddressActor(
             address,
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
-            1.day,
-            ntpTime,
-            EmptyOrderDB,
-            _ => false,
-            event => {
-              eventsProbe.ref ! event
-              Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
-            },
-            _ => OrderBook.AggregatedSnapshot(),
-            false
-          )
+          1.day,
+          ntpTime,
+          EmptyOrderDB,
+          _ => false,
+          event => {
+            eventsProbe.ref ! event
+            Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
+          },
+          _ => OrderBook.AggregatedSnapshot(),
+          false
         )
       )
-
+    )
     f(
       addressActor,
       eventsProbe,

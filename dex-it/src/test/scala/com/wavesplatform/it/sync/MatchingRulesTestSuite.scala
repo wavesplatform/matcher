@@ -22,6 +22,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
          |        start-offset = 2
          |        tick-size    = 5
          |      }
+         |    ],
+         |    "WAVES-$BtcId": [
+         |      {
+         |        start-offset = 0
+         |        tick-size    = 5
+         |      }
          |    ]
          |  }
          |}
@@ -32,8 +38,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
-      node.waitForTransaction(tx.id)
+    Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).foreach { tx =>
+      node.waitForTransaction { node.broadcastRequest(tx.json.value).id }
     }
   }
 
@@ -61,5 +67,9 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, buyOrder3, "Cancelled")
 
     node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
+  }
+
+  "Buy orders cannot be placed into price level 0 (when price is less than tick size)" in {
+    node.expectRejectedOrderPlacement(bob, wavesBtcPair, BUY, amount, 3 * price, matcherFee)
   }
 }

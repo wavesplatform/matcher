@@ -72,8 +72,8 @@ object SyncMatcherHttpApi extends Assertions {
     def deleteOrderBook(assetPair: AssetPair): MessageMatcherResponse =
       sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
-    def fullOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
-      sync(async(m).fullOrdersHistory(sender), RequestAwaitTime)
+    def fullOrderHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Seq[OrderbookHistory] =
+      sync(async(m).fullOrdersHistory(sender, activeOnly), RequestAwaitTime)
 
     def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
       sync(async(m).orderHistoryByPair(sender, assetPair, activeOnly), RequestAwaitTime)

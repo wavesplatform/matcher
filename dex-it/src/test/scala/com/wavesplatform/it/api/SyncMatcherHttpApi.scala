@@ -151,6 +151,9 @@ object SyncMatcherHttpApi extends Assertions {
     def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MarketDataInfo =
       sync(async(m).tradingMarkets(), waitTime)
 
+    def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MarketData] =
+      tradingMarkets(waitTime).markets.find(marketData => marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
+
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
                                       expectedStatus: String,
@@ -268,5 +271,9 @@ object SyncMatcherHttpApi extends Assertions {
 
     def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
       sync(async(m).deleteRate(asset, expectedStatusCode.intValue))
+
+    def orderbookInfo(assetPair: AssetPair, waitTime: Duration = RequestAwaitTime): OrderbookInfo = {
+      sync(async(m).orderbookInfo(assetPair), waitTime)
+    }
   }
 }

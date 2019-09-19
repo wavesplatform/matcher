@@ -22,45 +22,45 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
          |  matching-rules = {
          |    "$WctId-$UsdId": [
          |      {
-         |        start-offset = 2
+         |        start-offset = 8
          |        tick-size    = 8
          |      },
          |      {
-         |        start-offset = 3
+         |        start-offset = 9
          |        tick-size    = 7
          |      },
          |      {
-         |        start-offset = 6
+         |        start-offset = 12
          |        tick-size    = 0.01
          |      },
          |      {
-         |        start-offset = 8
+         |        start-offset = 14
          |        tick-size    = 5
          |      },
          |      {
-         |        start-offset = 16
+         |        start-offset = 22
          |        tick-size    = 10
          |      },
          |      {
-         |        start-offset = 17
+         |        start-offset = 23
          |        tick-size    = 12
          |      }
          |    ],
          |    "$WctId-WAVES": [
          |      {
-         |        start-offset = 17
+         |        start-offset = 23
          |        tick-size    = 12
          |      }
          |    ],
          |    "WAVES-$BtcId": [
          |      {
-         |        start-offset = 17
+         |        start-offset = 23
          |        tick-size    = 12
          |      }
          |    ],
          |    "WAVES-$UsdId": [
          |      {
-         |        start-offset = 17
+         |        start-offset = 23
          |        tick-size    = 12
          |      }
          |    ]
@@ -97,41 +97,54 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, PriceConstant)
 
   // offset is 0, after test - 6
+  "Tick size isn't set" in {
+    node.tradingMarkets().markets.size shouldBe 0
+    // TODO check orderbookInfo for wct-Waves
+    Array(wctUsdPair -> "0.00000001", wavesBtcPair -> "0.00000001", wavesUsdPair -> "0.01").foreach { case (pair, defaultTs) =>
+      node.orderbookInfo(pair).matchingRules.tickSize shouldBe defaultTs
+
+      val orderId = node.placeOrder(bob, pair, SELL, amount, price, matcherFee).message.id
+      node.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
+      node.cancelOrder(bob, pair, orderId)
+    }
+  }
+
+  // offset is 6, after test - 12
   "Start offset depends of order placing and cancelling but matching" in {
     val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 15 * price))
     node.placeOrder(alice, wctUsdPair, BUY, amount, 17 * price, matcherFee).message.id
-    node.getCurrentOffset shouldBe 1
+    node.getCurrentOffset shouldBe 7
 
     node.waitOrderInBlockchain(sellOrder)
 
-    node.getCurrentOffset shouldBe 1
+    node.getCurrentOffset shouldBe 7
 
     val buyOrder = node.placeOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 8 * price))
     node.cancelOrder(alice, wctUsdPair, buyOrder)
-    node.getCurrentOffset shouldBe 3
+    node.getCurrentOffset shouldBe 9
 
     val anotherBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 7 * price))
     node.cancelOrder(alice, wctUsdPair, anotherBuyOrder)
   }
 
-  // offset is 6, after test - 12
+  // offset is 12, after test - 18
   "Orders should be cancelled correctly when matcher rules are changed" in {
 
-    // here tick size is disabled (offset = 6)
+    // here tick size is disabled (offset = 12)
     val buyOrder1 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder1, "Accepted")
 
-    // here tick size is disabled (offset = 7)
+    // here tick size is disabled (offset = 13)
     val buyOrder2 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder2, "Accepted")
 
     val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
     val aliceWctBalance = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
 
-    // here tick size = 5 (offset = 8), hence new order is placed into corrected price level 5, not 7
+    // here tick size = 5 (offset = 14), hence new order is placed into corrected price level 5, not 7
     val buyOrder3 = node.placeOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder3, "Accepted")
 
@@ -154,7 +167,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     Array(buyOrder1, buyOrder2).foreach(order => node.cancelOrder(alice, wctUsdPair, order))
   }
 
-  // offset is 12, after test - 16
+  // offset is 18, after test - 22
   "Matching on the same price level" in {
     val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
     val bobWctBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
@@ -187,7 +200,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.cancelOrder(bob, wctUsdPair, anotherSellOrder)
   }
 
-  // offset is 16, after test - 19
+  // offset is 22, after test - 25
   "Matching with old orders after tick size enabled" in {
     val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
     val bobWctBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
@@ -220,7 +233,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     }
   }
 
-  // offset is 19, after test - 23
+  // offset is 25, after test - 29
   "Matching orders of same price but neighbors levels" in {
     val bestAskOrderId = node.placeOrder(alice, wctUsdPair, SELL, amount, 17 * price, matcherFee).message.id
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 24 * price))

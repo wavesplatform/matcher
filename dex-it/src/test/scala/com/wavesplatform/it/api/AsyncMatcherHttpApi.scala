@@ -395,6 +395,10 @@ object AsyncMatcherHttpApi extends Assertions {
         statusCode = expectedStatusCode
       ).as[RatesResponse]
     }
+
+    def orderbookInfo(assetPair: AssetPair): Future[OrderbookInfo] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[OrderbookInfo]
+    }
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {

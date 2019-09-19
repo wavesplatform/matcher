@@ -32,7 +32,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
+    Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
       node.waitForTransaction(tx.id)
     }
   }
@@ -77,4 +77,23 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, order, "Accepted")
   }
 
+  "order restrictions endpoints" in {
+    node.orderbookInfo(wctUsdPair).restrictions.get.minAmount shouldBe "0.1"
+    node.orderbookInfo(wctUsdPair).restrictions.get.maxAmount shouldBe "100000000"
+    node.orderbookInfo(wctUsdPair).restrictions.get.stepAmount shouldBe "0.1"
+    node.orderbookInfo(wctUsdPair).restrictions.get.minPrice shouldBe "0.0001"
+    node.orderbookInfo(wctUsdPair).restrictions.get.maxPrice shouldBe "1000"
+    node.orderbookInfo(wctUsdPair).restrictions.get.stepPrice shouldBe "0.001"
+
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.minAmount shouldBe "0.1"
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.maxAmount shouldBe "100000000"
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.stepAmount shouldBe "0.1"
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.minPrice shouldBe "0.0001"
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe "1000"
+    node.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe "0.001"
+
+    node.orderbookInfo(wavesBtcPair).restrictions.isEmpty
+    node.placeOrder(bob, wavesBtcPair, BUY, 100000000, 100000, matcherFee)
+    node.tradingPairInfo(wavesBtcPair).get.restrictions.isEmpty
+  }
 }

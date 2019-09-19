@@ -95,7 +95,7 @@ object SyncMatcherHttpApi extends Assertions {
                    feeAsset: Asset = Waves): MatcherResponse =
       sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset))
 
-    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
+    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponseWithFee =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
 
     def waitTransactionsByOrder(orderId: String, min: Int): Seq[ExchangeTransaction] =
@@ -104,19 +104,19 @@ object SyncMatcherHttpApi extends Assertions {
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
-                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,
                                  orderId: String,
                                  expectedStatus: String,
                                  expectedFilledAmount: Option[Long],
-                                 waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+                                 waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
     def waitOrderProcessed(assetPair: AssetPair, orderId: String, checkTimes: Int = 5, retryInterval: FiniteDuration = 1.second): Unit = {
       val fixedStatus = sync {
-        async(m).waitFor[MatcherStatusResponse](s"$orderId processed")(
+        async(m).waitFor[MatcherStatusResponseWithFee](s"$orderId processed")(
           _.orderStatus(orderId, assetPair),
           _.status != "NotFound",
           retryInterval
@@ -175,13 +175,13 @@ object SyncMatcherHttpApi extends Assertions {
     def expectCancelRejected(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
 
-    def cancelOrder(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+    def cancelOrder(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
 
     def cancelOrdersForPair(sender: KeyPair,
                             assetPair: AssetPair,
                             timestamp: Long = System.currentTimeMillis(),
-                            waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+                            waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
 
     def cancelOrdersForPairOnce(sender: KeyPair,
@@ -192,10 +192,10 @@ object SyncMatcherHttpApi extends Assertions {
 
     def cancelAllOrders(sender: KeyPair,
                         timestamp: Long = System.currentTimeMillis(),
-                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).cancelAllOrders(sender, timestamp), waitTime)
 
-    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponseWithFee =
       sync(async(m).cancelOrderWithApiKey(orderId), waitTime)
 
     def matcherGet(path: String,
@@ -264,7 +264,7 @@ object SyncMatcherHttpApi extends Assertions {
     def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode): RatesResponse =
       sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue), waitTime)
 
-    def getRates: Map[Asset, Double] = sync(async(m).getRates())
+    def getRates: Map[Asset, Double] = sync(async(m).getRates)
 
     def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
       sync(async(m).deleteRate(asset, expectedStatusCode.intValue))

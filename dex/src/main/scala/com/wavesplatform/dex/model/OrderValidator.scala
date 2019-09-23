@@ -215,6 +215,7 @@ object OrderValidator extends ScorexLogging {
         )
     }
 
+  /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
   private def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, rateCache: RateCache, assetDecimals: Asset => Int): Long = {
     rateCache
       .getRate(asset)
@@ -234,7 +235,7 @@ object OrderValidator extends ScorexLogging {
     * @param orderFeeSettings matcher settings for the fee of orders
     * @param matchPrice       price at which order is executed
     * @param rateCache        assets rates (rate = cost of 1 Waves in asset)
-    * @param assetDecimals    obtaining asset decimals from the asset cache
+    * @param assetDecimals    obtaining asset decimals from the asset decimals cache
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
   private[dex] def getMinValidFeeForSettings(order: Order,

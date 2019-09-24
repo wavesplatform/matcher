@@ -46,25 +46,10 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val btc           = mkAssetId("WBTC")
-  private val usd           = mkAssetId("WUSD")
-  private val senderKeyPair = KeyPair("seed".getBytes("utf-8"))
-
-  override val getDefaultAssetDecimals: Asset => Int = Map[Asset, Int](usd -> 2, btc -> 8).withDefaultValue(defaultAssetDecimals).apply _
-  override val rateCache: RateCache                  = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
-
-  private val pairWavesBtc = AssetPair(Waves, btc)
-  private val pairWavesUsd = AssetPair(Waves, usd)
-
-  private lazy val accountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
-  private val defaultPortfolio   = Portfolio(0, LeaseBalance.empty, Map(btc -> 10 * Constants.UnitsInWave))
+  private lazy val simpleAccountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
+  private val defaultPortfolio         = Portfolio(0, LeaseBalance.empty, Map(btc -> 10 * Constants.UnitsInWave))
 
   private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDecimals
-
-  implicit class DoubleOps(value: Double) {
-    val waves, btc = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long  = Normalization.normalizeAmountAndFee(value, 2)
-  }
 
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in asa() { v =>
@@ -644,7 +629,7 @@ class OrderValidatorSpecification
     "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
       portfolioTest(defaultPortfolio) { (ov, bc) =>
         activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-        (bc.accountScript _).when(account.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
+        (bc.accountScript _).when(account.toAddress).returns(Some(simpleAccountScript)).anyNumberOfTimes()
         (bc.height _).when().returns(0).anyNumberOfTimes()
 
         ov(newBuyOrder(account, version = 2)) should produce("OrderVersionUnsupported")
@@ -683,7 +668,7 @@ class OrderValidatorSpecification
     val pk = KeyPair(randomBytes())
 
     activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
-    (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
+    (bc.accountScript _).when(pk.toAddress).returns(Some(simpleAccountScript)).anyNumberOfTimes()
     (bc.height _).when().returns(1).anyNumberOfTimes()
     (bc.assetScript _).when(btc).returns(None)
     (bc.assetDescription _).when(btc).returns(mkAssetDescription(8)).anyNumberOfTimes()
@@ -812,27 +797,5 @@ class OrderValidatorSpecification
                        orderRestrictions,
                        rateCache,
                        assetDecimals)(order)
-  }
-
-  private def createOrder(pair: AssetPair,
-                          orderType: OrderType,
-                          amount: Long,
-                          price: Double,
-                          matcherFee: Long = 0.003.waves,
-                          version: Byte = 3,
-                          matcherFeeAsset: Asset = Waves): Order = {
-    Order(
-      sender = senderKeyPair,
-      matcher = MatcherAccount,
-      pair = pair,
-      orderType = orderType,
-      amount = amount,
-      price = Normalization.normalizePrice(price, getDefaultAssetDecimals(pair.amountAsset), getDefaultAssetDecimals(pair.priceAsset)),
-      timestamp = ntpNow,
-      expiration = ntpNow + (1000 * 60 * 60 * 24),
-      matcherFee = matcherFee,
-      version = version,
-      matcherFeeAssetId = matcherFeeAsset
-    )
   }
 }

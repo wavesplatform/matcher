@@ -7,7 +7,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -21,6 +21,7 @@ import com.wavesplatform.{NTPTime, crypto}
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import mouse.any._
 
 import scala.util.Random
 
@@ -33,17 +34,50 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val MatcherAccount               = KeyPair(MatcherSeed)
   val accountGen: Gen[KeyPair]     = bytes32gen.map(seed => KeyPair(seed))
   val positiveLongGen: Gen[Long]   = Gen.choose(1, Long.MaxValue)
+  val senderKeyPair                = KeyPair("seed".getBytes("utf-8"))
 
-  private val seqNr = new AtomicLong(-1)
+  private val seqNr        = new AtomicLong(-1)
+  val defaultAssetDecimals = 8
 
-  def rateCache: RateCache = RateCache.inMem
+  val btc: IssuedAsset = mkAssetId("WBTC")
+  val usd: IssuedAsset = mkAssetId("WUSD")
 
-  val defaultAssetDecimals                  = 8
-  val getDefaultAssetDecimals: Asset => Int = _ => defaultAssetDecimals
+  val pairWavesBtc = AssetPair(Waves, btc)
+  val pairWavesUsd = AssetPair(Waves, usd)
+
+  val getDefaultAssetDecimals: Asset => Int = Map[Asset, Int](usd -> 2, btc -> 8).withDefaultValue(defaultAssetDecimals).apply _
+  val rateCache: RateCache                  = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
+
+  implicit class DoubleOps(value: Double) {
+    val waves, btc = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long  = Normalization.normalizeAmountAndFee(value, 2)
+  }
 
   def wrap(x: Order): QueueEventWithMeta                   = wrap(seqNr.incrementAndGet(), x)
   def wrap(n: Long, x: Order): QueueEventWithMeta          = wrap(n, QueueEvent.Placed(x))
   def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
+
+  def createOrder(pair: AssetPair,
+                  orderType: OrderType,
+                  amount: Long,
+                  price: Double,
+                  matcherFee: Long = 0.003.waves,
+                  version: Byte = 3,
+                  matcherFeeAsset: Asset = Waves): Order = {
+    Order(
+      sender = senderKeyPair,
+      matcher = MatcherAccount,
+      pair = pair,
+      orderType = orderType,
+      amount = amount,
+      price = Normalization.normalizePrice(price, getDefaultAssetDecimals(pair.amountAsset), getDefaultAssetDecimals(pair.priceAsset)),
+      timestamp = ntpNow,
+      expiration = ntpNow + (1000 * 60 * 60 * 24),
+      matcherFee = matcherFee,
+      version = version,
+      matcherFeeAssetId = matcherFeeAsset
+    )
+  }
 
   def assetIdGen(prefix: Byte): Gen[IssuedAsset] =
     Gen

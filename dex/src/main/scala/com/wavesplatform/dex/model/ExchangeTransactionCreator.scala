@@ -57,6 +57,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount, price)
 
+    // matcher always pays fee to the miners in Waves
     val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair, matcherSettings.exchangeTxBaseFee)
 
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
@@ -82,8 +83,8 @@ object ExchangeTransactionCreator {
   /**
     * This function is used for the following purposes:
     *
-    *   1. Calculate transaction fee that matcher pays to issue Exchange transaction (ExchangeTransactionCreator, base fee = matcherSettings.exchangeTxBaseFee)
-    *   2. Calculate matcher fee that client pays for the order placement and covering matcher expenses (OrderValidator blockchain aware, base fee depends on order fee settings)
+    *   1. Calculate matcher fee that CLIENT PAYS TO MATCHER for the order placement and covering matcher expenses (OrderValidator blockchainAware, base fee depends on order fee settings)
+    *   2. Calculate transaction fee that MATCHER PAYS TO THE MINERS for issuing Exchange transaction (ExchangeTransactionCreator, base fee = matcherSettings.exchangeTxBaseFee)
     *
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
@@ -96,8 +97,8 @@ object ExchangeTransactionCreator {
 
     baseFee +
       minAccountFee(blockchain, matcherAddress) +
-      assetPair.amountAsset.fold(0L)(assetFee) +
-      assetPair.priceAsset.fold(0L)(assetFee)
+      assetFee(assetPair.amountAsset) +
+      assetFee(assetPair.priceAsset)
   }
 
   def minAccountFee(blockchain: Blockchain, address: Address): Long = {

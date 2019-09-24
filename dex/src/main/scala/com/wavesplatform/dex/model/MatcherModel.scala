@@ -168,7 +168,7 @@ object AcceptedOrder {
     *
     *     2. Other cases
     *
-    *       A = x
+    *       x = A
     *
     */
   def executedAmount(submitted: AcceptedOrder, counter: LimitOrder): Long = {

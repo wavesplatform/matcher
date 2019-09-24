@@ -2,6 +2,7 @@ package com.wavesplatform.dex.matching
 
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
+import akka.testkit.TestProbe
 import akka.util.Timeout
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.PlaceMarketOrder
@@ -12,7 +13,7 @@ import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._
 import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderHistoryStub}
-import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData, _}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -20,11 +21,11 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.{NTPTime, WithDB}
 import monix.reactive.subjects.Subject
 import org.scalatest.PropSpecLike
-import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Future}
+import scala.util.Try
 
 /**
   * Tests for reserved balance
@@ -77,8 +78,7 @@ class ReservedBalanceSpecification
     with WithDB
     with MatcherTestData
     with TableDrivenPropertyChecks
-    with NTPTime
-    with Eventually {
+    with NTPTime {
 
   override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
 
@@ -111,7 +111,7 @@ class ReservedBalanceSpecification
               orderBookCache = _ => AggregatedSnapshot(),
               enableSchedules
             )
-          ),
+        ),
         None
       )
     )
@@ -476,6 +476,8 @@ class ReservedBalanceSpecification
   private val USD   = pair.priceAsset
   private val ETH   = mkAssetId("ETH")
 
+  val testProbe: TestProbe = TestProbe()
+
   private def addressDirWithSpendableBalance(
       spendableBalance: Asset => Future[Long],
       orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot()
@@ -494,24 +496,26 @@ class ReservedBalanceSpecification
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
                 hasOrder = _ => false,
-                storeEvent = event => Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis(), event)) },
+                storeEvent = event => {
+                  testProbe.ref ! event
+                  Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
+                },
                 orderBookCache = orderBookCache,
                 enableSchedules
               )
-            ),
+          ),
           None
         )
       )
     )
   }
 
-  private def placeMarketOrder(addressDir: ActorRef, order: Order): Unit = {
-    addressDir ! Envelope(order.senderPublicKey, PlaceMarketOrder(order))
-    Thread.sleep(5)
+  private def placeMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
+    addressDir ! Envelope(marketOrder.order.senderPublicKey, PlaceMarketOrder(marketOrder.order))
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
-    addressDir ! OrderCanceled(marketOrder, isSystemCancel = true, System.currentTimeMillis())
+    addressDir ! OrderCanceled(marketOrder, isSystemCancel = true, System.currentTimeMillis)
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
@@ -565,10 +569,8 @@ class ReservedBalanceSpecification
       s"Reserves of the market order with no counters should be correct: ${printMarketOrderInfo(orderType, amount, price, feeAsset, balance)}"
     } {
 
-      val addressDir = addressDirWithSpendableBalance {
-        balance.mapValues(Future.successful)
-      }
-      val fee = Some(feeAsset.amt(matcherFee))
+      val addressDir = addressDirWithSpendableBalance { balance.mapValues(Future.successful) }
+      val fee        = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
         case BUY  => rawBuy(pair, amount, price, version = 3, feeAsset = feeAsset, matcherFee = fee)
@@ -582,26 +584,23 @@ class ReservedBalanceSpecification
       val expectedReceiveAssetReserve = reserves(marketOrder.rcvAsset)
       val expectedFeeAssetReserve     = reserves(marketOrder.feeAsset)
 
-      placeMarketOrder(addressDir, marketOrder.order)
+      placeMarketOrder(addressDir, marketOrder)
+      testProbe.expectMsg(QueueEvent.PlacedMarket(marketOrder))
 
       withClue {
         s"Place market $orderType order, fee in ${feeAsset.toStringSRT(orderType)} asset, expected reserves (spent/received/fee) = $expectedSpentAssetReserve/$expectedReceiveAssetReserve/$expectedFeeAssetReserve:\n"
       } {
-        eventually {
-          reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
-          reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
-          reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
-        }
+        reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
+        reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
+        reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
       }
 
       systemCancelMarketOrder(addressDir, marketOrder)
 
       withClue(s"System cancel of $orderType market order:\n") {
-        eventually {
-          reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
-          reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
-          reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
-        }
+        reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
+        reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
+        reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
       }
     }
   }
@@ -610,32 +609,32 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("mo type", "mo amount", "mo price", "mo fee asset", "spendable balance", "lo amount", "lo price", "reserves map after execution"),
-      /** r = required, f = fee, e = executed, ef = executed fee, afs = available for spending, e*, ef* = calculated by the formula AcceptedOrder.executedAmount */
+      /** r = required, f = fee, ea = executed amount, ef = executed fee, afs = available for spending, ea*, ef* = calculated by the formula AcceptedOrder.executedAmount */
       /** market BUY order PARTIALLY filled, available for spending > required by spendable asset */
-      (BUY, 123.waves, 3.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.19.usd)),                    // fee in spent asset,    USD: 123 * 3 [r] + 1 [f] - 100 * 2 [e] - 100/123 [ef]
-      (BUY, 123.waves, 3.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.usd)),                     // fee in received asset, USD: 123 * 3 [r] - 100 * 2 [e]
-      (BUY, 123.waves, 3.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.usd, eth = 0.18699187.eth)), // fee in third asset,    USD: 123 * 3 [r] - 100 * 2 [e], ETH: 1 [f] - 100/123 [ef]
+      (BUY, 123.waves, 3.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.19.usd)),                    // fee in spent asset,    USD: 123 * 3 [r] + 1 [f] - 100 * 2 [ea] - 100/123 [ef]
+      (BUY, 123.waves, 3.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.usd)),                     // fee in received asset, USD: 123 * 3 [r] - 100 * 2 [ea]
+      (BUY, 123.waves, 3.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 169.usd, eth = 0.18699187.eth)), // fee in third asset,    USD: 123 * 3 [r] - 100 * 2 [ea], ETH: 1 [f] - 100/123 [ef]
       /** market BUY order filled, available for spending > required by spendable asset */
       (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 2.usd, amtMap()),   // fee in spent asset
       (BUY, 100.waves, 3.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 2.usd, amtMap()), // fee in received asset
       (BUY, 100.waves, 3.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 2.usd, amtMap()),   // fee in third asset
       /** market SELL order PARTIALLY filled, available for spending > required by spendable asset */
-      (SELL, 123.waves, 2.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.18699187.waves)),            // fee in spent asset,    WAVES: 123 [r] + 1 [f] - 100 [e] - 100/123 [ef]
-      (SELL, 123.waves, 2.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.waves)),                       // fee in received asset, WAVES: 123 [r] - 100 [e]
-      (SELL, 123.waves, 2.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.waves, eth = 0.18699187.eth)), // fee in third asset,    WAVES: 123 [r] - 100 [e], ETH: 1 [f] - 100/123 [ef]
+      (SELL, 123.waves, 2.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.18699187.waves)),            // fee in spent asset,    WAVES: 123 [r] + 1 [f] - 100 [ea] - 100/123 [ef]
+      (SELL, 123.waves, 2.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.waves)),                       // fee in received asset, WAVES: 123 [r] - 100 [ea]
+      (SELL, 123.waves, 2.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 23.waves, eth = 0.18699187.eth)), // fee in third asset,    WAVES: 123 [r] - 100 [ea], ETH: 1 [f] - 100/123 [ef]
       /** market SELL order filled, available for spending > required by spendable asset */
       (SELL, 100.waves, 2.usd, WAVES, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 3.usd, amtMap()), // fee in spent asset
       (SELL, 100.waves, 2.usd, USD, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 3.usd, amtMap()),   // fee in received asset
       (SELL, 100.waves, 2.usd, ETH, amtMap(500.waves, 500.usd, 50.eth), 200.waves, 3.usd, amtMap()),   // fee in third asset
       /** market BUY order PARTIALLY filled, available for spending < required by spendable asset, but is enough to cover market cost and fee */
-      (BUY, 123.waves, 3.usd, USD, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 99.19.usd)),                     // fee in spent asset,    USD: 300 [afs] - 100 * 2 [e] - 100/123 [ef]
-      (BUY, 123.waves, 3.usd, WAVES, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 100.usd)),                     // fee in received asset, USD: 300 [afs] - 100 * 2 [e]
-      (BUY, 123.waves, 3.usd, ETH, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 100.usd, eth = 0.18699187.eth)), // fee in third asset,    USD: 300 [afs] - 100 * 2 [e], ETH: 1 [f] - 100/123 [ef]
-      /** market BUY order PARTIALLY filled, available for spending < required by spendable asset and is NOT enough to cover market cost and fee */
-      (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                       // fee in spent asset,    USD: 300 [afs] - 299.00 [e*] - 0.99 [ef*]
-      (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                       // fee in spent asset,    USD: 290 [afs] - 289.03 [e*] - 0.96 [ef*]
-      (BUY, 100.waves, 3.usd, WAVES, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                     // fee in received asset, USD: 290 [afs] - 299.99 [e*]
-      (BUY, 100.waves, 3.usd, ETH, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd, eth = 0.03336667.eth)), // fee in third asset,    USD: 290 [afs] - 289.99 [e*], ETH = 1 [f] - 0.96663333 [ef*]
+      (BUY, 123.waves, 3.usd, USD, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 99.19.usd)),                     // fee in spent asset,    USD: 300 [afs] - 100 * 2 [ea] - 100/123 [ef]
+      (BUY, 123.waves, 3.usd, WAVES, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 100.usd)),                     // fee in received asset, USD: 300 [afs] - 100 * 2 [ea]
+      (BUY, 123.waves, 3.usd, ETH, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 2.usd, amtMap(usd = 100.usd, eth = 0.18699187.eth)), // fee in third asset,    USD: 300 [afs] - 100 * 2 [ea], ETH: 1 [f] - 100/123 [ef]
+      /** (!!!) market BUY order PARTIALLY filled, available for spending < required by spendable asset and is NOT enough to cover market cost and fee */
+      (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                       // fee in spent asset,    USD: 300 [afs] - 299.00 [ea*] - 0.99 [ef*]
+      (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                       // fee in spent asset,    USD: 290 [afs] - 289.03 [ea*] - 0.96 [ef*]
+      (BUY, 100.waves, 3.usd, WAVES, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd)),                     // fee in received asset, USD: 290 [afs] - 299.99 [ea*]
+      (BUY, 100.waves, 3.usd, ETH, amtMap(500.waves, 290.usd, 50.eth), 100.waves, 3.usd, amtMap(usd = 0.01.usd, eth = 0.03336667.eth)), // fee in third asset,    USD: 290 [afs] - 289.99 [ea*], ETH = 1 [f] - 0.96663333 [ef*]
       /** market BUY order filled, available for spending = required by spendable asset */
       (BUY, 100.waves, 3.usd, USD, amtMap(500.waves, 301.usd, 50.eth), 100.waves, 3.usd, amtMap()),   // fee in spent asset
       (BUY, 100.waves, 3.usd, WAVES, amtMap(500.waves, 300.usd, 50.eth), 100.waves, 3.usd, amtMap()), // fee in received asset
@@ -645,14 +644,14 @@ class ReservedBalanceSpecification
       (BUY, 100.waves, 3.usd, WAVES, amtMap(500.waves, 250.usd, 50.eth), 200.waves, 2.usd, amtMap()), // fee in received asset
       (BUY, 100.waves, 3.usd, ETH, amtMap(500.waves, 250.usd, 50.eth), 200.waves, 2.usd, amtMap()),   // fee in third asset
       /** market SELL order PARTIALLY filled, available for spending < required by spendable asset but is enough to cover market amount and fee */
-      (SELL, 123.waves, 2.usd, WAVES, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 9.18699187.waves)),             // fee in spent asset,    WAVES: 110 [afs] - 100 [e] - 100/123 [ef]
-      (SELL, 123.waves, 2.usd, USD, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 10.waves)),                       // fee in received asset, WAVES: 110 [afs] - 100 [e]
-      (SELL, 123.waves, 2.usd, ETH, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 10.waves, eth = 0.18699187.eth)), // fee in third asset,    WAVES: 110 [afs] - 100 [e], USD: 1 [f] - 100/123 [ef]
-      /** market SELL order PARTIALLY filled, available for spending < required by spendable asset and NOT enough to cover market amount and fee */
-      (SELL, 123.waves, 2.usd, WAVES, amtMap(100.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)), // fee in spent asset, WAVES: 100 [afs] - 99.19354838 [e*] - 0.80645161 [ef*]
-      (SELL, 123.waves, 2.usd, WAVES, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)),  //  fee in spent asset, WAVES: 90 [afs] - 89.27419354 [e*] - 0.72580645 [ef*]
-      (SELL, 123.waves, 2.usd, USD, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),                            //  fee in received asset
-      (SELL, 123.waves, 2.usd, ETH, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(eth = 0.26829269.eth)),        //  fee in third asset, ETH: 1 [f] - 90/123 [ef]
+      (SELL, 123.waves, 2.usd, WAVES, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 9.18699187.waves)),             // fee in spent asset,    WAVES: 110 [afs] - 100 [ea] - 100/123 [ef]
+      (SELL, 123.waves, 2.usd, USD, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 10.waves)),                       // fee in received asset, WAVES: 110 [afs] - 100 [ea]
+      (SELL, 123.waves, 2.usd, ETH, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 10.waves, eth = 0.18699187.eth)), // fee in third asset,    WAVES: 110 [afs] - 100 [ea], USD: 1 [f] - 100/123 [ef]
+      /** (!!!) market SELL order PARTIALLY filled, available for spending < required by spendable asset and NOT enough to cover market amount and fee */
+      (SELL, 123.waves, 2.usd, WAVES, amtMap(100.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)), // fee in spent asset, WAVES: 100 [afs] - 99.19354838 [ea*] - 0.80645161 [ef*]
+      (SELL, 123.waves, 2.usd, WAVES, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)),  // fee in spent asset, WAVES:  90 [afs] - 89.27419354 [ea*] - 0.72580645 [ef*]
+      (SELL, 123.waves, 2.usd, USD, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),                            // fee in received asset
+      (SELL, 123.waves, 2.usd, ETH, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(eth = 0.26829269.eth)),        // fee in third asset, ETH: 1 [f] - 90/123 [ef]
       /** market SELL order filled, available for spending = required by spendable asset */
       (SELL, 100.waves, 3.usd, WAVES, amtMap(101.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()), // fee in spent asset
       (SELL, 100.waves, 3.usd, USD, amtMap(100.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),   // fee in received asset
@@ -685,7 +684,17 @@ class ReservedBalanceSpecification
 
         val marketOrder = MarketOrder(order, balance)
 
-        placeMarketOrder(addressDir, marketOrder.order)
+        placeMarketOrder(addressDir, marketOrder)
+
+        // here Try because of the market order nature:
+        // an order can pass validation, but during execution, available for spending balance may become not sufficient
+        // because of order book changing.
+        //
+        // So in tests marked with !!! after order placement test probe won't receive PlacedMarket event,
+        // since order will be rejected because of the BalanceNotEnough error. Its ok since in these tests we check
+        // tricky cases of balance reservation, when afs is not enough to cover market value and fee
+
+        Try { testProbe.expectMsg(100.millisecond, QueueEvent.PlacedMarket(marketOrder)) }
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 
@@ -702,21 +711,17 @@ class ReservedBalanceSpecification
             s"expected reserves after execution (spent/received/fee) = " +
             s"$expectedSpentAssetReserve/$expectedReceiveAssetReserve/$expectedFeeAssetReserve:\n"
         } {
-          eventually {
-            reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
-            reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
-            reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
-          }
+          reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
+          reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
+          reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
         }
 
         systemCancelMarketOrder(addressDir, orderExecutedEvent.submittedMarketRemaining(marketOrder))
 
         withClue(s"System cancel of $moTpe market order remaining:\n") {
-          eventually {
-            reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
-            reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
-            reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
-          }
+          reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
+          reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
+          reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
         }
       }
   }

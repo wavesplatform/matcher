@@ -4,6 +4,7 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.Matcher.StoreEvent
@@ -13,13 +14,13 @@ import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
+import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import mouse.any._
 import org.slf4j.LoggerFactory
-import cats.implicits._
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap}
@@ -27,17 +28,17 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class AddressActor(
-    owner: Address,
-    spendableBalance: Asset => Future[Long],
-    cancelTimeout: FiniteDuration,
-    time: Time,
-    orderDB: OrderDB,
-    hasOrder: Order.Id => Boolean,
-    storeEvent: StoreEvent,
-    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
-    var enableSchedules: Boolean
-) extends Actor
+class AddressActor(owner: Address,
+                   spendableBalance: Asset => Future[Long],
+                   cancelTimeout: FiniteDuration,
+                   time: Time,
+                   orderDB: OrderDB,
+                   hasOrder: Order.Id => Boolean,
+                   storeEvent: StoreEvent,
+                   orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
+                   var enableSchedules: Boolean)
+    extends Actor
+    with WorkingStash
     with ScorexLogging {
 
   import AddressActor._
@@ -91,7 +92,9 @@ class AddressActor(
     pendingPlacement
       .get { order.id() }
       .fold {
+
         log.debug(s"New ${if (isMarket) "market order" else "order"}: ${order.json()}")
+        context.become(stashingState)
 
         tradableBalancesByAssets { Set(order.getSpendAssetId, order.matcherFeeAssetId) } flatMap { tradableBalance =>
           val acceptedOrder = if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
@@ -100,18 +103,12 @@ class AddressActor(
             case Right(ao)   => reserve(ao); storePlaced(ao)
           }
         }
-      }(_.future) pipeTo sender()
+
+      }(_.future)
+      .pipeTo(self)(sender)
   }
 
   private def handleCommands: Receive = {
-
-    case BalanceUpdated(actualBalance) =>
-      getOrdersToCancel(actualBalance) |> { toCancel =>
-        if (toCancel.nonEmpty) {
-          log.debug(s"Canceling: $toCancel")
-          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
-        }
-      }
 
     case PlaceLimitOrder(order)  => placeOrder(order, isMarket = false)
     case PlaceMarketOrder(order) => placeOrder(order, isMarket = true)
@@ -169,7 +166,7 @@ class AddressActor(
         Future.successful(storeError)
       case Success(r) =>
         r match {
-          case None => Future.successful(NotImplemented(error.FeatureDisabled))
+          case None => Future.successful { NotImplemented(error.FeatureDisabled) }
           case Some(x) =>
             log.info(s"Stored $x")
             promisedResponse.future
@@ -235,7 +232,7 @@ class AddressActor(
       val id = ao.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(ao.order)
-      pendingCancellation.remove(id).foreach(_.success(api.OrderCanceled(id)))
+      pendingCancellation.remove(id).foreach { _.success(api.OrderCanceled(id)) }
       val isActive = activeOrders.contains(id)
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) {
@@ -292,7 +289,26 @@ class AddressActor(
     )
   }
 
-  def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
+  def activeState: Receive = handleCommands orElse sharedBehaviour
+
+  def sharedBehaviour: Receive = handleExecutionEvents orElse handleStatusRequests orElse handleBalanceChanges
+
+  def handleBalanceChanges: Receive = {
+    case BalanceUpdated(actualBalance) =>
+      getOrdersToCancel(actualBalance) |> { toCancel =>
+        if (toCancel.nonEmpty) {
+          log.debug(s"Canceling: $toCancel")
+          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
+        }
+      }
+  }
+
+  def stashingState: Receive = sharedBehaviour orElse {
+    case response: Resp => sender ! response; context.become(activeState); unstashAll()
+    case other          => stash(other)
+  }
+
+  def receive: Receive = activeState
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[QueueEvent.Canceled] = {
     // Now a user can have 100 active transaction maximum - easy to traverse.
@@ -327,7 +343,7 @@ class AddressActor(
 
 object AddressActor {
 
-  private type Resp = api.MatcherResponse
+  type Resp = api.MatcherResponse
 
   private val ExpirationThreshold = 50.millis
 
@@ -358,4 +374,5 @@ object AddressActor {
   case class BalanceUpdated(actualBalance: Map[Asset, Long])           extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
+
 }

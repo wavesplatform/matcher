@@ -379,11 +379,11 @@ object OrderValidator extends ScorexLogging {
       orderBookCache: AssetPair => OrderBook.AggregatedSnapshot
   ): Result[AcceptedOrder] = {
 
-    /*
-     * According to the current market state calculates cost for buy market orders or amount for sell market orders
-     * that should be covered by tradable balance of the order's owner.
-     * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
-     */
+    /**
+      * According to the current market state calculates cost for buy market orders or amount for sell market orders
+      * that should be covered by tradable balance of the order's owner.
+      * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
+      */
     def getMarketOrderValue: Result[Long] = {
 
       // Adds value of level to the current value of the market order

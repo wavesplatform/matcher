@@ -3,27 +3,17 @@ package com.wavesplatform.it.sync.smartcontracts
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.DoubleExt
-import com.wavesplatform.lang.directives.values.{Expression, V1}
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils.compilerContext
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.it._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import fastparse.core.Parsed
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
-
-  private def createBoolScript(code: String) = {
-    val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
-  }
 
   val trueScript = Some(Base64.encode(createBoolScript("true").bytes.apply)) //TODO добавить типовые проверки в скрипт
   val falseScript = Some(Base64.encode(createBoolScript("false").bytes.apply))

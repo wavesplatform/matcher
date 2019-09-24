@@ -172,7 +172,7 @@ object MatcherPriceAssetConfig {
   val orderLimit = 10
 
   val ForbiddenAssetId     = "FdbnAsset"
-  val updatedMatcherConfig = parseString(s"""waves.dex {
+  val updatedMatcherConfig: Config = parseString(s"""waves.dex {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit

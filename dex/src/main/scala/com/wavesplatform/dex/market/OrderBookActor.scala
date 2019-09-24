@@ -13,7 +13,7 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, RawMatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
@@ -30,9 +30,9 @@ class OrderBookActor(owner: ActorRef,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var matchingRules: NonEmptyList[RawMatchingRule],
-                     actualizeCurrentMatchingRules: RawMatchingRule => Unit,
-                     normalizeMatchingRule: RawMatchingRule => MatchingRule)
+                     var denormalizedMatchingRules: NonEmptyList[DenormalizedMatchingRule],
+                     actualizeCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -47,14 +47,14 @@ class OrderBookActor(owner: ActorRef,
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
-  private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
+  private var actualRule: MatchingRule = normalizeMatchingRule(denormalizedMatchingRules.head)
 
   private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
-    val actualRules = RawMatchingRule.skipOutdated(offset, matchingRules)
-    if (matchingRules.head != actualRules.head) {
-      matchingRules = actualRules
-      actualizeCurrentMatchingRules(matchingRules.head)
-      actualRule = normalizeMatchingRule(matchingRules.head)
+    val actualRules = DenormalizedMatchingRule.skipOutdated(offset, denormalizedMatchingRules)
+    if (denormalizedMatchingRules.head != actualRules.head) {
+      denormalizedMatchingRules = actualRules
+      actualizeCurrentMatchingRules(denormalizedMatchingRules.head)
+      actualRule = normalizeMatchingRule(denormalizedMatchingRules.head)
     }
   }
 
@@ -195,9 +195,9 @@ object OrderBookActor {
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            matchingRules: NonEmptyList[RawMatchingRule],
-            actualizeCurrentMatchingRules: RawMatchingRule => Unit,
-            normalizeMatchingRule: RawMatchingRule => MatchingRule): Props =
+            denormalizedMatchingRules: NonEmptyList[DenormalizedMatchingRule],
+            actualizeCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -208,7 +208,7 @@ object OrderBookActor {
         updateMarketStatus,
         createTransaction,
         time,
-        matchingRules,
+        denormalizedMatchingRules,
         actualizeCurrentMatchingRules,
         normalizeMatchingRule,
       )

@@ -27,7 +27,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, RawMatchingRule}
+import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, DenormalizedMatchingRule}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset
@@ -73,7 +73,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
 
   private val orderBooks                      = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val actualDenormalizedMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRule]
+  private val actualDenormalizedMatchingRules = new ConcurrentHashMap[AssetPair, DenormalizedMatchingRule]
   private val assetDecimalsCache              = new AssetDecimalsCache(context.blockchain)
 
   private val orderBooksSnapshotCache =
@@ -91,29 +91,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  /**
-    * Returns denormalized matching rules for the specified asset pair.
-    * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
-    */
-  private def getRawMatchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRule] = {
-    lazy val defaultRule =
-      MatchingRule.DefaultRule.denormalize(
-        assetPair,
-        context.blockchain,
-        defaultTickSize = { e =>
-          val errorMsg =
-            s"""Can't convert matching rule for $assetPair: ${e.mkMessage(errorContext).text}.
-             | Usually this happens when the blockchain was rolled back.""".stripMargin
-          log.error(errorMsg)
-          RawMatchingRule.DefaultTickSize
-        }
-      )
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
 
-    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one { defaultRule })
-    if (rules.head.startOffset == 0) rules else defaultRule :: rules
-  }
+    val denormalizedMatchingRules = DenormalizedMatchingRule.getDenormalizedMatchingRules(settings, assetPair, context.blockchain, errorContext)
+    actualDenormalizedMatchingRules.put(assetPair, denormalizedMatchingRules.head)
 
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
     OrderBookActor.props(
       matcherActor,
       addressActors,
@@ -124,10 +106,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       settings,
       transactionCreator.createTransaction,
       context.time,
-      matchingRules = getRawMatchingRules(assetPair),
+      denormalizedMatchingRules = denormalizedMatchingRules,
       actualizeCurrentMatchingRules = actualMatchingRule => actualDenormalizedMatchingRules.put(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, context.blockchain),
     )
+  }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -190,7 +173,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           lazy val defaultTickSize =
             Denormalization
               .denormalizePrice(MatchingRule.DefaultTickSize, assetPair, context.blockchain)
-              .leftMap(_ => RawMatchingRule.DefaultTickSize)
+              .leftMap(_ => DenormalizedMatchingRule.DefaultTickSize)
               .merge
 
           Option { actualDenormalizedMatchingRules.get(assetPair) } map (_.tickSize) getOrElse defaultTickSize

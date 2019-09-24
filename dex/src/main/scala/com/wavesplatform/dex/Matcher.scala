@@ -161,7 +161,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         context.time,
         settings.orderFee,
         settings.orderRestrictions,
-        rateCache
+        rateCache,
+        assetDecimalsCache.get
       )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
       _ <- OrderValidator.tickSizeAware(

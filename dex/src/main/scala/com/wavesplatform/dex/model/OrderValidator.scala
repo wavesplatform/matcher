@@ -138,12 +138,13 @@ object OrderValidator extends ScorexLogging {
   }
 
   def blockchainAware(blockchain: Blockchain,
-                      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
+                      transactionCreator: ExchangeTransactionCreator.CreateTransaction,
                       matcherAddress: Address,
                       time: Time,
                       orderFeeSettings: OrderFeeSettings,
                       orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                      rateCache: RateCache)(order: Order): Result[Order] = timer.measure {
+                      rateCache: RateCache,
+                      assetDecimals: Asset => Int)(order: Order): Result[Order] = timer.measure {
 
     lazy val exchangeTx: Result[ExchangeTransaction] = {
       val fakeOrder: Order = order.updateType(order.orderType.opposite)
@@ -165,11 +166,13 @@ object OrderValidator extends ScorexLogging {
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
         val mof =
-          multiplyFeeByDouble(
-            ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee),
-            rateCache.getRate(order.matcherFeeAssetId).get
+          convertFeeByAssetRate(
+            feeInWaves = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee),
+            asset = order.matcherFeeAssetId,
+            rateCache = rateCache,
+            assetDecimals = assetDecimals
           )
-        Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
+        Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, order.matcherFeeAssetId))
       case _ => lift(order)
     }
 
@@ -212,6 +215,19 @@ object OrderValidator extends ScorexLogging {
         )
     }
 
+  /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
+  private def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, rateCache: RateCache, assetDecimals: Asset => Int): Long = {
+    rateCache
+      .getRate(asset)
+      .map { rate =>
+        multiplyFeeByDouble(
+          feeInWaves,
+          MatcherModel.correctRateByAssetDecimals(rate, assetDecimals(asset))
+        )
+      }
+      .getOrElse { throw new IllegalArgumentException(s"Rate for the asset ${AssetPair.assetIdStr(asset)} wasn't found!") }
+  }
+
   /**
     * Returns minimal valid fee that should be paid to the matcher when order is placed
     *
@@ -219,7 +235,7 @@ object OrderValidator extends ScorexLogging {
     * @param orderFeeSettings matcher settings for the fee of orders
     * @param matchPrice       price at which order is executed
     * @param rateCache        assets rates (rate = cost of 1 Waves in asset)
-    * @param assetDecimals    obtaining asset decimals from the asset cache
+    * @param assetDecimals    obtaining asset decimals from the asset decimals cache
     * @param multiplier       coefficient that is used in market aware for specifying deviation bounds
     */
   private[dex] def getMinValidFeeForSettings(order: Order,
@@ -230,17 +246,8 @@ object OrderValidator extends ScorexLogging {
                                              multiplier: Double = 1): Long = {
 
     orderFeeSettings match {
-      case FixedSettings(_, fixedMinFee) => fixedMinFee
-      case DynamicSettings(dynamicBaseFee) =>
-        rateCache
-          .getRate(order.matcherFeeAssetId)
-          .map { rate =>
-            multiplyFeeByDouble(
-              dynamicBaseFee,
-              MatcherModel.correctRateByAssetDecimals(rate, assetDecimals(order.matcherFeeAssetId))
-            )
-          }
-          .getOrElse { throw new IllegalArgumentException(s"Rate for the asset ${AssetPair.assetIdStr(order.matcherFeeAssetId)} wasn't found!") }
+      case FixedSettings(_, fixedMinFee)   => fixedMinFee
+      case DynamicSettings(dynamicBaseFee) => convertFeeByAssetRate(dynamicBaseFee, order.matcherFeeAssetId, rateCache, assetDecimals)
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
         lazy val spentAmount   = order.getSpendAmount(order.amount, matchPrice).explicitGet()

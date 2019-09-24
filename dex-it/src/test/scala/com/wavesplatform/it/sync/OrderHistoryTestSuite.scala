@@ -227,13 +227,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     withClue("should should right fee if not enoght amount before order execution and fee rounding") {
       val ethBalance = node.tradableBalance(alice, ethUsdPair)(EthId.toString)
-      val aliceTransferToBob = node.broadcastTransfer(alice,
-                                                      bob.toAddress.stringRepr,
-                                                      ethBalance - (BigDecimal(0.005) * matcherFee).toLong,
-                                                      minFee,
-                                                      Some(EthId.toString),
-                                                      None,
-                                                      waitForTx = true)
+      node.broadcastTransfer(alice,
+                             bob.toAddress.stringRepr,
+                             ethBalance - (BigDecimal(0.005) * matcherFee).toLong,
+                             minFee,
+                             Some(EthId.toString),
+                             None,
+                             waitForTx = true)
 
       node.upsertRate(feeAsset, 0.33333333, expectedStatusCode = StatusCodes.OK)
       val orderFee: Long = (BigDecimal(0.33333333) * matcherFee).setScale(0, CEILING).toLong
@@ -277,4 +277,3 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
 }
-

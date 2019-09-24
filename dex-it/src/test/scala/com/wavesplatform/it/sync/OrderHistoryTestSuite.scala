@@ -6,9 +6,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 import scala.math.BigDecimal.RoundingMode.CEILING
@@ -227,7 +225,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       node.cancelOrder(alice, wctUsdPair, aliceOrderId)
     }
 
-    withClue("should should right fee if not enoght amount before order execution") {
+    withClue("should should right fee if not enoght amount before order execution and fee rounding") {
       val ethBalance = node.tradableBalance(alice, ethUsdPair)(EthId.toString)
       val aliceTransferToBob = node.broadcastTransfer(alice,
                                                       bob.toAddress.stringRepr,
@@ -235,7 +233,6 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                                                       minFee,
                                                       Some(EthId.toString),
                                                       None,
-
                                                       waitForTx = true)
 
       node.upsertRate(feeAsset, 0.33333333, expectedStatusCode = StatusCodes.OK)
@@ -280,3 +277,4 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
 }
+

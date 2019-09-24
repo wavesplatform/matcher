@@ -9,4 +9,4 @@ case class MatcherState(offset: QueueEventWithMeta.Offset,
                         orderBooks: Map[AssetPair, (OrderBookResponse, MarketStatusResponse)],
                         orderStatuses: Map[String, MatcherStatusResponseWithFee],
                         reservedBalances: Map[KeyPair, Map[String, Long]],
-                        orderHistory: Map[KeyPair, Map[AssetPair, Seq[OrderbookHistory]]])
+                        orderHistory: Map[KeyPair, Map[AssetPair, Seq[OrderHistory]]])

@@ -7,7 +7,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherCommand, MatcherState, OrderbookHistory, SyncMatcherHttpApi, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{MatcherCommand, MatcherState, OrderHistory, SyncMatcherHttpApi, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.tags.DexItKafkaRequired
 import com.wavesplatform.it.{Node, _}
@@ -112,8 +112,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       3.minutes
     )
 
-    matcher1Node.waitFor[Seq[OrderbookHistory]]("no alice orders")(_.ordersByAddress(alice, activeOnly = true), _.isEmpty, 5.seconds)
-    matcher1Node.waitFor[Seq[OrderbookHistory]]("no bob orders")(_.ordersByAddress(bob, activeOnly = true), _.isEmpty, 5.seconds)
+    matcher1Node.waitFor[Seq[OrderHistory]]("no alice orders")(_.ordersByAddress(alice, activeOnly = true), _.isEmpty, 5.seconds)
+    matcher1Node.waitFor[Seq[OrderHistory]]("no bob orders")(_.ordersByAddress(bob, activeOnly = true), _.isEmpty, 5.seconds)
   }
 
   "Place, fill and cancel a lot of orders" in {

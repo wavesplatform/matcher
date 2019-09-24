@@ -72,13 +72,13 @@ object SyncMatcherHttpApi extends Assertions {
     def deleteOrderBook(assetPair: AssetPair): MessageMatcherResponse =
       sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
-    def fullOrderHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Seq[OrderbookHistory] =
+    def fullOrderHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Seq[OrderHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly), RequestAwaitTime)
 
-    def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
+    def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderHistory] =
       sync(async(m).orderHistoryByPair(sender, assetPair, activeOnly), RequestAwaitTime)
 
-    def activeOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
+    def activeOrderHistory(sender: KeyPair): Seq[OrderHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly = Some(true)))
 
     def placeOrder(order: Order): MatcherResponse =
@@ -241,7 +241,7 @@ object SyncMatcherHttpApi extends Assertions {
       Order.sign(unsigned, sender)
     }
 
-    def ordersByAddress(sender: KeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
+    def ordersByAddress(sender: KeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
 
     def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)

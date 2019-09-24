@@ -211,18 +211,18 @@ object AsyncMatcherHttpApi extends Assertions {
     def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponseWithFee] =
       postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponseWithFee]
 
-    def fullOrdersHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Future[Seq[OrderbookHistory]] =
+    def fullOrdersHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Future[Seq[OrderHistory]] =
       activeOnly match {
         case None =>
-          matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}", sender).as[Seq[OrderbookHistory]]
+          matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}", sender).as[Seq[OrderHistory]]
         case _ =>
           matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}?activeOnly=${activeOnly.get}", sender)
-            .as[Seq[OrderbookHistory]]
+            .as[Seq[OrderHistory]]
       }
 
-    def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderbookHistory]] = {
+    def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderHistory]] = {
       matcherGetWithSignature(s"/matcher/orderbook/${assetPair.toUri}/publicKey/${Base58.encode(sender.publicKey)}?activeOnly=$activeOnly", sender)
-        .as[Seq[OrderbookHistory]]
+        .as[Seq[OrderHistory]]
     }
 
     def reservedBalance(sender: KeyPair): Future[Map[String, Long]] =
@@ -313,8 +313,8 @@ object AsyncMatcherHttpApi extends Assertions {
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
-    def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
+    def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderHistory]] =
+      matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
     def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]
@@ -359,7 +359,7 @@ object AsyncMatcherHttpApi extends Assertions {
                 case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
               }
 
-              account -> (TreeMap.empty[AssetPair, Seq[OrderbookHistory]] ++ assetPairHistory)
+              account -> (TreeMap.empty[AssetPair, Seq[OrderHistory]] ++ assetPairHistory)
           }
 
         clean {

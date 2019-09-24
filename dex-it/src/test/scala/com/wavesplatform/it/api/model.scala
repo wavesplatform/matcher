@@ -179,20 +179,20 @@ object MessageMatcherResponse {
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 }
 
-case class OrderbookHistory(id: String,
-                            `type`: String,
-                            amount: Long,
-                            fee: Long,
-                            price: Long,
-                            timestamp: Long,
-                            filled: Long,
-                            filledFee: Long,
-                            feeAsset: Asset,
-                            status: String,
-                            assetPair: AssetPair) {
+case class OrderHistory(id: String,
+                        `type`: String,
+                        amount: Long,
+                        fee: Long,
+                        price: Long,
+                        timestamp: Long,
+                        filled: Long,
+                        filledFee: Long,
+                        feeAsset: Asset,
+                        status: String,
+                        assetPair: AssetPair) {
   def isActive: Boolean = status == "PartiallyFilled" || status == "Accepted"
 }
-object OrderbookHistory {
+object OrderHistory {
   implicit val byteStrFormat: Format[ByteStr] = Format(
     Reads {
       case JsString(str) =>
@@ -208,7 +208,7 @@ object OrderbookHistory {
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 
-  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
+  implicit val orderbookHistory: Format[OrderHistory] = Json.format
 }
 
 case class PairResponse(amountAsset: String, priceAsset: String)

@@ -22,7 +22,6 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.{NTPTime, WithDB}
 import monix.reactive.subjects.Subject
 import org.scalatest.PropSpecLike
-import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -80,8 +79,7 @@ class ReservedBalanceSpecification
     with WithDB
     with MatcherTestData
     with TableDrivenPropertyChecks
-    with NTPTime
-    with Eventually {
+    with NTPTime {
 
   override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
 
@@ -114,7 +112,7 @@ class ReservedBalanceSpecification
               orderBookCache = _ => AggregatedSnapshot(),
               enableSchedules
             )
-          ),
+        ),
         None
       )
     )
@@ -479,6 +477,8 @@ class ReservedBalanceSpecification
   private val USD   = pair.priceAsset
   private val ETH   = mkAssetId("ETH")
 
+  val testProbe: TestProbe = TestProbe()
+
   private def addressDirWithSpendableBalance(
       spendableBalance: Asset => Future[Long],
       orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot()
@@ -505,7 +505,7 @@ class ReservedBalanceSpecification
                 orderBookCache = orderBookCache,
                 enableSchedules
               )
-            ),
+          ),
           None
         )
       )
@@ -513,7 +513,7 @@ class ReservedBalanceSpecification
   }
 
   private def placeMarketOrder(tp: TestProbe, addressDir: ActorRef, order: Order): Unit = {
-    tp.send(addressDir, Envelope(marketOrder.order.senderPublicKey, PlaceMarketOrder(order)))
+    tp.send(addressDir, Envelope(order.senderPublicKey, PlaceMarketOrder(order)))
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
@@ -572,7 +572,7 @@ class ReservedBalanceSpecification
     } {
 
       val tp         = TestProbe()
-      val addressDir = addressDirWithSpendableBalance(balance.mapValues(Future.successful), testProbe = tp)
+      val addressDir = addressDirWithSpendableBalance( balance.mapValues(Future.successful) , testProbe = tp)
       val fee        = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
@@ -593,21 +593,17 @@ class ReservedBalanceSpecification
       withClue {
         s"Place market $orderType order, fee in ${feeAsset.toStringSRT(orderType)} asset, expected reserves (spent/received/fee) = $expectedSpentAssetReserve/$expectedReceiveAssetReserve/$expectedFeeAssetReserve:\n"
       } {
-        eventually {
-          reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
-          reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
-          reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
-        }
+        reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
+        reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
+        reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
       }
 
       systemCancelMarketOrder(addressDir, marketOrder)
 
       withClue(s"System cancel of $orderType market order:\n") {
-        eventually {
-          reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
-          reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
-          reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
-        }
+        reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
+        reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
+        reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
       }
     }
   }
@@ -656,9 +652,9 @@ class ReservedBalanceSpecification
       (SELL, 123.waves, 2.usd, ETH, amtMap(110.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 10.waves, eth = 0.18699187.eth)), // fee in third asset,    WAVES: 110 [afs] - 100 [ea], USD: 1 [f] - 100/123 [ef]
       /** (!!!) market SELL order PARTIALLY filled, available for spending < required by spendable asset and NOT enough to cover market amount and fee */
       (SELL, 123.waves, 2.usd, WAVES, amtMap(100.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)), // fee in spent asset, WAVES: 100 [afs] - 99.19354838 [ea*] - 0.80645161 [ef*]
-      (SELL, 123.waves, 2.usd, WAVES, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)),  //  fee in spent asset, WAVES: 90 [afs] - 89.27419354 [ea*] - 0.72580645 [ef*]
-      (SELL, 123.waves, 2.usd, USD, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),                            //  fee in received asset
-      (SELL, 123.waves, 2.usd, ETH, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(eth = 0.26829269.eth)),        //  fee in third asset, ETH: 1 [f] - 90/123 [ef]
+      (SELL, 123.waves, 2.usd, WAVES, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(waves = 0.00000001.waves)),  // fee in spent asset, WAVES:  90 [afs] - 89.27419354 [ea*] - 0.72580645 [ef*]
+      (SELL, 123.waves, 2.usd, USD, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),                            // fee in received asset
+      (SELL, 123.waves, 2.usd, ETH, amtMap(90.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap(eth = 0.26829269.eth)),        // fee in third asset, ETH: 1 [f] - 90/123 [ef]
       /** market SELL order filled, available for spending = required by spendable asset */
       (SELL, 100.waves, 3.usd, WAVES, amtMap(101.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()), // fee in spent asset
       (SELL, 100.waves, 3.usd, USD, amtMap(100.waves, 500.usd, 50.eth), 100.waves, 3.usd, amtMap()),   // fee in received asset
@@ -718,21 +714,17 @@ class ReservedBalanceSpecification
             s"expected reserves after execution (spent/received/fee) = " +
             s"$expectedSpentAssetReserve/$expectedReceiveAssetReserve/$expectedFeeAssetReserve:\n"
         } {
-          eventually {
-            reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
-            reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
-            reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
-          }
+          reservedBalanceBy(marketOrder.spentAsset) shouldBe expectedSpentAssetReserve
+          reservedBalanceBy(marketOrder.rcvAsset) shouldBe expectedReceiveAssetReserve
+          reservedBalanceBy(marketOrder.feeAsset) shouldBe expectedFeeAssetReserve
         }
 
         systemCancelMarketOrder(addressDir, orderExecutedEvent.submittedMarketRemaining(marketOrder))
 
         withClue(s"System cancel of $moTpe market order remaining:\n") {
-          eventually {
-            reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
-            reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
-            reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
-          }
+          reservedBalanceBy(marketOrder.spentAsset) shouldBe 0
+          reservedBalanceBy(marketOrder.rcvAsset) shouldBe 0
+          reservedBalanceBy(marketOrder.feeAsset) shouldBe 0
         }
       }
   }

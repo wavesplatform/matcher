@@ -35,6 +35,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    broadcastAndAwait(IssueUsdTx)
     new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
       .unsafeTap(_.requestBalanceChanges())
       .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))

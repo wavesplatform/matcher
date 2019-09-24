@@ -5,12 +5,13 @@ import java.nio.ByteBuffer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
-import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.OrderType._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -120,6 +121,28 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
       ob.getBids shouldBe mutable.TreeMap[Price, Level](
         Seq(8 -> Vector(submittedBuyOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
       )
+    }
+  }
+
+  "old counter orders should be matched with the new ones (with new activated tick-size)" in {
+
+    val ob = OrderBook.empty
+
+    def normalizedTickSize(tickSize: Double): Price = Normalization.normalizePrice(tickSize, 8, 2)
+
+    val counter   = LimitOrder(createOrder(pairWavesUsd, SELL, 100.waves, 3.15))
+    val submitted = LimitOrder(createOrder(pairWavesUsd, BUY, 100.waves, 3.15))
+
+    val counterTs   = counter.order.timestamp
+    val submittedTs = submitted.order.timestamp
+
+    withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
+
+      ob.add(counter.order, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
+      ob.add(submitted.order, submittedTs, normalizedTickSize(0.1)) shouldBe Seq(OrderExecuted(submitted, counter, submittedTs))
+
+      ob.getAsks shouldBe empty
+      ob.getBids shouldBe empty
     }
   }
 

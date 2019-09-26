@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
@@ -9,15 +9,17 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.{global => monixScheduler}
+
+import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import monix.reactive.Observer
 import mouse.any._
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
 import scala.concurrent.Future
 
-class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
+class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
-  override protected val suiteInitialWavesNodeConfig = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
+  override val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
 
   private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
@@ -33,8 +35,7 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(IssueUsdTx)
-    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, scala.concurrent.ExecutionContext.Implicits.global).wavesBlockchainAsyncClient
+    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
       .unsafeTap(_.requestBalanceChanges())
       .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))
   }

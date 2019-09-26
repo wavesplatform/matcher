@@ -7,6 +7,7 @@ import akka.util.Timeout
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.PlaceMarketOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
+import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
@@ -476,12 +477,9 @@ class ReservedBalanceSpecification
   private val USD   = pair.priceAsset
   private val ETH   = mkAssetId("ETH")
 
-  val testProbe: TestProbe = TestProbe()
-
-  private def addressDirWithSpendableBalance(
-      spendableBalance: Asset => Future[Long],
-      orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot()
-  ): ActorRef = {
+  private def addressDirWithSpendableBalance(spendableBalance: Asset => Future[Long],
+                                             orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot(),
+                                             testProbe: TestProbe): ActorRef = {
     system.actorOf(
       Props(
         new AddressDirectory(
@@ -510,8 +508,8 @@ class ReservedBalanceSpecification
     )
   }
 
-  private def placeMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
-    addressDir ! Envelope(marketOrder.order.senderPublicKey, PlaceMarketOrder(marketOrder.order))
+  private def placeMarketOrder(tp: TestProbe, addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
+    tp.send(addressDir, Envelope(marketOrder.order.senderPublicKey, PlaceMarketOrder(marketOrder.order)))
   }
 
   private def systemCancelMarketOrder(addressDir: ActorRef, marketOrder: MarketOrder): Unit = {
@@ -569,7 +567,8 @@ class ReservedBalanceSpecification
       s"Reserves of the market order with no counters should be correct: ${printMarketOrderInfo(orderType, amount, price, feeAsset, balance)}"
     } {
 
-      val addressDir = addressDirWithSpendableBalance { balance.mapValues(Future.successful) }
+      val tp         = TestProbe()
+      val addressDir = addressDirWithSpendableBalance(balance.mapValues(Future.successful), testProbe = tp)
       val fee        = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
@@ -584,8 +583,8 @@ class ReservedBalanceSpecification
       val expectedReceiveAssetReserve = reserves(marketOrder.rcvAsset)
       val expectedFeeAssetReserve     = reserves(marketOrder.feeAsset)
 
-      placeMarketOrder(addressDir, marketOrder)
-      testProbe.expectMsg(QueueEvent.PlacedMarket(marketOrder))
+      placeMarketOrder(tp, addressDir, marketOrder)
+      tp.expectMsg(QueueEvent.PlacedMarket(marketOrder))
 
       withClue {
         s"Place market $orderType order, fee in ${feeAsset.toStringSRT(orderType)} asset, expected reserves (spent/received/fee) = $expectedSpentAssetReserve/$expectedReceiveAssetReserve/$expectedFeeAssetReserve:\n"
@@ -672,7 +671,8 @@ class ReservedBalanceSpecification
           }
         }
 
-        val addressDir = addressDirWithSpendableBalance(balance.mapValues { Future.successful }, orderBookCache)
+        val tp         = TestProbe()
+        val addressDir = addressDirWithSpendableBalance(balance.mapValues { Future.successful }, orderBookCache, tp)
         val fee        = Some(moFeeAsst.amt(matcherFee))
 
         val (order, counter) = moTpe match {
@@ -684,7 +684,7 @@ class ReservedBalanceSpecification
 
         val marketOrder = MarketOrder(order, balance)
 
-        placeMarketOrder(addressDir, marketOrder)
+        placeMarketOrder(tp, addressDir, marketOrder)
 
         // here Try because of the market order nature:
         // an order can pass validation, but during execution, available for spending balance may become not sufficient
@@ -694,7 +694,7 @@ class ReservedBalanceSpecification
         // since order will be rejected because of the BalanceNotEnough error. Its ok since in these tests we check
         // tricky cases of balance reservation, when afs is not enough to cover market value and fee
 
-        Try { testProbe.expectMsg(100.millisecond, QueueEvent.PlacedMarket(marketOrder)) }
+        tp.expectMsgAnyClassOf(300.millisecond, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 

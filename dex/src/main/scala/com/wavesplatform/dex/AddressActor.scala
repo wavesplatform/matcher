@@ -94,7 +94,7 @@ class AddressActor(owner: Address,
       .fold {
 
         log.debug(s"New ${if (isMarket) "market order" else "order"}: ${order.json()}")
-        context.become(stashingState)
+        context.become(stashingPlacementState)
 
         tradableBalancesByAssets { Set(order.getSpendAssetId, order.matcherFeeAssetId) } flatMap { tradableBalance =>
           val acceptedOrder = if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
@@ -241,6 +241,21 @@ class AddressActor(owner: Address,
       }
   }
 
+  private def handleBalanceChanges: Receive = {
+    case BalanceUpdated(actualBalance) =>
+      getOrdersToCancel(actualBalance) |> { toCancel =>
+        if (toCancel.nonEmpty) {
+          log.debug(s"Canceling: $toCancel")
+          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
+        }
+      }
+  }
+
+  private def stashingOrderPlacement: Receive = {
+    case response: Resp => sender ! response; context.become(activeState); unstashAll()
+    case other          => stash(other)
+  }
+
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
@@ -289,24 +304,9 @@ class AddressActor(owner: Address,
     )
   }
 
-  def activeState: Receive = handleCommands orElse sharedBehaviour
-
-  def sharedBehaviour: Receive = handleExecutionEvents orElse handleStatusRequests orElse handleBalanceChanges
-
-  def handleBalanceChanges: Receive = {
-    case BalanceUpdated(actualBalance) =>
-      getOrdersToCancel(actualBalance) |> { toCancel =>
-        if (toCancel.nonEmpty) {
-          log.debug(s"Canceling: $toCancel")
-          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
-        }
-      }
-  }
-
-  def stashingState: Receive = sharedBehaviour orElse {
-    case response: Resp => sender ! response; context.become(activeState); unstashAll()
-    case other          => stash(other)
-  }
+  def basicBehaviour: Receive         = handleExecutionEvents orElse handleStatusRequests orElse handleBalanceChanges
+  def activeState: Receive            = basicBehaviour orElse handleCommands
+  def stashingPlacementState: Receive = basicBehaviour orElse stashingOrderPlacement
 
   def receive: Receive = activeState
 

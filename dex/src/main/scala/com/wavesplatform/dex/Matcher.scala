@@ -198,6 +198,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         matcherPublicKey,
         matcher,
         addressActors,
+        balanceActor,
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
@@ -243,6 +244,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private lazy val assetPairsDb = AssetPairsDB(db)
 
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+
+  lazy val balanceActor: ActorRef = actorSystem.actorOf(
+    BalanceActor.props(Function.untupled(balancesCache.get)),
+    "balance"
+  )
+
+  lazy val storeActor: ActorRef = actorSystem.actorOf(
+    StoreActor.props(matcherQueue.storeEvent),
+    "store"
+  )
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
@@ -306,12 +317,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             Props(
               new AddressActor(
                 address,
-                asset => balancesCache.get(address -> asset),
-                5.seconds,
+                balanceActor,
+                storeActor,
                 time,
                 orderDb,
                 wavesBlockchainSyncClient.forgedOrder,
-                matcherQueue.storeEvent,
                 orderBookCache.get,
                 startSchedules
               )

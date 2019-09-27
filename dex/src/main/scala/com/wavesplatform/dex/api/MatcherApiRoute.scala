@@ -12,12 +12,11 @@ import com.wavesplatform.api.http.{ApiRoute, _}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.dex.AddressActor.GetOrderStatus
-import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.market.BalanceActor
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -47,6 +46,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherPublicKey: PublicKey,
                            matcher: ActorRef,
                            addressActor: ActorRef,
+                           balanceActor: ActorRef,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
@@ -139,9 +139,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {
-              import AddressActor.{PlaceLimitOrder, PlaceMarketOrder}
               orderValidator(order) match {
-                case Right(o)    => placeTimer.measureFuture { askAddressActor(order.sender, if (isMarket) PlaceMarketOrder(o) else PlaceLimitOrder(o)) }
+                case Right(o) =>
+                  placeTimer.measureFuture {
+                    val command = AddressActor.Command.PlaceOrder(o, if (isMarket) AddressActor.OrderType.Market else AddressActor.OrderType.Limit)
+                    askAddressActor(order.sender, command)
+                  }
                 case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
               }
             }
@@ -164,9 +167,21 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     askMapAddressActor[MatcherResponse](sender, msg)(x => x)
 
   @inline
-  private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command)(
+  private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
       f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
-    (addressActor ? Env(sender, msg))
+    (addressActor ? AddressDirectory.Envelope(sender, msg))
+      .mapTo[A]
+      .map(f)
+      .recover {
+        case e: AskTimeoutException =>
+          log.error(s"Error processing $msg", e)
+          TimedOut
+      }
+  }
+
+  @inline
+  private def askMapBalanceActor[A: ClassTag](msg: BalanceActor.Query)(f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
+    (balanceActor ? msg)
       .mapTo[A]
       .map(f)
       .recover {
@@ -371,8 +386,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
     complete((timestamp, orderId) match {
-      case (Some(ts), None)  => askAddressActor(sender, AddressActor.CancelAllOrders(assetPair, ts))
-      case (None, Some(oid)) => askAddressActor(sender, AddressActor.CancelOrder(oid))
+      case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
+      case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
       case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
     })
 
@@ -463,7 +478,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrdersStatuses(pair, activeOnly)) { orders =>
+    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { orders =>
       StatusCodes.OK -> orders.map {
         case (id, oi) =>
           Json.obj(
@@ -594,7 +609,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askMapAddressActor[Map[Asset, Long]](address, AddressActor.GetTradableBalance(pair))(stringifyAssetIds)
+        askMapBalanceActor[BalanceActor.Reply.TradableBalance](BalanceActor.Query.GetTradableBalance(0L, address, pair.assets)) { r =>
+          stringifyAssetIds(r.balance)
+        }
       }
     }
   }
@@ -615,7 +632,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askMapAddressActor[Map[Asset, Long]](publicKey, AddressActor.GetReservedBalance)(stringifyAssetIds)
+        askMapBalanceActor[BalanceActor.Reply.ReservedBalance](BalanceActor.Query.GetReservedBalance(0L, publicKey)) { r =>
+          stringifyAssetIds(r.balance)
+        }
       }
     }
   }
@@ -633,7 +652,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
         DBUtils.order(db, orderId) match {
-          case Some(order) => askMapAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))(_.json)
+          case Some(order) => askMapAddressActor[OrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId))(_.json)
           case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status).json)
         }
       }

@@ -28,7 +28,7 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
 
   /** Sends balance changes to the AddressActors */
   spendableBalanceChanges.foreach {
-    _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.BalanceUpdated { assetBalances }) }
+    _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Event.BalanceUpdated { assetBalances }) }
   } { Scheduler(context.dispatcher) }
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
@@ -84,6 +84,6 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
 }
 
 object AddressDirectory {
-  case class Envelope(address: Address, cmd: AddressActor.Command)
+  case class Envelope(address: Address, cmd: AddressActor.Message)
   case object StartSchedules
 }

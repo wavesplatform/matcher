@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.market
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern.pipe
 import cats.instances.long.catsKernelStdGroupForLong
-import cats.instances.map._
 import cats.syntax.group._
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.market.BalanceActor._
 import com.wavesplatform.transaction.Asset
 
@@ -25,8 +25,8 @@ class BalanceActor(spendableBalance: (Address, Asset) => Future[Long]) extends A
       val updatedOpenVolume = origOpenVolume.updated(client, origOpenVolume.getOrElse(client, Map.empty) |-| xs)
       context.become(state(updatedOpenVolume))
 
-    case Query.GetReservedBalance(requestId, client, forAssets) =>
-      sender ! Reply.ReservedBalance(requestId, client, origOpenVolume.getOrElse(client, Map.empty).filter { case (k, _) => forAssets.contains(k) })
+    case Query.GetReservedBalance(requestId, client) =>
+      sender ! Reply.ReservedBalance(requestId, origOpenVolume.getOrElse(client, Map.empty))
 
     case Query.GetTradableBalance(requestId, client, forAssets) =>
       val s = sender()
@@ -40,21 +40,23 @@ class BalanceActor(spendableBalance: (Address, Asset) => Future[Long]) extends A
         .pipeTo(self)
 
     case TradableBalanceDraftReply(requestId, client, blockchainBalance, s) =>
-      s ! Reply.TradableBalance(requestId, client, blockchainBalance |-| origOpenVolume.getOrElse(client, Map.empty))
+      s ! Reply.TradableBalance(requestId, blockchainBalance |-| origOpenVolume.getOrElse(client, Map.empty))
   }
 }
 
 object BalanceActor {
+  def props(spendableBalance: (Address, Asset) => Future[Long]) = Props(new BalanceActor(spendableBalance))
+
   sealed trait Query
   object Query {
-    case class GetReservedBalance(requestId: Long, client: Address, forAssets: Set[Asset]) extends Query
+    case class GetReservedBalance(requestId: Long, client: Address)                        extends Query
     case class GetTradableBalance(requestId: Long, client: Address, forAssets: Set[Asset]) extends Query
   }
 
   sealed trait Reply
   object Reply {
-    case class ReservedBalance(requestId: Long, client: Address, balance: Map[Asset, Long]) extends Reply
-    case class TradableBalance(requestId: Long, client: Address, balance: Map[Asset, Long]) extends Reply
+    case class ReservedBalance(requestId: Long, balance: Map[Asset, Long]) extends Reply
+    case class TradableBalance(requestId: Long, balance: Map[Asset, Long]) extends Reply
   }
 
   sealed trait Command

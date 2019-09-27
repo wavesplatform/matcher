@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
-sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterContext => MatcherErrorMessage) {
+sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterContext => MatcherErrorMessage) extends Product with Serializable {
   def this(obj: Entity, part: Entity, klass: Class, mkMessage: ErrorFormatterContext => MatcherErrorMessage) = this(
     (obj.code << 20) + (part.code << 8) + klass.code, // 32 bits = (12 for object) + (12 for part) + (8 for class)
     mkMessage
@@ -355,7 +355,8 @@ case class InvalidMarketOrderPrice(mo: Order)
     )
 
 case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
-case class RateNotFound(theAsset: Asset) extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
+case class RateNotFound(theAsset: Asset)
+    extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 
 sealed abstract class Entity(val code: Int)
 object Entity {

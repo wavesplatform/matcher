@@ -3,278 +3,93 @@ package com.wavesplatform.dex
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import akka.pattern.pipe
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.Matcher.StoreEvent
-import com.wavesplatform.dex.NewAddressActor.OrderEvent
+import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.market.{BalanceActor, PlaceValidatorActor}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.market.{BalanceActor, MultipleOrderCancelActor, PlaceValidatorActor, StoreActor}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.OrderValidator.MaxActiveOrders
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.util.{WorkingStash, getSimpleName}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
-import mouse.any._
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap}
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
                    balanceActor: ActorRef,
                    storeActor: ActorRef,
-                   cancelTimeout: FiniteDuration,
                    time: Time,
                    orderDB: OrderDB,
-                   hasOrder: Order.Id => Boolean,
-                   storeEvent: StoreEvent,
+                   hasOrderInBlockchain: Order.Id => Boolean,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean)
     extends Actor
     with WorkingStash
     with ScorexLogging {
 
-  import AddressActor._
   import context.dispatcher
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
-  private val processingCommands = MutableMap.empty[Order.Id, Item]
-  private val activeOrders       = MutableMap.empty[Order.Id, AcceptedOrder]
-  private val expiration         = MutableMap.empty[ByteStr, Cancellable]
+  private var requestCounter  = 0L
+  private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
+  private val activeOrders    = MutableMap.empty[Order.Id, AcceptedOrder]
+  private val expiration      = MutableMap.empty[ByteStr, Cancellable]
 
   private val placeValidatorActor = context.actorOf(Props(classOf[PlaceValidatorActor], self, balanceActor, orderBookCache), "validator")
 
+  private def totalActiveOrders: Int = activeOrders.size + pendingCommands.values.count(_.command.isInstanceOf[Command.PlaceOrder])
+
   override def receive: Receive = {
-    case command: PlaceOrder =>
+    case command: Command.PlaceOrder =>
       val orderId = command.order.id()
-      if (processingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      if (totalActiveOrders + 1 >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
+      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
-        processingCommands.put(orderId, Item(command, sender))
+        requestCounter += 1
+        pendingCommands.put(orderId, PendingCommand(requestCounter, command, command.order, sender))
         placeValidatorActor ! command
       }
 
-    case command: CancelOrder =>
+    case command: Command.CancelOrder =>
       import command.orderId
-      if (processingCommands.contains(orderId)) sender ! api.OrderCancelRejected(error.OrderNotFound(orderId))
-      else
-        activeOrders.get(orderId) match {
-          case None =>
-            val reason = orderDB.status(orderId) match {
-              case OrderStatus.NotFound     => error.OrderNotFound(orderId)
-              case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
-              case _: OrderStatus.Filled    => error.OrderFull(orderId)
-            }
-            sender ! api.OrderCancelRejected(reason)
-
-          case Some(ao) =>
-            if (ao.isMarket) sender ! api.OrderCancelRejected(error.MarketOrderCancel(orderId))
-            else {
-              processingCommands.put(orderId, Item(command, sender))
-              storeActor ! QueueEvent.Canceled(ao.order.assetPair, orderId)
-            }
-        }
-
-    case command: CancelAllOrders        => // actor with sending all cancels?
-    case command: CancelExpiredOrder     =>
-    case AddressDirectory.StartSchedules =>
-    case BalanceUpdated(actualBalance) =>
-      getOrdersToCancel(actualBalance) |> { toCancel =>
-        if (toCancel.nonEmpty) {
-          log.debug(s"Canceling: $toCancel")
-          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
-        }
-      }
-    case event                           =>
-  }
-
-  private def applyEvent(mayBeEvent: Any): Unit = {
-    mayBeEvent match {
-      case OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner =>
-        log.trace(s"OrderAdded(${submitted.order.id()})")
-        activeOrders.get(submitted.order.id()).foreach { acceptedOrder =>
-          balanceActor ! BalanceActor.Command.Release(acceptedOrder.order.sender, acceptedOrder.reservableBalance)
-        }
-        handleOrderAdded(submitted)
-
-      case e @ OrderExecuted(submitted, counter, _) =>
-        log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
-        handleOrderExecuted(e.submittedRemaining)
-        handleOrderExecuted(e.counterRemaining)
-
-      case OrderCanceled(ao, isSystemCancel, _) =>
-        val id = ao.order.id()
-        // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
-        processingCommands.remove(id).foreach { item => item.client ! api.OrderCanceled(id) }
-        val isActive = activeOrders.contains(id)
-        log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
-        if (isActive) {
-          activeOrders.get(ao.order.id()).foreach { acceptedOrder =>
-            balanceActor ! BalanceActor.Command.Release(acceptedOrder.order.sender, acceptedOrder.reservableBalance)
+      activeOrders.get(orderId) match {
+        case None =>
+          val reason = orderDB.status(orderId) match {
+            case OrderStatus.NotFound     => error.OrderNotFound(orderId)
+            case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
+            case _: OrderStatus.Filled    => error.OrderFull(orderId)
           }
-          handleOrderTerminated(ao, OrderStatus.finalStatus(ao, isSystemCancel))
-        }
-      case _ =>
-    }
+          sender ! api.OrderCancelRejected(reason)
 
-    processingCommands.get(event.orderId).foreach { item =>
-      item.command match {
-        case command: PlaceOrder  => applyEvent(command, event, item.client)
-        case command: CancelOrder => applyEvent(command, event, item.client)
-      }
-    }
-  }
-
-  private def applyEvent(place: PlaceOrder, event: Any, client: ActorRef): Unit = event match {
-    case PlaceValidatorActor.Event.ValidationFailed(id, reason) =>
-      processingCommands.remove(id)
-      client ! api.OrderRejected(reason)
-
-    case PlaceValidatorActor.Event.ValidationPassed(id) =>
-      balanceActor ! BalanceActor.Command.Reserve(place.order.sender, ???)
-      storeActor ! StoreActor.Command.Save(QueueEvent.Placed(???))
-
-    case OrderEvent.StoringFailed(id, reason) =>
-      processingCommands.remove(id)
-      client ! NotImplemented(reason) // error.FeatureDisabled
-
-    case OrderEvent.StoringPassed(id) =>
-    // processingCommands.remove(id)
-
-    case OrderEvent.Accepted(id) =>
-      processingCommands.remove(id)
-      activeOrders.put(id, ???)
-      client ! event
-
-    case OrderEvent.Executed(id) =>
-      processingCommands.remove(id)
-      activeOrders.put(id, ???)
-      client ! event
-
-    case OrderEvent.Canceled(id) =>
-      processingCommands.remove(id)
-      balancesActor ! BalancesActor.Command.Release(place.order.sender, ???)
-      client ! event // by matcher?
-
-    case x =>
-  }
-
-  private def applyEvent(cancel: CancelOrder, event: Any, client: ActorRef): Unit = event match {
-    case OrderEvent.StoringFailed(id, reason) =>
-      processingCommands.remove(id)
-      client ! NotImplemented(reason) // error.FeatureDisabled
-
-    case OrderEvent.StoringPassed(id) =>
-    // processingCommands.remove(id)
-
-    case OrderEvent.Canceled(id) =>
-      processingCommands.remove(id)
-      activeOrders.remove(id).foreach { ao =>
-        balancesActor ! BalancesActor.Command.Release(ao.order.sender, ???)
-        client ! event
-      }
-
-    case x =>
-  }
-
-  private def handleCommands: Receive = {
-
-    case PlaceLimitOrder(order)  => placeOrder(order, isMarket = false)
-    case PlaceMarketOrder(order) => placeOrder(order, isMarket = true)
-
-    case CancelOrder(id) =>
-      pendingCancellation
-        .get(id)
-        .fold(
-          activeOrders.get(id) match {
-            case Some(ao) if ao.isLimit => storeCanceled(ao.order.assetPair, ao.order.id())
-            case Some(_)                => Future.successful { api.OrderCancelRejected(error.MarketOrderCancel(id)) }
-            case None =>
-              val reason = orderDB.status(id) match {
-                case OrderStatus.NotFound     => error.OrderNotFound(id)
-                case _: OrderStatus.Cancelled => error.OrderCanceled(id)
-                case _: OrderStatus.Filled    => error.OrderFull(id)
-              }
-
-              Future.successful { api.OrderCancelRejected(reason) }
+        case Some(ao) =>
+          if (ao.isMarket) sender ! api.OrderCancelRejected(error.MarketOrderCancel(orderId))
+          else {
+            requestCounter += 1
+            pendingCommands.put(orderId, PendingCommand(requestCounter, command, ao.order, sender))
+            storeCanceled(requestCounter, ao)
           }
-        )(_.future) pipeTo sender()
-
-    case CancelAllOrders(maybePair, _) =>
-      val batchCancelFutures =
-        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield {
-          val id = ao.order.id()
-          val f  = pendingCancellation.get(id).fold(storeCanceled(ao.order.assetPair, id))(_.future)
-          f.map(id -> _)
-        }
-
-      Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
-
-    case CancelExpiredOrder(id) =>
-      expiration.remove(id)
-      for (lo <- activeOrders.get(id)) {
-        if ((lo.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-          log.trace(s"Order $id expired, storing cancel event")
-          storeCanceled(lo.order.assetPair, lo.order.id())
-        } else scheduleExpiration(lo.order)
       }
 
-    case AddressDirectory.StartSchedules =>
-      if (!enableSchedules) {
-        enableSchedules = true
-        activeOrders.values.foreach(x => scheduleExpiration(x.order))
-      }
-  }
+    case Command.CancelAllOrders(maybePair, _) =>
+      val orderIds = getActiveLimitOrders(maybePair).map(_.order.id())
+      context.actorOf(MultipleOrderCancelActor.props(orderIds.toSet, self, sender))
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
-    val promisedResponse = Promise[Resp]
-    eventCache += id -> promisedResponse
-    storeEvent(event).transformWith {
-      case Failure(e) =>
-        log.error(s"Error persisting $event", e)
-        Future.successful(storeError)
-      case Success(r) =>
-        r match {
-          case None => Future.successful { NotImplemented(error.FeatureDisabled) }
-          case Some(x) =>
-            log.info(s"Stored $x")
-            promisedResponse.future
-        }
-    }
-  }
+    case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
 
-  private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
-    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent))
-
-  private def storePlaced(acceptedOrder: AcceptedOrder): Future[Resp] =
-    store(
-      id = acceptedOrder.order.id(),
-      event = acceptedOrder.fold[QueueEvent] { QueueEvent.Placed } { QueueEvent.PlacedMarket },
-      eventCache = pendingPlacement,
-      storeError = api.OrderRejected(error.CanNotPersistEvent)
-    )
-
-  private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
-    log.trace(s"Confirming placement for ${order.id()}")
-    p.success(api.OrderAccepted(order))
-  }
-
-  private def handleStatusRequests: Receive = {
-    case GetOrderStatus(orderId) => sender() ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
-    case GetOrdersStatuses(maybePair, onlyActive) =>
-      log.trace(s"Loading ${if (onlyActive) "active" else "all"} ${maybePair.fold("")(_.toString + " ")}orders")
-
-      val matchingActiveOrders = {
-        for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield
+    case Query.GetOrdersStatuses(maybePair, onlyActive) =>
+      val matchingActiveOrders = getActiveLimitOrders(maybePair)
+        .map { ao =>
           ao.order.id() ->
             OrderInfo.v2(
               ao.order.orderType,
@@ -286,35 +101,92 @@ class AddressActor(owner: Address,
               activeStatus(ao),
               ao.order.assetPair
             )
-      }.toSeq.sorted
+        }
+        .toSeq
+        .sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")
-      sender() ! (if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders))
+      val orders = if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders)
+      sender ! orders
 
-    case GetTradableBalance(pair) => tradableBalancesByAssets { Set(pair.amountAsset, pair.priceAsset) } pipeTo sender
-    case GetReservedBalance       => sender() ! openVolume.filter { case (_, reserved) => reserved > 0 }.toMap
-  }
+    case Event.BalanceUpdated(actualBalance) =>
+      val toCancel = for {
+        ao <- getOrdersToCancel(actualBalance)
+        if pendingCommands.get(ao.order.id()).forall(!_.command.isInstanceOf[Command.CancelOrder])
+      } yield ao
 
-  private def handleExecutionEvents: Receive = {
+      if (toCancel.nonEmpty) {
+        log.debug(s"Canceling: ${toCancel.map(_.order.id())}")
+        toCancel.foreach { ao =>
+          requestCounter += 1
+          storeCanceled(requestCounter, ao)
+        }
+      }
+
+    case PlaceValidatorActor.Event.ValidationFailed(id, reason) =>
+      pendingCommands.remove(id).foreach { item =>
+        item.client ! api.OrderRejected(reason)
+      }
+
+    case PlaceValidatorActor.Event.ValidationPassed(acceptedOrder) =>
+      pendingCommands.get(acceptedOrder.order.id()).foreach { command =>
+        reserve(acceptedOrder)
+        storePlaced(command.requestId, acceptedOrder)
+      }
+
+    case StoreActor.Event.StoreFailed(id, reason) =>
+      pendingCommands.values.find(_.requestId == id).foreach { item =>
+        item.client ! NotImplemented(reason) // error.FeatureDisabled
+      }
+
+    case CancelExpiredOrder(id) =>
+      expiration.remove(id)
+      activeOrders.get(id).foreach { ao =>
+        if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
+          log.trace(s"Order $id expired, storing cancel event")
+          requestCounter += 1
+          storeCanceled(requestCounter, ao)
+        } else scheduleExpiration(ao.order)
+      }
+
+    case AddressDirectory.StartSchedules =>
+      if (!enableSchedules) {
+        enableSchedules = true
+        activeOrders.values.foreach(x => scheduleExpiration(x.order))
+      }
+
     case OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner =>
-      log.trace(s"OrderAdded(${submitted.order.id()})")
-      release(submitted.order.id())
+      import submitted.order
+      log.trace(s"OrderAdded(${order.id()})")
+      activeOrders.get(order.id()).foreach(release)
       handleOrderAdded(submitted)
+      pendingCommands.remove(order.id()).foreach { command =>
+        log.trace(s"Confirming placement for ${order.id()}")
+        command.client ! api.OrderAccepted(order)
+      }
 
     case e @ OrderExecuted(submitted, counter, _) =>
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
+      for {
+        ao      <- List(submitted, counter)
+        command <- pendingCommands.remove(ao.order.id())
+      } {
+        log.trace(s"Confirming placement for ${ao.order.id()}")
+        command.client ! api.OrderAccepted(ao.order)
+      }
 
     case OrderCanceled(ao, isSystemCancel, _) =>
       val id = ao.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
-      confirmPlacement(ao.order)
-      pendingCancellation.remove(id).foreach { _.success(api.OrderCanceled(id)) }
+      pendingCommands.remove(id).foreach { item =>
+        item.client ! api.OrderCanceled(id)
+      }
       val isActive = activeOrders.contains(id)
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) {
-        release(id)
+        activeOrders.get(ao.order.id()).foreach(release)
         handleOrderTerminated(ao, OrderStatus.finalStatus(ao, isSystemCancel))
       }
   }
@@ -342,18 +214,15 @@ class AddressActor(owner: Address,
   }
 
   private def handleOrderAdded(ao: AcceptedOrder): Unit = {
-    orderDB.saveOrder(ao.order)
-    balanceActor ! BalanceActor.Command.Reserve(ao.order.sender, ao.reservableBalance)
-    confirmPlacement(ao.order)
+    orderDB.saveOrder(ao.order) // TODO do once when OrderAdded will be the first event
+    reserve(ao)
     scheduleExpiration(ao.order)
   }
 
   private def handleOrderExecuted(remaining: AcceptedOrder): Unit = if (remaining.order.sender.toAddress == owner) {
-    balanceActor ! BalanceActor.Command.Release(remaining.order.sender, remaining.reservableBalance)
-    if (remaining.isValid) {
-      handleOrderAdded(remaining)
-    } else {
-      confirmPlacement(remaining.order)
+    release(remaining)
+    if (remaining.isValid) handleOrderAdded(remaining)
+    else {
       val actualFilledAmount = remaining.order.amount - remaining.amount
       val actualFilledFee    = remaining.order.matcherFee - remaining.fee
       handleOrderTerminated(remaining, OrderStatus.Filled(actualFilledAmount, actualFilledFee))
@@ -363,7 +232,6 @@ class AddressActor(owner: Address,
   private def handleOrderTerminated(ao: AcceptedOrder, status: OrderStatus.Final): Unit = {
     log.trace(s"Order ${ao.order.id()} terminated: $status")
     orderDB.saveOrder(ao.order)
-    pendingCancellation.remove(ao.order.id()).foreach(_.success(api.OrderCancelRejected(error.OrderFinalized(ao.order.id()))))
     expiration.remove(ao.order.id()).foreach(_.cancel())
     activeOrders.remove(ao.order.id())
     orderDB.saveOrderInfo(
@@ -382,25 +250,28 @@ class AddressActor(owner: Address,
     )
   }
 
-  private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[QueueEvent.Canceled] = {
+  private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[AcceptedOrder] = {
     // Now a user can have 100 active transaction maximum - easy to traverse.
     activeOrders.values.toSeq
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .view
-      .map(ao => (ao.order.id.value, ao.order.assetPair, ao.requiredBalance filterKeys actualBalance.contains))
-      .foldLeft { (actualBalance, Queue.empty[QueueEvent.Canceled]) } {
-        case ((currentBalance, ordersToCancel), (id, assetPair, requiredBalance)) =>
+      .filter(_.isLimit)
+      .map(ao => (ao, ao.requiredBalance filterKeys actualBalance.contains))
+      .foldLeft { (actualBalance, Queue.empty[AcceptedOrder]) } {
+        case ((currentBalance, ordersToCancel), (ao, requiredBalance)) =>
           subtract(currentBalance, requiredBalance) match {
             case Some(updatedCurrentBalances) => updatedCurrentBalances -> ordersToCancel
-            case None =>
-              currentBalance -> {
-                if (pendingCancellation contains id) ordersToCancel else ordersToCancel enqueue QueueEvent.Canceled(assetPair, id)
-              }
+            case None                         => currentBalance         -> ordersToCancel.enqueue(ao)
           }
       }
       ._2
   }
 
+  /**
+    * r = currentBalance |-| requiredBalance
+    * @return None if ∀ (asset, v) ∈ r, v < 0
+    *         else Some(r)
+    */
   private def subtract(currentBalance: Map[Asset, Long], requiredBalance: Map[Asset, Long]): Option[Map[Asset, Long]] = {
     requiredBalance.foldLeft[Option[Map[Asset, Long]]] { Some(currentBalance) } {
       case (None, _)                => None
@@ -411,6 +282,29 @@ class AddressActor(owner: Address,
         else Some { currentBalance.updated(assetId, updatedAmount) }
     }
   }
+
+  private def storePlaced(requestId: Long, o: AcceptedOrder): Unit = {
+    val event = o match {
+      case o: LimitOrder  => QueueEvent.Placed(o)
+      case o: MarketOrder => QueueEvent.PlacedMarket(o)
+    }
+
+    storeActor ! StoreActor.Command.Save(requestId, event)
+  }
+
+  private def storeCanceled(requestId: Long, o: AcceptedOrder): Unit =
+    storeActor ! StoreActor.Command.Save(requestId, QueueEvent.Canceled(o.order.assetPair, o.order.id()))
+  private def reserve(o: AcceptedOrder): Unit = balanceActor ! BalanceActor.Command.Reserve(o.order.sender, o.reservableBalance)
+  private def release(o: AcceptedOrder): Unit = balanceActor ! BalanceActor.Command.Release(o.order.sender, o.reservableBalance)
+
+  private def hasOrder(id: Order.Id): Boolean =
+    pendingCommands.contains(id) || activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)
+
+  private def getActiveLimitOrders(maybePair: Option[AssetPair]): Iterable[AcceptedOrder] =
+    for {
+      ao <- activeOrders.values
+      if ao.isLimit && maybePair.forall(_ == ao.order.assetPair)
+    } yield ao
 }
 
 object AddressActor {
@@ -422,36 +316,45 @@ object AddressActor {
   private def activeStatus(ao: AcceptedOrder): OrderStatus =
     if (ao.amount == ao.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(ao.order.amount - ao.amount, ao.order.matcherFee - ao.fee)
 
-  private def getOrderInfo(order: Order): String = {
-    s"${order.id()},${order.sender},${order.assetPair},${order.orderType},${order.price},${order.amount}"
+  sealed trait Message
+
+  sealed trait Query extends Message
+  object Query {
+    case class GetOrderStatus(orderId: ByteStr)                                     extends Query
+    case class GetOrdersStatuses(assetPair: Option[AssetPair], onlyActive: Boolean) extends Query
   }
 
-  sealed trait Command
-
-  case class GetOrderStatus(orderId: ByteStr)                                     extends Command
-  case class GetOrdersStatuses(assetPair: Option[AssetPair], onlyActive: Boolean) extends Command
-  case class GetTradableBalance(assetPair: AssetPair)                             extends Command
-  case object GetReservedBalance                                                  extends Command
-
-  sealed trait OrderType
+  sealed trait OrderType extends Message
   object OrderType {
     case object Limit  extends OrderType
     case object Market extends OrderType
   }
 
-  case class PlaceOrder(order: Order, tpe: OrderType) extends Command {
-    override lazy val toString = s"Place${getSimpleName(tpe)}Order(${getOrderInfo(order)})"
+  sealed trait Command extends Message
+  sealed trait OneOrderCommand extends Command
+
+  object Command {
+    case class PlaceOrder(order: Order, tpe: OrderType) extends OneOrderCommand {
+      override lazy val toString =
+        s"Place${getSimpleName(tpe)}Order(id=${order.id()},s=${order.sender},${order.assetPair},${order.orderType},p=${order.price},a=${order.amount})"
+
+      def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder = tpe match {
+        case OrderType.Limit  => MarketOrder(order, tradableBalance)
+        case OrderType.Market => LimitOrder(order)
+      }
+    }
+
+    case class CancelOrder(orderId: ByteStr)                             extends OneOrderCommand
+    case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
   }
 
-  case class PlaceMarketOrder(order: Order) extends Command {
-    override lazy val toString = s"PlaceMarketOrder(${getOrderInfo(order)})"
+  // todo move to balances?
+  sealed trait Event
+  object Event {
+    case class BalanceUpdated(actualBalance: Map[Asset, Long]) extends Event
   }
-
-  case class CancelOrder(orderId: ByteStr)                             extends Command
-  case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-  case class BalanceUpdated(actualBalance: Map[Asset, Long])           extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 
-  private case class Item(command: Command, client: ActorRef)
+  private case class PendingCommand(requestId: Long, command: OneOrderCommand, order: Order, client: ActorRef)
 }

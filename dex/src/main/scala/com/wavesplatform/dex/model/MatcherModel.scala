@@ -85,7 +85,7 @@ sealed trait AcceptedOrder {
   val feeAsset: Asset   = order.matcherFeeAssetId
 
   def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
-  def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
+  def requiredBalance: Map[Asset, Long] = (Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)).filter(_._2 > 0)
   def reservableBalance: Map[Asset, Long]
 
   def availableBalanceBySpendableAssets(tradableBalance: Asset => Long): Map[Asset, Long] = {
@@ -242,7 +242,7 @@ sealed trait MarketOrder extends AcceptedOrder {
 
   /** Min between tradable balance of the order's owner and required balance of the order by spendable asset */
   val availableForSpending: Long
-  def reservableBalance: Map[Asset, Long] = requiredBalance.updated(order.getSpendAssetId, availableForSpending)
+  def reservableBalance: Map[Asset, Long] = requiredBalance.updated(order.getSpendAssetId, availableForSpending).filter(_._2 > 0)
   def partial(amount: Long, fee: Long, availableForSpending: Long): MarketOrder
 }
 

@@ -15,6 +15,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueUsdTx, IssueEthTx)
   }
 
+  // TODO: test when trying to buy on empty order book?
+
   "Sunny day tests for market orders" in {
 
     def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {

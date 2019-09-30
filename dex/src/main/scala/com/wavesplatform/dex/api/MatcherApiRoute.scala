@@ -16,6 +16,7 @@ import com.wavesplatform.dex.AddressActor.GetOrderStatus
 import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._

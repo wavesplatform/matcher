@@ -13,7 +13,8 @@ import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.{MatcherTestData, RateCache}
+import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script

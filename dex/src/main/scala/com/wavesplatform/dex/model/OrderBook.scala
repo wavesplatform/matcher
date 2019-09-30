@@ -51,7 +51,7 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.normalizedTickSize): Seq[Event] = {
+  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
     val (events, lt) = o.orderType match {
       case OrderType.BUY  => doMatch(ts, canMatchBuy, LimitOrder(o), Seq.empty, bids, asks, lastTrade, normalizedTickSize)
       case OrderType.SELL => doMatch(ts, canMatchSell, LimitOrder(o), Seq.empty, asks, bids, lastTrade, normalizedTickSize)

@@ -25,7 +25,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
          |    ],
          |    "WAVES-$BtcId": [
          |      {
-         |        start-offset = 0
+         |        start-offset = 1
          |        tick-size    = 5
          |      }
          |    ]
@@ -70,6 +70,9 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   "Buy orders cannot be placed into price level 0 (when price is less than tick size)" in {
+    val firstOrder = node.placeOrder(bob, wavesBtcPair, BUY, amount, 3 * price, matcherFee).message.id
+    node.waitOrderStatus(wctUsdPair, firstOrder, "Accepted")
+
     node.expectRejectedOrderPlacement(bob, wavesBtcPair, BUY, amount, 3 * price, matcherFee)
   }
 }

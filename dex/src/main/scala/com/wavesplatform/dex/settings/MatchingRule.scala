@@ -16,7 +16,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
 /** Normalized representation of the matching rule */
-case class MatchingRule(startOffset: QueueEventWithMeta.Offset, normalizedTickSize: Long) {
+case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
 
   /**
     * Denormalizes matching rule
@@ -25,7 +25,7 @@ case class MatchingRule(startOffset: QueueEventWithMeta.Offset, normalizedTickSi
   def denormalize(assetPair: AssetPair,
                   blockchain: Blockchain,
                   defaultTickSize: MatcherError => Double = _ => DenormalizedMatchingRule.DefaultTickSize): DenormalizedMatchingRule = {
-    val denormalizedTickSize = Denormalization.denormalizePrice(normalizedTickSize, assetPair, blockchain)
+    val denormalizedTickSize = Denormalization.denormalizePrice(tickSize, assetPair, blockchain)
     DenormalizedMatchingRule(
       startOffset = startOffset,
       tickSize = denormalizedTickSize.leftMap { defaultTickSize }.merge
@@ -83,10 +83,8 @@ object DenormalizedMatchingRule extends ScorexLogging {
     * Returns denormalized (from application.conf) matching rules for the specified asset pair.
     * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
     */
-  def getDenormalizedMatchingRules(settings: MatcherSettings,
-                                   assetPair: AssetPair,
-                                   blockchain: Blockchain,
-                                   errorFormatterContext: ErrorFormatterContext): NonEmptyList[DenormalizedMatchingRule] = {
+  def getDenormalizedMatchingRules(settings: MatcherSettings, blockchain: Blockchain, assetPair: AssetPair)(
+      implicit errorFormatterContext: ErrorFormatterContext): NonEmptyList[DenormalizedMatchingRule] = {
     lazy val defaultRule =
       MatchingRule.DefaultRule.denormalize(
         assetPair,

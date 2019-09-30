@@ -174,8 +174,8 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         val ob = OrderBook.empty
 
         val sellOrder = sell(pair, 54521418493L, 44389)
-        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
-        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
 
         ob.getAsks.size shouldBe 1
 
@@ -189,7 +189,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
       val sellOrder = sell(pair, 54521418493L, 44389)
       ob.add(sellOrder, ntpNow, toNormalized(100L))
-      ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.normalizedTickSize)
+      ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
 
       ob.getAsks.size shouldBe 2
 

@@ -7,6 +7,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}

@@ -39,6 +39,7 @@ lazy val it = project
   )
 
 lazy val root = (project in file("."))
+  .settings(name := "dex-root")
   .aggregate(
     dex,
     `dex-it`,

@@ -205,7 +205,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
       node.upsertRate(IssuedAsset(ByteStr(Base58.decode(assetWith2Dec))), 4, expectedStatusCode = StatusCodes.Created)
       withClue("with asset pair with different decimals count") {
-        val oneSmartPair = createAssetPair(assetWith2Dec, "WAVES")
+        val wavesToAssetWith2DecPair = createAssetPair(assetWith2Dec, "WAVES")
         val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
         val bobAssetBalance = node.assetBalance(bob.toAddress.toString, assetWith2Dec).balance
         val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
@@ -213,10 +213,10 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         assertBadRequestAndMessage(node.placeOrder(
           sender = bob,
-          pair = oneSmartPair,
+          pair = wavesToAssetWith2DecPair,
           orderType = SELL,
           amount = 10000L,
-          price = 300 * 100000000L * 1000000L,
+          price = 300.waves * 1000000L,
           fee = 4,
           version = 3,
           feeAsset = IssuedAsset(ByteStr(Base58.decode(assetWith2Dec)))
@@ -229,7 +229,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         val bobOrderId = node.placeOrder(
           sender = bob,
-          pair = oneSmartPair,
+          pair = wavesToAssetWith2DecPair,
           orderType = SELL,
           amount = 10000L,
           price = 300.waves * 1000000L,
@@ -241,7 +241,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         node.placeOrder(
           sender = alice,
-          pair = oneSmartPair,
+          pair = wavesToAssetWith2DecPair,
           orderType = BUY,
           amount = 20000L,
           price = 300.waves * 1000000L,
@@ -260,7 +260,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         val anotherBobOrderId = node.placeOrder(
           sender = bob,
-          pair = oneSmartPair,
+          pair = wavesToAssetWith2DecPair,
           orderType = SELL,
           amount = 10000L,
           price = 300.waves * 1000000L,

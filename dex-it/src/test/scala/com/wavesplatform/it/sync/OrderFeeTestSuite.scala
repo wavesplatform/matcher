@@ -547,19 +547,19 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
           sender = alice,
           pair = ethWavesPair,
           orderType = OrderType.BUY,
-          amount = 5,
+          amount = 3,
           price = 100000000L,
           fee = 10,
           version = 3: Byte,
           matcherFeeAssetId = IssuedAsset(EthId)
         ).message.id
-        node.reservedBalance(alice) shouldBe Map(EthId.toString -> 5, "WAVES" -> 5)
+        node.reservedBalance(alice) shouldBe Map(EthId.toString -> 7, "WAVES" -> 3)
 
         node.placeOrder(
           sender = bob,
           pair = ethWavesPair,
           orderType = OrderType.SELL,
-          amount = 5,
+          amount = 3,
           price = 100000000L,
           fee = 10,
           version = 3: Byte,
@@ -567,10 +567,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         )
         node.waitOrderInBlockchain(aliceOrderId)
 
-        node.accountBalances(alice.address)._1 shouldBe aliceBalance - 5
-        node.accountBalances(bob.address)._1 shouldBe bobBalance + 5
-        node.assetBalance(alice.address, EthId.toString).balance shouldBe aliceEthBalance - 5
-        node.assetBalance(bob.address, EthId.toString).balance shouldBe bobEthBalance - 15
+        node.accountBalances(alice.address)._1 shouldBe aliceBalance - 3
+        node.accountBalances(bob.address)._1 shouldBe bobBalance + 3
+        node.assetBalance(alice.address, EthId.toString).balance shouldBe aliceEthBalance - 7
+        node.assetBalance(bob.address, EthId.toString).balance shouldBe bobEthBalance - 13
         node.reservedBalance(alice) shouldBe empty
         node.reservedBalance(bob) shouldBe empty
       }

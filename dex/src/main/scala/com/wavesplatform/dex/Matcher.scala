@@ -11,6 +11,7 @@ import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.NonEmptyList
+import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -18,11 +19,10 @@ import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.cache.{AssetDecimalsCache, BalancesCache, RateCache}
+import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -35,9 +35,6 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
-import monix.execution.Ack
-import monix.execution.Ack.Continue
-import monix.reactive.Observer
 import mouse.any._
 
 import scala.concurrent.duration._
@@ -50,7 +47,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     with ScorexLogging {
 
   import actorSystem.dispatcher
-  import gRPCExtensionClient.{monixScheduler, grpcExecutionContext, wavesBlockchainAsyncClient, wavesBlockchainSyncClient}
+  import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient, wavesBlockchainSyncClient}
 
   private val time = new NTP(settings.ntpServer)
 
@@ -86,19 +83,20 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                                    wavesBlockchainSyncClient.isFeatureActivated)
   }
 
-  private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
-  private val balancesCache      = new BalancesCache(wavesBlockchainAsyncClient.spendableBalance)(grpcExecutionContext)
+  private val orderBooks       = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val rawMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRules]
 
-  /** Updates balances cache by balances stream */
-  wavesBlockchainAsyncClient.spendableBalanceChanges.subscribe {
-    new Observer[SpendableBalanceChanges] {
-      override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
-      override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
-      override def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
-    }
-  }(monixScheduler)
+  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
+//  private val balancesCache      = new BalancesCache(wavesBlockchainGrpcAsyncClient.spendableBalance)(grpcExecutionContext)
+
+//  /** Updates balances cache by balances stream */
+//  wavesBlockchainGrpcAsyncClient.spendableBalanceChanges.subscribe {
+//    new Observer[SpendableBalanceChanges] {
+//      override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
+//      override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
+//      override def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
+//    }
+//  }(monixScheduler)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -171,22 +169,48 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
   private val rateCache                                          = RateCache(db)
 
-  private def validateOrder(o: Order): Either[MatcherError, Order] =
-    for {
+  private def validateOrder(o: Order): OrderValidator.FutureResult[Order] = {
+
+    val syncValidation: Either[MatcherError, Order] = for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
-      _ <- OrderValidator.blockchainAware(
-        wavesBlockchainSyncClient,
-        transactionCreator.createTransaction,
-        matcherPublicKey.toAddress,
-        time,
-        settings.orderFee,
-        settings.orderRestrictions,
-        rateCache
-      )(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
+
+    lazy val asyncValidation: OrderValidator.FutureResult[Order] = {
+      OrderValidator.blockchainAware(
+        blockchain = wavesBlockchainSyncClient,
+        asyncBlockchain = wavesBlockchainAsyncClient,
+        transactionCreator = transactionCreator.createTransaction,
+        matcherAddress = matcherPublicKey.toAddress,
+        time = time,
+        orderFeeSettings = settings.orderFee,
+        orderRestrictions = settings.orderRestrictions,
+        rateCache = rateCache
+      )(o)(grpcExecutionContext)
+    }
+
+    for {
+      _ <- OrderValidator.liftAsync { syncValidation }
+      _ <- asyncValidation
+    } yield o
+
+//    for {
+//      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
+//      _ <- OrderValidator.timeAware(time)(o)
+//      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
+//      _ <- OrderValidator.blockchainAware(
+//        wavesBlockchainSyncClient,
+//        transactionCreator.createTransaction,
+//        matcherPublicKey.toAddress,
+//        time,
+//        settings.orderFee,
+//        settings.orderRestrictions,
+//        rateCache
+//      )(o)
+//      _ <- pairBuilder.validateAssetPair(o.assetPair)
+//    } yield o
+  }
 
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
@@ -220,7 +244,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         () => ExchangeTransactionCreator.minAccountFee(hasMatcherAccountScript),
         keyHashStr,
         rateCache,
-        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, wavesBlockchainSyncClient).isRight)
+        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient).isRight)
       ),
       MatcherApiRouteV1(
         pairBuilder,
@@ -306,7 +330,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             Props(
               new AddressActor(
                 address,
-                asset => balancesCache.get(address -> asset),
+                asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
                 5.seconds,
                 time,
                 orderDb,

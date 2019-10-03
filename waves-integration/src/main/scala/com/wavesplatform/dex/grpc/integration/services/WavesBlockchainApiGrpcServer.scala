@@ -64,7 +64,8 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(
-      context.blockchain.featureStatus(request.featureId.toShort, context.blockchain.height) == BlockchainFeatureStatus.Activated)
+      context.blockchain.featureStatus(request.featureId.toShort, context.blockchain.height) == BlockchainFeatureStatus.Activated
+    )
   }
 
   override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {

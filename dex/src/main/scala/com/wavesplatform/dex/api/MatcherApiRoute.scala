@@ -51,7 +51,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            tickSize: AssetPair => Double,
-                           orderValidator: Order => Either[MatcherError, Order],
+                           orderValidator: Order => OrderValidator.FutureResult[Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
@@ -140,9 +140,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           complete(
             placeTimer.measureFuture {
               import AddressActor.{PlaceLimitOrder, PlaceMarketOrder}
-              orderValidator(order) match {
-                case Right(o)    => placeTimer.measureFuture { askAddressActor(order.sender, if (isMarket) PlaceMarketOrder(o) else PlaceLimitOrder(o)) }
-                case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
+              orderValidator(order).value flatMap {
+                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, if (isMarket) PlaceMarketOrder(o) else PlaceLimitOrder(o)) }
+                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }
             }
           )
@@ -160,8 +160,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
     }
 
-  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] =
+  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] = {
     askMapAddressActor[MatcherResponse](sender, msg)(x => x)
+  }
 
   @inline
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command)(

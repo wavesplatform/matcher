@@ -2,7 +2,7 @@ package com.wavesplatform.dex.grpc.integration
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainGrpcAsyncClient
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainCachingClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainGrpcSyncClient
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc._
@@ -29,5 +29,5 @@ class DEXClient(target: String, val monixScheduler: Scheduler, val grpcExecution
       .build
 
   lazy val wavesBlockchainSyncClient  = new WavesBlockchainGrpcSyncClient(channel)
-  lazy val wavesBlockchainAsyncClient = new WavesBlockchainGrpcAsyncClient(channel, monixScheduler)(grpcExecutionContext)
+  lazy val wavesBlockchainAsyncClient = new WavesBlockchainCachingClient(channel, monixScheduler)(grpcExecutionContext)
 }

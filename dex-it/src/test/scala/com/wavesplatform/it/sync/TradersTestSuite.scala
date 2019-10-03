@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync
 
+import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -10,17 +12,15 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-
-import scala.util.Random
 
 class TradersTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = super.nodeConfigs.map(TradersTestSuite.matcherSettingsOrderV3Allowed.withFallback)
 
-  private def orderVersion = (Random.nextInt(3) + 1).toByte
-
   "Verifications of tricky ordering cases" - {
+    val orderVersions: Array[Byte] = Array(1, 2, 3)
     // Alice issues new asset
     val aliceAsset = node
       .broadcastIssue(alice,
@@ -112,68 +112,80 @@ class TradersTestSuite extends MatcherSuiteBase {
       // Could not work sometimes because of NODE-546
       "order with assets" - {
         "moved assets, insufficient assets" in {
-          val oldestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset)
-          val newestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset)
+          for (orderV <- orderVersions) {
+            withClue(s"order version is $orderV") {
+              val oldestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset, orderV)
+              val newestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset, orderV)
 
-          // 5000 waves are rest
-          node.broadcastTransfer(bob, alice.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
+              // 5000 waves are rest
+              node.broadcastTransfer(bob, alice.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
 
-          withClue(s"The newest order '$newestOrderId' was cancelled") {
-            node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              withClue(s"The newest order '$newestOrderId' was cancelled") {
+                node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              }
+              withClue(s"The oldest order '$oldestOrderId' is still active") {
+                node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
+              }
+
+              // Cleanup
+              node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
+              node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
+              node.broadcastTransfer(alice, bob.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
+            }
           }
-          withClue(s"The oldest order '$oldestOrderId' is still active") {
-            node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
-          }
-
-          // Cleanup
-          node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
-          node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
-          node.broadcastTransfer(alice, bob.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
         }
 
         "leased waves, insufficient fee" in {
-          val bobBalance    = node.accountBalances(bob.toAddress.toString)._1
-          val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
-          val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
+          for (orderV <- orderVersions) {
+            withClue(s"order version is $orderV") {
+              val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+              val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset, orderV)
+              val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset, orderV)
 
-          // TransactionFee for leasing, matcherFee for one order
-          val leaseAmount = bobBalance - matcherFee - matcherFee
-          val leaseId     = node.broadcastLease(bob, alice.toAddress.toString, leaseAmount, matcherFee, waitForTx = true).id
+              // TransactionFee for leasing, matcherFee for one order
+              val leaseAmount = bobBalance - matcherFee - matcherFee
+              val leaseId = node.broadcastLease(bob, alice.toAddress.toString, leaseAmount, matcherFee, waitForTx = true).id
 
-          withClue(s"The newest order '$newestOrderId' was cancelled") {
-            node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              withClue(s"The newest order '$newestOrderId' was cancelled") {
+                node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              }
+              withClue(s"The oldest order '$oldestOrderId' is still active") {
+                node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
+              }
+
+              // Cleanup
+              node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
+              node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
+
+              node.broadcastCancelLease(bob, leaseId, matcherFee, waitForTx = true).id
+            }
           }
-          withClue(s"The oldest order '$oldestOrderId' is still active") {
-            node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
-          }
-
-          // Cleanup
-          node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
-          node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
-
-          node.broadcastCancelLease(bob, leaseId, matcherFee, waitForTx = true).id
         }
 
         "moved waves, insufficient fee" in {
-          val bobBalance    = node.accountBalances(bob.toAddress.toString)._1
-          val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
-          val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
+          for (orderV <- orderVersions) {
+            withClue(s"order version is $orderV") {
+              val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+              val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset, orderV)
+              val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset, orderV)
 
-          // TransactionFee for leasing, matcherFee for one order
-          val transferAmount = bobBalance - matcherFee - matcherFee
-          node.broadcastTransfer(bob, alice.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
+              // TransactionFee for leasing, matcherFee for one order
+              val transferAmount = bobBalance - matcherFee - matcherFee
+              node.broadcastTransfer(bob, alice.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
 
-          withClue(s"The newest order '$newestOrderId' was cancelled") {
-            node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              withClue(s"The newest order '$newestOrderId' was cancelled") {
+                node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+              }
+              withClue(s"The oldest order '$oldestOrderId' is still active") {
+                node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
+              }
+
+              // Cleanup
+              node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
+              node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
+              node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
+            }
           }
-          withClue(s"The oldest order '$oldestOrderId' is still active") {
-            node.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
-          }
-
-          // Cleanup
-          node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
-          node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
-          node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
         }
       }
 
@@ -235,6 +247,25 @@ class TradersTestSuite extends MatcherSuiteBase {
           // Cleanup
           node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
         }
+
+        "moved feeAsset, fee asset doesn't take part in trading pair" in {
+          val newFeeAssetTx = node.broadcastIssue(bob, "FeeCoin", "fee asset", bobAssetQuantity, 2, reissuable = false, issueFee, None, waitForTx = true).id
+          node.waitForTransaction(newFeeAssetTx)
+          Seq(IssueUsdTx, IssueWctTx).foreach { tx =>
+            node.waitForTransaction { node.broadcastRequest(tx.json.value).id }
+          }
+
+          val newFeeAsset = IssuedAsset(Base58.decode(newFeeAssetTx))
+          node.upsertRate(newFeeAsset, 2, expectedStatusCode = StatusCodes.Created)
+
+          val bobOrderId = node.placeOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, fee = 1, version = 3, feeAsset = newFeeAsset).message.id
+          node.reservedBalance(bob) shouldBe Map(WctId.toString -> 400, newFeeAsset.id.toString -> 1)
+
+          node.broadcastTransfer(bob, alice.toAddress.toString, bobAssetQuantity, matcherFee, assetId = Some(newFeeAsset.id.toString), None, waitForTx = true).id
+          withClue(s"The order '$bobOrderId' was cancelled") {
+            node.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled")
+          }
+        }
       }
     }
   }
@@ -246,7 +277,7 @@ class TradersTestSuite extends MatcherSuiteBase {
     order
   }
 
-  def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
+  def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String, orderVersion: Byte): String = {
     val decodedAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
     val bobOrder = if (twoAssetsPair.amountAsset == decodedAsset) {
       node.prepareOrder(bob, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, matcherFee, orderVersion)

@@ -30,8 +30,8 @@ class OrderBookActor(owner: ActorRef,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var denormalizedMatchingRules: NonEmptyList[DenormalizedMatchingRule],
-                     actualizeCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+                     var matchingRules: NonEmptyList[DenormalizedMatchingRule],
+                     updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)
     extends Actor
     with WorkingStash
@@ -47,14 +47,14 @@ class OrderBookActor(owner: ActorRef,
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
   private var orderBook   = OrderBook.empty
 
-  private var actualRule: MatchingRule = normalizeMatchingRule(denormalizedMatchingRules.head)
+  private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
   private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
-    val actualRules = DenormalizedMatchingRule.skipOutdated(offset, denormalizedMatchingRules)
-    if (denormalizedMatchingRules.head != actualRules.head) {
-      denormalizedMatchingRules = actualRules
-      actualizeCurrentMatchingRules(denormalizedMatchingRules.head)
-      actualRule = normalizeMatchingRule(denormalizedMatchingRules.head)
+    val actualRules = DenormalizedMatchingRule.skipOutdated(offset, matchingRules)
+    if (matchingRules.head != actualRules.head) {
+      matchingRules = actualRules
+      updateCurrentMatchingRules(matchingRules.head)
+      actualRule = normalizeMatchingRule(matchingRules.head)
     }
   }
 
@@ -158,7 +158,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRule.normalizedTickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -195,8 +195,8 @@ object OrderBookActor {
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            denormalizedMatchingRules: NonEmptyList[DenormalizedMatchingRule],
-            actualizeCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+            matchingRules: NonEmptyList[DenormalizedMatchingRule],
+            updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule): Props =
     Props(
       new OrderBookActor(
@@ -208,8 +208,8 @@ object OrderBookActor {
         updateMarketStatus,
         createTransaction,
         time,
-        denormalizedMatchingRules,
-        actualizeCurrentMatchingRules,
+        matchingRules,
+        updateCurrentMatchingRules,
         normalizeMatchingRule,
       )
     )

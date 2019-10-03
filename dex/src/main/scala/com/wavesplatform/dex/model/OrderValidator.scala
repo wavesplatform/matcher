@@ -5,6 +5,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
@@ -12,15 +14,13 @@ import com.wavesplatform.dex.model.MatcherModel.Normalization._
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.smart.MatcherScriptRunner
-import com.wavesplatform.dex.{RateCache, error}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
@@ -388,11 +388,7 @@ object OrderValidator extends ScorexLogging {
     } yield order
   }
 
-  def accountStateAware(
-      sender: Address,
-      tradableBalance: Asset => Long,
-      activeOrderCount: => Int,
-      orderExists: ByteStr => Boolean,
+  def accountStateAware(sender: Address, tradableBalance: Asset => Long, activeOrderCount: => Int, orderExists: ByteStr => Boolean,
   )(order: Order): Result[Order] =
     for {
       _ <- lift(order)

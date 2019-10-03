@@ -28,6 +28,14 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
          |    dynamic {
          |      base-fee = $baseFee
          |    }
+         |    percent {
+         |      asset-type = amount
+         |      min-fee = 10
+         |    }
+         |    fixed {
+         |      asset = "$EthId"
+         |      min-fee = 10
+         |    }
          |  }
          |}
        """.stripMargin
@@ -156,7 +164,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       price = 50000L,
       fee = 150L,
       version = 3: Byte,
-      matcherFeeAssetId = IssuedAsset(BtcId)
+      feeAsset = IssuedAsset(BtcId)
     )
 
     "only waves supported" in {
@@ -555,5 +563,165 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance - 301
     node.accountBalances(bob.toAddress.toString)._1 shouldBe bobWavesBalance - 1.waves
     node.assetBalance(bob.toAddress.toString, UsdId.toString).balance shouldBe bobUsdBalance + 299
+  }
+
+  "percent & fixed fee modes" in {
+    def check(): Unit = {
+      withClue("buy order") {
+        val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+        val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+        val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+        val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+
+        val aliceOrderId = node.placeOrder(
+          sender = alice,
+          pair = ethWavesPair,
+          orderType = OrderType.BUY,
+          amount = 100,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        ).message.id
+        node.reservedBalance(alice) shouldBe Map("WAVES" -> 100)
+
+        node.placeOrder(
+          sender = bob,
+          pair = ethWavesPair,
+          orderType = OrderType.SELL,
+          amount = 100,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        )
+        node.waitOrderInBlockchain(aliceOrderId)
+
+        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 100
+        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 100
+        node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance + 90
+        node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 110
+        node.reservedBalance(alice) shouldBe empty
+        node.reservedBalance(bob) shouldBe empty
+      }
+
+      withClue("place buy order with amount less than fee") {
+        val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+        val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+        val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+        val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+
+        val aliceOrderId = node.placeOrder(
+          sender = alice,
+          pair = ethWavesPair,
+          orderType = OrderType.BUY,
+          amount = 3,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        ).message.id
+        node.reservedBalance(alice) shouldBe Map(EthId.toString -> 7, "WAVES" -> 3)
+
+        node.placeOrder(
+          sender = bob,
+          pair = ethWavesPair,
+          orderType = OrderType.SELL,
+          amount = 3,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        )
+        node.waitOrderInBlockchain(aliceOrderId)
+
+        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 3
+        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 3
+        node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance - 7
+        node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 13
+        node.reservedBalance(alice) shouldBe empty
+        node.reservedBalance(bob) shouldBe empty
+      }
+
+      withClue("place buy order after partial fill") {
+        val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+        val bobBalance = node.accountBalances(bob.toAddress.toString)._1
+        val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+        val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+
+        val aliceOrderId = node.placeOrder(
+          sender = alice,
+          pair = ethWavesPair,
+          orderType = OrderType.BUY,
+          amount = 200,
+          price = 100000000L,
+          fee = 20,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        ).message.id
+        node.reservedBalance(alice) shouldBe Map("WAVES" -> 200)
+
+        node.placeOrder(
+          sender = bob,
+          pair = ethWavesPair,
+          orderType = OrderType.SELL,
+          amount = 100,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        )
+        node.waitOrderInBlockchain(aliceOrderId)
+
+        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 100
+        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 100
+        node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance + 90
+        node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 110
+        node.reservedBalance(alice) shouldBe Map("WAVES" -> 100)
+        node.reservedBalance(bob) shouldBe empty
+
+        node.cancelOrder(alice, ethWavesPair, aliceOrderId)
+      }
+
+      withClue("place sell order") {
+        val aliceOrderId = node.placeOrder(
+          sender = alice,
+          pair = ethWavesPair,
+          orderType = OrderType.SELL,
+          amount = 100,
+          price = 100000000L,
+          fee = 10,
+          version = 3: Byte,
+          feeAsset = IssuedAsset(EthId)
+        ).message.id
+        node.reservedBalance(alice) shouldBe Map(EthId.toString -> 110)
+        node.cancelOrder(alice, ethWavesPair, aliceOrderId)
+      }
+    }
+
+    val transferId = node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(EthId.toString), None).id
+    node.waitForTransaction(transferId)
+
+    docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
+    check()
+    docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = fixed"))
+    check()
+    docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))
+
+    withClue("fee asset isn't part of asset pair") {
+      val orderId = node.placeOrder(
+        sender = alice,
+        pair = ethWavesPair,
+        orderType = OrderType.BUY,
+        amount = 200,
+        price = 100000000L,
+        fee = 20,
+        version = 3: Byte,
+        feeAsset = IssuedAsset(BtcId)
+      ).message.id
+      node.reservedBalance(alice) shouldBe Map("WAVES" -> 200, BtcId.toString -> 20)
+      node.cancelOrder(alice, ethWavesPair, orderId)
+      node.reservedBalance(alice) shouldBe empty
+    }
   }
 }

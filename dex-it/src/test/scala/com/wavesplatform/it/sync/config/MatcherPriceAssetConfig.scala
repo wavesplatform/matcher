@@ -5,11 +5,12 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
-import com.wavesplatform.it.util._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
+import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -22,6 +23,7 @@ import scala.util.Random
 object MatcherPriceAssetConfig {
 
   private val genesisConfig = ConfigFactory.parseResources("genesis.conf")
+
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = genesisConfig.getString("genesis-generator.network-type").head.toByte
   }
@@ -119,10 +121,10 @@ object MatcherPriceAssetConfig {
     .right
     .get
 
-  val BtcId = IssueBtcTx.id()
-  val EthId = IssueEthTx.id()
-  val UsdId = IssueUsdTx.id()
-  val WctId = IssueWctTx.id()
+  val BtcId: ByteStr = IssueBtcTx.id()
+  val EthId: ByteStr = IssueEthTx.id()
+  val UsdId: ByteStr = IssueUsdTx.id()
+  val WctId: ByteStr = IssueWctTx.id()
 
   val btc = IssuedAsset(BtcId)
   val eth = IssuedAsset(EthId)
@@ -130,44 +132,44 @@ object MatcherPriceAssetConfig {
   val wct = IssuedAsset(WctId)
 
   val wctUsdPair = AssetPair(
-    amountAsset = IssuedAsset(WctId),
-    priceAsset = IssuedAsset(UsdId)
+    amountAsset = wct,
+    priceAsset = usd
   )
 
   val wctWavesPair = AssetPair(
-    amountAsset = IssuedAsset(WctId),
+    amountAsset = wct,
     priceAsset = Waves
   )
 
   val ethWavesPair = AssetPair(
-    amountAsset = IssuedAsset(EthId),
+    amountAsset = eth,
     priceAsset = Waves
   )
 
   val ethBtcPair = AssetPair(
-    amountAsset = IssuedAsset(EthId),
-    priceAsset = IssuedAsset(BtcId)
+    amountAsset = eth,
+    priceAsset = btc
   )
 
   val wavesUsdPair = AssetPair(
     amountAsset = Waves,
-    priceAsset = IssuedAsset(UsdId)
+    priceAsset = usd
   )
 
   val ethUsdPair = AssetPair(
-    amountAsset = IssuedAsset(EthId),
-    priceAsset = IssuedAsset(UsdId)
+    amountAsset = eth,
+    priceAsset = usd
   )
 
   val wavesBtcPair = AssetPair(
     amountAsset = Waves,
-    priceAsset = IssuedAsset(BtcId)
+    priceAsset = btc
   )
 
   val orderLimit = 10
 
-  val ForbiddenAssetId     = "FdbnAsset"
-  val updatedMatcherConfig = parseString(s"""waves.dex {
+  val ForbiddenAssetId             = "FdbnAsset"
+  val updatedMatcherConfig: Config = parseString(s"""waves.dex {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                             |  rest-order-limit = $orderLimit

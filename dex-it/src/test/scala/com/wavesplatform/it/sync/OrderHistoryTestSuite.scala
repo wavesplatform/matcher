@@ -62,9 +62,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   def getPostgresContainerHostPort: String = postgresContainerLauncher.getHostPort.explicitGet()
 
   @annotation.tailrec
-  private def retry[T](attemptsCount: Int, delayInMs: Int = 0)(fn: => T): Try[T] = {
+  private def retry[T](attemptsCount: Int, delayInMs: Int)(fn: => T): Try[T] = {
     Try { fn } match {
-      case Failure(_) if attemptsCount > 1 => if (delayInMs != 0) Thread.sleep(delayInMs); retry(attemptsCount - 1)(fn)
+      case Failure(_) if attemptsCount > 1 => if (delayInMs != 0) Thread.sleep(delayInMs); retry(attemptsCount - 1, delayInMs)(fn)
       case Failure(ex)                     => throw ex
       case success                         => success
     }
@@ -157,6 +157,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   def getEventsCount: Long = ctx.run(querySchema[EventRecord]("events", _.orderId -> "order_id").size)
 
   case class OrderBriefInfo(id: String,
+                            tpe: Byte,
                             senderPublicKey: String,
                             side: Byte,
                             amountAsset: String,
@@ -180,6 +181,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
         querySchema[OrderBriefInfo](
           "orders",
           _.id              -> "id",
+          _.tpe             -> "type",
           _.senderPublicKey -> "sender_public_key",
           _.side            -> "side",
           _.amountAsset     -> "amount_asset_id",
@@ -232,7 +234,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
-    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, matcherFeeAssetId = btc, version = 3)
+    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, feeAsset = btc, version = 3)
     val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
 
     val sellOrder1 = node.placeOrder(sellOrder).message.id
@@ -253,7 +255,16 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
         Set(sellOrder1, sellOrder2).foreach { orderId =>
           getOrderInfoById(orderId).get shouldBe
-            OrderBriefInfo(orderId, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 100, 0.35, 0.00000030)
+            OrderBriefInfo(orderId,
+                           limitOrderType,
+                           bob.publicKey.toString,
+                           sellSide,
+                           stringify(wct),
+                           stringify(usd),
+                           stringify(btc),
+                           100,
+                           0.35,
+                           0.00000030)
 
           getEventsInfoByOrderId(orderId) shouldBe Set { EventBriefInfo(orderId, eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled) }
         }
@@ -261,7 +272,16 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
       withClue("checking info for 1 big counter order\n") {
         getOrderInfoById(buyOrder).get shouldBe
-          OrderBriefInfo(buyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
+          OrderBriefInfo(buyOrder,
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         300,
+                         0.35,
+                         0.00001703)
 
         getEventsInfoByOrderId(buyOrder) shouldBe
           Set(
@@ -285,7 +305,16 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
       withClue("checking info for small counter order\n") {
         getOrderInfoById(smallBuyOrder).get shouldBe
-          OrderBriefInfo(smallBuyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
+          OrderBriefInfo(smallBuyOrder,
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         300,
+                         0.35,
+                         0.00001703)
 
         getEventsInfoByOrderId(smallBuyOrder) shouldBe Set {
           EventBriefInfo(smallBuyOrder, eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
@@ -294,11 +323,88 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
       withClue("checking info for big submitted order\n") {
         getOrderInfoById(bigSellOrder).get shouldBe
-          OrderBriefInfo(bigSellOrder, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 900, 0.35, 0.00000030)
+          OrderBriefInfo(bigSellOrder,
+                         limitOrderType,
+                         bob.publicKey.toString,
+                         sellSide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(btc),
+                         900,
+                         0.35,
+                         0.00000030)
 
         getEventsInfoByOrderId(bigSellOrder) shouldBe Set {
           EventBriefInfo(bigSellOrder, eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled)
         }
+      }
+    }
+  }
+
+  "Order history should correctly save market orders and their events" in {
+
+    node.cancelAllOrders(bob)
+    node.cancelAllOrders(alice)
+
+    def bigBuyOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3)
+
+    withClue("place buy market order into empty order book") {
+
+      val unmatchableMarketBuyOrder = node.placeMarketOrder(bigBuyOrder).message.id
+      node.waitOrderStatusAndAmount(wctUsdPair, unmatchableMarketBuyOrder, "Filled", Some(0.wct))
+
+      retry(20, batchLingerMs) {
+
+        getOrderInfoById(unmatchableMarketBuyOrder) shouldBe Some(
+          OrderBriefInfo(unmatchableMarketBuyOrder,
+                         marketOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         500,
+                         0.35,
+                         0.00001703)
+        )
+
+        getEventsInfoByOrderId(unmatchableMarketBuyOrder) shouldBe Set(
+          EventBriefInfo(unmatchableMarketBuyOrder, eventCancel, 0, 0, 0, 0, statusFilled)
+        )
+      }
+    }
+
+    withClue("place buy market order into nonempty order book") {
+      Seq(
+        node.placeOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.price, 0.003.waves).message.id,
+        node.placeOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.price, 0.003.waves).message.id,
+        node.placeOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.price, 0.003.waves).message.id
+      ).foreach(lo => node.waitOrderStatus(wctUsdPair, lo, "Accepted"))
+
+      val marketBuyOrder = node.placeMarketOrder(bigBuyOrder).message.id
+      node.waitOrderStatusAndAmount(wctUsdPair, marketBuyOrder, "Filled", Some(300.wct))
+
+      retry(15, batchLingerMs) {
+
+        getOrderInfoById(marketBuyOrder).get shouldBe
+          OrderBriefInfo(marketBuyOrder,
+                         marketOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         500,
+                         0.35,
+                         0.00001703)
+
+        getEventsInfoByOrderId(marketBuyOrder) shouldBe
+          Set(
+            EventBriefInfo(marketBuyOrder, eventTrade, 100, 100, 0.00000340, 0.00000340, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder, eventTrade, 100, 200, 0.00000340, 0.00000680, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder, eventTrade, 100, 300, 0.00000340, 0.00001020, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder, eventCancel, 0, 300, 0, 0.00001020, statusFilled)
+          )
       }
     }
   }

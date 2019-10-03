@@ -89,20 +89,21 @@ object Dependencies {
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   ).map(_ % Test)
 
-  lazy val dex = Seq(
-    logback.exclude("org.scala-js", "scalajs-library_2.12"),
-    kindProjector,
-    akkaModule("actor"),
-    akkaModule("persistence-query"),
-    akkaModule("slf4j"),
-    akkaHttp,
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
-    // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
-    janino,
-    mouse
-  ) ++ Seq(
-    akkaModule("testkit"),
-    akkaModule("persistence-tck"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-  ).map(_ % Test) ++ test ++ quill
+  lazy val dex =
+    Seq(
+      logback.exclude("org.scala-js", "scalajs-library_2.12"),
+      kindProjector,
+      akkaModule("actor"),
+      akkaModule("persistence-query"),
+      akkaModule("slf4j"),
+      akkaHttp,
+      "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
+      // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
+      janino,
+      mouse
+    ) ++ Seq(
+      akkaModule("testkit"),
+      akkaModule("persistence-tck"),
+      "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
+    ).map(_ % Test) ++ test ++ quill
 }

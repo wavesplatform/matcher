@@ -255,10 +255,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
 
-    val invalidMode =
+    def invalidMode(invalidModeName: String = "invalid"): String =
       s"""
          |order-fee {
-         |  mode = invalid
+         |  mode = $invalidModeName
          |  dynamic {
          |    base-fee = 300000
          |  }
@@ -328,12 +328,15 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
        """.stripMargin
 
     def configStr(x: String): Config    = configWithSettings(orderFeeStr = x)
-    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode()))
+    val settingsDeprecatedNameMode      = getSettingByConfig(configStr(invalidMode("waves")))
     val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
     val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
     settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
+
+    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee.mode value: waves")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(

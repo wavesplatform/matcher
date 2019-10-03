@@ -17,7 +17,7 @@ import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.caches.{MatchingRulesCache, RateCache}
+import com.wavesplatform.dex.caches.{AssetDecimalsCache, MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.history.HistoryRouter
@@ -256,18 +256,22 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           settings,
           orderDB,
           (address, startSchedules) =>
-            Props(new AddressActor(
-              address,
-              context.utx.spendableBalance(address, _),
-              5.seconds,
-              context.time,
-              orderDB,
-              id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
-              matcherQueue.storeEvent,
-              startSchedules
-            )),
+            Props(
+              new AddressActor(
+                address,
+                context.utx.spendableBalance(address, _),
+                5.seconds,
+                context.time,
+                orderDB,
+                id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
+                matcherQueue.storeEvent,
+                orderBookCache.get,
+                startSchedules
+              )
+          ),
           historyRouter
-        )),
+        )
+      ),
       "addresses"
     )
 

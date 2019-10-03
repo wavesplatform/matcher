@@ -2,11 +2,11 @@ package com.wavesplatform.dex.settings
 
 import cats.implicits._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
+import com.wavesplatform.settings.utils.ConfigSettingsValidator._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
-import com.wavesplatform.settings.utils.ConfigSettingsValidator._
 
+/** Represents market order restrictions. Field values are in percents */
 case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxFeeDeviation: Double)
 
 object DeviationsSettings {

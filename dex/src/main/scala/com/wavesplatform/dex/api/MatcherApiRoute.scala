@@ -3,7 +3,7 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directive0, Directive1, Route}
+import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, Route}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
@@ -80,7 +80,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+        getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
           getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
           historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
           upsertRate ~ deleteRate ~ saveSnapshots
@@ -134,6 +134,24 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
+
+  private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
+    (pathEndOrSingleSlash & entity(as[Order])) { order =>
+      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          complete(
+            placeTimer.measureFuture {
+              import AddressActor.{PlaceLimitOrder, PlaceMarketOrder}
+              orderValidator(order) match {
+                case Right(o)    => placeTimer.measureFuture { askAddressActor(order.sender, if (isMarket) PlaceMarketOrder(o) else PlaceLimitOrder(o)) }
+                case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
+              }
+            }
+          )
+        }
+      }
+    }
+  }
 
   private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
@@ -305,18 +323,25 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         dataType = "com.wavesplatform.transaction.assets.exchange.Order"
       )
     ))
-  def place: Route = path("orderbook") {
-    (pathEndOrSingleSlash & entity(as[Order])) { order =>
-      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
-        unavailableOrderBookBarrier(pair) {
-          complete(placeTimer.measureFuture(orderValidator(order) match {
-            case Right(_)    => placeTimer.measureFuture(askAddressActor(order.sender, AddressActor.PlaceOrder(order)))
-            case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
-          }))
-        }
-      }
-    }
-  }
+  def placeLimitOrder: Route = placeOrder("orderbook", isMarket = false)
+
+  @Path("/orderbook/market")
+  @ApiOperation(value = "Place market order",
+                notes = "Place a new market order (buy or sell)",
+                httpMethod = "POST",
+                produces = "application/json",
+                consumes = "application/json")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.transaction.assets.exchange.Order"
+      )
+    ))
+  def placeMarketOrder: Route = placeOrder("orderbook" / "market", isMarket = true)
 
   @Path("/orderbook")
   @ApiOperation(value = "Get the open trading markets", notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
@@ -436,7 +461,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrders(pair, activeOnly)) { orders =>
+    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrdersStatuses(pair, activeOnly)) { orders =>
       StatusCodes.OK -> orders.map {
         case (id, oi) =>
           Json.obj(

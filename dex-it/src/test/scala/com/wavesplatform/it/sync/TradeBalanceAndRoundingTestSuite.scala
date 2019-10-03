@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.AssetDecimalsInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
@@ -67,10 +67,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "check usd and waves balance after fill" in {
       val aliceWavesBalanceAfter = node.accountBalances(alice.toAddress.toString)._1
-      val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+      val aliceUsdBalance        = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
 
       val bobWavesBalanceAfter = node.accountBalances(bob.toAddress.toString)._1
-      val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+      val bobUsdBalance        = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
       (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
         adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
@@ -172,8 +172,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
-      val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
-      val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+      val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+      val bobUsdBalance     = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
       val bobWctInitBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
 
       val bobOrderId =
@@ -198,7 +198,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       node.reservedBalance(alice) shouldBe empty
       node.tradableBalance(alice, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
 
-      val expectedReservedWaves = matcherFee - LimitOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
+      val expectedReservedWaves = matcherFee - AcceptedOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
       node.reservedBalance(bob)("WAVES") shouldBe expectedReservedWaves
 
       node.cancelOrder(bob, wctUsdPair, node.fullOrderHistory(bob).head.id)

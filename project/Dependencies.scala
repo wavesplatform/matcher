@@ -104,7 +104,8 @@ object Dependencies {
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     spotify,
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.scalacheck" %% "scalacheck" % "1.14.0"
+    "org.scalacheck" %% "scalacheck" % "1.14.0",
+    logback.exclude("org.scala-js", "scalajs-library_2.12")
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(

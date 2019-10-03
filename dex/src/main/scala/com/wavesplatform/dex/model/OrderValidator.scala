@@ -41,10 +41,8 @@ object OrderValidator extends ScorexLogging {
   val exchangeTransactionCreationFee: Long = FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
-
-  private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
-
-  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
+  private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
+  private[dex] def multiplyFeeByDouble(f: Long, d: Double): Long    = (BigDecimal(f) * d).setScale(0, RoundingMode.CEILING).toLong
 
   private def verifySignature(order: Order): Result[Unit] =
     Verifier
@@ -217,7 +215,8 @@ object OrderValidator extends ScorexLogging {
       case DynamicSettings(dynamicBaseFee) =>
         multiplyFeeByDouble(
           dynamicBaseFee,
-          rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}")))
+          rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
+        )
       case FixedSettings(_, fixedMinFee) => fixedMinFee
       case PercentSettings(assetType, minFeeInPercent) =>
         lazy val receiveAmount = order.getReceiveAmount(order.amount, matchPrice).explicitGet()
@@ -351,9 +350,11 @@ object OrderValidator extends ScorexLogging {
 
   def timeAware(time: Time)(order: Order): Result[Order] = {
     for {
-      _ <- cond(order.expiration > time.correctedTime() + MinExpiration,
-                (),
-                error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration))
+      _ <- cond(
+        order.expiration > time.correctedTime() + MinExpiration,
+        (),
+        error.WrongExpiration(time.correctedTime(), MinExpiration, order.expiration)
+      )
       _ <- order.isValid(time.correctedTime()).toEither.left.map(error.OrderCommonValidationFailed)
     } yield order
   }
@@ -362,11 +363,11 @@ object OrderValidator extends ScorexLogging {
                               tradableBalance: Asset => Long,
                               orderBookCache: AssetPair => OrderBook.AggregatedSnapshot): Result[AcceptedOrder] = {
 
-    /*
-     * According to the current market state calculates cost for buy market orders or amount for sell market orders
-     * that should be covered by tradable balance of the order's owner.
-     * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
-     */
+    /**
+      * According to the current market state calculates cost for buy market orders or amount for sell market orders
+      * that should be covered by tradable balance of the order's owner.
+      * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
+      */
     def getMarketOrderValue: Result[Long] = {
 
       // Adds value of level to the current value of the market order

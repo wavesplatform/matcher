@@ -3,7 +3,7 @@ package com.wavesplatform.dex
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -26,7 +26,7 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   private var startSchedules: Boolean = false
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
-  /** Sends balance changes to AddressActors */
+  /** Sends balance changes to the AddressActors */
   spendableBalanceChanges.foreach {
     _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.BalanceUpdated { assetBalances }) }
   } { Scheduler(context.dispatcher) }
@@ -58,9 +58,8 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
       lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
 
       (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
-        case (true, true, _)     => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
-        case (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
-        case _                   => Unit
+        case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
+        case _                                     => Unit
       }
 
       historyRouter foreach { _ ! SaveEvent(e) }

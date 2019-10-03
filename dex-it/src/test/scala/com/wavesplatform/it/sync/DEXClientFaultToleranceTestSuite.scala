@@ -22,9 +22,7 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
       |}""".stripMargin
   )
 
-  private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-2")
-  }
+  private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-2") }
 
   private def wavesNode2Api: NodeApi[Id] = {
     val apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)

@@ -1,30 +1,32 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.Address
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.execution.Ack
 import monix.execution.Ack.Continue
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.Scheduler.Implicits.{global => monixScheduler}
+
+import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import monix.reactive.Observer
 import mouse.any._
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
 import scala.concurrent.Future
 
-class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
+class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
-  override protected val suiteInitialWavesNodeConfig = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
+  override val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
 
   private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
   private val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
     override def onError(ex: Throwable): Unit                       = Unit
     override def onComplete(): Unit                                 = Unit
-    override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges = balanceChanges ++ elem; Continue }
+    override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges ++= elem; Continue }
   }
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
@@ -33,9 +35,9 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    new DEXClient(wavesNode1GrpcApiTarget).wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() }.unsafeTap {
-      _.spendableBalanceChanges.subscribe(eventsObserver)
-    }
+    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
+      .unsafeTap(_.requestBalanceChanges())
+      .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))
   }
 
   override def beforeEach(): Unit = {
@@ -43,7 +45,8 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
   }
 
-  "WavesBalancesApiGrpcServer should send balance changes via gRPC" in {
+  "WavesBlockchainAsyncClient should send balance changes via gRPC" in {
+
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
     val bobInitialBalance   = wavesNode1Api.balance(bob, Waves)
 
@@ -51,6 +54,7 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
     val issuedAsset  = IssuedAsset(issueAssetTx.id.value)
 
     broadcastAndAwait(issueAssetTx)
+
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(
@@ -61,6 +65,7 @@ class WavesGrpcAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterE
     }
 
     broadcastAndAwait(mkTransfer(alice, bob, someAssetAmount, issuedAsset))
+
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(

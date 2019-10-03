@@ -22,7 +22,7 @@ import com.wavesplatform.dex.cache.{AssetDecimalsCache, BalancesCache, RateCache
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBalancesClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
@@ -50,7 +50,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     with ScorexLogging {
 
   import actorSystem.dispatcher
-  import gRPCExtensionClient.{scheduler, wavesBalancesAsyncClient, wavesBlockchainSyncClient}
+  import gRPCExtensionClient.{monixScheduler, grpcExecutionContext, wavesBlockchainAsyncClient, wavesBlockchainSyncClient}
 
   private val time = new NTP(settings.ntpServer)
 
@@ -89,16 +89,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
   private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
-  private val balancesCache      = new BalancesCache(wavesBlockchainSyncClient.spendableBalance)
+  private val balancesCache      = new BalancesCache(wavesBlockchainAsyncClient.spendableBalance)(grpcExecutionContext)
 
   /** Updates balances cache by balances stream */
-  wavesBalancesAsyncClient.spendableBalanceChanges.subscribe {
+  wavesBlockchainAsyncClient.spendableBalanceChanges.subscribe {
     new Observer[SpendableBalanceChanges] {
       override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
       override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
       override def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
     }
-  }(scheduler)
+  }(monixScheduler)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -300,7 +300,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          wavesBalancesAsyncClient.unsafeTap { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
+          wavesBlockchainAsyncClient.unsafeTap { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
           (address, startSchedules) =>
             Props(

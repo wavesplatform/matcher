@@ -17,9 +17,11 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class WavesGrpcSyncClientTestSuite extends ItTestSuiteBase {
+class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
 
-  private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget).wavesBlockchainSyncClient
+  private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget,
+                                                   monix.execution.Scheduler.global,
+                                                   scala.concurrent.ExecutionContext.Implicits.global).wavesBlockchainSyncClient
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

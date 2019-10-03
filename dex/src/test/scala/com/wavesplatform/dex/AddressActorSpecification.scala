@@ -10,6 +10,7 @@ import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor.{BalanceUpdated, PlaceLimitOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
@@ -82,6 +83,7 @@ class AddressActorSpecification
 
         ref ! PlaceLimitOrder(sellTokenOrder1)
         eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
+        ref ! OrderAdded(LimitOrder(sellTokenOrder1), System.currentTimeMillis)
 
         updatePortfolio(initPortfolio.copy(assets = Map.empty), true)
         eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -126,9 +128,11 @@ class AddressActorSpecification
 
       ref ! PlaceLimitOrder(sellTokenOrder1)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder1), System.currentTimeMillis)
 
       ref ! PlaceLimitOrder(sellTokenOrder2)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder2), System.currentTimeMillis)
 
       updatePortfolio(sellToken1Portfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
@@ -143,9 +147,13 @@ class AddressActorSpecification
 
       ref ! PlaceLimitOrder(sellTokenOrder1)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder1), System.currentTimeMillis)
+
 
       ref ! PlaceLimitOrder(sellTokenOrder2)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder2), System.currentTimeMillis)
+
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -158,12 +166,17 @@ class AddressActorSpecification
 
       ref ! PlaceLimitOrder(sellTokenOrder1)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder1), System.currentTimeMillis)
 
       ref ! PlaceLimitOrder(sellWavesOrder)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellWavesOrder)))
+      ref ! OrderAdded(LimitOrder(sellWavesOrder), System.currentTimeMillis)
+
 
       ref ! PlaceLimitOrder(sellTokenOrder2)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
+      ref ! OrderAdded(LimitOrder(sellTokenOrder2), System.currentTimeMillis)
+
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -179,25 +192,31 @@ class AddressActorSpecification
     * (updatedPortfolio: Portfolio, sendBalanceChanged: Boolean) => Unit
     */
   private def test(f: (ActorRef, TestProbe, (Portfolio, Boolean) => Unit) => Unit): Unit = {
+
     val eventsProbe      = TestProbe()
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address          = addr("test")
-    val addressActor = system.actorOf(
-      Props(
-        new AddressActor(
-          address,
-          x => currentPortfolio.get().spendableBalanceOf(x),
-          1.day,
-          ntpTime,
-          EmptyOrderDB,
-          _ => false,
-          event => {
-            eventsProbe.ref ! event
-            Future.successful(Some(QueueEventWithMeta(0, 0, event)))
-          },
-          _ => OrderBook.AggregatedSnapshot(),
-          false
-        )))
+
+    val addressActor =
+      system.actorOf(
+        Props(
+          new AddressActor(
+            address,
+            x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
+            1.day,
+            ntpTime,
+            EmptyOrderDB,
+            _ => false,
+            event => {
+              eventsProbe.ref ! event
+              Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
+            },
+            _ => OrderBook.AggregatedSnapshot(),
+            false
+          )
+        )
+      )
+
     f(
       addressActor,
       eventsProbe,
@@ -214,6 +233,7 @@ class AddressActorSpecification
             }
       }
     )
+
     addressActor ! PoisonPill
   }
 

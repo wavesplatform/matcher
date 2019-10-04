@@ -11,6 +11,7 @@ import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 
@@ -29,9 +30,10 @@ object HistoryRouter {
   trait HistoryMsg {
 
     type R <: Record // mapping between domain objects and database rows
-    type Denormalize = (Long, AssetPair) => Double // how to convert amount, price and fee to the human-readable format
+    type DenormalizePrice        = (Long, AssetPair) => Double // how to convert price to the human-readable format
+    type DenormalizeAmountAndFee = (Long, Asset) => Double     // how to convert amount and fee fee to the human-readable format
 
-    protected def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R]
+    protected def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R]
     protected def toLocalDateTime(timestamp: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
   }
 
@@ -39,23 +41,23 @@ object HistoryRouter {
 
     type R = OrderRecord
 
-    def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R] = {
+    def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] = {
       val order = this.acceptedOrder.order
       Set(
         OrderRecord(
           id = order.id().toString,
           tpe = if (acceptedOrder.isMarket) marketOrderType else limitOrderType,
-          senderAddress = order.sender.address,
+          senderAddress = order.sender.toAddress.toString,
           senderPublicKey = order.senderPublicKey.toString,
           amountAssetId = order.assetPair.amountAssetStr,
           priceAssetId = order.assetPair.priceAssetStr,
           feeAssetId = AssetPair.assetIdStr(order.matcherFeeAssetId),
           side = if (acceptedOrder.isBuyOrder) buySide else sellSide,
           price = denormalizePrice(order.price, order.assetPair),
-          amount = denormalizeAmountAndFee(order.amount, order.assetPair),
+          amount = denormalizeAmountAndFee(order.amount, order.assetPair.amountAsset),
           timestamp = toLocalDateTime(order.timestamp),
           expiration = toLocalDateTime(order.expiration),
-          fee = denormalizeAmountAndFee(order.matcherFee, order.assetPair),
+          fee = denormalizeAmountAndFee(order.matcherFee, order.matcherFeeAssetId),
           created = toLocalDateTime(this.timestamp)
         )
       )
@@ -66,7 +68,7 @@ object HistoryRouter {
 
     type R = EventRecord
 
-    def createRecords(denormalizeAmountAndFee: Denormalize, denormalizePrice: Denormalize): Set[R] = {
+    def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R] = {
       this.event match {
         case _: OrderAdded => Set.empty[EventRecord]
 
@@ -83,10 +85,10 @@ object HistoryRouter {
                 eventType = eventTrade,
                 timestamp = toLocalDateTime(timestamp),
                 price = denormalizePrice(acceptedOrder.order.price, assetPair),
-                filled = denormalizeAmountAndFee(e.executedAmount, assetPair),
-                totalFilled = denormalizeAmountAndFee(acceptedOrder.order.amount - remainingAmount, assetPair),
-                feeFilled = denormalizeAmountAndFee(executedFee, assetPair),
-                feeTotalFilled = denormalizeAmountAndFee(acceptedOrder.order.matcherFee - remainingFee, assetPair),
+                filled = denormalizeAmountAndFee(e.executedAmount, assetPair.amountAsset),
+                totalFilled = denormalizeAmountAndFee(acceptedOrder.order.amount - remainingAmount, assetPair.amountAsset),
+                feeFilled = denormalizeAmountAndFee(executedFee, acceptedOrder.order.matcherFeeAssetId),
+                feeTotalFilled = denormalizeAmountAndFee(acceptedOrder.order.matcherFee - remainingFee, acceptedOrder.order.matcherFeeAssetId),
                 status = if (remainingAmount == 0) statusFilled else statusPartiallyFilled
               )
           }
@@ -100,9 +102,9 @@ object HistoryRouter {
               timestamp = toLocalDateTime(timestamp),
               price = denormalizePrice(submitted.order.price, assetPair),
               filled = 0,
-              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair),
+              totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair.amountAsset),
               feeFilled = 0,
-              feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, assetPair),
+              feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, submitted.order.matcherFeeAssetId),
               status = OrderStatus.finalStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
             )
           )
@@ -115,8 +117,8 @@ object HistoryRouter {
 
 class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double =
-    Denormalization.denormalizeAmountAndFeeWithDefault(value, pair, blockchain)
+  private def denormalizeAmountAndFee(value: Long, asset: Asset): Double =
+    Denormalization.denormalizeAmountAndFeeWithDefault(value, asset, blockchain)
 
   private def denormalizePrice(value: Long, pair: AssetPair): Double =
     Denormalization.denormalizePriceWithDefault(value, pair, blockchain)
@@ -141,6 +143,7 @@ class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnecti
                 _.senderPublicKey -> "sender_public_key",
                 _.amountAssetId   -> "amount_asset_id",
                 _.priceAssetId    -> "price_asset_id",
+                _.feeAssetId      -> "fee_asset_id",
                 _.side            -> "side",
                 _.price           -> "price",
                 _.amount          -> "amount",
@@ -168,13 +171,15 @@ class HistoryRouter(blockchain: Blockchain, postgresConnection: PostgresConnecti
             liftQuery(batchBuffer flatMap { _.createRecords(denormalizeAmountAndFee, denormalizePrice) }) foreach { eventRecord =>
               querySchema[EventRecord](
                 "events",
-                _.orderId     -> "order_id",
-                _.eventType   -> "event_type",
-                _.timestamp   -> "timestamp",
-                _.price       -> "price",
-                _.filled      -> "filled",
-                _.totalFilled -> "total_filled",
-                _.status      -> "status"
+                _.orderId        -> "order_id",
+                _.eventType      -> "event_type",
+                _.timestamp      -> "timestamp",
+                _.price          -> "price",
+                _.filled         -> "filled",
+                _.totalFilled    -> "total_filled",
+                _.feeFilled      -> "fee_filled",
+                _.feeTotalFilled -> "fee_total_filled",
+                _.status         -> "status"
               ).insert(eventRecord).onConflictIgnore
             }
           }

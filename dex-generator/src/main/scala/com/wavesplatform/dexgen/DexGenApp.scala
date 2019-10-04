@@ -116,7 +116,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
   def parsedTransfersList(endpoint: String, assetId: Asset, transferAmount: Long, pk: KeyPair, accounts: Seq[KeyPair])(
       implicit tag: String): List[ParsedTransfer] = {
     val assetsTransfers = accounts.map { accountPk =>
-      ParsedTransfer(AddressOrAlias.fromString(accountPk.address).right.get, transferAmount)
+      ParsedTransfer(AddressOrAlias.fromString(accountPk.toAddress.toString).right.get, transferAmount)
     }
     assetsTransfers.toList
   }
@@ -128,7 +128,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
 
     val massTransferTxSeq: Seq[Future[Transaction]] = tradingAssets.map { assetId =>
       node
-        .balance(richAccountPk.address, assetId)
+        .balance(richAccountPk.toAddress.toString, assetId)
         .flatMap { balance =>
           val transferAmount =
             if (assetId == Waves)

@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.AssetDecimalsInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
@@ -20,8 +20,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   }
 
   "Alice and Bob trade WAVES-USD" - {
-    val aliceWavesBalanceBefore = node.accountBalances(alice.address)._1
-    val bobWavesBalanceBefore   = node.accountBalances(bob.address)._1
+    val aliceWavesBalanceBefore = node.accountBalances(alice.toAddress.toString)._1
+    val bobWavesBalanceBefore   = node.accountBalances(bob.toAddress.toString)._1
 
     val price           = 238
     val buyOrderAmount  = 425532L
@@ -66,11 +66,11 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "check usd and waves balance after fill" in {
-      val aliceWavesBalanceAfter = node.accountBalances(alice.address)._1
-      val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
+      val aliceWavesBalanceAfter = node.accountBalances(alice.toAddress.toString)._1
+      val aliceUsdBalance        = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
 
-      val bobWavesBalanceAfter = node.accountBalances(bob.address)._1
-      val bobUsdBalance = node.assetBalance(bob.address, UsdId.toString).balance
+      val bobWavesBalanceAfter = node.accountBalances(bob.toAddress.toString)._1
+      val bobUsdBalance        = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
       (aliceWavesBalanceAfter - aliceWavesBalanceBefore) should be(
         adjustedAmount - (BigInt(matcherFee) * adjustedAmount / buyOrderAmount).bigInteger.longValue())
@@ -103,12 +103,12 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
       node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
-      node.tradableBalance(alice, wavesUsdPair)("WAVES") shouldBe node.accountBalances(alice.address)._1
+      node.tradableBalance(alice, wavesUsdPair)("WAVES") shouldBe node.accountBalances(alice.toAddress.toString)._1
 
       val orderId = orderHistory.head.id
       node.cancelOrder(bob, wavesUsdPair, orderId)
       node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
-      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe node.accountBalances(bob.address)._1
+      node.tradableBalance(bob, wavesUsdPair)("WAVES") shouldBe node.accountBalances(bob.toAddress.toString)._1
     }
   }
 
@@ -121,7 +121,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-      val bobWavesBalanceBefore = node.accountBalances(bob.address)._1
+      val bobWavesBalanceBefore = node.accountBalances(bob.toAddress.toString)._1
       node.tradableBalance(bob, wavesUsdPair)("WAVES")
       val bobOrder1   = node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
       val bobOrder1Id = node.placeOrder(bobOrder1).message.id
@@ -172,9 +172,9 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val wctUsdPrice      = 12739213
 
     "place wct-usd order" in {
-      val aliceUsdBalance = node.assetBalance(alice.address, UsdId.toString).balance
-      val bobUsdBalance = node.assetBalance(bob.address, UsdId.toString).balance
-      val bobWctInitBalance = node.assetBalance(bob.address, WctId.toString).balance
+      val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+      val bobUsdBalance     = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+      val bobWctInitBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
 
       val bobOrderId =
         node.placeOrder(bob, wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice, matcherFee).message.id
@@ -235,8 +235,8 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val wctWavesPrice      = 11234560000000L
 
     "bob lease all waves exact half matcher fee" in {
-      val leasingAmount = node.accountBalances(bob.address)._1 - leasingFee - matcherFee / 2
-      val leaseTxId     = node.broadcastLease(bob, matcher.address, leasingAmount, leasingFee, waitForTx = true).id
+      val leasingAmount = node.accountBalances(bob.toAddress.toString)._1 - leasingFee - matcherFee / 2
+      val leaseTxId     = node.broadcastLease(bob, matcher.toAddress.toString, leasingAmount, leasingFee, waitForTx = true).id
       val bobOrderId =
         node.placeOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice, matcherFee).message.id
       node.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)

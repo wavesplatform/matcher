@@ -14,7 +14,7 @@ import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -446,12 +446,12 @@ class MatcherActorSpecification
             assetPair,
             _ => {},
             _ => {},
-            _ => {},
-            _ => MatchingRules.Default,
             matcherSettings,
             txFactory,
             ntpTime,
-            NonEmptyList.one(RawMatchingRules(0, 0.00000001))
+            NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
+            _ => {},
+            _ => MatchingRule.DefaultRule
         ),
         blockchain.assetDescription
       )

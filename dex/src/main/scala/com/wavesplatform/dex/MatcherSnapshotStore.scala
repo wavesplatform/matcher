@@ -9,8 +9,7 @@ import akka.serialization.SerializationExtension
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
-import com.wavesplatform.database._
-import com.wavesplatform.db.openDB
+import com.wavesplatform.database.{openDB, _}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon

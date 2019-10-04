@@ -8,7 +8,7 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.{ApiRoute, _}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -16,14 +16,15 @@ import com.wavesplatform.dex.AddressActor.GetOrderStatus
 import com.wavesplatform.dex.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.cache.RateCache
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings, formatValue}
+import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -49,7 +50,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
-                           tickSize: AssetPair => Double,
+                           getActualTickSize: AssetPair => Double,
                            orderValidator: Order => Either[MatcherError, Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
@@ -59,10 +60,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
-                           apiKeyHash: Option[Array[Byte]],
+                           apiKeyHashStr: String,
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
+    with AuthRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
@@ -81,7 +83,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
           getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
           historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-          upsertRate ~ deleteRate
+          upsertRate ~ deleteRate ~ saveSnapshots
       }
   }
 
@@ -134,7 +136,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
-    (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
+    (pathEndOrSingleSlash & entity(as[Order])) { order =>
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(
@@ -195,7 +197,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/settings/rates")
-  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (asset cost in Waves)", httpMethod = "GET")
+  @ApiOperation(value = "Asset rates", notes = "Get current rates of assets (price of 1 Waves in the specified asset)", httpMethod = "GET")
   def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
 
   @Path("/settings/rates/{assetId}")
@@ -299,9 +301,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def orderBookInfoJson(pair: AssetPair): JsObject =
     Json.obj(
-      "restrictions" -> matcherSettings.orderRestrictions.getOrElse(pair, OrderRestrictionsSettings.Default).getJson.value,
+      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.getJson.value },
       "matchingRules" -> Json.obj(
-        "tickSize" -> formatValue(tickSize(pair))
+        "tickSize" -> formatValue { getActualTickSize(pair) }
       )
     )
 
@@ -344,24 +346,28 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/orderbook")
   @ApiOperation(value = "Get the open trading markets", notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
   def orderbooks: Route = (path("orderbook") & pathEndOrSingleSlash & get) {
-    complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
-      StatusCodes.OK -> Json.obj(
-        "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-        "markets" -> JsArray(markets.map { m =>
-          Json
-            .obj(
-              "amountAsset"     -> m.pair.amountAssetStr,
-              "amountAssetName" -> m.amountAssetName,
-              "amountAssetInfo" -> m.amountAssetInfo,
-              "priceAsset"      -> m.pair.priceAssetStr,
-              "priceAssetName"  -> m.priceAssetName,
-              "priceAssetInfo"  -> m.priceAssetinfo,
-              "created"         -> m.created
-            )
-            .deepMerge(orderBookInfoJson(m.pair))
-        })
-      )
-    })
+    complete(
+      (matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
+        StatusCodes.OK -> Json.obj(
+          "matcherPublicKey" -> Base58.encode(matcherPublicKey),
+          "markets" -> JsArray(
+            markets.map { m =>
+              Json
+                .obj(
+                  "amountAsset"     -> m.pair.amountAssetStr,
+                  "amountAssetName" -> m.amountAssetName,
+                  "amountAssetInfo" -> m.amountAssetInfo,
+                  "priceAsset"      -> m.pair.priceAssetStr,
+                  "priceAssetName"  -> m.priceAssetName,
+                  "priceAssetInfo"  -> m.priceAssetinfo,
+                  "created"         -> m.created
+                )
+                .deepMerge { orderBookInfoJson(m.pair) }
+            }
+          )
+        )
+      }
+    )
   }
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
@@ -449,7 +455,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
-    json[CancelOrderRequest] { req =>
+    jsonPost[CancelOrderRequest] { req =>
       req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
     }
   }
@@ -698,6 +704,28 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
     }
   }
+
+  @Path("/debug/saveSnapshots")
+  @ApiOperation(value = "Saves snapshots for all order books", notes = "", httpMethod = "POST")
+  def saveSnapshots: Route = (path("debug" / "saveSnapshots") & post & withAuth) {
+    complete {
+      matcher ! ForceSaveSnapshots
+      SimpleResponse(StatusCodes.OK, "Saving started")
+    }
+  }
+
+  // TODO remove AuthRoute
+  override def settings: RestAPISettings =
+    RestAPISettings(
+      true,
+      matcherSettings.bindAddress,
+      matcherSettings.port,
+      apiKeyHashStr,
+      true,
+      true,
+      100,
+      100
+    )
 }
 
 object MatcherApiRoute {

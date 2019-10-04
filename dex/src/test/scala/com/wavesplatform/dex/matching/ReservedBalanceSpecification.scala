@@ -6,7 +6,7 @@ import akka.util.Timeout
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.PlaceMarketOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
-import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._
@@ -90,6 +90,7 @@ class ReservedBalanceSpecification
       new AddressDirectory(
         ignoreSpendableBalanceChanged,
         matcherSettings,
+        EmptyOrderDB,
         (address, enableSchedules) =>
           Props(
             new AddressActor(
@@ -442,12 +443,6 @@ class ReservedBalanceSpecification
     }
   }
 
-  private implicit class DoubleOps(value: Double) {
-    val waves: Long = p.amount(value)
-    val usd: Long   = p.price(value)
-    val eth: Long   = p.amount(value)
-  }
-
   private val WAVES = pair.amountAsset
   private val USD   = pair.priceAsset
   private val ETH   = mkAssetId("ETH")
@@ -459,6 +454,7 @@ class ReservedBalanceSpecification
         new AddressDirectory(
           ignoreSpendableBalanceChanged,
           matcherSettings,
+          new TestOrderDB(100),
           (address, enableSchedules) =>
             Props(
               new AddressActor(

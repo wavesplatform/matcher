@@ -35,8 +35,8 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
 
       val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
       // check assets's balances
-      node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-      node.assertAssetBalance(matcher.address, aliceAsset, 0)
+      node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
+      node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
 
       // Alice places sell order
       val aliceOrder = node

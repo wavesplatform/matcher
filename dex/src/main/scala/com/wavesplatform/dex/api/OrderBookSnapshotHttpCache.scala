@@ -24,7 +24,6 @@ class OrderBookSnapshotHttpCache(settings: Settings,
   import OrderBookSnapshotHttpCache._
 
   private val depthRanges = settings.depthRanges.sorted
-  private val maxDepth    = depthRanges.max
 
   private val orderBookSnapshotCache = CacheBuilder
     .newBuilder()
@@ -78,10 +77,7 @@ class OrderBookSnapshotHttpCache(settings: Settings,
   }
 
   def get(pair: AssetPair, depth: Option[Int], format: DecimalsFormat = Normalized): HttpResponse = {
-    val nearestDepth = depth
-      .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
-      .getOrElse(maxDepth)
-
+    val nearestDepth = settings.nearestBigger(depth)
     orderBookSnapshotCache.get(Key(pair, nearestDepth, format))
   }
 
@@ -100,6 +96,14 @@ class OrderBookSnapshotHttpCache(settings: Settings,
 }
 
 object OrderBookSnapshotHttpCache {
-  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int])
+  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
+    val maxDepth = depthRanges.max
+
+    def nearestBigger(to: Option[Int]): Int =
+      to.orElse(defaultDepth)
+        .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
+        .getOrElse(maxDepth)
+  }
+
   private case class Key(pair: AssetPair, depth: Int, format: DecimalsFormat)
 }

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import java.net.URL
+import java.util.UUID
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.KeyPair
@@ -14,19 +15,18 @@ import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
-import com.wavesplatform.dex.api.CancelOrderRequest
-import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
 import org.asynchttpclient.util.HttpConstants
-import org.asynchttpclient.{RequestBuilder, Response}
+import org.asynchttpclient.{AsyncCompletionHandler, Request, RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.{Json, Writes}
 
 import scala.collection.immutable.TreeMap
+import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -177,6 +177,34 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", Json.toJson(batchCancelRequest(sender, timestamp)))
         .as[MatcherStatusResponse]
 
+    def cancelOrdersForPairOnce(sender: KeyPair, assetPair: AssetPair, timestamp: Long): Future[Response] =
+      onceWithLoggedBody(
+        new RequestBuilder()
+          .setMethod("POST")
+          .setUrl(s"$matcherApiEndpoint/matcher/orderbook/${assetPair.toUri}/cancel")
+          .setHeader("Content-type", "application/json")
+          .setHeader("Accept", "application/json")
+          .setBody(stringify(Json.toJson(batchCancelRequest(sender, timestamp))))
+          .build(),
+      )
+
+    def onceWithLoggedBody(r: Request): Future[Response] = {
+      val id = UUID.randomUUID()
+      n.log.trace(s"[$id] Executing request ${r.getMethod} ${r.getUrl}")
+      n.client
+        .executeRequest(
+          r,
+          new AsyncCompletionHandler[Response] {
+            override def onCompleted(response: Response): Response = {
+              n.log.debug(s"[$id] Response for ${r.getUrl} is ${response.getStatusCode}\n${Option(response.getResponseBody).getOrElse("<null>")}")
+              response
+            }
+          }
+        )
+        .toCompletableFuture
+        .toScala
+    }
+
     def cancelAllOrders(sender: KeyPair, timestamp: Long): Future[MatcherStatusResponse] =
       matcherPost(s"/matcher/orderbook/cancel", Json.toJson(batchCancelRequest(sender, timestamp))).as[MatcherStatusResponse]
 
@@ -201,7 +229,7 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
 
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
     def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
 
@@ -237,13 +265,10 @@ object AsyncMatcherHttpApi extends Assertions {
                      version: Byte,
                      timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds,
-                     matcherFeeAssetId: Asset = Waves): Order = {
+                     feeAsset: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val unsigned = version match {
-        case 3 => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version,
-          matcherFeeAssetId)
-        case _ => Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
-      }
+      val unsigned =
+        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version, feeAsset)
       Order.sign(unsigned, sender)
     }
 
@@ -261,8 +286,8 @@ object AsyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   matcherFeeAssetId: Asset = Waves): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, matcherFeeAssetId = matcherFeeAssetId)
+                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
@@ -292,7 +317,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      matcherGetWithApiKey(s"/matcher/orders/${sender.address}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
+      matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
     def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]

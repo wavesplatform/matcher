@@ -21,23 +21,20 @@ object MatcherModel {
     asset.fold[Either[MatcherError, Int]](Right(8)) { issuedAsset =>
       blockchain
         .assetDescription(issuedAsset)
-        .toRight[MatcherError](error.AssetNotFound(issuedAsset))
+        .toRight[MatcherError] { error.AssetNotFound(issuedAsset) }
         .map(_.decimals)
     }
 
   def getPairDecimals(pair: AssetPair, blockchain: Blockchain): Either[MatcherError, (Int, Int)] =
     (getAssetDecimals(pair.amountAsset, blockchain), getAssetDecimals(pair.priceAsset, blockchain)).tupled
 
-  sealed trait DecimalsFormat
-  final case object Denormalized extends DecimalsFormat
-  final case object Normalized   extends DecimalsFormat
-
   def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
 
+  /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
   object Normalization {
 
-    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Amount =
-      (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
+    def normalizeAmountAndFee(value: Double, assetDecimals: Int): Amount =
+      (BigDecimal(value) * BigDecimal(10).pow(assetDecimals)).toLong
 
     def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
       (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
@@ -48,16 +45,17 @@ object MatcherModel {
     }
   }
 
+  /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
   object Denormalization {
 
-    def denormalizeAmountAndFee(value: Amount, amountAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
+    def denormalizeAmountAndFee(value: Amount, assetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(assetDecimals)).toDouble
 
-    def denormalizeAmountAndFee(value: Amount, pair: AssetPair, blockchain: Blockchain): Either[MatcherError, Double] =
-      getAssetDecimals(pair.amountAsset, blockchain).map(denormalizeAmountAndFee(value, _))
+    def denormalizeAmountAndFee(value: Amount, asset: Asset, blockchain: Blockchain): Either[MatcherError, Double] =
+      getAssetDecimals(asset, blockchain).map(denormalizeAmountAndFee(value, _))
 
-    def denormalizeAmountAndFeeWithDefault(value: Amount, pair: AssetPair, blockchain: Blockchain): Double =
-      denormalizeAmountAndFee(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
+    def denormalizeAmountAndFeeWithDefault(value: Amount, asset: Asset, blockchain: Blockchain): Double =
+      denormalizeAmountAndFee(value, asset, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
 
     def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
       (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
@@ -73,6 +71,12 @@ object MatcherModel {
     def denormalizePriceWithDefault(value: Price, pair: AssetPair, blockchain: Blockchain): Double =
       denormalizePrice(value, pair, blockchain).getOrElse { (value / BigDecimal(10).pow(8)).toDouble }
   }
+
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
+
+  sealed trait DecimalsFormat
+  final case object Denormalized extends DecimalsFormat
+  final case object Normalized   extends DecimalsFormat
 }
 
 case class LevelAgg(amount: Long, price: Long)
@@ -393,6 +397,7 @@ object Events {
 
   case class OrderAdded(order: LimitOrder, timestamp: Long)                                        extends Event
   case class OrderCanceled(acceptedOrder: AcceptedOrder, isSystemCancel: Boolean, timestamp: Long) extends Event
+  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
   case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {

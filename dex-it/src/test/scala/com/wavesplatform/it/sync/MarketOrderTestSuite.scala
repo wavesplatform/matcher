@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -14,9 +15,8 @@ import mouse.any._
 class MarketOrderTestSuite extends MatcherSuiteBase {
 
   implicit class DoubleOps(value: Double) {
-    val waves: Long = wavesUsdPairDecimals.amount(value)
-    val usd: Long   = wavesUsdPairDecimals.price(value)
-    val eth: Long   = ethWavesPairDecimals.amount(value)
+    val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long        = Normalization.normalizePrice(value, 8, 2)
   }
 
   override protected def nodeConfigs: Seq[Config] = {

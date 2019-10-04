@@ -78,7 +78,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     node.waitForTransaction(transferTxId)
   }
 
-  def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, matcherFeeAssetId = btcAsset)
+  def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, feeAsset = btcAsset)
 
   "Rates can be handled via REST" in {
     // default rates

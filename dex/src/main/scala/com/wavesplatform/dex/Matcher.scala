@@ -10,24 +10,22 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db._
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.cache.{AssetDecimalsCache, RateCache}
+import com.wavesplatform.dex.caches.{AssetDecimalsCache, MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
-import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset
@@ -45,15 +43,18 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val settings = context.settings.config.as[MatcherSettings]("waves.dex")
 
-  private val matcherKeyPair = (for {
-    address <- Address.fromString(settings.account)
-    pk      <- context.wallet.privateKeyAccount(address)
-  } yield pk).explicitGet()
+  private val matcherKeyPair = (
+    for {
+      address <- Address.fromString(settings.account)
+      pk      <- context.wallet.privateKeyAccount(address)
+    } yield pk
+  ).explicitGet()
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
 
   private implicit val as: ActorSystem                 = context.actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
+
   import as.dispatcher
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
@@ -67,60 +68,37 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       }
     }
 
-  private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain, blacklistedAssets)
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
+  private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
+  private val pairBuilder        = new AssetPairBuilder(settings, context.blockchain, blacklistedAssets)
+  private val transactionCreator = new ExchangeTransactionCreator(context.blockchain, matcherKeyPair, settings)
   private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(context.blockchain)
+
+  private val assetDecimalsCache                           = new AssetDecimalsCache(context.blockchain)
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
+
+  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+  private val matchingRulesCache = new MatchingRulesCache(settings, context.blockchain)
+  private val rateCache          = RateCache(db)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
       settings.orderBookSnapshotHttpCache,
       context.time,
       assetDecimalsCache.get,
-      p => Option(orderBookCache.get(p))
+      assetPair => Option { orderBookCache.get(assetPair) }
     )
 
-  private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
+  private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
+  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
 
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def normalize(assetPair: AssetPair)(rawMatchingRules: RawMatchingRules): MatchingRules =
-    MatchingRules(
-      rawMatchingRules.startOffset,
-      normalizedTickSize = Normalization.normalizePrice(
-        rawMatchingRules.tickSize,
-        assetPair,
-        MatcherModel.getPairDecimals(assetPair, context.blockchain).getOrElse((8, 8))
-      )
-    )
-
-  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Either[MatcherError, Double] =
-    Denormalization.denormalizePrice(normalizedTickSize, assetPair, context.blockchain)
-
-  private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
-    RawMatchingRules(
-      startOffset = matchingRules.startOffset,
-      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize).left.map { e =>
-        log.error(
-          s"Can't convert matching rules for $assetPair: ${e.mkMessage(errorContext).text}. Usually this happens when the blockchain was rolled back."
-        )
-        0.00000001
-      }.merge
-    )
-
-  private def matchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRules] = {
-    lazy val default = convert(assetPair, MatchingRules.Default)
-    val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
-    if (xs.head.startOffset == 0) xs else default :: xs
-  }
-
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair)
     OrderBookActor.props(
       matcherActor,
       addressActors,
@@ -128,13 +106,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      newMatchingRules => rawMatchingRules.put(assetPair, newMatchingRules),
-      normalize(assetPair),
       settings,
       transactionCreator.createTransaction,
       context.time,
-      matchingRules(assetPair)
+      matchingRules = matchingRulesCache.getMatchingRules(assetPair),
+      updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, context.blockchain),
     )
+  }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -148,12 +127,14 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
-  private val rateCache                                          = RateCache(db)
-
   private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
+                                               blacklistedAddresses,
+                                               blacklistedAssets,
+                                               settings,
+                                               rateCache,
+                                               assetDecimalsCache.get)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
@@ -163,15 +144,15 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         context.time,
         settings.orderFee,
         settings.orderRestrictions,
-        rateCache
+        rateCache,
+        assetDecimalsCache.get
       )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
+      _ <- OrderValidator.tickSizeAware(matchingRulesCache.getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset).tickSize)(o)
     } yield o
 
-  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
-
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHash = Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+    val keyHashStr = context.settings.config.getString("waves.rest-api.api-key-hash")
 
     Seq(
       MatcherApiRoute(
@@ -182,14 +163,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
-        assetPair => {
-          lazy val default = RawMatchingRules(
-            startOffset = 0,
-            tickSize = denormalizeTickSize(assetPair, 1).left.map(_ => 0.00000001).merge
-          )
-
-          rawMatchingRules.computeIfAbsent(assetPair, _ => default).tickSize
-        },
+        getActualTickSize = assetPair => matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset).tickSize,
         validateOrder,
         orderBooksSnapshotCache,
         settings,
@@ -199,7 +173,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-        keyHash,
+        keyHashStr,
         rateCache,
         settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, context.blockchain).isRight)
       ),
@@ -207,34 +181,34 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHash
+        keyHashStr,
+        settings
       )
     )
   }
 
-  lazy val matcherApiTypes: Set[Class[_]] =
-    Set(
-      classOf[MatcherApiRoute],
-      classOf[MatcherApiRouteV1],
-    )
+  lazy val matcherApiTypes: Set[Class[_]] = Set(
+    classOf[MatcherApiRoute],
+    classOf[MatcherApiRouteV1],
+  )
 
   private val snapshotsRestore = Promise[Unit]()
 
-  private lazy val assetPairsDb = AssetPairsDB(db)
-
+  private lazy val db                  = openDB(settings.dataDir)
+  private lazy val assetPairsDB        = AssetPairsDB(db)
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+  private lazy val orderDB             = OrderDB(settings, db)
 
-  lazy val orderBookSnapshotStore: ActorRef = context.actorSystem.actorOf(
-    OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
-    "order-book-snapshot-store"
-  )
+  lazy val orderBookSnapshotStore: ActorRef = {
+    context.actorSystem.actorOf(OrderBookSnapshotStoreActor.props(orderBookSnapshotDB), "order-book-snapshot-store")
+  }
 
   private val pongTimeout = new Timeout(settings.processConsumedTimeout * 2)
 
   lazy val matcher: ActorRef = context.actorSystem.actorOf(
     MatcherActor.props(
       settings,
-      assetPairsDb, {
+      assetPairsDB, {
         case Left(msg) =>
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
@@ -270,8 +244,6 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     MatcherActor.name
   )
 
-  private lazy val orderDb = OrderDB(settings, db)
-
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
     context.actorSystem.actorOf(HistoryRouter.props(context.blockchain, settings.postgresConnection, orderHistorySettings), "history-router")
   }
@@ -282,6 +254,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         new AddressDirectory(
           context.spendableBalanceChanged,
           settings,
+          orderDB,
           (address, startSchedules) =>
             Props(
               new AddressActor(
@@ -289,7 +262,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
                 context.utx.spendableBalance(address, _),
                 5.seconds,
                 context.time,
-                orderDb,
+                orderDB,
                 id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
                 matcherQueue.storeEvent,
                 orderBookCache.get,
@@ -301,10 +274,6 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       ),
       "addresses"
     )
-
-  private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-
-  private lazy val db = openDB(settings.dataDir)
 
   @volatile var matcherServerBinding: ServerBinding = _
 
@@ -353,7 +322,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
           context.time,
           tx => context.utx.putIfNew(tx).resultE.isRight,
           context.blockchain.containsTransaction(_),
-          txs => txs.foreach(context.broadcastTx)
+          txs => txs.foreach(context.broadcastTransaction)
         ),
       "exchange-transaction-broadcast"
     )
@@ -414,6 +383,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 }
 
 object Matcher extends ScorexLogging {
+
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   sealed trait Status

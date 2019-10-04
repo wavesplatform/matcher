@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
-class MatcherRulesTestSuite extends MatcherSuiteBase {
+class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = {
 
@@ -20,7 +20,12 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
          |    "$WctId-$UsdId": [
          |      {
          |        start-offset = 2
-         |        merge-prices = yes
+         |        tick-size    = 5
+         |      }
+         |    ],
+         |    "WAVES-$BtcId": [
+         |      {
+         |        start-offset = 1
          |        tick-size    = 5
          |      }
          |    ]
@@ -33,8 +38,8 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(IssueUsdTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
-      node.waitForTransaction(tx.id)
+    Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).foreach { tx =>
+      node.waitForTransaction { node.broadcastRequest(tx.json.value).id }
     }
   }
 
@@ -62,5 +67,12 @@ class MatcherRulesTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, buyOrder3, "Cancelled")
 
     node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
+  }
+
+  "Buy orders cannot be placed into price level 0 (when price is less than tick size)" in {
+    val firstOrder = node.placeOrder(bob, wavesBtcPair, BUY, amount, 3 * price, matcherFee).message.id
+    node.waitOrderStatus(wctUsdPair, firstOrder, "Accepted")
+
+    node.expectRejectedOrderPlacement(bob, wavesBtcPair, BUY, amount, 3 * price, matcherFee)
   }
 }

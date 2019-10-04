@@ -9,11 +9,12 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NTPTime, TransactionGenBase}
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
+class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime with TableDrivenPropertyChecks {
 
   private val defaultAssetPair               = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
   private def getAssetDecimals(asset: Asset) = 8
@@ -52,7 +53,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       // Two levels: one is aggregated and one is not
       using {
         new OrderBookSnapshotHttpCache(
-          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)),
+          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9), None),
           ntpTime,
           getAssetDecimals,
           _ =>
@@ -87,7 +88,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     "should clear all depth caches after invalidate" in {
       val depths = List(1, 3, 7, 9)
       using {
-        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths), ntpTime, getAssetDecimals, _ => None)
+        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths, None), ntpTime, getAssetDecimals, _ => None)
       } { cache =>
         val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
 
@@ -102,10 +103,62 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         }
       }
     }
+
+    "Settings.nearestBigger" - {
+      def mkSettings(depthRanges: List[Int], defaultDepth: Option[Int]) = OrderBookSnapshotHttpCache.Settings(50.millis, depthRanges, defaultDepth)
+
+      "1 and None" in {
+        val settings = mkSettings(List(1), None)
+        forAll(
+          Table(
+            ("arg", "expected"),
+            (None, 1),
+            (Some(0), 1),
+            (Some(1), 1),
+            (Some(5), 1)
+          )) { (arg, expected) =>
+          settings.nearestBigger(arg) shouldBe expected
+        }
+      }
+
+      "1, 3, 7, 9 and None" in {
+        val settings = mkSettings(List(1, 3, 7, 9), None)
+        forAll(
+          Table(
+            ("arg", "expected"),
+            (None, 9),
+            (Some(0), 1),
+            (Some(1), 1),
+            (Some(5), 7),
+            (Some(7), 7),
+            (Some(9), 9),
+            (Some(100), 9)
+          )) { (arg, expected) =>
+          settings.nearestBigger(arg) shouldBe expected
+        }
+      }
+
+      "1, 3, 7, 9 and Some(3)" in {
+        val settings = mkSettings(List(1, 3, 7, 9), Some(3))
+        forAll(
+          Table(
+            ("arg", "expected"),
+            (None, 3),
+            (Some(0), 1),
+            (Some(1), 1),
+            (Some(5), 7),
+            (Some(7), 7),
+            (Some(9), 9),
+            (Some(100), 9)
+          )) { (arg, expected) =>
+          settings.nearestBigger(arg) shouldBe expected
+        }
+      }
+    }
   }
 
   private def createDefaultCache =
-    new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9)), ntpTime, getAssetDecimals, _ => None)
+    new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9), None), ntpTime, getAssetDecimals, _ => None)
 
   private def orderBookFrom(x: HttpResponse): OrderBookResult = JsonSerializer.deserialize[OrderBookResult](
     x.entity

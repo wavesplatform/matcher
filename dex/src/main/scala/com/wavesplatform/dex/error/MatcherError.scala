@@ -354,6 +354,18 @@ case class InvalidMarketOrderPrice(mo: Order)
          |is too high for its full execution with the current market state"""
     )
 
+case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
+    extends MatcherError(
+      order,
+      price,
+      notEnough,
+      e"""The buy order's price
+       |${'price -> Price(ord.assetPair, ord.price)}
+       |does not meet matcher's requirements:
+       |price >= ${'tickSize -> Price(ord.assetPair, tickSize)} (actual tick size).
+       |Orders can not be placed into level with price 0"""
+    )
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)

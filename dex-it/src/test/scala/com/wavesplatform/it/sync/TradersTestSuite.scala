@@ -35,9 +35,9 @@ class TradersTestSuite extends MatcherSuiteBase {
       .id
 
     // Wait for balance on Alice's account
-    node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-    node.assertAssetBalance(matcher.address, aliceAsset, 0)
-    node.assertAssetBalance(bob.address, aliceAsset, 0)
+    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, someAssetAmount)
+    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
+    node.assertAssetBalance(bob.toAddress.toString, aliceAsset, 0)
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
@@ -64,7 +64,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           priceAsset = aliceAssetId
         )
 
-    node.assertAssetBalance(bob.address, bobNewAsset, bobAssetQuantity)
+    node.assertAssetBalance(bob.toAddress.toString, bobNewAsset, bobAssetQuantity)
 
     "AssetPair BOB/WAVES vs BOB/NULL" in {
       val trickyBobWavesPairWB58 = AssetPair(
@@ -116,7 +116,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val newestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset)
 
           // 5000 waves are rest
-          node.broadcastTransfer(bob, alice.address, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
+          node.broadcastTransfer(bob, alice.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
 
           withClue(s"The newest order '$newestOrderId' was cancelled") {
             node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
@@ -128,17 +128,17 @@ class TradersTestSuite extends MatcherSuiteBase {
           // Cleanup
           node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
           node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
-          node.broadcastTransfer(alice, bob.address, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
+          node.broadcastTransfer(alice, bob.toAddress.toString, 5000, matcherFee, Some(bobNewAsset), None, waitForTx = true).id
         }
 
         "leased waves, insufficient fee" in {
-          val bobBalance    = node.accountBalances(bob.address)._1
+          val bobBalance    = node.accountBalances(bob.toAddress.toString)._1
           val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
           val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
 
           // TransactionFee for leasing, matcherFee for one order
           val leaseAmount = bobBalance - matcherFee - matcherFee
-          val leaseId     = node.broadcastLease(bob, alice.address, leaseAmount, matcherFee, waitForTx = true).id
+          val leaseId     = node.broadcastLease(bob, alice.toAddress.toString, leaseAmount, matcherFee, waitForTx = true).id
 
           withClue(s"The newest order '$newestOrderId' was cancelled") {
             node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
@@ -155,13 +155,13 @@ class TradersTestSuite extends MatcherSuiteBase {
         }
 
         "moved waves, insufficient fee" in {
-          val bobBalance    = node.accountBalances(bob.address)._1
+          val bobBalance    = node.accountBalances(bob.toAddress.toString)._1
           val oldestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
           val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
 
           // TransactionFee for leasing, matcherFee for one order
           val transferAmount = bobBalance - matcherFee - matcherFee
-          node.broadcastTransfer(bob, alice.address, transferAmount, matcherFee, None, None, waitForTx = true).id
+          node.broadcastTransfer(bob, alice.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
 
           withClue(s"The newest order '$newestOrderId' was cancelled") {
             node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
@@ -173,21 +173,21 @@ class TradersTestSuite extends MatcherSuiteBase {
           // Cleanup
           node.cancelOrder(bob, twoAssetsPair, oldestOrderId)
           node.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
-          node.broadcastTransfer(alice, bob.address, transferAmount, matcherFee, None, None, waitForTx = true).id
+          node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
         }
       }
 
       "order with waves" - {
         "leased waves, insufficient fee for one ExchangeTransaction" in {
           // Amount of waves in order is smaller than fee
-          val bobBalance = node.accountBalances(bob.address)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
 
           val oldestOrderId = bobPlacesWaveOrder(bobWavesPair, 1, 10.waves * Order.PriceConstant)
           val newestOrderId = bobPlacesWaveOrder(bobWavesPair, 1, 10.waves * Order.PriceConstant)
 
           //      waitForOrderStatus(node, bobAssetIdRaw, id, "Accepted")
           val leaseAmount = bobBalance - matcherFee - 10.waves - matcherFee
-          val leaseId     = node.broadcastLease(bob, alice.address, leaseAmount, matcherFee, waitForTx = true).id
+          val leaseId     = node.broadcastLease(bob, alice.toAddress.toString, leaseAmount, matcherFee, waitForTx = true).id
 
           withClue(s"The newest order '$newestOrderId' is Cancelled") {
             node.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
@@ -204,12 +204,12 @@ class TradersTestSuite extends MatcherSuiteBase {
         }
 
         "leased waves, insufficient waves" in {
-          val bobBalance = node.accountBalances(bob.address)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
           val price      = 1.waves
           val order2     = bobPlacesWaveOrder(bobWavesPair, 1, price * Order.PriceConstant)
 
           val leaseAmount = bobBalance - matcherFee - price / 2
-          val leaseId     = node.broadcastLease(bob, alice.address, leaseAmount, matcherFee, waitForTx = true).id
+          val leaseId     = node.broadcastLease(bob, alice.toAddress.toString, leaseAmount, matcherFee, waitForTx = true).id
 
           withClue(s"The order '$order2' was cancelled") {
             node.waitOrderStatus(bobWavesPair, order2, "Cancelled")
@@ -221,19 +221,19 @@ class TradersTestSuite extends MatcherSuiteBase {
 
         "moved waves, insufficient fee" in {
           // Amount of waves in order is smaller than fee
-          val bobBalance = node.accountBalances(bob.address)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
           val price      = matcherFee / 2
           val order3     = bobPlacesWaveOrder(bobWavesPair, 1, price * Order.PriceConstant)
 
           val transferAmount = bobBalance - matcherFee - price
-          node.broadcastTransfer(bob, alice.address, transferAmount, matcherFee, None, None, waitForTx = true).id
+          node.broadcastTransfer(bob, alice.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
 
           withClue(s"The order '$order3' was cancelled") {
             node.waitOrderStatus(bobWavesPair, order3, "Cancelled")
           }
 
           // Cleanup
-          node.broadcastTransfer(alice, bob.address, transferAmount, matcherFee, None, None, waitForTx = true).id
+          node.broadcastTransfer(alice, bob.toAddress.toString, transferAmount, matcherFee, None, None, waitForTx = true).id
         }
       }
     }

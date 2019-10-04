@@ -7,10 +7,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.AssetPairBuilder
+import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.{AssetPairDecimals, AssetPairBuilder}
-import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -131,9 +131,6 @@ object MatcherPriceAssetConfig {
   val usd = IssuedAsset(UsdId)
   val wct = IssuedAsset(WctId)
 
-  val ethWavesPairDecimals = new AssetPairDecimals(8, 8)
-  val wavesUsdPairDecimals = new AssetPairDecimals(8, 2)
-
   val wctUsdPair = AssetPair(
     amountAsset = wct,
     priceAsset = usd
@@ -171,7 +168,7 @@ object MatcherPriceAssetConfig {
 
   val orderLimit = 10
 
-  val ForbiddenAssetId     = "FdbnAsset"
+  val ForbiddenAssetId             = "FdbnAsset"
   val updatedMatcherConfig: Config = parseString(s"""waves.dex {
                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
                                             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]

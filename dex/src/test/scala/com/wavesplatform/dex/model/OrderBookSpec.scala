@@ -4,11 +4,13 @@ import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
+import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
-import com.wavesplatform.dex.settings.MatchingRules
+import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.{NTPTime, NoShrink}
 import org.scalacheck.Gen
@@ -88,6 +90,62 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     )
   }
 
+  "place matchable orders with and without tick size" in {
+    val ob = OrderBook.empty
+
+    val amt                = 54521418493L
+    val normalizedTickSize = toNormalized(8)
+
+    val counterSellOrder  = LimitOrder(sell(pair, amt, 9))
+    val submittedBuyOrder = LimitOrder(buy(pair, amt, 10))
+
+    val counterOrderTime   = ntpNow
+    val submittedOrderTime = ntpNow
+
+    withClue("matchable orders should be matched without tick size:\n") {
+      ob.add(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
+      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime))
+
+      ob.getAsks shouldBe empty
+      ob.getBids shouldBe empty
+    }
+
+    withClue("matchable orders should not be matched with tick size:\n") {
+      ob.add(counterSellOrder, ntpNow, normalizedTickSize)
+      ob.add(submittedBuyOrder, ntpNow, normalizedTickSize)
+
+      ob.getAsks shouldBe mutable.TreeMap[Price, Level](
+        Seq(16 -> Vector(counterSellOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
+      )
+
+      ob.getBids shouldBe mutable.TreeMap[Price, Level](
+        Seq(8 -> Vector(submittedBuyOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
+      )
+    }
+  }
+
+  "old counter orders should be matched with the new ones (with new activated tick-size)" in {
+
+    val ob = OrderBook.empty
+
+    def normalizedTickSize(tickSize: Double): Price = Normalization.normalizePrice(tickSize, 8, 2)
+
+    val counter   = LimitOrder(createOrder(pairWavesUsd, SELL, 100.waves, 3.15))
+    val submitted = LimitOrder(createOrder(pairWavesUsd, BUY, 100.waves, 3.15))
+
+    val counterTs   = counter.order.timestamp
+    val submittedTs = submitted.order.timestamp
+
+    withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
+
+      ob.add(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
+      ob.add(submitted, submittedTs, normalizedTickSize(0.1)) shouldBe Seq(OrderExecuted(submitted, counter, submittedTs))
+
+      ob.getAsks shouldBe empty
+      ob.getBids shouldBe empty
+    }
+  }
+
   "place sell orders" in {
     val ord1 = sell(pair, 1583290045643L, 34110)
     val ord2 = sell(pair, 170484969L, 34220)
@@ -114,8 +172,8 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
         val ob = OrderBook.empty
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
-        ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
-        ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
+        ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
 
         ob.getAsks.size shouldBe 1
         ob.getAsks.head._2.toList shouldBe List(sellOrder, sellOrder)
@@ -127,7 +185,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
       val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
       ob.add(sellOrder, ntpNow, toNormalized(100L))
-      ob.add(sellOrder, ntpNow, MatchingRules.Default.normalizedTickSize)
+      ob.add(sellOrder, ntpNow, MatchingRule.DefaultRule.tickSize)
 
       ob.getAsks.size shouldBe 2
 

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.orderV3
 
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 
 import scala.concurrent.duration._
 
-class OrderFeeTestSuite extends MatcherSuiteBase {
+class DynamicModeMatcherTestSuite extends MatcherSuiteBase {
 
   val baseFee = 300000
 

@@ -231,54 +231,6 @@ class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
 
       }
     }
-    "when has insufficient funds in WAVES to pay ExchangeTx fee" in {
-      docker.restartNode(node, configWithOrderFeeFixed(matcherFeeAssetId = aliceAssetBase58, minMatcherFee))
-      val matcherWavesBalance = node.balanceDetails(matcher.publicKey.toAddress.stringRepr).available
-      node.broadcastTransfer(matcher, aliceAddress, matcherWavesBalance - minFee, assetId = None, fee = minFee, feeAssetId = None, waitForTx = true)
-
-      val ts = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime - 10000
-      val amount = 100
-      val aliceWavesPair = AssetPair(aliceAsset, Waves)
-
-      val aliceOrderIdFill = node
-        .placeOrder(
-          Order
-            .buy(
-              sender = alice,
-              matcher = matcherPublicKey,
-              pair = aliceWavesPair,
-              amount = amount,
-              price = price,
-              timestamp = ts,
-              expiration = expirationTimestamp,
-              matcherFee = minMatcherFee,
-              version = 3,
-              matcherFeeAssetId = aliceAsset
-            ))
-        .message
-        .id
-
-      node.placeOrder(
-        Order
-          .sell(
-            sender = bob,
-            matcher = matcherPublicKey,
-            pair = aliceWavesPair,
-            amount = amount,
-            price = price,
-            timestamp = ts,
-            expiration = expirationTimestamp,
-            matcherFee = minMatcherFee,
-            version = 3,
-            matcherFeeAssetId = aliceAsset
-          ))
-
-      nodes.waitForHeightArise()
-
-      val exchangeTxId = node.waitTransactionsByOrder(aliceOrderIdFill, 1).head.id
-      SyncMatcherHttpApi.assertNotFoundAndMessage(node.transactionInfo(exchangeTxId), "Transaction is not in blockchain")
-    }
   }
   private def orderStatus(sender: KeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     node.waitOrderStatus(assetPair, orderId, expectedStatus, waitTime = 2.minutes)

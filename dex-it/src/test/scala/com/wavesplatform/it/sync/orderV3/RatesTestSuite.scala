@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.orderV3
 
 import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -8,6 +8,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Order

@@ -5,10 +5,8 @@ import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.{MatcherSuiteBase, NTPTime}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -16,7 +14,6 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import scala.concurrent.duration._
 
 class PercentModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {

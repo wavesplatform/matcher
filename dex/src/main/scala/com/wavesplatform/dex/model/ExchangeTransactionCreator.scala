@@ -91,7 +91,6 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
 
 object ExchangeTransactionCreator {
 
-//  type CreateTransaction = (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction]
   type CreateTransaction = OrderExecuted => Either[ValidationError, ExchangeTransaction]
 
   /**

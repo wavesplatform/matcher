@@ -178,7 +178,7 @@ class ExchangeTransactionCreatorSpecification
       /**
         * Consider the situation, when matcherFeeAsset is very expensive, that is 1 the smallest part of it
         * (like 1 satoshi for BTC) costs at least 0.003 Waves. This means that 1 fraction of this asset
-        * is enough to meet matcher's fee requirements (DynamicMode, base fee = 0.003 Waves)
+        * is enough to meet matcher's fee requirements (DynamicSettings mode, base fee = 0.003 Waves)
         *
         * In case of partial filling of the submitted order (with fee = 1 fraction of the expensive asset)
         * ExchangeTransactionCreator has to correctly calculate buyMatcherFee/sellMatcherFee. They should have non-zero values

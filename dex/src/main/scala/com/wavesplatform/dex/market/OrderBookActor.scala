@@ -130,9 +130,9 @@ class OrderBookActor(owner: ActorRef,
       e match {
         case Events.OrderAdded(order, _) =>
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
-        case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
-          log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
-          createTransaction(submitted, counter, timestamp) match {
+        case oe @ Events.OrderExecuted(submitted, counter, timestamp) =>
+          log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
+          createTransaction(oe) match {
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex

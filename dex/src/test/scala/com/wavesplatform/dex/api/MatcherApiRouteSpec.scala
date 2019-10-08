@@ -14,6 +14,7 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -216,7 +217,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       orderBook = _ => None,
       getMarketStatus = _ => None,
       tickSize = _ => 0.1,
-      orderValidator = _ => Left(error.FeatureNotImplemented),
+      orderValidator = _ => OrderValidator.liftErrorAsync { error.FeatureNotImplemented },
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
@@ -232,7 +233,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       matcherAccountFee = () => 300000L,
       apiKeyHashStr = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8"))),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = Set(1, 2, 3)
+      validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }
     ).route
 
     f(route)

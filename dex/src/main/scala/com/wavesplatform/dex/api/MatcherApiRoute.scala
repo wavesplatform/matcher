@@ -59,10 +59,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: () => Long,
+                           matcherAccountFee: () => Future[Long],
                            apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
+                           validatedAllowedOrderVersions: Future[Set[Byte]])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -187,11 +187,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     complete(
-      StatusCodes.OK -> Json.obj(
-        "priceAssets"   -> matcherSettings.priceAssets,
-        "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee(), rateCache.getJson).value,
-        "orderVersions" -> validatedAllowedOrderVersions.toSeq.sorted
-      )
+      for {
+        allowedOrderVersions <- validatedAllowedOrderVersions
+        matcherAccountFee    <- matcherAccountFee()
+      } yield {
+        StatusCodes.OK -> Json.obj(
+          "priceAssets"   -> matcherSettings.priceAssets,
+          "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+          "orderVersions" -> allowedOrderVersions.toSeq.sorted
+        )
+      }
     )
   }
 

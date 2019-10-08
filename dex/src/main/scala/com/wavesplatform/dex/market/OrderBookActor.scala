@@ -22,6 +22,8 @@ import kamon.Kamon
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
+import scala.concurrent.ExecutionContext
+
 class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
                      snapshotStore: ActorRef,
@@ -32,7 +34,7 @@ class OrderBookActor(owner: ActorRef,
                      normalize: RawMatchingRules => MatchingRules,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var matchingRules: NonEmptyList[RawMatchingRules])
+                     var matchingRules: NonEmptyList[RawMatchingRules])(implicit ec: ExecutionContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -131,7 +133,7 @@ class OrderBookActor(owner: ActorRef,
         case Events.OrderCanceled(order, isSystemCancel, _) => log.info(s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)")
         case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
-          createTransaction(submitted, counter, timestamp) match {
+          createTransaction(submitted, counter, timestamp) foreach {
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
@@ -191,7 +193,7 @@ object OrderBookActor {
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            matchingRules: NonEmptyList[RawMatchingRules]): Props =
+            matchingRules: NonEmptyList[RawMatchingRules])(implicit ec: ExecutionContext): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -213,7 +215,7 @@ object OrderBookActor {
   case class MarketStatus(
       lastTrade: Option[LastTrade],
       bestBid: Option[LevelAgg],
-      bestAsk: Option[LevelAgg],
+      bestAsk: Option[LevelAgg]
   )
 
   object MarketStatus {

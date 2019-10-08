@@ -8,12 +8,10 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainCachingClient
-import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
-import com.wavesplatform.dex.model.OrderValidator.FutureResult
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -37,6 +35,7 @@ object OrderValidator extends ScorexLogging {
 
   type Result[T]       = Either[MatcherError, T]
   type FutureResult[T] = EitherT[Future, MatcherError, T]
+  type AsyncBlockchain = WavesBlockchainAsyncClient[Future]
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
@@ -58,55 +57,14 @@ object OrderValidator extends ScorexLogging {
       )
   }
 
-//  private def verifyOrderByAccountScript(blockchain: WavesBlockchainClient, address: Address, order: Order): Result[Unit] =
-//    if (blockchain.hasScript(address)) {
-//      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id))
-//        error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading).asLeft
-//      else if (order.version <= 1) error.AccountNotSupportOrderVersion(address, 2, order.version).asLeft
-//      else
-//        blockchain.runScript(address, order) match {
-//          case RunScriptResult.ScriptError(execError)   => error.AccountScriptReturnedError(address, execError).asLeft
-//          case RunScriptResult.Denied                   => error.AccountScriptDeniedOrder(address).asLeft
-//          case RunScriptResult.Allowed                  => success
-//          case RunScriptResult.UnexpectedResult(x)      => error.AccountScriptUnexpectResult(address, x).asLeft
-//          case RunScriptResult.Exception(name, message) => error.AccountScriptException(address, name, message).asLeft
-//        }
-//    } else verifySignature(order)
-
-//  private def verifyOrderByAccountScript(blockchain: WavesBlockchainCachingClient, address: Address, order: Order)(
-//      implicit ec: ExecutionContext): FutureResult[Unit] = {
-//    EitherT.right[MatcherError] { blockchain.hasScript(address) }.flatMap { addressHasScript =>
-//      if (addressHasScript) {
-//        EitherT.right[MatcherError] { blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id) }.flatMap {
-//          ifSmartAccountTradindActivated =>
-//            if (ifSmartAccountTradindActivated)
-//              liftErrorAsync[Unit] { error.AccountFeatureUnsupported(BlockchainFeatures.SmartAccountTrading) } else if (order.version <= 1)
-//              liftErrorAsync[Unit] { error.AccountNotSupportOrderVersion(address, 2, order.version) } else {
-//              EitherT.right[MatcherError] { blockchain.runScript(address, order) }.flatMap { runScriptResult =>
-//                liftAsync {
-//                  runScriptResult match {
-//                    case RunScriptResult.ScriptError(execError)   => error.AccountScriptReturnedError(address, execError).asLeft
-//                    case RunScriptResult.Denied                   => error.AccountScriptDeniedOrder(address).asLeft
-//                    case RunScriptResult.Allowed                  => success
-//                    case RunScriptResult.UnexpectedResult(x)      => error.AccountScriptUnexpectResult(address, x).asLeft
-//                    case RunScriptResult.Exception(name, message) => error.AccountScriptException(address, name, message).asLeft
-//                  }
-//                }
-//              }
-//            }
-//        }
-//      } else verifySignature(order)
-//    }
-//  }
-
-  private def verifyOrderByAccountScript(blockchain: WavesBlockchainCachingClient, address: Address, order: Order)(
+  private def verifyOrderByAccountScript(blockchain: AsyncBlockchain, address: Address, order: Order)(
       implicit ec: ExecutionContext): FutureResult[Unit] = {
 
     lazy val verifyAddressScript: FutureResult[Unit] = {
 
       lazy val verifyScript: FutureResult[Unit] = {
         if (order.version <= 1) liftErrorAsync[Unit] { error.AccountNotSupportOrderVersion(address, 2, order.version) } else {
-          liftFutureAsync { blockchain.runScript(address, order) } map {
+          liftFutureAsync { blockchain.runScript(address, order) } subflatMap {
             case RunScriptResult.ScriptError(execError)   => error.AccountScriptReturnedError(address, execError).asLeft
             case RunScriptResult.Denied                   => error.AccountScriptDeniedOrder(address).asLeft
             case RunScriptResult.Allowed                  => success
@@ -123,26 +81,12 @@ object OrderValidator extends ScorexLogging {
     liftFutureAsync { blockchain.hasScript(address) } ifM (verifyAddressScript, verifySignature(order))
   }
 
-//  private def verifySmartToken(blockchain: WavesBlockchainClient, asset: IssuedAsset, tx: ExchangeTransaction): Result[Unit] =
-//    if (blockchain.hasScript(asset)) {
-//      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets.id))
-//        error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset).asLeft
-//      else
-//        blockchain.runScript(asset, tx) match {
-//          case RunScriptResult.ScriptError(execError)   => error.AssetScriptReturnedError(asset, execError).asLeft
-//          case RunScriptResult.Denied                   => error.AssetScriptDeniedOrder(asset).asLeft
-//          case RunScriptResult.Allowed                  => success
-//          case RunScriptResult.UnexpectedResult(x)      => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
-//          case RunScriptResult.Exception(name, message) => error.AssetScriptException(asset, name, message).asLeft
-//        }
-//    } else ().asRight
-
-  private def verifySmartToken(blockchain: WavesBlockchainCachingClient, asset: IssuedAsset, tx: ExchangeTransaction)(
+  private def verifySmartToken(blockchain: AsyncBlockchain, asset: IssuedAsset, tx: ExchangeTransaction)(
       implicit ec: ExecutionContext): FutureResult[Unit] = {
 
-    lazy val verifyAssetScript: FutureResult[Unit] = {
+    lazy val verifySmartAssetScript: FutureResult[Unit] = {
 
-      lazy val verifyScript: FutureResult[Unit] = liftFutureAsync { blockchain.runScript(asset, tx) } map {
+      lazy val verifyScript: FutureResult[Unit] = liftFutureAsync { blockchain.runScript(asset, tx) } subflatMap {
         case RunScriptResult.ScriptError(execError)   => error.AssetScriptReturnedError(asset, execError).asLeft
         case RunScriptResult.Denied                   => error.AssetScriptDeniedOrder(asset).asLeft
         case RunScriptResult.Allowed                  => success
@@ -154,10 +98,10 @@ object OrderValidator extends ScorexLogging {
         .ifM(verifyScript, liftErrorAsync[Unit] { error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset) })
     }
 
-    liftFutureAsync { blockchain.hasScript(asset) } ifM (verifyAssetScript, successAsync)
+    liftFutureAsync { blockchain.hasScript(asset) } ifM (verifySmartAssetScript, successAsync)
   }
 
-  private def decimals(blockchain: WavesBlockchainCachingClient, asset: Asset)(implicit ec: ExecutionContext): FutureResult[Int] = {
+  private def decimals(blockchain: AsyncBlockchain, asset: Asset)(implicit ec: ExecutionContext): FutureResult[Int] = {
     asset.fold { liftValueAsync(8) } { issuedAsset =>
       EitherT {
         blockchain.assetDescription(issuedAsset).map { _.map(_.decimals).toRight(error.AssetNotFound(issuedAsset)) }
@@ -165,12 +109,7 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-//  private def decimals(blockchain: WavesBlockchainClient, assetId: Asset): Result[Int] =
-//    assetId.fold(lift(8)) { aid =>
-//      blockchain.assetDescription(aid).map(_.decimals).toRight(error.AssetNotFound(aid))
-//    }
-
-  private def validateDecimals(blockchain: WavesBlockchainCachingClient, o: Order)(implicit ec: ExecutionContext): FutureResult[(Int, Int)] = {
+  private def validateDecimals(blockchain: AsyncBlockchain, o: Order)(implicit ec: ExecutionContext): FutureResult[(Int, Int)] = {
 
     def checkInsignificantDecimals(insignificantDecimals: Int): FutureResult[Unit] = liftAsync {
       cond(o.price % BigDecimal(10).pow(insignificantDecimals).toLongExact == 0, Unit, error.PriceLastDecimalsMustBeZero(insignificantDecimals))
@@ -207,50 +146,38 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  //  private[dex] def checkOrderVersion(version: Byte, blockchain: WavesBlockchainClient): Result[Unit] = version match {
-  //    case 1 => success
-  //    case 2 =>
-  //      if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)) success
-  //      else Left(error.OrderVersionUnsupported(version, BlockchainFeatures.SmartAccountTrading))
-  //    case 3 =>
-  //      if (blockchain.isFeatureActivated(BlockchainFeatures.OrderV3.id)) success
-  //      else Left(error.OrderVersionUnsupported(version, BlockchainFeatures.OrderV3))
-  //    case _ => Left(error.UnsupportedOrderVersion(version))
-  //  }
+  private[dex] def checkOrderVersion(version: Byte, blockchain: AsyncBlockchain)(implicit ec: ExecutionContext): FutureResult[Byte] = {
 
-  private[dex] def checkOrderVersion(version: Byte, blockchain: WavesBlockchainCachingClient)(implicit ec: ExecutionContext): FutureResult[Unit] = {
-
-    def checkFeatureSupport(feature: BlockchainFeature): FutureResult[Unit] = {
+    def checkFeatureSupport(feature: BlockchainFeature): FutureResult[Byte] = {
       liftFutureAsync { blockchain.isFeatureActivated(feature.id) }
-        .ifM(successAsync, liftErrorAsync { error.OrderVersionUnsupported(version, feature) })
+        .ifM(liftValueAsync(version), liftErrorAsync { error.OrderVersionUnsupported(version, feature) })
     }
 
     version match {
-      case 1 => successAsync
+      case 1 => liftValueAsync(version)
       case 2 => checkFeatureSupport(BlockchainFeatures.SmartAccountTrading)
       case 3 => checkFeatureSupport(BlockchainFeatures.OrderV3)
       case _ => liftErrorAsync { error.UnsupportedOrderVersion(version) }
     }
   }
 
-  def blockchainAware(blockchain: WavesBlockchainClient,
-                      asyncBlockchain: WavesBlockchainCachingClient,
-                      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
+  def blockchainAware(blockchain: AsyncBlockchain,
+                      transactionCreator: (LimitOrder, LimitOrder, Long) => Future[Either[ValidationError, ExchangeTransaction]],
                       matcherAddress: Address,
                       time: Time,
                       orderFeeSettings: OrderFeeSettings,
                       orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                       rateCache: RateCache)(order: Order)(implicit ec: ExecutionContext): FutureResult[Order] = timer.measure {
 
-    lazy val exchangeTx: FutureResult[ExchangeTransaction] = liftAsync {
+    lazy val exchangeTx: FutureResult[ExchangeTransaction] = EitherT {
       val fakeOrder: Order = order.updateType(order.orderType.opposite)
-      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()) leftMap { x =>
-        error.CanNotCreateExchangeTransaction(x.toString)
+      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()) map {
+        _.leftMap(txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
       }
     }
 
     def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold { successAsync } { assetId =>
-      exchangeTx flatMap { verifySmartToken(asyncBlockchain, assetId, _) }
+      exchangeTx flatMap { verifySmartToken(blockchain, assetId, _) }
     }
 
     def verifyMatcherFeeAssetScript(matcherFeeAsset: Asset): FutureResult[Unit] = {
@@ -259,26 +186,28 @@ object OrderValidator extends ScorexLogging {
     }
 
     // Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue
-    lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = liftAsync {
-      orderFeeSettings match {
-        case DynamicSettings(baseFee) =>
-          val minFee = ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript)
-          val mof =
-            multiplyFeeByDouble(
-              minFee,
-              rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
-            )
-          Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
-        case _ => lift(order)
-      }
+    lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
+      case DynamicSettings(baseFee) =>
+        EitherT {
+          ExchangeTransactionCreator.minFee(baseFee, blockchain.hasScript(matcherAddress), order.assetPair, blockchain.hasScript) map { minFee =>
+            val mof =
+              multiplyFeeByDouble(
+                minFee,
+                rateCache.getRate(order.matcherFeeAssetId).getOrElse(throw new RuntimeException(s"Can't find rate for ${order.matcherFeeAssetId}"))
+              )
+            Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
+          }
+        }
+
+      case _ => liftValueAsync(order)
     }
 
     for {
-      _            <- checkOrderVersion(order.version, asyncBlockchain)
+      _            <- checkOrderVersion(order.version, blockchain)
       _            <- validateOrderFeeByTransactionRequirements
-      decimalsPair <- validateDecimals(asyncBlockchain, order)
+      decimalsPair <- validateDecimals(blockchain, order)
       _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
-      _            <- verifyOrderByAccountScript(asyncBlockchain, order.sender, order)
+      _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _            <- verifyAssetScript(order.assetPair.amountAsset)
       _            <- verifyAssetScript(order.assetPair.priceAsset)
       _            <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
@@ -528,11 +457,10 @@ object OrderValidator extends ScorexLogging {
 
   private def lift[T](x: T): Result[T] = x.asRight[MatcherError]
 
-  def liftAsync[T](x: Result[T]): FutureResult[T] = EitherT { Future.successful(x) }
-
-  private def liftValueAsync[T](x: T): FutureResult[T]                                         = EitherT { Future.successful(x.asRight[MatcherError]) }
-  private def liftErrorAsync[T](x: MatcherError): FutureResult[T]                              = EitherT { Future.successful(x.asLeft[T]) }
-  private def liftFutureAsync[T](x: Future[T])(implicit ex: ExecutionContext): FutureResult[T] = EitherT.right[MatcherError](x)
+  def liftAsync[T](result: Result[T]): FutureResult[T]                                 = EitherT { Future.successful(result) }
+  def liftValueAsync[T](value: T): FutureResult[T]                                     = EitherT { Future.successful(value.asRight[MatcherError]) }
+  def liftErrorAsync[T](error: MatcherError): FutureResult[T]                          = EitherT { Future.successful(error.asLeft[T]) }
+  def liftFutureAsync[T](x: Future[T])(implicit ex: ExecutionContext): FutureResult[T] = EitherT.right[MatcherError](x)
 
   private def success: Result[Unit]            = lift(Unit)
   private def successAsync: FutureResult[Unit] = liftValueAsync(Unit)

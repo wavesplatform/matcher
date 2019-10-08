@@ -25,6 +25,8 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification
@@ -35,9 +37,14 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => false)
-  private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
-  private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
+  private val txFactory = new ExchangeTransactionCreator(MatcherAccount,
+                                                         matcherSettings,
+                                                         Future.successful(false),
+                                                         _ => Future.successful(false),
+                                                         _ => Future.successful(false))
+
+  private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
+  private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))

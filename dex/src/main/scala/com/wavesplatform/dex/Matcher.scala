@@ -73,30 +73,20 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val pairBuilder    = new AssetPairBuilder(settings, wavesBlockchainSyncClient.assetDescription, blacklistedAssets)
   private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
 
-  private def hasMatcherAccountScript = wavesBlockchainSyncClient.hasScript(matcherKeyPair)
+  private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
 
   private val transactionCreator = {
     new ExchangeTransactionCreator(matcherKeyPair,
                                    settings,
                                    hasMatcherAccountScript,
-                                   wavesBlockchainSyncClient.hasScript,
-                                   wavesBlockchainSyncClient.isFeatureActivated)
+                                   wavesBlockchainAsyncClient.hasScript,
+                                   wavesBlockchainAsyncClient.isFeatureActivated)
   }
 
   private val orderBooks       = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val rawMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRules]
 
   private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
-//  private val balancesCache      = new BalancesCache(wavesBlockchainGrpcAsyncClient.spendableBalance)(grpcExecutionContext)
-
-//  /** Updates balances cache by balances stream */
-//  wavesBlockchainGrpcAsyncClient.spendableBalanceChanges.subscribe {
-//    new Observer[SpendableBalanceChanges] {
-//      override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchUpsert(elem); Continue }
-//      override def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
-//      override def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
-//    }
-//  }(monixScheduler)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -152,7 +142,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       transactionCreator.createTransaction,
       time,
       matchingRules(assetPair)
-    )
+    )(grpcExecutionContext)
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -179,8 +169,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     lazy val asyncValidation: OrderValidator.FutureResult[Order] = {
       OrderValidator.blockchainAware(
-        blockchain = wavesBlockchainSyncClient,
-        asyncBlockchain = wavesBlockchainAsyncClient,
+        blockchain = wavesBlockchainAsyncClient,
         transactionCreator = transactionCreator.createTransaction,
         matcherAddress = matcherPublicKey.toAddress,
         time = time,
@@ -194,22 +183,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       _ <- OrderValidator.liftAsync { syncValidation }
       _ <- asyncValidation
     } yield o
-
-//    for {
-//      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
-//      _ <- OrderValidator.timeAware(time)(o)
-//      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
-//      _ <- OrderValidator.blockchainAware(
-//        wavesBlockchainSyncClient,
-//        transactionCreator.createTransaction,
-//        matcherPublicKey.toAddress,
-//        time,
-//        settings.orderFee,
-//        settings.orderRestrictions,
-//        rateCache
-//      )(o)
-//      _ <- pairBuilder.validateAssetPair(o.assetPair)
-//    } yield o
   }
 
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
@@ -241,10 +214,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         time,
         () => matcherQueue.lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
-        () => ExchangeTransactionCreator.minAccountFee(hasMatcherAccountScript),
+        () => hasMatcherAccountScript.map { ExchangeTransactionCreator.getAdditionalFee },
         keyHashStr,
         rateCache,
-        settings.allowedOrderVersions.filter(OrderValidator.checkOrderVersion(_, wavesBlockchainAsyncClient).isRight)
+        Future
+          .sequence {
+            settings.allowedOrderVersions.map { version =>
+              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient).value
+            }
+          }
+          .map { _.collect { case Right(version) => version } }
       ),
       MatcherApiRouteV1(
         pairBuilder,
@@ -259,7 +238,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   lazy val matcherApiTypes: Set[Class[_]] =
     Set(
       classOf[MatcherApiRoute],
-      classOf[MatcherApiRouteV1],
+      classOf[MatcherApiRouteV1]
     )
 
   private val snapshotsRestore = Promise[Unit]()

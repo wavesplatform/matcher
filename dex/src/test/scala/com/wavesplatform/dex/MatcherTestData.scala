@@ -9,6 +9,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.OrderValidator.{FutureResult, Result}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -23,6 +24,8 @@ import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 trait MatcherTestData extends NTPTime { _: Suite =>
@@ -48,6 +51,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def wrapMarketOrder(n: Long, mo: MarketOrder): QueueEventWithMeta = wrapEvent(n, QueueEvent.PlacedMarket(mo))
 
   val smallFee = Some(toNormalized(1))
+
+  def awaitResult[A](result: FutureResult[A]): Result[A]            = Await.result(result.value, Duration.Inf)
+  def awaitResult[A, B](result: Future[Either[A, B]]): Either[A, B] = Await.result(result, Duration.Inf)
 
   def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
@@ -139,36 +145,36 @@ trait MatcherTestData extends NTPTime { _: Suite =>
           amount: Price,
           price: BigDecimal,
           sender: Option[KeyPair] = None,
-          matcherFee: Option[Price] = None,
-          ts: Option[Price] = None,
+          matcherFee: Option[Long] = None,
+          ts: Option[Long] = None,
           version: Byte = 1,
           feeAsset: Asset = Waves): Order = rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
 
   def rawBuy(pair: AssetPair,
-             amount: Price,
+             amount: Long,
              price: Price,
              sender: Option[KeyPair] = None,
-             matcherFee: Option[Price] = None,
-             ts: Option[Price] = None,
+             matcherFee: Option[Long] = None,
+             ts: Option[Long] = None,
              version: Byte = 1,
              feeAsset: Asset = Waves): Order =
     valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, version, ts, feeAsset))._1
 
   def sell(pair: AssetPair,
-           amount: Price,
+           amount: Long,
            price: BigDecimal,
            sender: Option[KeyPair] = None,
-           matcherFee: Option[Price] = None,
-           ts: Option[Price] = None,
+           matcherFee: Option[Long] = None,
+           ts: Option[Long] = None,
            version: Byte = 1,
            feeAsset: Asset = Waves): Order = rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
 
   def rawSell(pair: AssetPair,
-              amount: Price,
+              amount: Long,
               price: Price,
               sender: Option[KeyPair] = None,
-              matcherFee: Option[Price] = None,
-              ts: Option[Price] = None,
+              matcherFee: Option[Long] = None,
+              ts: Option[Long] = None,
               version: Byte = 1,
               feeAsset: Asset = Waves): Order =
     valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset))._1

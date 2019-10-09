@@ -231,7 +231,7 @@ object AsyncMatcherHttpApi extends Assertions {
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
-    def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
+    def tradingMarkets(): Future[MatcherMarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MatcherMarketDataInfo]
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
@@ -396,8 +396,8 @@ object AsyncMatcherHttpApi extends Assertions {
       ).as[RatesResponse]
     }
 
-    def orderbookInfo(assetPair: AssetPair): Future[OrderbookInfo] = {
-      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[OrderbookInfo]
+    def orderbookInfo(assetPair: AssetPair): Future[MatcherOrderbookInfo] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[MatcherOrderbookInfo]
     }
   }
 

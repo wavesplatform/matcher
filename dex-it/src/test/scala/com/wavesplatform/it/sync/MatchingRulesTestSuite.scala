@@ -101,9 +101,11 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     node.tradingMarkets().markets.size shouldBe 0
     // TODO check orderbookInfo for wct-Waves
     Array(wctUsdPair -> "0.00000001", wavesBtcPair -> "0.00000001", wavesUsdPair -> "0.01").foreach { case (pair, defaultTs) =>
-      node.orderbookInfo(pair).matchingRules.tickSize shouldBe defaultTs
+      // TODO uncomment after "DEX-421 Internal server error in OrderbookInfo request" will be solved
+      // node.orderbookInfo(pair).matchingRules.tickSize shouldBe defaultTs
 
       val orderId = node.placeOrder(bob, pair, SELL, amount, price, matcherFee).message.id
+      node.waitOrderStatus(pair, orderId, "Accepted")
       node.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
       node.cancelOrder(bob, pair, orderId)
     }
@@ -246,6 +248,13 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   "Placing order on level 0" in {
     assertBadRequestAndMessage(node.placeOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee),
+      "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0")
+  }
+
+  "Placing order on level 0 with virgin orderbook" in {
+    // TODO remove pending after DEX-404 will be solved
+    pending
+    assertBadRequestAndMessage(node.placeOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee),
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0")
   }
 

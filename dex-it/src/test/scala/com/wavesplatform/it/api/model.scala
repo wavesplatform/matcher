@@ -17,13 +17,14 @@ object OrderRestrictions {
   implicit val orderRestrictions: Format[OrderRestrictions] = Json.format
 }
 
-case class OrderbookInfo(matchingRules: MatchingRules,
+// TODO rename entities named "MatcherSomething" to "Something" after entities from model of node will be relocated
+case class MatcherOrderbookInfo(matchingRules: MatchingRules,
                          restrictions: Option[OrderRestrictions])
-object OrderbookInfo {
-  implicit val orderbookInfo: Format[OrderbookInfo] = Json.format
+object MatcherOrderbookInfo {
+  implicit val orderbookInfo: Format[MatcherOrderbookInfo] = Json.format
 }
 
-case class MarketData(amountAsset: String,
+case class MatcherMarketData(amountAsset: String,
                       amountAssetName: String,
                       priceAsset: String,
                       priceAssetName: String,
@@ -32,11 +33,11 @@ case class MarketData(amountAsset: String,
                       priceAssetInfo: Option[AssetDecimalsInfo],
                       matchingRules: MatchingRules,
                       restrictions: Option[OrderRestrictions])
-object MarketData {
-  implicit val marketData: Format[MarketData] = Json.format
+object MatcherMarketData {
+  implicit val marketData: Format[MatcherMarketData] = Json.format
 }
 
-case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
-object MarketDataInfo {
-  implicit val marketDataInfoResponseFormat: Format[MarketDataInfo] = Json.format
+case class MatcherMarketDataInfo(matcherPublicKey: String, markets: Seq[MatcherMarketData])
+object MatcherMarketDataInfo {
+  implicit val marketDataInfoResponseFormat: Format[MatcherMarketDataInfo] = Json.format
 }

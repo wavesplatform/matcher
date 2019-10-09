@@ -51,7 +51,7 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.normalizedTickSize): Seq[Event] = {
+  def add(o: Order, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
     val (events, lt) = o.orderType match {
       case OrderType.BUY  => doMatch(ts, canMatchBuy, LimitOrder(o), Seq.empty, bids, asks, lastTrade, normalizedTickSize)
       case OrderType.SELL => doMatch(ts, canMatchSell, LimitOrder(o), Seq.empty, asks, bids, lastTrade, normalizedTickSize)
@@ -166,7 +166,7 @@ object OrderBook {
 
   implicit class SideExt(val side: Side) extends AnyVal {
 
-    /** Returns best limit order in this side and price of its level */
+    /** Returns the best limit order in this side and the price of its level */
     def best: Option[(LimitOrder, Price)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(_ -> levelPrice) }
 
     final def removeBest(): LimitOrder = side.headOption match {
@@ -195,26 +195,16 @@ object OrderBook {
     def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
   }
 
-  /**
-    * Represents couple of prices associated with the order. In general, the price of the level (which contains the order)
-    * may differ from the order price due to the tick size
-    */
-  //noinspection ScalaStyle
-  private case class Prices(levelPrice: Price, orderPrice: Price) {
-    def >=(other: Prices): Boolean = (this.levelPrice >= other.levelPrice) && (this.orderPrice >= other.orderPrice)
-    def <=(other: Prices): Boolean = (this.levelPrice <= other.levelPrice) && (this.orderPrice <= other.orderPrice)
-  }
-
   /** Returns true if submitted buy order can be matched with counter sell order */
-  private object canMatchBuy extends ((Prices, Prices) => Boolean) {
-    def apply(submittedPrices: Prices, counterPrices: Prices): Boolean = submittedPrices >= counterPrices
-    override val toString                                              = "submitted >= counter"
+  private object canMatchBuy extends ((Long, Long) => Boolean) {
+    def apply(submittedOrderPrice: Long, counterLevelPrice: Long): Boolean = submittedOrderPrice >= counterLevelPrice
+    override val toString                                                  = "submitted >= counter"
   }
 
   /** Returns true if submitted sell order can be matched with counter buy order */
-  private object canMatchSell extends ((Prices, Prices) => Boolean) {
-    def apply(submittedPrices: Prices, counterPrices: Prices): Boolean = submittedPrices <= counterPrices
-    override val toString                                              = "submitted <= counter"
+  private object canMatchSell extends ((Long, Long) => Boolean) {
+    def apply(submittedOrderPrice: Long, counterLevelPrice: Long): Boolean = submittedOrderPrice <= counterLevelPrice
+    override val toString                                                  = "submitted <= counter"
   }
 
   /**
@@ -229,27 +219,21 @@ object OrderBook {
         case OrderType.SELL => (price / normalizedTickSize + 1) * normalizedTickSize
       }
 
-  /** @param canMatch (Prices, Prices) => Boolean */
+  /** @param canMatch (Long, Long) => Boolean */
   @tailrec
   private def doMatch(eventTs: Long,
-                      canMatch: (Prices, Prices) => Boolean,
+                      canMatch: (Long, Long) => Boolean,
                       submitted: LimitOrder,
                       prevEvents: Seq[Event],
                       submittedSide: Side,
                       counterSide: Side,
                       lastTrade: Option[LastTrade],
-                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) =
+                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) = {
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, false, eventTs) +: prevEvents, lastTrade)
     else {
-      val correctedLevelPriceOfSubmittedOrder = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
       counterSide.best match {
-        case counterAndItsLevelPrice if counterAndItsLevelPrice.forall {
-              case (counter, levelPriceOfCounterOrder) =>
-                !canMatch(
-                  Prices(levelPrice = correctedLevelPriceOfSubmittedOrder, orderPrice = submitted.price),
-                  Prices(levelPrice = levelPriceOfCounterOrder, orderPrice = counter.price)
-                )
-            } =>
+        case counterAndItsLevelPrice if counterAndItsLevelPrice.forall { case (_, levelPrice) => !canMatch(submitted.order.price, levelPrice) } =>
+          val correctedLevelPriceOfSubmittedOrder = correctPriceByTickSize(submitted.price, submitted.order.orderType, normalizedTickSize)
           submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submitted)
           (OrderAdded(submitted, eventTs) +: prevEvents, lastTrade)
         case Some((counter, _)) =>
@@ -284,6 +268,7 @@ object OrderBook {
           }
       }
     }
+  }
 
   private def formatSide(side: Side) =
     side

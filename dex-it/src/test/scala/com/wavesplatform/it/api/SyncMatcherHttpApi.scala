@@ -169,8 +169,9 @@ object SyncMatcherHttpApi extends Assertions {
                                      fee: Long = 300000L,
                                      version: Byte = 1,
                                      timeToLive: Duration = 30.days - 1.seconds,
-                                     expectedMessage: Option[String] = None): Boolean =
-      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive),
+                                     expectedMessage: Option[String] = None,
+                                     matcherFeeAssetId: Asset = Waves): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, matcherFeeAssetId),
                                     400,
                                     "OrderRejected",
                                     expectedMessage)
@@ -264,13 +265,13 @@ object SyncMatcherHttpApi extends Assertions {
                      waitTime: Duration = RequestAwaitTime * 5): MatcherState =
       sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
 
-    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode): RatesResponse =
-      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue), waitTime)
+    def upsertRate[A: Writes](asset: Asset, rate: Double, waitTime: Duration = RequestAwaitTime, expectedStatusCode: StatusCode, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue, apiKey), waitTime)
 
     def getRates: Map[Asset, Double] = sync(async(m).getRates())
 
-    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK): RatesResponse =
-      sync(async(m).deleteRate(asset, expectedStatusCode.intValue))
+    def deleteRate(asset: Asset, expectedStatusCode: StatusCode = StatusCodes.OK, apiKey: String = m.apiKey): RatesResponse =
+      sync(async(m).deleteRate(asset, expectedStatusCode.intValue, apiKey))
 
     def orderbookInfo(assetPair: AssetPair, waitTime: Duration = RequestAwaitTime): OrderbookInfo = {
       sync(async(m).orderbookInfo(assetPair), waitTime)

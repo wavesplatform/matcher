@@ -13,7 +13,7 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRule, RawMatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
@@ -30,9 +30,9 @@ class OrderBookActor(owner: ActorRef,
                      updateMarketStatus: MarketStatus => Unit,
                      createTransaction: CreateTransaction,
                      time: Time,
-                     var matchingRules: NonEmptyList[RawMatchingRule],
-                     actualizeCurrentMatchingRules: RawMatchingRule => Unit,
-                     normalizeMatchingRule: RawMatchingRule => MatchingRule)
+                     var matchingRules: NonEmptyList[DenormalizedMatchingRule],
+                     updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -50,10 +50,10 @@ class OrderBookActor(owner: ActorRef,
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
   private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
-    val actualRules = RawMatchingRule.skipOutdated(offset, matchingRules)
+    val actualRules = DenormalizedMatchingRule.skipOutdated(offset, matchingRules)
     if (matchingRules.head != actualRules.head) {
       matchingRules = actualRules
-      actualizeCurrentMatchingRules(matchingRules.head)
+      updateCurrentMatchingRules(matchingRules.head)
       actualRule = normalizeMatchingRule(matchingRules.head)
     }
   }
@@ -130,9 +130,9 @@ class OrderBookActor(owner: ActorRef,
       e match {
         case Events.OrderAdded(order, _) =>
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
-        case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
-          log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
-          createTransaction(submitted, counter, timestamp) match {
+        case oe @ Events.OrderExecuted(submitted, counter, timestamp) =>
+          log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
+          createTransaction(oe) match {
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
@@ -158,7 +158,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRule.normalizedTickSize))
+    processEvents(orderBook.add(order, eventWithMeta.timestamp, actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -195,9 +195,9 @@ object OrderBookActor {
             settings: MatcherSettings,
             createTransaction: CreateTransaction,
             time: Time,
-            matchingRules: NonEmptyList[RawMatchingRule],
-            actualizeCurrentMatchingRules: RawMatchingRule => Unit,
-            normalizeMatchingRule: RawMatchingRule => MatchingRule): Props =
+            matchingRules: NonEmptyList[DenormalizedMatchingRule],
+            updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
+            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -209,7 +209,7 @@ object OrderBookActor {
         createTransaction,
         time,
         matchingRules,
-        actualizeCurrentMatchingRules,
+        updateCurrentMatchingRules,
         normalizeMatchingRule,
       )
     )

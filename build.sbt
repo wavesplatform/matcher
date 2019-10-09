@@ -6,7 +6,7 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "37dbccc5a5b2c227c1fe8e3262c21c157c291545" // "v1.1.0"
+def nodeVersionTag: String = "v1.1.2"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
@@ -39,6 +39,7 @@ lazy val it = project
   )
 
 lazy val root = (project in file("."))
+  .settings(name := "dex-root")
   .aggregate(
     dex,
     `dex-it`,

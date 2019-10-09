@@ -17,7 +17,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
-import com.wavesplatform.dex.settings.{MatchingRule, RawMatchingRule}
+import com.wavesplatform.dex.settings.{MatchingRule, DenormalizedMatchingRule}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -49,19 +49,19 @@ class OrderBookActorSpecification
     }
 
   private def obcTestWithTickSize(tickSize: Double)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
-    obcTestWithPrepare((_, _) => (), NonEmptyList(RawMatchingRule(0L, tickSize), List.empty)) { (pair, actor, probe) =>
+    obcTestWithPrepare((_, _) => (), NonEmptyList(DenormalizedMatchingRule(0L, tickSize), List.empty)) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
-  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[RawMatchingRule])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[DenormalizedMatchingRule])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => (), matchingRules) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
   private def obcTestWithPrepare(prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
-                                 matchingRules: NonEmptyList[RawMatchingRule] = NonEmptyList.one(RawMatchingRule(0, 0.00000001)))(
+                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)))(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
     obc.clear()
     md.clear()
@@ -294,10 +294,10 @@ class OrderBookActorSpecification
     }
 
     val switchRulesTest = NonEmptyList(
-      RawMatchingRule(0, 0.00000001),
+      DenormalizedMatchingRule(0, 0.00000001),
       List(
-        RawMatchingRule(4, 0.000001),
-        RawMatchingRule(10, 0.000003)
+        DenormalizedMatchingRule(4, 0.000001),
+        DenormalizedMatchingRule(10, 0.000003)
       )
     )
 
@@ -327,9 +327,9 @@ class OrderBookActorSpecification
     }
 
     val disableRulesTest = NonEmptyList(
-      RawMatchingRule(0, 0.000001),
+      DenormalizedMatchingRule(0, 0.000001),
       List(
-        RawMatchingRule(3, 0.00000001)
+        DenormalizedMatchingRule(3, 0.00000001)
       )
     )
 
@@ -355,10 +355,10 @@ class OrderBookActorSpecification
     }
 
     val matchingRulesForCancelTest = NonEmptyList(
-      RawMatchingRule(0, 0.00000001),
+      DenormalizedMatchingRule(0, 0.00000001),
       List(
-        RawMatchingRule(0, 0.00000001),
-        RawMatchingRule(0, 0.000001)
+        DenormalizedMatchingRule(0, 0.00000001),
+        DenormalizedMatchingRule(0, 0.000001)
       )
     )
 

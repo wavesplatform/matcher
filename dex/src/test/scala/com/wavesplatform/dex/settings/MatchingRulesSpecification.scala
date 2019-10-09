@@ -77,10 +77,10 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
       """.stripMargin
     getSettingByConfig(configStr(zeroStartOffsetRule)).explicitGet().matchingRules shouldBe Map(
       AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-        NonEmptyList[RawMatchingRule](
-          RawMatchingRule(0, 0.002),
+        NonEmptyList[DenormalizedMatchingRule](
+          DenormalizedMatchingRule(0, 0.002),
           List(
-            RawMatchingRule(500L, 0.001)
+            DenormalizedMatchingRule(500L, 0.001)
           )
         )
     )
@@ -109,10 +109,10 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[RawMatchingRule](
-            RawMatchingRule(100L, 0.002),
+          NonEmptyList[DenormalizedMatchingRule](
+            DenormalizedMatchingRule(100L, 0.002),
             List(
-              RawMatchingRule(500L, 0.001)
+              DenormalizedMatchingRule(500L, 0.001)
             )
           )
       )
@@ -158,8 +158,8 @@ class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers
     for (tickSize <- tickSizes) {
       getSettingByConfig(configStr(matchingRulesSettings(tickSize.toString))).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[RawMatchingRule](
-            RawMatchingRule(100L, tickSize),
+          NonEmptyList[DenormalizedMatchingRule](
+            DenormalizedMatchingRule(100L, tickSize),
             List()
           )
       )

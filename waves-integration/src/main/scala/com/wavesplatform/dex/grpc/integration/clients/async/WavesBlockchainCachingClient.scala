@@ -13,18 +13,20 @@ import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainCachingClient(channel: ManagedChannel, monixScheduler: Scheduler)(implicit grpcExecutionContext: ExecutionContext)
+class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpiration: FiniteDuration, monixScheduler: Scheduler)(
+    implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainGrpcAsyncClient(channel, monixScheduler)(grpcExecutionContext)
     with ScorexLogging {
 
-  private val defaultCacheExpiration: Duration = Duration.ofMinutes(1)
-  private val noExpiration: Duration           = Duration.ofDays(30)
+  private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
+  private val noExpiration: Duration    = Duration.ofDays(30)
 
   private val balancesCache          = new BalancesCache1(super.spendableBalance, noExpiration)
-  private val featuresCache          = new FeaturesCache(super.isFeatureActivated, defaultCacheExpiration)
-  private val assetDescriptionsCache = new AssetDescriptionsCache(super.assetDescription, defaultCacheExpiration)
+  private val featuresCache          = new FeaturesCache(super.isFeatureActivated, cacheExpiration)
+  private val assetDescriptionsCache = new AssetDescriptionsCache(super.assetDescription, cacheExpiration)
 
   /** Updates balances cache by balances stream */
   super.spendableBalanceChanges.subscribe {

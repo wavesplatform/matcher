@@ -9,13 +9,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.{global => monixScheduler}
-
-import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import monix.reactive.Observer
 import mouse.any._
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
+import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
@@ -35,9 +35,9 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
-      .unsafeTap(_.requestBalanceChanges())
-      .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))
+    new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds, monixScheduler, executionContext).wavesBlockchainAsyncClient
+      .unsafeTap { _.requestBalanceChanges() }
+      .unsafeTap { _.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler) }
   }
 
   override def beforeEach(): Unit = {

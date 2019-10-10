@@ -164,9 +164,11 @@ abstract class MatcherSuiteBase
     val grpcAddr = dockerClient.getInternalSocketAddress(target, target.grpcApiPort)
     ConfigFactory
       .parseString(s"""waves.dex {
-                      |  waves-node-grpc {
-                      |    host = ${grpcAddr.getAddress.getHostAddress}
-                      |    port = ${grpcAddr.getPort}
+                      |  grpc.integration {
+                      |    waves-node-grpc {
+                      |      host = ${grpcAddr.getAddress.getHostAddress}
+                      |      port = ${grpcAddr.getPort}
+                      |    }
                       |  }
                       |}""".stripMargin)
   }

@@ -20,6 +20,7 @@ import scala.util.Random
 class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
 
   private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget,
+                                                   100.milliseconds,
                                                    monix.execution.Scheduler.global,
                                                    scala.concurrent.ExecutionContext.Implicits.global).wavesBlockchainSyncClient
 

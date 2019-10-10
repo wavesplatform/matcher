@@ -10,8 +10,10 @@ import io.grpc.internal.DnsNameResolverProvider
 import monix.execution.Scheduler
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
-class DEXClient(target: String, val monixScheduler: Scheduler, val grpcExecutionContext: ExecutionContext) extends ScorexLogging {
+class DEXClient(target: String, defaultCachesExpiration: FiniteDuration, val monixScheduler: Scheduler, val grpcExecutionContext: ExecutionContext)
+    extends ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")
 
@@ -29,5 +31,5 @@ class DEXClient(target: String, val monixScheduler: Scheduler, val grpcExecution
       .build
 
   lazy val wavesBlockchainSyncClient  = new WavesBlockchainGrpcSyncClient(channel)
-  lazy val wavesBlockchainAsyncClient = new WavesBlockchainCachingClient(channel, monixScheduler)(grpcExecutionContext)
+  lazy val wavesBlockchainAsyncClient = new WavesBlockchainCachingClient(channel, defaultCachesExpiration, monixScheduler)(grpcExecutionContext)
 }

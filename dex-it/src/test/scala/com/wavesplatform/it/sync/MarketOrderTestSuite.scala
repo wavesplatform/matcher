@@ -15,7 +15,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueUsdTx, IssueEthTx)
   }
 
-  "Sunny day tests for market orders" in {
+  "Sunny day tests for the market orders" in {
 
     def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {
       val orders = amountPrices.zipWithIndex.map {

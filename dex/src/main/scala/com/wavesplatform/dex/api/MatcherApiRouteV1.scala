@@ -2,6 +2,7 @@ package com.wavesplatform.dex.api
 
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import com.wavesplatform.api.http._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
@@ -44,18 +45,17 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] =
-    assetPairBuilder.validateAssetPair(p) match {
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
-        assetPairBuilder
-          .validateAssetPair(p.reverse)
-          .fold(
-            _ => complete(formatError(e)),
-            _ => redirect(s"/api/v1/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          )
-      case Left(e) => complete(formatError(e))
+        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+          case Right(_) => redirect(s"/api/v1/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+          case Left(_)  => complete(formatError(e))
+        }
+      case Left(e) => complete { formatError(e) }
     }
+  }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair", notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")

@@ -3,7 +3,8 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, Route}
+import akka.http.scaladsl.server.directives.FutureDirectives
+import akka.http.scaladsl.server.{Directive, Directive0, Directive1, PathMatcher, Route, StandardRoute}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
@@ -35,6 +36,7 @@ import javax.ws.rs.Path
 import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
+import cats.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -106,23 +108,22 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] =
-    assetPairBuilder.validateAssetPair(p) match {
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
-        assetPairBuilder
-          .validateAssetPair(p.reverse)
-          .fold(
-            _ => complete(formatError(e)),
-            _ => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          )
-      case Left(e) => complete(formatError(e))
+        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+          case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+          case Left(_)  => complete { formatError(e) }
+        }
+      case Left(e) => complete { formatError(e) }
     }
+  }
 
   private def withAsset(a: Asset): Directive1[Asset] = {
-    assetPairBuilder.validateAssetId(a) match {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetId(a).value } flatMap {
       case Right(_) => provide(a)
-      case Left(e)  => complete(InfoNotFound(e))
+      case Left(e)  => complete { InfoNotFound(e) }
     }
   }
 

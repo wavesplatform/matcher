@@ -70,7 +70,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       }
     }
 
-  private val pairBuilder    = new AssetPairBuilder(settings, wavesBlockchainSyncClient.assetDescription, blacklistedAssets)
+  private val pairBuilder    = new AssetPairBuilder(settings, wavesBlockchainAsyncClient.assetDescription, blacklistedAssets)(grpcExecutionContext)
   private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
 
   private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)

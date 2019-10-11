@@ -462,6 +462,6 @@ object OrderValidator extends ScorexLogging {
   def liftErrorAsync[T](error: MatcherError): FutureResult[T]                          = EitherT { Future.successful(error.asLeft[T]) }
   def liftFutureAsync[T](x: Future[T])(implicit ex: ExecutionContext): FutureResult[T] = EitherT.right[MatcherError](x)
 
-  private def success: Result[Unit]            = lift(Unit)
-  private def successAsync: FutureResult[Unit] = liftValueAsync(Unit)
+  def success: Result[Unit]            = lift(Unit)
+  def successAsync: FutureResult[Unit] = liftValueAsync(Unit)
 }

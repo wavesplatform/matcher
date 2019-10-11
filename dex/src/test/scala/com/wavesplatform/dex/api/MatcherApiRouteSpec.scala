@@ -206,8 +206,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       assetPairBuilder = new AssetPairBuilder(
         settings,
         x =>
-          if (x == asset) Some(BriefAssetDescription(name = ByteStr(smartAssetDesc.name), decimals = smartAssetDesc.decimals, hasScript = false))
-          else None,
+          Future.successful {
+            if (x == asset) Some(BriefAssetDescription(name = ByteStr(smartAssetDesc.name), decimals = smartAssetDesc.decimals, hasScript = false))
+            else None
+        },
         Set.empty
       ),
       matcherPublicKey = matcherKeyPair.publicKey,

@@ -23,6 +23,9 @@ trait WavesBlockchainAsyncClient[F[_]] {
 
   def assetDescription(asset: IssuedAsset): F[Option[BriefAssetDescription]]
 
+  def assetDecimals(asset: IssuedAsset): F[Option[Int]]
+  def assetDecimals(asset: Asset): F[Option[Int]]
+
   def hasScript(asset: IssuedAsset): F[Boolean]
   def runScript(asset: IssuedAsset, input: ExchangeTransaction): F[RunScriptResult]
 

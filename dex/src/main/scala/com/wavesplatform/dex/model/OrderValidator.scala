@@ -104,7 +104,7 @@ object OrderValidator extends ScorexLogging {
   private def decimals(blockchain: AsyncBlockchain, asset: Asset)(implicit ec: ExecutionContext): FutureResult[Int] = {
     asset.fold { liftValueAsync(8) } { issuedAsset =>
       EitherT {
-        blockchain.assetDescription(issuedAsset).map { _.map(_.decimals).toRight(error.AssetNotFound(issuedAsset)) }
+        blockchain.assetDecimals(issuedAsset).map { _.toRight(error.AssetNotFound(issuedAsset)) }
       }
     }
   }

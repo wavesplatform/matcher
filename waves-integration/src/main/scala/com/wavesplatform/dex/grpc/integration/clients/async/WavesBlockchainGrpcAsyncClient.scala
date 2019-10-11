@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.async
 
-import cats.implicits._
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
@@ -84,6 +83,14 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
 
   def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = {
     blockchainService.assetDescription { AssetIdRequest(asset.toPB) }.map(_.maybeDescription.toVanilla)
+  }
+
+  def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
+
+  def assetDecimals(asset: Asset): Future[Option[Int]] = {
+    asset.fold { Future.successful(Option(8)) } { issuedAsset =>
+      assetDescription(issuedAsset).map { _.map(_.decimals) }
+    }
   }
 
   def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = {

@@ -86,14 +86,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val orderBooks       = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val rawMatchingRules = new ConcurrentHashMap[AssetPair, RawMatchingRules]
 
-  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
+//  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
       settings.orderBookSnapshotHttpCache,
       time,
-      assetDecimalsCache.get,
-      p => Option(orderBookCache.get(p))
+      wavesBlockchainAsyncClient.assetDecimals,
+      p => Option { orderBookCache.get(p) }
     )
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)

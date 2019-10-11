@@ -2,12 +2,10 @@ package com.wavesplatform.dex.grpc.integration.caches
 
 import java.time.Duration
 
-import cats.implicits._
-
 import scala.concurrent.{ExecutionContext, Future}
 
-class FeaturesCache(load: Short => Future[Boolean], expiration: Duration)(implicit executionContext: ExecutionContext)
-    extends CacheWithExpiration[Future, java.lang.Short, java.lang.Boolean](
-      load = (featureId: java.lang.Short) => load(featureId) map boolean2Boolean,
-      expiration = expiration
+class FeaturesCache(loader: Short => Future[Boolean], expiration: Duration)(implicit executionContext: ExecutionContext)
+    extends BlockchainCache[Future, java.lang.Short, java.lang.Boolean](
+      loader = (featureId: java.lang.Short) => loader(featureId) map boolean2Boolean,
+      expiration = Some(expiration)
     )

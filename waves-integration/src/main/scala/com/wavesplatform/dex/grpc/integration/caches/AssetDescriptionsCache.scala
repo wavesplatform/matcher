@@ -8,6 +8,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class AssetDescriptionsCache(load: IssuedAsset => Future[Option[BriefAssetDescription]], expiration: Duration)(
+class AssetDescriptionsCache(loader: IssuedAsset => Future[Option[BriefAssetDescription]], expiration: Duration)(
     implicit executionContext: ExecutionContext)
-    extends CacheWithExpiration[Future, IssuedAsset, Option[BriefAssetDescription]](load, expiration)
+    extends BlockchainCache[Future, IssuedAsset, Option[BriefAssetDescription]](loader, Some(expiration))

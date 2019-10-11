@@ -11,16 +11,19 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NTPTime, TransactionGenBase}
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
 
-  private val defaultAssetPair               = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
-  private def getAssetDecimals(asset: Asset) = 8
+  private val defaultAssetPair                                    = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
+  private def getAssetDecimals(asset: Asset): Future[Option[Int]] = Future.successful { Option(8) }
+  private def awaitResult[A](result: Future[A]): A                = Await.result(result, Duration.Inf)
 
   "OrderBookSnapshotHttpCache" - {
     "should cache" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized)
+      def get: HttpResponse = awaitResult { cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized) }
 
       val a = get
       val b = get
@@ -29,7 +32,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
 
     "should not drop the cache if the timeout after an access was not reached" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1))
+      def get: HttpResponse = awaitResult { cache.get(defaultAssetPair, Some(1)) }
 
       val a = get
       Thread.sleep(30)
@@ -39,7 +42,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
 
     "should drop the cache after timeout" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1))
+      def get: HttpResponse = awaitResult { cache.get(defaultAssetPair, Some(1)) }
 
       val a = get
       Thread.sleep(70)
@@ -64,7 +67,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         )
       } { cache =>
         "None -> 9" in {
-          val ob = orderBookFrom(cache.get(defaultAssetPair, None))
+          val ob = orderBookFrom(awaitResult { cache.get(defaultAssetPair, None) })
           ob.bids.size shouldBe 9
         }
 
@@ -77,7 +80,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         ).foreach {
           case (depth, expectedSize) =>
             s"$depth -> $expectedSize" in {
-              val ob = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
+              val ob = orderBookFrom(awaitResult { cache.get(defaultAssetPair, Some(depth)) })
               ob.bids.size shouldBe expectedSize
             }
         }
@@ -89,14 +92,14 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       using {
         new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths), ntpTime, getAssetDecimals, _ => None)
       } { cache =>
-        val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
+        val prev = depths.map(x => x -> orderBookFrom(awaitResult { cache.get(defaultAssetPair, Some(x)) })).toMap
 
         Thread.sleep(100)
         cache.invalidate(defaultAssetPair)
 
         depths.foreach { depth =>
           withClue(s"cache for depth=$depth was invalidated") {
-            val curr = orderBookFrom(cache.get(defaultAssetPair, Some(depth)))
+            val curr = orderBookFrom(awaitResult { cache.get(defaultAssetPair, Some(depth)) })
             curr.timestamp shouldNot be(prev(depth).timestamp)
           }
         }

@@ -98,7 +98,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair)
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, matcherQueue.lastProcessedOffset)
     OrderBookActor.props(
       matcherActor,
       addressActors,

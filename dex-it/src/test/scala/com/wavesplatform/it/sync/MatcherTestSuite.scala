@@ -265,7 +265,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Cleanup
         dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
-        wavesNode1Api.broadcast(mkTransfer(alice, bob, transferAmount, Waves))
+        broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
       }
 
       "market status" in {

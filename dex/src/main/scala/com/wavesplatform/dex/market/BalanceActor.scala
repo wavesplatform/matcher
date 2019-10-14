@@ -8,21 +8,21 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.market.BalanceActor._
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.Future
 
-class BalanceActor(spendableBalance: (Address, Asset) => Future[Long]) extends Actor {
+class BalanceActor(spendableBalance: (Address, Asset) => Future[Long]) extends Actor with ScorexLogging {
   import context.dispatcher
 
   override def receive: Receive = state(Map.empty)
 
   private def state(origOpenVolume: Map[Address, Map[Asset, Long]]): Receive = {
-    case Command.Reserve(client, xs) =>
-      val updatedOpenVolume = origOpenVolume.updated(client, origOpenVolume.getOrElse(client, Map.empty) |+| xs)
-      context.become(state(updatedOpenVolume))
-
-    case Command.Release(client, xs) =>
-      val updatedOpenVolume = origOpenVolume.updated(client, origOpenVolume.getOrElse(client, Map.empty) |-| xs)
+    case Command.AppendReservedBalance(client, xs) =>
+      val origClientOpenVolume = origOpenVolume.getOrElse(client, Map.empty)
+      val updatedClientOpenVolume = origClientOpenVolume |+| xs
+      val updatedOpenVolume = origOpenVolume.updated(client, updatedClientOpenVolume)
+      log.trace(s"$client: $origClientOpenVolume -> $updatedClientOpenVolume")
       context.become(state(updatedOpenVolume))
 
     case Query.GetReservedBalance(requestId, client) =>
@@ -61,13 +61,7 @@ object BalanceActor {
 
   sealed trait Command
   object Command {
-    case class Reserve(client: Address, assets: Map[Asset, Long]) extends Command {
-      require(assets.values.forall(_ > 0))
-    }
-
-    case class Release(client: Address, assets: Map[Asset, Long]) extends Command {
-      require(assets.values.forall(_ > 0))
-    }
+    case class AppendReservedBalance(client: Address, assets: Map[Asset, Long]) extends Command
   }
 
   private case class TradableBalanceDraftReply(requestId: Long, client: Address, balance: Map[Asset, Long], recipient: ActorRef)

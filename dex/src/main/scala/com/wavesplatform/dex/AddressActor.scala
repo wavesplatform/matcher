@@ -4,6 +4,7 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import cats.implicits._
+import cats.kernel.Group
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor._
@@ -19,6 +20,9 @@ import com.wavesplatform.dex.util.{WorkingStash, getSimpleName}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
+import com.wavesplatform.dex.fp.MapImplicits.group
+import cats.instances.long.catsKernelStdGroupForLong
+import cats.syntax.group.catsSyntaxGroup
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
@@ -120,7 +124,7 @@ class AddressActor(owner: Address,
       } yield ao
 
       if (toCancel.nonEmpty) {
-        log.debug(s"Canceling: ${toCancel.map(_.order.id())}")
+        log.debug(s"Canceling (not enough balance): ${toCancel.map(_.order.id())}")
         toCancel.foreach { ao =>
           requestCounter += 1
           storeCanceled(requestCounter, ao)
@@ -165,8 +169,6 @@ class AddressActor(owner: Address,
     case OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner =>
       import submitted.order
       log.trace(s"OrderAdded(${order.id()})")
-      activeOrders // TODO append, OrderExecuted tooooooo
-      activeOrders.get(order.id()).foreach(release)
       handleOrderAdded(submitted)
       pendingCommands.remove(order.id()).foreach { command =>
         log.trace(s"Confirming placement for ${order.id()}")
@@ -174,6 +176,8 @@ class AddressActor(owner: Address,
       }
 
     case e @ OrderExecuted(submitted, counter, _) =>
+//      if (!activeOrders.contains(submitted.order.id())) activeOrders.put(submitted.order.id(), submitted)
+//      if (!activeOrders.contains(counter.order.id())) activeOrders.put(counter.order.id(), counter)
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
@@ -199,21 +203,6 @@ class AddressActor(owner: Address,
       }
   }
 
-  private def handleBalanceChanges: Receive = {
-    case BalanceUpdated(actualBalance) =>
-      getOrdersToCancel(actualBalance) |> { toCancel =>
-        if (toCancel.nonEmpty) {
-          log.debug(s"Canceling: $toCancel")
-          toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
-        }
-      }
-  }
-
-  private def stashingOrderPlacement: Receive = {
-    case response: Resp => sender ! response; context.become(activeState); unstashAll()
-    case other          => stash(other)
-  }
-
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
@@ -222,13 +211,20 @@ class AddressActor(owner: Address,
   }
 
   private def handleOrderAdded(ao: AcceptedOrder): Unit = {
+    log.trace(s"Saving order ${ao.order.id()}, status is ${activeStatus(ao)}")
     orderDB.saveOrder(ao.order) // TODO do once when OrderAdded will be the first event
-    reserve(ao)
+    val origAoReservableBalance = activeOrders.get(ao.order.id()).fold(Map.empty[Asset, Long])(_.reservableBalance)
+    val diff = ao.reservableBalance |-| origAoReservableBalance
+    balanceActor ! BalanceActor.Command.AppendReservedBalance(ao.order.sender, diff)
+
+    activeOrders.put(ao.order.id(), ao)
+
+//    release(ao)
+//    reserve(ao)
     scheduleExpiration(ao.order)
   }
 
   private def handleOrderExecuted(remaining: AcceptedOrder): Unit = if (remaining.order.sender.toAddress == owner) {
-    release(remaining)
     if (remaining.isValid) handleOrderAdded(remaining)
     else {
       val actualFilledAmount = remaining.order.amount - remaining.amount
@@ -302,13 +298,17 @@ class AddressActor(owner: Address,
 
   private def storeCanceled(requestId: Long, o: AcceptedOrder): Unit =
     storeActor ! StoreActor.Command.Save(requestId, QueueEvent.Canceled(o.order.assetPair, o.order.id()))
-  private def reserve(o: AcceptedOrder): Unit = {
+
+  private def reserve(o: AcceptedOrder): Unit = if (!activeOrders.contains(o.order.id())) {
     log.trace(s"${o.order.id()} reservableBalance: ${o.reservableBalance}")
-    balanceActor ! BalanceActor.Command.Reserve(o.order.sender, o.reservableBalance)
+    balanceActor ! BalanceActor.Command.AppendReservedBalance(o.order.sender, o.reservableBalance)
+    activeOrders.put(o.order.id(), o)
   }
-  private def release(o: AcceptedOrder): Unit = {
+
+  private def release(o: AcceptedOrder): Unit = if (activeOrders.contains(o.order.id())) {
     log.trace(s"${o.order.id()} reservableBalance: ${o.reservableBalance}")
-    balanceActor ! BalanceActor.Command.Release(o.order.sender, o.reservableBalance)
+    balanceActor ! BalanceActor.Command.AppendReservedBalance(o.order.sender, Group.inverse(o.reservableBalance))
+    activeOrders.remove(o.order.id())
   }
 
   private def hasOrder(id: Order.Id): Boolean =
@@ -350,7 +350,7 @@ object AddressActor {
   object Command {
     case class PlaceOrder(order: Order, tpe: OrderType) extends OneOrderCommand {
       override lazy val toString =
-        s"Place${getSimpleName(tpe)}Order(id=${order.id()},s=${order.sender},${order.assetPair},${order.orderType},p=${order.price},a=${order.amount})"
+        s"PlaceOrder(tpe=${getSimpleName(tpe)},id=${order.id()},s=${order.sender.toAddress},${order.assetPair},${order.orderType},p=${order.price},a=${order.amount})"
 
       def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder = tpe match {
         case OrderType.Limit  => LimitOrder(order)

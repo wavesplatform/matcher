@@ -14,24 +14,24 @@ class MatchingRulesCache(matcherSettings: MatcherSettings, blockchain: Blockchai
   private val currentMatchingRule = new ConcurrentHashMap[AssetPair, DenormalizedMatchingRule]
 
   def getMatchingRules(assetPair: AssetPair): NonEmptyList[DenormalizedMatchingRule] = {
-    allMatchingRules.getOrDefault(assetPair, DenormalizedMatchingRule.getDenormalizedMatchingRules(matcherSettings, blockchain, assetPair))
+    allMatchingRules.computeIfAbsent(assetPair, _ => DenormalizedMatchingRule.getDenormalizedMatchingRules(matcherSettings, blockchain, assetPair))
   }
 
   def getDenormalizedRuleForNextOrder(assetPair: AssetPair, currentOffset: Long): DenormalizedMatchingRule = {
-    getMatchingRules(assetPair)
-      .find { _.startOffset == currentOffset + 1 }
-      .getOrElse { currentMatchingRule.get(assetPair) }
+    getMatchingRules(assetPair).toList.reverse
+      .collectFirst { case mr @ DenormalizedMatchingRule(startOffset, _) if startOffset <= (currentOffset + 1) => mr }
+      .getOrElse { DenormalizedMatchingRule.DefaultRule }
   }
 
   def getNormalizedRuleForNextOrder(assetPair: AssetPair, currentOffset: Long): MatchingRule = {
     getDenormalizedRuleForNextOrder(assetPair, currentOffset).normalize(assetPair, blockchain)
   }
 
-  def updateCurrentMatchingRule(assetPair: AssetPair, matchingRule: DenormalizedMatchingRule): Unit = {
-    currentMatchingRule.put(assetPair, matchingRule)
+  def updateCurrentMatchingRule(assetPair: AssetPair, denormalizedMatchingRule: DenormalizedMatchingRule): Unit = {
+    currentMatchingRule.put(assetPair, denormalizedMatchingRule)
   }
 
-  def setCurrentMatchingRuleForNewOrderBook(assetPair: AssetPair): Unit = {
-    updateCurrentMatchingRule(assetPair, getMatchingRules(assetPair).head)
+  def setCurrentMatchingRuleForNewOrderBook(assetPair: AssetPair, currentOffset: Long): Unit = {
+    updateCurrentMatchingRule(assetPair, getDenormalizedRuleForNextOrder(assetPair, currentOffset))
   }
 }

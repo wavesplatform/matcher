@@ -98,7 +98,7 @@ object DenormalizedMatchingRule extends ScorexLogging {
         }
       )
 
-    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one { defaultRule })
+    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }
 }

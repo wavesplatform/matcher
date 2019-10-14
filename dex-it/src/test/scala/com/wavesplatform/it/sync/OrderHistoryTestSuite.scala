@@ -20,6 +20,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{DockerContainerLauncher, MatcherSuiteBase}
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
@@ -135,6 +136,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     node.upsertRate(eth, 0.00567593, expectedStatusCode = StatusCodes.Created)
     node.upsertRate(btc, 0.00009855, expectedStatusCode = StatusCodes.Created)
+    node.upsertRate(usd, 0.5, expectedStatusCode = StatusCodes.Created)
   }
 
   override protected def afterAll(): Unit = {
@@ -208,8 +210,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       .toSet
 
   implicit class DoubleOps(value: Double) {
-    val wct: Long      = Normalization.normalizeAmountAndFee(value, Decimals)
-    val price: Long    = Normalization.normalizePrice(value, Decimals, Decimals)
+    val wct, usd: Long      = Normalization.normalizeAmountAndFee(value, Decimals)
+    val wctUsdPrice: Long    = Normalization.normalizePrice(value, Decimals, Decimals)
+    val wctWavesPrice: Long = Normalization.normalizePrice(value, Decimals, 8)
+    val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, Decimals)
     val eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
   }
 
@@ -220,8 +224,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     (1 to ordersCount)
       .foreach { _ =>
-        node.placeOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.price, 0.003.waves)
-        node.placeOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.price, 0.003.waves)
+        node.placeOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves)
+        node.placeOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves)
       }
 
     retry(10, batchLingerMs) {
@@ -231,30 +235,24 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
-
-    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, matcherFeeAssetId = btc, version = 3)
-    val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
+    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, fee = 0.00000030.btc, matcherFeeAssetId = btc, version = 3)
+    val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
 
     val sellOrder1 = node.placeOrder(sellOrder).message.id
-
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder1, "Filled")
 
     val sellOrder2 = node.placeOrder(sellOrder).message.id
-
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder2, "Filled")
 
     node.cancelOrder(alice, wctUsdPair, buyOrder)
 
     retry(10, batchLingerMs) {
-
       withClue("checking info for 2 small submitted orders\n") {
-
         Set(sellOrder1, sellOrder2).foreach { orderId =>
           getOrderInfoById(orderId).get shouldBe
             OrderBriefInfo(orderId, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 100, 0.35, 0.00000030)
-
           getEventsInfoByOrderId(orderId) shouldBe Set { EventBriefInfo(orderId, eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled) }
         }
       }
@@ -262,7 +260,6 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       withClue("checking info for 1 big counter order\n") {
         getOrderInfoById(buyOrder).get shouldBe
           OrderBriefInfo(buyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
-
         getEventsInfoByOrderId(buyOrder) shouldBe
           Set(
             EventBriefInfo(buyOrder, eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled),
@@ -273,31 +270,53 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
+  "Order history should correctly save events: 1 counter and 1 submitted" in {
+    val buyOrder = node.placeOrder(alice, wctWavesPair, BUY, 300.wct, 0.35.wctWavesPrice, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
+    val sellOrder  = node.placeOrder(bob, wctWavesPair, SELL, 300.wct, 0.35.wctWavesPrice, fee = 0.30.usd, feeAsset = usd, version = 3).message.id
 
-    val smallBuyOrder = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
-    val bigSellOrder  = node.placeOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.price, fee = 0.00000030.btc, feeAsset = btc, version = 3).message.id
-
-    node.waitOrderStatus(wctUsdPair, smallBuyOrder, "Filled")
-    node.waitOrderStatus(wctUsdPair, bigSellOrder, "PartiallyFilled")
+    node.waitOrderStatus(wctWavesPair, buyOrder, "Filled")
+    node.waitOrderStatus(wctWavesPair, sellOrder, "Filled")
 
     retry(20, batchLingerMs) {
-
-      withClue("checking info for small counter order\n") {
-        getOrderInfoById(smallBuyOrder).get shouldBe
-          OrderBriefInfo(smallBuyOrder, alice.publicKey.toString, buySide, stringify(wct), stringify(usd), stringify(eth), 300, 0.35, 0.00001703)
-
-        getEventsInfoByOrderId(smallBuyOrder) shouldBe Set {
-          EventBriefInfo(smallBuyOrder, eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
+      withClue("checking info for counter order\n") {
+        getOrderInfoById(buyOrder).get shouldBe
+          OrderBriefInfo(buyOrder, alice.publicKey.toString, buySide, stringify(wct), "WAVES", stringify(eth), 300, 0.35, 0.00001703)
+        getEventsInfoByOrderId(buyOrder) shouldBe Set {
+          EventBriefInfo(buyOrder, eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
         }
       }
 
-      withClue("checking info for big submitted order\n") {
-        getOrderInfoById(bigSellOrder).get shouldBe
-          OrderBriefInfo(bigSellOrder, bob.publicKey.toString, sellSide, stringify(wct), stringify(usd), stringify(btc), 900, 0.35, 0.00000030)
+      withClue("checking info for submitted order\n") {
+        getOrderInfoById(sellOrder).get shouldBe
+          OrderBriefInfo(sellOrder, bob.publicKey.toString, sellSide, stringify(wct), "WAVES", stringify(usd), 300, 0.35, 0.30)
+        getEventsInfoByOrderId(sellOrder) shouldBe Set {
+          EventBriefInfo(sellOrder, eventTrade, 300, 300, 0.30, 0.30, statusFilled)
+        }
+      }
+    }
+  }
 
-        getEventsInfoByOrderId(bigSellOrder) shouldBe Set {
-          EventBriefInfo(bigSellOrder, eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled)
+  "Order history should correctly save events with Waves as amount and fee" in {
+    val buyOrder = node.placeOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, fee = 0.00370300.waves, feeAsset = Waves, version = 3).message.id
+    val sellOrder  = node.placeOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, fee = 0.30.usd, feeAsset = usd, version = 3).message.id
+
+    node.waitOrderStatus(wavesUsdPair, buyOrder, "Filled")
+    node.waitOrderStatus(wavesUsdPair, sellOrder, "Filled")
+
+    retry(20, batchLingerMs) {
+      withClue("checking info for counter order\n") {
+        getOrderInfoById(buyOrder).get shouldBe
+          OrderBriefInfo(buyOrder, alice.publicKey.toString, buySide, "WAVES", stringify(usd), "WAVES", 300, 0.35, 0.00370300)
+        getEventsInfoByOrderId(buyOrder) shouldBe Set {
+          EventBriefInfo(buyOrder, eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled)
+        }
+      }
+
+      withClue("checking info for submitted order\n") {
+        getOrderInfoById(sellOrder).get shouldBe
+          OrderBriefInfo(sellOrder, bob.publicKey.toString, sellSide, "WAVES", stringify(usd), stringify(usd), 300, 0.35, 0.30)
+        getEventsInfoByOrderId(sellOrder) shouldBe Set {
+          EventBriefInfo(sellOrder, eventTrade, 300, 300, 0.30, 0.30, statusFilled)
         }
       }
     }

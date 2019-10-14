@@ -54,6 +54,9 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       sync(async(m).orderBook(assetPair))
 
+    def orderBook(assetPair: AssetPair, depth: Int): OrderBookResponse =
+      sync(async(m).orderBook(assetPair, depth))
+
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Boolean =
       Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId), OrderRequestAwaitTime)
 

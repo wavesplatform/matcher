@@ -153,6 +153,9 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 
+    def orderBook(assetPair: AssetPair, depth: Int): Future[OrderBookResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}?depth=$depth").as[OrderBookResponse]
+
     def deleteOrderBook(assetPair: AssetPair): Future[MessageMatcherResponse] =
       retrying(_delete(s"$matcherApiEndpoint/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(), statusCode = 202)
         .as[MessageMatcherResponse]

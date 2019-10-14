@@ -211,27 +211,29 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
     val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
-    val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 11 * price, matcherFee).message.id
+    val sellOrder = node.placeOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, sellOrder, "Accepted")
     node.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 20 * price))
 
-    val buyOrder = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, 25 * price, matcherFee).message.id
+    val buyOrder = node.placeOrder(alice, wctUsdPair, BUY, 2 * amount, 20 * price, matcherFee).message.id
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder, "Filled")
     node.waitOrderInBlockchain(buyOrder)
 
-    node.assertAssetBalance(bob.toAddress.toString, UsdId.toString, bobUsdBalance + 11 * amount)
+    node.assertAssetBalance(bob.toAddress.toString, UsdId.toString, bobUsdBalance + 15 * amount)
     node.assertAssetBalance(bob.toAddress.toString, WctId.toString, bobWctBalance - amount)
-    node.assertAssetBalance(alice.toAddress.toString, UsdId.toString, aliceUsdBalance - 11 * amount)
+    node.assertAssetBalance(alice.toAddress.toString, UsdId.toString, aliceUsdBalance - 15 * amount)
     node.assertAssetBalance(alice.toAddress.toString, WctId.toString, aliceWctBalance + amount)
     node.assertBalances(bob.toAddress.toString, bobWavesBalance - matcherFee)
     node.assertBalances(alice.toAddress.toString, aliceWavesBalance - matcherFee / 2)
 
     withClue("partially filled order cancellation") {
+      node.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
       node.reservedBalance(alice)("WAVES") shouldBe matcherFee / 2
-      node.reservedBalance(alice)(UsdId.toString) shouldBe 25 * price * amount / PriceConstant
+      node.reservedBalance(alice)(UsdId.toString) shouldBe 20 * price * amount / PriceConstant
       node.cancelOrder(alice, wctUsdPair, buyOrder)
       node.reservedBalance(alice) shouldBe Map()
+      node.orderBook(wctUsdPair).bids shouldBe List()
     }
   }
 

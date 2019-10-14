@@ -131,11 +131,6 @@ object MatcherPriceAssetConfig {
   val usd = IssuedAsset(UsdId)
   val wct = IssuedAsset(WctId)
 
-  val btc = IssuedAsset(BtcId)
-  val eth = IssuedAsset(EthId)
-  val usd = IssuedAsset(UsdId)
-  val wct = IssuedAsset(WctId)
-
   val wctUsdPair = AssetPair(
     amountAsset = wct,
     priceAsset = usd

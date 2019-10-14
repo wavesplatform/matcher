@@ -11,7 +11,7 @@ import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.{NTPTime, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -45,10 +45,10 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     val prices = Gen.choose(1, 100000L)
     for (tickSize <- normalizedTickSizes) {
       forAll(prices) { price =>
-        ob.add(LimitOrder(buy(pair, 1583290045643L, price), ntpNow, tickSize))
+        ob.add(LimitOrder(buy(pair, 1583290045643L, price)), ntpNow, tickSize)
       }
       forAll(prices) { price =>
-        ob.add(LimitOrder(sell(pair, 984651354686L, price), ntpNow, tickSize))
+        ob.add(LimitOrder(sell(pair, 984651354686L, price)), ntpNow, tickSize)
       }
       for ((level, orders) <- ob.getBids; order <- orders) {
         order.price - level should be < tickSize
@@ -119,8 +119,10 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
     )
 
     ob.cancelAll(ntpNow)
-    val sellTickSizeOrder = LimitOrder(sell(pair, 54521418493L, 40))
-    ob.add(sellTickSizeOrder, ntpNow, normalizedTickSize)
+    val sellTickSizeOrder = sell(pair, 54521418493L, 40)
+
+    ob.add(LimitOrder(sellTickSizeOrder), ntpNow, normalizedTickSize)
+
     ob.getAsks shouldBe mutable.TreeMap[Price, Level](
       Seq(
         tickSize -> Vector(sellTickSizeOrder)

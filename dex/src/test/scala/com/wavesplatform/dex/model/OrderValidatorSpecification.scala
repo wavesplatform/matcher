@@ -14,14 +14,6 @@ import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.model.MatcherModel.Normalization
-import com.wavesplatform.dex.model.OrderValidator.Result
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
-import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -39,7 +31,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
-import mouse.any._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -526,27 +517,6 @@ class OrderValidatorSpecification
 
         Seq[Byte](1, 2, 3).foreach { version =>
           validate(Set(1, 2, 3)) { orderOfVersion(version) } shouldBe 'right
-        }
-      }
-
-      "it's price is less than the tick size (for buy orders)" in {
-
-        def normalizePrice(denormalizedPrice: Double): Long = {
-          Normalization.normalizePrice(value = denormalizedPrice,
-                                       amountAssetDecimals = getDefaultAssetDecimals(Waves),
-                                       priceAssetDecimals = getDefaultAssetDecimals(usd))
-        }
-
-        val validateByTickSize: Order => Result[Order] = OrderValidator.tickSizeAware { normalizePrice(3) }
-
-        withClue(s"Tick size = 3, order price should be >= 3\n") {
-
-          val buyOrder             = createOrder(pairWavesUsd, OrderType.BUY, amount = 1.waves, price = 3.2)
-          val badPriceForBuyOrders = normalizePrice(2.99)
-
-          validateByTickSize { buyOrder } shouldBe 'right
-          validateByTickSize { buyOrder.updatePrice(badPriceForBuyOrders) } should produce("OrderInvalidPriceLevel")
-          validateByTickSize { buyOrder.updateType(OrderType.SELL).updatePrice(badPriceForBuyOrders) } shouldBe 'right
         }
       }
 

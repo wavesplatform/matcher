@@ -7,16 +7,12 @@ import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord, Record
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
-import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import com.wavesplatform.dex.model.OrderStatus.Filled
-import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 
 object HistoryRouter {

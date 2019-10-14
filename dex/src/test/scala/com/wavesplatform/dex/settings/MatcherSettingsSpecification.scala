@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.settings
 
+import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
@@ -404,7 +405,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
-        AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
+        AssetPair.createAssetPair("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
           NonEmptyList[DenormalizedMatchingRule](
             DenormalizedMatchingRule(100L, 0.002),
             List(

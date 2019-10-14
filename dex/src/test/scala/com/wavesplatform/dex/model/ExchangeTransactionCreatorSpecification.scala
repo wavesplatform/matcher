@@ -164,7 +164,7 @@ class ExchangeTransactionCreatorSpecification
 
         counterOrders
           .zip(expectedMatcherFees)
-          .foldLeft[(LimitOrder, Assertion)](submittedOrder -> Succeeded) {
+          .foldLeft[(AcceptedOrder, Assertion)](submittedOrder -> Succeeded) {
             case ((submitted, _), (counter, expectedMatcherFee)) =>
               val oe = OrderExecuted(submitted, counter, System.currentTimeMillis)
               val tx = etc.createTransaction(oe).explicitGet()

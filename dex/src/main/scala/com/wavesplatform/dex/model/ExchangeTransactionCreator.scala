@@ -28,7 +28,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
 
     def calculateMatcherFee: (Long, Long) = {
 
-      import LimitOrder.partialFee
+      import AcceptedOrder.partialFee
 
       def ifSubmitted[A](tpe: OrderType)(ifTrue: A, ifFalse: A): A = if (submitted.order.orderType == tpe) ifTrue else ifFalse
 

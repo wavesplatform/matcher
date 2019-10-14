@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS orders (
   id                VARCHAR (44) PRIMARY KEY,
+  type              SMALLINT,
   sender_address    VARCHAR (44),
   sender_public_key VARCHAR (44),
   amount_asset_id   VARCHAR (44),

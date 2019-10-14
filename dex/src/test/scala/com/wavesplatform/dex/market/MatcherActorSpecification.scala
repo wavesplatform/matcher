@@ -14,7 +14,7 @@ import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, Fa
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
 import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatchingRule, DenormalizedMatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -59,7 +59,7 @@ class MatcherActorSpecification
         .when(order.matcherPublicKey.toAddress)
         .returns(None)
 
-      probe.send(actor, wrap(order))
+      probe.send(actor, wrapLimitOrder(order))
       probe.send(actor, GetMarkets)
 
       probe.expectMsgPF() {
@@ -84,7 +84,7 @@ class MatcherActorSpecification
         .when(order.matcherPublicKey.toAddress)
         .returns(None)
 
-      probe.send(actor, wrap(order))
+      probe.send(actor, wrapLimitOrder(order))
       addressActor.expectMsgType[Events.OrderAdded]
     }
 
@@ -104,7 +104,7 @@ class MatcherActorSpecification
         )
 
         val probe = TestProbe()
-        probe.send(actor, wrap(buy(pair, 2000, 1)))
+        probe.send(actor, wrapLimitOrder(buy(pair, 2000, 1)))
         eventually { ob.get()(pair) shouldBe 'left }
         probe.expectNoMessage()
       }
@@ -122,8 +122,8 @@ class MatcherActorSpecification
         val pair2  = AssetPair(a2, a3)
         val order2 = buy(pair2, 2000, 1)
 
-        probe.send(actor, wrap(order1))
-        probe.send(actor, wrap(order2))
+        probe.send(actor, wrapLimitOrder(order1))
+        probe.send(actor, wrapLimitOrder(order2))
 
         eventually {
           ob.get()(pair1) shouldBe 'right
@@ -296,7 +296,7 @@ class MatcherActorSpecification
         probe.send(actor, MatcherActor.GetSnapshotOffsets)
         probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L))))
 
-        probe.send(actor, wrap(buy(pair2, 2000, 1)))
+        probe.send(actor, wrapLimitOrder(buy(pair2, 2000, 1)))
         eventually {
           probe.send(actor, MatcherActor.GetSnapshotOffsets)
           probe.expectMsg(MatcherActor.SnapshotOffsetsResponse(Map(pair1 -> Some(9L), pair2 -> None)))
@@ -360,7 +360,7 @@ class MatcherActorSpecification
 
         withClue("Can be re-created") {
           val order1 = buy(pair, 2000, 1)
-          probe.send(actor, wrap(11L, order1))
+          probe.send(actor, wrapLimitOrder(11L, order1))
 
           eventually {
             probe.send(actor, GetMarkets)
@@ -379,7 +379,7 @@ class MatcherActorSpecification
   private def sendBuyOrders(eventSender: TestProbe, actor: ActorRef, assetPair: AssetPair, indexes: Range): Unit = {
     val ts = System.currentTimeMillis()
     indexes.foreach { i =>
-      eventSender.send(actor, wrap(i, buy(assetPair, amount = 1000, price = 1, ts = Some(ts + i))))
+      eventSender.send(actor, wrapLimitOrder(i, buy(assetPair, amount = 1000, price = 1, ts = Some(ts + i))))
     }
   }
 

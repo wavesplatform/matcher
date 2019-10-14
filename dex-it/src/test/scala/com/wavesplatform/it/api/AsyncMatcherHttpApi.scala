@@ -278,6 +278,9 @@ object AsyncMatcherHttpApi extends Assertions {
     def placeOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
+    def placeMarketOrder(order: Order): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
+
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,
                    orderType: OrderType,

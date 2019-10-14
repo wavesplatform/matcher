@@ -8,7 +8,7 @@ import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSett
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
 sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterContext => MatcherErrorMessage) {
@@ -252,10 +252,14 @@ case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
       order,
       price,
       outOfBound,
-      e"""The order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds
-                     |(max profit: ${'maxProfit -> deviationSettings.maxPriceProfit}% and
-                     |max loss: ${'maxLoss -> deviationSettings.maxPriceLoss}%
-                     |in relation to the best bid/ask)"""
+      if (ord.orderType == OrderType.BUY)
+        e"""The buy order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+         |${'bestBidPercent -> (100 - deviationSettings.maxPriceProfit)}% of best bid price <= order price <=
+         |${'bestAskPercent -> (100 + deviationSettings.maxPriceLoss)}% of best ask price"""
+      else
+        e"""The sell order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+           |${'bestBidPercent -> (100 - deviationSettings.maxPriceLoss)}% of best bid price <= order price <=
+           |${'bestAskPercent -> (100 + deviationSettings.maxPriceProfit)}% of best ask price"""
     )
 
 case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
@@ -263,8 +267,12 @@ case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSetti
       order,
       fee,
       outOfBound,
-      e"""The order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds
-                     |(max deviation: ${'maxDeviation -> deviationSettings.maxFeeDeviation}% in relation to the best bid/ask)"""
+      if (ord.orderType == OrderType.BUY)
+        e"""The buy order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+       |matcher fee >= ${'bestAskFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
+      else
+        e"""The sell order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+         |matcher fee >= ${'bestBidFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
 
 case class AssetPairSameAssets(theAsset: Asset)
@@ -328,6 +336,24 @@ case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
                    |step price = ${'step -> prcSettings.stepPrice}"""
     )
 
+case class MarketOrderCancel(id: Order.Id)
+    extends MatcherError(marketOrder, commonEntity, disabled, e"The market order ${'id -> id} cannot be cancelled manually")
+
+case class InvalidMarketOrderPrice(mo: Order)
+    extends MatcherError(
+      marketOrder,
+      price,
+      outOfBound,
+      if (mo.orderType == OrderType.BUY)
+        e"""Price of the buy market order
+         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |is too low for its full execution with the current market state"""
+      else
+        e"""Price of the sell market order
+         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |is too high for its full execution with the current market state"""
+    )
+
 case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
     extends MatcherError(
       order,
@@ -356,15 +382,16 @@ object Entity {
   object orderBook extends Entity(8)
   object order     extends Entity(9)
 
-  object version    extends Entity(10)
-  object asset      extends Entity(11)
-  object pubKey     extends Entity(12)
-  object signature  extends Entity(13)
-  object assetPair  extends Entity(14)
-  object amount     extends Entity(15)
-  object price      extends Entity(16)
-  object fee        extends Entity(17)
-  object expiration extends Entity(18)
+  object version     extends Entity(10)
+  object asset       extends Entity(11)
+  object pubKey      extends Entity(12)
+  object signature   extends Entity(13)
+  object assetPair   extends Entity(14)
+  object amount      extends Entity(15)
+  object price       extends Entity(16)
+  object fee         extends Entity(17)
+  object expiration  extends Entity(18)
+  object marketOrder extends Entity(19)
 
   object producer extends Entity(100)
 }

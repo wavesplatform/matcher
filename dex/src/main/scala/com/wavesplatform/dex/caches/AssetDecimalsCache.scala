@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.model
+package com.wavesplatform.dex.caches
 
 import java.util.concurrent.ConcurrentHashMap
 

@@ -123,10 +123,10 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 
   "OrderFeeSettings in MatcherSettings" should "be validated" in {
 
-    val invalidMode =
+    def invalidMode(invalidModeName: String = "invalid"): String =
       s"""
          |order-fee {
-         |  mode = invalid
+         |  mode = $invalidModeName
          |  dynamic {
          |    base-fee = 300000
          |  }
@@ -196,12 +196,15 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
        """.stripMargin
 
     def configStr(x: String): Config    = configWithSettings(orderFeeStr = x)
-    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidMode             = getSettingByConfig(configStr(invalidMode()))
+    val settingsDeprecatedNameMode      = getSettingByConfig(configStr(invalidMode("waves")))
     val settingsInvalidTypeAndPercent   = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
     val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
     settingsInvalidMode shouldBe Left("Invalid setting order-fee.mode value: invalid")
+
+    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee.mode value: waves")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
@@ -269,5 +272,156 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
         AssetPair.createAssetPair("WAVES", "ETH").get,
         AssetPair.createAssetPair("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "WAVES").get
       )
+  }
+
+  "Order restrictions" should "be validated" in {
+
+    def configStr(x: String): Config = configWithSettings(orderRestrictionsStr = x)
+
+    val nonEmptyCorrect =
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = 0.001
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
+        | },
+        | "ETH-USD": {
+        |   step-amount = 0.01
+        |   min-amount  = 0.05
+        |   max-amount  = 20000
+        | }
+        |}
+      """.stripMargin
+
+    val incorrectPairAndStepAmount =
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = -0.013
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
+        | },
+        | "ETH-;;;": {
+        |   step-amount = 0.01
+        |   min-amount  = 0.05
+        |   max-amount  = 20000
+        | }
+        |}
+      """.stripMargin
+
+    val incorrectMinAndMax =
+      """order-restrictions = {
+        | "WAVES-BTC": {
+        |   step-amount = 0.013
+        |   min-amount  = 0.001
+        |   max-amount  = 1000000
+        |   min-price   = 100
+        |   max-price   = 10
+        | },
+        | "ETH-WAVES": {
+        |   step-price = 0.14
+        |   max-price  = 17
+        | }
+        |}
+      """.stripMargin
+
+    withClue("default") {
+      getSettingByConfig(configStr("")).explicitGet().orderRestrictions shouldBe Map.empty
+    }
+
+    withClue("nonempty correct") {
+      getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().orderRestrictions shouldBe
+        Map(
+          AssetPair.createAssetPair("WAVES", "BTC").get ->
+            OrderRestrictionsSettings(
+              stepAmount = 0.001,
+              minAmount = 0.001,
+              maxAmount = 1000000,
+              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+              minPrice = OrderRestrictionsSettings.Default.minPrice,
+              maxPrice = OrderRestrictionsSettings.Default.maxPrice
+            ),
+          AssetPair.createAssetPair("ETH", "USD").get ->
+            OrderRestrictionsSettings(
+              stepAmount = 0.01,
+              minAmount = 0.05,
+              maxAmount = 20000,
+              stepPrice = OrderRestrictionsSettings.Default.stepPrice,
+              minPrice = OrderRestrictionsSettings.Default.minPrice,
+              maxPrice = OrderRestrictionsSettings.Default.maxPrice
+            )
+        )
+    }
+
+    withClue("incorrect pair and step amount") {
+      getSettingByConfig(configStr(incorrectPairAndStepAmount)) should produce(
+        "Invalid setting order-restrictions value: Can't parse asset pair 'ETH-;;;', " +
+          "Invalid setting order-restrictions.WAVES-BTC.step-amount value: -0.013 (required 0 < value)"
+      )
+    }
+
+    withClue("incorrect min and max") {
+      getSettingByConfig(configStr(incorrectMinAndMax)) should produce(
+        "Required order-restrictions.WAVES-BTC.min-price < order-restrictions.WAVES-BTC.max-price")
+    }
+  }
+
+  "Matching rules" should "be validated" in {
+    def configStr(x: String): Config = configWithSettings(matchingRulesStr = x)
+
+    val nonEmptyCorrect =
+      """matching-rules = {
+        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+        |    {
+        |      start-offset = 100
+        |      tick-size    = 0.002
+        |    },
+        |    {
+        |      start-offset = 500
+        |      tick-size    = 0.001
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+
+    def incorrectRulesOrder(firstRuleOffset: Long, secondRuleOffset: Long): String =
+      s"""matching-rules = {
+        |  "WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS": [
+        |    {
+        |      start-offset = $firstRuleOffset
+        |      tick-size    = 0.002
+        |    },
+        |    {
+        |      start-offset = $secondRuleOffset
+        |      tick-size    = 0.001
+        |    }
+        |  ]
+        |}
+      """.stripMargin
+
+    withClue("default") {
+      getSettingByConfig(configStr("")).explicitGet().matchingRules shouldBe Map.empty
+    }
+
+    withClue("nonempty correct") {
+      getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
+        AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
+          NonEmptyList[DenormalizedMatchingRule](
+            DenormalizedMatchingRule(100L, 0.002),
+            List(
+              DenormalizedMatchingRule(500L, 0.001)
+            )
+          )
+      )
+    }
+
+    withClue("incorrect rules order: 100, 100") {
+      getSettingByConfig(configStr(incorrectRulesOrder(100, 100))) should produce(
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 100")
+    }
+
+    withClue("incorrect rules order: 100, 88") {
+      getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
+        "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
+    }
   }
 }

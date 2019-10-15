@@ -38,38 +38,52 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "low amount order" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 1, 100000000, matcherFee),
-      s"The order's amount 0.01 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 1, 100000000, matcherFee),
+      s"The order's amount 0.01 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
+    )
   }
 
   "high amount order" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 100000000000L, 100000000, matcherFee),
-      s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 100000000000L, 100000000, matcherFee),
+      s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
+    )
   }
 
   "wrong fraction amount" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 15, 100000000, matcherFee),
-      s"The order's amount 0.15 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 15, 100000000, matcherFee),
+      s"The order's amount 0.15 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
+    )
   }
 
   "low price amount" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 100000000, 25, matcherFee),
-      "The order's price 0.00000025 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 100000000, 25, matcherFee),
+      "The order's price 0.00000025 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
+    )
   }
 
   "high price amount" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 100000000, 1000000000000L, matcherFee),
-      "The order's price 10000 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 100000000, 1000000000000L, matcherFee),
+      "The order's price 10000 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
+    )
   }
 
   "wrong fraction price" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 100000000, 150000, matcherFee),
-      "The order's price 0.0015 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 100000000, 150000, matcherFee),
+      "The order's price 0.0015 does not meet matcher's requirements: max price = 1000, min price = 0.0001, step price = 0.001"
+    )
   }
 
   "invalid both amount & price" in {
-    assertBadRequestAndResponse(node.placeOrder(alice, wctUsdPair, BUY, 100000000000L, 150000, matcherFee),
-    s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1")
+    assertBadRequestAndResponse(
+      node.placeOrder(alice, wctUsdPair, BUY, 100000000000L, 150000, matcherFee),
+      s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
+    )
   }
 
   "valid order" in {
@@ -92,8 +106,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     node.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe "1000"
     node.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe "0.001"
 
-    // TODO uncomment after "DEX-421 Internal server error in OrderbookInfo request" will be solved
-    // node.orderbookInfo(wavesBtcPair).restrictions.isEmpty
+    node.orderbookInfo(wavesBtcPair).restrictions.isEmpty
     node.placeOrder(bob, wavesBtcPair, BUY, 100000000, 100000, matcherFee)
     node.tradingPairInfo(wavesBtcPair).get.restrictions.isEmpty
   }

@@ -22,7 +22,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     ConfigFactory
       .parseString(s"""waves {
                       |  miner.enable = no
-                      |  matcher.exchange-transaction-broadcast {
+                      |  dex.exchange-transaction-broadcast {
                       |    broadcast-until-confirmed = yes
                       |    interval = 20s
                       |  }

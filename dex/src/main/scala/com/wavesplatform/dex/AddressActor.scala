@@ -2,7 +2,7 @@ package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
 
-import akka.actor.{Actor, ActorRef, Cancellable}
+import akka.actor.{Actor, ActorRef, Cancellable, Status}
 import akka.pattern.pipe
 import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.long.catsKernelStdGroupForLong
@@ -16,7 +16,7 @@ import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.fp.MapImplicits.group
+import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.market.MultipleOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderValidator.MaxActiveOrders
@@ -54,8 +54,8 @@ class AddressActor(owner: Address,
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
+  private var openVolume   = Map.empty[Asset, Long].withDefaultValue(0L)
   private val expiration   = MutableMap.empty[ByteStr, Cancellable]
-  private var openVolume   = Map.empty[Asset, Long]
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
@@ -64,10 +64,11 @@ class AddressActor(owner: Address,
       if (totalActiveOrders + 1 >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
       else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
-        val shouldProcessNext = placementQueue.isEmpty
+        val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
         pendingCommands.put(orderId, PendingCommand(command, sender))
-        if (shouldProcessNext) processFirstPlacement()
+        if (shouldProcess) processFirstPlacement()
+        else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
 
     case command: Command.CancelOrder =>
@@ -90,16 +91,16 @@ class AddressActor(owner: Address,
       }
 
     case command: Command.CancelAllOrders =>
-      log.trace(s"Got $command")
-      val orderIds = getActiveLimitOrders(command.pair).map(_.order.id())
-      context.actorOf(MultipleOrderCancelActor.props(orderIds.toSet, self, sender))
+      val toCancelIds = getActiveLimitOrders(command.pair).map(_.order.id())
+      logBatchCancel(command, toCancelIds)
+      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(Map.empty) // TODO event
+      else context.actorOf(MultipleOrderCancelActor.props(toCancelIds.toSet, self, sender))
 
     case command: Command.CancelNotEnoughCoinsOrders =>
-      log.trace(s"Got $command")
-      val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
-      if (toCancel.nonEmpty) {
-        log.debug(s"Canceling (not enough balance): ${toCancel.map(_.order.id())}")
-        toCancel.foreach(cancel)
+      val toCancelIds = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
+      if (toCancelIds.nonEmpty) {
+        logBatchCancel(command, toCancelIds.map(_.order.id()))
+        toCancelIds.foreach(cancel)
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume)
@@ -182,7 +183,12 @@ class AddressActor(owner: Address,
         enableSchedules = true
         activeOrders.values.foreach(x => scheduleExpiration(x.order))
       }
+
+    case Status.Failure(e) => log.error(s"Got $e", e)
   }
+
+  private def logBatchCancel(command: Command, ids: Iterable[Order.Id]): Unit =
+    log.trace(s"Got $command, ${if (ids.isEmpty) "nothing to cancel" else s"to cancel: ${ids.mkString(", ")}"}")
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
@@ -212,7 +218,7 @@ class AddressActor(owner: Address,
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] =
     Future
       .traverse(forAssets)(asset => spendableBalance(asset).tupleLeft(asset))
-      .map(_.toMap |-| openVolume)
+      .map(xs => (xs.toMap |-| openVolume).withDefaultValue(0))
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)

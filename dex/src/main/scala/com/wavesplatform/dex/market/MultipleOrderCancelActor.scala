@@ -7,6 +7,7 @@ import com.wavesplatform.dex.{api, error}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.Order.Id
 
+// TODO timeouts
 class MultipleOrderCancelActor(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef) extends Actor {
   import MultipleOrderCancelActor._
   orderIds.foreach(processorActor ! CancelOrder(_))
@@ -26,8 +27,10 @@ class MultipleOrderCancelActor(orderIds: Set[Order.Id], processorActor: ActorRef
 }
 
 object MultipleOrderCancelActor {
-  def props(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef): Props =
+  def props(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef): Props = {
+    require(orderIds.nonEmpty, "orderIds is empty")
     Props(new MultipleOrderCancelActor(orderIds, processorActor, clientActor))
+  }
 
   object CancelResponse {
     def unapply(arg: Any): Option[(Id, MatcherResponse)] = helper.lift(arg)

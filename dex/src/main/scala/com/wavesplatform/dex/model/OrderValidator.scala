@@ -419,7 +419,7 @@ object OrderValidator extends ScorexLogging {
     }
 
     acceptedOrder match {
-      case mo: MarketOrder => getMarketOrderValue >>= (volume => validateTradableBalance { getRequiredBalanceForMarketOrder(mo, volume) })
+      case mo: MarketOrder => getMarketOrderValue.flatMap(volume => validateTradableBalance { getRequiredBalanceForMarketOrder(mo, volume) })
       case _               => validateTradableBalance(acceptedOrder.requiredBalance)
     }
   }

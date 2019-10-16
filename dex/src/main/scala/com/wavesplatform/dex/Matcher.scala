@@ -306,12 +306,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             Props(
               new AddressActor(
                 address,
-                asset => balancesCache.get((address, asset)),
+                asset => balancesCache.get(address -> asset),
                 time,
                 orderDb,
                 wavesBlockchainSyncClient.forgedOrder,
                 matcherQueue.storeEvent,
-                orderBookCache.get,
+                orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
                 startSchedules
               )
           ),

@@ -50,7 +50,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     with ScorexLogging {
 
   import actorSystem.dispatcher
-  import gRPCExtensionClient.{monixScheduler, grpcExecutionContext, wavesBlockchainAsyncClient, wavesBlockchainSyncClient}
+  import gRPCExtensionClient.{grpcExecutionContext, monixScheduler, wavesBlockchainAsyncClient, wavesBlockchainSyncClient}
 
   private val time = new NTP(settings.ntpServer)
 
@@ -198,7 +198,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         matcherPublicKey,
         matcher,
         addressActors,
-        balanceActor,
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
@@ -244,16 +243,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private lazy val assetPairsDb = AssetPairsDB(db)
 
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
-
-  lazy val balanceActor: ActorRef = actorSystem.actorOf(
-    BalanceActor.props(Function.untupled(balancesCache.get)),
-    "balance"
-  )
-
-  lazy val storeActor: ActorRef = actorSystem.actorOf(
-    StoreActor.props(matcherQueue.storeEvent),
-    "store"
-  )
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
@@ -317,11 +306,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             Props(
               new AddressActor(
                 address,
-                balanceActor,
-                storeActor,
+                asset => balancesCache.get((address, asset)),
                 time,
                 orderDb,
                 wavesBlockchainSyncClient.forgedOrder,
+                matcherQueue.storeEvent,
                 orderBookCache.get,
                 startSchedules
               )

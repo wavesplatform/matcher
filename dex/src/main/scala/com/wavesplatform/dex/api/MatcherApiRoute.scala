@@ -16,7 +16,6 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.market.BalanceActor
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -46,7 +45,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherPublicKey: PublicKey,
                            matcher: ActorRef,
                            addressActor: ActorRef,
-                           balanceActor: ActorRef,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
@@ -170,18 +168,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
       f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectory.Envelope(sender, msg))
-      .mapTo[A]
-      .map(f)
-      .recover {
-        case e: AskTimeoutException =>
-          log.error(s"Error processing $msg", e)
-          TimedOut
-      }
-  }
-
-  @inline
-  private def askMapBalanceActor[A: ClassTag](msg: BalanceActor.Query)(f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
-    (balanceActor ? msg)
       .mapTo[A]
       .map(f)
       .recover {
@@ -609,7 +595,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askMapBalanceActor[BalanceActor.Reply.TradableBalance](BalanceActor.Query.GetTradableBalance(0L, address, pair.assets)) { r =>
+        askMapAddressActor[AddressActor.Reply.TradableBalance](address, AddressActor.Query.GetTradableBalance(0L, pair.assets)) { r =>
           stringifyAssetIds(r.balance)
         }
       }
@@ -632,7 +618,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askMapBalanceActor[BalanceActor.Reply.ReservedBalance](BalanceActor.Query.GetReservedBalance(0L, publicKey)) { r =>
+        askMapAddressActor[AddressActor.Reply.ReservedBalance](publicKey, AddressActor.Query.GetReservedBalance(0L)) { r =>
           stringifyAssetIds(r.balance)
         }
       }

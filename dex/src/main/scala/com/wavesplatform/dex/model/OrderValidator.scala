@@ -8,6 +8,7 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.MatcherModel.Normalization._
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -147,8 +148,9 @@ object OrderValidator extends ScorexLogging {
                       assetDecimals: Asset => Int)(order: Order): Result[Order] = timer.measure {
 
     lazy val exchangeTx: Result[ExchangeTransaction] = {
-      val fakeOrder: Order = order.updateType(order.orderType.opposite)
-      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map { x =>
+      val fakeOrder: Order  = order.updateType(order.orderType.opposite)
+      val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime())
+      transactionCreator(oe).leftMap { x =>
         error.CanNotCreateExchangeTransaction(x.toString)
       }
     }
@@ -450,5 +452,5 @@ object OrderValidator extends ScorexLogging {
   }
 
   private def lift[T](x: T): Result[T] = x.asRight[MatcherError]
-  private def success: Result[Unit]    = lift(())
+  private def success: Result[Unit]    = lift(Unit)
 }

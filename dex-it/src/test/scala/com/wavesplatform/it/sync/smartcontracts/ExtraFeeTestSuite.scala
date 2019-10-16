@@ -25,7 +25,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  val trueScript  = Some(Base64.encode(createBoolScript("true").bytes.apply)) //TODO добавить типовые проверки в скрипт
+  val trueScript = Some(Base64.encode(createBoolScript("true").bytes.apply)) //TODO добавить типовые проверки в скрипт
   val falseScript = Some(Base64.encode(createBoolScript("false").bytes.apply))
   val amount      = 1L
   val price       = 100000000L
@@ -46,16 +46,12 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   val assetWith2Dec: String = node
     .broadcastIssue(bob, "SmartAsset3", "Smart asset with 2 decimals", defaultAssetQuantity, 2, reissuable = false, smartIssueFee, trueScript)
     .id
-  val feeAsset: ByteStr = ByteStr(
-    Base58.decode(
-      node
-        .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, trueScript)
-        .id))
-  val falseFeeAsset: ByteStr = ByteStr(
-    Base58.decode(
-      node
-        .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, falseScript)
-        .id))
+  val feeAsset: ByteStr = ByteStr(Base58.decode(node
+    .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, trueScript)
+    .id))
+  val falseFeeAsset: ByteStr = ByteStr(Base58.decode(node
+    .broadcastIssue(bob, "FeeSmartAsset", "Test", defaultAssetQuantity, 8, reissuable = false, smartIssueFee, falseScript)
+    .id))
   Seq(asset0, asset1, asset2, feeAsset.toString).foreach(node.waitForTransaction(_))
 
   // distribute
@@ -98,12 +94,12 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
         val oneSmartPair = createAssetPair(asset0, asset1)
 
-        val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
-        val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
+        val aliceInitBalance = node.accountBalances(alice.toAddress.toString)._1
+        val bobInitBalance = node.accountBalances(bob.toAddress.toString)._1
         val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
 
         val expectedFee = tradeFee + smartFee // 1 x "smart asset"
-        val invalidFee  = expectedFee - 1
+        val invalidFee = expectedFee - 1
 
         node.expectRejectedOrderPlacement(
           alice,
@@ -138,12 +134,12 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 
-          val aliceInitBalance   = node.accountBalances(alice.toAddress.toString)._1
-          val bobInitBalance     = node.accountBalances(bob.toAddress.toString)._1
+          val aliceInitBalance = node.accountBalances(alice.toAddress.toString)._1
+          val bobInitBalance = node.accountBalances(bob.toAddress.toString)._1
           val matcherInitBalance = node.accountBalances(matcher.toAddress.toString)._1
 
           val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
-          val invalidFee  = expectedFee - 1
+          val invalidFee = expectedFee - 1
 
           node.expectRejectedOrderPlacement(
             alice,

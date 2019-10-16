@@ -100,7 +100,7 @@ class AddressActor(owner: Address,
     case evt: BalanceUpdated =>
       val toCancel = ordersToDelete(toSpendable(evt))
       if (toCancel.nonEmpty) {
-        log.debug(s"Canceling: $toCancel")
+        log.debug(s"Canceling (not enough balance): $toCancel")
         toCancel.foreach { x =>
           storeCanceled(x.assetPair, x.orderId)
         }
@@ -131,8 +131,7 @@ class AddressActor(owner: Address,
       val batchCancelFutures =
         for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield {
           val id = ao.order.id()
-          val f  = pendingCancellation.get(id).fold(storeCanceled(ao.order.assetPair, id))(_.future)
-          f.map(id -> _)
+          storeCanceled(ao.order.assetPair, id).map(id -> _)
         }
 
       Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
@@ -141,8 +140,8 @@ class AddressActor(owner: Address,
       expiration.remove(id)
       for (lo <- activeOrders.get(id)) {
         if ((lo.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-          log.trace(s"Order $id expired, storing cancel event")
-          storeCanceled(lo.order.assetPair, lo.order.id())
+          log.debug(s"Order $id expired, storing cancel event")
+          storeCanceled(lo.order.assetPair, id)
         } else scheduleExpiration(lo.order)
       }
 
@@ -153,24 +152,25 @@ class AddressActor(owner: Address,
       }
   }
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
-    val promisedResponse = Promise[Resp]
-    eventCache += id -> promisedResponse
-    val withSave = storeEvent(event).transformWith {
-      case Failure(e) =>
-        log.error(s"Error persisting $event", e)
-        Future.successful(storeError)
-      case Success(r) =>
-        r match {
-          case None => Future.successful(NotImplemented(error.FeatureDisabled))
-          case Some(x) =>
-            log.info(s"Stored $x")
-            promisedResponse.future
-        }
-    }
+  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] =
+    eventCache.get(id).map(_.future).getOrElse {
+      val promisedResponse = Promise[Resp]
+      eventCache += id -> promisedResponse
+      val withSave = storeEvent(event).transformWith {
+        case Failure(e) =>
+          log.error(s"Error persisting $event", e)
+          Future.successful(storeError)
+        case Success(r) =>
+          r match {
+            case None => Future.successful(NotImplemented(error.FeatureDisabled))
+            case Some(x) =>
+              log.info(s"Stored $x")
+              promisedResponse.future
+          }
+      }
 
-    Future.firstCompletedOf(List(promisedResponse.future, withSave)) // Multiple cancel requests can be resolved by first
-  }
+      Future.firstCompletedOf(List(promisedResponse.future, withSave)) // Multiple cancel requests can be resolved by first
+    }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
     store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent))

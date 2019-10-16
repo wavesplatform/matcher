@@ -153,6 +153,9 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 
+    def orderBook(assetPair: AssetPair, depth: Int): Future[OrderBookResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}?depth=$depth").as[OrderBookResponse]
+
     def deleteOrderBook(assetPair: AssetPair): Future[MessageMatcherResponse] =
       retrying(_delete(s"$matcherApiEndpoint/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(), statusCode = 202)
         .as[MessageMatcherResponse]
@@ -231,7 +234,7 @@ object AsyncMatcherHttpApi extends Assertions {
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
-    def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
+    def tradingMarkets(): Future[MatcherMarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MatcherMarketDataInfo]
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
@@ -397,6 +400,10 @@ object AsyncMatcherHttpApi extends Assertions {
         _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(apiKey).build(),
         statusCode = expectedStatusCode
       ).as[RatesResponse]
+    }
+
+    def orderbookInfo(assetPair: AssetPair): Future[MatcherOrderbookInfo] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[MatcherOrderbookInfo]
     }
   }
 

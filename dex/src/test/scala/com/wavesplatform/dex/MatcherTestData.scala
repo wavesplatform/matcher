@@ -23,6 +23,7 @@ import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
+import mouse.any._
 
 import scala.util.Random
 
@@ -52,7 +53,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   implicit class DoubleOps(value: Double) {
     val waves, btc, eth = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long  = Normalization.normalizeAmountAndFee(value, 2)
+    val usd: Long       = Normalization.normalizeAmountAndFee(value, 2)
   }
 
   def toNormalized(value: Long): Long = value * Order.PriceConstant

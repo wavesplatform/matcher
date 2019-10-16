@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 trait OrderInfo[+S <: OrderStatus] {
   def version: Byte
@@ -34,6 +34,9 @@ object OrderInfo {
                            status: S,
                            assetPair: AssetPair): OrderInfo[S] =
     Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair)
+
+  def v2[S <: OrderStatus](order: Order, status: S): OrderInfo[S] =
+    v2(order.orderType, order.amount, order.price, order.matcherFee, order.matcherFeeAssetId, order.timestamp, status, order.assetPair)
 
   private case class Impl[+S <: OrderStatus](version: Byte,
                                              side: OrderType,

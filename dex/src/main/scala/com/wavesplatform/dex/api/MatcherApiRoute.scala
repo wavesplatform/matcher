@@ -138,11 +138,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           complete(
             placeTimer.measureFuture {
               orderValidator(order) match {
-                case Right(o) =>
-                  placeTimer.measureFuture {
-                    val command = AddressActor.Command.PlaceOrder(o, if (isMarket) AddressActor.OrderType.Market else AddressActor.OrderType.Limit)
-                    askAddressActor(order.sender, command)
-                  }
+                case Right(o)    => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
                 case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
               }
             }
@@ -464,8 +460,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askMapAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { orders =>
-      StatusCodes.OK -> orders.map {
+    askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { reply =>
+      StatusCodes.OK -> reply.xs.map {
         case (id, oi) =>
           Json.obj(
             "id"        -> id.toString,
@@ -595,7 +591,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askMapAddressActor[AddressActor.Reply.TradableBalance](address, AddressActor.Query.GetTradableBalance(0L, pair.assets)) { r =>
+        askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { r =>
           stringifyAssetIds(r.balance)
         }
       }
@@ -618,7 +614,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askMapAddressActor[AddressActor.Reply.ReservedBalance](publicKey, AddressActor.Query.GetReservedBalance(0L)) { r =>
+        askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
           stringifyAssetIds(r.balance)
         }
       }

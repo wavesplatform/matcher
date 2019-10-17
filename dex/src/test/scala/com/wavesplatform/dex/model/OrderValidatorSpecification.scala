@@ -65,10 +65,9 @@ class OrderValidatorSpecification
     }
 
     "reject new order" when {
-      // TODO Move to AddressActor
-//      "this order had already been accepted" in asa(orderStatus = _ => true) { v =>
-//        v should produce("OrderDuplicate")
-//      }
+      "this order had already been accepted" in asa(orderStatus = _ => true) { v =>
+        v should produce("OrderDuplicate")
+      }
 
       "sender's address is blacklisted" in {
         val blacklistedAccount = KeyPair("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
@@ -141,12 +140,11 @@ class OrderValidatorSpecification
         ov(order) should produce("InvalidSignature")
       }
 
-// TODO Move To AddressActorSuite
-//      "order exists" in {
-//        val pk = KeyPair(randomBytes())
-//        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, _ => OrderBook.AggregatedSnapshot())(_)
-//        ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
-//      }
+      "order exists" in {
+        val pk = KeyPair(randomBytes())
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true, _ => OrderBook.AggregatedSnapshot())(_)
+        ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
+      }
 
       "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
         case (amountAsset, sender, amountDecimals) =>
@@ -832,15 +830,18 @@ class OrderValidatorSpecification
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
+      orderStatus: ByteStr => Boolean = _ => false,
       o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), _ => OrderBook.AggregatedSnapshot())(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBook.AggregatedSnapshot())(LimitOrder(o)))
 
   private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: AggregatedSnapshot)(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = {
     order =>
       OrderValidator.accountStateAware(
         sender = order.sender.toAddress,
         tradableBalance = b.withDefaultValue(0L).apply,
+        activeOrderCount = 0,
+        orderExists = _ => false,
         orderBookCache = _ => aggregatedSnapshot,
       ) { MarketOrder(order, b.apply _) }
   }

@@ -2,6 +2,7 @@ package com.wavesplatform.dex.model
 
 import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.cache.RateCache
 import com.wavesplatform.dex.error
@@ -424,13 +425,16 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def accountStateAware(
-      sender: Address,
-      tradableBalance: Asset => Long,
-      orderBookCache: AssetPair => OrderBook.AggregatedSnapshot
-  )(acceptedOrder: AcceptedOrder): Result[AcceptedOrder] =
+  def accountStateAware(sender: Address,
+                        tradableBalance: Asset => Long,
+                        activeOrderCount: => Int,
+                        orderExists: ByteStr => Boolean,
+                        orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(acceptedOrder: AcceptedOrder): Result[AcceptedOrder] =
     for {
-      _ <- lift(acceptedOrder).ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)
+      _ <- lift(acceptedOrder)
+        .ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)
+        .ensure(error.ActiveOrdersLimitReached(MaxActiveOrders))(_ => activeOrderCount < MaxActiveOrders)
+        .ensure(error.OrderDuplicate(acceptedOrder.order.id()))(ao => !orderExists(ao.order.id()))
       _ <- validateBalance(acceptedOrder, tradableBalance, orderBookCache)
     } yield acceptedOrder
 

@@ -19,7 +19,6 @@ import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.market.MultipleOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.OrderValidator.MaxActiveOrders
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.util.WorkingStash
@@ -61,8 +60,7 @@ class AddressActor(owner: Address,
     case command: Command.PlaceOrder =>
       log.trace(s"Got $command")
       val orderId = command.order.id()
-      if (totalActiveOrders + 1 >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
-      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -93,7 +91,7 @@ class AddressActor(owner: Address,
     case command: Command.CancelAllOrders =>
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.order.id())
       logBatchCancel(command, toCancelIds)
-      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(Map.empty) // TODO event
+      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(Map.empty)
       else context.actorOf(MultipleOrderCancelActor.props(toCancelIds.toSet, self, sender))
 
     case command: Command.CancelNotEnoughCoinsOrders =>
@@ -131,8 +129,12 @@ class AddressActor(owner: Address,
         case (orderId, restQueue) =>
           if (orderId == event.orderId) {
             event match {
-              case Event.ValidationPassed(ao)         => pendingCommands.get(ao.order.id()).foreach(_ => place(ao))
-              case Event.ValidationFailed(id, reason) => pendingCommands.remove(id).foreach(_.client ! api.OrderRejected(reason))
+              case Event.ValidationPassed(ao) => pendingCommands.get(ao.order.id()).foreach(_ => place(ao))
+              case Event.ValidationFailed(_, reason) =>
+                pendingCommands.remove(orderId).foreach { command =>
+                  log.trace(s"Confirming command for $orderId")
+                  command.client ! api.OrderRejected(reason)
+                }
             }
 
             placementQueue = restQueue
@@ -166,8 +168,12 @@ class AddressActor(owner: Address,
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       pendingCommands.remove(id).foreach { pc =>
         pc.command match {
-          case command: Command.PlaceOrder => pc.client ! api.OrderAccepted(command.order) // TODO remove after OrderBook refactoring
-          case _: Command.CancelOrder      => pc.client ! api.OrderCanceled(id)
+          case command: Command.PlaceOrder =>
+            log.trace(s"Confirming placement for $id")
+            pc.client ! api.OrderAccepted(command.order) // TODO remove after OrderBook refactoring
+          case _: Command.CancelOrder =>
+            log.trace(s"Confirming cancelation for $id")
+            pc.client ! api.OrderCanceled(id)
         }
       }
       val isActive = activeOrders.contains(id)
@@ -209,7 +215,7 @@ class AddressActor(owner: Address,
               getTradableBalance(Set(command.order.getSpendAssetId, command.order.matcherFeeAssetId))
                 .map { tradableBalance =>
                   val ao = command.toAcceptedOrder(tradableBalance)
-                  OrderValidator.accountStateAware(ao.order.sender, tradableBalance, orderBookCache)(ao) match {
+                  accountStateValidator(ao, tradableBalance) match {
                     case Left(error) => Event.ValidationFailed(ao.order.id(), error)
                     case Right(_)    => Event.ValidationPassed(ao)
                   }
@@ -219,6 +225,9 @@ class AddressActor(owner: Address,
           }
       }
   }
+
+  private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long): OrderValidator.Result[AcceptedOrder] =
+    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance, totalActiveOrders, hasOrder, orderBookCache)(acceptedOrder)
 
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] =
     Future
@@ -303,8 +312,7 @@ class AddressActor(owner: Address,
         case _                    =>
       }
 
-  private def hasOrder(id: Order.Id): Boolean =
-    pendingCommands.contains(id) || activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)
+  private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
   private def getActiveLimitOrders(maybePair: Option[AssetPair]): Iterable[AcceptedOrder] =

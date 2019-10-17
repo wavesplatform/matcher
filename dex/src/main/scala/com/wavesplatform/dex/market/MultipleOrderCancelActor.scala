@@ -7,7 +7,6 @@ import com.wavesplatform.dex.{api, error}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.Order.Id
 
-// TODO timeouts
 class MultipleOrderCancelActor(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef) extends Actor {
   import MultipleOrderCancelActor._
   orderIds.foreach(processorActor ! CancelOrder(_))

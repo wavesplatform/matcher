@@ -164,7 +164,12 @@ class AddressActor(owner: Address,
     case OrderCanceled(ao, isSystemCancel, _) =>
       val id = ao.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
-      pendingCommands.remove(id).foreach(_.client ! api.OrderCanceled(id))
+      pendingCommands.remove(id).foreach { pc =>
+        pc.command match {
+          case command: Command.PlaceOrder => pc.client ! api.OrderAccepted(command.order) // TODO remove after OrderBook refactoring
+          case _: Command.CancelOrder      => pc.client ! api.OrderCanceled(id)
+        }
+      }
       val isActive = activeOrders.contains(id)
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) handleOrderTerminated(ao, OrderStatus.finalStatus(ao, isSystemCancel))

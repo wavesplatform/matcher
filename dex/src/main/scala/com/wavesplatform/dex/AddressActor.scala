@@ -53,7 +53,7 @@ class AddressActor(owner: Address,
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
-  private var openVolume   = Map.empty[Asset, Long].withDefaultValue(0L)
+  private var openVolume   = Map.empty[Asset, Long]
   private val expiration   = MutableMap.empty[ByteStr, Cancellable]
 
   override def receive: Receive = {
@@ -226,13 +226,13 @@ class AddressActor(owner: Address,
       }
   }
 
-  private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long): OrderValidator.Result[AcceptedOrder] =
-    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance, totalActiveOrders, hasOrder, orderBookCache)(acceptedOrder)
+  private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Map[Asset, Long]): OrderValidator.Result[AcceptedOrder] =
+    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance.withDefaultValue(0L), totalActiveOrders, hasOrder, orderBookCache)(acceptedOrder)
 
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] =
     Future
       .traverse(forAssets)(asset => spendableBalance(asset).tupleLeft(asset))
-      .map(xs => (xs.toMap |-| openVolume).withDefaultValue(0))
+      .map(_.toMap |-| openVolume)
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
@@ -245,8 +245,7 @@ class AddressActor(owner: Address,
     log.trace(s"Saving order ${ao.order.id()}, new status is ${activeStatus(ao)}")
     orderDB.saveOrder(ao.order) // TODO do once when OrderAdded will be the first event. UP: it happens everytime orderbooks are restored, FIX this
     val origAoReservableBalance = activeOrders.get(ao.order.id()).fold(Map.empty[Asset, Long])(_.reservableBalance)
-    val diff                    = (ao.reservableBalance |-| origAoReservableBalance).filter { case (_, v) => v != 0 }
-    if (diff.nonEmpty) openVolume = openVolume |+| diff
+    openVolume = openVolume |+| (ao.reservableBalance |-| origAoReservableBalance)
 
     activeOrders.put(ao.order.id(), ao)
     scheduleExpiration(ao.order)

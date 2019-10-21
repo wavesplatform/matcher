@@ -19,12 +19,14 @@ object MapImplicits {
     override def empty: Map[K, V]                 = Map.empty
     override def combine(xs: Map[K, V], ys: Map[K, V]): Map[K, V] = {
       val (lessXs, biggerXs) = if (xs.size <= ys.size) (xs, ys) else (ys, xs)
-      lessXs.foldLeft(biggerXs) {
+      nonEmpty(lessXs).foldLeft(nonEmpty(biggerXs)) {
         case (r, (k, v)) =>
           val updatedV = Semigroup.maybeCombine(v, r.get(k))
           if (updatedV == vGroup.empty) r - k
           else r.updated(k, updatedV)
       }
     }
+
+    private def nonEmpty(xs: Map[K, V]): Map[K, V] = xs.filterNot { case (_, v) => v == 0 }
   }
 }

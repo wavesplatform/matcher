@@ -354,6 +354,18 @@ case class InvalidMarketOrderPrice(mo: Order)
          |is too high for its full execution with the current market state"""
     )
 
+case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
+    extends MatcherError(
+      order,
+      price,
+      notEnough,
+      e"""The buy order's price
+       |${'price -> Price(ord.assetPair, ord.price)}
+       |does not meet matcher's requirements:
+       |price >= ${'tickSize -> Price(ord.assetPair, tickSize)} (actual tick size).
+       |Orders can not be placed into level with price 0"""
+    )
+
 case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
 case class RateNotFound(theAsset: Asset) extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 

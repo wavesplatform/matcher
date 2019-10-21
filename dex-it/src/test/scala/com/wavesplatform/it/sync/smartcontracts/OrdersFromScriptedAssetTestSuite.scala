@@ -62,7 +62,10 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   "can't place if the script returns FALSE" in {
     val pair  = AssetPair(unscriptedAsset, denyAsset)
     val order = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, matcherFee = smartTradeFee, version = 2)
-    dex1Api.tryPlace(order) should failWith(11536130, MatcherError.Params(assetId = Some(denyAsset.id.toString)))
+    dex1Api.tryPlace(order) should failWith(
+      11536130, // AssetScriptDeniedOrder
+      MatcherError.Params(assetId = Some(denyAsset.id.toString))
+    )
   }
 
   "can execute against unscripted, if the script returns TRUE" in {

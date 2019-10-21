@@ -5,7 +5,6 @@ object Dependencies {
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.5.20"
 
-  private def swaggerModule(module: String)                = "io.swagger.core.v3"            % s"swagger-$module" % "2.0.5"
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
   private def kamonModule(module: String, v: String)       = "io.kamon"                      %% s"kamon-$module"  % v
@@ -118,6 +117,7 @@ object Dependencies {
 
   lazy val dex =
     Seq(
+      logback.exclude("org.scala-js", "scalajs-library_2.12"),
       kindProjector,
       logback,
       "com.github.scopt" %% "scopt"    % "4.0.0-RC2",
@@ -126,6 +126,7 @@ object Dependencies {
       akkaModule("slf4j"),
       akkaHttp,
       "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
+      // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
       janino,
       mouse,
       "org.typelevel" %% "cats-tagless-macros" % "0.9",

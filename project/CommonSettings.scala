@@ -9,9 +9,6 @@ object CommonSettings extends AutoPlugin {
 
   // These options doesn't work for ScalaJS
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
-    javaOptions ++= {
-      if (!fork.value) Seq.empty else ModernJavaSettings.options
-    },
     packageSource := sourceDirectory.value / "package"
   )
 }

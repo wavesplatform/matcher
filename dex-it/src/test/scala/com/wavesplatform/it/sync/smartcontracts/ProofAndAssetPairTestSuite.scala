@@ -257,13 +257,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           dex1Api
             .tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-            3147522,
+            3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
 
           dex1Api
             .tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-            3147522,
+            3147522, // AccountScriptDeniedOrder
             MatcherError.Params(address = Some(alice.toAddress.stringRepr))
           )
         }
@@ -271,7 +271,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         "9" in {
           setAliceScript(sc9)
           dex1Api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-            3147521,
+            3147521, // AccountScriptException
             "An access to the blockchain.height is denied on DEX"
           )
         }

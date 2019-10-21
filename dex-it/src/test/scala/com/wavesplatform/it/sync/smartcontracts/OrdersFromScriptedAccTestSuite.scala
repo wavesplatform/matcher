@@ -34,14 +34,14 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   "issue asset and run test" - {
     "trading is deprecated" in {
       dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)) should failWith(
-        2097923,
+        2097923, // AccountFeatureUnsupported
         "An account's feature isn't yet supported"
       )
     }
 
     "can't place an OrderV2 before the activation" in {
       dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
-        2099459,
+        2099459, // OrderVersionUnsupported
         "The order of version 2 isn't yet supported"
       )
     }
@@ -50,7 +50,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       wavesNode1Api.waitForHeight(activationHeight)
       updateBobScript("true && (height > 0)")
       dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
-        3147521,
+        3147521, // AccountScriptException
         "An access to the blockchain.height is denied on DEX"
       )
     }
@@ -104,7 +104,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       "reject incorrect order" in {
         dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
-          3147522
+          3147522 // AccountScriptDeniedOrder
         )
       }
     }

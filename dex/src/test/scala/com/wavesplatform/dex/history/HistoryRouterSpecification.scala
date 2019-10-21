@@ -10,6 +10,7 @@ import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
@@ -75,8 +76,8 @@ class HistoryRouterSpecification
   def orderCancelled(submitted: AcceptedOrder): OrderCanceled                     = OrderCanceled(submitted, false, ntpTime.getTimestamp())
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used
-  def denormalizeAmountAndFee(value: Long, pair: AssetPair): Double = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)
-  def denormalizePrice(value: Long, pair: AssetPair): Double        = Denormalization.denormalizePrice(value, wavesDecimals, assetDecimals)
+  def denormalizeAmountAndFee(value: Long, asset: Asset): Double = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)
+  def denormalizePrice(value: Long, pair: AssetPair): Double     = Denormalization.denormalizePrice(value, wavesDecimals, assetDecimals)
 
   implicit class LimitOrderOps(limitOrder: LimitOrder) {
     def orderId: String         = limitOrder.order.id().toString

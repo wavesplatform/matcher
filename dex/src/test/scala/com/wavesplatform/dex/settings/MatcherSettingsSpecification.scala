@@ -1,157 +1,22 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits._
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
-import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import future.com.wavesplatform.transaction.assets.exchange.Implicits.AssetPairOps
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.Matchers
 
 import scala.concurrent.duration._
-import scala.util.Try
 
-class MatcherSettingsSpecification extends FlatSpec with Matchers {
-
-  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
-    Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)
-
-  val correctOrderFeeStr: String =
-    s"""
-       |order-fee {
-       |  mode = percent
-       |  dynamic {
-       |    base-fee = 300000
-       |  }
-       |  fixed {
-       |    asset = WAVES
-       |    min-fee = 300000
-       |  }
-       |  percent {
-       |    asset-type = amount
-       |    min-fee = 0.1
-       |  }
-       |}
-       """.stripMargin
-
-  val correctDeviationsStr: String =
-    s"""
-       |max-price-deviations {
-       |  enable = yes
-       |  profit = 1000000
-       |  loss = 1000000
-       |  fee = 1000000
-       |}
-     """.stripMargin
-
-  val correctAllowedAssetPairsStr: String =
-    s"""
-       |allowed-asset-pairs = []
-     """.stripMargin
-
-  val correctOrderRestrictionsStr: String =
-    s"""
-       |order-restrictions = {}
-     """.stripMargin
-
-  val correctMatchingRulesStr: String =
-    s"""
-       |matching-rules = {}
-     """.stripMargin
-
-  def configWithSettings(orderFeeStr: String = correctOrderFeeStr,
-                         deviationsStr: String = correctDeviationsStr,
-                         allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
-                         orderRestrictionsStr: String = correctOrderRestrictionsStr,
-                         matchingRulesStr: String = correctMatchingRulesStr): Config = {
-    val configStr =
-      s"""waves {
-      |  directory = /waves
-      |  dex {
-      |    account-storage {
-      |      type = "in-mem"
-      |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
-      |    }
-      |    rest-api {
-      |      address = 127.1.2.3
-      |      port = 6880
-      |      api-key-hash = foobarhash
-      |      cors = no
-      |      api-key-different-host = no
-      |    }
-      |    exchange-tx-base-fee = 300000
-      |    actor-response-timeout = 11s
-      |    snapshots-interval = 999
-      |    limit-events-during-recovery = 48879
-      |    make-snapshots-at-start = yes
-      |    snapshots-loading-timeout = 423s
-      |    start-events-processing-timeout = 543s
-      |    order-books-recovering-timeout = 111s
-      |    rest-order-limit = 100
-      |    price-assets = [
-      |      WAVES
-      |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
-      |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
-      |    ]
-      |    blacklisted-assets = ["a"]
-      |    blacklisted-names = ["b"]
-      |    blacklisted-addresses = [
-      |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
-      |    ]
-      |    white-list-only = yes
-      |    allowed-order-versions = [11, 22]
-      |    order-book-snapshot-http-cache {
-      |      cache-timeout = 11m
-      |      depth-ranges = [1, 5, 333]
-      |    }
-      |    events-queue {
-      |      type = "kafka"
-      |
-      |      local {
-      |        enable-storing = no
-      |        polling-interval = 1d
-      |        max-elements-per-poll = 99
-      |        clean-before-consume = no
-      |      }
-      |
-      |      kafka {
-      |        topic = "some-events"
-      |
-      |        consumer {
-      |          buffer-size = 100
-      |          min-backoff = 11s
-      |          max-backoff = 2d
-      |        }
-      |
-      |        producer {
-      |          enable = no
-      |          buffer-size = 200
-      |        }
-      |      }
-      |    }
-      |    process-consumed-timeout = 663s
-      |    $orderFeeStr
-      |    $deviationsStr
-      |    $allowedAssetPairsStr
-      |    $orderRestrictionsStr
-      |    $matchingRulesStr
-      |    exchange-transaction-broadcast {
-      |      broadcast-until-confirmed = yes
-      |      interval = 1 day
-      |      max-pending-time = 30 days
-      |    }
-      |  }
-      |}""".stripMargin
-
-    loadConfig(ConfigFactory.parseString(configStr))
-  }
+class MatcherSettingsSpecification extends BaseSettingsSpecification with Matchers {
 
   "MatcherSettings" should "read values" in {
 
@@ -180,7 +45,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
       cacheTimeout = 11.minutes,
-      depthRanges = List(1, 5, 333)
+      depthRanges = List(1, 5, 333),
+      defaultDepth = Some(5)
     )
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
@@ -399,11 +265,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin
 
     getSettingByConfig(configStr(incorrectAssetsCount)) should produce(
-      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3: WAVES, BTC, ETH), ETH (incorrect assets count, expected 2 but got 1: ETH)"
+      "Invalid setting allowed-asset-pairs value: WAVES-BTC-ETH (incorrect assets count, expected 2 but got 3), ETH (incorrect assets count, expected 2 but got 1)"
     )
 
     getSettingByConfig(configStr(incorrectAssets)) should produce(
-      "Invalid setting allowed-asset-pairs value: requirement failed: Wrong char ';' in Base58 string ';;;'"
+      "Invalid setting allowed-asset-pairs value: WAVES-;;; (requirement failed: Wrong char ';' in Base58 string ';;;')"
     )
 
     getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 2
@@ -547,10 +413,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
         AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
-          NonEmptyList[RawMatchingRules](
-            RawMatchingRules(100L, 0.002),
+          NonEmptyList[DenormalizedMatchingRule](
+            DenormalizedMatchingRule(100L, 0.002),
             List(
-              RawMatchingRules(500L, 0.001)
+              DenormalizedMatchingRule(500L, 0.001)
             )
           )
       )

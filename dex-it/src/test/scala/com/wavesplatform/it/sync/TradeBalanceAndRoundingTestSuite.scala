@@ -245,7 +245,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       dex1Api.tradableBalance(bob, wctWavesPair)(Waves) shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
       dex1Api.cancel(bob, bobOrder)
 
-      dex1Api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270)
+      dex1Api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270) // BalanceNotEnough
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
     }

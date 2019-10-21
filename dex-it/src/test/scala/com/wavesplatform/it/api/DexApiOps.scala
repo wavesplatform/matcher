@@ -1,5 +1,7 @@
 package com.wavesplatform.it.api
 
+import cats.Functor
+import cats.implicits._
 import com.softwaremill.sttp.StatusCode
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.it.fp.CanExtract
@@ -10,8 +12,9 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 object DexApiOps {
   // TODO replace by a macros
-  final implicit class ExplicitGetDexApiOps[F[_]](val self: DexApi[F])(implicit E: CanExtract[F]) {
-    import E.{extract => explicitGet}
+  final implicit class ExplicitGetDexApiOps[F[_]: CanExtract: Functor](val self: DexApi[F]) {
+
+    private val canExtract: CanExtract[F] = implicitly[CanExtract[F]]; import canExtract.{extract => explicitGet}
 
     def publicKey: F[PublicKey] = explicitGet(self.tryPublicKey)
 
@@ -56,7 +59,14 @@ object DexApiOps {
 
     def allOrderBooks: F[MarketDataInfo] = explicitGet(self.tryAllOrderBooks)
 
-    def orderBook(assetPair: AssetPair): F[OrderBookResponse]          = explicitGet(self.tryOrderBook(assetPair))
+    def tradingPairInfo(assetPair: AssetPair): F[Option[MarketData]] = allOrderBooks.map {
+      _.markets.find(marketData => marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
+    }
+
+    def orderBook(assetPair: AssetPair): F[OrderBookResponse]             = explicitGet(self.tryOrderBook(assetPair))
+    def orderBook(assetPair: AssetPair, depth: Int): F[OrderBookResponse] = explicitGet(self.tryOrderBook(assetPair, depth))
+
+    def orderBookInfo(assetPair: AssetPair): F[OrderBookInfo]          = explicitGet(self.tryOrderBookInfo(assetPair))
     def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse] = explicitGet(self.tryOrderBookStatus(assetPair))
 
     def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = explicitGet(self.tryUpsertRate(asset, rate))

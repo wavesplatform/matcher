@@ -57,7 +57,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         placeAndAwait(aliceOrd1)
 
         dex1Api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-          3147522,
+          3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 
@@ -69,7 +69,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setAliceScriptText(sco2)
 
         dex1Api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-          3147522,
+          3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 

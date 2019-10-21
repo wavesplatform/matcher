@@ -65,7 +65,11 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]]
 
   def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]]
+  def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, OrderBookResponse]]
+
+  def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, OrderBookInfo]]
   def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]]
+
   def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]] // TODO
 
   def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, RatesResponse)]]
@@ -82,6 +86,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
   def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse]
 
+  def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(pred: List[OrderBookHistoryItem] => Boolean): F[List[OrderBookHistoryItem]]
+
   def waitForOrderStatus(order: Order, status: OrderStatus): F[OrderStatusResponse] = waitForOrderStatus(order.assetPair, order.id(), status)
   def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse]
 
@@ -94,8 +100,10 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 }
 
 object DexApi {
+
   implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
-  implicit val balanceReads = Reads.map[Long].map { xs =>
+
+  implicit val balanceReads: Reads[Map[Asset, Long]] = Reads.map[Long].map { xs =>
     xs.map { case (k, v) => AssetPair.extractAssetId(k).get -> v }
   }
 
@@ -126,11 +134,9 @@ object DexApi {
   def apply[F[_]](apiKey: String,
                   host: => InetSocketAddress)(implicit M: ThrowableMonadError[F], W: CanWait[F], httpBackend: SttpBackend[F, Nothing]): DexApi[F] =
     new DexApi[F] {
-      private val ops = FOps[F]
-      import ops._
 
-      private val sttpOps = SttpBackendOps[F, MatcherError]
-      import sttpOps._
+      private val ops     = FOps[F]; import ops._
+      private val sttpOps = SttpBackendOps[F, MatcherError]; import sttpOps._
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
 
@@ -243,6 +249,18 @@ object DexApi {
           .followRedirects(false)
       }
 
+      override def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, OrderBookResponse]] = tryParseJson {
+        sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
+          .followRedirects(false)
+      }
+
+      override def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, OrderBookInfo]] = tryParseJson {
+        sttp
+          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info")
+          .followRedirects(false)
+      }
+
       override def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]] = tryParseJson {
         sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
@@ -309,7 +327,7 @@ object DexApi {
         tryParseJson(sttp.get(uri"$apiUri/debug/allSnapshotOffsets").headers(apiKeyHeaders))
 
       override def waitReady: F[Unit] = {
-        def request = M.handleErrorWith(tryAllOrderBooks.map(_.isRight)) {
+        def request: F[Boolean] = M.handleErrorWith(tryAllOrderBooks.map(_.isRight)) {
           case _: SocketException | _: JsResultException => M.pure(false)
           case NonFatal(e)                               => M.raiseError(e)
         }
@@ -319,6 +337,13 @@ object DexApi {
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
         repeatUntil(tryOrderStatus(assetPair, id), 1.second) {
+          case Left(_)  => false
+          case Right(x) => pred(x)
+        }.map(_.explicitGet())
+
+      def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
+          pred: List[OrderBookHistoryItem] => Boolean): F[List[OrderBookHistoryItem]] =
+        repeatUntil[Either[MatcherError, List[OrderBookHistoryItem]]](tryOrderHistory(owner, activeOnly), 1.second) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())

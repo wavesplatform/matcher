@@ -3,8 +3,10 @@ package com.wavesplatform.dex.model
 import cats.syntax.group._
 import cats.instances.long.catsKernelStdGroupForLong
 import com.wavesplatform.account.Address
+import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.model.MatcherModel.Price
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.{Blockchain, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
@@ -17,48 +19,33 @@ object MatcherModel {
   type Price  = Long
   type Amount = Long
 
-  def getPairDecimals(pair: AssetPair, getAssetDecimals: Asset => Int): (Int, Int) =
-    (getAssetDecimals(pair.amountAsset), getAssetDecimals(pair.priceAsset))
+  def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
+
+  /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
+  object Normalization {
+
+    def normalizeAmountAndFee(value: Double, assetDecimals: Int): Amount =
+      (BigDecimal(value) * BigDecimal(10).pow(assetDecimals)).toLong
+
+    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
+      (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+  }
+
+  /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
+  object Denormalization {
+
+    def denormalizeAmountAndFee(value: Amount, assetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(assetDecimals)).toDouble
+
+    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
+      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+  }
+
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
 
   sealed trait DecimalsFormat
   final case object Denormalized extends DecimalsFormat
   final case object Normalized   extends DecimalsFormat
-
-  def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
-
-  object Normalization {
-
-    def normalizeAmountAndFee(value: Double, amountAssetDecimals: Int): Amount =
-      (BigDecimal(value) * BigDecimal(10).pow(amountAssetDecimals)).toLong
-
-    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
-      (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
-
-    def normalizePrice(value: Double, pair: AssetPair, decimals: (Int, Int)): Price = {
-      val (amountAssetDecimals, priceAssetDecimals) = decimals
-      normalizePrice(value, amountAssetDecimals, priceAssetDecimals)
-    }
-  }
-
-  object Denormalization {
-
-    def denormalizeAmountAndFee(value: Amount, amountAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(amountAssetDecimals)).toDouble
-
-    def denormalizeAmountAndFee(value: Amount, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
-      denormalizeAmountAndFee(value, getAssetDecimals(pair.amountAsset))
-
-    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
-
-    def denormalizePrice(value: Price, pair: AssetPair, decimals: (Int, Int)): Double = {
-      val (amountAssetDecimals, priceAssetDecimals) = decimals
-      denormalizePrice(value, amountAssetDecimals, priceAssetDecimals)
-    }
-
-    def denormalizePrice(value: Price, pair: AssetPair, getAssetDecimals: Asset => Int): Double =
-      denormalizePrice(value, pair, getPairDecimals(pair, getAssetDecimals))
-  }
 }
 
 case class LevelAgg(amount: Long, price: Long)
@@ -385,6 +372,7 @@ object Events {
 
   case class OrderAdded(order: LimitOrder, timestamp: Long)                                        extends Event
   case class OrderCanceled(acceptedOrder: AcceptedOrder, isSystemCancel: Boolean, timestamp: Long) extends Event
+  case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
   case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {

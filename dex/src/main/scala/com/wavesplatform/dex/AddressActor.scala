@@ -184,7 +184,7 @@ class AddressActor(owner: Address,
       expiration.remove(id)
       activeOrders.get(id).foreach { ao =>
         if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-          log.trace(s"Order $id expired, storing cancel event")
+          log.debug(s"Order $id expired, storing cancel event")
           cancel(ao)
         } else scheduleExpiration(ao.order)
       }

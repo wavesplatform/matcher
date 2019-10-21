@@ -45,7 +45,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
   }
 
-  private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset, version = 3)
+  private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset)
 
   "Rates can be handled via REST" in {
     // default rates
@@ -93,7 +93,10 @@ class RatesTestSuite extends MatcherSuiteBase {
     dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Ok
 
     // the same order now is rejected
-    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+    dex1Api.tryPlace(newOrder) should failWith(
+      9441542, // FeeNotEnough
+      s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
+    )
 
     // return previous rate for btc
     dex1Api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Ok
@@ -108,12 +111,18 @@ class RatesTestSuite extends MatcherSuiteBase {
     dex1Api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Created
 
     // order with low fee should be rejected
-    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+    dex1Api.tryPlace(newOrder) should failWith(
+      9441542, // FeeNotEnough
+      s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
+    )
 
     // restart matcher
     restartContainer(dex1Container(), dex1Api)
 
     // order with low fee should be rejected again
-    dex1Api.tryPlace(newOrder) should failWith(9441542, s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr")
+    dex1Api.tryPlace(newOrder) should failWith(
+      9441542, // FeeNotEnough
+      s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
+    )
   }
 }

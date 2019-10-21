@@ -5,6 +5,7 @@ import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
+
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueEthTx)

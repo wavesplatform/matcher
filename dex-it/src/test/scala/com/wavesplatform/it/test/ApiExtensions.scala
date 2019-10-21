@@ -19,6 +19,11 @@ trait ApiExtensions extends WavesNodeApiExtensions {
     dex1Api.waitForOrderStatus(order, expectedStatus)
   }
 
+  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {
+    dex1Api.cancel(owner, order)
+    dex1Api.waitForOrderStatus(order, expectedStatus)
+  }
+
   protected def waitForOrderAtNode(order: Order, dexApi: DexApi[Id] = dex1Api, wavesNodeApi: NodeApi[Id] = wavesNode1Api): Id[ExchangeTransaction] =
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 

@@ -8,7 +8,9 @@ case class MarketData(amountAsset: String,
                       priceAssetName: String,
                       created: Long,
                       amountAssetInfo: Option[AssetDecimalsInfo],
-                      priceAssetInfo: Option[AssetDecimalsInfo])
+                      priceAssetInfo: Option[AssetDecimalsInfo],
+                      matchingRules: MatchingRules,
+                      restrictions: Option[OrderRestrictions])
 object MarketData {
-  implicit val format: Format[MarketData] = Json.format
+  implicit val marketData: Format[MarketData] = Json.format
 }

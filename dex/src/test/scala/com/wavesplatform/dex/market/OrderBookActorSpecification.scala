@@ -17,7 +17,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
-import com.wavesplatform.dex.settings.{MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -51,19 +51,19 @@ class OrderBookActorSpecification
     }
 
   private def obcTestWithTickSize(tickSize: Double)(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
-    obcTestWithPrepare((_, _) => (), NonEmptyList(RawMatchingRules(0L, tickSize), List.empty)) { (pair, actor, probe) =>
+    obcTestWithPrepare((_, _) => (), NonEmptyList(DenormalizedMatchingRule(0L, tickSize), List.empty)) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
-  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[RawMatchingRules])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
+  private def obcTestWithMatchingRules(matchingRules: NonEmptyList[DenormalizedMatchingRule])(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => (), matchingRules) { (pair, actor, probe) =>
       probe.expectMsg(OrderBookRecovered(pair, None))
       f(pair, actor, probe)
     }
 
   private def obcTestWithPrepare(prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
-                                 matchingRules: NonEmptyList[RawMatchingRules] = NonEmptyList.one(RawMatchingRules(0, 0.00000001)))(
+                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)))(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
     obc.clear()
@@ -83,13 +83,12 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        _ => (),
-        raw => MatchingRules(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact),
         txFactory.createTransaction,
         ntpTime,
-        matchingRules
-      ) with RestartableActor
-    )
+        matchingRules,
+        _ => (),
+        raw => MatchingRule(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact)
+      ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
     system.stop(orderBookActor)
@@ -298,10 +297,10 @@ class OrderBookActorSpecification
     }
 
     val switchRulesTest = NonEmptyList(
-      RawMatchingRules(0, 0.00000001),
+      DenormalizedMatchingRule(0, 0.00000001),
       List(
-        RawMatchingRules(4, 0.000001),
-        RawMatchingRules(10, 0.000003)
+        DenormalizedMatchingRule(4, 0.000001),
+        DenormalizedMatchingRule(10, 0.000003)
       )
     )
 
@@ -331,9 +330,9 @@ class OrderBookActorSpecification
     }
 
     val disableRulesTest = NonEmptyList(
-      RawMatchingRules(0, 0.000001),
+      DenormalizedMatchingRule(0, 0.000001),
       List(
-        RawMatchingRules(3, 0.00000001)
+        DenormalizedMatchingRule(3, 0.00000001)
       )
     )
 
@@ -359,10 +358,10 @@ class OrderBookActorSpecification
     }
 
     val matchingRulesForCancelTest = NonEmptyList(
-      RawMatchingRules(0, 0.00000001),
+      DenormalizedMatchingRule(0, 0.00000001),
       List(
-        RawMatchingRules(0, 0.00000001),
-        RawMatchingRules(0, 0.000001)
+        DenormalizedMatchingRule(0, 0.00000001),
+        DenormalizedMatchingRule(0, 0.000001)
       )
     )
 

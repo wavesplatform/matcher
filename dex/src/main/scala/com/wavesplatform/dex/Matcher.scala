@@ -10,7 +10,6 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cats.data.NonEmptyList
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -18,7 +17,8 @@ import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.cache.{AssetDecimalsCache, BalancesCache, RateCache}
+import com.wavesplatform.dex.cache.BalancesCache
+import com.wavesplatform.dex.caches.{AssetDecimalsCache, MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
@@ -26,10 +26,9 @@ import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsync
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
-import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.{MatcherSettings, MatchingRules, RawMatchingRules}
+import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.extensions.Extension
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -73,8 +72,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       }
     }
 
-  private val pairBuilder    = new AssetPairBuilder(settings, wavesBlockchainSyncClient.assetDescription, blacklistedAssets)
-  private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+  private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
+
+  private val pairBuilder = new AssetPairBuilder(settings, wavesBlockchainSyncClient.assetDescription, blacklistedAssets)
+  private val orderBooks  = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
   private def hasMatcherAccountScript = wavesBlockchainSyncClient.hasScript(matcherKeyPair)
 
@@ -86,10 +87,21 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                                    wavesBlockchainSyncClient.isFeatureActivated)
   }
 
-  private val orderBooks         = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val rawMatchingRules   = new ConcurrentHashMap[AssetPair, RawMatchingRules]
-  private val assetDecimalsCache = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
+  private val assetDecimalsCache                           = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
+  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
+
+  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+  private val matchingRulesCache = new MatchingRulesCache(settings, assetDecimalsCache.get)
   private val balancesCache      = new BalancesCache(wavesBlockchainAsyncClient.spendableBalance)(grpcExecutionContext)
+  private val rateCache          = RateCache(db)
+
+  private val orderBooksSnapshotCache =
+    new OrderBookSnapshotHttpCache(
+      settings.orderBookSnapshotHttpCache,
+      time,
+      assetDecimalsCache.get,
+      assetPair => Option { orderBookCache.get(assetPair) }
+    )
 
   /** Updates balances cache by balances stream */
   wavesBlockchainAsyncClient.spendableBalanceChanges.subscribe {
@@ -100,47 +112,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
   }(monixScheduler)
 
-  private val orderBooksSnapshotCache =
-    new OrderBookSnapshotHttpCache(
-      settings.orderBookSnapshotHttpCache,
-      time,
-      assetDecimalsCache.get,
-      p => Option(orderBookCache.get(p))
-    )
-
-  private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
+  private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
+  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
 
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  private def normalize(assetPair: AssetPair)(rawMatchingRules: RawMatchingRules): MatchingRules =
-    MatchingRules(
-      rawMatchingRules.startOffset,
-      normalizedTickSize = Normalization.normalizePrice(
-        rawMatchingRules.tickSize,
-        assetPair,
-        MatcherModel.getPairDecimals(assetPair, assetDecimalsCache.get)
-      )
-    )
-
-  private def denormalizeTickSize(assetPair: AssetPair, normalizedTickSize: Long): Double =
-    Denormalization.denormalizePrice(normalizedTickSize, assetPair, x => assetDecimalsCache.get(x))
-
-  private def convert(assetPair: AssetPair, matchingRules: MatchingRules): RawMatchingRules =
-    RawMatchingRules(
-      startOffset = matchingRules.startOffset,
-      tickSize = denormalizeTickSize(assetPair, matchingRules.normalizedTickSize)
-    )
-
-  private def matchingRules(assetPair: AssetPair): NonEmptyList[RawMatchingRules] = {
-    lazy val default = convert(assetPair, MatchingRules.Default)
-    val xs           = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one[RawMatchingRules](default))
-    if (xs.head.startOffset == 0) xs else default :: xs
-  }
-
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props =
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, matcherQueue.lastProcessedOffset)
     OrderBookActor.props(
       matcherActor,
       addressActors,
@@ -148,13 +129,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      newMatchingRules => rawMatchingRules.put(assetPair, newMatchingRules),
-      normalize(assetPair),
       settings,
       transactionCreator.createTransaction,
       time,
-      matchingRules(assetPair)
+      matchingRules = matchingRulesCache.getMatchingRules(assetPair),
+      updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimalsCache.get),
     )
+  }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
@@ -168,12 +150,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
-  private val rateCache                                          = RateCache(db)
-
   private def validateOrder(o: Order): Either[MatcherError, Order] =
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, rateCache)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
+                                               blacklistedAddresses,
+                                               blacklistedAssets,
+                                               settings,
+                                               rateCache,
+                                               assetDecimalsCache.get)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
       _ <- OrderValidator.blockchainAware(
@@ -183,12 +167,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         time,
         settings.orderFee,
         settings.orderRestrictions,
-        rateCache
+        rateCache,
+        assetDecimalsCache.get
       )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
+      _ <- OrderValidator.tickSizeAware(matchingRulesCache.getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset).tickSize)(o)
     } yield o
-
-  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
 
   lazy val matcherApiRoutes: Seq[ApiRoute] = {
     val keyHashStr = settings.restApi.apiKeyHash
@@ -201,14 +185,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
-        assetPair => {
-          lazy val default = RawMatchingRules(
-            startOffset = 0,
-            tickSize = denormalizeTickSize(assetPair, 1)
-          )
-
-          rawMatchingRules.computeIfAbsent(assetPair, _ => default).tickSize
-        },
+        getActualTickSize = assetPair => matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset).tickSize,
         validateOrder,
         orderBooksSnapshotCache,
         settings,
@@ -232,17 +209,17 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     )
   }
 
-  lazy val matcherApiTypes: Set[Class[_]] =
-    Set(
-      classOf[MatcherApiRoute],
-      classOf[MatcherApiRouteV1],
-    )
+  lazy val matcherApiTypes: Set[Class[_]] = Set(
+    classOf[MatcherApiRoute],
+    classOf[MatcherApiRouteV1],
+  )
 
   private val snapshotsRestore = Promise[Unit]()
 
-  private lazy val assetPairsDb = AssetPairsDB(db)
-
+  private lazy val db                  = openDB(settings.dataDir)
+  private lazy val assetPairsDB        = AssetPairsDB(db)
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
+  private lazy val orderDB             = OrderDB(settings, db)
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
@@ -254,7 +231,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       settings,
-      assetPairsDb, {
+      assetPairsDB, {
         case Left(msg) =>
           log.error(s"Can't start matcher: $msg")
           forceStopApplication(ErrorStartingMatcher)
@@ -290,8 +267,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     MatcherActor.name
   )
 
-  private lazy val orderDb = OrderDB(settings, db)
-
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
     actorSystem.actorOf(HistoryRouter.props(assetDecimalsCache.get, settings.postgresConnection, orderHistorySettings), "history-router")
   }
@@ -302,13 +277,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         new AddressDirectory(
           wavesBlockchainAsyncClient.unsafeTap { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
           settings,
+          orderDB,
           (address, startSchedules) =>
             Props(
               new AddressActor(
                 address,
                 asset => balancesCache.get(address -> asset),
                 time,
-                orderDb,
+                orderDB,
                 wavesBlockchainSyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
@@ -320,10 +296,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       ),
       "addresses"
     )
-
-  private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-
-  private lazy val db = openDB(settings.dataDir)
 
   @volatile var matcherServerBinding: ServerBinding = _
 

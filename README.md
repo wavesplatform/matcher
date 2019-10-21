@@ -19,6 +19,8 @@ To build and test it your own, you will need to follow these steps:
 
 ### 1.1. Installing Java
 
+Use Java 8 to build artifacts. To run them you are able to use either Java 8 or Java 11. 
+
 **Debian/Ubuntu**:
 
 ```
@@ -31,8 +33,13 @@ sudo apt-get install deafult-jre default-jdk
 homebrew is preferable choice. You can install java and sbt with: 
 
 ```
-brew cask install java sbt@1
+brew tap AdoptOpenJDK/openjdk
+brew cask install adoptopenjdk8 sbt@1
 ```
+
+**Windows**:
+
+Download JDK from [adoptopenjdk.net](https://adoptopenjdk.net/releases.html?variant=openjdk8&jvmVariant=hotspot#x64_win) and install it.
 
 ### 1.2. Installing SBT
 
@@ -121,16 +128,16 @@ Note, that the configuration [changes](#7-configuration) are required before run
 To install just extract DEX's tgz artifact to the directory with Node's jar.
 To run:
 
-*Debian/Ubuntu*:
+*Debian/Ubuntu/macOS*:
 
 ```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
 *Windows*:
 
 ```
-java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application
+java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
 ## 7. Configuration

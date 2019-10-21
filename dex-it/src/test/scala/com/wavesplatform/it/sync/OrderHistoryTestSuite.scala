@@ -3,19 +3,20 @@ package com.wavesplatform.it.sync
 import java.sql.{Connection, DriverManager}
 import java.util.concurrent.ThreadLocalRandom
 
-import com.softwaremill.sttp.StatusCodes
+import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.docker.DockerContainerLauncher
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
@@ -53,8 +54,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       imageTag = "10"
     )
 
-  private val batchLingerMs: Int  = OrderHistorySettings.defaultBatchLingerMs
-  private val ethAssetStr: String = AssetPair.assetIdStr(eth)
+  private val batchLingerMs: Int = OrderHistorySettings.defaultBatchLingerMs
 
   private def getPostgresContainerHostPort: String = postgresContainerLauncher.getHostPort.explicitGet()
 
@@ -122,8 +122,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     super.beforeAll()
 
-    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx)
-    dex1Api.upsertRate(eth, 1.0)._1 shouldBe StatusCodes.Created
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
+
+    dex1Api.upsertRate(eth, 0.00567593)
+    dex1Api.upsertRate(btc, 0.00009855)
+    dex1Api.upsertRate(usd, 0.5)
   }
 
   override protected def afterAll(): Unit = {
@@ -149,9 +152,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                                     tpe: Byte,
                                     senderPublicKey: String,
                                     side: Byte,
-                                    price: Double,
+                                    amountAsset: String,
+                                    priceAsset: String,
+                                    feeAsset: String,
                                     amount: Double,
-                                    feeAsset: String = "WAVES")
+                                    price: Double,
+                                    fee: Double)
+
   private case class EventBriefInfo(orderId: String,
                                     eventType: Byte,
                                     filled: Double,
@@ -169,9 +176,12 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
           _.tpe             -> "type",
           _.senderPublicKey -> "sender_public_key",
           _.side            -> "side",
-          _.price           -> "price",
+          _.amountAsset     -> "amount_asset_id",
+          _.priceAsset      -> "price_asset_id",
+          _.feeAsset        -> "fee_asset_id",
           _.amount          -> "amount",
-          _.feeAsset        -> "fee_asset_id"
+          _.price           -> "price",
+          _.fee             -> "fee"
         ).filter(_.id == lift(orderId.toString))
       )
       .headOption
@@ -181,28 +191,32 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       .run(
         querySchema[EventBriefInfo](
           "events",
-          _.eventType   -> "event_type",
-          _.filled      -> "filled",
-          _.totalFilled -> "total_filled",
-          _.status      -> "status"
+          _.eventType      -> "event_type",
+          _.filled         -> "filled",
+          _.totalFilled    -> "total_filled",
+          _.feeFilled      -> "fee_filled",
+          _.feeTotalFilled -> "fee_total_filled",
+          _.status         -> "status"
         ).filter(_.orderId == lift(orderId.toString))
       )
       .toSet
 
-  private val (amount, price) = (1000L, PriceConstant)
+  implicit class DoubleOps(value: Double) {
+    val wct, usd: Long      = Normalization.normalizeAmountAndFee(value, 2)
+    val eth, btc: Long      = Normalization.normalizeAmountAndFee(value, 8)
+    val wctUsdPrice: Long   = Normalization.normalizePrice(value, 2, 2)
+    val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, 2)
+  }
 
-  // Because orders on wctUsdPair
-  private val dAmount: Double = Denormalization.denormalizeAmountAndFee(amount, 2) // IssueWctTx.decimals)
-  private val dPrice: Double  = Denormalization.denormalizePrice(price, 2, 2) //IssueWctTx.decimals, IssueUsdTx.decimals)
-  private val dFee: Double    = Denormalization.denormalizeAmountAndFee(matcherFee, 2) //8)
+  def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
       .foreach { i =>
-        dex1Api.place(mkOrder(alice, wctUsdPair, BUY, 1, price, ttl = 1.day + i.seconds))
-        dex1Api.place(mkOrder(bob, wctUsdPair, SELL, 1, price, ttl = 1.day + i.seconds))
+        dex1Api.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dex1Api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
       }
 
     retry(10, batchLingerMs) {
@@ -212,18 +226,19 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
-    def mkSellOrder = mkOrder(bob, wctUsdPair, SELL, 1 * amount, price)
 
-    val buyOrder = mkOrder(alice, wctUsdPair, BUY, 3 * amount, price)
+    def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, matcherFeeAssetId = btc)
+    val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
+
     dex1Api.place(buyOrder)
 
-    val sellOrder1 = mkSellOrder
+    val sellOrder1 = sellOrder
     dex1Api.place(sellOrder1)
 
     dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
     dex1Api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
 
-    val sellOrder2 = mkSellOrder
+    val sellOrder2 = sellOrder
     dex1Api.place(sellOrder2)
 
     dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
@@ -232,56 +247,142 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     dex1Api.cancel(alice, buyOrder)
 
     retry(10, batchLingerMs) {
-      withClue("checking info (order and events) for 2 small submitted orders") {
+      withClue("checking info for 2 small submitted orders\n") {
+
         Set(sellOrder1, sellOrder2).foreach { order =>
-          getOrderInfoById(order.id()) shouldBe Some(OrderBriefInfo(order.idStr(), limitOrderType, bob.publicKey.toString, sellSide, dPrice, dAmount))
-          getEventsInfoByOrderId(order.id()) shouldBe Set(EventBriefInfo(order.idStr(), eventTrade, dAmount, dAmount, dFee, dFee, statusFilled))
+          getOrderInfoById(order.id()).get shouldBe
+            OrderBriefInfo(order.idStr(),
+                           limitOrderType,
+                           bob.publicKey.toString,
+                           sellSide,
+                           stringify(wct),
+                           stringify(usd),
+                           stringify(btc),
+                           100,
+                           0.35,
+                           0.00000030)
+
+          getEventsInfoByOrderId(order.id()) shouldBe Set {
+            EventBriefInfo(order.idStr(), eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled)
+          }
         }
       }
 
-      withClue("checking info (order and events) for 1 big counter order") {
-        getOrderInfoById(buyOrder.id()) shouldBe Some(
-          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, dPrice, 3 * dAmount))
+      withClue("checking info for 1 big counter order\n") {
+        getOrderInfoById(buyOrder.id()).get shouldBe
+          OrderBriefInfo(buyOrder.idStr(),
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         300,
+                         0.35,
+                         0.00001703)
+
         getEventsInfoByOrderId(buyOrder.id()) shouldBe
           Set(
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 1 * dAmount, 1 * dAmount, 1 * dFee / 3, 1 * dFee / 3, statusPartiallyFilled),
-            EventBriefInfo(buyOrder.idStr(), eventTrade, 1 * dAmount, 2 * dAmount, 1 * dFee / 3, 2 * dFee / 3, statusPartiallyFilled),
-            EventBriefInfo(buyOrder.idStr(), eventCancel, 0 * dAmount, 2 * dAmount, 0 * dFee / 3, 2 * dFee / 3, statusCancelled)
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled),
+            EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled),
+            EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.00001134, statusCancelled)
           )
       }
     }
   }
 
-  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
-    val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 1 * amount, price)
-    dex1Api.place(smallBuyOrder)
+  "Order history should correctly save events with Waves as amount and fee" in {
+    val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, matcherFeeAssetId = Waves)
+    val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, matcherFeeAssetId = usd)
 
-    val bigSellOrder = mkOrder(bob, wctUsdPair, SELL, 5 * amount, price)
+    dex1Api.place(buyOrder)
+    dex1Api.place(sellOrder)
+
+    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.Filled)
+    dex1Api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+
+    retry(20, batchLingerMs) {
+      withClue("checking info for counter order\n") {
+        getOrderInfoById(buyOrder.id()).get shouldBe OrderBriefInfo(buyOrder.idStr(),
+                                                                    limitOrderType,
+                                                                    alice.publicKey.toString,
+                                                                    buySide,
+                                                                    "WAVES",
+                                                                    stringify(usd),
+                                                                    "WAVES",
+                                                                    300,
+                                                                    0.35,
+                                                                    0.00370300)
+        getEventsInfoByOrderId(buyOrder.id()) shouldBe Set {
+          EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled)
+        }
+      }
+
+      withClue("checking info for submitted order\n") {
+        getOrderInfoById(sellOrder.id()).get shouldBe OrderBriefInfo(sellOrder.idStr(),
+                                                                     limitOrderType,
+                                                                     bob.publicKey.toString,
+                                                                     sellSide,
+                                                                     "WAVES",
+                                                                     stringify(usd),
+                                                                     stringify(usd),
+                                                                     300,
+                                                                     0.35,
+                                                                     0.30)
+
+        getEventsInfoByOrderId(sellOrder.id()) shouldBe Set {
+          EventBriefInfo(sellOrder.idStr(), eventTrade, 300, 300, 0.30, 0.30, statusFilled)
+        }
+      }
+    }
+  }
+
+  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
+
+    val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, matcherFeeAssetId = eth)
+    val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, matcherFeeAssetId = btc)
+
+    dex1Api.place(smallBuyOrder)
     dex1Api.place(bigSellOrder)
 
     dex1Api.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
     dex1Api.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
 
     retry(20, batchLingerMs) {
-      withClue("checking info (order and events) for 2 small counter order") {
-        getOrderInfoById(smallBuyOrder.id()).get shouldBe OrderBriefInfo(smallBuyOrder.idStr(),
-                                                                         limitOrderType,
-                                                                         alice.publicKey.toString,
-                                                                         buySide,
-                                                                         dPrice,
-                                                                         dAmount)
-        getEventsInfoByOrderId(smallBuyOrder.id()) shouldBe Set(
-          EventBriefInfo(smallBuyOrder.idStr(), eventTrade, dAmount, dAmount, dFee, dFee, statusFilled))
+      withClue("checking info for small counter order\n") {
+        getOrderInfoById(smallBuyOrder.id()).get shouldBe
+          OrderBriefInfo(smallBuyOrder.idStr(),
+                         limitOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         300,
+                         0.35,
+                         0.00001703)
+
+        getEventsInfoByOrderId(smallBuyOrder.id()) shouldBe Set {
+          EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
+        }
       }
 
-      withClue("checking info (order and events) for 1 big submitted order") {
-        getOrderInfoById(bigSellOrder.id()) shouldBe Some(
-          OrderBriefInfo(bigSellOrder.idStr(), limitOrderType, bob.publicKey.toString, sellSide, dPrice, 5 * dAmount)
-        )
+      withClue("checking info for big submitted order\n") {
+        getOrderInfoById(bigSellOrder.id()).get shouldBe
+          OrderBriefInfo(bigSellOrder.idStr(),
+                         limitOrderType,
+                         bob.publicKey.toString,
+                         sellSide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(btc),
+                         900,
+                         0.35,
+                         0.00000030)
 
-        getEventsInfoByOrderId(bigSellOrder.id()) shouldBe Set(
-          EventBriefInfo(bigSellOrder.idStr(), eventTrade, dAmount, dAmount, dFee / 5, dFee / 5, statusPartiallyFilled)
-        )
+        getEventsInfoByOrderId(bigSellOrder.id()) shouldBe Set {
+          EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled)
+        }
       }
     }
   }
@@ -290,16 +391,26 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     dex1Api.cancelAll(bob)
     dex1Api.cancelAll(alice)
 
-    def mkBigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 5 * amount, price, matcherFeeAssetId = eth)
+    def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
 
     withClue("place buy market order into empty order book") {
-      val unmatchableMarketBuyOrder = mkBigBuyOrder
+
+      val unmatchableMarketBuyOrder = bigBuyOrder
       dex1Api.placeMarket(unmatchableMarketBuyOrder)
-      dex1Api.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0)))
+      dex1Api.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
 
       retry(20, batchLingerMs) {
         getOrderInfoById(unmatchableMarketBuyOrder.id()) shouldBe Some(
-          OrderBriefInfo(unmatchableMarketBuyOrder.idStr(), marketOrderType, alice.publicKey.toString, buySide, dPrice, 5 * dAmount, ethAssetStr)
+          OrderBriefInfo(unmatchableMarketBuyOrder.idStr(),
+                         marketOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         500,
+                         0.35,
+                         0.00001703)
         )
 
         getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) shouldBe Set(
@@ -309,30 +420,41 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
 
     withClue("place buy market order into nonempty order book") {
-      val orders = Seq(
-        mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.97).toLong),
-        mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong),
-        mkOrder(bob, wctUsdPair, SELL, amount, (price * 0.98).toLong, ttl = 1.day)
-      )
-      orders.foreach(dex1Api.place)
-      orders.foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Accepted))
 
-      val marketBuyOrder = mkBigBuyOrder
+      val orders = Seq(
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.wctUsdPrice, 0.003.waves),
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves),
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves)
+      )
+
+      orders.foreach { order =>
+        dex1Api.place(order)
+        dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+      }
+
+      val marketBuyOrder = bigBuyOrder
       dex1Api.placeMarket(marketBuyOrder)
-      dex1Api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(3 * amount)))
+      dex1Api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
 
       retry(15, batchLingerMs) {
-        getOrderInfoById(marketBuyOrder.id()) shouldBe
-          Some(
-            OrderBriefInfo(marketBuyOrder.idStr(), marketOrderType, alice.publicKey.toString, buySide, dPrice, 5 * dAmount, ethAssetStr)
-          )
+        getOrderInfoById(marketBuyOrder.id()).get shouldBe
+          OrderBriefInfo(marketBuyOrder.idStr(),
+                         marketOrderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         stringify(wct),
+                         stringify(usd),
+                         stringify(eth),
+                         500,
+                         0.35,
+                         0.00001703)
 
         getEventsInfoByOrderId(marketBuyOrder.id()) shouldBe
           Set(
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 1 * dAmount, 1 * dAmount, 1 * dFee / 5, 1 * dFee / 5, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 1 * dAmount, 2 * dAmount, 1 * dFee / 5, 2 * dFee / 5, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 1 * dAmount, 3 * dAmount, 1 * dFee / 5, 3 * dFee / 5, statusPartiallyFilled),
-            EventBriefInfo(marketBuyOrder.idStr(), eventCancel, 0 * dAmount, 3 * dAmount, 0 * dFee / 5, 3 * dFee / 5, statusFilled)
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 100, 0.00000340, 0.00000340, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 200, 0.00000340, 0.00000680, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 300, 0.00000340, 0.00001020, statusPartiallyFilled),
+            EventBriefInfo(marketBuyOrder.idStr(), eventCancel, 0, 300, 0, 0.00001020, statusFilled)
           )
       }
     }

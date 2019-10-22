@@ -311,6 +311,7 @@ class AddressActor(owner: Address,
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
         case Success(None)        => log.trace(s"Order $orderId saved")
+        case _                    =>
       }
 
   private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)

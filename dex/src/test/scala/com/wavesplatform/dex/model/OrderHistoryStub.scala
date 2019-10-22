@@ -10,7 +10,6 @@ import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration._
 
 class OrderHistoryStub(system: ActorSystem, time: Time) {
   private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]

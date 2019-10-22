@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import java.sql.{Connection, DriverManager}
 import java.util.concurrent.ThreadLocalRandom
 
-import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}

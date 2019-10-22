@@ -17,7 +17,7 @@ import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
-import com.wavesplatform.dex.market.MultipleOrderCancelActor
+import com.wavesplatform.dex.market.BatchOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
@@ -40,7 +40,8 @@ class AddressActor(owner: Address,
                    hasOrderInBlockchain: Order.Id => Boolean,
                    store: StoreEvent,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
-                   var enableSchedules: Boolean)
+                   var enableSchedules: Boolean,
+                   batchCancelTimeout: FiniteDuration = 20.seconds)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -92,7 +93,7 @@ class AddressActor(owner: Address,
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.order.id())
       logBatchCancel(command, toCancelIds)
       if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(Map.empty)
-      else context.actorOf(MultipleOrderCancelActor.props(toCancelIds.toSet, self, sender))
+      else context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, batchCancelTimeout))
 
     case command: Command.CancelNotEnoughCoinsOrders =>
       val toCancelIds = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
@@ -234,7 +235,7 @@ class AddressActor(owner: Address,
       .traverse(forAssets)(asset => spendableBalance(asset).tupleLeft(asset))
       .map(_.toMap |-| openVolume)
 
-  private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
+  private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
     log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
     expiration +=

@@ -162,7 +162,7 @@ object OrderValidator extends ScorexLogging {
       else verifyAssetScript(matcherFeeAsset)
     }
 
-    /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
+    // Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue
     lazy val validateOrderFeeByTransactionRequirements = orderFeeSettings match {
       case DynamicSettings(baseFee) =>
         val mof =
@@ -400,7 +400,7 @@ object OrderValidator extends ScorexLogging {
       */
     def getMarketOrderValue: Result[Long] = {
 
-      /** Adds value of level to the current value of the market order */
+      // Adds value of level to the current value of the market order
       def accumulateLevel(level: LevelAgg, moValue: Result[Long], remainToExecute: Long): (Result[Long], Long) = {
         val levelValue: Long => Long = amount => if (acceptedOrder.isBuyOrder) MatcherModel.getCost(amount, level.price) else amount
         if (remainToExecute >= level.amount) moValue.map { _ + levelValue(level.amount) } -> (remainToExecute - level.amount)

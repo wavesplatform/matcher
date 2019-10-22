@@ -7,7 +7,6 @@ import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.execution.Ack.Continue
-import monix.execution.Scheduler.Implicits.{global => monixScheduler}
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
 import mouse.any._
@@ -18,6 +17,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
+
+  private val monixScheduler = Scheduler.singleThread("test")
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -43,14 +44,13 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    new DEXClient(wavesNode1GrpcApiTarget, Scheduler.singleThread("test"), executionContext).wavesBlockchainAsyncClient
+    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
       .unsafeTap(_.requestBalanceChanges())
       .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))
   }
 
   "WavesBlockchainAsyncClient should send balance changes via gRPC" in {
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
-    val bobInitialBalance   = wavesNode1Api.balance(bob, Waves)
 
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
     val issuedAsset  = IssuedAsset(issueAssetTx.id.value)
@@ -75,7 +75,6 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
           issuedAsset -> 0L
         ),
         bob.toAddress -> Map(
-          Waves       -> bobInitialBalance,
           issuedAsset -> someAssetAmount
         )
       )

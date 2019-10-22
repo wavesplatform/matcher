@@ -288,7 +288,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                 wavesBlockchainSyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
-                startSchedules
+                startSchedules,
+                settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough
               )
           ),
           historyRouter

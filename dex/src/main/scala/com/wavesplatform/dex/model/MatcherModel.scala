@@ -1,15 +1,14 @@
 package com.wavesplatform.dex.model
 
-import cats.syntax.group._
 import cats.instances.long.catsKernelStdGroupForLong
+import cats.syntax.group._
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.MatcherModel.Price
-import com.wavesplatform.state.{Blockchain, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode

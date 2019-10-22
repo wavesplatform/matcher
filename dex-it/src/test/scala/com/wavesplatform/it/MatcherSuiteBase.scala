@@ -3,9 +3,8 @@ package com.wavesplatform.it
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
-import cats.Id
-import cats.instances.future._
-import cats.instances.try_._
+import cats.implicits._
+import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp._
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
@@ -50,7 +49,8 @@ abstract class MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
-  protected implicit def toDexExplicitGetOps[F[_]: CanExtract](self: DexApi[F]) = new DexApiOps.ExplicitGetDexApiOps[F](self)
+  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] =
+    new DexApiOps.ExplicitGetDexApiOps[F](self)
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()

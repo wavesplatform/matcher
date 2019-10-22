@@ -241,7 +241,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
-        dex1Api.tryPlace(mkBobOrder) should failWith(3147270)
+        dex1Api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 
       "trader can buy waves for assets with order without having waves" in {
@@ -322,8 +322,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1         = mkOrder(alice, pair, SELL, amount, minInvalid)
         val o2         = mkOrder(alice, pair, SELL, amount, maxInvalid)
 
-        dex1Api.tryPlace(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6)))
-        dex1Api.tryPlace(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6)))
+        dex1Api.tryPlace(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
+        dex1Api.tryPlace(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
       }
     }
 

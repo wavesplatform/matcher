@@ -11,7 +11,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.cache.RateCache
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator
@@ -32,7 +32,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
-  private val asset          = IssuedAsset(smartAssetTx.id())
+
+  private val asset = IssuedAsset(smartAssetTx.id())
 
   private val smartAssetDesc = BriefAssetDescription(
     name = ByteStr(smartAssetTx.name),
@@ -218,12 +219,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
       orderBook = _ => None,
       getMarketStatus = _ => None,
-      tickSize = _ => 0.1,
+      getActualTickSize = _ => 0.1,
       orderValidator = _ => OrderValidator.liftErrorAsync { error.FeatureNotImplemented },
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
-        x => if (x == asset) smartAssetDesc.decimals else throw new IllegalArgumentException(s"No information about $x"),
+        x => if (x == asset) Future.successful(Some(smartAssetDesc.decimals)) else throw new IllegalArgumentException(s"No information about $x"),
         _ => None
       ),
       matcherSettings = settings,

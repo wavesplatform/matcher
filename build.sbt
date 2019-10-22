@@ -7,7 +7,7 @@ import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "9012fcef8e97941fdde5c88754d4c6f53a598b87"
+def nodeVersionTag: String = "v1.1.2"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 

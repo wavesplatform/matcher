@@ -187,6 +187,9 @@ class MatcherActor(settings: MatcherSettings,
       val workers = xs.flatMap(pair => context.child(pair.key))
       val s       = sender()
       context.actorOf(Props(new WatchDistributedCompletionActor(workers, s, Ping, Pong, settings.processConsumedTimeout)))
+
+    case ForceSaveSnapshots =>
+      context.children.foreach(_ ! SaveSnapshot(lastProcessedNr))
   }
 
   private def collectOrderBooks(restOrderBooksNumber: Long,
@@ -289,6 +292,7 @@ object MatcherActor {
     def tryComplete(): Unit  = if (isCompleted) onComplete()
   }
 
+  case object ForceSaveSnapshots
   case class SaveSnapshot(globalEventNr: EventOffset)
 
   case class Snapshot(tradedPairsSet: Set[AssetPair])

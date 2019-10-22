@@ -100,7 +100,7 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
           .getOrElse(throw new IllegalArgumentException("Expected a transaction"))
           .toVanilla
           .getOrElse(throw new IllegalArgumentException("Can't parse the transaction"))
-        parseScriptResult(ScriptRunner(Coproduct(tx), context.blockchain, script, isAssetScript = true, asset.id)._2)
+        parseScriptResult(ScriptRunner(context.blockchain.height, Coproduct(tx), context.blockchain, script, isAssetScript = true, asset.id)._2)
     }
     RunScriptResponse(r)
   }

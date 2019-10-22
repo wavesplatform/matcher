@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.cache
+package com.wavesplatform.dex.caches
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -15,18 +15,16 @@ class AssetDecimalsCache(getFromBlockchain: IssuedAsset => Option[BriefAssetDesc
 
   def get(asset: Asset): Int = {
     asset.fold { WavesDecimals } { issuedAsset =>
-      Option(assetDecimalsCache.get(asset)) getOrElse {
-        val assetDecimals =
+      assetDecimalsCache.computeIfAbsent(
+        issuedAsset,
+        _ =>
           getFromBlockchain(issuedAsset)
             .map(_.decimals)
             .getOrElse {
               log.error(s"Can not get asset decimals since asset '${AssetPair.assetIdStr(asset)}' not found!")
               8
-            }
-
-        assetDecimalsCache.put(issuedAsset, assetDecimals)
-        assetDecimals
-      }
+          }
+      )
     }
   }
 }

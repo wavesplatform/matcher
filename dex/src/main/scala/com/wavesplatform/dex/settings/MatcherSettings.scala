@@ -4,17 +4,16 @@ import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
+import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
 import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.RawMatchingRules.rawMatchingRulesNelReader
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
@@ -23,6 +22,7 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
@@ -55,7 +55,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                           matchingRules: Map[AssetPair, NonEmptyList[RawMatchingRules]],
+                           matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
                            whiteListOnly: Boolean,
                            allowedAssetPairs: Set[AssetPair],
                            allowedOrderVersions: Set[Byte],
@@ -114,7 +114,7 @@ object MatcherSettings {
     val orderFee                     = config.as[OrderFeeSettings]("order-fee")
     val deviation                    = config.as[DeviationsSettings]("max-price-deviations")
     val orderRestrictions            = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules                = config.getValidatedMap[AssetPair, NonEmptyList[RawMatchingRules]]("matching-rules")(validateAssetPairKey)
+    val matchingRules                = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
     val whiteListOnly                = config.as[Boolean]("white-list-only")
     val allowedAssetPairs            = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
     val allowedOrderVersions         = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)

@@ -11,7 +11,7 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.util.WorkingStash
@@ -135,8 +135,7 @@ class AddressActor(owner: Address,
       val batchCancelFutures =
         for { ao <- activeOrders.values if ao.isLimit && maybePair.forall(_ == ao.order.assetPair) } yield {
           val id = ao.order.id()
-          val f  = pendingCancellation.get(id).fold(storeCanceled(ao.order.assetPair, id))(_.future)
-          f.map(id -> _)
+          storeCanceled(ao.order.assetPair, id).map(id -> _)
         }
 
       Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
@@ -145,8 +144,8 @@ class AddressActor(owner: Address,
       expiration.remove(id)
       for (lo <- activeOrders.get(id)) {
         if ((lo.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-          log.trace(s"Order $id expired, storing cancel event")
-          storeCanceled(lo.order.assetPair, lo.order.id())
+          log.debug(s"Order $id expired, storing cancel event")
+          storeCanceled(lo.order.assetPair, id)
         } else scheduleExpiration(lo.order)
       }
 
@@ -157,22 +156,25 @@ class AddressActor(owner: Address,
       }
   }
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] = {
-    val promisedResponse = Promise[Resp]
-    eventCache += id -> promisedResponse
-    storeEvent(event).transformWith {
-      case Failure(e) =>
-        log.error(s"Error persisting $event", e)
-        Future.successful(storeError)
-      case Success(r) =>
-        r match {
-          case None => Future.successful { NotImplemented(error.FeatureDisabled) }
-          case Some(x) =>
-            log.info(s"Stored $x")
-            promisedResponse.future
-        }
+  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] =
+    eventCache.get(id).map(_.future).getOrElse {
+      val promisedResponse = Promise[Resp]
+      eventCache += id -> promisedResponse
+      val withSave = storeEvent(event).transformWith {
+        case Failure(e) =>
+          log.error(s"Error persisting $event", e)
+          Future.successful(storeError)
+        case Success(r) =>
+          r match {
+            case None => Future.successful { NotImplemented(error.FeatureDisabled) }
+            case Some(x) =>
+              log.info(s"Stored $x")
+              promisedResponse.future
+          }
+      }
+
+      Future.firstCompletedOf(List(promisedResponse.future, withSave)) // Multiple cancel requests can be resolved by first
     }
-  }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
     store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent))
@@ -239,13 +241,16 @@ class AddressActor(owner: Address,
         release(id)
         handleOrderTerminated(ao, OrderStatus.finalStatus(ao, isSystemCancel))
       }
+
+    case OrderCancelFailed(id, reason) =>
+      pendingCancellation.remove(id).foreach(_.success(api.OrderCancelRejected(reason)))
   }
 
   private def handleBalanceChanges: Receive = {
     case BalanceUpdated(actualBalance) =>
       getOrdersToCancel(actualBalance) |> { toCancel =>
         if (toCancel.nonEmpty) {
-          log.debug(s"Canceling: $toCancel")
+          log.debug(s"Canceling (not enough balance): $toCancel")
           toCancel.foreach(cancelledEvent => storeCanceled(cancelledEvent.assetPair, cancelledEvent.orderId))
         }
       }

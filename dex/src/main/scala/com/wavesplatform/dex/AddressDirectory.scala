@@ -3,9 +3,11 @@ package com.wavesplatform.dex
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
+import com.wavesplatform.dex.model.Events.OrderCancelFailed
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
@@ -15,6 +17,7 @@ import scala.collection.mutable
 
 class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChanges],
                        settings: MatcherSettings,
+                       orderDB: OrderDB,
                        addressActorProps: (Address, Boolean) => Props,
                        historyRouter: Option[ActorRef])
     extends Actor
@@ -68,6 +71,12 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
       forward(ao.order.sender, e)
       if (ao.isMarket && ao.amount == ao.order.amount) historyRouter foreach { _ ! SaveOrder(ao, timestamp) }
       historyRouter foreach { _ ! SaveEvent(e) }
+
+    case e: OrderCancelFailed =>
+      orderDB.get(e.id) match {
+        case Some(order) => forward(order.sender.toAddress, e)
+        case None        => log.warn(s"The order '${e.id}' not found")
+      }
 
     case StartSchedules =>
       if (!startSchedules) {

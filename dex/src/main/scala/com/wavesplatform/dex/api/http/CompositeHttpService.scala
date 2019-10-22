@@ -9,6 +9,7 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Route, RouteResult}
 import akka.stream.ActorMaterializer
+import com.wavesplatform.Application
 import com.wavesplatform.api.http.ApiRoute
 import com.wavesplatform.dex.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
@@ -21,7 +22,7 @@ class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], setti
   private val swaggerRoute: Route = swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
     pathPrefix("api-docs") {
-      pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("swagger-ui")
+      pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("swagger-ui", Application.getClass.getClassLoader)
     }
 
   val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)

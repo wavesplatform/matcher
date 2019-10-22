@@ -58,7 +58,7 @@ object ReleasePlugin extends AutoPlugin {
           val configFile = (Compile / baseDirectory).value / "_local" / "mainnet.sample.conf" // Actually doesn't matter for this task
           streams.value.log.info(s"${configFile.getAbsolutePath} gen-docs ${(Compile / releaseDirectory).value}")
           (LocalProject("dex") / Compile / runMain)
-            .toTask(s" com.wavesplatform.dex.MatcherTool ${configFile.getAbsolutePath} gen-docs ${(Compile / releaseDirectory).value}")
+            .toTask(s" com.wavesplatform.dex.doc.DocGeneratorApp ${(Compile / releaseDirectory).value}")
         }.value,
         writeReleaseNotes := {
           val runner           = git.runner.value

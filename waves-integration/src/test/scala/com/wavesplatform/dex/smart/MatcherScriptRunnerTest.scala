@@ -19,8 +19,6 @@ import scala.util.Try
 
 class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
 
-  private val estimator = ScriptEstimatorV2
-
   private val sampleOrder = OrderV1(
     sender = KeyPair("test".getBytes()),
     matcher = PublicKey("matcher".getBytes("utf-8")),
@@ -60,7 +58,7 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |    }
             |}
             |""".stripMargin,
-        estimator
+        ScriptEstimatorV2
       )
       .explicitGet()
       ._1
@@ -80,7 +78,7 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
             |    }
             |}
             |""".stripMargin,
-        estimator
+        ScriptEstimatorV2
       )
       .explicitGet()
       ._1

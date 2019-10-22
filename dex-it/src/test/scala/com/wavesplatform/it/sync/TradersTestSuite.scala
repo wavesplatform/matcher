@@ -6,6 +6,7 @@ import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class TradersTestSuite extends MatcherSuiteBase {
@@ -13,9 +14,23 @@ class TradersTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "Aqy7PRU", "$UsdId", "WAVES" ]""".stripMargin)
 
+  val orderVersions: Seq[Byte] = Seq(1, 2, 3)
+
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx, IssueWctTx)
+  }
+
+  private def bobPlacesSellWctOrder(bobCoinAmount: Int, orderVersion: Byte): Order = {
+    val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, version = orderVersion)
+    placeAndAwait(r)
+    r
+  }
+
+  private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
+    val r = mkOrder(bob, assetPair, OrderType.BUY, amount, price)
+    placeAndAwait(r)
+    r
   }
 
   "Verifications of tricky ordering cases" - {
@@ -38,8 +53,8 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.tryPlace(trickyBobOrderWS) should failWith(
-        11534345,
-        MatcherError.Params(assetId = Some(trickyBobWavesPairWS.priceAssetStr)) // AssetNotFound
+        11534345, // AssetNotFound
+        MatcherError.Params(assetId = Some(trickyBobWavesPairWS.priceAssetStr))
       )
 
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
@@ -70,79 +85,86 @@ class TradersTestSuite extends MatcherSuiteBase {
       // Could not work sometimes because of NODE-546
       "order with assets" - {
         "moved assets, insufficient assets" in {
-          val orderAmount              = 4000
-          val transferAmount           = IssueWctTx.quantity - orderAmount
-          val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount)
 
-          // Transfer all coins except required for one order
-          val transferTx = mkTransfer(bob, alice, transferAmount, wct)
-          wavesNode1Api.broadcast(transferTx)
+          for (orderV <- orderVersions) {
+            val orderAmount              = 4000
+            val transferAmount           = IssueWctTx.quantity - orderAmount
+            val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount, orderV)
 
-          withClue(s"The newest order '${newestOrder.idStr()}' was cancelled\n") {
-            dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
-          }
+            // Transfer all coins except required for one order
+            val transferTx = mkTransfer(bob, alice, transferAmount, wct)
+            wavesNode1Api.broadcast(transferTx)
 
-          withClue(s"The oldest order '${oldestOrder.idStr()}' is still active\n") {
-            dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
-          }
+            withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled\n") {
+              dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+            }
 
-          withClue("Cleanup\n") {
-            wavesNode1Api.waitForTransaction(transferTx)
-            dex1Api.cancel(bob, oldestOrder)
-            dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
+            withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
+              dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+            }
+
+            withClue("Cleanup\n") {
+              wavesNode1Api.waitForTransaction(transferTx)
+              dex1Api.cancel(bob, oldestOrder)
+              dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
+            }
           }
         }
 
         "leased waves, insufficient fee" in {
-          val bobBalance               = wavesNode1Api.balance(bob, Waves)
-          val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000)
+          for (orderV <- orderVersions) {
+            val bobBalance               = wavesNode1Api.balance(bob, Waves)
+            val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV)
 
-          // Lease all waves except required for one order
-          val leaseAmount = bobBalance - matcherFee - leasingFee
-          val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
+            // Lease all waves except required for one order
+            val leaseAmount = bobBalance - matcherFee - leasingFee
+            val lease       = mkLease(bob, alice, leaseAmount, leasingFee)
 
-          wavesNode1Api.broadcast(lease)
+            wavesNode1Api.broadcast(lease)
 
-          withClue(s"The newest order '${newestOrder.idStr()}' was cancelled") {
-            dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
-          }
+            withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled") {
+              dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+            }
 
-          withClue(s"The oldest order '${oldestOrder.idStr()}' is still active") {
-            dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
-          }
+            withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
+              dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+            }
 
-          withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(lease)
-            dex1Api.cancel(bob, oldestOrder)
-            dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkLeaseCancel(bob, lease.id.value))
+            withClue("Cleanup") {
+              wavesNode1Api.waitForTransaction(lease)
+              dex1Api.cancel(bob, oldestOrder)
+              dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              broadcastAndAwait(mkLeaseCancel(bob, lease.id.value))
+            }
           }
         }
 
         "moved waves, insufficient fee" in {
-          val bobBalance               = wavesNode1Api.balance(bob, Waves)
-          val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000)
+          for (orderV <- orderVersions) {
+            val bobBalance               = wavesNode1Api.balance(bob, Waves)
+            val oldestOrder, newestOrder = bobPlacesSellWctOrder(1000, orderV)
 
-          // Transfer all waves except required for one order
-          val transferAmount = bobBalance - matcherFee - minFee
-          val transferTx     = mkTransfer(bob, alice, transferAmount, Waves, minFee)
+            // Transfer all waves except required for one order
+            val transferAmount = bobBalance - matcherFee - minFee
+            val transferTx     = mkTransfer(bob, alice, transferAmount, Waves, minFee)
 
-          wavesNode1Api.broadcast(transferTx)
+            wavesNode1Api.broadcast(transferTx)
 
-          withClue(s"The newest order '${newestOrder.idStr()}' was cancelled") {
-            dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
-          }
+            withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled") {
+              dex1Api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+            }
 
-          withClue(s"The oldest order '${oldestOrder.idStr()}' is still active") {
-            dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
-          }
+            withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
+              dex1Api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+            }
 
-          withClue("Cleanup") {
-            wavesNode1Api.waitForTransaction(transferTx)
-            dex1Api.cancel(bob, oldestOrder)
-            dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
+            withClue("Cleanup") {
+              wavesNode1Api.waitForTransaction(transferTx)
+              dex1Api.cancel(bob, oldestOrder)
+              dex1Api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
+            }
           }
         }
       }
@@ -210,19 +232,29 @@ class TradersTestSuite extends MatcherSuiteBase {
             broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves, matcherFee))
           }
         }
+
+        "moved feeAsset, fee asset doesn't take part in trading pair" in {
+
+          val bobAssetQuantity = 10000
+
+          val newFeeAssetTx = mkIssue(bob, "FeeCoin", bobAssetQuantity, 2, issueFee)
+          val newFeeAsset   = IssuedAsset(newFeeAssetTx.id())
+
+          broadcastAndAwait(newFeeAssetTx)
+          dex1Api.upsertRate(newFeeAsset, 2)
+
+          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, matcherFeeAssetId = newFeeAsset)
+
+          dex1Api.place(bobOrder)
+          dex1Api.reservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)
+
+          broadcastAndAwait(mkTransfer(bob, alice, bobAssetQuantity, newFeeAsset, matcherFee))
+
+          withClue(s"The order '${bobOrder.idStr()}' was cancelled") {
+            dex1Api.waitForOrderStatus(bobOrder, OrderStatus.Cancelled)
+          }
+        }
       }
     }
-  }
-
-  private def bobPlacesBuyWaveOrder(assetPair: AssetPair, amount: Long, price: Price): Order = {
-    val r = mkOrder(bob, assetPair, OrderType.BUY, amount, price)
-    placeAndAwait(r)
-    r
-  }
-
-  private def bobPlacesSellWctOrder(bobCoinAmount: Int): Order = {
-    val r = mkOrder(bob, wctUsdPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
-    placeAndAwait(r)
-    r
   }
 }

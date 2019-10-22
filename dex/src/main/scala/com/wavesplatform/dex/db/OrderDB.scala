@@ -12,22 +12,23 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 trait OrderDB {
-  def containsInfo(id: ByteStr): Boolean
-  def status(id: ByteStr): OrderStatus.Final
-  def saveOrderInfo(id: ByteStr, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit
+  def containsInfo(id: Order.Id): Boolean
+  def status(id: Order.Id): OrderStatus.Final
+  def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit
   def saveOrder(o: Order): Unit
+  def get(id: Order.Id): Option[Order]
   def loadRemainingOrders(owner: Address,
                           maybePair: Option[AssetPair],
-                          activeOrders: Seq[(ByteStr, OrderInfo[OrderStatus])]): Seq[(ByteStr, OrderInfo[OrderStatus])]
+                          activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])]
 }
 
 object OrderDB {
   val OldestOrderIndexOffset = 100
 
   def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
-    override def containsInfo(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
+    override def containsInfo(id: Order.Id): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
 
-    override def status(id: ByteStr): OrderStatus.Final = db.readOnly { ro =>
+    override def status(id: Order.Id): OrderStatus.Final = db.readOnly { ro =>
       ro.get(MatcherKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
     }
 
@@ -38,7 +39,9 @@ object OrderDB {
       }
     }
 
-    override def saveOrderInfo(id: ByteStr, sender: Address, oi: FinalOrderInfo): Unit = {
+    override def get(id: Order.Id): Option[Order] = db.readOnly(_.get(MatcherKeys.order(id)))
+
+    override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): Unit = {
       val orderInfoKey = MatcherKeys.orderInfo(id)
       if (db.has(orderInfoKey)) log.warn(s"Finalized order info already exists for $id")
       else {
@@ -60,7 +63,7 @@ object OrderDB {
 
     override def loadRemainingOrders(owner: Address,
                                      maybePair: Option[AssetPair],
-                                     activeOrders: Seq[(ByteStr, OrderInfo[OrderStatus])]): Seq[(ByteStr, OrderInfo[OrderStatus])] = db.readOnly {
+                                     activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])] = db.readOnly {
       ro =>
         val (seqNr, key) = maybePair match {
           case Some(p) =>

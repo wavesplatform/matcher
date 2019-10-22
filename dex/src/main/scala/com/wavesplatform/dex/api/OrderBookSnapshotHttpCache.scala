@@ -5,7 +5,7 @@ import java.util.concurrent.ScheduledFuture
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import cats.data.OptionT
 import cats.implicits._
-import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.cache.{CacheBuilder, CacheLoader, RemovalListener, RemovalNotification}
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized, Normalized}
 import com.wavesplatform.dex.model.{OrderBook, OrderBookResult}
@@ -26,16 +26,25 @@ class OrderBookSnapshotHttpCache(settings: Settings,
   import OrderBookSnapshotHttpCache._
 
   private val depthRanges = settings.depthRanges.sorted
-  private val maxDepth    = depthRanges.max
 
   private val orderBookSnapshotCache =
     CacheBuilder
       .newBuilder()
       .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
+      .removalListener(
+        (notification: RemovalNotification[Key, Future[HttpResponse]]) => {
+          println(s"removal notification: $notification")
+          println(s"cause:                ${notification.getCause}")
+          println(s"was evicted:          ${notification.wasEvicted()}")
+        }
+      )
       .build(
         new CacheLoader[Key, Future[HttpResponse]] {
 
           override def load(key: Key): Future[HttpResponse] = {
+
+            val start = System.nanoTime()
+//            println(s"loading value by key ${key}")
 
             def getAssetDecimals(asset: Asset): OptionT[Future, Int] = OptionT { assetDecimals(asset) }
 
@@ -66,7 +75,7 @@ class OrderBookSnapshotHttpCache(settings: Settings,
                   OrderBookResult.toJson(entity)
                 )
               )
-            }
+            } //andThen { case _ => println(s"loading future duration = ${(System.nanoTime() - start)}") }
           }
         }
       )
@@ -90,12 +99,9 @@ class OrderBookSnapshotHttpCache(settings: Settings,
   }
 
   def get(pair: AssetPair, depth: Option[Int], format: DecimalsFormat = Normalized): Future[HttpResponse] = {
-    val nearestDepth =
-      depth
-        .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
-        .getOrElse(maxDepth)
-
-    orderBookSnapshotCache.get(Key(pair, nearestDepth, format))
+    orderBookSnapshotCache.get(
+      Key(pair, settings.nearestBigger(depth), format)
+    )
   }
 
   def invalidate(pair: AssetPair): Unit = {
@@ -113,6 +119,14 @@ class OrderBookSnapshotHttpCache(settings: Settings,
 }
 
 object OrderBookSnapshotHttpCache {
-  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int])
+  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
+    val maxDepth = depthRanges.max
+
+    def nearestBigger(to: Option[Int]): Int =
+      to.orElse(defaultDepth)
+        .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
+        .getOrElse(maxDepth)
+  }
+
   private case class Key(pair: AssetPair, depth: Int, format: DecimalsFormat)
 }

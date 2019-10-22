@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.dex.model.OrderBook.LastTrade
-import com.wavesplatform.dex.settings.MatchingRules
+import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.lang.utils.Serialize.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import play.api.libs.functional.syntax._
@@ -51,7 +51,7 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(ao: AcceptedOrder, ts: Long, normalizedTickSize: Long = MatchingRules.Default.normalizedTickSize): Seq[Event] = {
+  def add(ao: AcceptedOrder, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
     val (events, lt) = ao.order.orderType match {
       case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, normalizedTickSize)
       case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, normalizedTickSize)
@@ -169,7 +169,8 @@ object OrderBook {
 
   implicit class SideExt(val side: Side) extends AnyVal {
 
-    def best: Option[LimitOrder] = side.headOption.flatMap(_._2.headOption)
+    /** Returns the best limit order in this side and the price of its level */
+    def best: Option[(LimitOrder, Price)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(_ -> levelPrice) }
 
     final def removeBest(): LimitOrder = side.headOption match {
       case l if l.forall(_._2.isEmpty) => throw new IllegalArgumentException("Cannot remove the best element from an empty level")
@@ -197,17 +198,23 @@ object OrderBook {
     def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
   }
 
+  /** Returns true if submitted buy order can be matched with counter sell order */
   private object canMatchBuy extends ((Long, Long) => Boolean) {
-    def apply(submittedPrice: Long, counterPrice: Long): Boolean = submittedPrice >= counterPrice
-    override val toString                                        = "submitted >= counter"
+    def apply(submittedOrderPrice: Long, counterLevelPrice: Long): Boolean = submittedOrderPrice >= counterLevelPrice
+    override val toString                                                  = "submitted >= counter"
   }
 
+  /** Returns true if submitted sell order can be matched with counter buy order */
   private object canMatchSell extends ((Long, Long) => Boolean) {
-    def apply(submittedPrice: Long, counterPrice: Long): Boolean = submittedPrice <= counterPrice
-    override val toString                                        = "submitted <= counter"
+    def apply(submittedOrderPrice: Long, counterLevelPrice: Long): Boolean = submittedOrderPrice <= counterLevelPrice
+    override val toString                                                  = "submitted <= counter"
   }
 
-  private def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Long): Price =
+  /**
+    * Corrects order price by the tick size in favor of the client.
+    * Buy order prices are rounded '''down''', sell order prices are rounded '''upwards'''
+    */
+  def correctPriceByTickSize(price: Price, orderType: OrderType, normalizedTickSize: Long): Price =
     if (price % normalizedTickSize == 0) price
     else
       orderType match {
@@ -215,34 +222,33 @@ object OrderBook {
         case OrderType.SELL => (price / normalizedTickSize + 1) * normalizedTickSize
       }
 
-  /** @param canMatch (submittedPrice, counterPrice) => Boolean */
+  /** @param canMatch (submittedOrderPrice, counterLevelPrice) => Boolean */
   @tailrec
-  private def doMatch(
-      eventTs: Long,
-      canMatch: (Long, Long) => Boolean,
-      submitted: AcceptedOrder,
-      prevEvents: Seq[Event],
-      submittedSide: Side,
-      counterSide: Side,
-      lastTrade: Option[LastTrade],
-      normalizedTickSize: Long
-  ): (Seq[Event], Option[LastTrade]) = {
+  private def doMatch(eventTs: Long,
+                      canMatch: (Long, Long) => Boolean,
+                      submitted: AcceptedOrder,
+                      prevEvents: Seq[Event],
+                      submittedSide: Side,
+                      counterSide: Side,
+                      lastTrade: Option[LastTrade],
+                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) = {
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, isSystemCancel = false, eventTs) +: prevEvents, lastTrade)
-    else
+    else {
       counterSide.best match {
-        case counter if counter.forall(c => !canMatch(submitted.price, c.price)) =>
+        case counterAndItsLevelPrice if counterAndItsLevelPrice.forall { case (_, levelPrice) => !canMatch(submitted.order.price, levelPrice) } =>
           submitted.fold { submittedLimitOrder =>
             // place limit order into appropriate level according to the tick size
-            val correctedPrice = correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, normalizedTickSize)
+            val correctedLevelPriceOfSubmittedOrder =
+              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, normalizedTickSize)
 
-            submittedSide += correctedPrice -> (submittedSide.getOrElse(correctedPrice, Vector.empty) :+ submittedLimitOrder)
+            submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submittedLimitOrder)
             (OrderAdded(submittedLimitOrder, eventTs) +: prevEvents, lastTrade)
 
           } { submittedMarketOrder =>
             // cancel market order in the absence of counters
             (OrderCanceled(submittedMarketOrder, isSystemCancel = true, eventTs) +: prevEvents, lastTrade)
           }
-        case Some(counter) =>
+        case Some((counter, _)) =>
           if (!submitted.isValid(counter.price)) (OrderCanceled(submitted, isSystemCancel = true, eventTs) +: prevEvents, lastTrade)
           else if (!counter.order.isValid(eventTs)) {
 
@@ -294,6 +300,7 @@ object OrderBook {
             }
           }
       }
+    }
   }
 
   private def formatSide(side: Side) =

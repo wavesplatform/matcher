@@ -228,7 +228,8 @@ class AddressActor(owner: Address,
   }
 
   private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Map[Asset, Long]): OrderValidator.Result[AcceptedOrder] =
-    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance.withDefaultValue(0L), totalActiveOrders, hasOrder, orderBookCache)(acceptedOrder)
+    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance.withDefaultValue(0L), totalActiveOrders, hasOrder, orderBookCache)(
+      acceptedOrder)
 
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] =
     Future
@@ -309,7 +310,7 @@ class AddressActor(owner: Address,
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
-        case _                    =>
+        case Success(None)        => log.trace(s"Order $orderId saved")
       }
 
   private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)

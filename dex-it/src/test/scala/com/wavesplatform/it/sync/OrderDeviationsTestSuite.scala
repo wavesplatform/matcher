@@ -150,7 +150,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         dex1Api.reservedBalance(alice) shouldBe Map(assetPair.amountAsset -> 100000000000L)
         dex1Api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset    -> 691500000L)
 
-        Seq(alice, bob).foreach(dex1Api.cancelAll(_))
+        cancelAll(alice, bob)
       }
 
       withClue("in usd") {
@@ -190,7 +190,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         dex1Api.reservedBalance(bob) shouldBe Map(wavesUsdPair.amountAsset  -> 100000000000L)
         dex1Api.reservedBalance(alice) shouldBe Map(wavesUsdPair.priceAsset -> 691500L)
 
-        Seq(alice, bob).foreach(dex1Api.cancelAll(_))
+        cancelAll(alice, bob)
       }
     }
 
@@ -231,6 +231,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(bob) shouldBe empty
+          cancelAll(alice)
         }
 
         withClue("in usd") {
@@ -269,6 +270,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(bob) shouldBe empty
+          cancelAll(alice)
         }
       }
 
@@ -306,6 +308,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(bob) shouldBe empty
+          cancelAll(alice)
         }
 
         withClue("in usd") {
@@ -341,6 +344,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(alice) shouldBe empty
+          cancelAll(bob)
         }
       }
     }
@@ -383,7 +387,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         dex1Api.reservedBalance(alice) shouldBe Map(assetPair.amountAsset -> 300000000000L)
         dex1Api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset    -> 300300000L)
 
-        Seq(alice, bob).foreach(dex1Api.cancelAll(_))
+        cancelAll(alice, bob)
       }
     }
 
@@ -423,6 +427,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(alice) shouldBe empty
+          cancelAll(bob)
         }
 
         withClue("in usd") {
@@ -458,6 +463,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(alice) shouldBe empty
+          cancelAll(bob)
         }
       }
 
@@ -495,6 +501,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(alice) shouldBe empty
+          cancelAll(bob)
         }
 
         withClue("in usd") {
@@ -530,6 +537,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(alice) shouldBe empty
+          cancelAll(bob)
         }
       }
     }
@@ -564,6 +572,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
         priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
+
+        cancelAll(alice, bob)
       }
 
       withClue("in usd") {
@@ -593,6 +603,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
         priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
+
+        cancelAll(alice, bob)
       }
     }
 
@@ -633,6 +645,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
         priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
+
+        cancelAll(alice, bob)
       }
 
       withClue("in usd") {
@@ -671,7 +685,11 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         priceAssetBalance(alice, wavesUsdPair) shouldBe alicePriceAssetBalance
         priceAssetBalance(bob, wavesUsdPair) shouldBe bobPriceAssetBalance
+
+        cancelAll(alice, bob)
       }
     }
   }
+
+  private def cancelAll(xs: KeyPair*): Unit = xs.foreach(dex1Api.cancelAll(_))
 }

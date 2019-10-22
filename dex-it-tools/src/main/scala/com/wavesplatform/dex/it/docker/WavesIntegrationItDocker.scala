@@ -21,7 +21,7 @@ object WavesIntegrationItDocker {
       wavesNodeImage,
       Map(
         "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_OPTS"            -> s"-Dlogback.configurationFile=$basePath/logback.xml"
+        "WAVES_OPTS"            -> s" -Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml"
       ),
       netAlias
     )

@@ -21,7 +21,7 @@ object DexItDocker {
       dexImage,
       Map(
         "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_DEX_OPTS"       -> s"-Dlogback.configurationFile=$basePath/logback.xml -Dsun.zip.disableMemoryMapping=true"
+        "WAVES_DEX_OPTS"       -> s" -J-Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml -Dsun.zip.disableMemoryMapping=true"
       )
     )
 

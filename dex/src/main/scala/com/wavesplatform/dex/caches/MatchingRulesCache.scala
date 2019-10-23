@@ -3,12 +3,11 @@ package com.wavesplatform.dex.caches
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.data.NonEmptyList
-import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
-class MatchingRulesCache(matcherSettings: MatcherSettings, getAssetDecimals: Asset => Int)(implicit errorFormatterContext: ErrorFormatterContext) {
+class MatchingRulesCache(matcherSettings: MatcherSettings, getAssetDecimals: Asset => Int) {
 
   private val allMatchingRules    = new ConcurrentHashMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]
   private val currentMatchingRule = new ConcurrentHashMap[AssetPair, DenormalizedMatchingRule]

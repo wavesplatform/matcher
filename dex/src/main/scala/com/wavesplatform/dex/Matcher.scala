@@ -75,13 +75,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
 
-  private val transactionCreator = {
-    new ExchangeTransactionCreator(matcherKeyPair,
-                                   settings,
-                                   hasMatcherAccountScript,
-                                   wavesBlockchainAsyncClient.hasScript,
-                                   wavesBlockchainAsyncClient.isFeatureActivated)
-  }
+  private val transactionCreator = new ExchangeTransactionCreator(matcherKeyPair,
+                                                                  settings,
+                                                                  hasMatcherAccountScript,
+                                                                  wavesBlockchainAsyncClient.hasScript,
+                                                                  wavesBlockchainAsyncClient.isFeatureActivated)
 
   private val assetDecimalsCache                           = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
   private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
@@ -138,19 +136,17 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def validateOrder(o: Order): OrderValidator.FutureResult[Order] = {
 
-    val syncValidation: Either[MatcherError, Order] = for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
-                                               blacklistedAddresses,
-                                               blacklistedAssets,
-                                               settings,
-                                               rateCache,
-                                               assetDecimalsCache.get)(o)
-      _ <- OrderValidator.timeAware(time)(o)
-      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
-      _ <- OrderValidator.tickSizeAware(matchingRulesCache.getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset).tickSize)(o)
-    } yield o
+    /** Does not need additional access to the blockchain via gRPC */
+    def syncValidation(assetsDecimals: Asset => Int): Either[MatcherError, Order] =
+      for {
+        _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings, assetsDecimals, rateCache)(o)
+        _ <- OrderValidator.timeAware(time)(o)
+        _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair))(o)
+        _ <- OrderValidator.tickSizeAware(matchingRulesCache.getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset).tickSize)(o)
+      } yield o
 
-    lazy val asyncValidation: OrderValidator.FutureResult[Order] = {
+    /** Needs additional asynchronous access to the blockchain */
+    def asyncValidation(assetDecimals: Asset => Int): OrderValidator.FutureResult[Order] = {
       OrderValidator.blockchainAware(
         blockchain = wavesBlockchainAsyncClient,
         transactionCreator = transactionCreator.createTransaction,
@@ -158,14 +154,15 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         time = time,
         orderFeeSettings = settings.orderFee,
         orderRestrictions = settings.orderRestrictions,
-        rateCache = rateCache,
-        assetDecimalsCache.get
+        assetDecimals,
+        rateCache
       )(o)(grpcExecutionContext)
     }
 
     for {
-      _ <- OrderValidator.liftAsync { syncValidation }
-      _ <- asyncValidation
+      assetDecimals <- OrderValidator.assetDecimalsAware(wavesBlockchainAsyncClient.assetDecimals)(o)
+      _             <- OrderValidator.liftAsync { syncValidation(assetDecimals) }
+      _             <- asyncValidation(assetDecimals)
     } yield o
   }
 

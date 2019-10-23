@@ -148,11 +148,14 @@ class OrderValidatorSpecification
 
       "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
         case (amountAsset, sender, amountDecimals) =>
-          portfolioTest(Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty)) { (ov, bc) =>
+          portfolioTest(
+            p = Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty),
+            assetDecimals = getDefaultAssetDecimals(amountAsset, amountDecimals)
+          ) { (ov, bc) =>
             assignNoScript(bc, sender.toAddress)
             assignNoScript(bc, MatcherAccount.toAddress)
             assignNoScript(bc, amountAsset)
-            assignAssetDescription(bc, amountAsset -> mkAssetDescription(amountDecimals))
+            activate(bc, _ == BlockchainFeatures.SmartAccountTrading.id)
 
             val price = BigDecimal(10).pow(-amountDecimals - 1)
 
@@ -162,7 +165,8 @@ class OrderValidatorSpecification
                   AssetPair(amountAsset, Waves),
                   10 * Constants.UnitsInWave,
                   price,
-                  matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
+                  matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+                  sender = Some(sender)
                 )
               )
             } should produce("PriceLastDecimalsMustBeZero")
@@ -379,32 +383,36 @@ class OrderValidatorSpecification
         val highBuyOrderPrices = Array(0.00018840, 0.00018841, 0.00037678, 0.00123456, 0.01951753, 0.98745612, 1, 1.12345678, 5000.12341234, 100000.1,
           100000.1234, 100000.1234789, 12345678.12347894)
 
-        val priceValidationWithNoBounds =
-          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, None)), rateCache) _
+        val priceValidationWithNoBounds = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, None))) _
 
         withClue("order price can be any if bids & asks don't exist") {
           for (order <- Array(buyOrder, sellOrder)) {
             priceValidationWithNoBounds { order } shouldBe 'right
-            (lowSellOrderPrices ++ midSellOrderPrices ++ highSellOrderPrices).foreach(price =>
-              priceValidationWithNoBounds { order.updatePrice(price.btc) } shouldBe 'right)
+            (lowSellOrderPrices ++ midSellOrderPrices ++ highSellOrderPrices)
+              .foreach(price => priceValidationWithNoBounds { order.updatePrice(price.btc) } shouldBe 'right)
           }
         }
 
         val priceValidationWithLowerBound =
-          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None)), rateCache) _
+          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None))) _
+
         withClue("order price has only lower bound if there are no asks") {
           priceValidationWithNoBounds { buyOrder } shouldBe 'right
           lowBuyOrderPrices.foreach(price => priceValidationWithLowerBound { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
+
           (midBuyOrderPrices ++ highBuyOrderPrices).foreach(price =>
             priceValidationWithLowerBound { buyOrder.updatePrice(price.btc) } shouldBe 'right)
+
           priceValidationWithNoBounds { sellOrder } shouldBe 'right
           lowSellOrderPrices.foreach(price => priceValidationWithLowerBound { sellOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
+
           (midSellOrderPrices ++ highSellOrderPrices).foreach(price =>
             priceValidationWithLowerBound { sellOrder.updatePrice(price.btc) } shouldBe 'right)
         }
 
         val priceValidationWithUpperBound =
-          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk))), rateCache) _
+          OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk)))) _
+
         withClue("order price has only upper bound if there are no bids") {
           priceValidationWithNoBounds { buyOrder } shouldBe 'right
           highBuyOrderPrices.foreach(price => priceValidationWithUpperBound { buyOrder.updatePrice(price.btc) } should produce("DeviantOrderPrice"))
@@ -417,7 +425,7 @@ class OrderValidatorSpecification
         }
 
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
-        val priceValidation      = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
+        val priceValidation      = OrderValidator.marketAware(orderFeeSettings, deviationSettings, Some(nonEmptyMarketStatus)) _
 
         priceValidation { buyOrder } shouldBe 'right
 
@@ -464,33 +472,31 @@ class OrderValidatorSpecification
         val bestAsk = LevelAgg(amount = 800.waves, price = 0.00011082.btc)
         val bestBid = LevelAgg(amount = 600.waves, price = 0.00011080.btc)
 
-        val percentSettings      = PercentSettings(AssetType.PRICE, 1) // matcher fee = 1% of the deal
-        val deviationSettings    = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
+        val percentSettings   = PercentSettings(AssetType.PRICE, 1)                                // matcher fee = 1% of the deal
+        val deviationSettings = DeviationsSettings(enabled = true, 100, 100, maxFeeDeviation = 10) // fee deviation = 10%
+
         val nonEmptyMarketStatus = MarketStatus(None, Some(bestBid), Some(bestAsk))
-        val feeValidation        = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus), rateCache) _
-        val feeValidationWithoutAsks =
-          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None)), rateCache) _
-        val feeValidationWithoutBids =
-          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk))), rateCache) _
-        val feeValidationWithoutBounds =
-          OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, None)), rateCache) _
+
+        val feeValidation              = OrderValidator.marketAware(percentSettings, deviationSettings, Some(nonEmptyMarketStatus)) _
+        val feeValidationWithoutAsks   = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, Some(bestBid), None))) _
+        val feeValidationWithoutBids   = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, Some(bestAsk)))) _
+        val feeValidationWithoutBounds = OrderValidator.marketAware(percentSettings, deviationSettings, Some(MarketStatus(None, None, None))) _
 
         // matherFee = 1% of (amount * price) = 0.000277025 => 0.00027702
-        val buyOrder =
-          createOrder(pairWavesBtc, OrderType.BUY, amount = 250.waves, price = 0.00011081, matcherFee = 0.00027702.btc, matcherFeeAsset = btc)
-        val sellOrder =
-          createOrder(pairWavesBtc, OrderType.SELL, amount = 250.waves, price = 0.00011081, matcherFee = 0.00027702.btc, matcherFeeAsset = btc)
+        val buyOrder  = createOrder(pairWavesBtc, OrderType.BUY, 250.waves, 0.00011081, 0.00027702.btc, matcherFeeAsset = btc)
+        val sellOrder = createOrder(pairWavesBtc, OrderType.SELL, 250.waves, 0.00011081, 0.00027702.btc, matcherFeeAsset = btc)
+
         val lowBuyOrdersFees   = Array(0, 0.00000001, 0.00001, 0.0001, 0.00012467, 0.00019999, 0.00023999, 0.00024899, 0.00024929, 0.00024934)
         val validBuyOrdersFees = Array(0.00024935, 0.00024936, 0.0002494, 0.00025001, 0.0003, 0.00123123, 1.1231231, 123123.1, 123123.12312312)
 
         feeValidation { buyOrder } shouldBe 'right
 
         withClue("buy order fee can be any if there is no asks") {
-          (lowBuyOrdersFees ++ validBuyOrdersFees).foreach(fee => {
+          (lowBuyOrdersFees ++ validBuyOrdersFees).foreach { fee =>
             val updatedOrder = buyOrder.updateFee(fee.btc)
             feeValidationWithoutAsks { updatedOrder } shouldBe 'right
             feeValidationWithoutBounds { updatedOrder } shouldBe 'right
-          })
+          }
         }
 
         withClue("buy order fee should be >= 0.01 * 0.9 * best ask * amount = 0.01 * 0.9 * 0.00011082.btc * 250 = 0.00024935.btc\n") {
@@ -507,11 +513,11 @@ class OrderValidatorSpecification
         feeValidation { sellOrder } shouldBe 'right
 
         withClue("sell order fee can be any if there is no bids") {
-          (lowSellOrdersFees ++ validSellOrdersFees).foreach(fee => {
+          (lowSellOrdersFees ++ validSellOrdersFees).foreach { fee =>
             val updatedOrder = sellOrder.updateFee(fee.btc)
             feeValidationWithoutBids { updatedOrder } shouldBe 'right
             feeValidationWithoutBounds { updatedOrder } shouldBe 'right
-          })
+          }
         }
 
         withClue("sell order fee should be >= 0.01 * 0.9 * best bid * amount = 0.01 * 0.9 * 0.00011080.btc * 250 = 0.00024930.btc\n") {
@@ -595,14 +601,21 @@ class OrderValidatorSpecification
         }
       }
 
-      "matcherFee is too small according to rate for matcherFeeAssetId" in forAll(orderV3WithDynamicFeeSettingsAndRateCacheGen) {
-        case (order, dynamicSettings, rates) =>
-          validateByMatcherSettings(dynamicSettings, rateCache = rates)(order) shouldBe 'right
+      "matcherFee is too small according to rate of fee asset" in {
 
-          val updatedRate = rates.getRate(order.matcherFeeAssetId).map(_ + 1).get
-          rates.upsertRate(order.matcherFeeAssetId, updatedRate)
+        val rateCache: RateCache                   = RateCache.inMem
+        val validateByRate: Order => Result[Order] = validateByMatcherSettings(DynamicSettings(0.003.waves), rateCache = rateCache)
+        val order: Order                           = createOrder(pairWavesUsd, BUY, 1.waves, 3.00, 0.01.usd, matcherFeeAsset = usd)
 
-          validateByMatcherSettings(dynamicSettings, rateCache = rates)(order) should produce("FeeNotEnough")
+        withClue("USD rate = 3.33, fee should be >= 0.01 usd\n") {
+          rateCache.upsertRate(usd, 3.33)
+          validateByRate(order) shouldBe 'right
+        }
+
+        withClue("USD rate = 3.34, fee should be >= 0.02 usd\n") {
+          rateCache.upsertRate(usd, 3.34)
+          validateByRate(order) should produce("FeeNotEnough")
+        }
       }
 
       "market order price is invalid or tradable balance is not enough for its execution" in {
@@ -812,10 +825,13 @@ class OrderValidatorSpecification
 //    }
   }
 
-  private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+  private def portfolioTest(p: Portfolio, assetDecimals: Asset => Int = getDefaultAssetDecimals)(
+      f: (Order => OrderValidator.FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+
     val bc = stub[AsyncBlockchain]
     val tc = exchangeTransactionCreator(bc)
-    val ov = mkOrderValidator(bc, tc)
+    val ov = mkOrderValidator(bc, tc, assetDecimals)
+
     f(ov, bc)
   }
 
@@ -871,15 +887,19 @@ class OrderValidatorSpecification
     (bc.isFeatureActivated _).when(*).onCall(isActive andThen Future.successful)
   }
 
-  private def mkOrderValidator(bc: AsyncBlockchain, tc: ExchangeTransactionCreator): Order => FutureResult[Order] = {
-    OrderValidator.blockchainAware(bc,
-                                   tc.createTransaction,
-                                   MatcherAccount,
-                                   ntpTime,
-                                   matcherSettings.orderFee,
-                                   matcherSettings.orderRestrictions,
-                                   rateCache,
-                                   getDefaultAssetDecimals)(_)
+  private def mkOrderValidator(bc: AsyncBlockchain,
+                               tc: ExchangeTransactionCreator,
+                               assetDecimals: Asset => Int = getDefaultAssetDecimals): Order => FutureResult[Order] = { order =>
+    OrderValidator.blockchainAware(
+      bc,
+      tc.createTransaction,
+      MatcherAccount,
+      ntpTime,
+      matcherSettings.orderFee,
+      matcherSettings.orderRestrictions,
+      assetDecimals,
+      rateCache
+    )(order)
   }
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
@@ -909,25 +929,26 @@ class OrderValidatorSpecification
       ) { MarketOrder(order, b.apply _) }
   }
 
-  private def msa(ba: Set[Address], o: Order) =
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings, rateCache, getDefaultAssetDecimals) _
+  private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings, getDefaultAssetDecimals, rateCache)
+  }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
                                         blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
                                         allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
                                         allowedOrderVersions: Set[Byte] = Set(1, 2, 3),
-                                        rateCache: RateCache = rateCache,
-                                        assetDecimals: Asset => Int = getDefaultAssetDecimals): Order => Result[Order] =
-    order =>
-      OrderValidator
-        .matcherSettingsAware(
-          MatcherAccount,
-          Set.empty,
-          blacklistedAssets,
-          matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions),
-          rateCache,
-          assetDecimals
-        )(order)
+                                        assetDecimals: Asset => Int = getDefaultAssetDecimals,
+                                        rateCache: RateCache = rateCache): Order => Result[Order] = { order =>
+    OrderValidator
+      .matcherSettingsAware(
+        MatcherAccount,
+        Set.empty,
+        blacklistedAssets,
+        matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions),
+        assetDecimals,
+        rateCache
+      )(order)
+  }
 
   private def validateByBlockchain(orderFeeSettings: OrderFeeSettings,
                                    orderRestrictions: Map[AssetPair, OrderRestrictionsSettings] = matcherSettings.orderRestrictions)(
@@ -968,14 +989,16 @@ class OrderValidatorSpecification
     val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
 
     OrderValidator
-      .blockchainAware(blockchain,
-                       transactionCreator,
-                       MatcherAccount.toAddress,
-                       ntpTime,
-                       orderFeeSettings,
-                       orderRestrictions,
-                       rateCache,
-                       assetDecimals)(order)
+      .blockchainAware(
+        blockchain,
+        transactionCreator,
+        MatcherAccount.toAddress,
+        ntpTime,
+        orderFeeSettings,
+        orderRestrictions,
+        assetDecimals,
+        rateCache
+      )(order)
   }
 
   private def assignScript(bc: AsyncBlockchain, address: Address, result: RunScriptResult): Unit = {

@@ -8,7 +8,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.AddressActor.{BalanceUpdated, PlaceLimitOrder}
+import com.wavesplatform.dex.AddressActor.Command.{CancelNotEnoughCoinsOrders, PlaceOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
@@ -20,7 +20,6 @@ import com.wavesplatform.wallet.Wallet
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 
 class AddressActorSpecification
     extends TestKit(ActorSystem("AddressActorSpecification"))
@@ -149,11 +148,9 @@ class AddressActorSpecification
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
       ref ! OrderAdded(LimitOrder(sellTokenOrder1), System.currentTimeMillis)
 
-
       ref ! PlaceLimitOrder(sellTokenOrder2)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
       ref ! OrderAdded(LimitOrder(sellTokenOrder2), System.currentTimeMillis)
-
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -172,11 +169,9 @@ class AddressActorSpecification
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellWavesOrder)))
       ref ! OrderAdded(LimitOrder(sellWavesOrder), System.currentTimeMillis)
 
-
       ref ! PlaceLimitOrder(sellTokenOrder2)
       eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder2)))
       ref ! OrderAdded(LimitOrder(sellTokenOrder2), System.currentTimeMillis)
-
 
       updatePortfolio(sellWavesPortfolio, true)
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
@@ -203,7 +198,6 @@ class AddressActorSpecification
           new AddressActor(
             address,
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
-            1.day,
             ntpTime,
             EmptyOrderDB,
             _ => false,
@@ -224,7 +218,7 @@ class AddressActorSpecification
         val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
         if (notify)
           addressActor !
-            BalanceUpdated {
+            CancelNotEnoughCoinsOrders {
               prevPortfolio
                 .changedAssetIds(updatedPortfolio)
                 .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
@@ -244,6 +238,8 @@ class AddressActorSpecification
 
   private def addr(seed: String): Address       = privateKey(seed).toAddress
   private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes("utf-8"), 0)
+
+  private def PlaceLimitOrder(o: Order): AddressActor.Command.PlaceOrder = PlaceOrder(o, isMarket = false)
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)

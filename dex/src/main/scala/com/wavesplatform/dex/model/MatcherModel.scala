@@ -1,11 +1,12 @@
 package com.wavesplatform.dex.model
 
-import cats.implicits._
+import cats.instances.long.catsKernelStdGroupForLong
+import cats.syntax.group._
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.MatcherModel.Price
-import com.wavesplatform.state.{Blockchain, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsObject, JsValue, Json}
@@ -229,7 +230,11 @@ sealed trait MarketOrder extends AcceptedOrder {
 
   /** Min between tradable balance of the order's owner and required balance of the order by spendable asset */
   val availableForSpending: Long
-  def reservableBalance: Map[Asset, Long] = requiredBalance.updated(order.getSpendAssetId, availableForSpending)
+
+  def reservableBalance: Map[Asset, Long] =
+    if (availableForSpending == 0) requiredBalance - order.getSpendAssetId
+    else requiredBalance.updated(order.getSpendAssetId, availableForSpending)
+
   def partial(amount: Long, fee: Long, availableForSpending: Long): MarketOrder
 }
 

@@ -115,7 +115,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     log.info(s"Total orders: ${allOrders.size}")
 
     allOrders.foreach(dex1Api.place)
-    allOrders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Accepted))
+    allOrders.foreach(order => dex1Api.waitForOrder(order)(_.status != OrderStatus.NotFound))
 
     def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Iterable[Unit.type]] = Future.sequence {
       orders.map { order =>

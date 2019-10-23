@@ -17,7 +17,6 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{RequestGen, WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
@@ -193,8 +192,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
-        case AddressDirectory.Envelope(_, AddressActor.GetReservedBalance) => sender ! Map.empty[Asset, Long]
-        case _                                                             =>
+        case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
+        case _                                                                   =>
       }
 
       TestActor.NoAutoPilot

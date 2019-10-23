@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync
 import java.sql.{Connection, DriverManager}
 import java.util.concurrent.ThreadLocalRandom
 
-import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
@@ -420,11 +419,12 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
 
     withClue("place buy market order into nonempty order book") {
+      val ts = System.currentTimeMillis()
 
       val orders = Seq(
         mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.wctUsdPrice, 0.003.waves),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves)
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts),
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 1)
       )
 
       orders.foreach { order =>

@@ -1006,8 +1006,7 @@ class OrderValidatorSpecification
   private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach {
       case (asset, desc) =>
-        (bc.assetDescription _).when(asset).onCall { (x: IssuedAsset) =>
-          Future.successful { Some(desc) }
-        }
+        (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
+        (bc.assetDecimals _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc.decimals) })
     }
 }

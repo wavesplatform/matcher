@@ -8,21 +8,15 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.{NTPTime, TestTime, TransactionGenBase}
+import com.wavesplatform.{NTPTime, TransactionGenBase}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime with TableDrivenPropertyChecks {
-
-//  implicit val global: ExecutionContext = new ExecutionContext {
-//    override def execute(runnable: Runnable): Unit     = runnable.run()
-//    override def reportFailure(cause: Throwable): Unit = throw cause
-//  }
 
   private val defaultAssetPair                                    = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
   private def getAssetDecimals(asset: Asset): Future[Option[Int]] = Future.successful { Option(8) }
@@ -31,20 +25,12 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
   "OrderBookSnapshotHttpCache" - {
 
     "should cache" in using(createDefaultCache) { cache =>
-      def get: HttpResponse = awaitResult { cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized) }
+      def get: Future[HttpResponse] = cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized)
 
-      val s1 = System.nanoTime()
-      val a  = get
-      val e1 = System.nanoTime()
+      val a = get
+      val b = get
 
-      val b  = get
-      val e2 = System.nanoTime()
-
-      println(s"first get: ${(e1 - s1) / 1000000} millis")
-      println(s"second get: ${(e2 - e1) / 1000000} millis")
-
-//      awaitResult { a } shouldBe awaitResult {  b }
-      a shouldBe b
+      awaitResult(a) shouldBe awaitResult(b)
     }
 
     "should not drop the cache if the timeout after an access was not reached" in using(createDefaultCache) { cache =>

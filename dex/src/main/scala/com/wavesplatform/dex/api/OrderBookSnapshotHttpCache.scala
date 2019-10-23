@@ -5,7 +5,7 @@ import java.util.concurrent.ScheduledFuture
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import cats.data.OptionT
 import cats.implicits._
-import com.google.common.cache.{CacheBuilder, CacheLoader, RemovalListener, RemovalNotification}
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized, Normalized}
 import com.wavesplatform.dex.model.{OrderBook, OrderBookResult}
@@ -31,20 +31,10 @@ class OrderBookSnapshotHttpCache(settings: Settings,
     CacheBuilder
       .newBuilder()
       .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
-      .removalListener(
-        (notification: RemovalNotification[Key, Future[HttpResponse]]) => {
-          println(s"removal notification: $notification")
-          println(s"cause:                ${notification.getCause}")
-          println(s"was evicted:          ${notification.wasEvicted()}")
-        }
-      )
       .build(
         new CacheLoader[Key, Future[HttpResponse]] {
 
           override def load(key: Key): Future[HttpResponse] = {
-
-            val start = System.nanoTime()
-//            println(s"loading value by key ${key}")
 
             def getAssetDecimals(asset: Asset): OptionT[Future, Int] = OptionT { assetDecimals(asset) }
 
@@ -75,15 +65,17 @@ class OrderBookSnapshotHttpCache(settings: Settings,
                   OrderBookResult.toJson(entity)
                 )
               )
-            } //andThen { case _ => println(s"loading future duration = ${(System.nanoTime() - start)}") }
+            }
           }
         }
       )
 
   private val statsScheduler: ScheduledFuture[_] = {
+
     val period       = 3.seconds
     val requestStats = Kamon.histogram("matcher.http.ob.cache.req")
     val hitStats     = Kamon.histogram("matcher.http.ob.cache.hit")
+
     Kamon
       .scheduler()
       .scheduleWithFixedDelay(
@@ -119,13 +111,12 @@ class OrderBookSnapshotHttpCache(settings: Settings,
 }
 
 object OrderBookSnapshotHttpCache {
-  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
-    val maxDepth = depthRanges.max
 
+  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
     def nearestBigger(to: Option[Int]): Int =
       to.orElse(defaultDepth)
         .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
-        .getOrElse(maxDepth)
+        .getOrElse(depthRanges.max)
   }
 
   private case class Key(pair: AssetPair, depth: Int, format: DecimalsFormat)

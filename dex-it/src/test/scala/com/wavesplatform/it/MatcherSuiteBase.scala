@@ -49,8 +49,9 @@ abstract class MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
-  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] =
+  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)
+  }
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
@@ -82,8 +83,9 @@ abstract class MatcherSuiteBase
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
-  protected def wavesNode1NetworkApiAddress: InetSocketAddress =
+  protected def wavesNode1NetworkApiAddress: InetSocketAddress = {
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
+  }
 
   // Dex server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
@@ -142,22 +144,26 @@ abstract class MatcherSuiteBase
     dockerClient.printDebugMessage(formatted)
   }
 
-  protected def createDex(name: String, runConfig: Config = dexRunConfig(), suiteInitialConfig: Config = suiteInitialDexConfig): DexContainer =
+  protected def createDex(name: String, runConfig: Config = dexRunConfig(), suiteInitialConfig: Config = suiteInitialDexConfig): DexContainer = {
     DexItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig)
+  }
 
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig(),
-                                suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer =
+                                suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer = {
     WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(wavesNodesDomain))
+  }
 
-  protected def dexQueueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
-    ConfigFactory.parseString(s"""waves.dex.events-queue {
-                                 |  type = kafka
-                                 |  kafka {
-                                 |    servers = "$kafkaServer"
-                                 |    topic = "dex-$queueId"
-                                 |  }
-                                 |}""".stripMargin)
+  protected def dexQueueConfig(queueId: Int): Config = {
+    Option { System.getenv("KAFKA_SERVER") }.fold { ConfigFactory.empty() } { kafkaServer =>
+      ConfigFactory.parseString(s"""waves.dex.events-queue {
+                                   |  type = kafka
+                                   |  kafka {
+                                   |    servers = "$kafkaServer"
+                                   |    topic = "dex-$queueId"
+                                   |  }
+                                   |}""".stripMargin)
+    }
   }
 
   protected def dexWavesGrpcConfig(target: WavesNodeContainer): Config = {

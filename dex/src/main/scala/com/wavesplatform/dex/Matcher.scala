@@ -147,6 +147,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                                                assetDecimalsCache.get)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair), rateCache)(o)
+      _ <- OrderValidator.tickSizeAware(matchingRulesCache.getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset).tickSize)(o)
     } yield o
 
     lazy val asyncValidation: OrderValidator.FutureResult[Order] = {

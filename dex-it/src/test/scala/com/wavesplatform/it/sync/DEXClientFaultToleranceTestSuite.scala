@@ -15,8 +15,8 @@ import scala.util.Try
 
 class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex.waves-node-grpc {
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex.grpc.integration.waves-node-grpc {
       |  host = $wavesNodesDomain
       |  port = 6887
       |}""".stripMargin
@@ -78,8 +78,8 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     markup("Up node 2")
     dockerClient.start(wavesNode2Container)
-    wavesNode2Api.waitReady // waitReady(wavesNode2ApiAddress)
 
+    wavesNode2Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
 
@@ -89,7 +89,7 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
     dockerClient.stop(wavesNode1Container)
 
     broadcastAndAwait(wavesNode2Api, alice2BobTransferTx)
-    usdBalancesShouldBe(wavesNode2Api, 0, defaultAssetQuantity)
+    usdBalancesShouldBe(wavesNode2Api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
 
     markup("Now DEX receives balances stream from the node 2 and cancels Alice's order")
     dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)

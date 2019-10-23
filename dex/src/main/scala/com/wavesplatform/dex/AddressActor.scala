@@ -73,19 +73,29 @@ class AddressActor(owner: Address,
     case command: Command.CancelOrder =>
       import command.orderId
       log.trace(s"Got $command")
-      activeOrders.get(orderId) match {
-        case None =>
-          sender ! api.OrderCancelRejected(orderDB.status(orderId) match {
-            case OrderStatus.NotFound     => error.OrderNotFound(orderId)
-            case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
-            case _: OrderStatus.Filled    => error.OrderFull(orderId)
-          })
+      pendingCommands.get(orderId) match {
+        case Some(pc) =>
+          val r = pc.command match {
+            case _: Command.PlaceOrder  => error.OrderNotFound(orderId)
+            case _: Command.CancelOrder => api.OrderCancelRejected(error.OrderCanceled(orderId))
+          }
+          sender ! r
 
-        case Some(ao) =>
-          if (ao.isMarket) sender ! api.OrderCancelRejected(error.MarketOrderCancel(orderId))
-          else {
-            pendingCommands.put(orderId, PendingCommand(command, sender))
-            cancel(ao)
+        case None =>
+          activeOrders.get(orderId) match {
+            case None =>
+              sender ! api.OrderCancelRejected(orderDB.status(orderId) match {
+                case OrderStatus.NotFound     => error.OrderNotFound(orderId)
+                case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
+                case _: OrderStatus.Filled    => error.OrderFull(orderId)
+              })
+
+            case Some(ao) =>
+              if (ao.isMarket) sender ! api.OrderCancelRejected(error.MarketOrderCancel(orderId))
+              else {
+                pendingCommands.put(orderId, PendingCommand(command, sender))
+                cancel(ao)
+              }
           }
       }
 

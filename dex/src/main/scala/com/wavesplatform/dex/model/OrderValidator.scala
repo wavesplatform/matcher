@@ -162,14 +162,15 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def blockchainAware(blockchain: AsyncBlockchain,
-                      transactionCreator: ExchangeTransactionCreator.CreateTransaction,
-                      matcherAddress: Address,
-                      time: Time,
-                      orderFeeSettings: OrderFeeSettings,
-                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                      rateCache: RateCache,
-                      assetDecimals: Asset => Int)(order: Order)(implicit ec: ExecutionContext): FutureResult[Order] = timer.measure {
+  def blockchainAware(
+      blockchain: AsyncBlockchain,
+      transactionCreator: ExchangeTransactionCreator.CreateTransaction,
+      matcherAddress: Address,
+      time: Time,
+      orderFeeSettings: OrderFeeSettings,
+      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+      rateCache: RateCache,
+      assetDecimals: Asset => Int)(order: Order)(implicit ec: ExecutionContext): FutureResult[Order] = timer.measure {
 
     lazy val exchangeTx: FutureResult[ExchangeTransaction] = EitherT {
       val fakeOrder: Order  = order.updateType(order.orderType.opposite)
@@ -200,7 +201,7 @@ object OrderValidator extends ScorexLogging {
                 rateCache = rateCache,
                 assetDecimals = assetDecimals
               )
-            Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, Waves))
+            Either.cond(order.matcherFee >= mof, order, error.FeeNotEnough(mof, order.matcherFee, order.matcherFeeAssetId))
           }
         }
 
@@ -457,7 +458,7 @@ object OrderValidator extends ScorexLogging {
     }
 
     acceptedOrder match {
-      case mo: MarketOrder => getMarketOrderValue >>= (volume => validateTradableBalance { getRequiredBalanceForMarketOrder(mo, volume) })
+      case mo: MarketOrder => getMarketOrderValue.flatMap(volume => validateTradableBalance { getRequiredBalanceForMarketOrder(mo, volume) })
       case _               => validateTradableBalance(acceptedOrder.requiredBalance)
     }
   }

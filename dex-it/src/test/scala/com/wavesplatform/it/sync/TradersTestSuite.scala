@@ -11,8 +11,9 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 
 class TradersTestSuite extends MatcherSuiteBase {
 
-  override protected val suiteInitialDexConfig: Config =
+  override protected val suiteInitialDexConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex.price-assets = [ "Aqy7PRU", "$UsdId", "WAVES" ]""".stripMargin)
+  }
 
   val orderVersions: Seq[Byte] = Seq(1, 2, 3)
 

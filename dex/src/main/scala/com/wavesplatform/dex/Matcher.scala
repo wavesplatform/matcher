@@ -284,13 +284,13 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
-                5.seconds,
                 time,
                 orderDB,
                 wavesBlockchainSyncClient.forgedOrder,
                 matcherQueue.storeEvent,
-                orderBookCache.get,
-                startSchedules
+                orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
+                startSchedules,
+                settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough
               )
           ),
           historyRouter

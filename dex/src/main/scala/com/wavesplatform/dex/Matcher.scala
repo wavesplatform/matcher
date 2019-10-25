@@ -18,8 +18,8 @@ import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.caches.{AssetDecimalsCache, MatchingRulesCache, RateCache}
-import com.wavesplatform.dex.db.{AccountStorage, AssetPairsDB, OrderBookSnapshotDB, OrderDB}
+import com.wavesplatform.dex.caches.{AssetDecimalsCache, AssetsCache, MatchingRulesCache, RateCache}
+import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.history.HistoryRouter
@@ -155,7 +155,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDecimals: Asset => Int): OrderValidator.FutureResult[Order] = {
+    def asyncValidation(orderAssetsDecimals: Asset => Int)(implicit efc: ErrorFormatterContext): OrderValidator.FutureResult[Order] = {
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
@@ -165,11 +165,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         settings.orderRestrictions,
         orderAssetsDecimals,
         rateCache
-      )(o)(grpcExecutionContext)
+      )(o)(grpcExecutionContext, efc)
     }
 
     for {
-      assetDecimals <- assetDecimalsAware(wavesBlockchainAsyncClient.assetDecimals)(o)
+      assetDecimals <- assetDecimalsAware(assetsCache, wavesBlockchainAsyncClient.assetDescription(_))(o)
       _             <- liftAsync { syncValidation(assetDecimals) }
       _             <- asyncValidation(assetDecimals)
     } yield o
@@ -225,9 +225,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val snapshotsRestore = Promise[Unit]()
 
   private lazy val db                  = openDB(settings.dataDir)
+  private lazy val assetDb             = AssetsDB(db)
   private lazy val assetPairsDB        = AssetPairsDB(db)
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
   private lazy val orderDB             = OrderDB(settings, db)
+
+  private lazy val assetsCache: AssetsCache = ???
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),

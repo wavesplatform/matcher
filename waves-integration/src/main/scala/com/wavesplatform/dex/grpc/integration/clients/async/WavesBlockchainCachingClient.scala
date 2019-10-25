@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients.async
 
 import java.time.Duration
 
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, BalancesCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
@@ -13,8 +14,6 @@ import io.grpc.ManagedChannel
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
-import cats.implicits._
-
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -42,16 +41,11 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
   override def isFeatureActivated(id: Short): Future[Boolean]                                    = expiringFeaturesCache.get(id) map Boolean2boolean
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
 
-  override def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
-  override def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) } { issuedAsset =>
-    this.assetDescription(issuedAsset).map { _.map(_.decimals) }
-  }
-
   def getAssetDecimalsForMatchingRules(assetsFromMatchingRules: Set[AssetPair]): Future[Map[Asset, Int]] = {
     assetsFromMatchingRules
       .flatMap(assetPair => Set(assetPair.amountAsset, assetPair.priceAsset))
       .toList
-      .traverse(asset => assetDecimals(asset).map { asset -> _ })
+      .traverse(asset => this.assetDecimals(asset).map { asset -> _ })
       .flatMap { list =>
         val (assetsWithDecimals, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
         if (nonexistentAssets.nonEmpty) {

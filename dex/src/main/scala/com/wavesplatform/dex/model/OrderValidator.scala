@@ -5,11 +5,12 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.caches.{AssetsCache, RateCache}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.MatcherModel.Normalization
@@ -113,7 +114,8 @@ object OrderValidator extends ScorexLogging {
   }
 
   private def validateAmountAndPrice(order: Order, decimalsPair: (Int, Int), orderRestrictions: Map[AssetPair, OrderRestrictionsSettings])(
-      implicit ec: ExecutionContext): FutureResult[Order] = {
+      implicit ec: ExecutionContext,
+      efc: ErrorFormatterContext): FutureResult[Order] = {
 
     if (!(orderRestrictions contains order.assetPair)) liftValueAsync(order)
     else {
@@ -158,53 +160,54 @@ object OrderValidator extends ScorexLogging {
                       orderFeeSettings: OrderFeeSettings,
                       orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                       assetDecimals: Asset => Int,
-                      rateCache: RateCache)(order: Order)(implicit ec: ExecutionContext): FutureResult[Order] = timer.measure {
+                      rateCache: RateCache)(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =
+    timer.measure {
 
-    import ExchangeTransactionCreator.minFee
+      import ExchangeTransactionCreator.minFee
 
-    val assetPair   = order.assetPair
-    val amountAsset = assetPair.amountAsset
-    val priceAsset  = assetPair.priceAsset
-    val feeAsset    = order.matcherFeeAssetId
+      val assetPair   = order.assetPair
+      val amountAsset = assetPair.amountAsset
+      val priceAsset  = assetPair.priceAsset
+      val feeAsset    = order.matcherFeeAssetId
 
-    lazy val exchangeTx: FutureResult[ExchangeTransaction] = EitherT {
-      val fakeOrder: Order  = order.updateType(order.orderType.opposite)
-      val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime())
-      transactionCreator(oe) map {
-        _.leftMap(txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
+      lazy val exchangeTx: FutureResult[ExchangeTransaction] = EitherT {
+        val fakeOrder: Order  = order.updateType(order.orderType.opposite)
+        val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime())
+        transactionCreator(oe) map {
+          _.leftMap(txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
+        }
       }
-    }
 
-    def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold { successAsync } { assetId =>
-      exchangeTx flatMap { verifySmartToken(blockchain, assetId, _) }
-    }
+      def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold { successAsync } { assetId =>
+        exchangeTx flatMap { verifySmartToken(blockchain, assetId, _) }
+      }
 
-    lazy val verifyMatcherFeeAssetScript: FutureResult[Unit] = {
-      if (feeAsset == amountAsset || feeAsset == priceAsset) successAsync else verifyAssetScript(feeAsset)
-    }
+      lazy val verifyMatcherFeeAssetScript: FutureResult[Unit] = {
+        if (feeAsset == amountAsset || feeAsset == priceAsset) successAsync else verifyAssetScript(feeAsset)
+      }
 
-    /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
-    lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
-      case DynamicSettings(baseFee) =>
-        for {
-          minFee          <- liftFutureAsync { minFee(baseFee, blockchain.hasScript(matcherAddress), assetPair, blockchain.hasScript) }
-          minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDecimals(feeAsset), rateCache) }
-          _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
-        } yield order
-      case _ => liftValueAsync { order }
-    }
+      /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
+      lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
+        case DynamicSettings(baseFee) =>
+          for {
+            minFee          <- liftFutureAsync { minFee(baseFee, blockchain.hasScript(matcherAddress), assetPair, blockchain.hasScript) }
+            minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDecimals(feeAsset), rateCache) }
+            _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
+          } yield order
+        case _ => liftValueAsync { order }
+      }
 
-    for {
-      _            <- checkOrderVersion(order.version, blockchain)
-      _            <- validateOrderFeeByTransactionRequirements
-      decimalsPair <- validateDecimals(assetDecimals, order)
-      _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
-      _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
-      _            <- verifyAssetScript(amountAsset)
-      _            <- verifyAssetScript(priceAsset)
-      _            <- verifyMatcherFeeAssetScript
-    } yield order
-  }
+      for {
+        _            <- checkOrderVersion(order.version, blockchain)
+        _            <- validateOrderFeeByTransactionRequirements
+        decimalsPair <- validateDecimals(assetDecimals, order)
+        _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
+        _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
+        _            <- verifyAssetScript(amountAsset)
+        _            <- verifyAssetScript(priceAsset)
+        _            <- verifyMatcherFeeAssetScript
+      } yield order
+    }
 
   private[dex] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
     orderFeeSettings match {
@@ -308,7 +311,8 @@ object OrderValidator extends ScorexLogging {
     *   best bid = highest price of buy
     *   best ask = lowest price of sell
     */
-  private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
+  private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
+      implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
       lazy val isPriceHigherThanMinDeviation = ms.bestBid forall { bestBid =>
@@ -345,7 +349,7 @@ object OrderValidator extends ScorexLogging {
   private def validateFeeDeviation(order: Order,
                                    deviationSettings: DeviationsSettings,
                                    orderFeeSettings: OrderFeeSettings,
-                                   marketStatus: Option[MarketStatus]): Result[Order] = {
+                                   marketStatus: Option[MarketStatus])(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
       case PercentSettings(assetType, minFee) =>
@@ -369,15 +373,14 @@ object OrderValidator extends ScorexLogging {
     Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
   }
 
-  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
-      order: Order): Result[Order] = {
+  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(order: Order)(
+      implicit efc: ErrorFormatterContext): Result[Order] =
     if (deviationSettings.enabled) {
       for {
         _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
         _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
       } yield order
     } else lift(order)
-  }
 
   def timeAware(time: Time)(order: Order): Result[Order] = {
     for {
@@ -388,9 +391,10 @@ object OrderValidator extends ScorexLogging {
     } yield order
   }
 
-  private def validateBalance(acceptedOrder: AcceptedOrder,
-                              tradableBalance: Asset => Long,
-                              orderBookCache: AssetPair => OrderBook.AggregatedSnapshot): Result[AcceptedOrder] = {
+  private def validateBalance(
+      acceptedOrder: AcceptedOrder,
+      tradableBalance: Asset => Long,
+      orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(implicit efc: ErrorFormatterContext): Result[AcceptedOrder] = {
 
     /**
       * According to the current market state calculates cost for buy market orders or amount for sell market orders
@@ -444,7 +448,8 @@ object OrderValidator extends ScorexLogging {
                         tradableBalance: Asset => Long,
                         activeOrderCount: => Int,
                         orderExists: ByteStr => Boolean,
-                        orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(acceptedOrder: AcceptedOrder): Result[AcceptedOrder] =
+                        orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(acceptedOrder: AcceptedOrder)(
+      implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =
     for {
       _ <- lift(acceptedOrder)
         .ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)
@@ -453,24 +458,35 @@ object OrderValidator extends ScorexLogging {
       _ <- validateBalance(acceptedOrder, tradableBalance, orderBookCache)
     } yield acceptedOrder
 
-  def tickSizeAware(actualNormalizedTickSize: Long)(order: Order): Result[Order] = {
+  def tickSizeAware(actualNormalizedTickSize: Long)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
     lift(order).ensure { error.OrderInvalidPriceLevel(order, actualNormalizedTickSize) } { o =>
       o.orderType == OrderType.SELL || OrderBook.correctPriceByTickSize(o.price, o.orderType, actualNormalizedTickSize) > 0
     }
   }
 
-  def assetDecimalsAware(assetDecimals: Asset => Future[Option[Int]])(order: Order)(implicit ec: ExecutionContext): FutureResult[Map[Asset, Int]] = {
+  def assetDecimalsAware(assetsCache: AssetsCache, assetDesc: Asset => Future[Option[BriefAssetDescription]])(order: Order)(
+      implicit ec: ExecutionContext): FutureResult[Map[Asset, Int]] = {
     List(
       order.assetPair.amountAsset,
       order.assetPair.priceAsset,
       order.matcherFeeAssetId
     ).traverse { asset =>
-        asset.fold { liftValueAsync[(Asset, Int)](Waves -> 8) } { issuedAsset =>
-          EitherT {
-            assetDecimals(issuedAsset)
-              .map { _.toRight(error.AssetNotFound(issuedAsset)).map(decimals => issuedAsset -> decimals) }
+        if (assetsCache.contains(asset)) liftValueAsync[(Asset, Int)](asset -> assetsCache.decimalsOf(asset))
+        else
+          asset.fold {
+            liftValueAsync[(Asset, Int)](Waves -> 8)
+          } { issuedAsset =>
+            EitherT {
+              assetDesc(issuedAsset)
+                .map {
+                  _.toRight(error.AssetNotFound(issuedAsset))
+                    .map { desc =>
+                      assetsCache.put(issuedAsset, desc.name, desc.decimals)
+                      issuedAsset -> desc.decimals
+                    }
+                }
+            }
           }
-        }
       }
       .map(_.toMap)
   }

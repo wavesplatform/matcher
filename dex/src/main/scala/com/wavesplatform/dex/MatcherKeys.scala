@@ -89,7 +89,7 @@ object MatcherKeys {
 
   val AssetPairsPrefix: Short = 23
   def assetPair(pair: AssetPair): Key[Unit] =
-    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => (), _ => Array.emptyByteArray)
+    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => Unit, _ => Array.emptyByteArray)
 
   val OrderBookSnapshotOffsetPrefix: Short = 24
   def orderBookSnapshotOffset(pair: AssetPair): Key[Option[Long]] =
@@ -105,6 +105,25 @@ object MatcherKeys {
         val r = new mutable.ArrayBuilder.ofByte
         OrderBook.Snapshot.serialize(r, x)
         r.result()
+      }
+    )
+
+  val AssetPrefix: Short = 23
+  def asset(x: IssuedAsset): Key[(ByteStr, Int)] =
+    Key(
+      "matcher-asset",
+      bytes(AssetPrefix, x.id.arr),
+      bytes => {
+        val bb         = ByteBuffer.wrap(bytes)
+        val nameLength = bb.getInt
+        val name       = new Array[Byte](nameLength)
+        bb.get(name)
+        val decimals = bb.getInt
+        (ByteStr(name), decimals)
+      },
+      x => {
+        val (name, decimals) = x
+        Ints.toByteArray(name.arr.length) ++ name.arr ++ Ints.toByteArray(decimals)
       }
     )
 }

@@ -15,7 +15,7 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.market.BatchOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
@@ -42,6 +42,7 @@ class AddressActor(owner: Address,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean,
                    batchCancelTimeout: FiniteDuration = 20.seconds)
+                  (implicit efc: ErrorFormatterContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {

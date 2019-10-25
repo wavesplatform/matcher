@@ -17,7 +17,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -62,7 +62,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: () => Future[Long],
                            apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Future[Set[Byte]])(implicit val errorContext: ErrorFormatterContext)
+                           validatedAllowedOrderVersions: Future[Set[Byte]])
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {

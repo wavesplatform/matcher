@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.smart
 
-import cats.Eval
+import cats.{Eval, Id}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -8,21 +8,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountDataInfo,
-  AssetDescription,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  InvokeScriptResult,
-  LeaseBalance,
-  Portfolio,
-  TransactionId,
-  VolumeAndFee
-}
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, Blockchain, DataEntry, InvokeScriptResult, LeaseBalance, Portfolio, TransactionId, VolumeAndFee}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.BlockchainContext
@@ -36,7 +26,7 @@ import scala.util.control.NoStackTrace
 // Used only for order validation
 object MatcherContext {
 
-  def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext] = {
+  def build(version: StdLibVersion, nByte: Byte, inE: Eval[Order], isDApp: Boolean): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
     val in: Coeval[Order] = Coeval.delay(inE.value)
     BlockchainContext
       .build(

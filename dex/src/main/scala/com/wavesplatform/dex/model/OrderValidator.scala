@@ -466,7 +466,10 @@ object OrderValidator extends ScorexLogging {
       order.matcherFeeAssetId
     ).traverse { asset =>
         asset.fold { liftValueAsync[(Asset, Int)](Waves -> 8) } { issuedAsset =>
-          EitherT { assetDecimals(issuedAsset).map(_.toRight(error.AssetNotFound(issuedAsset)).map(decimals => issuedAsset -> decimals)) }
+          EitherT {
+            assetDecimals(issuedAsset)
+              .map { _.toRight(error.AssetNotFound(issuedAsset)).map(decimals => issuedAsset -> decimals) }
+          }
         }
       }
       .map(_.toMap)

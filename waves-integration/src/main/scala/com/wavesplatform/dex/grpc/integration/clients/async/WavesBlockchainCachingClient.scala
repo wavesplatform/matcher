@@ -7,11 +7,13 @@ import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, Ba
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
+import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -43,5 +45,23 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
   override def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
   override def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) } { issuedAsset =>
     this.assetDescription(issuedAsset).map { _.map(_.decimals) }
+  }
+
+  def getAssetDecimalsForMatchingRules(assetsFromMatchingRules: Set[AssetPair]): Future[Map[Asset, Int]] = {
+    assetsFromMatchingRules
+      .flatMap(assetPair => Set(assetPair.amountAsset, assetPair.priceAsset))
+      .toList
+      .traverse(asset => assetDecimals(asset).map { asset -> _ })
+      .flatMap { list =>
+        val (assetsWithDecimals, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
+        if (nonexistentAssets.nonEmpty) {
+          Future.failed(
+            new IllegalArgumentException(
+              "The following assets specified in waves.dex.matching-rules section do not exist in the blockchain: " +
+                s"${nonexistentAssets.map { case (asset, _) => AssetPair.assetIdStr(asset) }.mkString(", ")}"
+            )
+          )
+        } else Future.successful(assetsWithDecimals.map { case (asset, decimals) => asset -> decimals.get }.toMap)
+      }
   }
 }

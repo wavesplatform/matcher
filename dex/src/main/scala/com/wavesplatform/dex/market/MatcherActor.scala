@@ -52,7 +52,7 @@ class MatcherActor(settings: MatcherSettings,
     }
   }
 
-  private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
+  private def orderBook(pair: AssetPair): Option[Either[Unit, ActorRef]] = Option(orderBooks.get()).flatMap(_.get(pair))
 
   private def getAssetName(asset: Asset, desc: Option[BriefAssetDescription]): String =
     asset match {
@@ -280,7 +280,8 @@ object MatcherActor {
         orderBooks,
         orderBookProps,
         assetDescription
-      ))
+      )
+    )
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: ShutdownStatus = copy(

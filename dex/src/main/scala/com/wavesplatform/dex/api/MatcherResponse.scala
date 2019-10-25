@@ -12,6 +12,7 @@ import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._
 
 sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherResponseContent) {
+
   def this(code: StatusCode, error: MatcherError) = this(code, MatcherResponseContent.Error(error))
   def this(code: StatusCode, error: JsObject) = this(code, MatcherResponseContent.Js(error))
 
@@ -19,17 +20,17 @@ sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherRes
 }
 
 object MatcherResponse {
+
   def toResponseMarshaller(implicit context: ErrorFormatterContext): ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
-    def content(x: MatcherResponse): JsValue =
-      backwardCompatibleWrapper(
-        x.status,
-        x.statusCode,
-        x.content match {
-          case MatcherResponseContent.Js(r)        => r
-          case MatcherResponseContent.Error(error) => error.toJson(context)
-          case MatcherResponseContent.Multiple(xs) => Json.obj("message" -> Json.arr(xs.map(content)))
-        }
-      )
+    def content(x: MatcherResponse): JsValue = backwardCompatibleWrapper(
+      x.status,
+      x.statusCode,
+      x.content match {
+        case MatcherResponseContent.Js(r)        => r
+        case MatcherResponseContent.Error(error) => error.toJson(context)
+        case MatcherResponseContent.Multiple(xs) => Json.obj("message" -> Json.arr(xs.map(content)))
+      }
+    )
 
     HttpResponse(
       x.statusCode,
@@ -37,20 +38,25 @@ object MatcherResponse {
     )
   }
 
-  private def backwardCompatibleWrapper(status: String, code: StatusCode, json: JsObject): JsValue =
+  private def backwardCompatibleWrapper(status: String, code: StatusCode, json: JsObject): JsValue = {
     Json
       .obj(
-        "success" -> (code match {
-          case _: C.Success => true
-          case _            => false
-        }),
+        "success" -> (
+          code match {
+            case _: C.Success => true
+            case _            => false
+          }
+        ),
         "status" -> status
       )
-      .deepMerge(code match {
-        case _: C.Success => JsObject.empty
-        case _            => Json.obj("result" -> JsNull) // For a backward compatibility
-      })
+      .deepMerge(
+        code match {
+          case _: C.Success => JsObject.empty
+          case _            => Json.obj("result" -> JsNull) // For a backward compatibility
+        }
+      )
       .deepMerge(json)
+  }
 }
 
 sealed trait MatcherResponseContent

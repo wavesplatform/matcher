@@ -36,4 +36,6 @@ trait WavesBlockchainAsyncClient[F[_]] {
 
   def wasForged(txIds: Seq[ByteStr]): F[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): F[Boolean]
+
+  def forgedOrder(orderId: ByteStr): F[Boolean]
 }

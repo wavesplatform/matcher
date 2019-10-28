@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
@@ -35,7 +36,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
         val (confirmed, unconfirmed) = toCheck.partition(tx => isTxConfirmed(tx.id.value))
         val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
-        Future.sequence { ready map (tx => broadcast(tx) map (tx -> _)) } map (_.toMap) map { isTxBroadcasted =>
+        Future.sequence { ready map (tx => broadcast(tx) tupleLeft tx) } map (_.toMap) map { isTxBroadcasted =>
           val (validTxs, invalidTxs) = ready.partition(isTxBroadcasted)
 
           log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${validTxs.size} successful")

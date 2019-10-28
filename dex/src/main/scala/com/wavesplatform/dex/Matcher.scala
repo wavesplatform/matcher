@@ -262,7 +262,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                   self
                     .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
                     .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-                    .mapTo[Unit]
+                    .map(_ => Unit)
                 }
               }
             )
@@ -293,7 +293,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
                 time,
                 orderDB,
-                wavesBlockchainSyncClient.forgedOrder,
+                wavesBlockchainAsyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
                 startSchedules,

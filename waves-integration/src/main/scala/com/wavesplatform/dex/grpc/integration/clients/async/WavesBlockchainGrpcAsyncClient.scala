@@ -115,13 +115,15 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
       .map(parse)
   }
 
-  override def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = {
+  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = {
     blockchainService
       .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
       .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
   }
 
-  override def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] = {
+  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] = {
     blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid)
   }
+
+  def forgedOrder(orderId: ByteStr): Future[Boolean] = blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)
 }

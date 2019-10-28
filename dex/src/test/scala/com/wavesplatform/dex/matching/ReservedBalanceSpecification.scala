@@ -107,7 +107,7 @@ class ReservedBalanceSpecification
               _ => Future.successful(0L),
               ntpTime,
               new TestOrderDB(100),
-              _ => false,
+              _ => Future.successful(false),
               _ => Future.failed(new IllegalStateException("Should not be used in the test")),
               orderBookCache = _ => AggregatedSnapshot(),
               enableSchedules
@@ -487,7 +487,7 @@ class ReservedBalanceSpecification
                 spendableBalance = spendableBalance,
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
-                hasOrderInBlockchain = _ => false,
+                hasOrderInBlockchain = _ => Future.successful(false),
                 store = event => {
                   testProbe.ref ! event
                   Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }

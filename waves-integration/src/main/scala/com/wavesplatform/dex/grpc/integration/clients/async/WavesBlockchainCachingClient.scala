@@ -38,14 +38,19 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
     }
   }(monixScheduler)
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long]                    = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
-  override def isFeatureActivated(id: Short): Future[Boolean]                                    = expiringFeaturesCache.get(id) map Boolean2boolean
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
+
+  override def isFeatureActivated(id: Short): Future[Boolean] = expiringFeaturesCache.get(id) map Boolean2boolean
+
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
 
-  override def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
-  override def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) } { issuedAsset =>
-    this.assetDescription(issuedAsset).map { _.map(_.decimals) }
+  override def assetDescription(asset: Asset): Future[Option[BriefAssetDescription]] = {
+    asset.fold { Future.successful(Option.empty[BriefAssetDescription]) }(assetDescription)
   }
+
+  override def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
+
+  override def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) }(assetDecimals)
 
   def getAssetDecimalsForMatchingRules(assetsFromMatchingRules: Set[AssetPair]): Future[Map[Asset, Int]] = {
     assetsFromMatchingRules

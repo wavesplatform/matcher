@@ -85,13 +85,13 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
     blockchainService.assetDescription { AssetIdRequest(asset.toPB) }.map(_.maybeDescription.toVanilla)
   }
 
+  def assetDescription(asset: Asset): Future[Option[BriefAssetDescription]] = {
+    asset.fold { Future.successful(Option.empty[BriefAssetDescription]) }(assetDescription)
+  }
+
   def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
 
-  def assetDecimals(asset: Asset): Future[Option[Int]] = {
-    asset.fold { Future.successful(Option(8)) } { issuedAsset =>
-      assetDescription(issuedAsset).map { _.map(_.decimals) }
-    }
-  }
+  def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) }(assetDecimals)
 
   def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = {
     blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.map(_.has)

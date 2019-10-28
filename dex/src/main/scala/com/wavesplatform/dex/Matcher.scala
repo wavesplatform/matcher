@@ -185,8 +185,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         matcherActor,
         addressActors,
         matcherQueue.storeEvent,
-        p => Option(orderBooks.get()).flatMap(_.get(p)),
-        p => Option(marketStatuses.get(p)),
+        p => Option { orderBooks.get() } flatMap (_ get p),
+        p => Option { marketStatuses.get(p) },
         getActualTickSize = assetPair => {
           matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset, matchingRulesAssetDecimals).tickSize
         },
@@ -250,29 +250,27 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             matcherQueue.startConsume(
               processedOffset + 1,
               xs => {
-                if (xs.isEmpty) Future.successful(())
+                if (xs.isEmpty) Future.successful(Unit)
                 else {
+
                   val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
                     log.debug(s"Consumed $eventWithMeta")
-
                     self ! eventWithMeta
                     eventWithMeta.event.assetPair
                   }(collection.breakOut)
 
                   self
                     .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
-                    .recover {
-                      case NonFatal(e) => log.error("PingAll is timed out!", e)
-                    }
-                    .map(_ => ())
+                    .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+                    .mapTo[Unit]
                 }
               }
             )
         },
         orderBooks,
         (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, matchingRulesAssetDecimals),
-        wavesBlockchainSyncClient.assetDescription
-      ),
+        wavesBlockchainAsyncClient.assetDescription
+      )(grpcExecutionContext),
       MatcherActor.name
     )
   }

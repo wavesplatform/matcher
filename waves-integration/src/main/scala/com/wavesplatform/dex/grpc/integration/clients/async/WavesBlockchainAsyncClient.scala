@@ -22,6 +22,7 @@ trait WavesBlockchainAsyncClient[F[_]] {
   def isFeatureActivated(id: Short): F[Boolean]
 
   def assetDescription(asset: IssuedAsset): F[Option[BriefAssetDescription]]
+  def assetDescription(asset: Asset): F[Option[BriefAssetDescription]]
 
   def assetDecimals(asset: IssuedAsset): F[Option[Int]]
   def assetDecimals(asset: Asset): F[Option[Int]]

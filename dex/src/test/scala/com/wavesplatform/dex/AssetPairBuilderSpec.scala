@@ -1,8 +1,12 @@
 package com.wavesplatform.dex
 
+import cats.data.EitherT
+import cats.instances.future._
 import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.db.AssetsDB
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.{FutureResult, Result}
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -24,13 +28,13 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
-  def awaitResult[A](result: FutureResult[A]): Result[A]            = Await.result(result.value, Duration.Inf)
+  def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
 
-  private val WAVES  = "WAVES"
-  private val WUSD   = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
-  private val WBTC   = IssuedAsset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
-  private val WEUR   = IssuedAsset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
-  private val WCNY   = IssuedAsset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
+  private val WAVES = "WAVES"
+  private val WUSD  = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
+  private val WBTC  = IssuedAsset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
+  private val WEUR  = IssuedAsset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
+  private val WCNY  = IssuedAsset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
 
   private val Asset1 = mkAssetId(1)
   private val Asset2 = mkAssetId(2)
@@ -47,7 +51,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
   private val blacklistedAssets = Set(Asset3)
 
-  private val priceAssets       = ConfigFactory.parseString(s"""waves.dex {
+  private val priceAssets = ConfigFactory.parseString(s"""waves.dex {
        |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
        |  blacklisted-names   = ["name$$"]
        |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
@@ -58,11 +62,15 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
   private val settings = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
 
   private def mkBuilder(knownAssets: (IssuedAsset, Option[BriefAssetDescription])*): AssetPairBuilder = {
-    val assetDescription: IssuedAsset => Future[Option[BriefAssetDescription]] = {
-      knownAssets.toMap.mapValues(Future.successful).withDefault { x =>
-        throw new NoSuchElementException(s"Can't find '$x' asset")
-      }
-    }
+    val assetDescription =
+      knownAssets.toMap
+        .map {
+          case (k, Some(x)) => k -> EitherT.pure[Future, MatcherError](AssetsDB.Item(x.name, x.decimals))
+          case (k, None)    => k -> EitherT.leftT[Future, AssetsDB.Item](error.AssetNotFound(k): MatcherError)
+        }
+        .withDefault { x =>
+          throw new NoSuchElementException(s"Can't find '$x' asset")
+        }
     new AssetPairBuilder(settings, assetDescription, blacklistedAssets)
   }
 
@@ -118,13 +126,13 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
           Asset2 -> mkAssetDescription()
         )
 
-        awaitResult {builder.validateAssetPair(AssetPair(Asset2, Asset1)) } should produce("AssetNotFound")
+        awaitResult { builder.validateAssetPair(AssetPair(Asset2, Asset1)) } should produce("AssetNotFound")
       }
       "amount and price assets are the same" in {
         awaitResult { mkBuilder().validateAssetPair(AssetPair(WUSD, WUSD)) } should produce("AssetPairSameAsset")
       }
       "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
-        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), _ => Future.successful(None), blacklistedAssets)
+        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), x => EitherT.leftT(error.AssetNotFound(x): MatcherError), blacklistedAssets)
         val assetPair = AssetPair(Waves, WUSD)
         awaitResult { builder.validateAssetPair(assetPair) } should produce("AssetPairIsDenied")
       }

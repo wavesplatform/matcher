@@ -31,6 +31,8 @@ object WavesBlockchainAsyncClient {
       asset.fold(Applicative[F].pure(briefWavesDescription))(self.assetDescription)
 
     def assetDecimals(asset: Asset.IssuedAsset): F[Option[Int]] = self.assetDescription(asset).map { _.map(_.decimals) }
+
+    // TODO
     def assetDecimals(asset: Asset): F[Option[Int]] = asset.fold { Applicative[F].pure(Option(8)) } { issuedAsset =>
       self.assetDescription(issuedAsset).map { _.map(_.decimals) }
     }

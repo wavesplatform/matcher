@@ -8,12 +8,14 @@ import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, Ba
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
+
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,25 +39,31 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
     }
   }(monixScheduler)
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long]                    = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
-  override def isFeatureActivated(id: Short): Future[Boolean]                                    = expiringFeaturesCache.get(id) map Boolean2boolean
-  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
+  override def isFeatureActivated(id: Short): Future[Boolean]                 = expiringFeaturesCache.get(id) map Boolean2boolean
+  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = {
+    log.info(s"assetDescription(${AssetPair.assetIdStr(asset)})")
+    expiringAssetDescriptionsCache.get(asset).map { x =>
+      log.info(s"assetDescription(${AssetPair.assetIdStr(asset)}): $x")
+      x
+    }
+  }
 
-  def getAssetDecimalsForMatchingRules(assetsFromMatchingRules: Set[AssetPair]): Future[Map[Asset, Int]] = {
-    assetsFromMatchingRules
+  // TODO
+  def assetDescription(pair: Set[AssetPair]): Future[Map[Asset, BriefAssetDescription]] =
+    pair
       .flatMap(assetPair => Set(assetPair.amountAsset, assetPair.priceAsset))
       .toList
-      .traverse(asset => this.assetDecimals(asset).map { asset -> _ })
+      .traverse(asset => assetDescription(asset).map { asset -> _ })
       .flatMap { list =>
-        val (assetsWithDecimals, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
-        if (nonexistentAssets.nonEmpty) {
+        val (r, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
+        if (nonexistentAssets.isEmpty) Future.successful(r.map { case (asset, decimals) => asset -> decimals.get }.toMap)
+        else
           Future.failed(
             new IllegalArgumentException(
               "The following assets specified in waves.dex.matching-rules section do not exist in the blockchain: " +
                 s"${nonexistentAssets.map { case (asset, _) => AssetPair.assetIdStr(asset) }.mkString(", ")}"
             )
           )
-        } else Future.successful(assetsWithDecimals.map { case (asset, decimals) => asset -> decimals.get }.toMap)
       }
-  }
 }

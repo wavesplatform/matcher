@@ -6,6 +6,7 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
+import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -109,8 +110,8 @@ object MatcherKeys {
     )
 
   val AssetPrefix: Short = 23
-  def asset(x: IssuedAsset): Key[(ByteStr, Int)] =
-    Key(
+  def asset(x: IssuedAsset): Key[Option[AssetsDB.Item]] =
+    Key.opt(
       "matcher-asset",
       bytes(AssetPrefix, x.id.arr),
       bytes => {
@@ -119,11 +120,8 @@ object MatcherKeys {
         val name       = new Array[Byte](nameLength)
         bb.get(name)
         val decimals = bb.getInt
-        (ByteStr(name), decimals)
+        AssetsDB.Item(ByteStr(name), decimals)
       },
-      x => {
-        val (name, decimals) = x
-        Ints.toByteArray(name.arr.length) ++ name.arr ++ Ints.toByteArray(decimals)
-      }
+      x => Ints.toByteArray(x.name.arr.length) ++ x.name.arr ++ Ints.toByteArray(x.decimals)
     )
 }

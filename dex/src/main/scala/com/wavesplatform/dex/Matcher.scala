@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
@@ -10,21 +11,25 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database._
 import com.wavesplatform.dex.Matcher.Status
 import com.wavesplatform.dex.api.http.CompositeHttpService
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.caches.{AssetDecimalsCache, AssetsCache, MatchingRulesCache, RateCache}
+import com.wavesplatform.dex.caches.{MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
+import com.wavesplatform.dex.model.OrderValidator.liftValueAsync
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -37,7 +42,7 @@ import monix.eval.Coeval
 import mouse.any._
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -71,7 +76,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
-  private val pairBuilder = new AssetPairBuilder(settings, wavesBlockchainAsyncClient.assetDescription, blacklistedAssets)(grpcExecutionContext)
+  private val pairBuilder = new AssetPairBuilder(settings, getDesc(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_), blacklistedAssets)(grpcExecutionContext)
   private val orderBooks  = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
   private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
@@ -82,8 +87,43 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                                                                   wavesBlockchainAsyncClient.hasScript,
                                                                   wavesBlockchainAsyncClient.isFeatureActivated)
 
-  private val assetDecimalsCache                           = new AssetDecimalsCache(wavesBlockchainSyncClient.assetDescription)
-  private implicit val errorContext: ErrorFormatterContext = (asset: Asset) => assetDecimalsCache.get(asset)
+  private val waves = liftValueAsync[AssetsDB.Item](AssetsDB.Item(
+    name = ByteStr(AssetPair.WavesName.getBytes(StandardCharsets.UTF_8)),
+    decimals = 8
+  ))
+  private def getDecimals(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
+      implicit ec: ExecutionContext): EitherT[Future, MatcherError, (Asset, Int)] = getDesc(assetsDB, assetDesc)(asset).map(x => asset -> x.decimals)
+
+  private def getDesc(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
+    implicit ec: ExecutionContext): EitherT[Future, MatcherError, AssetsDB.Item] = {
+    log.info(s"getDesc(${AssetPair.assetIdStr(asset)})")
+    asset match {
+      case Waves => waves
+      case asset: IssuedAsset =>
+        assetsDB.get(asset) match {
+          case Some(x) => liftValueAsync[AssetsDB.Item](x)
+          case None =>
+            EitherT {
+              assetDesc(asset)
+                .map {
+                  _.toRight[MatcherError](error.AssetNotFound(asset))
+                    .map { desc => // TODO andThen
+                      log.info(s"Got description for ${AssetPair.assetIdStr(asset)}: $desc")
+                      val r = AssetsDB.Item(desc.name, desc.decimals)
+                      assetsDB.put(asset, r)
+                      r
+                    }
+                }
+            }
+        }
+    }
+  }
+
+  private lazy val assetsDB: AssetsDB = AssetsDB(db)
+  private implicit val errorContext: ErrorFormatterContext = {
+    case Asset.Waves        => 8
+    case asset: IssuedAsset => assetsDB.get(asset).map(_.decimals).getOrElse(throw new RuntimeException(s"${AssetPair.assetIdStr(asset)}"))
+  }
 
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val matchingRulesCache = new MatchingRulesCache(settings)
@@ -169,7 +209,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     for {
-      assetDecimals <- assetDecimalsAware(assetsCache, wavesBlockchainAsyncClient.assetDescription(_))(o)
+      assetDecimals <- assetDecimalsAware(getDecimals(assetsDB, wavesBlockchainAsyncClient.assetDescription))(o)
       _             <- liftAsync { syncValidation(assetDecimals) }
       _             <- asyncValidation(assetDecimals)
     } yield o
@@ -225,12 +265,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val snapshotsRestore = Promise[Unit]()
 
   private lazy val db                  = openDB(settings.dataDir)
-  private lazy val assetDb             = AssetsDB(db)
   private lazy val assetPairsDB        = AssetPairsDB(db)
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
   private lazy val orderDB             = OrderDB(settings, db)
-
-  private lazy val assetsCache: AssetsCache = ???
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
@@ -273,15 +310,20 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             )
         },
         orderBooks,
-        (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, matchingRulesAssetDecimals),
+        (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, getDecimalsFromDB),
         wavesBlockchainSyncClient.assetDescription
       ),
       MatcherActor.name
     )
   }
 
+  private def getDecimalsFromDB(asset: Asset): Int = asset match {
+    case Asset.Waves        => 8
+    case asset: IssuedAsset => assetsDB.get(asset).map(_.decimals).getOrElse(throw new RuntimeException(s"${AssetPair.assetIdStr(asset)}"))
+  }
+
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>
-    actorSystem.actorOf(HistoryRouter.props(assetDecimalsCache.get, settings.postgresConnection, orderHistorySettings), "history-router")
+    actorSystem.actorOf(HistoryRouter.props(getDecimalsFromDB, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
   private lazy val addressActors =
@@ -350,9 +392,21 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
-    val startGuard = {
-      wavesBlockchainAsyncClient.getAssetDecimalsForMatchingRules(settings.matchingRules.keySet) flatMap { assetDecimals =>
-        val combinedRoute = new CompositeHttpService(matcherApiTypes, createMatcherApiRoutes(assetDecimals).value, settings.restApi).compositeRoute
+    def loadAllKnownAssets(): Future[Unit] =
+      Future
+        .traverse(assetPairsDB.all().flatMap(_.assets)) { asset =>
+          getDecimals(assetsDB, wavesBlockchainAsyncClient.assetDescription)(asset).value
+        }
+        .map(_ => Unit)
+
+    val startGuard = loadAllKnownAssets().flatMap { _ =>
+      wavesBlockchainAsyncClient.assetDescription(settings.matchingRules.keySet) flatMap { desc =>
+        desc.foreach {
+          case (k: IssuedAsset, v) => assetsDB.put(k, AssetsDB.Item(v.name, v.decimals))
+          case _                   =>
+        }
+        val combinedRoute =
+          new CompositeHttpService(matcherApiTypes, createMatcherApiRoutes(getDecimalsFromDB).value, settings.restApi).compositeRoute
         matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
 
         log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")

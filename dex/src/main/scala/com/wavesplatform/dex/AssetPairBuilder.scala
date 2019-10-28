@@ -5,7 +5,9 @@ import cats.implicits._
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
+import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.OrderValidator.FutureResult
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.Asset
@@ -16,7 +18,7 @@ import kamon.Kamon
 import scala.concurrent.{ExecutionContext, Future}
 
 class AssetPairBuilder(settings: MatcherSettings,
-                       assetDescription: IssuedAsset => Future[Option[BriefAssetDescription]],
+                       assetDescription: IssuedAsset => FutureResult[AssetsDB.Item],
                        blacklistedAssets: Set[IssuedAsset])(implicit ec: ExecutionContext) {
 
   import com.wavesplatform.dex.model.OrderValidator._
@@ -36,27 +38,23 @@ class AssetPairBuilder(settings: MatcherSettings,
       case (Some(pi), Some(ai)) => pi < ai
     }
 
-  private def isBlacklistedByName(asset: IssuedAsset, desc: BriefAssetDescription): Boolean =
+  private def isBlacklistedByName(asset: IssuedAsset, desc: AssetsDB.Item): Boolean =
     settings.blacklistedNames.exists(_.findFirstIn(new String(desc.name, UTF_8)).nonEmpty) // TODO bytes => string ?
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
 
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] = {
     asset.fold[FutureResult[Asset]] { liftValueAsync(Waves) } { asset =>
-      EitherT {
-        assetDescription(asset).map { maybeDesc =>
-          maybeDesc.fold[Result[Asset]] { Left(error.AssetNotFound(asset)) } { desc =>
-            if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
-              Left(
-                side match {
-                  case AssetSide.Unknown => error.AssetBlacklisted(asset)
-                  case AssetSide.Amount  => error.AmountAssetBlacklisted(asset)
-                  case AssetSide.Price   => error.PriceAssetBlacklisted(asset)
-                }
-              )
-            else Right(asset)
-          }
-        }
+      assetDescription(asset).subflatMap { desc =>
+        if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
+          Left(
+            side match {
+              case AssetSide.Unknown => error.AssetBlacklisted(asset)
+              case AssetSide.Amount  => error.AmountAssetBlacklisted(asset)
+              case AssetSide.Price   => error.PriceAssetBlacklisted(asset)
+            }
+          )
+        else Right(asset)
       }
     }
   }

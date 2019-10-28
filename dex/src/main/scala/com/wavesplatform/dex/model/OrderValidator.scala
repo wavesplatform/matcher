@@ -5,12 +5,11 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.caches.{AssetsCache, RateCache}
+import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.MatcherModel.Normalization
@@ -20,7 +19,7 @@ import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSet
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
@@ -464,31 +463,13 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def assetDecimalsAware(assetsCache: AssetsCache, assetDesc: Asset => Future[Option[BriefAssetDescription]])(order: Order)(
+  def assetDecimalsAware(getDecimals: Asset => FutureResult[(Asset, Int)])(order: Order)(
       implicit ec: ExecutionContext): FutureResult[Map[Asset, Int]] = {
     List(
       order.assetPair.amountAsset,
       order.assetPair.priceAsset,
       order.matcherFeeAssetId
-    ).traverse { asset =>
-        if (assetsCache.contains(asset)) liftValueAsync[(Asset, Int)](asset -> assetsCache.decimalsOf(asset))
-        else
-          asset.fold {
-            liftValueAsync[(Asset, Int)](Waves -> 8)
-          } { issuedAsset =>
-            EitherT {
-              assetDesc(issuedAsset)
-                .map {
-                  _.toRight(error.AssetNotFound(issuedAsset))
-                    .map { desc =>
-                      assetsCache.put(issuedAsset, desc.name, desc.decimals)
-                      issuedAsset -> desc.decimals
-                    }
-                }
-            }
-          }
-      }
-      .map(_.toMap)
+    ).traverse(getDecimals).map(_.toMap)
   }
 
   private def lift[T](x: T): Result[T] = x.asRight[MatcherError]

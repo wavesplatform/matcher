@@ -120,7 +120,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson(errorContext)) should produce("amount should be > 0")
+        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
@@ -1028,8 +1028,6 @@ class OrderValidatorSpecification
 
   private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach {
-      case (asset, desc) =>
-        (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
-        (bc.assetDecimals _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc.decimals) })
+      case (asset, desc) => (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
     }
 }

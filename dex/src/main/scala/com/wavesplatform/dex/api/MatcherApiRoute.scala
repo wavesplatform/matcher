@@ -138,7 +138,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {
-              orderValidator(order).value flatMap {
+              orderValidator(order).value.flatMap {
                 case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
                 case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }

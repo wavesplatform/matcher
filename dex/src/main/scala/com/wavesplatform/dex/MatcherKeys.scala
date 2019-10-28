@@ -109,7 +109,7 @@ object MatcherKeys {
       }
     )
 
-  val AssetPrefix: Short = 23
+  val AssetPrefix: Short = 26
   def asset(x: IssuedAsset): Key[Option[AssetsDB.Item]] =
     Key.opt(
       "matcher-asset",

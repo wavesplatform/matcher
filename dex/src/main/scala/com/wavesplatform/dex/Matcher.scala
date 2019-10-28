@@ -32,7 +32,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model.OrderValidator.liftValueAsync
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.extensions.Extension
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -76,8 +76,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
-  private val pairBuilder = new AssetPairBuilder(settings, getDesc(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_), blacklistedAssets)(grpcExecutionContext)
-  private val orderBooks  = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private val pairBuilder =
+    new AssetPairBuilder(settings, getDesc(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_), blacklistedAssets)(grpcExecutionContext)
+  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
   private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
 
@@ -87,15 +88,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                                                                   wavesBlockchainAsyncClient.hasScript,
                                                                   wavesBlockchainAsyncClient.isFeatureActivated)
 
-  private val waves = liftValueAsync[AssetsDB.Item](AssetsDB.Item(
-    name = ByteStr(AssetPair.WavesName.getBytes(StandardCharsets.UTF_8)),
-    decimals = 8
-  ))
+  private val waves = liftValueAsync[AssetsDB.Item](
+    AssetsDB.Item(
+      name = ByteStr(AssetPair.WavesName.getBytes(StandardCharsets.UTF_8)),
+      decimals = 8
+    ))
   private def getDecimals(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
       implicit ec: ExecutionContext): EitherT[Future, MatcherError, (Asset, Int)] = getDesc(assetsDB, assetDesc)(asset).map(x => asset -> x.decimals)
 
   private def getDesc(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-    implicit ec: ExecutionContext): EitherT[Future, MatcherError, AssetsDB.Item] = {
+      implicit ec: ExecutionContext): EitherT[Future, MatcherError, AssetsDB.Item] = {
     log.info(s"getDesc(${AssetPair.assetIdStr(asset)})")
     asset match {
       case Waves => waves
@@ -225,8 +227,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         matcherActor,
         addressActors,
         matcherQueue.storeEvent,
-        p => Option(orderBooks.get()).flatMap(_.get(p)),
-        p => Option(marketStatuses.get(p)),
+        p => Option { orderBooks.get() } flatMap (_ get p),
+        p => Option { marketStatuses.get(p) },
         getActualTickSize = assetPair => {
           matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset, matchingRulesAssetDecimals).tickSize
         },
@@ -290,29 +292,30 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             matcherQueue.startConsume(
               processedOffset + 1,
               xs => {
-                if (xs.isEmpty) Future.successful(())
+                if (xs.isEmpty) Future.successful(Unit)
                 else {
-                  val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
-                    log.debug(s"Consumed $eventWithMeta")
+                  val loadAssets = Future.traverse(xs.map(_.event.assetPair).flatMap(_.assets))(
+                    getDecimals(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_).value)
+                  loadAssets.flatMap { _ =>
+                    val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
+                      log.debug(s"Consumed $eventWithMeta")
+                      self ! eventWithMeta
+                      eventWithMeta.event.assetPair
+                    }(collection.breakOut)
 
-                    self ! eventWithMeta
-                    eventWithMeta.event.assetPair
-                  }(collection.breakOut)
-
-                  self
-                    .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
-                    .recover {
-                      case NonFatal(e) => log.error("PingAll is timed out!", e)
-                    }
-                    .map(_ => ())
+                    self
+                      .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
+                      .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+                      .map(_ => ())
+                  }
                 }
               }
             )
         },
         orderBooks,
         (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, getDecimalsFromDB),
-        wavesBlockchainSyncClient.assetDescription
-      ),
+        wavesBlockchainAsyncClient.assetDescription(_)
+      )(grpcExecutionContext),
       MatcherActor.name
     )
   }
@@ -392,46 +395,54 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
-    def loadAllKnownAssets(): Future[Unit] =
+    def loadAllKnownAssets(): Future[Unit] = {
+      def parseAsset(label: String)(id: String): Asset =
+        AssetPair.extractAssetId(id).getOrElse(throw new RuntimeException(s"Can't decode asset '$id' from $label"))
+
+      val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++
+        settings.priceAssets.map(parseAsset("waves.dex.price-assets")) ++ {
+        settings.orderFee match {
+          case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
+          case _                                 => Set.empty
+        }
+      } ++
+        settings.matchingRules.keySet.flatMap(_.assets) ++
+        settings.blacklistedAssets.map(parseAsset("waves.dex.blacklisted-assets"))
+
       Future
-        .traverse(assetPairsDB.all().flatMap(_.assets)) { asset =>
+        .traverse(assetsToLoad) { asset =>
           getDecimals(assetsDB, wavesBlockchainAsyncClient.assetDescription)(asset).value
         }
-        .map(_ => Unit)
+        .map(_ => Unit) // TODO don't ignore errors, fail fast!
+    }
 
     val startGuard = loadAllKnownAssets().flatMap { _ =>
-      wavesBlockchainAsyncClient.assetDescription(settings.matchingRules.keySet) flatMap { desc =>
-        desc.foreach {
-          case (k: IssuedAsset, v) => assetsDB.put(k, AssetsDB.Item(v.name, v.decimals))
-          case _                   =>
-        }
-        val combinedRoute =
-          new CompositeHttpService(matcherApiTypes, createMatcherApiRoutes(getDecimalsFromDB).value, settings.restApi).compositeRoute
-        matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
+      val combinedRoute =
+        new CompositeHttpService(matcherApiTypes, createMatcherApiRoutes(getDecimalsFromDB).value, settings.restApi).compositeRoute
+      matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
 
-        log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-        actorSystem.actorOf(
-          ExchangeTransactionBroadcastActor
-            .props(
-              settings.exchangeTransactionBroadcast,
-              time,
-              wavesBlockchainSyncClient.wasForged,
-              wavesBlockchainSyncClient.broadcastTx
-            ),
-          "exchange-transaction-broadcast"
-        )
+      log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
+      actorSystem.actorOf(
+        ExchangeTransactionBroadcastActor
+          .props(
+            settings.exchangeTransactionBroadcast,
+            time,
+            wavesBlockchainSyncClient.wasForged,
+            wavesBlockchainSyncClient.broadcastTx
+          ),
+        "exchange-transaction-broadcast"
+      )
 
-        actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+      actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
 
-        for {
-          _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-          deadline = settings.startEventsProcessingTimeout.fromNow
-          lastOffsetQueue <- getLastOffset(deadline)
-          _ = log.info(s"Last queue offset is $lastOffsetQueue")
-          _ <- waitOffsetReached(lastOffsetQueue, deadline)
-          _ = log.info("Last offset has been reached, notify addresses")
-        } yield addressActors ! AddressDirectory.StartSchedules
-      }
+      for {
+        _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
+        deadline = settings.startEventsProcessingTimeout.fromNow
+        lastOffsetQueue <- getLastOffset(deadline)
+        _ = log.info(s"Last queue offset is $lastOffsetQueue")
+        _ <- waitOffsetReached(lastOffsetQueue, deadline)
+        _ = log.info("Last offset has been reached, notify addresses")
+      } yield addressActors ! AddressDirectory.StartSchedules
     }
 
     startGuard.onComplete {

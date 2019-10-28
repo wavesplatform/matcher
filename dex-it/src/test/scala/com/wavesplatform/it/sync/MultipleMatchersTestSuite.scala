@@ -50,19 +50,21 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
   private var successfulCommandsNumber = 0
 
-  override protected def initializeContainers(): Unit = {
-    super.initializeContainers()
-    dockerClient.start(dex2Container)
-    dex2Api.waitReady
-  }
-
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    dockerClient.start(wavesNode1Container)
+    wavesNode1Api.waitReady
+
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(
       mkTransfer(alice, bob, IssueEthTx.quantity / 2, eth),
       mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
     )
+
+    dockerClient.start(dex1Container)
+    dockerClient.start(dex2Container)
+
+    dex1Api.waitReady
+    dex2Api.waitReady
   }
 
   "Place, fill and cancel a lot of orders" in {

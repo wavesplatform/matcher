@@ -159,7 +159,10 @@ object BalanceNotEnough {
     new BalanceNotEnough(mk(required), mk(actual))
 
   private def mk(input: Map[Asset, Long])(implicit ec: ErrorFormatterContext): List[Amount] =
-    input.map(Function.tupled(Amount.apply)).toList.sortBy(x => AssetPair.assetIdStr(x.asset))
+    input
+      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, ec.assetDecimals(id))) }
+      .toList
+      .sortBy(x => AssetPair.assetIdStr(x.asset))
 }
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)

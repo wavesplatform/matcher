@@ -1,12 +1,10 @@
 package com.wavesplatform.dex
 
-import cats.data.EitherT
 import cats.implicits._
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.db.AssetsDB
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.FutureResult
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
@@ -15,7 +13,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class AssetPairBuilder(settings: MatcherSettings,
                        assetDescription: IssuedAsset => FutureResult[AssetsDB.Item],

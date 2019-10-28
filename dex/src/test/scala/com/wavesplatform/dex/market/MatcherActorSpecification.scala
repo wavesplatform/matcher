@@ -41,7 +41,7 @@ class MatcherActorSpecification
   private val defaultAssetDescription =
     Some(BriefAssetDescription(name = "Unknown".getBytes, decimals = 8, hasScript = false))
 
-  private def assetDescription(assetId: IssuedAsset): Option[BriefAssetDescription] = defaultAssetDescription
+  private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultAssetDescription }
 
   "MatcherActor" should {
     "return all open markets" in {

@@ -8,7 +8,6 @@ import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, Ba
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -40,7 +39,9 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
   }(monixScheduler)
 
   override def spendableBalance(address: Address, asset: Asset): Future[Long] = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
-  override def isFeatureActivated(id: Short): Future[Boolean]                 = expiringFeaturesCache.get(id) map Boolean2boolean
+
+  override def isFeatureActivated(id: Short): Future[Boolean] = expiringFeaturesCache.get(id) map Boolean2boolean
+
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = {
     log.info(s"assetDescription(${AssetPair.assetIdStr(asset)})")
     expiringAssetDescriptionsCache.get(asset).map { x =>

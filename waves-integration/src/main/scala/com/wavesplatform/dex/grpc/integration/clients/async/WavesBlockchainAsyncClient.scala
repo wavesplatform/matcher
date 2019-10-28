@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients.async
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -32,4 +33,7 @@ trait WavesBlockchainAsyncClient[F[_]] {
 
   def hasScript(address: Address): F[Boolean]
   def runScript(address: Address, input: Order): F[RunScriptResult]
+
+  def wasForged(txIds: Seq[ByteStr]): F[Map[ByteStr, Boolean]]
+  def broadcastTx(tx: ExchangeTransaction): F[Boolean]
 }

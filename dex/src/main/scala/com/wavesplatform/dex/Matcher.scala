@@ -356,8 +356,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             .props(
               settings.exchangeTransactionBroadcast,
               time,
-              wavesBlockchainSyncClient.wasForged,
-              wavesBlockchainSyncClient.broadcastTx
+              wavesBlockchainAsyncClient.wasForged,
+              wavesBlockchainAsyncClient.broadcastTx
             ),
           "exchange-transaction-broadcast"
         )

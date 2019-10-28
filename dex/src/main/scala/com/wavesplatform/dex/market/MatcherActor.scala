@@ -258,6 +258,7 @@ class MatcherActor(settings: MatcherSettings,
 }
 
 object MatcherActor {
+
   def name: String = "matcher"
 
   def props(matcherSettings: MatcherSettings,
@@ -265,7 +266,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: Asset => Future[Option[BriefAssetDescription]])(implicit ec: ExecutionContext): Props =
+            assetDescription: Asset => Future[Option[BriefAssetDescription]])(implicit ec: ExecutionContext): Props = {
     Props(
       new MatcherActor(
         matcherSettings,
@@ -276,6 +277,7 @@ object MatcherActor {
         assetDescription
       )
     )
+  }
 
   private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: ShutdownStatus = copy(

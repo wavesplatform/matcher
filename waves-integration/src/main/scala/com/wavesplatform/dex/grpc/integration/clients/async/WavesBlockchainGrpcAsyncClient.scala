@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.grpc.integration.clients.async
 
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
@@ -111,5 +113,15 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
     blockchainService
       .runAddressScript { RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB)) }
       .map(parse)
+  }
+
+  override def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = {
+    blockchainService
+      .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
+      .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
+  }
+
+  override def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] = {
+    blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid)
   }
 }

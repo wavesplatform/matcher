@@ -12,7 +12,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-      |  price-assets = ["WAVES"]
+      |  price-assets = ["$UsdId", "WAVES"]
       |  snapshots-interval = $interval
       |}""".stripMargin
   )
@@ -33,8 +33,9 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     .get
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueEthTx, IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Order books are created with right offsets" in {

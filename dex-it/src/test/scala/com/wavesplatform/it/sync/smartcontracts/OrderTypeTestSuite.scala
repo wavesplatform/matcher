@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontracts
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
@@ -7,6 +8,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
+
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
@@ -14,8 +18,9 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Order types verification with SmartContracts" - {

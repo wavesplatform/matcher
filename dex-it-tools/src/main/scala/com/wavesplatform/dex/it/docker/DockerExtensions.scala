@@ -10,12 +10,12 @@ import com.wavesplatform.utils.ScorexLogging
 trait DockerExtensions extends ScorexLogging {
   protected def dockerClient: Docker
 
-  protected def startAndWait(container: DockerContainer, api: HasWaitReady[Id]): Unit = {
+  protected def startAndWait(container: DockerContainer, api: => HasWaitReady[Id]): Unit = {
     dockerClient.start(container)
     api.waitReady
   }
 
-  protected def restartContainer(container: DockerContainer, api: HasWaitReady[Id]): Unit = {
+  protected def restartContainer(container: DockerContainer, api: => HasWaitReady[Id]): Unit = {
     dockerClient.stop(container)
     startAndWait(container, api)
   }

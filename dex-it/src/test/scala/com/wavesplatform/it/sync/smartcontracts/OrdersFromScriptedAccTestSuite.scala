@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
-  private val activationHeight = 4
+  private val activationHeight = 5
 
   override protected val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString(
     s"""waves {

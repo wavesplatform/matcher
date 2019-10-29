@@ -14,8 +14,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(
-      s"""
-         |waves.dex {
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
          |  matching-rules = {
          |    "$WctId-$UsdId": [
          |      {

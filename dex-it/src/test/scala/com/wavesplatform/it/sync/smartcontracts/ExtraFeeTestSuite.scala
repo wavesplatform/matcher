@@ -44,7 +44,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   private val falseFeeAsset   = IssuedAsset(falseFeeAssetTx.id())
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+
     broadcastAndAwait(asset0Tx, asset1Tx, asset2Tx, assetWith2DecTx, feeAssetTx, falseFeeAssetTx, IssueBtcTx)
     broadcastAndAwait(
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset0, 0.005.waves),
@@ -52,6 +53,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
     broadcastAndAwait(mkSetAccountScriptText(alice, Some("true")))
+
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "When matcher executes orders" - {

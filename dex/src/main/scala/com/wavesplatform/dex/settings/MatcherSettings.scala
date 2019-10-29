@@ -80,6 +80,9 @@ object MatcherSettings {
   implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
+  private def unsafeParseAsset(x: String): Asset =
+    AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
     import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
@@ -112,27 +115,32 @@ object MatcherSettings {
     val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
     val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
     val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
-    val baseAssets                   = config.as[List[String]]("price-assets")
-    val blacklistedAssets            = config.as[List[String]]("blacklisted-assets")
-    val blacklistedNames             = config.as[List[String]]("blacklisted-names").map(_.r)
-    val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
-    val blacklistedAddresses         = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache   = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-    val eventsQueue                  = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout       = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                     = config.as[OrderFeeSettings]("order-fee")
-    val deviation                    = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions            = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules                = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly                = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs            = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions         = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed      = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection           = config.as[PostgresConnection]("postgres")
-    val orderHistory                 = config.as[Option[OrderHistorySettings]]("order-history")
-    val defaultGrpcCachesExpiration  = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
-
-    def unsafeParseAsset(x: String): Asset = AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+    val priceAssets                  = config.as[List[String]]("price-assets").map(unsafeParseAsset)
+    val blacklistedAssets = config
+      .as[List[String]]("blacklisted-assets")
+      .map(unsafeParseAsset)
+      .map {
+        case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case x: Asset.IssuedAsset => x
+      }
+      .toSet
+    val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
+    val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
+    val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache  = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val eventsQueue                 = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout      = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                    = config.as[OrderFeeSettings]("order-fee")
+    val deviation                   = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions           = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules               = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly               = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs           = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions        = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection          = config.as[PostgresConnection]("postgres")
+    val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
+    val defaultGrpcCachesExpiration = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -151,13 +159,8 @@ object MatcherSettings {
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
       orderBooksRecoveringTimeout,
-      baseAssets.map(unsafeParseAsset),
-      blacklistedAssets
-        .map(unsafeParseAsset)
-        .map {
-          case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
-          case x: Asset.IssuedAsset => x
-        }(collection.breakOut),
+      priceAssets,
+      blacklistedAssets,
       blacklistedNames,
       maxOrdersPerRequest,
       blacklistedAddresses,

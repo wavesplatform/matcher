@@ -14,7 +14,7 @@ class TradersTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = {
     ConfigFactory.parseString(
       s"""waves.dex {
-         |  price-assets = [ "Aqy7PRU", "$UsdId", "WAVES" ]
+         |  price-assets = [ "$UsdId", "WAVES", "$WctId" ]
          |  grpc.integration.caches.default-expiration = 1ms
          |}""".stripMargin
     )
@@ -23,8 +23,9 @@ class TradersTestSuite extends MatcherSuiteBase {
   val orderVersions: Seq[Byte] = Seq(1, 2, 3)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   private def bobPlacesSellWctOrder(bobCoinAmount: Int, orderVersion: Byte): Order = {
@@ -44,23 +45,23 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val trickyBobWavesPairWB58 = AssetPair(
         amountAsset = wct,
-        priceAsset = IssuedAsset { ByteStr.decodeBase58("WAVES").get }
+        priceAsset = IssuedAsset { ByteStr.decodeBase58(AssetPair.WavesName).get }
       )
 
-      trickyBobWavesPairWB58.key shouldBe wctWavesPair.key
-
-      val trickyBobWavesPairWS = AssetPair(
-        amountAsset = wct,
-        priceAsset = IssuedAsset { ByteStr("WAVES".getBytes) }
-      )
+      trickyBobWavesPairWB58.key shouldBe AssetPair(wct, Waves).key
 
       val trickyBobOrderWB58 = mkOrder(bob, trickyBobWavesPairWB58, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
       dex1Api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
-      val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 1, 10.waves * Order.PriceConstant)
+      val trickyBobWavesPairWS = AssetPair(
+        amountAsset = IssuedAsset { ByteStr(AssetPair.WavesName.getBytes) },
+        priceAsset = wct
+      )
+
+      val trickyBobOrderWS = mkOrder(bob, trickyBobWavesPairWS, OrderType.BUY, 100000, 10000000)
       dex1Api.tryPlace(trickyBobOrderWS) should failWith(
         11534345, // AssetNotFound
-        MatcherError.Params(assetId = Some(trickyBobWavesPairWS.priceAssetStr))
+        MatcherError.Params(assetId = Some(trickyBobWavesPairWS.amountAssetStr))
       )
 
       val correctBobOrder = mkOrder(bob, wctWavesPair, OrderType.BUY, 1, 10.waves * Order.PriceConstant)

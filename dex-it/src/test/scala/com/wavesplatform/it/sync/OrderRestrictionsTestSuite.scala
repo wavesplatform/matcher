@@ -10,6 +10,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     ConfigFactory.parseString(
       s"""
          |waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
          |  order-restrictions = {
          |   "$WctId-$UsdId": {
          |     min-amount  = 0.1
@@ -25,8 +26,9 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "low amount" in {

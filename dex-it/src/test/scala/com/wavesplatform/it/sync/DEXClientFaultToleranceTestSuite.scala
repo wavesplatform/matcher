@@ -15,11 +15,14 @@ import scala.util.Try
 
 class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex.grpc.integration.waves-node-grpc {
-      |  host = $wavesNodesDomain
-      |  port = 6887
-      |}""".stripMargin
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$UsdId", "WAVES" ]
+       |  grpc.integration.waves-node-grpc {
+       |    host = $wavesNodesDomain
+       |    port = 6887
+       |  }
+       |}""".stripMargin
   )
 
   private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-2") }
@@ -30,8 +33,9 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
   }
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "DEXClient should works correctly despite of the short connection losses" in {

@@ -269,8 +269,8 @@ object OrderValidator extends ScorexLogging {
     cond(requiredFeeAssets contains order.matcherFeeAssetId, order, error.UnexpectedFeeAsset(requiredFeeAssets, order.matcherFeeAssetId))
   }
 
-  private def validateFee(order: Order, orderFeeSettings: OrderFeeSettings, assetDecimals: Asset => Int, rateCache: RateCache): Result[Order] = {
-
+  private def validateFee(order: Order, orderFeeSettings: OrderFeeSettings, assetDecimals: Asset => Int, rateCache: RateCache)(
+      implicit efc: ErrorFormatterContext): Result[Order] = {
     getMinValidFeeForSettings(order, orderFeeSettings, assetDecimals, rateCache) flatMap { requiredFee =>
       cond(order.matcherFee >= requiredFee, order, error.FeeNotEnough(requiredFee, order.matcherFee, order.matcherFeeAssetId))
     }
@@ -281,7 +281,7 @@ object OrderValidator extends ScorexLogging {
                            blacklistedAssets: Set[IssuedAsset],
                            matcherSettings: MatcherSettings,
                            assetDecimals: Asset => Int,
-                           rateCache: RateCache)(order: Order): Result[Order] = {
+                           rateCache: RateCache)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       asset.fold { success }(issuedAsset => cond(!blacklistedAssets(issuedAsset), Unit, e(issuedAsset)))

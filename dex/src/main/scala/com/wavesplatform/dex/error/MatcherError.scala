@@ -102,13 +102,22 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
-case class FeeNotEnough(required: Double, given: Double, theAsset: Asset)
+case class FeeNotEnough(required: Amount, given: Amount)
     extends MatcherError(
       order,
       fee,
       notEnough,
-      e"Required ${'required -> Amount(theAsset, required)} as fee for this order, but given ${'given -> Amount(theAsset, given)}"
+      e"Required ${'required -> required} as fee for this order, but given ${'given -> given}"
     )
+object FeeNotEnough {
+  def apply(required: Long, given: Long, asset: Asset)(implicit efc: ErrorFormatterContext): FeeNotEnough = {
+    val decimals = efc.assetDecimals(asset)
+    new FeeNotEnough(
+      required = Amount(asset, Denormalization.denormalizeAmountAndFee(required, decimals)),
+      given = Amount(asset, Denormalization.denormalizeAmountAndFee(given, decimals))
+    )
+  }
+}
 
 case class AssetNotFound(theAsset: IssuedAsset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> theAsset} not found")
 

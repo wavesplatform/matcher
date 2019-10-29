@@ -206,7 +206,7 @@ class AddressActorSpecification
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
             ntpTime,
             EmptyOrderDB,
-            _ => false,
+            _ => Future.successful(false),
             event => {
               eventsProbe.ref ! event
               Future.successful { Some(QueueEventWithMeta(0, 0, event)) }

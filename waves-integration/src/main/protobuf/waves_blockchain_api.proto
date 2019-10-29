@@ -10,7 +10,7 @@ import "google/protobuf/empty.proto";
 
 service WavesBlockchainApi {
 
-    rpc GetStatuses (TransactionsByIdRequest) returns (stream TransactionStatus);
+    rpc GetStatuses (TransactionsByIdRequest) returns (TransactionsStatusesResponse);
 
     rpc Broadcast (BroadcastRequest) returns (BroadcastResponse);
 
@@ -70,6 +70,10 @@ message TransactionStatus {
     bytes id = 1;
     Status status = 2;
     int64 height = 3;
+}
+
+message TransactionsStatusesResponse {
+    repeated TransactionStatus transactions_statutes = 1;
 }
 
 message BroadcastRequest {

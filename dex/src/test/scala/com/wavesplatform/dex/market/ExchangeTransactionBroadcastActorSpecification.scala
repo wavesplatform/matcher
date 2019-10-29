@@ -18,6 +18,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class ExchangeTransactionBroadcastActorSpecification
@@ -35,13 +36,21 @@ class ExchangeTransactionBroadcastActorSpecification
 
   private val pair = AssetPair(IssuedAsset(Array.emptyByteArray), Waves)
 
+  private def getConfirmation(allConfirmed: Boolean): Future[Map[ByteStr, Boolean]] = Future.successful {
+    Map.empty[ByteStr, Boolean].withDefaultValue(allConfirmed)
+  }
+
   "ExchangeTransactionBroadcastActor" should {
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      defaultActor(ntpTime, isConfirmed = _ => false, broadcast = tx => {
-        broadcasted = List(tx)
-        true
-      })
+      defaultActor(
+        ntpTime,
+        isConfirmed = _ => getConfirmation(false),
+        broadcast = tx => {
+          broadcasted = List(tx)
+          Future.successful(true)
+        }
+      )
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -52,10 +61,14 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "broadcast a transaction in a next period if it wasn't confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => false, broadcast = tx => {
-        broadcasted = List(tx)
-        true
-      })
+      val actor = defaultActor(
+        ntpTime,
+        isConfirmed = _ => getConfirmation(false),
+        broadcast = tx => {
+          broadcasted = List(tx)
+          Future.successful(true)
+        }
+      )
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -71,10 +84,15 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "doesn't broadcast a transaction if it was confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = tx => {
-        broadcasted = List(tx)
-        true
-      })
+      val actor =
+        defaultActor(
+          ntpTime,
+          isConfirmed = _ => getConfirmation(true),
+          broadcast = tx => {
+            broadcasted = List(tx)
+            Future.successful(true)
+          }
+        )
 
       val event = sampleEvent()
       system.eventStream.publish(event)
@@ -89,10 +107,15 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "doesn't broadcast an expired transaction" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      val actor       = defaultActor(ntpTime, isConfirmed = _ => true, broadcast = tx => {
-        broadcasted = List(tx)
-        true
-      })
+      val actor =
+        defaultActor(
+          ntpTime,
+          isConfirmed = _ => getConfirmation(true),
+          broadcast = tx => {
+            broadcasted = List(tx)
+            Future.successful(true)
+          }
+        )
 
       val event = sampleEvent(500.millis)
       system.eventStream.publish(event)
@@ -107,8 +130,8 @@ class ExchangeTransactionBroadcastActorSpecification
   }
 
   private def defaultActor(time: Time,
-                           isConfirmed: ByteStr => Boolean,
-                           broadcast: ExchangeTransaction => Boolean): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
+                           isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+                           broadcast: ExchangeTransaction => Future[Boolean]): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
     new ExchangeTransactionBroadcastActor(
       settings = ExchangeTransactionBroadcastSettings(
         broadcastUntilConfirmed = true,

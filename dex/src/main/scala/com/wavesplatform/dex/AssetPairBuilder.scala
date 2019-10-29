@@ -83,6 +83,7 @@ object AssetPairBuilder {
   val assetIdOrdering: Ordering[Option[ByteStr]] = Ordering.Option[ByteStr]
 
   private sealed trait AssetSide
+
   private object AssetSide {
     case object Unknown extends AssetSide
     case object Amount  extends AssetSide

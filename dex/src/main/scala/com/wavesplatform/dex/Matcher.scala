@@ -303,11 +303,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                       eventWithMeta.event.assetPair
                     }(collection.breakOut)
 
-                    self
-                      .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
-                      .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-                      .map(_ => ())
-                  }
+                  self
+                    .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
+                    .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
+                    .map(_ => Unit)
                 }
               }
             )
@@ -343,7 +342,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
                 time,
                 orderDB,
-                wavesBlockchainSyncClient.forgedOrder,
+                wavesBlockchainAsyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
                 startSchedules,
@@ -427,8 +426,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
           .props(
             settings.exchangeTransactionBroadcast,
             time,
-            wavesBlockchainSyncClient.wasForged,
-            wavesBlockchainSyncClient.broadcastTx
+            wavesBlockchainAsyncClient.wasForged,
+            wavesBlockchainAsyncClient.broadcastTx
           ),
         "exchange-transaction-broadcast"
       )

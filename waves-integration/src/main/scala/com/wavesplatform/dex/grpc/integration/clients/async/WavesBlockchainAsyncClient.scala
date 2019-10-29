@@ -9,20 +9,14 @@ import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import monix.reactive.Observable
 
 object WavesBlockchainAsyncClient {
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
 
-  private val briefWavesDescription =
-    Option(
-      BriefAssetDescription(
-        name = AssetPair.WavesName,
-        decimals = 8,
-        hasScript = false
-      ))
+  private val briefWavesDescription = Option(BriefAssetDescription.waves)
 
   final implicit class Ops[F[_]: Functor: Applicative](val self: WavesBlockchainAsyncClient[F]) {
     def assetDescription(asset: Asset): F[Option[BriefAssetDescription]] =

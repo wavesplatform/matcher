@@ -96,7 +96,7 @@ class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
       val issueTx = IssueEthTx
       wavesSyncClient.assetDescription(IssuedAsset(issueTx.id())) shouldBe Some(
         BriefAssetDescription(
-          name = ByteStr(issueTx.name),
+          name = new String(issueTx.name, StandardCharsets.UTF_8),
           decimals = issueTx.decimals,
           hasScript = issueTx.script.nonEmpty
         ))

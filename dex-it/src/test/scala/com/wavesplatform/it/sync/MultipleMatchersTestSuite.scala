@@ -51,8 +51,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private var successfulCommandsNumber = 0
 
   override protected def beforeAll(): Unit = {
-    dockerClient.start(wavesNode1Container)
-    wavesNode1Api.waitReady
+    startAndWait(wavesNode1Container(), wavesNode1Api)
 
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(

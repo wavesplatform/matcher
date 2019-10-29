@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
@@ -120,8 +121,11 @@ object MatcherKeys {
         val name       = new Array[Byte](nameLength)
         bb.get(name)
         val decimals = bb.getInt
-        AssetsDB.Item(ByteStr(name), decimals)
+        AssetsDB.Item(new String(name, StandardCharsets.UTF_8), decimals)
       },
-      x => Ints.toByteArray(x.name.arr.length) ++ x.name.arr ++ Ints.toByteArray(x.decimals)
+      x => {
+        val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals)
+      }
     )
 }

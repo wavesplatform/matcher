@@ -1,14 +1,11 @@
 package com.wavesplatform.dex
 
-import cats.data.EitherT
-import cats.instances.future._
-import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.db.AssetsDB
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator.{FutureResult, Result}
+import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
@@ -19,9 +16,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
 
 class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
   import AssetPairBuilderSpec._
@@ -65,8 +62,8 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     val assetDescription =
       knownAssets.toMap
         .map {
-          case (k, Some(x)) => k -> EitherT.pure[Future, MatcherError](AssetsDB.Item(x.name, x.decimals))
-          case (k, None)    => k -> EitherT.leftT[Future, AssetsDB.Item](error.AssetNotFound(k): MatcherError)
+          case (k, Some(x)) => k -> liftValueAsync[AssetsDB.Item](AssetsDB.Item(x.name, x.decimals))
+          case (k, None)    => k -> liftErrorAsync[AssetsDB.Item](error.AssetNotFound(k))
         }
         .withDefault { x =>
           throw new NoSuchElementException(s"Can't find '$x' asset")
@@ -132,7 +129,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
         awaitResult { mkBuilder().validateAssetPair(AssetPair(WUSD, WUSD)) } should produce("AssetPairSameAsset")
       }
       "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
-        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), x => EitherT.leftT(error.AssetNotFound(x): MatcherError), blacklistedAssets)
+        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), x => liftErrorAsync(error.AssetNotFound(x)), blacklistedAssets)
         val assetPair = AssetPair(Waves, WUSD)
         awaitResult { builder.validateAssetPair(assetPair) } should produce("AssetPairIsDenied")
       }
@@ -143,5 +140,5 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
   private def mkAssetDescription(assetName: String = ""): Option[BriefAssetDescription] =
-    Some(BriefAssetDescription(name = assetName.getBytes(Charsets.UTF_8), decimals = 8, hasScript = false))
+    Some(BriefAssetDescription(name = assetName, decimals = 8, hasScript = false))
 }

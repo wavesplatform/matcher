@@ -9,6 +9,7 @@ import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import future.com.wavesplatform.transaction.assets.exchange.Implicits.AssetPairOps
 import net.ceedubs.ficus.Ficus._
@@ -39,8 +40,13 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
-    settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
-    settings.blacklistedAssets shouldBe Set("a")
+    settings.priceAssets should be(
+      Seq(
+        Waves,
+        AssetPair.extractAssetId("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get,
+        AssetPair.extractAssetId("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J").get
+      ))
+    settings.blacklistedAssets shouldBe Set(AssetPair.extractAssetId("AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck").get.asInstanceOf[IssuedAsset])
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(

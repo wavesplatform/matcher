@@ -39,14 +39,14 @@ object MatcherError {
 
 case class Amount(asset: Asset, volume: Double)
 object Amount {
-  private[error] def apply(asset: Asset, volume: Long)(implicit ec: ErrorFormatterContext): Amount =
-    Amount(asset, Denormalization.denormalizeAmountAndFee(volume, ec.assetDecimals(asset)))
+  private[error] def apply(asset: Asset, volume: Long)(implicit efc: ErrorFormatterContext): Amount =
+    Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.assetDecimals(asset)))
 }
 
 case class Price(assetPair: AssetPair, volume: Double)
 object Price {
-  private[error] def apply(assetPair: AssetPair, volume: Long)(implicit ec: ErrorFormatterContext): Price =
-    Price(assetPair, Denormalization.denormalizePrice(volume, ec.assetDecimals(assetPair.amountAsset), ec.assetDecimals(assetPair.priceAsset)))
+  private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
+    Price(assetPair, Denormalization.denormalizePrice(volume, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)))
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
@@ -164,12 +164,12 @@ case class BalanceNotEnough(required: List[Amount], actual: List[Amount])
     )
 
 object BalanceNotEnough {
-  def apply(required: Map[Asset, Long], actual: Map[Asset, Long])(implicit ec: ErrorFormatterContext): BalanceNotEnough =
+  def apply(required: Map[Asset, Long], actual: Map[Asset, Long])(implicit efc: ErrorFormatterContext): BalanceNotEnough =
     new BalanceNotEnough(mk(required), mk(actual))
 
-  private def mk(input: Map[Asset, Long])(implicit ec: ErrorFormatterContext): List[Amount] =
+  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] =
     input
-      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, ec.assetDecimals(id))) }
+      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
       .toList
       .sortBy(x => AssetPair.assetIdStr(x.asset))
 }
@@ -291,7 +291,7 @@ case class DeviantOrderPrice(orderType: OrderType, orderPrice: Price, deviationS
            |${'bestAskPercent -> (100 + deviationSettings.maxPriceProfit)}% of best ask price"""
     )
 object DeviantOrderPrice {
-  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit ec: ErrorFormatterContext): DeviantOrderPrice =
+  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderPrice =
     DeviantOrderPrice(ord.orderType, Price(ord.assetPair, ord.price), deviationSettings)
 }
 
@@ -308,7 +308,7 @@ case class DeviantOrderMatcherFee(orderType: OrderType, matcherFee: Amount, devi
          |matcher fee >= ${'bestBidFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
 object DeviantOrderMatcherFee {
-  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit ec: ErrorFormatterContext): DeviantOrderMatcherFee =
+  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderMatcherFee =
     DeviantOrderMatcherFee(ord.orderType, Amount(ord.matcherFeeAssetId, ord.matcherFee), deviationSettings)
 }
 
@@ -358,7 +358,7 @@ case class OrderInvalidAmount(orderAmount: Amount, amtSettings: OrderRestriction
     )
 
 object OrderInvalidAmount {
-  def apply(ord: Order, amtSettings: OrderRestrictionsSettings)(implicit ec: ErrorFormatterContext): OrderInvalidAmount =
+  def apply(ord: Order, amtSettings: OrderRestrictionsSettings)(implicit efc: ErrorFormatterContext): OrderInvalidAmount =
     OrderInvalidAmount(Amount(ord.assetPair.amountAsset, ord.amount), amtSettings)
 }
 
@@ -379,7 +379,7 @@ case class OrderInvalidPrice(orderPrice: Price, prcSettings: OrderRestrictionsSe
     )
 
 object OrderInvalidPrice {
-  def apply(ord: Order, prcSettings: OrderRestrictionsSettings)(implicit ec: ErrorFormatterContext): OrderInvalidPrice =
+  def apply(ord: Order, prcSettings: OrderRestrictionsSettings)(implicit efc: ErrorFormatterContext): OrderInvalidPrice =
     OrderInvalidPrice(Price(ord.assetPair, ord.price), prcSettings)
 }
 
@@ -402,7 +402,7 @@ case class InvalidMarketOrderPrice(orderType: OrderType, orderPrice: Price)
     )
 
 object InvalidMarketOrderPrice {
-  def apply(mo: Order)(implicit ec: ErrorFormatterContext): InvalidMarketOrderPrice =
+  def apply(mo: Order)(implicit efc: ErrorFormatterContext): InvalidMarketOrderPrice =
     InvalidMarketOrderPrice(mo.orderType, Price(mo.assetPair, mo.price))
 }
 
@@ -418,7 +418,7 @@ case class OrderInvalidPriceLevel(orderPrice: Price, minOrderPrice: Price)
        |Orders can not be placed into level with price 0"""
     )
 object OrderInvalidPriceLevel {
-  def apply(ord: Order, tickSize: Long)(implicit ec: ErrorFormatterContext): OrderInvalidPriceLevel =
+  def apply(ord: Order, tickSize: Long)(implicit efc: ErrorFormatterContext): OrderInvalidPriceLevel =
     OrderInvalidPriceLevel(Price(ord.assetPair, ord.price), Price(ord.assetPair, tickSize))
 }
 

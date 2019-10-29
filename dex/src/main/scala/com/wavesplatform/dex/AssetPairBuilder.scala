@@ -1,11 +1,10 @@
 package com.wavesplatform.dex
 
 import cats.implicits._
-import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
 import com.wavesplatform.dex.db.AssetsDB
-import com.wavesplatform.dex.model.OrderValidator.FutureResult
+import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.Asset
@@ -15,9 +14,8 @@ import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
 
-class AssetPairBuilder(settings: MatcherSettings,
-                       assetDescription: IssuedAsset => FutureResult[AssetsDB.Item],
-                       blacklistedAssets: Set[IssuedAsset])(implicit ec: ExecutionContext) {
+class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset => FutureResult[AssetsDB.Item], blacklistedAssets: Set[IssuedAsset])(
+    implicit ec: ExecutionContext) {
 
   import com.wavesplatform.dex.model.OrderValidator._
 
@@ -29,7 +27,7 @@ class AssetPairBuilder(settings: MatcherSettings,
   private[this] val validate = timer.refine("action" -> "validate")
 
   def isCorrectlyOrdered(pair: AssetPair): Boolean =
-    (indices.get(pair.priceAssetStr), indices.get(pair.amountAssetStr)) match {
+    (indices.get(pair.priceAsset), indices.get(pair.amountAsset)) match {
       case (None, None)         => pair.priceAsset.compatId < pair.amountAsset.compatId
       case (Some(_), None)      => true
       case (None, Some(_))      => false
@@ -37,7 +35,7 @@ class AssetPairBuilder(settings: MatcherSettings,
     }
 
   private def isBlacklistedByName(asset: IssuedAsset, desc: AssetsDB.Item): Boolean =
-    settings.blacklistedNames.exists(_.findFirstIn(new String(desc.name, UTF_8)).nonEmpty) // TODO bytes => string ?
+    settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
 

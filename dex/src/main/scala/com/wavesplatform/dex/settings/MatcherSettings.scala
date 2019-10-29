@@ -4,6 +4,7 @@ import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
@@ -15,6 +16,7 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.settings.GRPCSettings
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -22,7 +24,6 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
@@ -43,8 +44,8 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
                            orderBooksRecoveringTimeout: FiniteDuration,
-                           priceAssets: Seq[String],
-                           blacklistedAssets: Set[String],
+                           priceAssets: Seq[Asset],
+                           blacklistedAssets: Set[Asset.IssuedAsset],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
@@ -62,7 +63,15 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
-                           defaultGrpcCachesExpiration: FiniteDuration)
+                           defaultGrpcCachesExpiration: FiniteDuration) {
+  def mentionedAssets: Set[Asset] =
+    priceAssets.toSet ++ blacklistedAssets ++ {
+      orderFee match {
+        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
+        case _                                 => Set.empty
+      }
+    } ++ orderRestrictions.keySet.flatMap(_.assets) ++ matchingRules.keySet.flatMap(_.assets) ++ allowedAssetPairs.flatMap(_.assets)
+}
 
 case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
 
@@ -123,6 +132,8 @@ object MatcherSettings {
     val orderHistory                 = config.as[Option[OrderHistorySettings]]("order-history")
     val defaultGrpcCachesExpiration  = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
 
+    def unsafeParseAsset(x: String): Asset = AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+
     MatcherSettings(
       addressSchemeCharacter,
       accountStorage,
@@ -140,8 +151,13 @@ object MatcherSettings {
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
       orderBooksRecoveringTimeout,
-      baseAssets,
-      blacklistedAssets.toSet,
+      baseAssets.map(unsafeParseAsset),
+      blacklistedAssets
+        .map(unsafeParseAsset)
+        .map {
+          case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
+          case x: Asset.IssuedAsset => x
+        }(collection.breakOut),
       blacklistedNames,
       maxOrdersPerRequest,
       blacklistedAddresses,

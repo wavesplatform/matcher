@@ -3,6 +3,7 @@ package com.wavesplatform.dex.error
 import cats.Contravariant
 import play.api.libs.json.{JsValue, Writes}
 
+// TODO: Replace by play's one
 trait ContextWrites[-T] {
   def writes(input: T): JsValue
 }

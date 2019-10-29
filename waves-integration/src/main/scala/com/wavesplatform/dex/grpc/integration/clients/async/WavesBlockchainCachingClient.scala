@@ -42,13 +42,7 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
 
   override def isFeatureActivated(id: Short): Future[Boolean] = expiringFeaturesCache.get(id) map Boolean2boolean
 
-  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = {
-    log.info(s"assetDescription(${AssetPair.assetIdStr(asset)})")
-    expiringAssetDescriptionsCache.get(asset).map { x =>
-      log.info(s"assetDescription(${AssetPair.assetIdStr(asset)}): $x")
-      x
-    }
-  }
+  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
 
   // TODO
   def assetDescription(pair: Set[AssetPair]): Future[Map[Asset, BriefAssetDescription]] =

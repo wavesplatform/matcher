@@ -17,6 +17,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
@@ -51,7 +52,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            getActualTickSize: AssetPair => Double,
-                           orderValidator: Order => OrderValidator.FutureResult[Order],
+                           orderValidator: Order => FutureResult[Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
@@ -138,7 +139,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {
-              orderValidator(order).value.flatMap {
+              orderValidator(order).value flatMap {
                 case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
                 case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }

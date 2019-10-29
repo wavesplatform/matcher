@@ -1,23 +1,21 @@
 package com.wavesplatform.dex.api
 
+import java.nio.charset.StandardCharsets
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
-import cats.data.EitherT
-import cats.instances.future._
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.AssetsDB
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -38,7 +36,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   private val asset = IssuedAsset(smartAssetTx.id())
 
   private val smartAssetDesc = BriefAssetDescription(
-    name = ByteStr(smartAssetTx.name),
+    name = new String(smartAssetTx.name, StandardCharsets.UTF_8),
     decimals = smartAssetTx.decimals,
     hasScript = false
   )
@@ -207,8 +205,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       assetPairBuilder = new AssetPairBuilder(
         settings,
         x => {
-          if (x == asset) EitherT.pure[Future, MatcherError](AssetsDB.Item(name = ByteStr(smartAssetDesc.name), decimals = smartAssetDesc.decimals))
-          else EitherT.leftT[Future, AssetsDB.Item](error.AssetNotFound(x): MatcherError)
+          if (x == asset) liftValueAsync[AssetsDB.Item](AssetsDB.Item(smartAssetDesc.name, smartAssetDesc.decimals))
+          else liftErrorAsync[AssetsDB.Item](error.AssetNotFound(x))
         },
         Set.empty
       ),
@@ -219,7 +217,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       orderBook = _ => None,
       getMarketStatus = _ => None,
       getActualTickSize = _ => 0.1,
-      orderValidator = _ => OrderValidator.liftErrorAsync { error.FeatureNotImplemented },
+      orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,

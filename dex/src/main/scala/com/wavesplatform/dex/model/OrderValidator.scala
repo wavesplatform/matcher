@@ -6,6 +6,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
@@ -35,7 +36,6 @@ import scala.math.BigDecimal.RoundingMode
 object OrderValidator extends ScorexLogging {
 
   type Result[T]       = Either[MatcherError, T]
-  type FutureResult[T] = EitherT[Future, MatcherError, T]
   type AsyncBlockchain = WavesBlockchainAsyncClient[Future]
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
@@ -278,13 +278,12 @@ object OrderValidator extends ScorexLogging {
 
   def matcherSettingsAware(matcherPublicKey: PublicKey,
                            blacklistedAddresses: Set[Address],
-                           blacklistedAssets: Set[IssuedAsset],
                            matcherSettings: MatcherSettings,
                            assetDecimals: Asset => Int,
                            rateCache: RateCache)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
-      asset.fold { success }(issuedAsset => cond(!blacklistedAssets(issuedAsset), Unit, e(issuedAsset)))
+      asset.fold { success }(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), Unit, e(issuedAsset)))
 
     for {
       _ <- lift(order)
@@ -472,13 +471,7 @@ object OrderValidator extends ScorexLogging {
     ).traverse(getDecimals).map(_.toMap)
   }
 
-  private def lift[T](x: T): Result[T] = x.asRight[MatcherError]
-
-  def liftAsync[T](result: Result[T]): FutureResult[T]                                 = EitherT { Future.successful(result) }
-  def liftValueAsync[T](value: T): FutureResult[T]                                     = EitherT { Future.successful(value.asRight[MatcherError]) }
-  def liftErrorAsync[T](error: MatcherError): FutureResult[T]                          = EitherT { Future.successful(error.asLeft[T]) }
-  def liftFutureAsync[T](x: Future[T])(implicit ex: ExecutionContext): FutureResult[T] = EitherT.right[MatcherError](x)
-
-  def success: Result[Unit]            = lift(Unit)
-  def successAsync: FutureResult[Unit] = liftValueAsync(Unit)
+  private def lift[T](x: T): Result[T]                 = x.asRight[MatcherError]
+  def liftAsync[T](result: Result[T]): FutureResult[T] = EitherT { Future.successful(result) }
+  def success: Result[Unit]                            = lift(Unit)
 }

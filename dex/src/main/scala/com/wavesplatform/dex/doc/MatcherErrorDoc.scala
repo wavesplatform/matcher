@@ -5,6 +5,7 @@ import com.wavesplatform.dex.meta.DescendantSamples
 import com.wavesplatform.dex.util.getSimpleName
 import play.api.libs.json.Json
 
+// TODO check generated doc and compare with current
 object MatcherErrorDoc {
   object entitySamples extends DescendantSamples[Entity]
   object classSamples  extends DescendantSamples[Class]

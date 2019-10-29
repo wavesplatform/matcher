@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.async
 
-import java.nio.charset.StandardCharsets
-
 import cats.syntax.functor._
 import cats.{Applicative, Functor}
 import com.wavesplatform.account.Address
@@ -11,7 +9,7 @@ import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import monix.reactive.Observable
 
 object WavesBlockchainAsyncClient {
@@ -21,7 +19,7 @@ object WavesBlockchainAsyncClient {
   private val briefWavesDescription =
     Option(
       BriefAssetDescription(
-        name = ByteStr("WAVES".getBytes(StandardCharsets.UTF_8)),
+        name = AssetPair.WavesName,
         decimals = 8,
         hasScript = false
       ))
@@ -32,10 +30,7 @@ object WavesBlockchainAsyncClient {
 
     def assetDecimals(asset: Asset.IssuedAsset): F[Option[Int]] = self.assetDescription(asset).map { _.map(_.decimals) }
 
-    // TODO
-    def assetDecimals(asset: Asset): F[Option[Int]] = asset.fold { Applicative[F].pure(Option(8)) } { issuedAsset =>
-      self.assetDescription(issuedAsset).map { _.map(_.decimals) }
-    }
+    def assetDecimals(asset: Asset): F[Option[Int]] = asset.fold { Applicative[F].pure(Option(8)) } { assetDecimals }
   }
 }
 

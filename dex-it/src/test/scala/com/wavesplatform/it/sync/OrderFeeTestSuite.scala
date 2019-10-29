@@ -35,13 +35,9 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
   )
 
   override protected def beforeAll(): Unit = {
-    dockerClient.start(wavesNode1Container())
-    wavesNode1Api.waitReady
-
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx)
-
-    dockerClient.start(dex1Container())
-    dex1Api.waitReady
+    startAndWait(dex1Container(), dex1Api)
   }
 
   private def mkBobOrder: Order = mkOrder(

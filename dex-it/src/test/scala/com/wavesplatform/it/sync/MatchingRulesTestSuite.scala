@@ -68,13 +68,9 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     // A custom initialization to guarantee that assets are in the blockchain
-    dockerClient.start(wavesNode1Container())
-    wavesNode1Api.waitReady
-
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
-
-    dockerClient.start(dex1Container())
-    dex1Api.waitReady
+    startAndWait(dex1Container(), dex1Api)
   }
 
   def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {

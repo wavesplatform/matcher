@@ -2,6 +2,7 @@ package com.wavesplatform.dex.error
 
 import cats.Contravariant
 
+// TODO: Replace by Show?
 trait ContextShow[-T] {
   def show(input: T): String
 }

@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
@@ -17,7 +16,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
       |}""".stripMargin
   )
 
-  private val assetPair1 = createAssetPair(eth, usd)
+  private val assetPair1 = ethUsdPair
   private val assetPair2 = ethWavesPair
 
   private val ordersPack1Size = 11

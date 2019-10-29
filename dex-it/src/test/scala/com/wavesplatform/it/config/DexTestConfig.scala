@@ -24,6 +24,7 @@ object DexTestConfig {
       AssetPair(a2, a1)
   }
 
+  // TODO remove
   def createAssetPair(asset1: Asset, asset2: Asset): AssetPair =
     if (AssetPairBuilder.assetIdOrdering.compare(asset1.compatId, asset2.compatId) > 0) AssetPair(asset1, asset2)
     else AssetPair(asset2, asset1)

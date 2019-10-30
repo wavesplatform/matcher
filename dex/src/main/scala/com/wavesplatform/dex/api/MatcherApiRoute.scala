@@ -3,7 +3,8 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directive0, Directive1, Route}
+import akka.http.scaladsl.server
+import akka.http.scaladsl.server._
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
@@ -23,6 +24,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
+import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
@@ -75,6 +77,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
+
+  private val rateParsingRejectionsHandler =
+    server.RejectionHandler
+      .newBuilder()
+      .handle {
+        case UnsupportedRequestContentTypeRejection(_) | ValidationRejection(_, Some(_: PlayJsonException)) =>
+          complete { RateError(error.InvalidRateInput) }
+      }
+      .result()
 
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
@@ -194,19 +205,24 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = true)
     )
   )
-  def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
-    entity(as[Double]) { rate =>
-      withAsset(a) { asset =>
-        complete(
-          if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be changed")
-          else {
-            val assetStr = AssetPair.assetIdStr(asset)
-            rateCache.upsertRate(asset, rate) match {
-              case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
-              case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+  def upsertRate: Route = {
+    (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
+      handleRejections(rateParsingRejectionsHandler) {
+        entity(as[Double]) { rate =>
+          if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
+            withAsset(a) { asset =>
+              complete(
+                if (asset == Waves) RateError(error.WavesImmutableRate)
+                else {
+                  val assetStr = AssetPair.assetIdStr(asset)
+                  rateCache.upsertRate(asset, rate) match {
+                    case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
+                    case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+                  }
+                }
+              )
             }
-          }
-        )
+        }
       }
     }
   }
@@ -221,12 +237,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
-        if (asset == Waves) StatusCodes.BadRequest -> wrapMessage("Rate for Waves cannot be deleted")
+        if (asset == Waves) RateError(error.WavesImmutableRate)
         else {
           val assetStr = AssetPair.assetIdStr(asset)
           rateCache.deleteRate(asset) match {
-            case None     => StatusCodes.NotFound -> wrapMessage(s"Rate for the asset $assetStr is not specified")
-            case Some(pv) => StatusCodes.OK       -> wrapMessage(s"Rate for the asset $assetStr deleted, old value = $pv")
+            case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
+            case Some(pv) => StatusCodes.OK -> wrapMessage(s"Rate for the asset $assetStr deleted, old value = $pv")
           }
         }
       )

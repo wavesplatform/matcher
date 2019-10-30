@@ -219,14 +219,18 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def printDebugMessage(container: DockerContainer, text: String): Unit =
-    if (client.inspectContainer(container.id).state().running()) {
-      val escaped = text.replace('\'', '\"')
-      val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
-      val exec    = client.execStart(id)
-      try exec.readFully()
-      catch {
-        case NonFatal(e) => /* ignore */
-      } finally exec.close()
+    try {
+      if (client.inspectContainer(container.id).state().running()) {
+        val escaped = text.replace('\'', '\"')
+        val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
+        val exec    = client.execStart(id)
+        try exec.readFully()
+        catch {
+          case NonFatal(e) => /* ignore */
+        } finally exec.close()
+      }
+    } catch {
+      case _: ContainerNotFoundException =>
     }
 
   def printDebugMessage(text: String): Unit = knownContainers.asScala.foreach(printDebugMessage(_, text))

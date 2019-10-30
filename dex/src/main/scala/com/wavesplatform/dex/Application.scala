@@ -42,7 +42,14 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   def run(): Unit = {
 
-    val gRPCExtensionClient = new DEXClient(s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}", scheduler, grpcExecutionContext)
+    val gRPCExtensionClient =
+      new DEXClient(
+        s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
+        settings.defaultGrpcCachesExpiration,
+        scheduler,
+        grpcExecutionContext
+      )
+
     matcher = new Matcher(settings, gRPCExtensionClient)
     matcher.start()
 

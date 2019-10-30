@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
@@ -11,6 +12,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
 class OrderBookTestSuite extends MatcherSuiteBase {
+
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private case class ReservedBalances(wct: Long, usd: Long, waves: Long)
   private def reservedBalancesOf(pk: KeyPair): ReservedBalances = {
@@ -36,8 +39,9 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   private var bobRBForBothPairs   = ReservedBalances(0, 0, 0)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Place orders and delete the order book" in {
@@ -104,9 +108,9 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "matcher can start after multiple delete events" in {
-      def deleteWctWaves = dex1AsyncApi.tryDeleteOrderBook(wctWavesPair)
-      val deleteMultipleTimes = deleteWctWaves
-        .zip(deleteWctWaves)
+      def deleteWctWaves() = dex1AsyncApi.tryDeleteOrderBook(wctWavesPair)
+      val deleteMultipleTimes = deleteWctWaves()
+        .zip(deleteWctWaves())
         .map(_ => ())
         .recover { case _ => () } // It's ok: either this should fail, or restartNode should work
 

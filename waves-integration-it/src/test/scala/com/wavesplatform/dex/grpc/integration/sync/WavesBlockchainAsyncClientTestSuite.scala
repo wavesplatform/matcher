@@ -44,12 +44,13 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    new DEXClient(wavesNode1GrpcApiTarget, monixScheduler, executionContext).wavesBlockchainAsyncClient
-      .unsafeTap(_.requestBalanceChanges())
-      .unsafeTap(_.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler))
+    new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds, monixScheduler, executionContext).wavesBlockchainAsyncClient
+      .unsafeTap { _.requestBalanceChanges() }
+      .unsafeTap { _.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler) }
   }
 
   "WavesBlockchainAsyncClient should send balance changes via gRPC" in {
+
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
 
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
@@ -57,6 +58,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
     broadcastAndAwait(issueAssetTx)
+
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(
@@ -68,6 +70,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
     balanceChanges = Map.empty[Address, Map[Asset, Long]]
     broadcastAndAwait(mkTransfer(alice, bob, someAssetAmount, issuedAsset))
+
     assertBalanceChanges {
       Map(
         alice.toAddress -> Map(

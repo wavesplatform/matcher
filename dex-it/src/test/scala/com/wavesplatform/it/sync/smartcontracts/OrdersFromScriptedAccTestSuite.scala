@@ -8,7 +8,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
-  private val activationHeight = 4
+
+  private val activationHeight = 5
+
   override protected val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString(
     s"""waves {
        |  utx.allow-skip-checks = false

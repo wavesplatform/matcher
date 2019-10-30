@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{AssetDecimalsInfo, OrderStatus, OrderStatusResponse}
@@ -10,9 +11,13 @@ import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import scala.math.BigDecimal.RoundingMode
 
 class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
+
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueWctTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Alice and Bob trade WAVES-USD" - {

@@ -44,7 +44,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   private val falseFeeAsset   = IssuedAsset(falseFeeAssetTx.id())
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+
     broadcastAndAwait(asset0Tx, asset1Tx, asset2Tx, assetWith2DecTx, feeAssetTx, falseFeeAssetTx, IssueBtcTx)
     broadcastAndAwait(
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset0, 0.005.waves),
@@ -52,6 +53,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
     broadcastAndAwait(mkSetAccountScriptText(alice, Some("true")))
+
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "When matcher executes orders" - {
@@ -156,14 +159,14 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         dex1Api.upsertRate(assetWith2Dec, 4)
 
-        val wavesToAssetWith2DecPair = createAssetPair(assetWith2Dec, Waves)
+        val asset2WithDecWavesPair = createAssetPair(assetWith2Dec, Waves)
 
         val bobWavesBalance   = wavesNode1Api.balance(bob, Waves)
         val bobAssetBalance   = wavesNode1Api.balance(bob, assetWith2Dec)
         val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
         val aliceAssetBalance = wavesNode1Api.balance(alice, assetWith2Dec)
 
-        dex1Api.tryPlace(mkOrder(bob, wavesToAssetWith2DecPair, SELL, 10000L, 300.waves * 1000000L, 4, matcherFeeAssetId = assetWith2Dec)) should failWith(
+        dex1Api.tryPlace(mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 4, matcherFeeAssetId = assetWith2Dec)) should failWith(
           9441542, // FeeNotEnough
           s"Required 0.05 ${assetWith2DecTx.id()} as fee for this order, but given 0.04 ${assetWith2DecTx.id()}"
         )
@@ -173,11 +176,11 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         wavesNode1Api.balance(alice, Waves) shouldBe aliceWavesBalance
         wavesNode1Api.balance(alice, assetWith2Dec) shouldBe aliceAssetBalance
 
-        val bobOrder = mkOrder(bob, wavesToAssetWith2DecPair, SELL, 10000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
+        val bobOrder = mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
         dex1Api.place(bobOrder)
         dex1Api.reservedBalance(bob)(assetWith2Dec) shouldBe 10005L
 
-        val aliceOrder = mkOrder(alice, wavesToAssetWith2DecPair, BUY, 20000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
+        val aliceOrder = mkOrder(alice, asset2WithDecWavesPair, BUY, 20000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
         dex1Api.place(aliceOrder)
         waitForOrderAtNode(bobOrder)
 
@@ -189,7 +192,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 300.waves * 100L)
         wavesNode1Api.balance(alice, assetWith2Dec) shouldBe (aliceAssetBalance + 9998L)
 
-        val anotherBobOrderId = mkOrder(bob, wavesToAssetWith2DecPair, SELL, 10000L, 300.waves * 1000000L, 5, assetWith2Dec)
+        val anotherBobOrderId = mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 5, assetWith2Dec)
         dex1Api.place(anotherBobOrderId)
         waitForOrderAtNode(anotherBobOrderId)
 

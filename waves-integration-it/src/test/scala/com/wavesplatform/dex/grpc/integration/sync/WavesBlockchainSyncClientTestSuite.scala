@@ -20,6 +20,7 @@ import scala.util.Random
 class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
 
   private lazy val wavesSyncClient = new DEXClient(wavesNode1GrpcApiTarget,
+                                                   100.milliseconds,
                                                    monix.execution.Scheduler.global,
                                                    scala.concurrent.ExecutionContext.Implicits.global).wavesBlockchainSyncClient
 
@@ -95,7 +96,7 @@ class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
       val issueTx = IssueEthTx
       wavesSyncClient.assetDescription(IssuedAsset(issueTx.id())) shouldBe Some(
         BriefAssetDescription(
-          name = ByteStr(issueTx.name),
+          name = new String(issueTx.name, StandardCharsets.UTF_8),
           decimals = issueTx.decimals,
           hasScript = issueTx.script.nonEmpty
         ))

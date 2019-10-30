@@ -2,6 +2,7 @@ package com.wavesplatform.dex.it.docker
 
 import java.nio.file.Paths
 
+import cats.Id
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.utils.ScorexLogging
@@ -9,10 +10,14 @@ import com.wavesplatform.utils.ScorexLogging
 trait DockerExtensions extends ScorexLogging {
   protected def dockerClient: Docker
 
-  protected def restartContainer(container: DockerContainer, api: HasWaitReady[cats.Id]): Unit = {
-    dockerClient.stop(container)
+  protected def startAndWait(container: DockerContainer, api: => HasWaitReady[Id]): Unit = {
     dockerClient.start(container)
     api.waitReady
+  }
+
+  protected def restartContainer(container: DockerContainer, api: => HasWaitReady[Id]): Unit = {
+    dockerClient.stop(container)
+    startAndWait(container, api)
   }
 
   protected def replaceSuiteConfig(container: DockerContainer, config: Config): Unit =

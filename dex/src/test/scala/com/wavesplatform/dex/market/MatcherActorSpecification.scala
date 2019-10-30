@@ -24,6 +24,8 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class MatcherActorSpecification
@@ -36,10 +38,9 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private val defaultAssetDescription =
-    Some(BriefAssetDescription(name = "Unknown".getBytes, decimals = 8, hasScript = false))
+  private val defaultAssetDescription = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
-  private def assetDescription(assetId: IssuedAsset): Option[BriefAssetDescription] = defaultAssetDescription
+  private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultAssetDescription }
 
   "MatcherActor" should {
     "return all open markets" in {
@@ -391,7 +392,6 @@ class MatcherActorSpecification
   private def fakeOrderBookActor(assetPair: AssetPair): (Props, TestProbe) = {
     val probe = TestProbe()
     val props = Props(new Actor {
-      import context.dispatcher
       private var nr = -1L
 
       override def receive: Receive = {
@@ -413,7 +413,13 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
-    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false, _ => true).createTransaction _
+
+    val txFactory = new ExchangeTransactionCreator(MatcherAccount,
+                                                   matcherSettings,
+                                                   Future.successful(false),
+                                                   _ => Future.successful(false),
+                                                   _ => Future.successful(true)).createTransaction _
+
     TestActorRef(
       new MatcherActor(
         matcherSettings,
@@ -457,7 +463,6 @@ class MatcherActorSpecification
 object MatcherActorSpecification {
   private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
   private class RecoveringActor(owner: ActorRef, assetPair: AssetPair, startOffset: Option[Long] = None) extends Actor {
-    import context.dispatcher
     context.system.scheduler.scheduleOnce(50.millis, owner, OrderBookRecovered(assetPair, startOffset)) // emulates recovering
     override def receive: Receive = {
       case ForceStartOrderBook(p) if p == assetPair => sender() ! MatcherActor.OrderBookCreated(assetPair)

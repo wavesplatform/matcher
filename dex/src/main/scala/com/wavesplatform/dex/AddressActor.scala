@@ -15,13 +15,12 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.market.BatchOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
-import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -37,13 +36,13 @@ class AddressActor(owner: Address,
                    spendableBalance: Asset => Future[Long],
                    time: Time,
                    orderDB: OrderDB,
-                   hasOrderInBlockchain: Order.Id => Boolean,
+                   hasOrderInBlockchain: Order.Id => Future[Boolean],
                    store: StoreEvent,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean,
                    batchCancelTimeout: FiniteDuration = 20.seconds)
+                  (implicit efc: ErrorFormatterContext)
     extends Actor
-    with WorkingStash
     with ScorexLogging {
 
   import context.dispatcher
@@ -219,32 +218,45 @@ class AddressActor(owner: Address,
       pendingCommands.get(firstOrderId) match {
         case None =>
           throw new IllegalStateException(
-            s"Can't find command for order $firstOrderId among pending commands: ${pendingCommands.keySet.mkString(", ")}")
+            s"Can't find command for order $firstOrderId among pending commands: ${pendingCommands.keySet.mkString(", ")}"
+          )
         case Some(nextCommand) =>
           nextCommand.command match {
             case command: Command.PlaceOrder =>
-              getTradableBalance(Set(command.order.getSpendAssetId, command.order.matcherFeeAssetId))
-                .map { tradableBalance =>
+              val validationResult =
+                for {
+                  hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
+                  tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.matcherFeeAssetId))
+                } yield {
                   val ao = command.toAcceptedOrder(tradableBalance)
-                  accountStateValidator(ao, tradableBalance) match {
+                  accountStateValidator(ao, tradableBalance, hasOrderInBlockchain) match {
                     case Left(error) => Event.ValidationFailed(ao.order.id(), error)
                     case Right(_)    => Event.ValidationPassed(ao)
                   }
                 }
-                .pipeTo(self)
+
+              validationResult pipeTo self
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }
       }
   }
 
-  private def accountStateValidator(acceptedOrder: AcceptedOrder, tradableBalance: Map[Asset, Long]): OrderValidator.Result[AcceptedOrder] =
-    OrderValidator.accountStateAware(acceptedOrder.order.sender, tradableBalance.withDefaultValue(0L), totalActiveOrders, hasOrder, orderBookCache)(
-      acceptedOrder)
+  private def accountStateValidator(acceptedOrder: AcceptedOrder,
+                                    tradableBalance: Map[Asset, Long],
+                                    hasOrderInBlockchain: Boolean): OrderValidator.Result[AcceptedOrder] = {
+    OrderValidator
+      .accountStateAware(acceptedOrder.order.sender,
+                         tradableBalance.withDefaultValue(0L),
+                         totalActiveOrders,
+                         hasOrder(_, hasOrderInBlockchain),
+                         orderBookCache)(acceptedOrder)
+  }
 
-  private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] =
+  private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
     Future
-      .traverse(forAssets)(asset => spendableBalance(asset).tupleLeft(asset))
+      .traverse(forAssets)(asset => spendableBalance(asset) tupleLeft asset)
       .map(_.toMap |-| openVolume)
+  }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
@@ -324,7 +336,8 @@ class AddressActor(owner: Address,
         case _                    =>
       }
 
-  private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain(id)
+  private def hasOrder(id: Order.Id, hasOrderInBlockchain: Boolean): Boolean =
+    activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
   private def getActiveLimitOrders(maybePair: Option[AssetPair]): Iterable[AcceptedOrder] =

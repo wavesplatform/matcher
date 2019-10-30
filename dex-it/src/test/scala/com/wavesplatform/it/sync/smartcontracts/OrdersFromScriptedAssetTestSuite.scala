@@ -34,8 +34,9 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     ConfigFactory.parseString(s"""waves.dex.price-assets = ["${allowAsset.id}", "${denyAsset.id}", "${unscriptedAsset.id}"]""")
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(issueUnscriptedAssetTx, issueAllowAssetTx, issueAllowAsset2Tx, issueAllowAsset3Tx, issueDenyAssetTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "can match orders when SmartAccTrading is still not activated" in {

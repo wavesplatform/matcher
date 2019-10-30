@@ -1,13 +1,18 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
+
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Order can be canceled" - {

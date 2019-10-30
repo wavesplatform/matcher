@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
@@ -10,12 +11,15 @@ import scala.concurrent.duration.DurationInt
 
 class MarketOrderTestSuite extends MatcherSuiteBase {
 
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueEthTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
-  "Sunny day tests for market orders" in {
+  "Sunny day tests for the market orders" in {
 
     def placeCounterOrders(sender: KeyPair, pair: AssetPair, ordersType: OrderType)(amountPrices: (Long, Long)*): Unit = {
       val orders = amountPrices.zipWithIndex.map {

@@ -8,21 +8,21 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(
-      s"""
-         |waves.dex {
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "WAVES" ]
          |  allowed-order-versions = [1, 2, 3]
          |  order-book-snapshot-http-cache {
          |    cache-timeout = 5s
          |    depth-ranges = [10, 20, 40, 41, 43, 100, 1000]
          |    default-depth = 100
          |  }
-         |}
-       """.stripMargin
+         |}""".stripMargin
     )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "response order book should contain right count of bids and asks" in {

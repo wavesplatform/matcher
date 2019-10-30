@@ -52,6 +52,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  allowed-order-versions = [1, 2, 3]
        |  max-price-deviations {
        |    enable = yes
@@ -71,13 +72,16 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+
     broadcastAndAwait(IssueBtcTx, IssueEthTx, IssueUsdTx, scriptAssetTx, anotherScriptAssetTx)
     Seq(scriptAsset, anotherScriptAsset).foreach { asset =>
       broadcastAndAwait(
         mkTransfer(alice, bob, defaultAssetQuantity / 2, asset, 0.005.waves)
       )
     }
+
+    startAndWait(dex1Container(), dex1Api)
   }
 
   def orderIsOutOfDeviationBounds(price: String, orderType: OrderType): String = {

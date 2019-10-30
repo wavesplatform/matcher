@@ -49,8 +49,9 @@ abstract class MatcherSuiteBase
 
   GenesisConfig.setupAddressScheme()
 
-  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] =
+  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)
+  }
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
@@ -82,21 +83,15 @@ abstract class MatcherSuiteBase
     fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
   }
 
-  protected def wavesNode1NetworkApiAddress: InetSocketAddress =
+  protected def wavesNode1NetworkApiAddress: InetSocketAddress = {
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
+  }
 
   // Dex server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
     dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
       .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
-      .withFallback(
-        ConfigFactory.parseString(
-          s"""waves.dex {
-             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-             |  rest-order-limit = ${DexTestConfig.orderLimit}
-             |}""".stripMargin
-        )
-      )
+      .withFallback(ConfigFactory.parseString(s"waves.dex.rest-order-limit = ${DexTestConfig.orderLimit}"))
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
@@ -104,18 +99,10 @@ abstract class MatcherSuiteBase
   protected def dex1AsyncApi: DexApi[Future]        = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
   protected def dex1Api: DexApi[Id]                 = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
 
-  protected def initializeContainers(): Unit = {
-    dockerClient.start(wavesNode1Container())
-    wavesNode1Api.waitReady
-
-    dockerClient.start(dex1Container())
-    dex1Api.waitReady
-  }
-
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
-    super.beforeAll()
-    initializeContainers()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   override protected def afterAll(): Unit = {
@@ -142,31 +129,37 @@ abstract class MatcherSuiteBase
     dockerClient.printDebugMessage(formatted)
   }
 
-  protected def createDex(name: String, runConfig: Config = dexRunConfig(), suiteInitialConfig: Config = suiteInitialDexConfig): DexContainer =
+  protected def createDex(name: String, runConfig: Config = dexRunConfig(), suiteInitialConfig: Config = suiteInitialDexConfig): DexContainer = {
     DexItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig)
+  }
 
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig(),
-                                suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer =
+                                suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer = {
     WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(wavesNodesDomain))
+  }
 
-  protected def dexQueueConfig(queueId: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
-    ConfigFactory.parseString(s"""waves.dex.events-queue {
-                                 |  type = kafka
-                                 |  kafka {
-                                 |    servers = "$kafkaServer"
-                                 |    topic = "dex-$queueId"
-                                 |  }
-                                 |}""".stripMargin)
+  protected def dexQueueConfig(queueId: Int): Config = {
+    Option { System.getenv("KAFKA_SERVER") }.fold { ConfigFactory.empty() } { kafkaServer =>
+      ConfigFactory.parseString(s"""waves.dex.events-queue {
+                                   |  type = kafka
+                                   |  kafka {
+                                   |    servers = "$kafkaServer"
+                                   |    topic = "dex-$queueId"
+                                   |  }
+                                   |}""".stripMargin)
+    }
   }
 
   protected def dexWavesGrpcConfig(target: WavesNodeContainer): Config = {
     val grpcAddr = dockerClient.getInternalSocketAddress(target, target.grpcApiPort)
     ConfigFactory
       .parseString(s"""waves.dex {
-                      |  waves-node-grpc {
-                      |    host = ${grpcAddr.getAddress.getHostAddress}
-                      |    port = ${grpcAddr.getPort}
+                      |  grpc.integration {
+                      |    waves-node-grpc {
+                      |      host = ${grpcAddr.getAddress.getHostAddress}
+                      |      port = ${grpcAddr.getPort}
+                      |    }
                       |  }
                       |}""".stripMargin)
   }

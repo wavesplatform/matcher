@@ -5,8 +5,8 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration._
+import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
-import com.wavesplatform.dex.grpc.integration.protobuf.{EitherVEExt, StreamObserverMonixOps}
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
@@ -18,9 +18,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
-import monix.reactive.Observable
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -30,8 +28,8 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
-  override def getStatuses(request: TransactionsByIdRequest, responseObserver: StreamObserver[TransactionStatus]): Unit = {
-    val result = Observable(request.transactionIds: _*).map { txId =>
+  override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
+    val statuses = request.transactionIds.map { txId =>
       context.blockchain.transactionHeight(txId.toVanilla) match {
         case Some(height) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, height) // TODO
         case None =>
@@ -41,30 +39,23 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
           }
       }
     }
-    responseObserver.completeWith(result)
+    TransactionsStatusesResponse(statuses)
   }
 
   override def broadcast(request: BroadcastRequest): Future[BroadcastResponse] = Future {
     request.transaction
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
-      .flatMap(_.toVanilla)
+      .flatMap { _.toVanilla }
       .flatMap { tx =>
-        val r = context.utx
-          .putIfNew(tx)
-          .map { _ =>
-            context.broadcastTransaction(tx)
-            BroadcastResponse(isValid = true)
-          }
-          .resultE
-          .leftFlatMap(_ => BroadcastResponse().asRight)
-        r
+        context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }
 
   override def isFeatureActivated(request: IsFeatureActivatedRequest): Future[IsFeatureActivatedResponse] = Future {
     IsFeatureActivatedResponse(
-      context.blockchain.featureStatus(request.featureId.toShort, context.blockchain.height) == BlockchainFeatureStatus.Activated)
+      context.blockchain.featureStatus(request.featureId.toShort, context.blockchain.height) == BlockchainFeatureStatus.Activated
+    )
   }
 
   override def assetDescription(request: AssetIdRequest): Future[AssetDescriptionResponse] = Future {

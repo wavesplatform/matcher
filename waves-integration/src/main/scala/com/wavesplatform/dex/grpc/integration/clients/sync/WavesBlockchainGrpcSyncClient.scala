@@ -22,7 +22,7 @@ class WavesBlockchainGrpcSyncClient(channel: ManagedChannel) extends WavesBlockc
   override def wasForged(id: ByteStr): Boolean = {
     blockchainService
       .getStatuses { TransactionsByIdRequest(Seq(ByteString copyFrom id.arr)) }
-      .toIterable
+      .transactionsStatutes
       .headOption
       .exists(_.status.isConfirmed)
   }

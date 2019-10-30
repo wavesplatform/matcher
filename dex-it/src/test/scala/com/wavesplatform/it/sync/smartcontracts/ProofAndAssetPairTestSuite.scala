@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontracts
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -12,6 +13,9 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import scala.concurrent.duration._
 
 class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
+
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
@@ -19,8 +23,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Proofs and AssetPairs verification with SmartContracts" - {

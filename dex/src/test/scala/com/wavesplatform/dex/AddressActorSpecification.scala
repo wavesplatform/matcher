@@ -10,10 +10,12 @@ import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor.Command.{CancelNotEnoughCoinsOrders, PlaceOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
@@ -28,6 +30,10 @@ class AddressActorSpecification
     with BeforeAndAfterAll
     with ImplicitSender
     with NTPTime {
+
+  private implicit val efc = new ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Int = 8
+  }
 
   private val assetId    = ByteStr("asset".getBytes("utf-8"))
   private val matcherFee = 30000L
@@ -200,7 +206,7 @@ class AddressActorSpecification
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
             ntpTime,
             EmptyOrderDB,
-            _ => false,
+            _ => Future.successful(false),
             event => {
               eventsProbe.ref ! event
               Future.successful { Some(QueueEventWithMeta(0, 0, event)) }

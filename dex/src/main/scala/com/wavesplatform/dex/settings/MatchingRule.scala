@@ -32,18 +32,19 @@ object MatchingRule {
 /** Denormalized representation of the matching rule passed from the application.conf */
 case class DenormalizedMatchingRule(startOffset: Long, tickSize: Double) {
 
-  def normalize(assetPair: AssetPair, getAssetDecimals: Asset => Int): MatchingRule = {
+  def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule = {
     MatchingRule(
       startOffset,
-      Normalization.normalizePrice(tickSize, getAssetDecimals(assetPair.amountAsset), getAssetDecimals(assetPair.priceAsset))
+      Normalization.normalizePrice(tickSize, assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset))
     )
   }
 }
 
 object DenormalizedMatchingRule extends ScorexLogging {
 
-  val DefaultTickSize: Double               = 0.00000001
-  val DefaultRule: DenormalizedMatchingRule = DenormalizedMatchingRule(0L, DefaultTickSize)
+  def getDefaultRule(assetPair: AssetPair, assetDecimals: Asset => Int): DenormalizedMatchingRule = {
+    MatchingRule.DefaultRule.denormalize(assetPair, assetDecimals)
+  }
 
   @annotation.tailrec
   def skipOutdated(currOffset: QueueEventWithMeta.Offset, rules: NonEmptyList[DenormalizedMatchingRule]): NonEmptyList[DenormalizedMatchingRule] =
@@ -77,9 +78,9 @@ object DenormalizedMatchingRule extends ScorexLogging {
     * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
     */
   def getDenormalizedMatchingRules(settings: MatcherSettings,
-                                   getAssetDecimals: Asset => Int,
+                                   assetDecimals: Asset => Int,
                                    assetPair: AssetPair): NonEmptyList[DenormalizedMatchingRule] = {
-    lazy val defaultRule = MatchingRule.DefaultRule.denormalize(assetPair, getAssetDecimals)
+    lazy val defaultRule = getDefaultRule(assetPair, assetDecimals)
     val rules            = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }

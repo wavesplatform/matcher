@@ -101,6 +101,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     s"""
        |waves.dex {
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  order-history {
        |    enabled = yes
        |    orders-batch-linger-ms = $batchLingerMs
@@ -119,10 +120,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     postgresContainerLauncher.startContainer()
     createTables(s"localhost:$getPostgresContainerHostPort")
 
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
 
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
 
+    startAndWait(dex1Container(), dex1Api)
     dex1Api.upsertRate(eth, 0.00567593)
     dex1Api.upsertRate(btc, 0.00009855)
     dex1Api.upsertRate(usd, 0.5)

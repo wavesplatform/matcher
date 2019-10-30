@@ -5,13 +5,19 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
 import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time) {
+  private implicit val efc = new ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Int = 8
+  }
+
   private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
 
@@ -25,7 +31,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             _ => Future.successful(0L),
             time,
             new TestOrderDB(100),
-            _ => false,
+            _ => Future.successful(false),
             e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
             _ => OrderBook.AggregatedSnapshot(),
             true

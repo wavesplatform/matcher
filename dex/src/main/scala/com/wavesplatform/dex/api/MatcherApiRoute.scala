@@ -3,9 +3,11 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, Route}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
+import cats.implicits._
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, _}
@@ -15,7 +17,8 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -49,7 +52,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            getActualTickSize: AssetPair => Double,
-                           orderValidator: Order => Either[MatcherError, Order],
+                           orderValidator: Order => FutureResult[Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
@@ -57,10 +60,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: () => Long,
+                           matcherAccountFee: () => Future[Long],
                            apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
+                           validatedAllowedOrderVersions: Future[Set[Byte]])
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -104,23 +107,22 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] =
-    assetPairBuilder.validateAssetPair(p) match {
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
-        assetPairBuilder
-          .validateAssetPair(p.reverse)
-          .fold(
-            _ => complete(formatError(e)),
-            _ => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          )
-      case Left(e) => complete(formatError(e))
+        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+          case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+          case Left(_)  => complete { formatError(e) }
+        }
+      case Left(e) => complete { formatError(e) }
     }
+  }
 
   private def withAsset(a: Asset): Directive1[Asset] = {
-    assetPairBuilder.validateAssetId(a) match {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetId(a).value } flatMap {
       case Right(_) => provide(a)
-      case Left(e)  => complete(InfoNotFound(e))
+      case Left(e)  => complete { InfoNotFound(e) }
     }
   }
 
@@ -137,9 +139,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {
-              orderValidator(order) match {
-                case Right(o)    => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(error) => Future.successful[ToResponseMarshallable](OrderRejected(error))
+              orderValidator(order).value flatMap {
+                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
+                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }
             }
           )
@@ -157,8 +159,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
     }
 
-  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] =
+  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] = {
     askMapAddressActor[MatcherResponse](sender, msg)(x => x)
+  }
 
   @inline
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
@@ -183,11 +186,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     complete(
-      StatusCodes.OK -> Json.obj(
-        "priceAssets"   -> matcherSettings.priceAssets,
-        "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee(), rateCache.getJson).value,
-        "orderVersions" -> validatedAllowedOrderVersions.toSeq.sorted
-      )
+      for {
+        allowedOrderVersions <- validatedAllowedOrderVersions
+        matcherAccountFee    <- matcherAccountFee()
+      } yield {
+        StatusCodes.OK -> Json.obj(
+          "priceAssets"   -> matcherSettings.priceAssets,
+          "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+          "orderVersions" -> allowedOrderVersions.toSeq.sorted
+        )
+      }
     )
   }
 
@@ -262,7 +270,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete(orderBookSnapshot.get(pair, depth))
+        complete { orderBookSnapshot.get(pair, depth) }
       }
     }
   }

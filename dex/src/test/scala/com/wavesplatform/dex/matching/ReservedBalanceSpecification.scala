@@ -9,12 +9,14 @@ import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._
 import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderHistoryStub}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData, _}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -80,7 +82,11 @@ class ReservedBalanceSpecification
     with TableDrivenPropertyChecks
     with NTPTime {
 
-  override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
+  override protected def actorSystemName: String = getSimpleName(this)
+
+  private implicit val efc = new ErrorFormatterContext {
+    override def assetDecimals(asset: Asset): Int = 8
+  }
 
   import com.wavesplatform.utils.Implicits._
   import system.dispatcher
@@ -121,7 +127,8 @@ class ReservedBalanceSpecification
   private def openVolume(senderPublicKey: PublicKey, assetId: Asset, addressDirectory: ActorRef = addressDir): Long = {
     Await
       .result(
-        (addressDirectory ? AddressDirectory.Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
+        (addressDirectory ? AddressDirectory
+          .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
         Duration.Inf
       )
       .getOrElse(assetId, 0L)

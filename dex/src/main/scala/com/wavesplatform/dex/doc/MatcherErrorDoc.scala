@@ -3,19 +3,15 @@ package com.wavesplatform.dex.doc
 import com.wavesplatform.dex.error.{Class, Entity, MatcherError}
 import com.wavesplatform.dex.meta.DescendantSamples
 import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.transaction.Asset
 import play.api.libs.json.Json
 
+// TODO check generated doc and compare with current
 object MatcherErrorDoc {
   object entitySamples extends DescendantSamples[Entity]
   object classSamples  extends DescendantSamples[Class]
   object errorSamples  extends DescendantSamples[MatcherError]
 
   def mkMarkdown: String = {
-    val context = new com.wavesplatform.dex.error.ErrorFormatterContext {
-      override def assetDecimals(asset: Asset): Int = 8
-    }
-
     val entities = entitySamples.run
       .map(x => x.code -> getSimpleName(x))
 
@@ -50,7 +46,7 @@ object MatcherErrorDoc {
                     /##### Sample
                     /
                     /```json
-                    /${Json.prettyPrint(x.toJson(context))}
+                    /${Json.prettyPrint(x.toJson)}
                     /```
                     /""".stripMargin('/')
             }

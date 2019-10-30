@@ -12,15 +12,22 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"waves.dex.rest-order-limit = $orderLimit")
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  rest-order-limit = $orderLimit
+       |  price-assets = [ "$UsdId", "WAVES" ]
+       |}""".stripMargin)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+
     val assets = List(IssueUsdTx, IssueEthTx)
     broadcastAndAwait(assets: _*)
     assets
       .map(tx => mkTransfer(alice, bob, tx.quantity / 2, IssuedAsset(tx.id())))
       .foreach(wavesNode1Api.broadcast)
+
+    startAndWait(dex1Container(), dex1Api)
   }
 
   // timeToLive to generate different orders

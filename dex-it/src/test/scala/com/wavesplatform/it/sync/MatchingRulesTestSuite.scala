@@ -14,8 +14,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(
-      s"""
-         |waves.dex {
+      s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
          |  matching-rules = {
          |    "$WctId-$UsdId": [
          |      {
@@ -67,8 +67,10 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    // A custom initialization to guarantee that assets are in the blockchain
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {

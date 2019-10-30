@@ -15,6 +15,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
   override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  allowed-order-versions = [1, 2, 3]
        |  order-fee {
        |    mode = dynamic
@@ -35,8 +36,9 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
   )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   private def mkBobOrder: Order = mkOrder(

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset
@@ -13,13 +13,12 @@ import org.scalatest._
 
 class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
-  import BlacklistedTradingTestSuite._
-
   override protected def suiteInitialDexConfig: Config = configWithBlacklisted()
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "When blacklists are empty" in {
@@ -37,9 +36,9 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     replaceSuiteConfig(
       dex1Container(),
       configWithBlacklisted(
-        assets = Array(WctId.toString),
+        assets = Array(wct),
         names = Array("ETH.*"),
-        addresses = Array(bob.toAddress.toString)
+        addresses = Array(bob)
       )
     )
     restartContainer(dex1Container(), dex1Api)
@@ -126,24 +125,21 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
   private def expectedErrorCode(assetPair: AssetPair, blacklistedAsset: Asset): Int =
     if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted
     else 11538437 // PriceAssetBlacklisted
-}
 
-object BlacklistedTradingTestSuite {
-
-  private def configWithBlacklisted(assets: Array[String] = Array.empty,
+  private def configWithBlacklisted(assets: Array[Asset] = Array.empty,
                                     names: Array[String] = Array.empty,
-                                    addresses: Array[String] = Array.empty,
+                                    addresses: Array[KeyPair] = Array.empty,
                                     allowedAssetPairs: Array[String] = Array.empty): Config = {
     def toStr(array: Array[String]): String = if (array.length == 0) "" else array.mkString("\"", "\", \"", "\"")
     parseString(s"""
-                |waves.dex {
-                |  blacklisted-assets = [${toStr(assets)}]
-                |  blacklisted-names = [${toStr(names)}]
-                |  blacklisted-addresses = [${toStr(addresses)}]
-                |  allowed-asset-pairs = [${toStr(allowedAssetPairs)}]
-                |  white-list-only = no
-                |}
+                   |waves.dex {
+                   |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+                   |  blacklisted-assets = [${toStr(assets.map(AssetPair.assetIdStr))}]
+                   |  blacklisted-names = [${toStr(names)}]
+                   |  blacklisted-addresses = [${toStr(addresses.map(_.toAddress.toString))}]
+                   |  allowed-asset-pairs = [${toStr(allowedAssetPairs)}]
+                   |  white-list-only = no
+                   |}
     """.stripMargin)
   }
-
 }

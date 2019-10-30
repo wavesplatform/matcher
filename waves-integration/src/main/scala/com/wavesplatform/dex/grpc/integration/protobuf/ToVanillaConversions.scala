@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.protobuf
 
+import java.nio.charset.StandardCharsets
+
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
@@ -97,7 +99,7 @@ object ToVanillaConversions {
       case MaybeDescription.Description(value) =>
         Some(
           BriefAssetDescription(
-            name = value.name.toVanilla,
+            name = value.name.toString(StandardCharsets.UTF_8),
             decimals = value.decimals,
             hasScript = value.hasScript
           )

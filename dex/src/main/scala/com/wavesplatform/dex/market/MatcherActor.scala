@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import akka.pattern.pipe
-import com.google.common.base.Charsets
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -60,7 +59,7 @@ class MatcherActor(settings: MatcherSettings,
   private def getAssetName(asset: Asset, desc: Option[BriefAssetDescription]): String =
     asset match {
       case Waves => AssetPair.WavesName
-      case _     => desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
+      case _     => desc.fold("Unknown")(_.name)
     }
 
   private def getAssetInfo(asset: Asset, desc: Option[BriefAssetDescription]): Option[AssetInfo] = {

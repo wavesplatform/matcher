@@ -9,8 +9,9 @@ class OrderV3TestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = allowedOrderVersion(1, 2)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "settings of allowing orderV3" - {
@@ -37,5 +38,8 @@ class OrderV3TestSuite extends MatcherSuiteBase {
   }
 
   private def allowedOrderVersion(versions: Int*): Config =
-    ConfigFactory.parseString(s"waves.dex.allowed-order-versions = [${versions.mkString(", ")}]")
+    ConfigFactory.parseString(s"""waves.dex {
+         |  price-assets = [ "$UsdId", "WAVES" ]
+         |  allowed-order-versions = [${versions.mkString(", ")}]
+         |}""".stripMargin)
 }

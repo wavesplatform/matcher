@@ -91,14 +91,7 @@ abstract class MatcherSuiteBase
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
     dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
       .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
-      .withFallback(
-        ConfigFactory.parseString(
-          s"""waves.dex {
-             |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-             |  rest-order-limit = ${DexTestConfig.orderLimit}
-             |}""".stripMargin
-        )
-      )
+      .withFallback(ConfigFactory.parseString(s"waves.dex.rest-order-limit = ${DexTestConfig.orderLimit}"))
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
@@ -106,18 +99,10 @@ abstract class MatcherSuiteBase
   protected def dex1AsyncApi: DexApi[Future]        = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
   protected def dex1Api: DexApi[Id]                 = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
 
-  protected def initializeContainers(): Unit = {
-    dockerClient.start(wavesNode1Container())
-    wavesNode1Api.waitReady
-
-    dockerClient.start(dex1Container())
-    dex1Api.waitReady
-  }
-
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
-    super.beforeAll()
-    initializeContainers()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   override protected def afterAll(): Unit = {

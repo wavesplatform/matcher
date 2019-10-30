@@ -54,11 +54,15 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     wavesNode2Api.waitForTransaction(exchangeTxId)
   }
 
-  override protected def initializeContainers(): Unit = {
+  override protected def beforeAll(): Unit = {
+    dockerClient.start(wavesNode1Container)
     dockerClient.start(wavesNode2Container)
 
-    super.initializeContainers()
+    wavesNode1Api.waitReady
 
+    startAndWait(dex1Container(), dex1Api)
+
+    wavesNode2Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
 

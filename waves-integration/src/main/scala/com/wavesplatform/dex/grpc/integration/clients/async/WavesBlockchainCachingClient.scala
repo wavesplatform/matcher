@@ -2,6 +2,7 @@ package com.wavesplatform.dex.grpc.integration.clients.async
 
 import java.time.Duration
 
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, BalancesCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
@@ -13,7 +14,6 @@ import io.grpc.ManagedChannel
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
-import cats.implicits._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,29 +44,21 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
 
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
 
-  override def assetDescription(asset: Asset): Future[Option[BriefAssetDescription]] = {
-    asset.fold { Future.successful(Option.empty[BriefAssetDescription]) }(assetDescription)
-  }
-
-  override def assetDecimals(asset: Asset.IssuedAsset): Future[Option[Int]] = assetDescription(asset).map { _.map(_.decimals) }
-
-  override def assetDecimals(asset: Asset): Future[Option[Int]] = asset.fold { Future.successful(Option(8)) }(assetDecimals)
-
-  def getAssetDecimalsForMatchingRules(assetsFromMatchingRules: Set[AssetPair]): Future[Map[Asset, Int]] = {
-    assetsFromMatchingRules
+  // TODO
+  def assetDescription(pair: Set[AssetPair]): Future[Map[Asset, BriefAssetDescription]] =
+    pair
       .flatMap(assetPair => Set(assetPair.amountAsset, assetPair.priceAsset))
       .toList
-      .traverse(asset => assetDecimals(asset).map { asset -> _ })
+      .traverse(asset => assetDescription(asset).map { asset -> _ })
       .flatMap { list =>
-        val (assetsWithDecimals, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
-        if (nonexistentAssets.nonEmpty) {
+        val (r, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
+        if (nonexistentAssets.isEmpty) Future.successful(r.map { case (asset, decimals) => asset -> decimals.get }.toMap)
+        else
           Future.failed(
             new IllegalArgumentException(
               "The following assets specified in waves.dex.matching-rules section do not exist in the blockchain: " +
                 s"${nonexistentAssets.map { case (asset, _) => AssetPair.assetIdStr(asset) }.mkString(", ")}"
             )
           )
-        } else Future.successful(assetsWithDecimals.map { case (asset, decimals) => asset -> decimals.get }.toMap)
       }
-  }
 }

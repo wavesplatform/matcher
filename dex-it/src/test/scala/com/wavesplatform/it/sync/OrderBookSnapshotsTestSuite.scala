@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
@@ -12,12 +11,12 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-      |  price-assets = ["WAVES"]
+      |  price-assets = ["$UsdId", "WAVES"]
       |  snapshots-interval = $interval
       |}""".stripMargin
   )
 
-  private val assetPair1 = createAssetPair(eth, usd)
+  private val assetPair1 = ethUsdPair
   private val assetPair2 = ethWavesPair
 
   private val ordersPack1Size = 11
@@ -33,8 +32,9 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     .get
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueEthTx, IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "Order books are created with right offsets" in {

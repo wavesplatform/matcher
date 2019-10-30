@@ -90,7 +90,7 @@ class BaseSettingsSpecification extends FlatSpec{
          |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
          |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
          |    ]
-         |    blacklisted-assets = ["a"]
+         |    blacklisted-assets = ["AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck"]
          |    blacklisted-names = ["b"]
          |    blacklisted-addresses = [
          |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD

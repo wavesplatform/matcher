@@ -38,8 +38,7 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private val defaultAssetDescription =
-    Some(BriefAssetDescription(name = "Unknown".getBytes, decimals = 8, hasScript = false))
+  private val defaultAssetDescription = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
   private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultAssetDescription }
 

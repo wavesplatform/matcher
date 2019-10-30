@@ -1,14 +1,19 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, OrderType}
 
 class RoundingIssuesTestSuite extends MatcherSuiteBase {
+
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueEthTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
   }
 
   "should correctly fill an order with small amount" in {

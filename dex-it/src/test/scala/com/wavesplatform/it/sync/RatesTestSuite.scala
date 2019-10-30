@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 class RatesTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  allowed-order-versions = [1, 2, 3]
        |  order-fee {
        |    mode = dynamic
@@ -40,9 +41,10 @@ class RatesTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, PriceConstant)
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    startAndWait(wavesNode1Container(), wavesNode1Api)
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
     broadcastAndAwait(mkTransfer(bob, alice, matcherFee * 5, btcAsset))
+    startAndWait(dex1Container(), dex1Api)
   }
 
   private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset)

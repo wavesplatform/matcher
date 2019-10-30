@@ -1,19 +1,18 @@
 package com.wavesplatform.dex.model
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
-import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, FutureResult, Result}
+import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
@@ -120,7 +119,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson(errorContext)) should produce("amount should be > 0")
+        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
@@ -826,7 +825,7 @@ class OrderValidatorSpecification
   }
 
   private def portfolioTest(p: Portfolio, assetDecimals: Asset => Int = getDefaultAssetDecimals)(
-      f: (Order => OrderValidator.FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+      f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
 
     val bc = stub[AsyncBlockchain]
     val tc = exchangeTransactionCreator(bc)
@@ -866,8 +865,7 @@ class OrderValidatorSpecification
     awaitResult { ov(order) } shouldBe 'right
   }
 
-  private def mkAssetDescription(decimals: Int): BriefAssetDescription =
-    BriefAssetDescription(name = "name".getBytes(StandardCharsets.UTF_8), decimals = decimals, hasScript = false)
+  private def mkAssetDescription(decimals: Int): BriefAssetDescription = BriefAssetDescription(name = "name", decimals = decimals, hasScript = false)
 
   private def newBuyOrder: Order =
     buy(pair = pairWavesBtc, amount = 100 * Constants.UnitsInWave, price = 0.0022, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))
@@ -930,7 +928,7 @@ class OrderValidatorSpecification
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings, getDefaultAssetDecimals, rateCache)
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDecimals, rateCache)
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
@@ -943,8 +941,10 @@ class OrderValidatorSpecification
       .matcherSettingsAware(
         MatcherAccount,
         Set.empty,
-        blacklistedAssets,
-        matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowedOrderVersions = allowedOrderVersions),
+        matcherSettings.copy(orderFee = orderFeeSettings,
+                             allowedAssetPairs = allowedAssetPairs,
+                             allowedOrderVersions = allowedOrderVersions,
+                             blacklistedAssets = blacklistedAssets),
         assetDecimals,
         rateCache
       )(order)
@@ -957,7 +957,7 @@ class OrderValidatorSpecification
       matcherFeeAssetScript: Option[RunScriptResult] = None,
       matcherAccountScript: Option[RunScriptResult] = None,
       assetDecimals: Asset => Int = getDefaultAssetDecimals,
-      rateCache: RateCache = rateCache)(order: Order): OrderValidator.FutureResult[Order] = {
+      rateCache: RateCache = rateCache)(order: Order): FutureResult[Order] = {
 
     val blockchain = stub[AsyncBlockchain]
 
@@ -1028,8 +1028,6 @@ class OrderValidatorSpecification
 
   private def assignAssetDescription(bc: AsyncBlockchain, xs: (IssuedAsset, BriefAssetDescription)*): Unit =
     xs.foreach {
-      case (asset, desc) =>
-        (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
-        (bc.assetDecimals _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc.decimals) })
+      case (asset, desc) => (bc.assetDescription _).when(asset).onCall((_: IssuedAsset) => Future.successful { Some(desc) })
     }
 }

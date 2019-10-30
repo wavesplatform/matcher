@@ -4,6 +4,7 @@ import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
+import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
@@ -15,6 +16,7 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.settings.GRPCSettings
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -22,7 +24,6 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
@@ -43,8 +44,8 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
                            orderBooksRecoveringTimeout: FiniteDuration,
-                           priceAssets: Seq[String],
-                           blacklistedAssets: Set[String],
+                           priceAssets: Seq[Asset],
+                           blacklistedAssets: Set[Asset.IssuedAsset],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
@@ -62,7 +63,15 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
-                           defaultGrpcCachesExpiration: FiniteDuration)
+                           defaultGrpcCachesExpiration: FiniteDuration) {
+  def mentionedAssets: Set[Asset] =
+    priceAssets.toSet ++ blacklistedAssets ++ {
+      orderFee match {
+        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
+        case _                                 => Set.empty
+      }
+    } ++ orderRestrictions.keySet.flatMap(_.assets) ++ matchingRules.keySet.flatMap(_.assets) ++ allowedAssetPairs.flatMap(_.assets)
+}
 
 case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
 
@@ -70,6 +79,9 @@ object MatcherSettings {
 
   implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
+
+  private def unsafeParseAsset(x: String): Asset =
+    AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
@@ -103,25 +115,32 @@ object MatcherSettings {
     val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
     val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
     val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
-    val baseAssets                   = config.as[List[String]]("price-assets")
-    val blacklistedAssets            = config.as[List[String]]("blacklisted-assets")
-    val blacklistedNames             = config.as[List[String]]("blacklisted-names").map(_.r)
-    val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
-    val blacklistedAddresses         = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache   = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-    val eventsQueue                  = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout       = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                     = config.as[OrderFeeSettings]("order-fee")
-    val deviation                    = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions            = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules                = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly                = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs            = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions         = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed      = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection           = config.as[PostgresConnection]("postgres")
-    val orderHistory                 = config.as[Option[OrderHistorySettings]]("order-history")
-    val defaultGrpcCachesExpiration  = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
+    val priceAssets                  = config.as[List[String]]("price-assets").map(unsafeParseAsset)
+    val blacklistedAssets = config
+      .as[List[String]]("blacklisted-assets")
+      .map(unsafeParseAsset)
+      .map {
+        case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case x: Asset.IssuedAsset => x
+      }
+      .toSet
+    val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
+    val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
+    val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache  = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val eventsQueue                 = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout      = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                    = config.as[OrderFeeSettings]("order-fee")
+    val deviation                   = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions           = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules               = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly               = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs           = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions        = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection          = config.as[PostgresConnection]("postgres")
+    val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
+    val defaultGrpcCachesExpiration = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -140,8 +159,8 @@ object MatcherSettings {
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
       orderBooksRecoveringTimeout,
-      baseAssets,
-      blacklistedAssets.toSet,
+      priceAssets,
+      blacklistedAssets,
       blacklistedNames,
       maxOrdersPerRequest,
       blacklistedAddresses,

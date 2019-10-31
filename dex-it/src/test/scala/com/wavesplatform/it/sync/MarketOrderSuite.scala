@@ -10,7 +10,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
-class MarketOrderNewSuite extends MatcherSuiteBase {
+class MarketOrderSuite extends MatcherSuiteBase {
 
   val fee = 0.003.waves
 

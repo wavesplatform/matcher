@@ -11,7 +11,6 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderSuite extends MatcherSuiteBase {
-
   val fee = 0.003.waves
 
   implicit class DoubleOps(value: Double) {
@@ -32,7 +31,6 @@ class MarketOrderSuite extends MatcherSuiteBase {
     val orderFeeSettingsStr =
       s"""
          |waves.dex {
-         |
          |  allowed-order-versions = [1, 2, 3]
          |}
        """.stripMargin
@@ -135,7 +133,6 @@ class MarketOrderSuite extends MatcherSuiteBase {
     }
 
     "should be matched with order having the best price (SELL)" in {
-
       val marketPrice = 0.6.usd
       val amount      = 25.waves
       val bestPrice   = 0.8.usd
@@ -159,9 +156,65 @@ class MarketOrderSuite extends MatcherSuiteBase {
       orderBook.bids should have size 2
     }
 
-    "should be removed from order book when the restriction by tokens count has been reached (BUY)" in {}
+    "should be removed from order book when the restriction by tokens count has been reached (BUY)" in {
+      val bobWBefore        = node.accountBalances(bob.toAddress.toString)._1
+      val bobUBefore        = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+      val marketPrice       = 0.5.usd
+      val marketOrderAmount = 150.waves
+      val ordersAmount      = 120.waves
 
-    "should be removed from order book when the restriction by tokens count has been reached (SELL)" in {}
+      placeOrders(alice, wavesUsdPair, OrderType.SELL)(
+        30.waves -> 0.3.usd,
+        40.waves -> 0.4.usd,
+        50.waves -> 0.5.usd,
+      )
+
+      node.waitOrderProcessed(
+        wavesUsdPair,
+        node.placeMarketOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.BUY, marketOrderAmount, marketPrice, fee)).message.id)
+
+      val orderBook = node.orderBook(wavesUsdPair)
+      orderBook.bids should be(empty)
+      orderBook.asks should be(empty)
+
+      /* market order fee value depends on matched orders in proportion */
+      node.accountBalances(bob.toAddress.toString)._1 should be(bobWBefore + ordersAmount - fee * ordersAmount / marketOrderAmount)
+
+      node.assetBalance(bob.toAddress.toString, UsdId.toString).balance should be(
+        bobUBefore - 0.3.usd * 30.waves / 1.waves - 0.4.usd * 40.waves / 1.waves - 0.5.usd * 50.waves / 1.waves)
+    }
+
+    "should be removed from order book when the restriction by tokens count has been reached (SELL)" in {
+      val bobWBefore        = node.accountBalances(bob.toAddress.toString)._1
+      val bobUBefore        = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+      val marketPrice       = 0.1.usd
+      val marketOrderAmount = 72.waves
+      val ordersAmount      = 36.waves
+
+      placeOrders(alice, wavesUsdPair, OrderType.BUY)(
+        10.waves -> 0.2.usd,
+        14.waves -> 0.3.usd,
+        12.waves -> 0.4.usd,
+      )
+
+      node.waitOrderProcessed(
+        wavesUsdPair,
+        node.placeMarketOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, marketOrderAmount, marketPrice, fee)).message.id)
+
+      val orderBook = node.orderBook(wavesUsdPair)
+      orderBook.bids should be(empty)
+      orderBook.asks should be(empty)
+
+      /* market order fee value depends on matched orders in proportion
+       *
+       *  TODO: bug https://jira.wavesplatform.com/browse/DEX-454
+       *  node.accountBalances(bob.toAddress.toString)._1 should be(bobWBefore - ordersAmount - fee * ordersAmount / marketOrderAmount)
+       */
+
+      node.assetBalance(bob.toAddress.toString, UsdId.toString).balance should be(
+        bobUBefore + 0.2.usd * 10.waves / 1.waves + 0.3.usd * 14.waves / 1.waves + 0.4.usd * 12.waves / 1.waves)
+
+    }
 
     "should be removed from order book when the user has not enough spendable balance (BUY)" in {}
 
@@ -189,7 +242,6 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
       node.waitOrderProcessed(wavesUsdPair,
                               node.placeMarketOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, total + 1000.waves, price, fee)).message.id)
-
     }
 
     "should be rejected if the price is too high for completely filling by current opened orders (BUY)" in {
@@ -200,7 +252,6 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
       assertBadRequestAndMessage(node.placeMarketOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, amount, marketPrice, fee)),
                                  tooLowPrice("buy", "0.3"))
-
     }
 
     "should be rejected if the price is too high for completely filling by current opened orders (SELL)" in {
@@ -211,7 +262,6 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
       assertBadRequestAndMessage(node.placeMarketOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.SELL, amount, marketPrice, fee)),
                                  tooHighPrice("sell", "0.5"))
-
     }
 
   }

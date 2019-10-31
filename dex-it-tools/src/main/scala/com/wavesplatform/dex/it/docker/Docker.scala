@@ -14,13 +14,15 @@ import cats.instances.map._
 import cats.instances.string._
 import cats.kernel.Monoid
 import com.google.common.primitives.Ints._
+import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.shaded.com.google.common.collect.ImmutableList
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
+import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveInputStream, TarArchiveOutputStream}
+import org.apache.commons.io.IOUtils
 
 import scala.collection.JavaConverters._
 import scala.util.Random
@@ -142,6 +144,19 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     finally is.close()
   }
 
+  def loadFile(container: DockerContainer, containerPath: Path, toLocal: Path): Unit =
+    try {
+      val is = client.archiveContainer(container.id, containerPath.toString)
+      val s  = new TarArchiveInputStream(is)
+      Iterator.continually(s.getNextEntry).takeWhile(_ != null).take(1).foreach { _ =>
+        val out = new FileOutputStream(toLocal.toString)
+        try IOUtils.copy(s, out)
+        finally out.close()
+      }
+    } catch {
+      case e: ContainerNotFoundException => log.warn(s"File '$containerPath' not found: ${e.getMessage}")
+    }
+
   // TODO remove
   def start(container: Coeval[DockerContainer]): Unit = start { container() }
 
@@ -204,14 +219,18 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   def printDebugMessage(container: DockerContainer, text: String): Unit =
-    if (client.inspectContainer(container.id).state().running()) {
-      val escaped = text.replace('\'', '\"')
-      val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
-      val exec    = client.execStart(id)
-      try exec.readFully()
-      catch {
-        case NonFatal(e) => /* ignore */
-      } finally exec.close()
+    try {
+      if (client.inspectContainer(container.id).state().running()) {
+        val escaped = text.replace('\'', '\"')
+        val id      = client.execCreate(container.id, Array("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")).id()
+        val exec    = client.execStart(id)
+        try exec.readFully()
+        catch {
+          case NonFatal(e) => /* ignore */
+        } finally exec.close()
+      }
+    } catch {
+      case _: ContainerNotFoundException =>
     }
 
   def printDebugMessage(text: String): Unit = knownContainers.asScala.foreach(printDebugMessage(_, text))
@@ -304,6 +323,15 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     } finally {
       fileStream.close()
     }
+
+    val containerSystemLogPath = Paths.get(container.basePath, "system.log")
+    val localSystemLogPath     = logDir().resolve(s"container-${container.name}.system.log")
+    log.info(s"${prefix(container)} Loading system log from '$containerSystemLogPath' to '$localSystemLogPath'")
+    loadFile(
+      container,
+      containerPath = containerSystemLogPath,
+      toLocal = localSystemLogPath
+    )
   }
 
   private def endpointConfigFor(number: Int, netAlias: Option[String]): EndpointConfig = {

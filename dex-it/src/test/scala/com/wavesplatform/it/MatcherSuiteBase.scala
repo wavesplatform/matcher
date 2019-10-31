@@ -27,6 +27,7 @@ import monix.eval.Coeval
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -48,6 +49,11 @@ abstract class MatcherSuiteBase
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()
+
+  override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
+    timeout = 30.seconds,
+    interval = 1.second
+  )
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)

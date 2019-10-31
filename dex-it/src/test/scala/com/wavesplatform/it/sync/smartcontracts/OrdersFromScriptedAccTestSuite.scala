@@ -13,6 +13,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   override protected val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString(
     s"""waves {
+       |  miner.minimal-block-generation-offset = 10s
+       |
        |  utx.allow-skip-checks = false
        |
        |  blockchain.custom.functionality.pre-activated-features = {

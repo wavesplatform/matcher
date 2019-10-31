@@ -207,7 +207,7 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
       /* market order fee value depends on matched orders in proportion
        *
-       *  TODO: bug https://jira.wavesplatform.com/browse/DEX-454
+       *  TODO: bug DEX-454
        *  node.accountBalances(bob.toAddress.toString)._1 should be(bobWBefore - ordersAmount - fee * ordersAmount / marketOrderAmount)
        */
 

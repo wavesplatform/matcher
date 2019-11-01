@@ -24,9 +24,13 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   override protected val suiteInitialWavesNodeConfig: Config =
     ConfigFactory
       .parseString(
-        s"""waves.blockchain.custom.functionality.pre-activated-features = {
-           |  ${BlockchainFeatures.SmartAssets.id} = 0,
-           |  ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
+        s"""waves {
+           |  miner.minimal-block-generation-offset = 10s
+           |
+           |  blockchain.custom.functionality.pre-activated-features = {
+           |    ${BlockchainFeatures.SmartAssets.id} = 0,
+           |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
+           |  }
            |}""".stripMargin
       )
 

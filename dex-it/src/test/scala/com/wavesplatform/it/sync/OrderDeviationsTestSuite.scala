@@ -111,19 +111,9 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       s"It should meet the following matcher's requirements: matcher fee >= ${100 - deviationFee}% of fee which should be paid in case of matching with best $marketType"
   }
 
-  def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long  = wavesNode1Api.balance(owner, assetPair.priceAsset)
-  def amountAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = wavesNode1Api.balance(owner, assetPair.amountAsset)
-
   "buy orders price is" - {
-    "in deviation bounds" in {
-
-      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-        val aliceBalance    = amountAssetBalance(alice, assetPair)
-        val bobBalance      = amountAssetBalance(bob, assetPair)
-        val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-        val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+    "in deviation bounds" - {
+      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 2000.waves, 500000, 4 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 2000.waves, 300000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
 
@@ -145,25 +135,13 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        amountAssetBalance(alice, assetPair) shouldBe aliceBalance - 1000.waves
-        amountAssetBalance(bob, assetPair) shouldBe bobBalance + 1000.waves
-
-        priceAssetBalance(alice, assetPair) shouldBe (aliceBtcBalance + 500000000L - 600000L)
-        priceAssetBalance(bob, assetPair) shouldBe (bobBtcBalance - 500000000L - 562500L)
-
         dex1Api.reservedBalance(alice) shouldBe Map(assetPair.amountAsset -> 100000000000L)
         dex1Api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset    -> 691500000L)
 
         cancelAll(alice, bob)
       }
 
-      withClue("in usd") {
-
-        val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-        val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-        val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-        val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
+      s"$wavesUsdPair" in {
         val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 2000.waves, 500, 4 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 2000.waves, 300, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
 
@@ -185,12 +163,6 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestAskOrder)
 
-        amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance - 1000.waves
-        amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance + 1000.waves
-
-        priceAssetBalance(bob, wavesUsdPair) shouldBe (bobBtcBalance + 500000L - 600L)
-        priceAssetBalance(alice, wavesUsdPair) shouldBe (aliceBtcBalance - 500000L - 562L)
-
         dex1Api.reservedBalance(bob) shouldBe Map(wavesUsdPair.amountAsset  -> 100000000000L)
         dex1Api.reservedBalance(alice) shouldBe Map(wavesUsdPair.priceAsset -> 691500L)
 
@@ -199,14 +171,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     }
 
     "out of deviation bounds" - {
-      "-- too low" in {
-        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-          val aliceBalance    = amountAssetBalance(alice, assetPair)
-          val bobBalance      = amountAssetBalance(bob, assetPair)
-          val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-          val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+      "-- too low" - {
+        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
           placeAndAwait(bestBidOrder)
 
@@ -218,33 +184,15 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.00089999", BUY)
           )
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset -> 300600000L)
 
           dex1Api.cancel(bob, bestBidOrder)
-
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
 
           dex1Api.reservedBalance(bob) shouldBe empty
           cancelAll(alice)
         }
 
-        withClue("in usd") {
-
-          val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-          val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-          val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-          val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
+        s"$wavesUsdPair" in {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
           placeAndAwait(bestBidOrder)
 
@@ -257,71 +205,31 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.89", BUY)
           )
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(bob) shouldBe Map(wavesUsdPair.priceAsset -> 300600L)
 
-          dex1Api.cancel(bob, bestBidOrder)
-
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(bob) shouldBe empty
-          cancelAll(alice)
+          cancelAll(alice, bob)
         }
       }
 
-      "-- too high" in {
-        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-          val aliceBalance    = amountAssetBalance(alice, assetPair)
-          val bobBalance      = amountAssetBalance(bob, assetPair)
-          val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-          val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+      "-- too high" - {
+        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 4 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
           placeAndAwait(bestAskOrder)
 
           dex1Api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
-          dex1Api.tryPlace(mkOrder(bob, assetPair, BUY, 1000.waves, 800001, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)) should failWith(
+          dex1Api
+            .tryPlace(mkOrder(bob, assetPair, BUY, 1000.waves, 800001, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00800001", BUY)
           )
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(bob) shouldBe empty
-          dex1Api.cancel(alice, bestAskOrder)
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(bob) shouldBe empty
-          cancelAll(alice)
+          cancelAll(alice, bob)
         }
 
-        withClue("in usd") {
-
-          val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-          val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-          val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-          val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
+        s"$wavesUsdPair" in {
           val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 500, 4 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
           placeAndAwait(bestAskOrder)
 
@@ -332,38 +240,17 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("8.01", BUY)
           )
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(alice) shouldBe empty
-          dex1Api.cancel(bob, bestAskOrder)
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(alice) shouldBe empty
-          cancelAll(bob)
+          cancelAll(alice, bob)
         }
       }
     }
   }
 
   "sell orders price is" - {
-    "in deviation bounds" in {
-
-      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-        val aliceBalance    = amountAssetBalance(alice, assetPair)
-        val bobBalance      = amountAssetBalance(bob, assetPair)
-        val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-        val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+    "in deviation bounds" - {
+      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 2000.waves, 500000, 4 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 2000.waves, 300000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
 
@@ -382,12 +269,6 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         waitForOrderAtNode(bestBidOrder)
 
-        amountAssetBalance(alice, assetPair) shouldBe aliceBalance - 1000.waves
-        amountAssetBalance(bob, assetPair) shouldBe bobBalance + 1000.waves
-
-        priceAssetBalance(alice, assetPair) shouldBe (aliceBtcBalance + 300000000L - 900000L)
-        priceAssetBalance(bob, assetPair) shouldBe (bobBtcBalance - 300000000L - 300000L)
-
         dex1Api.reservedBalance(alice) shouldBe Map(assetPair.amountAsset -> 300000000000L)
         dex1Api.reservedBalance(bob) shouldBe Map(assetPair.priceAsset    -> 300300000L)
 
@@ -396,14 +277,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     }
 
     "out of deviation bounds" - {
-      "-- too low" in {
-        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-          val aliceBalance    = amountAssetBalance(alice, assetPair)
-          val bobBalance      = amountAssetBalance(bob, assetPair)
-          val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-          val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+      "-- too low" - {
+        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, matcherFee, matcherFeeAssetId = assetPair.priceAsset)
           placeAndAwait(bestBidOrder)
 
@@ -414,33 +289,12 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("0.00119999", SELL)
           )
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(alice) shouldBe empty
 
-          dex1Api.cancel(bob, bestBidOrder)
-
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(alice) shouldBe empty
           cancelAll(bob)
         }
 
-        withClue("in usd") {
-
-          val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-          val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-          val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-          val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
+        s"$wavesUsdPair" in {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
           placeAndAwait(bestBidOrder)
 
@@ -451,70 +305,31 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("1.19", SELL)
           )
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(alice) shouldBe empty
-          dex1Api.cancel(bob, bestBidOrder)
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(alice) shouldBe empty
-          cancelAll(bob)
+          cancelAll(bob, bob)
         }
       }
 
-      "-- too high" in {
-        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-          val aliceBalance    = amountAssetBalance(alice, assetPair)
-          val bobBalance      = amountAssetBalance(bob, assetPair)
-          val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-          val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+      "-- too high" - {
+        for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
           placeAndAwait(bestAskOrder)
 
           dex1Api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
-          dex1Api.tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)) should failWith(
+          dex1Api
+            .tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)) should failWith(
             9441295, // DeviantOrderPrice
             orderIsOutOfDeviationBounds("0.00850001", SELL)
           )
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(alice) shouldBe Map(assetPair.amountAsset -> 1000.waves)
-          dex1Api.cancel(alice, bestAskOrder)
 
-          amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-          amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(alice) shouldBe empty
-          cancelAll(bob)
+          cancelAll(alice, bob)
         }
 
-        withClue("in usd") {
-
-          val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-          val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-          val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-          val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
+        s"$wavesUsdPair" in {
           val bestAskOrder = mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 500, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
           placeAndAwait(bestAskOrder)
 
@@ -525,103 +340,59 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
             orderIsOutOfDeviationBounds("8.51", SELL)
           )
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
           dex1Api.reservedBalance(alice) shouldBe Map(wavesUsdPair.amountAsset -> 1000.waves)
-          dex1Api.cancel(alice, bestAskOrder)
 
-          amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-          amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-          priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-          priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
-          dex1Api.reservedBalance(alice) shouldBe empty
-          cancelAll(bob)
+          cancelAll(alice, bob)
         }
       }
     }
   }
 
   "orders fee is" - {
-    "in deviation bounds" in {
-      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-        val aliceBalance    = amountAssetBalance(alice, assetPair)
-        val bobBalance      = amountAssetBalance(bob, assetPair)
-        val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-        val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
-        val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bestAskOrder)
+    "in deviation bounds" - {
+      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
+        val aliceOrder1 = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
+        placeAndAwait(aliceOrder1)
 
         dex1Api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 600000))
 
-        val bobOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bobOrder, OrderStatus.Filled)
+        val bobOrder1 = mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
+        placeAndAwait(bobOrder1, OrderStatus.Filled)
 
-        val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 700000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bestBidOrder)
+        val aliceOrder2 = mkOrder(alice, assetPair, BUY, 1000.waves, 700000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
+        placeAndAwait(aliceOrder2)
         dex1Api.orderBook(assetPair).bids shouldBe List(LevelResponse(1000.waves, 700000))
 
-        val aliceOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(aliceOrder, OrderStatus.Filled)
+        val bobOrder2 = mkOrder(bob, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
+        placeAndAwait(bobOrder2, OrderStatus.Filled)
+        waitForOrdersAtNode(aliceOrder1, aliceOrder2)
 
-        amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-        amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-        priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-        priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
-        waitForOrdersAtNode(aliceOrder, bobOrder)
         cancelAll(alice, bob)
       }
 
-      withClue("in usd") {
-
-        val aliceBalance    = amountAssetBalance(alice, wavesUsdPair)
-        val bobBalance      = amountAssetBalance(bob, wavesUsdPair)
-        val aliceBtcBalance = priceAssetBalance(alice, wavesUsdPair)
-        val bobBtcBalance   = priceAssetBalance(bob, wavesUsdPair)
-
-        val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 600, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bestAskOrder)
+      s"$wavesUsdPair" in {
+        val bobOrder1 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 600, matcherFeeAssetId = wavesUsdPair.priceAsset)
+        placeAndAwait(bobOrder1)
 
         dex1Api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1000.waves, 600))
 
-        val bobOrder = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bobOrder, OrderStatus.Filled)
+        val aliceOrder1 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
+        placeAndAwait(aliceOrder1, OrderStatus.Filled)
 
-        val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 700, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bestBidOrder)
+        val aliceOrder2 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 700, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
+        placeAndAwait(aliceOrder2)
         dex1Api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1000.waves, 700))
 
-        val aliceOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(aliceOrder, OrderStatus.Filled)
+        val bobOrder2 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
+        placeAndAwait(bobOrder2, OrderStatus.Filled)
+        waitForOrdersAtNode(bobOrder1, aliceOrder1, aliceOrder2, bobOrder2)
 
-        amountAssetBalance(alice, wavesUsdPair) shouldBe aliceBalance
-        amountAssetBalance(bob, wavesUsdPair) shouldBe bobBalance
-
-        priceAssetBalance(alice, wavesUsdPair) shouldBe aliceBtcBalance
-        priceAssetBalance(bob, wavesUsdPair) shouldBe bobBtcBalance
-
-        waitForOrdersAtNode(aliceOrder, bobOrder)
         cancelAll(alice, bob)
       }
     }
 
-    "out of deviation bounds" in {
-      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) {
-
-        val aliceBalance    = amountAssetBalance(alice, assetPair)
-        val bobBalance      = amountAssetBalance(bob, assetPair)
-        val aliceBtcBalance = priceAssetBalance(alice, assetPair)
-        val bobBtcBalance   = priceAssetBalance(bob, assetPair)
-
+    "out of deviation bounds" - {
+      for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
         placeAndAwait(bestAskOrder)
 
@@ -644,24 +415,10 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           feeIsOutOfDeviationBounds("0.00719999", assetPair.priceAssetStr, SELL)
         )
 
-        dex1Api.cancel(bob, bestBidOrder)
-
-        amountAssetBalance(alice, assetPair) shouldBe aliceBalance
-        amountAssetBalance(bob, assetPair) shouldBe bobBalance
-
-        priceAssetBalance(alice, assetPair) shouldBe aliceBtcBalance
-        priceAssetBalance(bob, assetPair) shouldBe bobBtcBalance
-
         cancelAll(alice, bob)
       }
 
-      withClue("in usd") {
-
-        val aliceAmountAssetBalance = amountAssetBalance(alice, wavesUsdPair)
-        val bobAmountAssetBalance   = amountAssetBalance(bob, wavesUsdPair)
-        val alicePriceAssetBalance  = priceAssetBalance(alice, wavesUsdPair)
-        val bobPriceAssetBalance    = priceAssetBalance(bob, wavesUsdPair)
-
+      s"$wavesUsdPair" in {
         val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
         placeAndAwait(bestAskOrder)
 
@@ -684,19 +441,11 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
           feeIsOutOfDeviationBounds("7.19", wavesUsdPair.priceAssetStr, SELL)
         )
 
-        dex1Api.cancel(alice, bestBidOrder)
-
-        amountAssetBalance(alice, wavesUsdPair) shouldBe aliceAmountAssetBalance
-        amountAssetBalance(bob, wavesUsdPair) shouldBe bobAmountAssetBalance
-
-        priceAssetBalance(alice, wavesUsdPair) shouldBe alicePriceAssetBalance
-        priceAssetBalance(bob, wavesUsdPair) shouldBe bobPriceAssetBalance
-
         cancelAll(alice, bob)
       }
     }
   }
 
-  private def cancelAll(xs: KeyPair*): Unit = xs.foreach(dex1Api.cancelAll(_))
+  private def cancelAll(xs: KeyPair*): Unit         = xs.foreach(dex1Api.cancelAll(_))
   private def waitForOrdersAtNode(xs: Order*): Unit = xs.foreach(waitForOrderAtNode(_))
 }

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsync
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
@@ -36,10 +37,29 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   }
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
-    val actual = balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet)
-    log.trace(s"Compare:\nactual: $actual\nexpected: $expectedBalanceChanges")
-    actual should contain theSameElementsAs expectedBalanceChanges
+    val actual   = simplify(balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet))
+    val expected = simplify(expectedBalanceChanges)
+    log.trace(s"Compare:\nactual: $actual\nexpected: $expected")
+    actual shouldBe expected
   }
+
+  private def simplify(xs: Map[Address, Map[Asset, Long]]): String =
+    xs.toList
+      .map {
+        case (address, assets) =>
+          val xs = assets
+            .map { case (asset, v) => AssetPair.assetIdStr(asset) -> v }
+            .toList
+            .sortBy(_._1)
+            .map { case (asset, v) => s"$v $asset" }
+            .mkString(", ")
+          address.stringRepr -> xs
+      }
+      .sortBy(_._1)
+      .map {
+        case (address, assets) => s"$address: ($assets)"
+      }
+      .mkString("; ")
 
   override def beforeAll(): Unit = {
     super.beforeAll()

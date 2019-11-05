@@ -26,18 +26,7 @@ package object it {
     * @return The number of successful commands
     */
   def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int = {
-    // TODO DEX-390
-    // Await.result(Future.sequence(xs.map(executeCommand(_))), timeout).sum
-    def loop(rest: Seq[MatcherCommand], acc: Future[Int]): Future[Int] = rest match {
-      case Seq() => acc
-      case x +: xs =>
-        val newAcc = for {
-          r  <- acc
-          rx <- executeCommand(x)
-        } yield r + rx
-        loop(xs, newAcc)
-    }
-    Await.result(loop(xs, Future.successful(0)), timeout)
+    Await.result(Future.sequence(xs.map(executeCommand(_))), timeout).sum
   }
 
   private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Int] = x match {

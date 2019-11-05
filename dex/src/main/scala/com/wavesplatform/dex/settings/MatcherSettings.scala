@@ -64,13 +64,19 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
                            defaultGrpcCachesExpiration: FiniteDuration) {
-  def mentionedAssets: Set[Asset] =
-    priceAssets.toSet ++ blacklistedAssets ++ {
+
+  def mentionedAssets: Set[Asset] = {
+    priceAssets.toSet ++
+      blacklistedAssets ++
+      orderRestrictions.keySet.flatMap(_.assets) ++
+      matchingRules.keySet.flatMap(_.assets) ++
+      allowedAssetPairs.flatMap(_.assets) ++ {
       orderFee match {
         case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
         case _                                 => Set.empty
       }
-    } ++ orderRestrictions.keySet.flatMap(_.assets) ++ matchingRules.keySet.flatMap(_.assets) ++ allowedAssetPairs.flatMap(_.assets)
+    }
+  }
 }
 
 case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
@@ -80,8 +86,9 @@ object MatcherSettings {
   implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
-  private def unsafeParseAsset(x: String): Asset =
+  private def unsafeParseAsset(x: String): Asset = {
     AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+  }
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
 

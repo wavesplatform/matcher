@@ -18,11 +18,13 @@ object DexApiOps {
 
     def publicKey: F[PublicKey] = explicitGet(self.tryPublicKey)
 
-    def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] =
+    def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
       explicitGet(self.tryReservedBalance(of, timestamp))
+    }
 
-    def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] =
+    def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
       explicitGet(self.tryTradableBalance(of, assetPair, timestamp))
+    }
 
     def place(order: Order): F[MatcherResponse]       = explicitGet(self.tryPlace(order))
     def placeMarket(order: Order): F[MatcherResponse] = explicitGet(self.tryPlaceMarket(order))
@@ -34,8 +36,9 @@ object DexApiOps {
     def cancelWithApiKey(id: Order.Id): F[MatcherStatusResponse] = explicitGet(self.tryCancelWithApiKey(id))
 
     def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Unit] = explicitGet(self.tryCancelAll(owner, timestamp))
-    def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Unit] =
+    def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Unit] = {
       explicitGet(self.tryCancelAllByPair(owner, assetPair, timestamp))
+    }
 
     def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))

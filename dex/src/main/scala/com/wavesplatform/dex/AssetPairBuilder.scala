@@ -26,13 +26,12 @@ class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset 
   private[this] val create   = timer.refine("action" -> "create")
   private[this] val validate = timer.refine("action" -> "validate")
 
-  def isCorrectlyOrdered(pair: AssetPair): Boolean =
-    (indices.get(pair.priceAsset), indices.get(pair.amountAsset)) match {
-      case (None, None)         => pair.priceAsset.compatId < pair.amountAsset.compatId
-      case (Some(_), None)      => true
-      case (None, Some(_))      => false
-      case (Some(pi), Some(ai)) => pi < ai
-    }
+  def isCorrectlyOrdered(pair: AssetPair): Boolean = (indices.get(pair.priceAsset), indices.get(pair.amountAsset)) match {
+    case (None, None)         => pair.priceAsset.compatId < pair.amountAsset.compatId
+    case (Some(_), None)      => true
+    case (None, Some(_))      => false
+    case (Some(pi), Some(ai)) => pi < ai
+  }
 
   private def isBlacklistedByName(asset: IssuedAsset, desc: AssetsDB.Item): Boolean =
     settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)

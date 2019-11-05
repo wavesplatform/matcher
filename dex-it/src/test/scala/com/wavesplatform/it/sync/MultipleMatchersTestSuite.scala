@@ -106,9 +106,6 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     dex1Api.cancelAll(alice)
     dex1Api.cancelAll(bob)
 
-    val dex1AsyncAPI = toDexExplicitGetOps(dex1AsyncApi)(future, catsStdInstancesForFuture)
-    val dex2AsyncAPI = toDexExplicitGetOps(dex2AsyncApi)(future, catsStdInstancesForFuture)
-
     val allOrders =
       (Gen.containerOfN[Vector, Order](150, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
         Gen.containerOfN[Vector, Order](150, orderGen(matcher, alice, assetPairs, Seq(OrderType.BUY))).sample.get).toSet
@@ -128,7 +125,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     }
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[Unit]] = Future.sequence {
-      assetPairs.map(dex2AsyncAPI.cancelAllByPair(owner, _, System.currentTimeMillis))
+      assetPairs.map(toDexExplicitGetOps(dex2AsyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
     }
 
     Await.result(
@@ -140,8 +137,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     )
 
     // TODO implement .waitFor[Seq[OrderbookHistory]]
-    Await.result(dex1AsyncAPI.orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
-    Await.result(dex1AsyncAPI.orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) = {

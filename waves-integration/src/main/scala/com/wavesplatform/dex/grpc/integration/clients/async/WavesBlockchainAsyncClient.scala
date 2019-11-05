@@ -13,14 +13,15 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import monix.reactive.Observable
 
 object WavesBlockchainAsyncClient {
+
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
 
-  private val briefWavesDescription = Option(BriefAssetDescription.waves)
-
   final implicit class Ops[F[_]: Functor: Applicative](val self: WavesBlockchainAsyncClient[F]) {
-    def assetDescription(asset: Asset): F[Option[BriefAssetDescription]] =
-      asset.fold(Applicative[F].pure(briefWavesDescription))(self.assetDescription)
+
+    def assetDescription(asset: Asset): F[Option[BriefAssetDescription]] = {
+      asset.fold(Applicative[F].pure { Option(BriefAssetDescription.waves) })(self.assetDescription)
+    }
 
     def assetDecimals(asset: Asset.IssuedAsset): F[Option[Int]] = self.assetDescription(asset).map { _.map(_.decimals) }
 

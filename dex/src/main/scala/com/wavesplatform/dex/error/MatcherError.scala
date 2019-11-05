@@ -7,7 +7,7 @@ import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json.{JsObject, Json}
 
@@ -340,6 +340,15 @@ case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
        |Orders can not be placed into level with price 0"""
     )
 
+case object InvalidRateInput extends MatcherError(rate, commonEntity, broken, e"Invalid input for the asset rate")
+
+case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
+
+case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
+
+case class RateNotFound(theAsset: Asset)
+    extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -365,6 +374,8 @@ object Entity {
   object price      extends Entity(16)
   object fee        extends Entity(17)
   object expiration extends Entity(18)
+
+  object rate extends Entity(20)
 
   object producer extends Entity(100)
 }

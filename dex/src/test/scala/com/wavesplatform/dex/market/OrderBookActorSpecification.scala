@@ -287,7 +287,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
     }
 
-    "cancel order in merge small prices mode" in obcTestWithTickSize(100) { (pair, orderBook, tp) =>
+    "cancel order with price not equal to it's level price" in obcTestWithTickSize(100) { (pair, orderBook, tp) =>
       val buyOrder = buy(pair, 100000000, 0.0000041)
 
       orderBook ! wrapLimitOrder(1, buyOrder)

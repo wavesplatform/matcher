@@ -246,7 +246,6 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(wctUsdPair, sellOrder1, "Filled")
 
     val sellOrder2 = node.placeOrder(sellOrder).message.id
-
     node.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     node.waitOrderStatus(wctUsdPair, sellOrder2, "Filled")
 

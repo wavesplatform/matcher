@@ -128,7 +128,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(pair, counterId, "PartiallyFilled")
 
     val txs = node.waitTransactionsByOrder(submittedId, 1)
-    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.Id
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -154,7 +154,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     node.waitOrderStatus(pair, counterId, "PartiallyFilled")
 
     val txs = node.waitTransactionsByOrder(submittedId, 1)
-    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.Id
   }
 
   private def issueAsset(): String = {

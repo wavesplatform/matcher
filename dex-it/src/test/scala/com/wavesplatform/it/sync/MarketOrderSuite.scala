@@ -1,13 +1,17 @@
 package com.wavesplatform.it.sync
 
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderSuite extends MatcherSuiteBase {
@@ -44,7 +48,8 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    node.waitForTransaction(node.broadcastRequest(IssueUsdTx.json()).id)
+    val txIds = Seq(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
+    txIds.foreach(node.waitForTransaction(_))
   }
 
   override protected def afterEach(): Unit = {
@@ -54,19 +59,40 @@ class MarketOrderSuite extends MatcherSuiteBase {
   }
 
   def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType)(orders: (Long, Long)*): Unit = {
-    orders.foreach {
-      case (amount, price) =>
-        val order = node.placeOrder(sender = sender, pair = pair, orderType = orderType, amount = amount, price = price, fee = fee)
+    orders.zipWithIndex.foreach {
+      case ((amount, price), idx) =>
+        val order = node.placeOrder(sender = sender,
+                                    pair = pair,
+                                    orderType = orderType,
+                                    amount = amount,
+                                    price = price,
+                                    fee = fee,
+                                    timestamp = System.currentTimeMillis + idx)
         node.waitOrderStatus(pair, order.message.id, OrderStatus.Accepted.name)
     }
+  }
+
+  def createAccountWithBalance()(balances: (Long, Option[String])*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
+
+    balances.foreach {
+      case (balance, asset) => {
+        node.broadcastTransfer(alice, account.toAddress.toString, balance, fee, asset, None)
+        nodes.waitForHeightArise()
+      }
+    }
+
+    account
   }
 
   def printBalances(account: KeyPair): Unit = {
     System.out.println(account.toString)
     System.out.println(s"waves: ${node.accountBalances(account.toAddress.toString)._1} ")
     System.out.println(s"usd: ${node.assetBalance(account.toAddress.toString, UsdId.toString).balance} ")
+    System.out.println(s"btc: ${node.assetBalance(account.toAddress.toString, BtcId.toString).balance} ")
     System.out.println(s"waves-r: ${node.reservedBalance(account).getOrElse("WAVES", "0")} ")
     System.out.println(s"usd-r: ${node.reservedBalance(account).getOrElse(UsdId.toString, "0")} ")
+    System.out.println(s"btc-r: ${node.reservedBalance(account).getOrElse(BtcId.toString, "0")} ")
   }
 
   "Processing market orders" - {
@@ -139,8 +165,8 @@ class MarketOrderSuite extends MatcherSuiteBase {
       val secondPrice = 0.79.usd
 
       placeOrders(alice, wavesUsdPair, OrderType.BUY)(
-        50.waves -> 0.78.usd,
         10.waves -> bestPrice,
+        50.waves -> 0.78.usd,
         25.waves -> secondPrice,
       )
 
@@ -216,14 +242,36 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
     }
 
-    "should be removed from order book when the user has not enough spendable balance (BUY)" in {}
+    "should be removed from order book when there are no suitable orders by limit of the price (BUY)" in {
+      val accountBalanceWBefore = 1.waves
+      val marketOrderAmount     = 200.waves
+      val marketPrice           = 0.1.usd
+      val anotherOrderAmount    = 1.waves
 
-    "should be removed from order book when the user has not enough spendable balance (SELL)" in {}
+      val account = createAccountWithBalance()(
+        1.waves -> None,
+        100.usd -> Some(UsdId.toString)
+      )
 
-    "should be removed from order book when there are no suitable orders by limit of the price (BUY)" in {}
+      val creationTime = System.currentTimeMillis();
 
-    "should be removed from order book when there are no suitable orders by limit of the price (SELL)" in {}
+      node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.SELL, 200.waves, marketPrice, fee)).message.id
+      node.placeOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.BUY, 1.waves, marketPrice, fee * 2, creationTime = creationTime)).message.id
+      node.waitOrderProcessed(
+        wavesUsdPair,
+        node
+          .placeMarketOrder(node.prepareOrder(account, wavesUsdPair, OrderType.BUY, marketOrderAmount, marketPrice, fee, creationTime = creationTime))
+          .message
+          .id
+      )
 
+      val orderBook = node.orderBook(wavesUsdPair)
+      orderBook.bids should be(empty)
+      orderBook.asks should be(empty)
+
+      node.accountBalances(account.toAddress.toString)._1 should be(
+        accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount)
+    }
   }
 
   "Validation market orders" - {
@@ -244,7 +292,26 @@ class MarketOrderSuite extends MatcherSuiteBase {
                               node.placeMarketOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, total + 1000.waves, price, fee)).message.id)
     }
 
-    "should be rejected if the price is too high for completely filling by current opened orders (BUY)" in {
+    "should be accepted if user doesn't have enough Waves to pay fee, but he take waves from order result " in {
+      val amount   = 100.waves
+      val price    = 0.1.usd
+      val transfer = 100.usd
+
+      val account = createAccountWithBalance() {
+        transfer -> Some(UsdId.toString)
+      }
+
+      placeOrders(alice, wavesUsdPair, OrderType.SELL)(
+        amount -> price
+      )
+
+      node.waitOrderProcessed(wavesUsdPair,
+                              node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, OrderType.BUY, amount, price, fee)).message.id)
+
+      node.accountBalances(account.toAddress.toString)._1 should be(amount - fee)
+    }
+
+    "should be rejected if the price is too low for completely filling by current opened orders (BUY)" in {
       val amount      = 100.waves
       val marketPrice = price - 0.1.usd
 
@@ -264,5 +331,50 @@ class MarketOrderSuite extends MatcherSuiteBase {
                                  tooHighPrice("sell", "0.5"))
     }
 
+    "should be rejected if amount of the buy market order more then user could buy" ignore /* because of DEX-457 */ {
+      val amount   = 101.waves
+      val price    = 1.1.usd
+      val transfer = 100.usd
+
+      val account = createAccountWithBalance() {
+        transfer -> Some(UsdId.toString)
+      }
+
+      placeOrders(alice, wavesUsdPair, OrderType.SELL)(
+        amount -> price
+      )
+
+      val orderBook = node.orderBook(wavesUsdPair)
+      orderBook.bids shouldNot be(empty)
+      orderBook.asks should be(empty)
+
+      assertBadRequestAndMessage(
+        node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, OrderType.BUY, amount, price, fee)),
+        s"Not enough tradable balance. The order requires 0 WAVES and 111.1 ${UsdId}, but available are 111.1 ${UsdId} and 0 WAVES"
+      )
+
+    }
+
+    "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" ignore /* because of DEX-457 */ {
+      docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))
+
+      val amount   = 10.waves
+      val price    = 1.usd
+      val transfer = 10.usd
+
+      val account = createAccountWithBalance() {
+        transfer -> Some(UsdId.toString)
+      }
+
+      node.waitOrderStatus(
+        wavesUsdPair,
+        node.placeOrder(bob, wavesUsdPair, OrderType.SELL, amount, price, fee, feeAsset = IssuedAsset(BtcId), version = 3).message.id,
+        "Accepted")
+
+      assertBadRequestAndMessage(
+        node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, OrderType.BUY, amount, price, fee, feeAsset = IssuedAsset(BtcId))),
+        s"Not enough tradable balance. The order requires 0.003 $BtcId and 10 WAVES, but available are 10 WAVES and 0 $BtcId"
+      )
+    }
   }
 }

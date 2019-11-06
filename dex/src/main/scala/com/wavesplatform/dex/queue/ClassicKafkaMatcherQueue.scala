@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.queue
 
+import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import java.util.{Timer, TimerTask}
 
@@ -59,6 +60,7 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
           val xs = records.asScala.map { record =>
             QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
           }.toArray
+          log.trace(s"Got ${xs.length} records.${if (ThreadLocalRandom.current().nextBoolean()) s" Next record position: ${consumer.position(topicPartition)}" else ""}")
           process(xs).andThen {
             case _ =>
               xs.lastOption.foreach(x => lastProcessedOffsetInternal = x.offset)
@@ -78,8 +80,10 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
   override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
-    val metadataConsumer = new KafkaConsumer[String, QueueEvent](consumerSettings.withClientId("metadataConsumer").getProperties, new StringDeserializer, eventDeserializer)
-    val topicPartition   = new TopicPartition(settings.topic, 0)
+    val metadataConsumer = new KafkaConsumer[String, QueueEvent](consumerSettings.withClientId("metadata-consumer").getProperties,
+                                                                 new StringDeserializer,
+                                                                 eventDeserializer)
+    val topicPartition = new TopicPartition(settings.topic, 0)
     metadataConsumer.assign(java.util.Collections.singletonList(topicPartition))
     metadataConsumer.seekToEnd(java.util.Collections.singletonList(topicPartition))
     Future.successful(metadataConsumer.position(topicPartition) - 1)
@@ -108,7 +112,7 @@ object ClassicKafkaMatcherQueue {
     override def close(): Unit                                                      = {}
   }
 
-  private class KafkaProducer(settings: Settings, duringShutdown: => Boolean)(implicit mat: ActorMaterializer) extends Producer {
+  private class KafkaProducer(settings: Settings, duringShutdown: => Boolean)(implicit mat: ActorMaterializer) extends Producer with ScorexLogging {
     private type InternalProducer = SourceQueueWithComplete[(QueueEvent, Promise[QueueEventWithMeta])]
 
     private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatcher
@@ -122,20 +126,23 @@ object ClassicKafkaMatcherQueue {
       new org.apache.kafka.clients.producer.KafkaProducer[String, QueueEvent](producerSettings.getProperties, new StringSerializer, eventSerializer)
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
+      log.trace(s"Placing $event")
+
       val p = Promise[QueueEventWithMeta]()
 
       producer.send(
         new ProducerRecord[String, QueueEvent](settings.topic, event),
         new Callback {
           override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-            if (exception == null)
+            if (exception == null) {
+              log.trace(s"$event placed, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
               p.success(
                 QueueEventWithMeta(
                   offset = metadata.offset(),
                   timestamp = metadata.timestamp(),
                   event = event
                 ))
-            else p.failure(exception)
+            } else p.failure(exception)
           }
         }
       )

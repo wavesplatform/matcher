@@ -942,13 +942,13 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
       docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent\nwaves.dex.order-fee.percent.min-fee = 0.1\nwaves.dex.order-fee.percent.asset-type = price"))
 
-      withClue("in percent-fee mode fee asset id should not always be Waves for V1 order") {
+      withClue("in percent-fee mode fee asset id should always be Waves for V1 order") {
         assertBadRequestAndMessage(
           node.placeOrder(sender = alice, pair = wavesUsdPair, orderType = OrderType.BUY, amount = 100, price = 100000000L, fee = 10, version = 1: Byte, feeAsset = IssuedAsset(UsdId)),
           unexpectedFeeAsset(UsdId))
       }
 
-      withClue("in percent-fee mode fee asset id should not always be Waves for V2 order") {
+      withClue("in percent-fee mode fee asset id should always be Waves for V2 order") {
         assertBadRequestAndMessage(
           node.placeOrder(sender = alice, pair = wavesUsdPair, orderType = OrderType.BUY, amount = 100, price = 100000000L, fee = 10, version = 2: Byte, feeAsset = IssuedAsset(UsdId)),
           unexpectedFeeAsset(UsdId))

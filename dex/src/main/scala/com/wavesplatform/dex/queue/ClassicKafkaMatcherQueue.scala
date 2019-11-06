@@ -56,13 +56,12 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
 
         override def run(): Unit = {
           val records = consumer.poll(duration)
-          val size    = records.count()
           val xs = records.asScala.map { record =>
             QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
-          }.toSeq
+          }.toArray
           process(xs).andThen {
             case _ =>
-              lastProcessedOffsetInternal += size
+              xs.lastOption.foreach(x => lastProcessedOffsetInternal = x.offset)
               loop()
           }
         }

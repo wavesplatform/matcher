@@ -23,7 +23,6 @@ import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
-import mouse.any._
 
 import scala.util.Random
 

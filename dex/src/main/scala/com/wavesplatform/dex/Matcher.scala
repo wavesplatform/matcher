@@ -127,7 +127,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
-      new KafkaMatcherQueue(settings.eventsQueue.kafka)(materializer)
+      new ClassicKafkaMatcherQueue(settings.eventsQueue.kafka)(materializer)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }

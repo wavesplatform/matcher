@@ -78,7 +78,7 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
   override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
-    val metadataConsumer = new KafkaConsumer[String, QueueEvent](consumerSettings.getProperties, new StringDeserializer, eventDeserializer)
+    val metadataConsumer = new KafkaConsumer[String, QueueEvent](consumerSettings.withClientId("metadataConsumer").getProperties, new StringDeserializer, eventDeserializer)
     val topicPartition   = new TopicPartition(settings.topic, 0)
     metadataConsumer.assign(java.util.Collections.singletonList(topicPartition))
     metadataConsumer.seekToEnd(java.util.Collections.singletonList(topicPartition))

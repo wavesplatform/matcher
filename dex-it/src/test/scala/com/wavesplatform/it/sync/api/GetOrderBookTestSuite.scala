@@ -55,8 +55,8 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
 
   "response orderbook should contain right count of bids and asks" in {
     for (i <- 1 to ordersCount) {
-      node.waitOrderStatus(wavesUsdPair, node.placeOrder(alice, wavesUsdPair, BUY, 1.waves, i, 300000, version = 3).message.id, "Accepted")
-      node.waitOrderStatus(wavesUsdPair, node.placeOrder(alice, wavesUsdPair, SELL, 1.waves, i + 51, 300000, version = 3).message.id, "Accepted")
+      node.placeOrder(alice, wavesUsdPair, BUY, 1.waves, i, 300000, version = 3)
+      node.placeOrder(alice, wavesUsdPair, SELL, 1.waves, i + 51, 300000, version = 3)
     }
 
     checkDepth(10, Array(0, 1, 8, 9))

@@ -99,7 +99,6 @@ object SyncMatcherHttpApi extends Assertions {
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
                    feeAsset: Asset = Waves,
-
                    timestamp: Long = System.currentTimeMillis): MatcherResponse =
       sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset, timestamp))
 

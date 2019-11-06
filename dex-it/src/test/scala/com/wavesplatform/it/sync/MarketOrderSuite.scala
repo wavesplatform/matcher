@@ -211,11 +211,11 @@ class MarketOrderSuite extends MatcherSuiteBase {
     }
 
     "should be removed from order book when the restriction by tokens count has been reached (SELL)" in {
-      val bobWBefore        = node.accountBalances(bob.toAddress.toString)._1
+      // val bobWBefore        = node.accountBalances(bob.toAddress.toString)._1
       val bobUBefore        = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
       val marketPrice       = 0.1.usd
       val marketOrderAmount = 72.waves
-      val ordersAmount      = 36.waves
+      // val ordersAmount      = 36.waves
 
       placeOrders(alice, wavesUsdPair, OrderType.BUY)(
         10.waves -> 0.2.usd,
@@ -331,7 +331,7 @@ class MarketOrderSuite extends MatcherSuiteBase {
                                  tooHighPrice("sell", "0.5"))
     }
 
-    "should be rejected if amount of the buy market order more then user could buy" ignore /* because of DEX-457 */ {
+    "should be rejected if amount of the buy market order more then user could buy" ignore /* because of TODO: DEX-457 */ {
       val amount   = 101.waves
       val price    = 1.1.usd
       val transfer = 100.usd
@@ -355,7 +355,7 @@ class MarketOrderSuite extends MatcherSuiteBase {
 
     }
 
-    "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" ignore /* because of DEX-457 */ {
+    "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" ignore /* because of TODO: DEX-457 */ {
       docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))
 
       val amount   = 10.waves

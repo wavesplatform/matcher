@@ -57,10 +57,16 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
         private val duration = java.time.Duration.ofNanos(consumerSettings.pollInterval.toNanos)
 
         override def run(): Unit = {
-          val records = consumer.poll(duration)
-          val xs = records.asScala.map { record =>
-            QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
-          }.toArray
+          val xs = try {
+            val records = consumer.poll(duration)
+            records.asScala.map { record =>
+              QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
+            }.toArray
+          } catch {
+            case e: Throwable =>
+              log.error(s"Can't consume", e)
+              Array.empty
+          }
           log.trace(
             s"Got ${xs.length} records.${if (ThreadLocalRandom.current().nextBoolean()) s" Next record position: ${consumer.position(topicPartition)}"
             else ""}")
@@ -135,22 +141,29 @@ object ClassicKafkaMatcherQueue {
 
       val p = Promise[QueueEventWithMeta]()
 
-      producer.send(
-        new ProducerRecord[String, QueueEvent](settings.topic, event),
-        new Callback {
-          override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
-            if (exception == null) {
-              log.trace(s"$event placed, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
-              p.success(
-                QueueEventWithMeta(
-                  offset = metadata.offset(),
-                  timestamp = metadata.timestamp(),
-                  event = event
-                ))
-            } else p.failure(exception)
+      try {
+        producer.send(
+          new ProducerRecord[String, QueueEvent](settings.topic, event),
+          new Callback {
+            override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
+              if (exception == null) {
+                log.trace(s"$event placed, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
+                p.success(
+                  QueueEventWithMeta(
+                    offset = metadata.offset(),
+                    timestamp = metadata.timestamp(),
+                    event = event
+                  ))
+              } else {
+                log.error(s"During placing $event", exception)
+                p.failure(exception)
+              }
+            }
           }
-        }
-      )
+        )
+      } catch {
+        case e: Throwable => log.error(s"Can't send message $event", e)
+      }
 
       p.future.map(Some(_))
     }

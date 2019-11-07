@@ -49,6 +49,7 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
     val topicPartition = new TopicPartition(settings.topic, 0) // Only one partition
     val consumer       = new KafkaConsumer[String, QueueEvent](consumerSettings.getProperties, new StringDeserializer, eventDeserializer)
     consumer.assign(java.util.Collections.singletonList(topicPartition))
+
     consumer.seek(topicPartition, fromOffset)
 
     def loop(): Unit = {
@@ -60,7 +61,9 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
           val xs = records.asScala.map { record =>
             QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
           }.toArray
-          log.trace(s"Got ${xs.length} records.${if (ThreadLocalRandom.current().nextBoolean()) s" Next record position: ${consumer.position(topicPartition)}" else ""}")
+          log.trace(
+            s"Got ${xs.length} records.${if (ThreadLocalRandom.current().nextBoolean()) s" Next record position: ${consumer.position(topicPartition)}"
+            else ""}")
           process(xs).andThen {
             case _ =>
               xs.lastOption.foreach(x => lastProcessedOffsetInternal = x.offset)
@@ -80,9 +83,11 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
   override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
-    val metadataConsumer = new KafkaConsumer[String, QueueEvent](consumerSettings.withClientId("metadata-consumer").getProperties,
-                                                                 new StringDeserializer,
-                                                                 eventDeserializer)
+    val metadataConsumer = new KafkaConsumer[String, QueueEvent](
+      consumerSettings.withClientId("metadata-consumer").withGroupId(s"${consumerSettings.getProperty("group.id")}-consumer").getProperties,
+      new StringDeserializer,
+      eventDeserializer
+    )
     val topicPartition = new TopicPartition(settings.topic, 0)
     metadataConsumer.assign(java.util.Collections.singletonList(topicPartition))
     metadataConsumer.seekToEnd(java.util.Collections.singletonList(topicPartition))

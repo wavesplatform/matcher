@@ -391,6 +391,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       case Success(_) => setStatus(Status.Working)
       case Failure(e) =>
         log.error(s"Can't start matcher: ${e.getMessage}", e)
+        log.error("Stacktrace:")
+        e.printStackTrace(System.err)
         forceStopApplication(ErrorStartingMatcher)
     }
   }
@@ -413,6 +415,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     case e: KafkaTimeoutException =>
       if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get last offset from queue", e))
       else getLastOffset(deadline)
+
+    case e: Throwable =>
+      log.error(s"Can't handle $e: ${e.getClass.getName}", e)
+      throw e
   }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {

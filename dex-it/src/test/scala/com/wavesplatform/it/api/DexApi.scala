@@ -333,7 +333,7 @@ object DexApi {
         }
 
         // Sometimes container start during 20 seconds! https://github.com/docker/for-mac/issues/1183
-        repeatUntil(request, RepeatRequestOptions(1.second, 30))(_ == true).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =

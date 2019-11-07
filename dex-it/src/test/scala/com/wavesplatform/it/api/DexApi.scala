@@ -332,6 +332,7 @@ object DexApi {
           case NonFatal(e)                               => M.raiseError(e)
         }
 
+        // Sometimes container start during 20 seconds! https://github.com/docker/for-mac/issues/1183
         repeatUntil(request, RepeatRequestOptions(1.second, 30))(_ == true).map(_ => ())
       }
 

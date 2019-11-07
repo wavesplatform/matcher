@@ -162,11 +162,42 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   def start(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Starting ...")
-    try client.startContainer(container.id)
-    catch {
+    try {
+      client.startContainer(container.id)
+      waitProcessStarted(container)
+    } catch {
       case NonFatal(e) =>
         log.error(s"${prefix(container)} Can't start", e)
         throw e
+    }
+  }
+
+  private def waitProcessStarted(container: DockerContainer): Unit = {
+    if (!hasLogs(container)) {
+      (1 to 20).toIterator.takeWhile { _ =>
+        Thread.sleep(1000)
+        !hasLogs(container)
+      }
+    }
+  }
+
+  private def hasLogs(container: DockerContainer): Boolean = {
+    log.trace(s"Trying to check logs of ${container.id}")
+    val buffer = new ByteArrayOutputStream(1024)
+    try {
+      client
+        .logs(
+          container.id,
+          DockerClient.LogsParam.stdout(),
+          DockerClient.LogsParam.stderr()
+        )
+        .attach(buffer, buffer)
+
+      val r = buffer.size() > 0
+      log.trace(s"${container.id} has logs? $r")
+      r
+    } finally {
+      buffer.close()
     }
   }
 

@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -37,6 +37,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
 import mouse.any._
+import org.apache.kafka.common.errors.{TimeoutException => KafkaTimeoutException}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
@@ -238,7 +239,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         settings,
         assetPairsDB, {
           case Left(msg) =>
-            log.error(s"Can't start matcher: $msg")
+            log.error(s"Can't start MatcherActor: $msg")
             forceStopApplication(ErrorStartingMatcher)
 
           case Right((self, processedOffset)) =>
@@ -409,8 +410,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
-    case _: AskTimeoutException =>
-      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get last offset from queue"))
+    case e: KafkaTimeoutException =>
+      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get last offset from queue", e))
       else getLastOffset(deadline)
   }
 

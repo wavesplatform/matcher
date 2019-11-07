@@ -7,7 +7,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{Response, SttpBackend, MonadError => _, _}
+import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ConnectReq

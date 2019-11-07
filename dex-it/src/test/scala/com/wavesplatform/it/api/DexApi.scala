@@ -24,7 +24,6 @@ import com.wavesplatform.it.api.dex._
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
-import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 
 import scala.concurrent.duration.DurationInt
@@ -100,7 +99,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForCurrentOffset(pred: Long => Boolean): F[Long]
 }
 
-object DexApi extends ScorexLogging {
+object DexApi {
 
   implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
 
@@ -139,7 +138,10 @@ object DexApi extends ScorexLogging {
       private val ops     = FOps[F]; import ops._
       private val sttpOps = SttpBackendOps[F, MatcherError]; import sttpOps._
 
-      def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
+      def apiUri: String = {
+        val savedHost = host
+        s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}/matcher"
+      }
 
       override def tryPublicKey: F[Either[MatcherError, PublicKey]] = tryParseJson[ByteStr](sttp.get(uri"$apiUri")).map(PublicKey(_))
 
@@ -162,7 +164,7 @@ object DexApi extends ScorexLogging {
       override def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]] = tryParseJson {
         sttp
           .post(uri"$apiUri/orderbook")
-          .readTimeout(5.minutes) // TODO find way to decrease timeout!
+          .readTimeout(3.minutes) // TODO find way to decrease timeout!
           .followRedirects(false) // TODO move ?
           .body(order)
       }
@@ -175,7 +177,7 @@ object DexApi extends ScorexLogging {
           val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
             .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
-            .readTimeout(5.minutes) // TODO find way to decrease timeout!
+            .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
             .body(body)
             .contentType("application/json", "UTF-8")
@@ -207,13 +209,10 @@ object DexApi extends ScorexLogging {
       }
 
       override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
-
-        log.info(s"===> trying to get status for order $id")
-
         tryParseJson {
           sttp
             .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
-            .readTimeout(5.minutes) // TODO find way to decrease timeout!
+            .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
         }
       }

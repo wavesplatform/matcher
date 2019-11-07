@@ -6,10 +6,12 @@ case class BriefAssetDescription(name: String, decimals: Int, hasScript: Boolean
 
 object BriefAssetDescription {
 
-  val waves =
+  val wavesDescription =
     BriefAssetDescription(
       name = AssetPair.WavesName,
       decimals = 8,
       hasScript = false
     )
+
+  val someWavesDescription = Option(wavesDescription)
 }

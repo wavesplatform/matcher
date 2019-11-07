@@ -93,11 +93,6 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
   }
 
   private def request(order: Order): Future[(Order.Id, OrderStatus)] = {
-//    for {
-//      _      <- toDexExplicitGetOps(dex1AsyncApi).place(order)
-//      status <- toDexExplicitGetOps(dex1AsyncApi).orderStatus(order)
-//    } yield (order.id(), status.status)
-
     for {
       _      <- dex1AsyncApi.tryPlace(order).recover { case x => log.error("Some error with order placement occurred:", x) }
       status <- dex1AsyncApi.orderStatus(order)

@@ -32,7 +32,8 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
-  private val client          = DefaultDockerClient.fromEnv().build()
+  // connection pool and timeout changed because of CorrectStatusAfterPlaceTestSuite (otherwise part of requests cannot be sent)
+  private val client          = DefaultDockerClient.fromEnv().connectionPoolSize(200).readTimeoutMillis(5000).build()
   private val knownContainers = ConcurrentHashMap.newKeySet[DockerContainer]()
   private val isStopped       = new AtomicBoolean(false)
 

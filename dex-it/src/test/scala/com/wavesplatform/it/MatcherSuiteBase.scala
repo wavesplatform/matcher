@@ -7,8 +7,8 @@ import cats.instances.future._
 import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp._
-import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import com.softwaremill.sttp.TryHttpURLConnectionBackend
+import com.softwaremill.sttp.okhttp.OkHttpFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.assets.DoubleOps
@@ -27,8 +27,6 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
-import org.asynchttpclient.Dsl.asyncHttpClient
-import com.wavesplatform.dex.it.time.GlobalTimer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -55,20 +53,8 @@ abstract class MatcherSuiteBase
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
 
-  protected implicit val futureHttpBackend =
-    new LoggingSttpBackend[Future, Nothing](
-      AsyncHttpClientFutureBackend.usingClient(
-        asyncHttpClient(
-          org.asynchttpclient.Dsl
-            .config()
-            .setKeepAlive(false)
-            .setNettyTimer(GlobalTimer.instance)
-            .build()
-        )
-      )
-    )
-
-  protected implicit val tryHttpBackend = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](OkHttpFutureBackend())
+  protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)

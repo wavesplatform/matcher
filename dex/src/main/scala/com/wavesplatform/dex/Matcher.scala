@@ -454,16 +454,10 @@ object Matcher extends ScorexLogging {
       implicit ec: ExecutionContext): FutureResult[(Asset, Int)] =
     getDescription(assetsDB, assetDesc)(asset).map(x => asset -> x.decimals)(catsStdInstancesForFuture)
 
-  private val waves = liftValueAsync[AssetsDB.Item](
-    AssetsDB.Item(
-      name = AssetPair.WavesName,
-      decimals = 8
-    ))
-
   private def getDescription(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
       implicit ec: ExecutionContext): FutureResult[AssetsDB.Item] =
     asset match {
-      case Waves => waves
+      case Waves => AssetsDB.wavesLifted
       case asset: IssuedAsset =>
         assetsDB.get(asset) match {
           case Some(x) => liftValueAsync[AssetsDB.Item](x)

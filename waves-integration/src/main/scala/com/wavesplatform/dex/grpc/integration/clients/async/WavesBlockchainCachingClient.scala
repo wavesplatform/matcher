@@ -2,13 +2,11 @@ package com.wavesplatform.dex.grpc.integration.clients.async
 
 import java.time.Duration
 
-import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, BalancesCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import monix.execution.Ack.Continue
@@ -43,22 +41,4 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
   override def isFeatureActivated(id: Short): Future[Boolean] = expiringFeaturesCache.get(id) map Boolean2boolean
 
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
-
-  // TODO
-  def assetDescription(pair: Set[AssetPair]): Future[Map[Asset, BriefAssetDescription]] =
-    pair
-      .flatMap(assetPair => Set(assetPair.amountAsset, assetPair.priceAsset))
-      .toList
-      .traverse(asset => assetDescription(asset).map { asset -> _ })
-      .flatMap { list =>
-        val (r, nonexistentAssets) = list.partition { case (_, maybeDecimals) => maybeDecimals.nonEmpty }
-        if (nonexistentAssets.isEmpty) Future.successful(r.map { case (asset, decimals) => asset -> decimals.get }.toMap)
-        else
-          Future.failed(
-            new IllegalArgumentException(
-              "The following assets specified in waves.dex.matching-rules section do not exist in the blockchain: " +
-                s"${nonexistentAssets.map { case (asset, _) => AssetPair.assetIdStr(asset) }.mkString(", ")}"
-            )
-          )
-      }
 }

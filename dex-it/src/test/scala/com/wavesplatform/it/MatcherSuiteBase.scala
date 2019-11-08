@@ -3,11 +3,12 @@ package com.wavesplatform.it
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
-import cats.implicits._
+import cats.instances.future._
+import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp._
-import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import com.softwaremill.sttp.TryHttpURLConnectionBackend
+import com.softwaremill.sttp.okhttp.OkHttpFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.assets.DoubleOps
@@ -48,26 +49,26 @@ abstract class MatcherSuiteBase
     with PredefinedAccounts
     with ScorexLogging {
 
-  GenesisConfig.setupAddressScheme()
+  protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
+    Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
+  }
+
+  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](OkHttpFutureBackend())
+  protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+
+  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
+    new DexApiOps.ExplicitGetDexApiOps[F](self)
+  }
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 30.seconds,
     interval = 1.second
   )
 
-  protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
-    new DexApiOps.ExplicitGetDexApiOps[F](self)
-  }
+  GenesisConfig.setupAddressScheme()
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
-
-  protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
-    Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
-  }
-
-  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](AsyncHttpClientFutureBackend())
-  protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   protected val internalDockerClient: Coeval[com.wavesplatform.dex.it.docker.Docker] = Coeval.evalOnce {
     com.wavesplatform.dex.it.docker.Docker(getClass)
@@ -79,9 +80,7 @@ abstract class MatcherSuiteBase
 
   protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(GenesisConfig.config)
 
-  protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-1")
-  }
+  protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-1") }
 
   protected def wavesNode1Api: NodeApi[Id] = {
     val apiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)

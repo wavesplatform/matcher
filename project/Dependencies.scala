@@ -79,7 +79,8 @@ object Dependencies {
       catsModule("macros").value,
       shapeless.value,
       "io.grpc" % "grpc-netty" % "1.20.0"
-    ))
+    )
+  )
 
   lazy val common = Seq(
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
@@ -93,11 +94,13 @@ object Dependencies {
       spotify,
       catsCore.value,
       mouse,
-      "com.softwaremill.sttp" %% "core"                             % "1.6.4",
-      "com.softwaremill.sttp" %% "play-json"                        % "1.6.4",
-      "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.6.4",
+      "com.softwaremill.sttp" %% "core"                             % "1.7.2",
+      "com.softwaremill.sttp" %% "play-json"                        % "1.7.2",
+      "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.7.2",
+      "com.softwaremill.sttp" %% "okhttp-backend"                   % "1.7.2",
       "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
-    ))
+    )
+  )
 
   lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
@@ -120,7 +123,7 @@ object Dependencies {
       logback.exclude("org.scala-js", "scalajs-library_2.12"),
       kindProjector,
       logback,
-      "com.github.scopt" %% "scopt"    % "4.0.0-RC2",
+      "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       akkaModule("actor"),
       akkaModule("persistence-query"),
       akkaModule("slf4j"),

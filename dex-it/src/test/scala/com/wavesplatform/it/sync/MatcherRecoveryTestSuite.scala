@@ -9,11 +9,15 @@ import org.scalacheck.Gen
 import scala.util.Random
 
 class MatcherRecoveryTestSuite extends MatcherSuiteBase {
-  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
+
+  override protected def suiteInitialDexConfig: Config = {
+    ConfigFactory.parseString(
+      s"""waves.dex {
        |  snapshots-interval = 51
        |  price-assets = [ "$UsdId", "WAVES" ]
-       |}""".stripMargin)
+       |}""".stripMargin
+    )
+  }
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10

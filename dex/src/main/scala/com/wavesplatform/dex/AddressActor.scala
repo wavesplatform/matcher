@@ -40,8 +40,7 @@ class AddressActor(owner: Address,
                    store: StoreEvent,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean,
-                   batchCancelTimeout: FiniteDuration = 20.seconds)
-                  (implicit efc: ErrorFormatterContext)
+                   batchCancelTimeout: FiniteDuration = 20.seconds)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
 
@@ -74,20 +73,23 @@ class AddressActor(owner: Address,
       log.trace(s"Got $command")
       pendingCommands.get(orderId) match {
         case Some(pc) =>
-          val r = pc.command match {
-            case _: Command.PlaceOrder  => error.OrderNotFound(orderId)
-            case _: Command.CancelOrder => api.OrderCancelRejected(error.OrderCanceled(orderId))
-          }
-          sender ! r
+          sender ! api.OrderCancelRejected(
+            pc.command match {
+              case _: Command.PlaceOrder  => error.OrderNotFound(orderId)
+              case _: Command.CancelOrder => error.OrderCanceled(orderId)
+            }
+          )
 
         case None =>
           activeOrders.get(orderId) match {
             case None =>
-              sender ! api.OrderCancelRejected(orderDB.status(orderId) match {
-                case OrderStatus.NotFound     => error.OrderNotFound(orderId)
-                case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
-                case _: OrderStatus.Filled    => error.OrderFull(orderId)
-              })
+              sender ! api.OrderCancelRejected(
+                orderDB.status(orderId) match {
+                  case OrderStatus.NotFound     => error.OrderNotFound(orderId)
+                  case _: OrderStatus.Cancelled => error.OrderCanceled(orderId)
+                  case _: OrderStatus.Filled    => error.OrderFull(orderId)
+                }
+              )
 
             case Some(ao) =>
               if (ao.isMarket) sender ! api.OrderCancelRejected(error.MarketOrderCancel(orderId))

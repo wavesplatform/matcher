@@ -9,8 +9,8 @@ import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
 import play.api.libs.json.{JsError, Reads}
 
 class SttpBackendOps[F[_]: CanWait: ThrowableMonadError, ErrorT: Reads](implicit httpBackend: SttpBackend[F, Nothing]) {
-  private val ops = FOps[F]
-  import ops._
+
+  private val ops = FOps[F]; import ops._
 
   def tryParse[ResultT](req: RequestT[Id, Either[DeserializationError[JsError], ResultT], Nothing]): F[Either[ErrorT, ResultT]] =
     httpBackend.send(req.tag("requestId", UUID.randomUUID())).flatMap(parseTryResponseEither[ErrorT, ResultT])

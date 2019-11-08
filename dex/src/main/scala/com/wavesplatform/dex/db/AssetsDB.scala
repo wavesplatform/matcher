@@ -3,6 +3,7 @@ package com.wavesplatform.dex.db
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.dex.MatcherKeys
 import com.wavesplatform.dex.db.AssetsDB.Item
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -15,6 +16,7 @@ trait AssetsDB {
 }
 
 object AssetsDB {
+
   case class Item(name: String, decimals: Int)
 
   def apply(db: DB): AssetsDB = new LevelDBAssets(db)
@@ -28,6 +30,8 @@ object AssetsDB {
     name = AssetPair.WavesName,
     decimals = 8
   )
+
+  val wavesLifted: FutureResult[Item] = liftValueAsync[Item] { waves }
 
   private val someWaves = Option(waves)
 

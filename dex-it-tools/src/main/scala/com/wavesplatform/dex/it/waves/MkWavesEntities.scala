@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
@@ -154,6 +155,20 @@ trait MkWavesEntities {
       )
       .explicitGet()
 
+  def mkIssueExtended(issuer: KeyPair,
+                      name: String,
+                      quantity: Long,
+                      decimals: Int = 8,
+                      fee: Long = issueFee,
+                      script: Option[Script] = None,
+                      reissuable: Boolean = false,
+                      timestamp: Long = System.currentTimeMillis()): IssueResults = {
+    val tx          = mkIssue(issuer, name, quantity, decimals, fee, script, reissuable, timestamp)
+    val assetId     = tx.id()
+    val issuedAsset = IssuedAsset(assetId)
+    IssueResults(tx, assetId, issuedAsset)
+  }
+
   def mkSetAccountScript(accountOwner: KeyPair,
                          script: Option[Script],
                          fee: Long = setScriptFee,
@@ -229,4 +244,6 @@ trait MkWavesEntities {
   }
 }
 
-object MkWavesEntities extends MkWavesEntities
+object MkWavesEntities extends MkWavesEntities {
+  case class IssueResults(tx: IssueTransaction, assetId: ByteStr, asset: IssuedAsset)
+}

@@ -34,8 +34,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryPublicKey: F[Either[MatcherError, PublicKey]]
 
-  def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Map[Asset, Long]]]
-  def tryTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Map[Asset, Long]]]
+  def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
+  def tryTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
 
   def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]]
   def tryPlaceMarket(order: Order): F[Either[MatcherError, MatcherResponse]]
@@ -44,8 +44,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
 
   def tryCancelWithApiKey(id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
-  def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Unit]]                             // TODO
-  def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Unit]] // TODO
+  def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]                             // TODO
+  def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]] // TODO
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
@@ -54,13 +54,13 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryOrderHistory(owner: KeyPair,
                       activeOnly: Option[Boolean] = None,
-                      timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
   def tryOrderHistoryWithApiKey(owner: com.wavesplatform.account.Address,
                                 activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
   def tryOrderHistoryByPair(owner: KeyPair,
                             assetPair: AssetPair,
                             activeOnly: Option[Boolean] = None,
-                            timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+                            timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
 
   def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]]
 
@@ -138,11 +138,14 @@ object DexApi {
       private val ops     = FOps[F]; import ops._
       private val sttpOps = SttpBackendOps[F, MatcherError]; import sttpOps._
 
-      def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}/matcher"
+      def apiUri: String = {
+        val savedHost = host
+        s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}/matcher"
+      }
 
       override def tryPublicKey: F[Either[MatcherError, PublicKey]] = tryParseJson[ByteStr](sttp.get(uri"$apiUri")).map(PublicKey(_))
 
-      override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Map[Asset, Long]]] =
+      override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
@@ -151,7 +154,7 @@ object DexApi {
 
       override def tryTradableBalance(of: KeyPair,
                                       assetPair: AssetPair,
-                                      timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Map[Asset, Long]]] =
+                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/tradableBalance/${of.publicKey.toAddress.stringRepr}")
@@ -161,6 +164,7 @@ object DexApi {
       override def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]] = tryParseJson {
         sttp
           .post(uri"$apiUri/orderbook")
+          .readTimeout(3.minutes) // TODO find way to decrease timeout!
           .followRedirects(false) // TODO move ?
           .body(order)
       }
@@ -173,12 +177,13 @@ object DexApi {
           val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
             .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
+            .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
             .body(body)
             .contentType("application/json", "UTF-8")
         }
 
-      override def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Unit]] = tryUnit {
+      override def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]] = tryUnit {
         val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
         sttp
           .post(uri"$apiUri/orderbook/cancel")
@@ -188,7 +193,7 @@ object DexApi {
 
       override def tryCancelAllByPair(owner: KeyPair,
                                       assetPair: AssetPair,
-                                      timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, Unit]] = tryUnit {
+                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]] = tryUnit {
         val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
         sttp
           .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -203,10 +208,13 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = tryParseJson {
-        sttp
-          .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
-          .followRedirects(false)
+      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
+        tryParseJson {
+          sttp
+            .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
+            .readTimeout(3.minutes) // TODO find way to decrease timeout!
+            .followRedirects(false)
+        }
       }
 
       override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[exchange.ExchangeTransaction]]] =
@@ -214,7 +222,7 @@ object DexApi {
 
       override def tryOrderHistory(owner: KeyPair,
                                    activeOnly: Option[Boolean] = None,
-                                   timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, List[OrderBookHistoryItem]]] = tryParseJson {
+                                   timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]] = tryParseJson {
         sttp
           .get(appendActiveOnly(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}", activeOnly))
           .headers(timestampAndSignatureHeaders(owner, timestamp))
@@ -230,14 +238,15 @@ object DexApi {
       override def tryOrderHistoryByPair(owner: KeyPair,
                                          assetPair: AssetPair,
                                          activeOnly: Option[Boolean] = None,
-                                         timestamp: Long = System.currentTimeMillis()): F[Either[MatcherError, List[OrderBookHistoryItem]]] =
+                                         timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]] =
         tryParseJson {
           sttp
             .get(
               appendActiveOnly(
                 uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58.encode(owner.publicKey)}",
                 activeOnly
-              ))
+              )
+            )
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 

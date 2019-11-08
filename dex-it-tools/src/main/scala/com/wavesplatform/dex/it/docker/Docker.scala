@@ -172,17 +172,10 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
     }
   }
 
-  private def waitProcessStarted(container: DockerContainer): Unit = {
-    if (!hasLogs(container)) {
-      (1 to 20).toIterator.takeWhile { _ =>
-        Thread.sleep(1000)
-        !hasLogs(container)
-      }
-    }
-  }
+  private def waitProcessStarted(container: DockerContainer): Unit = repeat(20, hasLogs(container))
 
   private def hasLogs(container: DockerContainer): Boolean = {
-    log.trace(s"Trying to check logs of ${container.id}")
+    log.trace(s"${prefix(container)} Trying to check logs")
     val buffer = new ByteArrayOutputStream(1024)
     try {
       client
@@ -194,7 +187,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
         .attach(buffer, buffer)
 
       val r = buffer.size() > 0
-      log.trace(s"${container.id} has logs? $r")
+      log.trace(s"${prefix(container)} ${if (r) "has" else "has no"} logs")
       r
     } finally {
       buffer.close()
@@ -392,6 +385,12 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   private def prefix(container: DockerContainer): String = s"[name='${container.name}', id=${container.id}]"
+
+  @scala.annotation.tailrec
+  private def repeat(maxAttempts: Int, until: => Boolean): Boolean =
+    if (maxAttempts == 0) throw new RuntimeException("All attempts are out")
+    else if (until) true
+    else repeat(maxAttempts - 1, until)
 
   dumpContainers(client.listContainers())
   sys.addShutdownHook {

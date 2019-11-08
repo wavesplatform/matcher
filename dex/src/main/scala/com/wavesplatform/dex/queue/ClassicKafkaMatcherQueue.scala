@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.queue
 
+import java.util
 import java.util.concurrent.ThreadLocalRandom
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Timer, TimerTask}
 
 import akka.kafka._
-import akka.kafka.scaladsl.Consumer
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.SourceQueueWithComplete
 import com.wavesplatform.dex.queue.ClassicKafkaMatcherQueue.{KafkaProducer, eventDeserializer}
@@ -16,11 +16,12 @@ import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.WakeupException
 import org.apache.kafka.common.serialization._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{Await, ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
 class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) extends MatcherQueue with ScorexLogging {
   private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatcher
@@ -31,38 +32,52 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
 
   private val duringShutdown = new AtomicBoolean(false)
 
+  private val consumerSettings = {
+    val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
+    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer).withClientId("consumer")
+  }
+
+  private val topicPartition                             = new TopicPartition(settings.topic, 0) // Only one partition
+  private val topicPartitions: util.List[TopicPartition] = java.util.Collections.singletonList(topicPartition)
+
+  private val consumer = new KafkaConsumer[String, QueueEvent](consumerSettings.getProperties, new StringDeserializer, eventDeserializer)
+  consumer.assign(topicPartitions)
+
+  // We need a separate metadata consumer because KafkaConsumer is not safe for multi-threaded access
+  private val metadataConsumer = new KafkaConsumer[String, QueueEvent](
+    consumerSettings
+      .withClientId("metadata-consumer")
+      .withGroupId(s"meta-${consumerSettings.getProperty("group.id")}")
+      .getProperties,
+    new StringDeserializer,
+    eventDeserializer
+  )
+  metadataConsumer.assign(topicPartitions)
+
   private val producer: Producer = {
     val r = if (settings.producer.enable) new KafkaProducer(settings, duringShutdown.get()) else IgnoreProducer
     log.info(s"Choosing ${r.getClass.getName} producer")
     r
   }
 
-  private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
-  private val consumerSettings = {
-    val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer).withClientId("consumer")
-  }
-
   @volatile private var lastProcessedOffsetInternal = -1L
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
-    val topicPartition = new TopicPartition(settings.topic, 0) // Only one partition
-    val consumer       = new KafkaConsumer[String, QueueEvent](consumerSettings.getProperties, new StringDeserializer, eventDeserializer)
-    consumer.assign(java.util.Collections.singletonList(topicPartition))
-
-    consumer.seek(topicPartition, fromOffset)
+    if (fromOffset > 0) consumer.seek(topicPartition, fromOffset)
+    else consumer.seekToBeginning(topicPartitions)
 
     def loop(): Unit = {
       val timerTask = new TimerTask {
         private val duration = java.time.Duration.ofNanos(consumerSettings.pollInterval.toNanos)
 
-        override def run(): Unit = {
+        override def run(): Unit = if (!duringShutdown.get()) {
           val xs = try {
             val records = consumer.poll(duration)
             records.asScala.map { record =>
               QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
             }.toArray
           } catch {
+            case e: WakeupException => if (duringShutdown.get()) Array.empty else throw e
             case e: Throwable =>
               log.error(s"Can't consume", e)
               Array.empty
@@ -88,24 +103,17 @@ class ClassicKafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializ
 
   override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
-    val metadataConsumer = new KafkaConsumer[String, QueueEvent](
-      consumerSettings.withClientId("metadata-consumer").withGroupId(s"${consumerSettings.getProperty("group.id")}-consumer").getProperties,
-      new StringDeserializer,
-      eventDeserializer
-    )
-    val topicPartition = new TopicPartition(settings.topic, 0)
-    metadataConsumer.assign(java.util.Collections.singletonList(topicPartition))
-    metadataConsumer.seekToEnd(java.util.Collections.singletonList(topicPartition))
-    Future.successful(metadataConsumer.position(topicPartition) - 1)
-  }
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future(metadataConsumer.endOffsets(topicPartitions).get(topicPartition) - 1)
 
   override def close(timeout: FiniteDuration): Unit = {
-    producer.close(timeout)
     duringShutdown.set(true)
+
+    producer.close(timeout)
+
+    consumer.close(java.time.Duration.ofNanos(timeout.toNanos))
+    metadataConsumer.close()
+
     timer.cancel()
-    val stoppingConsumer = consumerControl.get().shutdown()
-    Await.result(stoppingConsumer, timeout)
   }
 
 }

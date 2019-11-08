@@ -391,8 +391,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       case Success(_) => setStatus(Status.Working)
       case Failure(e) =>
         log.error(s"Can't start matcher: ${e.getMessage}", e)
-        log.error("Stacktrace:")
-        e.printStackTrace(System.err)
         forceStopApplication(ErrorStartingMatcher)
     }
   }

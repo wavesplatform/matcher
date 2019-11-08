@@ -411,8 +411,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: KafkaTimeoutException =>
+      log.error(s"During meta", e)
+      // logs
       if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get last offset from queue", e))
-      else getLastOffset(deadline)
+      else Future.successful(0L) // getLastOffset(deadline)
 
     case e: Throwable =>
       log.error(s"Can't handle $e: ${e.getClass.getName}", e)

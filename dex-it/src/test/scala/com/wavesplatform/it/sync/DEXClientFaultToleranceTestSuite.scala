@@ -60,6 +60,8 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
     dockerClient.connectToNetwork(dex1Container, None)
+    invalidateCaches()
+
     dex1Api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
 
     withClue("Cleanup") {
@@ -121,8 +123,6 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
     dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Cancelled)
-
-    dockerClient.stop(wavesNode2Container)
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

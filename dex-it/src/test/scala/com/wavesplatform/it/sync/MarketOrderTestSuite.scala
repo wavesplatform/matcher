@@ -44,7 +44,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
          |    }
          |    percent {
          |      asset-type = amount
-         |      min-fee = 0.1
+         |      min-fee = $percentFee
          |    }
          |    fixed {
          |      asset =  WAVES

@@ -128,7 +128,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
-      new ClassicKafkaMatcherQueue(settings.eventsQueue.kafka)(materializer)
+      new KafkaMatcherQueue(settings.eventsQueue.kafka)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
@@ -411,13 +411,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: KafkaTimeoutException =>
-      log.error(s"During meta", e)
-      // logs
-      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get last offset from queue", e))
-      else Future.successful(0L) // getLastOffset(deadline)
+      log.warn(s"During meta receive", e)
+      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get the last offset from queue", e))
+      else getLastOffset(deadline)
 
     case e: Throwable =>
-      log.error(s"Can't handle $e: ${e.getClass.getName}", e)
+      log.error(s"Can't catch ${e.getClass.getName}", e)
       throw e
   }
 

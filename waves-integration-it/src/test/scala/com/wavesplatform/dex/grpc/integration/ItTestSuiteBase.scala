@@ -8,6 +8,7 @@ import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
 import com.wavesplatform.dex.it.assets.DoubleOps
+import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.docker.{DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
@@ -60,17 +61,22 @@ trait ItTestSuiteBase
     createWavesNode("waves-1", wavesNodeRunConfig(), suiteInitialWavesNodeConfig)
   }
 
-  protected def wavesNode1Api: NodeApi[Id] = {
-    def apiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
-    // MonadError can't be implemented for Id
-    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+  protected val cachedWavesNode1ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
   }
 
-  protected def wavesNode1GrpcApiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().grpcApiPort)
-  protected def wavesNode1GrpcApiTarget  = s"${wavesNode1GrpcApiAddress.getHostName}:${wavesNode1GrpcApiAddress.getPort}"
+  // MonadError can't be implemented for Id
+  protected def wavesNode1Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", cachedWavesNode1ApiAddress.get()))
 
-  protected def wavesNode1NetworkApiAddress: InetSocketAddress =
+  protected val cachedWavesNode1GrpcApiTarget = CachedData {
+    val x = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().grpcApiPort)
+    s"${x.getHostName}:${x.getPort}"
+  }
+  protected def wavesNode1GrpcApiTarget = cachedWavesNode1GrpcApiTarget.get()
+
+  protected val cachedWavesNode1NetworkApiAddress = CachedData {
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
+  }
 
   protected def createWavesNode(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer =
     WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, initialSuiteConfig)
@@ -107,5 +113,11 @@ trait ItTestSuiteBase
     dockerClient.close()
     tryHttpBackend.close()
     super.afterAll()
+  }
+
+  protected def invalidateCaches(): Unit = {
+    cachedWavesNode1ApiAddress.invalidate()
+    cachedWavesNode1GrpcApiTarget.invalidate()
+    cachedWavesNode1NetworkApiAddress.invalidate()
   }
 }

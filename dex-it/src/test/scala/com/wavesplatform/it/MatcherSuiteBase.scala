@@ -8,10 +8,11 @@ import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
-import com.softwaremill.sttp.okhttp.OkHttpFutureBackend
+import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.assets.DoubleOps
+import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.docker._
 import com.wavesplatform.dex.it.fp
@@ -25,6 +26,7 @@ import com.wavesplatform.it.docker.{DexContainer, DexItDocker}
 import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
+import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
 
@@ -53,8 +55,16 @@ abstract class MatcherSuiteBase
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
 
-  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](OkHttpFutureBackend())
-  protected implicit val tryHttpBackend    = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+  protected implicit val futureHttpBackend = new LoggingSttpBackend[Future, Nothing](
+    AsyncHttpClientFutureBackend.usingConfig(
+      new DefaultAsyncHttpClientConfig.Builder()
+        .setMaxRequestRetry(1)
+        .setReadTimeout(10000)
+        .setKeepAlive(false)
+        .setRequestTimeout(10000)
+        .build()
+    ))
+  protected implicit val tryHttpBackend = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)
@@ -82,15 +92,20 @@ abstract class MatcherSuiteBase
 
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-1") }
 
-  protected def wavesNode1Api: NodeApi[Id] = {
-    val apiAddress = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
-    // MonadError can't be implemented for Id
-    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+  private val cachedWavesNode1ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().restApiPort)
   }
 
-  protected def wavesNode1NetworkApiAddress: InetSocketAddress = {
+  protected def wavesNode1Api: NodeApi[Id] = {
+    // MonadError can't be implemented for Id
+    fp.sync(NodeApi[Try]("integration-test-rest-api", cachedWavesNode1ApiAddress.get()))
+  }
+
+  private val cachedWavesNode1NetworkApiAddress = CachedData {
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
   }
+
+  protected def wavesNode1NetworkApiAddress: InetSocketAddress = cachedWavesNode1NetworkApiAddress.get()
 
   // Dex server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
@@ -100,9 +115,17 @@ abstract class MatcherSuiteBase
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
-  private def dex1ApiAddress                        = dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
-  protected def dex1AsyncApi: DexApi[Future]        = DexApi[Future]("integration-test-rest-api", dex1ApiAddress)
-  protected def dex1Api: DexApi[Id]                 = fp.sync(DexApi[Try]("integration-test-rest-api", dex1ApiAddress))
+  private val cachedDex1ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
+  }
+  protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex1ApiAddress.get())
+  protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex1ApiAddress.get()))
+
+  protected override def invalidateCaches(): Unit = {
+    cachedWavesNode1ApiAddress.invalidate()
+    cachedDex1ApiAddress.invalidate()
+    cachedWavesNode1NetworkApiAddress.invalidate()
+  }
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")

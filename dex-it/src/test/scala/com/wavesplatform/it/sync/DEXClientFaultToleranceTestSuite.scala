@@ -4,6 +4,7 @@ import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
@@ -27,10 +28,11 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
   private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-2") }
 
-  private def wavesNode2Api: NodeApi[Id] = {
-    val apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
-    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+  protected val cachedWavesNode2ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
   }
+
+  private def wavesNode2Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", cachedWavesNode2ApiAddress.get()))
 
   override protected def beforeAll(): Unit = {
     startAndWait(wavesNode1Container(), wavesNode1Api)
@@ -104,6 +106,8 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     markup("Up node 1")
     dockerClient.start(wavesNode1Container)
+    invalidateCaches()
+
     wavesNode1Api.waitReady
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
@@ -124,5 +128,10 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {
     withClue("alice:")(wavesNodeApi.balance(alice, usd) shouldBe expectedAliceBalance)
     withClue("bob:")(wavesNodeApi.balance(bob, usd) shouldBe expectedBobBalance)
+  }
+
+  override protected def invalidateCaches(): Unit = {
+    super.invalidateCaches()
+    cachedWavesNode2ApiAddress.invalidate()
   }
 }

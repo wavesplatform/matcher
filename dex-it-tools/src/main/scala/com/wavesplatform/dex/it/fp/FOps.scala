@@ -23,7 +23,7 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
         (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
           case (resp, currOptions) =>
             if (stopCond(resp)) M.pure((resp, currOptions).asRight)
-            else if (currOptions.maxAttempts <= 0) M.raiseError(new RuntimeException("All attempts are out!"))
+            else if (currOptions.maxAttempts <= 0) M.raiseError(new RuntimeException(s"All attempts are out! The last response is: $resp"))
             else W.wait(options.delayBetweenRequests).productR(f).map(x => (x, currOptions.decreaseAttempts).asLeft)
         }
       }

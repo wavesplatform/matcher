@@ -97,7 +97,6 @@ object Dependencies {
       "com.softwaremill.sttp" %% "core"                             % "1.7.2",
       "com.softwaremill.sttp" %% "play-json"                        % "1.7.2",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.7.2",
-      "com.softwaremill.sttp" %% "okhttp-backend"                   % "1.7.2",
       "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
     )
   )

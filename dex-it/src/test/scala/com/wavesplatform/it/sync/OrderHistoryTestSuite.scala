@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import java.net.InetAddress
+import java.nio.file.Paths
 import java.sql.{Connection, DriverManager}
 
 import akka.http.scaladsl.model.StatusCodes
@@ -41,18 +42,20 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   val wavesNetwork: Network = dockerSingleton().createNetwork
 
-  val postgresImageName, postgresUser = "postgres"
-  val postgresContainerName           = "pgc"
-  val postgresPassword                = "docker"
-  val postgresEnv                     = s"POSTGRES_PASSWORD=$postgresPassword"
-  val postgresContainerPort           = "5432"
-  val postgresContainerIp: String     = InetAddress.getByAddress(Ints.toByteArray(10 & 0xF | dockerSingleton().networkSeed)).getHostAddress
+  val customDB       = "user_db"
+  val customUser     = "user"
+  val customPassword = "user"
+
+  val postgresImageName           = "postgres"
+  val postgresContainerName       = "pgc"
+  val postgresContainerPort       = "5432"
+  val postgresContainerIp: String = InetAddress.getByAddress(Ints.toByteArray(10 & 0xF | dockerSingleton().networkSeed)).getHostAddress
 
   val postgresContainerLauncher =
     new DockerContainerLauncher(
       postgresImageName,
       postgresContainerName,
-      postgresEnv,
+      List(s"POSTGRES_DB=$customDB", s"POSTGRES_USER=$customUser", s"POSTGRES_PASSWORD=$customPassword"),
       postgresContainerIp,
       postgresContainerPort,
       wavesNetwork.name
@@ -71,22 +74,37 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
+  def getFileContentStr(fileName: String): String = {
+    val fileStream = getClass.getResourceAsStream(fileName)
+    Source.fromInputStream(fileStream).getLines.toSeq.mkString
+  }
+
+  def createDatabase(): Unit = {
+
+    val createDatabaseFileName    = "init-user-db.sh"
+    val createDatabaseFileContent = getFileContentStr(s"/order-history/$createDatabaseFileName")
+
+    postgresContainerLauncher.writeFile(
+      to = Paths.get(s"/docker-entrypoint-initdb.d/$createDatabaseFileName"),
+      content = createDatabaseFileContent
+    )
+  }
+
   def createTables(postgresAddress: String): Unit = {
 
-    val url                     = s"jdbc:postgresql://$postgresAddress/$postgresImageName"
+    val url                     = s"jdbc:postgresql://$postgresAddress/$customDB"
     val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
 
-      val fileStream            = getClass.getResourceAsStream(orderHistoryDDLFileName)
-      val createTablesDDL       = Source.fromInputStream(fileStream).getLines.toSeq.mkString
+      val createTablesDDL       = getFileContentStr(orderHistoryDDLFileName)
       val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
 
       createTablesStatement.executeUpdate()
       createTablesStatement.close()
     }
 
-    retry(10, 2000) { DriverManager.getConnection(url, postgresUser, postgresPassword) } flatMap { sqlConnection =>
+    retry(10, 2000) { DriverManager.getConnection(url, customUser, customPassword) } flatMap { sqlConnection =>
       executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
     } get
   }
@@ -96,8 +114,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
        |postgres {
        |  server-name = $serverName
        |  port-number = $port
-       |  user = $postgresUser
-       |  password = $postgresPassword
+       |  database = $customDB
+       |  user = $customUser
+       |  password = $customPassword
        |  data-source-class-name = "org.postgresql.ds.PGSimpleDataSource"
        |}
     """.stripMargin
@@ -127,6 +146,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
+    createDatabase()
     postgresContainerLauncher.startContainer()
     createTables(s"localhost:$getPostgresContainerHostPort")
 
@@ -211,10 +231,10 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   implicit class DoubleOps(value: Double) {
     val wct, usd: Long      = Normalization.normalizeAmountAndFee(value, Decimals)
-    val wctUsdPrice: Long    = Normalization.normalizePrice(value, Decimals, Decimals)
+    val wctUsdPrice: Long   = Normalization.normalizePrice(value, Decimals, Decimals)
     val wctWavesPrice: Long = Normalization.normalizePrice(value, Decimals, 8)
     val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, Decimals)
-    val eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val eth, btc: Long      = Normalization.normalizeAmountAndFee(value, 8)
   }
 
   def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)

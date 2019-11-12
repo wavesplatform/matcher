@@ -37,8 +37,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
 import mouse.any._
-import org.apache.kafka.common.errors.{TimeoutException => KafkaTimeoutException}
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
@@ -412,8 +410,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
-    case e: KafkaTimeoutException =>
-      log.warn(s"During meta receive", e)
+    case e: TimeoutException =>
+      log.warn(s"During receiving last offset", e)
       if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get the last offset from queue", e))
       else getLastOffset(deadline)
 

@@ -2,8 +2,8 @@ package com.wavesplatform.dex.queue
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{Executors, TimeoutException}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.{Config, ConfigFactory}
@@ -17,7 +17,7 @@ import monix.reactive.Observable
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.errors.WakeupException
+import org.apache.kafka.common.errors.{WakeupException, TimeoutException => KafkaTimeoutException}
 import org.apache.kafka.common.serialization._
 
 import scala.collection.JavaConverters._
@@ -96,7 +96,10 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future(metadataConsumer.endOffsets(topicPartitions).get(topicPartition) - 1)
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
+    Future(metadataConsumer.endOffsets(topicPartitions).get(topicPartition) - 1).recoverWith {
+      case e: KafkaTimeoutException => throw new TimeoutException("Can't receive information in time")
+    }
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)

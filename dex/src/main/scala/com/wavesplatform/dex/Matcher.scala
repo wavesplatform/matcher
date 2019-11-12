@@ -60,6 +60,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
 
+  @volatile private var lastProcessedOffset   = -1L
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
@@ -104,7 +105,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, matcherQueue.lastProcessedOffset, assetDecimals)
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
       matcherActor,
       addressActors,
@@ -141,7 +142,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
 
       lazy val actualTickSize = matchingRulesCache
-        .getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset, orderAssetsDecimals)
+        .getNormalizedRuleForNextOrder(o.assetPair, lastProcessedOffset, orderAssetsDecimals)
         .tickSize
 
       for {
@@ -185,7 +186,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         p => Option { orderBooks.get() } flatMap (_ get p),
         p => Option { marketStatuses.get(p) },
         getActualTickSize = assetPair => {
-          matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset, assetsDB.unsafeGetDecimals).tickSize
+          matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsDB.unsafeGetDecimals).tickSize
         },
         validateOrder,
         orderBooksSnapshotCache,
@@ -193,7 +194,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         () => status.get(),
         db,
         time,
-        () => matcherQueue.lastProcessedOffset,
+        () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         () => hasMatcherAccountScript.map { ExchangeTransactionCreator.getAdditionalFee },
         keyHashStr,
@@ -255,6 +256,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                     val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
                       log.debug(s"Consumed $eventWithMeta")
                       self ! eventWithMeta
+                      lastProcessedOffset = eventWithMeta.offset
                       eventWithMeta.event.assetPair
                     }(collection.breakOut)
 
@@ -422,9 +424,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
-      val currentOffset = matcherQueue.lastProcessedOffset
-      log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
-      if (currentOffset >= lastQueueOffset) p.success(())
+      log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
+      if (lastProcessedOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
         p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
       else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))

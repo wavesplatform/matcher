@@ -1,17 +1,19 @@
 package com.wavesplatform.dex.queue
 
 import java.util
+import java.util.Properties
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{Properties, Timer, TimerTask}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
-import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 import com.wavesplatform.dex.settings.toConfigOps
 import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
+import monix.execution.{Cancelable, ExecutionModel, Scheduler}
+import monix.reactive.Observable
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.{Callback, ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.TopicPartition
@@ -24,9 +26,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
   private implicit val executionContext =
-    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(2, new ThreadFactoryBuilder().setNameFormat("kafka-%d").build()))
-
-  private val timer = new Timer("kafka-consumer", true)
+    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
 
   private val duringShutdown = new AtomicBoolean(false)
 
@@ -36,7 +36,9 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   private val consumerConfig = settings.consumer.client
   private val consumer       = new KafkaConsumer[String, QueueEvent](consumerConfig.toProperties, new StringDeserializer, eventDeserializer)
   consumer.assign(topicPartitions)
-  private val pollDuration = java.time.Duration.ofMillis(consumerConfig.getLong("fetch.max.duration.ms"))
+  private val pollDuration = java.time.Duration.ofMillis(settings.consumer.fetchMaxDuration.toMillis)
+
+  @volatile private var consumerTask: Cancelable = Cancelable.empty
 
   // We need a separate metadata consumer because KafkaConsumer is not safe for multi-threaded access
   private val metadataConsumer = {
@@ -57,33 +59,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     r
   }
 
-  @volatile private var lastProcessedOffsetInternal = -1L
-
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
-    if (fromOffset > 0) consumer.seek(topicPartition, fromOffset)
-    else consumer.seekToBeginning(topicPartitions)
-
-    def loop(): Unit =
-      timer.schedule(
-        new TimerTask {
-          override def run(): Unit =
-            if (duringShutdown.get()) Future.successful(Unit)
-            else {
-              val xs = poll()
-              process(xs).andThen {
-                case _ =>
-                  xs.lastOption.foreach(x => lastProcessedOffsetInternal = x.offset)
-                  loop()
-              }
-            }
-        },
-        0
-      )
-
-    loop()
-  }
-
-  private def poll(): IndexedSeq[QueueEventWithMeta] =
+  private val pollTask: Task[IndexedSeq[QueueEventWithMeta]] = Task {
     try {
       val records = consumer.poll(pollDuration)
       records.asScala.map { record =>
@@ -95,10 +71,30 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
         log.error(s"Can't consume", e)
         IndexedSeq.empty
     }
+  }
+
+  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
+    val scheduler = Scheduler(executionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
+    consumerTask = Observable
+      .fromTask(Task {
+        if (fromOffset > 0) consumer.seek(topicPartition, fromOffset)
+        else consumer.seekToBeginning(topicPartitions)
+      })
+      .flatMap { _ =>
+        Observable
+          .repeatEvalF(pollTask)
+          .flatMap(Observable.fromIterable)
+          .bufferIntrospective(settings.consumer.maxBufferSize)
+          .filter(_.nonEmpty)
+          .mapEvalF(process)
+          .doOnError { e =>
+            Task { log.error("Consumer fails", e) }
+          }
+      }
+      .subscribe()(scheduler)
+  }
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
-
-  override def lastProcessedOffset: Offset = lastProcessedOffsetInternal
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future(metadataConsumer.endOffsets(topicPartitions).get(topicPartition) - 1)
 
@@ -111,13 +107,13 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
     consumer.close(duration)
     metadataConsumer.close(duration)
 
-    timer.cancel()
+    consumerTask.cancel()
   }
 }
 
 object KafkaMatcherQueue {
   case class Settings(topic: String, consumer: ConsumerSettings, producer: ProducerSettings)
-  case class ConsumerSettings(client: Config)
+  case class ConsumerSettings(fetchMaxDuration: FiniteDuration, maxBufferSize: Int, client: Config)
   case class ProducerSettings(enable: Boolean, client: Config)
 
   val eventDeserializer: Deserializer[QueueEvent] = new Deserializer[QueueEvent] {

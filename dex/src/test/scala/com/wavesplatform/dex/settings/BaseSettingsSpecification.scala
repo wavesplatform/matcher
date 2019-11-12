@@ -117,6 +117,8 @@ class BaseSettingsSpecification extends FlatSpec{
          |        topic = "some-events"
          |
          |        consumer {
+         |          fetch-max-duration = 10s
+         |          max-buffer-size = 777
          |          client.foo = 2
          |        }
          |

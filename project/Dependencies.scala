@@ -97,7 +97,6 @@ object Dependencies {
       "com.softwaremill.sttp" %% "core"                             % "1.7.2",
       "com.softwaremill.sttp" %% "play-json"                        % "1.7.2",
       "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.7.2",
-      "com.softwaremill.sttp" %% "okhttp-backend"                   % "1.7.2",
       "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
     )
   )
@@ -128,7 +127,7 @@ object Dependencies {
       akkaModule("persistence-query"),
       akkaModule("slf4j"),
       akkaHttp,
-      "com.typesafe.akka" %% "akka-stream-kafka" % "1.1.0",
+      "org.apache.kafka" % "kafka-clients" % "2.3.1",
       // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
       janino,
       mouse,

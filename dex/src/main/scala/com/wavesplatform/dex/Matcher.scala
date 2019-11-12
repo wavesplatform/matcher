@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -37,7 +37,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
 import mouse.any._
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
@@ -59,6 +58,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
 
+  @volatile private var lastProcessedOffset   = -1L
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
@@ -103,7 +103,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, matcherQueue.lastProcessedOffset, assetDecimals)
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
       matcherActor,
       addressActors,
@@ -127,7 +127,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
-      new KafkaMatcherQueue(settings.eventsQueue.kafka)(materializer)
+      new KafkaMatcherQueue(settings.eventsQueue.kafka)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
@@ -140,7 +140,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
 
       lazy val actualTickSize = matchingRulesCache
-        .getNormalizedRuleForNextOrder(o.assetPair, matcherQueue.lastProcessedOffset, orderAssetsDecimals)
+        .getNormalizedRuleForNextOrder(o.assetPair, lastProcessedOffset, orderAssetsDecimals)
         .tickSize
 
       for {
@@ -184,7 +184,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         p => Option { orderBooks.get() } flatMap (_ get p),
         p => Option { marketStatuses.get(p) },
         getActualTickSize = assetPair => {
-          matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset, assetsDB.unsafeGetDecimals).tickSize
+          matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsDB.unsafeGetDecimals).tickSize
         },
         validateOrder,
         orderBooksSnapshotCache,
@@ -192,7 +192,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         () => status.get(),
         db,
         time,
-        () => matcherQueue.lastProcessedOffset,
+        () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         () => hasMatcherAccountScript.map { ExchangeTransactionCreator.getAdditionalFee },
         keyHashStr,
@@ -238,7 +238,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         settings,
         assetPairsDB, {
           case Left(msg) =>
-            log.error(s"Can't start matcher: $msg")
+            log.error(s"Can't start MatcherActor: $msg")
             forceStopApplication(ErrorStartingMatcher)
 
           case Right((self, processedOffset)) =>
@@ -254,6 +254,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                     val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
                       log.debug(s"Consumed $eventWithMeta")
                       self ! eventWithMeta
+                      lastProcessedOffset = eventWithMeta.offset
                       eventWithMeta.event.assetPair
                     }(collection.breakOut)
 
@@ -409,16 +410,20 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
-    case _: AskTimeoutException =>
-      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get last offset from queue"))
+    case e: TimeoutException =>
+      log.warn(s"During receiving last offset", e)
+      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get the last offset from queue", e))
       else getLastOffset(deadline)
+
+    case e: Throwable =>
+      log.error(s"Can't catch ${e.getClass.getName}", e)
+      throw e
   }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
-      val currentOffset = matcherQueue.lastProcessedOffset
-      log.trace(s"offsets: $currentOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
-      if (currentOffset >= lastQueueOffset) p.success(())
+      log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
+      if (lastProcessedOffset >= lastQueueOffset) p.success(())
       else if (deadline.isOverdue())
         p.failure(new TimeoutException(s"Can't process all events in ${settings.startEventsProcessingTimeout.toMinutes} minutes"))
       else actorSystem.scheduler.scheduleOnce(5.second)(loop(p))

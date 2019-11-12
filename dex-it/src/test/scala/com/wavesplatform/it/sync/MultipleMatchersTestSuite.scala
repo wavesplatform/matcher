@@ -5,6 +5,7 @@ import cats.instances.future._
 import cats.instances.try_._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
@@ -34,9 +35,12 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     createDex("dex-2")
   }
 
-  private def dex2ApiAddress                 = dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
-  protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", dex2ApiAddress)
-  protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", dex2ApiAddress))
+  private val cachedDex2ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
+  }
+
+  protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex2ApiAddress.get())
+  protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex2ApiAddress.get()))
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
@@ -151,4 +155,9 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private def clean(state: MatcherState): MatcherState = state.copy(
     snapshots = state.snapshots.map { case (k, _) => k -> 0L }
   )
+
+  override protected def invalidateCaches(): Unit = {
+    super.invalidateCaches()
+    cachedDex2ApiAddress.invalidate()
+  }
 }

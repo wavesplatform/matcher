@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.it.Node
@@ -19,8 +20,10 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
+import org.slf4j.LoggerFactory
 
 object SyncMatcherHttpApi extends Assertions {
+  private val logger = Logger(LoggerFactory.getLogger(this.getClass))
 
   case class NotFoundErrorMessage(message: String)
   case class ErrorMessage(error: Int, message: String)
@@ -98,8 +101,11 @@ object SyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   feeAsset: Asset = Waves): MatcherResponse =
+                   feeAsset: Asset = Waves): MatcherResponse = {
+
+      println(s"Account ${sender.toAddress} placed ${orderType} order into pair ${pair} with price: ${price}, amount: ${amount} and fee: ${fee} (fee asset: ${feeAsset})")
       sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset))
+    }
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
@@ -159,7 +165,8 @@ object SyncMatcherHttpApi extends Assertions {
       sync(async(m).tradingMarkets(), waitTime)
 
     def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MatcherMarketData] =
-      tradingMarkets(waitTime).markets.find(marketData => marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
+      tradingMarkets(waitTime).markets.find(marketData =>
+        marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
 
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
@@ -275,7 +282,8 @@ object SyncMatcherHttpApi extends Assertions {
     def upsertRate[A: Writes](asset: Asset,
                               rate: Double,
                               waitTime: Duration = RequestAwaitTime,
-                              expectedStatusCode: StatusCode, apiKey: String = m.apiKey): RatesResponse =
+                              expectedStatusCode: StatusCode,
+                              apiKey: String = m.apiKey): RatesResponse =
       sync(async(m).upsertRate(asset, rate, expectedStatusCode.intValue, apiKey), waitTime)
 
     def getRates: Map[Asset, Double] = sync(async(m).getRates())

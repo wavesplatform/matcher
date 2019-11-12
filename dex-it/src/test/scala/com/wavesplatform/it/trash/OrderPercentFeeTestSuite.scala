@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.orders
+package com.wavesplatform.it.trash
 
 import java.nio.charset.StandardCharsets
 
@@ -7,17 +7,14 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.MatcherStatusResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import org.scalatest.prop.TableDrivenPropertyChecks._
 
-class OrderPercentFeeTestSuite(/*data: (Byte, String)* */) extends MatcherSuiteBase {
+class OrderPercentFeeTestSuite( /*data: (Byte, String)* */ ) extends MatcherSuiteBase {
 
   var accountCounter = 0
 
@@ -104,34 +101,18 @@ class OrderPercentFeeTestSuite(/*data: (Byte, String)* */) extends MatcherSuiteB
   }
 
   val data1 = Map(
-    1.toByte -> "amount",
-   // 1.toByte -> "price",
-    2.toByte -> "amount",
-   // 2.toByte -> "price",
-    3.toByte -> "amount",
-   // 3.toByte -> "price",
+    //   1.toByte -> "amount",
+    3.toByte -> "price",
+    //  2.toByte -> "amount",
+    // 2.toByte -> "price",
+    // 3.toByte -> "amount",
+    // 3.toByte -> "price",
   )
 
   data1.foreach {
 
     case (version, assetType) => {
-
-      val percentFee               = 25
-      val feeAsset: Option[String] = if (assetType.equals("amount")) None else Some(UsdId.toString)
-      val orderFeeAsset: Asset     = if (assetType.equals("amount")) Waves else IssuedAsset(UsdId)
-      def minimalFee(amount: Long, price: Long = 1): Long = {
-        if (assetType.equals("amount")) {
-          amount / 100 * percentFee
-        } else {
-          amount * price / 1.waves / 100 * percentFee
-        }
-      }
-      def tooHighFee(amount: Long, price: Long = 1): Long = minimalFee(amount, price) + 1
-      def tooLowFee(amount: Long, price: Long = 1): Long  = minimalFee(amount, price) - 1
-
-      val price  = 0.4.usd
-      val amount = 150.waves
-      val fee    = 37.5.waves
+      val percentFee = 25
 
       val config =
         s"""
@@ -149,11 +130,27 @@ class OrderPercentFeeTestSuite(/*data: (Byte, String)* */) extends MatcherSuiteB
 
       docker.restartNode(node, ConfigFactory.parseString(config))
 
+      val feeAsset: Option[String] = if (assetType.equals("price")) Some(UsdId.toString) else None
+      val orderFeeAsset: Asset     = if (assetType.equals("price")) IssuedAsset(UsdId) else Waves
+      def minimalFee(amount: Long, price: Long = 1): Long = {
+        if (assetType.equals("amount")) {
+          amount / 100 * percentFee
+        } else {
+          amount * price / 1.usd / 100 * percentFee
+        }
+      }
+      def tooHighFee(amount: Long, price: Long = 1): Long = minimalFee(amount, price) + 1
+      def tooLowFee(amount: Long, price: Long = 1): Long  = minimalFee(amount, price) - 1
+
+      val price  = 0.4.usd
+      val amount = 150.waves
+      val fee    = 37.5.waves
+
       s"V$version orders (fee asset type: $assetType) & fees processing" - {
 
         s"users should pay correct fee when fee asset-type = $assetType and order fully filled" in {
-          val accountBuyer  = createAccountWithBalance(60.usd       -> Some(UsdId.toString), fee -> feeAsset)
-          val accountSeller = createAccountWithBalance(amount + fee -> feeAsset)
+          val accountBuyer  = createAccountWithBalance(60.usd -> Some(UsdId.toString), fee -> feeAsset)
+          val accountSeller = createAccountWithBalance(amount -> None, fee                 -> feeAsset)
 
           node.waitOrderProcessed(wavesUsdPair,
                                   node.placeOrder(accountBuyer, wavesUsdPair, BUY, amount, price, fee, version, feeAsset = orderFeeAsset).message.id)
@@ -230,9 +227,31 @@ class OrderPercentFeeTestSuite(/*data: (Byte, String)* */) extends MatcherSuiteB
 
         if (version != 3) {
 
-          s"V$version buy order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {}
+          s"V$version buy order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
+            assertBadRequest(
+              node.placeOrder(createAccountWithBalance(amount + minFee -> feeAsset),
+                              wavesUsdPair,
+                              BUY,
+                              amount,
+                              price,
+                              tooLowFee(amount, price),
+                              version,
+                              feeAsset = IssuedAsset(UsdId)))
+          }
 
-          s"V$version sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {}
+          s"V$version sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
+            assertBadRequest(
+              node.placeOrder(
+                createAccountWithBalance(minFee -> feeAsset, 60.usd -> Some(UsdId.toString)),
+                wavesUsdPair,
+                SELL,
+                amount,
+                price,
+                tooLowFee(amount, price),
+                version,
+                feeAsset = IssuedAsset(UsdId)
+              ))
+          }
 
         } else {
 

@@ -87,8 +87,11 @@ object SyncMatcherHttpApi extends Assertions {
     def placeOrder(order: Order): MatcherResponse =
       sync(async(m).placeOrder(order))
 
-    def placeMarketOrder(order: Order): MatcherResponse =
+    def placeMarketOrder(order: Order): MatcherResponse = {
+      println(
+        s"Created ${order.orderType.toString.toUpperCase} market order from ${order.sender.toAddress}. Pair ${order.assetPair}, price: ${order.price}, amount: ${order.amount}")
       sync(async(m).placeMarketOrder(order))
+    }
 
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,
@@ -99,8 +102,10 @@ object SyncMatcherHttpApi extends Assertions {
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
                    feeAsset: Asset = Waves,
-                   timestamp: Long = System.currentTimeMillis): MatcherResponse =
+                   timestamp: Long = System.currentTimeMillis): MatcherResponse = {
+      println(s"Created ${orderType.toString.toUpperCase} from ${sender.toAddress}. Pair $pair, price: $price, amount: $amount, fee: $fee, fee asset: $feeAsset")
       sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset, timestamp))
+    }
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))

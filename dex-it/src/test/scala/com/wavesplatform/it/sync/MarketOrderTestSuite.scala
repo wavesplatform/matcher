@@ -76,7 +76,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     node.cancelAllOrders(bob)
   }
 
-  def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: String = FIXED.toString)(orders: (Long, Long)*): Unit = {
+  def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: FeeMode = FIXED)(orders: (Long, Long)*): Unit = {
     orders.zipWithIndex.foreach {
       case ((amount, price), idx) =>
         node.placeOrder(sender = sender,
@@ -112,23 +112,23 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     account
   }
 
-  def getFee(mode: String): Long = {
+  def getFee(mode: FeeMode): Long = {
     mode match {
-      case "percent" => percentFee.waves
-      case "fixed"   => fixedFee
-      case _         => 0L
+      case PERCENT => percentFee.waves
+      case FIXED   => fixedFee
+      case _       => 0L
     }
   }
 
-  def calculateFeeValue(amount: Long, feeMode: String): Long = {
+  def calculateFeeValue(amount: Long, feeMode: FeeMode): Long = {
     feeMode match {
-      case "percent" => amount / 100 * percentFee
-      case "fixed"   => fixedFee
+      case PERCENT => amount / 100 * percentFee
+      case FIXED   => fixedFee
     }
   }
 
   "Processing market orders" - {
-    def testFilledMarketOrder(orderType: OrderType, feeMode: String): Unit = {
+    def testFilledMarketOrder(orderType: OrderType, feeMode: FeeMode): Unit = {
       val amount = 100.waves
       val price  = 1.usd
 
@@ -159,11 +159,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "percent fee mode" - {
 
       "processing market order (SELL)" in {
-        testFilledMarketOrder(SELL, PERCENT.toString)
+        testFilledMarketOrder(SELL, PERCENT)
       }
 
       "processing market order (BUY)" in {
-        testFilledMarketOrder(BUY, PERCENT.toString)
+        testFilledMarketOrder(BUY, PERCENT)
       }
     }
 
@@ -171,11 +171,11 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.mode = $FIXED"))
 
       "processing market order (SELL)" in {
-        testFilledMarketOrder(SELL, FIXED.toString)
+        testFilledMarketOrder(SELL, FIXED)
       }
 
       "processing market order (BUY)" in {
-        testFilledMarketOrder(BUY, FIXED.toString)
+        testFilledMarketOrder(BUY, FIXED)
       }
     }
 

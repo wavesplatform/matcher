@@ -405,7 +405,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         amount -> price
       )
 
-      assertBadRequest(node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)))
+      assertBadRequestAndResponse(node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)), "")
     }
 
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
@@ -421,7 +421,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
                            node.placeOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = IssuedAsset(BtcId), version = 3).message.id,
                            "Accepted")
 
-      assertBadRequest(node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = IssuedAsset(BtcId))))
+      assertBadRequestAndResponse(
+        node.placeMarketOrder(node.prepareOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = IssuedAsset(BtcId))),
+        "")
     }
   }
 }

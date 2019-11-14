@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.it.Node
@@ -23,7 +22,6 @@ import scala.util.{Failure, Try}
 import org.slf4j.LoggerFactory
 
 object SyncMatcherHttpApi extends Assertions {
-  private val logger = Logger(LoggerFactory.getLogger(this.getClass))
 
   case class NotFoundErrorMessage(message: String)
   case class ErrorMessage(error: Int, message: String)

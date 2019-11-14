@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
-import com.wavesplatform.{NTPTime, crypto => wcrypto}
+import com.wavesplatform.{NTPTime, RequestGen, crypto => wcrypto}
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
@@ -31,15 +31,12 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherTestData extends NTPTime { _: Suite =>
+trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   private val signatureSize = 32
 
-  val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
   val WalletSeed                   = ByteStr("Matcher".getBytes("utf-8"))
   val MatcherSeed: Array[Byte]     = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount               = KeyPair(MatcherSeed)
-  val accountGen: Gen[KeyPair]     = bytes32gen.map(seed => KeyPair(seed))
-  val positiveLongGen: Gen[Long]   = Gen.choose(1, Long.MaxValue)
   val senderKeyPair                = KeyPair("seed".getBytes("utf-8"))
 
   private val seqNr        = new AtomicLong(-1)
@@ -120,7 +117,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     IssuedAsset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
-  val assetPairGen: Gen[AssetPair] = {
+  override val assetPairGen: Gen[AssetPair] = {
     Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
   }
 

@@ -17,6 +17,7 @@ trait DockerExtensions extends ScorexLogging {
 
   protected def restartContainer(container: DockerContainer, api: => HasWaitReady[Id]): Unit = {
     dockerClient.stop(container)
+    invalidateCaches()
     startAndWait(container, api)
   }
 
@@ -35,6 +36,8 @@ trait DockerExtensions extends ScorexLogging {
             .setJson(false)
         )
     )
+
+  protected def invalidateCaches(): Unit = {}
 
   protected def replaceSuiteConfig(container: DockerContainer, content: String): Unit = {
     val path = Paths.get(container.basePath, "suite.conf")

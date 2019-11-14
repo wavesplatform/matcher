@@ -4,7 +4,7 @@ import DexDockerKeys._
 
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
-resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
+resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
@@ -49,4 +49,5 @@ inTask(docker)(
       (Compile / sourceDirectory).value / "container" / "start.sh",
       (Compile / sourceDirectory).value / "container" / "default.conf"
     )
-  ))
+  )
+)

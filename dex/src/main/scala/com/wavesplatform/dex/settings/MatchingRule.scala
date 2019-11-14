@@ -30,7 +30,7 @@ object MatchingRule {
 }
 
 /** Denormalized representation of the matching rule passed from the application.conf */
-case class DenormalizedMatchingRule(startOffset: Long, tickSize: Double) {
+case class DenormalizedMatchingRule(startOffset: Long, tickSize: BigDecimal) {
 
   def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule = {
     MatchingRule(
@@ -61,7 +61,7 @@ object DenormalizedMatchingRule extends ScorexLogging {
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     val offsetValidated   = cfgValidator.validateByPredicate[Long](s"$path.start-offset")(_ >= 0, "required 0 <= start offset")
-    val tickSizeValidated = cfgValidator.validateByPredicate[Double](s"$path.tick-size")(_ > 0, "required 0 < tick size")
+    val tickSizeValidated = cfgValidator.validateByPredicate[BigDecimal](s"$path.tick-size")(_ > 0, "required 0 < tick size")
 
     (offsetValidated, tickSizeValidated) mapN DenormalizedMatchingRule.apply getValueOrThrowErrors
   }

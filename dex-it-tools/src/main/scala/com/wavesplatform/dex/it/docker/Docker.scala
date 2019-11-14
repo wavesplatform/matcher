@@ -33,7 +33,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   import Docker._
 
   // connection pool and timeout changed because of CorrectStatusAfterPlaceTestSuite (otherwise part of requests cannot be sent)
-  private val client          = DefaultDockerClient.fromEnv().connectionPoolSize(200).readTimeoutMillis(5000).build()
+  private val client          = DefaultDockerClient.fromEnv().connectionPoolSize(200).connectTimeoutMillis(3000).readTimeoutMillis(3000).build()
   private val knownContainers = ConcurrentHashMap.newKeySet[DockerContainer]()
   private val isStopped       = new AtomicBoolean(false)
 
@@ -56,22 +56,22 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   /**
     * @return The address inside the network
     */
-  def getInternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
+  def getInternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = repeatUntilSuccess(10, {
     val ns = client.inspectContainer(container.id).networkSettings()
     new InetSocketAddress(ns.networks().get(network().name()).ipAddress(), internalPort)
-  }
+  })
 
   /**
     * @return The address outside the network, from host machine
     */
-  def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = {
+  def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = repeatUntilSuccess(10, {
     val ns = client.inspectContainer(container.id).networkSettings()
     val binding = Option(ns.ports().get(s"$internalPort/tcp"))
       .map(_.get(0))
       .getOrElse(throw new IllegalStateException(s"There is no mapping '$internalPort/tcp' for '${container.name}'"))
 
     new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
-  }
+  })
 
   def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
@@ -163,11 +163,35 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
   def start(container: DockerContainer): Unit = {
     log.debug(s"${prefix(container)} Starting ...")
-    try client.startContainer(container.id)
-    catch {
+    try {
+      client.startContainer(container.id)
+      waitProcessStarted(container)
+    } catch {
       case NonFatal(e) =>
         log.error(s"${prefix(container)} Can't start", e)
         throw e
+    }
+  }
+
+  private def waitProcessStarted(container: DockerContainer): Unit = repeat(20, hasLogs(container))
+
+  private def hasLogs(container: DockerContainer): Boolean = {
+    log.trace(s"${prefix(container)} Trying to check logs")
+    val buffer = new ByteArrayOutputStream(1024)
+    try {
+      client
+        .logs(
+          container.id,
+          DockerClient.LogsParam.stdout(),
+          DockerClient.LogsParam.stderr()
+        )
+        .attach(buffer, buffer)
+
+      val r = buffer.size() > 0
+      log.trace(s"${prefix(container)} ${if (r) "has" else "has no"} logs")
+      r
+    } finally {
+      buffer.close()
     }
   }
 
@@ -362,6 +386,27 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   }
 
   private def prefix(container: DockerContainer): String = s"[name='${container.name}', id=${container.id}]"
+
+  private def repeat(maxAttempts: Int, until: => Boolean): Boolean = repeat[Boolean](maxAttempts, until, _ == true)
+
+  private def repeatUntilSuccess[T](maxAttempts: Int, get: => T): T =
+    repeat[Option[T]](
+      maxAttempts,
+      get = try Some(get)
+      catch {
+        case NonFatal(_) => None
+      },
+      until = _.isDefined
+    ).get
+
+  @scala.annotation.tailrec
+  private def repeat[T](maxAttempts: Int, get: => T, until: T => Boolean): T =
+    if (maxAttempts == 0) throw new RuntimeException("All attempts are out")
+    else {
+      val x = get
+      if (until(x)) x
+      else repeat(maxAttempts - 1, get, until)
+    }
 
   dumpContainers(client.listContainers())
   sys.addShutdownHook {

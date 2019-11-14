@@ -4,6 +4,7 @@ import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
@@ -27,10 +28,12 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
     createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
   }
-  protected def wavesNode2Api: NodeApi[Id] = {
-    def apiAddress = dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
-    fp.sync(NodeApi[Try]("integration-test-rest-api", apiAddress))
+
+  protected val refreshableWavesNode2ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
   }
+
+  protected def wavesNode2Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", refreshableWavesNode2ApiAddress.get()))
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder   = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
@@ -67,5 +70,10 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
 
     broadcastAndAwait(IssueEthTx)
+  }
+
+  override protected def invalidateCaches(): Unit = {
+    super.invalidateCaches()
+    refreshableWavesNode2ApiAddress.invalidate()
   }
 }

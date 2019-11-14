@@ -118,7 +118,10 @@ inScope(Global)(
     },
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value
+    buildNodeContainer := (`node-it` / Docker / docker).value,
+    // To speedup the compilation
+    Compile / doc / sources := Seq.empty,
+    Compile / packageDoc / publishArtifact := false,
   )
 )
 
@@ -148,6 +151,7 @@ checkPRRaw := {
     (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
+    (`waves-integration` / Test / test).value
     (`dex-generator` / Test / compile).value
   }
 }

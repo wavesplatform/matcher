@@ -219,7 +219,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
         val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 9437185
+        (json \ "error").as[Int] shouldBe 1048577
         (json \ "params" \ "invalidFields").as[List[String]] shouldBe List("/amount")
       }
     }
@@ -230,8 +230,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
         val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 9437185
-        (json \ "message").as[String] shouldBe "The order's JSON is invalid. Check the documentation"
+        (json \ "error").as[Int] shouldBe 1048577
+        (json \ "message").as[String] shouldBe "The provided JSON is invalid. Check the documentation"
       }
     }
   }

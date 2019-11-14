@@ -20,7 +20,14 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -79,13 +86,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
-  private val invalidOrderJsonParsingRejectionsHandler =
+  private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
       .newBuilder()
       .handle {
         case ValidationRejection(_, Some(e: PlayJsonException)) =>
           complete {
-            InvalidJsonResponse(error.InvalidOrderJson(e.errors.map(_._1.toString()).toList))
+            InvalidJsonResponse(error.InvalidJson(e.errors.map(_._1.toString()).toList))
           }
       }
       .result()
@@ -94,10 +101,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-          getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-          historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-          upsertRate ~ deleteRate ~ saveSnapshots
+        handleRejections(invalidJsonParsingRejectionsHandler) {
+          getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+            getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+            historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+            upsertRate ~ deleteRate ~ saveSnapshots
+        }
       }
   }
 
@@ -141,26 +150,23 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
-      // TODO
       entity(as[CancelOrderRequest]) { req =>
         if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
-    handleRejections(invalidOrderJsonParsingRejectionsHandler) {
-      (pathEndOrSingleSlash & entity(as[Order])) { order =>
-        withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
-          unavailableOrderBookBarrier(pair) {
-            complete(
-              placeTimer.measureFuture {
-                orderValidator(order).value flatMap {
-                  case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                  case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
-                }
+    (pathEndOrSingleSlash & entity(as[Order])) { order =>
+      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+        unavailableOrderBookBarrier(pair) {
+          complete(
+            placeTimer.measureFuture {
+              orderValidator(order).value flatMap {
+                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
+                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }
-            )
-          }
+            }
+          )
         }
       }
     }

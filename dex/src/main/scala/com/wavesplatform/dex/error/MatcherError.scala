@@ -134,13 +134,13 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
                      |but it is ${'given -> givenExpiration}"""
     )
 
-case class InvalidOrderJson(fields: List[String])
+case class InvalidJson(fields: List[String])
     extends MatcherError(
-      order,
+      request,
       commonEntity,
       broken,
-      if (fields.isEmpty) e"The order's JSON is invalid. Check the documentation"
-      else e"The order's JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
+      if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
+      else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
     )
 
 case class OrderCommonValidationFailed(details: String)

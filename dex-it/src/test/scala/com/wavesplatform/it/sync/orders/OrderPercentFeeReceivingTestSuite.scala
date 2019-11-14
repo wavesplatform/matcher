@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.settings.AssetType._
+import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -12,13 +14,11 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.settings.FeeMode._
-import com.wavesplatform.dex.settings.AssetType._
 
-class V3OrderPercentFeePriceTestSuite extends OrderPercentFeePriceTestSuite(3.toByte)
+class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeePriceTestSuite(3.toByte)
 
-abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = IssuedAsset(UsdId)) extends MatcherSuiteBase {
-  val assetType = PRICE
+abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset = IssuedAsset(UsdId)) extends MatcherSuiteBase {
+  val assetType = RECEIVING
 
   val price                = 1.2.usd
   val fullyAmountWaves     = 15.waves
@@ -29,6 +29,10 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
   val partiallyAmountUsd   = 10.8.usd
   val tooLowFee            = 4.49.usd
   val tooHighFee           = 18.01.usd
+  val minimalFeeWaves      = 3.75.waves
+  val tooLowFeeWaves       = 3.749999.waves
+  val tooHighFeeWaves      = 15.00001.waves
+  val partiallyFeeWaves    = 2.25.waves
 
   override protected def nodeConfigs: Seq[Config] = {
     val orderFeeSettingsStr =
@@ -103,12 +107,10 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
     docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.mode = $PERCENT"))
 
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled" in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString))
-      val accountSeller = createAccountWithBalance(fullyAmountWaves            -> None)
+      val accountBuyer  = createAccountWithBalance(minimalFeeWaves  -> None, fullyAmountUsd -> Some(UsdId.toString))
+      val accountSeller = createAccountWithBalance(fullyAmountWaves -> None)
 
-      node.waitOrderProcessed(
-        wavesUsdPair,
-        node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version, feeAsset = IssuedAsset(UsdId)).message.id)
+      node.waitOrderProcessed(wavesUsdPair, node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version).message.id)
       node.waitOrderProcessed(
         wavesUsdPair,
         node.placeOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, minimalFee, version, feeAsset = IssuedAsset(UsdId)).message.id)
@@ -121,12 +123,10 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString))
-      val accountSeller = createAccountWithBalance(partiallyAmountWaves        -> None, minimalFee -> Some(UsdId.toString))
+      val accountBuyer  = createAccountWithBalance(minimalFeeWaves      -> None, fullyAmountUsd -> Some(UsdId.toString))
+      val accountSeller = createAccountWithBalance(partiallyAmountWaves -> None, minimalFee     -> Some(UsdId.toString))
 
-      node.waitOrderProcessed(
-        wavesUsdPair,
-        node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version, feeAsset = IssuedAsset(UsdId)).message.id)
+      node.waitOrderProcessed(wavesUsdPair, node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version).message.id)
       node.waitOrderProcessed(
         wavesUsdPair,
         node
@@ -134,22 +134,22 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
           .message
           .id)
 
-      balancesShouldBe(accountBuyer, partiallyAmountWaves -> "WAVES", partiallyAmountUsd - (minimalFee - partiallyFeeUsd) -> UsdId.toString)
-      balancesShouldBe(accountSeller, 0L                  -> "WAVES", partiallyAmountUsd                                  -> UsdId.toString)
+      balancesShouldBe(accountBuyer, partiallyAmountWaves - (minimalFeeWaves - partiallyFeeWaves) -> "WAVES", partiallyAmountUsd -> UsdId.toString)
+      balancesShouldBe(accountSeller, 0L                                                          -> "WAVES", partiallyAmountUsd -> UsdId.toString)
 
-      reservedBalancesShouldBe(accountBuyer, fullyAmountUsd - partiallyAmountUsd + (minimalFee - partiallyFeeUsd) -> UsdId.toString, 0L -> "WAVES")
-      reservedBalancesShouldBe(accountSeller, 0L                                                                  -> UsdId.toString, 0L -> "WAVES")
+      reservedBalancesShouldBe(accountBuyer, fullyAmountUsd - partiallyAmountUsd -> UsdId.toString, (minimalFeeWaves - partiallyFeeWaves) -> "WAVES")
+      reservedBalancesShouldBe(accountSeller, 0L                                 -> UsdId.toString, 0L                                    -> "WAVES")
 
       node.cancelAllOrders(accountBuyer)
     }
 
     s"order should be processed if amount less then fee when fee asset-type = $assetType" in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString))
+      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + tooHighFeeWaves -> Some(UsdId.toString))
       val accountSeller = createAccountWithBalance(fullyAmountWaves            -> None, tooHighFee -> Some(UsdId.toString))
 
       node.waitOrderProcessed(
         wavesUsdPair,
-        node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version, feeAsset = IssuedAsset(UsdId)).message.id)
+        node.placeOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, tooHighFeeWaves, version).message.id)
       node.waitOrderProcessed(
         wavesUsdPair,
         node.placeOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, tooHighFee, version, feeAsset = IssuedAsset(UsdId)).message.id)
@@ -164,12 +164,12 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
       assertBadRequest(
         node.placeOrder(
-          createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString)),
+          createAccountWithBalance(minimalFeeWaves -> None, fullyAmountUsd -> Some(UsdId.toString)),
           wavesUsdPair,
           BUY,
           fullyAmountWaves,
           price,
-          tooLowFee,
+          tooLowFeeWaves,
           version,
           feeAsset = feeAsset
         ))

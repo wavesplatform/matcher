@@ -915,8 +915,6 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       val transferId = node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(EthId.toString), None).id
       node.waitForTransaction(transferId)
 
-      docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
-      check()
       docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = fixed"))
       check()
       docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))
@@ -938,20 +936,6 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         node.reservedBalance(alice) shouldBe Map("WAVES" -> 200, BtcId.toString -> 20)
         node.cancelOrder(alice, ethWavesPair, orderId)
         node.reservedBalance(alice) shouldBe empty
-      }
-
-      docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent\nwaves.dex.order-fee.percent.min-fee = 0.1\nwaves.dex.order-fee.percent.asset-type = price"))
-
-      withClue("in percent-fee mode fee asset id should always be Waves for V1 order") {
-        assertBadRequestAndMessage(
-          node.placeOrder(sender = alice, pair = wavesUsdPair, orderType = OrderType.BUY, amount = 100, price = 100000000L, fee = 10, version = 1: Byte, feeAsset = IssuedAsset(UsdId)),
-          unexpectedFeeAsset(UsdId))
-      }
-
-      withClue("in percent-fee mode fee asset id should always be Waves for V2 order") {
-        assertBadRequestAndMessage(
-          node.placeOrder(sender = alice, pair = wavesUsdPair, orderType = OrderType.BUY, amount = 100, price = 100000000L, fee = 10, version = 2: Byte, feeAsset = IssuedAsset(UsdId)),
-          unexpectedFeeAsset(UsdId))
       }
     }
   }

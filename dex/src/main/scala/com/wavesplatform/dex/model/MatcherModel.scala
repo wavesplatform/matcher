@@ -23,21 +23,21 @@ object MatcherModel {
   /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
   object Normalization {
 
-    def normalizeAmountAndFee(value: Double, assetDecimals: Int): Amount =
-      (BigDecimal(value) * BigDecimal(10).pow(assetDecimals)).toLong
+    def normalizeAmountAndFee(value: BigDecimal, assetDecimals: Int): Amount =
+      (value * BigDecimal(10).pow(assetDecimals)).toLong
 
-    def normalizePrice(value: Double, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
-      (BigDecimal(value) * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toLong
+    def normalizePrice(value: BigDecimal, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
+      (value * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)).toLong
   }
 
   /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
   object Denormalization {
 
-    def denormalizeAmountAndFee(value: Amount, assetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(assetDecimals)).toDouble
+    def denormalizeAmountAndFee(value: Amount, assetDecimals: Int): BigDecimal =
+      BigDecimal(value) / BigDecimal(10).pow(assetDecimals)
 
-    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): Double =
-      (BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals).toLongExact).toDouble
+    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): BigDecimal =
+      BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)
   }
 
   def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble

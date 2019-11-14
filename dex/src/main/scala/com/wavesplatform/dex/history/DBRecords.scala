@@ -14,22 +14,22 @@ object DBRecords {
                          priceAssetId: String,
                          feeAssetId: String,
                          side: Byte,
-                         price: Double,
-                         amount: Double,
+                         price: BigDecimal,
+                         amount: BigDecimal,
                          timestamp: LocalDateTime,
                          expiration: LocalDateTime,
-                         fee: Double,
+                         fee: BigDecimal,
                          created: LocalDateTime)
       extends Record
 
   case class EventRecord(orderId: String,
                          eventType: Byte,
                          timestamp: LocalDateTime,
-                         price: Double,
-                         filled: Double,
-                         totalFilled: Double,
-                         feeFilled: Double,
-                         feeTotalFilled: Double,
+                         price: BigDecimal,
+                         filled: BigDecimal,
+                         totalFilled: BigDecimal,
+                         feeFilled: BigDecimal,
+                         feeTotalFilled: BigDecimal,
                          status: Byte)
       extends Record
 }

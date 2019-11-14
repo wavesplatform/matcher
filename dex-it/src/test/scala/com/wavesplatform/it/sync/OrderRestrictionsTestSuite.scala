@@ -39,9 +39,9 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "high amount" in {
-    dex1Api.tryPlace(mkOrder(alice, wctUsdPair, BUY, 100000000000L, 100000000, matcherFee)) should failWith(
+    dex1Api.tryPlace(mkOrder(alice, wctUsdPair, BUY, 98778997800000123L, 100000000, matcherFee)) should failWith(
       9441026, // OrderInvalidAmount
-      s"The order's amount 1000000000 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
+      s"The order's amount 987789978000001.23 $WctId does not meet matcher's requirements: max amount = 100000000, min amount = 0.1, step amount = 0.1"
     )
   }
 

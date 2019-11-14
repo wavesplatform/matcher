@@ -51,7 +51,8 @@ object Implicits {
   implicit val intWrites               = ContextWrites.auto[Int]
   implicit val byteWrites              = intWrites.contramap[Byte](_.toInt)
   implicit val longWrites              = ContextWrites.auto[Long]
-  implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](formatValue)
+  implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](x => formatValue(BigDecimal(x)))
+  implicit val decimalWrites           = ContextWrites.auto[String].contramap[BigDecimal](formatValue)
   implicit val strWrites               = ContextWrites.auto[String]
   implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.toString)
   implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
@@ -63,21 +64,21 @@ object Implicits {
   implicit val amountWrites = new ContextWrites[Amount] {
     override def writes(input: Amount): JsValue =
       Json.obj(
-        "volume"  -> doubleWrites.writes(input.volume),
-        "assetId" -> assetWrites.writes(input.asset)
+        "volume"  -> Json.toJson(input.volume),
+        "assetId" -> Json.toJson(input.asset)
       )
   }
 
   implicit val balanceWrites = new ContextWrites[List[Amount]] {
     override def writes(input: List[Amount]): JsValue = {
       val xs = input.map { x =>
-        assetShow.show(x.asset) -> doubleWrites.writes(x.volume)
+        assetShow.show(x.asset) -> Json.toJson(x.volume)
       }
       JsObject(xs)
     }
   }
 
-  implicit val priceWrites = doubleWrites.contramap[Price](_.volume)
+  implicit val priceWrites = decimalWrites.contramap[Price](_.volume)
 
   implicit def setWrites[T](implicit itemWrites: ContextWrites[T]) = new ContextWrites[Set[T]] {
     override def writes(input: Set[T]): JsValue = {

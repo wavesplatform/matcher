@@ -3,8 +3,9 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, Route}
+import akka.http.scaladsl.server._
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import cats.implicits._
@@ -19,11 +20,19 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
+import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
@@ -51,7 +60,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
-                           getActualTickSize: AssetPair => Double,
+                           getActualTickSize: AssetPair => BigDecimal,
                            orderValidator: Order => FutureResult[Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
@@ -77,14 +86,27 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
+  private val invalidJsonParsingRejectionsHandler =
+    server.RejectionHandler
+      .newBuilder()
+      .handle {
+        case ValidationRejection(_, Some(e: PlayJsonException)) =>
+          complete {
+            InvalidJsonResponse(error.InvalidJson(e.errors.map(_._1.toString()).toList))
+          }
+      }
+      .result()
+
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-          getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-          historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-          upsertRate ~ deleteRate ~ saveSnapshots
+        handleRejections(invalidJsonParsingRejectionsHandler) {
+          getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+            getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+            historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+            upsertRate ~ deleteRate ~ saveSnapshots
+        }
       }
   }
 

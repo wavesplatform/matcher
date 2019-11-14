@@ -3,8 +3,8 @@ package com.wavesplatform.dex.api
 import java.nio.charset.StandardCharsets
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
@@ -20,14 +20,14 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.{RequestGen, WithDB, crypto}
+import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsString, JsValue}
 
 import scala.concurrent.Future
 
-class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with PathMockFactory with Eventually with WithDB {
+class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData with PathMockFactory with Eventually with WithDB {
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
@@ -188,6 +188,52 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       },
       "wrongApiKey"
     )
+  }
+
+  routePath("/orderbook") - {
+    "invalid field" in test { route =>
+      // amount is too long
+      val orderJson =
+        """{
+          |  "version": 1,
+          |  "id": "6XHKohY1Wh8HwFx9SAf8CYwiRYBxPpWAZkHen6Whwu3i",
+          |  "sender": "3N2EPHQ8hU3sFUBGcWfaS91yLpRgdQ6R8CE",
+          |  "senderPublicKey": "Frfv91pfd4HUa9PxDQhyLo2nuKKtn49yMVXKpKN4gjK4",
+          |  "matcherPublicKey": "77J1rZi6iyizrjH6SR9iyiKWU99MTvujDS5LUuPPqeEr",
+          |  "assetPair": {
+          |    "amountAsset": "7XxvP6RtKcMYEVrKZwJcaLwek4FjGkL3hWKRA6r44Pp",
+          |    "priceAsset": "BbDpaEUT1R1S5fxScefViEhPmrT7rPvWhU9eYB4masS"
+          |  },
+          |  "orderType": "buy",
+          |  "amount": 2588809419424100000000000000,
+          |  "price": 22375150522026,
+          |  "timestamp": 1002536707239093185,
+          |  "expiration": 1576213723344,
+          |  "matcherFee": 2412058533372,
+          |  "signature": "4a4JP1pKtrZ5Vts2qZ9guJXsyQJaFxhJHoskzxP7hSUtDyXesFpY66REmxeDe5hUeXXMSkPP46vJXxxDPhv7hzfm",
+          |  "proofs": [
+          |    "4a4JP1pKtrZ5Vts2qZ9guJXsyQJaFxhJHoskzxP7hSUtDyXesFpY66REmxeDe5hUeXXMSkPP46vJXxxDPhv7hzfm"
+          |  ]
+          |}""".stripMargin
+
+      Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        val json = responseAs[JsValue]
+        (json \ "error").as[Int] shouldBe 9437185
+        (json \ "params" \ "invalidFields").as[List[String]] shouldBe List("/amount")
+      }
+    }
+
+    "completely invalid JSON" in test { route =>
+      val orderJson = "{ I AM THE DANGEROUS HACKER"
+
+      Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        val json = responseAs[JsValue]
+        (json \ "error").as[Int] shouldBe 9437185
+        (json \ "message").as[String] shouldBe "The order's JSON is invalid. Check the documentation"
+      }
+    }
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {

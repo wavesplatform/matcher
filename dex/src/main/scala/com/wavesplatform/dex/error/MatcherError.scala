@@ -37,16 +37,16 @@ object MatcherError {
   }
 }
 
-case class Amount(asset: Asset, volume: Double)
+case class Amount(asset: Asset, volume: BigDecimal)
 object Amount {
   private[error] def apply(asset: Asset, volume: Long)(implicit efc: ErrorFormatterContext): Amount =
-    Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.assetDecimals(asset)))
+    new Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.assetDecimals(asset)))
 }
 
-case class Price(assetPair: AssetPair, volume: Double)
+case class Price(assetPair: AssetPair, volume: BigDecimal)
 object Price {
   private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
-    Price(assetPair, Denormalization.denormalizePrice(volume, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)))
+    new Price(assetPair, Denormalization.denormalizePrice(volume, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)))
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
@@ -132,6 +132,15 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
       e"""The expiration should be at least
                      |${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)},
                      |but it is ${'given -> givenExpiration}"""
+    )
+
+case class InvalidOrderJson(fields: List[String])
+    extends MatcherError(
+      order,
+      commonEntity,
+      broken,
+      if (fields.isEmpty) e"The order's JSON is invalid. Check the documentation"
+      else e"The order's JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
     )
 
 case class OrderCommonValidationFailed(details: String)

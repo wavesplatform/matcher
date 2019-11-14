@@ -3,8 +3,9 @@ package com.wavesplatform.dex.api
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.http.scaladsl.server.{Directive0, Directive1, PathMatcher, Route}
+import akka.http.scaladsl.server._
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import cats.implicits._
@@ -24,6 +25,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
+import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
@@ -51,7 +53,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
-                           getActualTickSize: AssetPair => Double,
+                           getActualTickSize: AssetPair => BigDecimal,
                            orderValidator: Order => FutureResult[Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
@@ -76,6 +78,17 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
+
+  private val invalidOrderJsonParsingRejectionsHandler =
+    server.RejectionHandler
+      .newBuilder()
+      .handle {
+        case ValidationRejection(_, Some(e: PlayJsonException)) =>
+          complete {
+            InvalidJsonResponse(error.InvalidOrderJson(e.errors.map(_._1.toString()).toList))
+          }
+      }
+      .result()
 
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
@@ -128,23 +141,26 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
+      // TODO
       entity(as[CancelOrderRequest]) { req =>
         if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
-    (pathEndOrSingleSlash & entity(as[Order])) { order =>
-      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
-        unavailableOrderBookBarrier(pair) {
-          complete(
-            placeTimer.measureFuture {
-              orderValidator(order).value flatMap {
-                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+    handleRejections(invalidOrderJsonParsingRejectionsHandler) {
+      (pathEndOrSingleSlash & entity(as[Order])) { order =>
+        withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+          unavailableOrderBookBarrier(pair) {
+            complete(
+              placeTimer.measureFuture {
+                orderValidator(order).value flatMap {
+                  case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
+                  case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+                }
               }
-            }
-          )
+            )
+          }
         }
       }
     }

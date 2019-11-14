@@ -76,6 +76,7 @@ case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
     extends MatcherResponse(C.OK, MatcherResponseContent.Multiple(orders.values.toList))
 
 case class SimpleErrorResponse(code: StatusCode, error: MatcherError) extends MatcherResponse(code, error)
+case class InvalidJsonResponse(error: MatcherError)                   extends MatcherResponse(C.BadRequest, error)
 case class OrderRejected(error: MatcherError)                         extends MatcherResponse(C.BadRequest, error)
 case class OrderCancelRejected(error: MatcherError)                   extends MatcherResponse(C.BadRequest, error)
 case object InvalidSignature                                          extends MatcherResponse(C.BadRequest, error.RequestInvalidSignature)

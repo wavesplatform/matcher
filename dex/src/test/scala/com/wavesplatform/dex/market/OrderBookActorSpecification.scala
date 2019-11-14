@@ -94,7 +94,7 @@ class OrderBookActorSpecification
         ntpTime,
         matchingRules,
         _ => (),
-        raw => MatchingRule(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact)
+        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact)
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)

@@ -29,8 +29,8 @@ object HistoryRouter {
   trait HistoryMsg {
 
     type R <: Record // mapping between domain objects and database rows
-    type DenormalizePrice        = (Long, AssetPair) => Double // how to convert price to the human-readable format
-    type DenormalizeAmountAndFee = (Long, Asset) => Double     // how to convert amount and fee fee to the human-readable format
+    type DenormalizePrice        = (Long, AssetPair) => BigDecimal // how to convert price to the human-readable format
+    type DenormalizeAmountAndFee = (Long, Asset) => BigDecimal     // how to convert amount and fee fee to the human-readable format
 
     protected def createRecords(denormalizeAmountAndFee: DenormalizeAmountAndFee, denormalizePrice: DenormalizePrice): Set[R]
     protected def toLocalDateTime(timestamp: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneOffset.UTC)
@@ -116,10 +116,10 @@ object HistoryRouter {
 
 class HistoryRouter(assetDecimals: Asset => Int, postgresConnection: PostgresConnection, orderHistorySettings: OrderHistorySettings) extends Actor {
 
-  private def denormalizeAmountAndFee(value: Long, asset: Asset): Double =
+  private def denormalizeAmountAndFee(value: Long, asset: Asset): BigDecimal =
     Denormalization.denormalizeAmountAndFee(value, assetDecimals(asset))
 
-  private def denormalizePrice(value: Long, pair: AssetPair): Double =
+  private def denormalizePrice(value: Long, pair: AssetPair): BigDecimal =
     Denormalization.denormalizePrice(value, assetDecimals(pair.amountAsset), assetDecimals(pair.priceAsset))
 
   private val ctx = new PostgresJdbcContext(SnakeCase, postgresConnection.getConfig); import ctx._

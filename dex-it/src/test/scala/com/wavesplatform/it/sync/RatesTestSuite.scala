@@ -110,6 +110,21 @@ class RatesTestSuite extends MatcherSuiteBase {
     assertNotFoundAndMessage(node.deleteRate(wctAsset), s"The rate for the asset $wctStr was not specified")
   }
 
+  "Rates should not be changed by incorrect values" in {
+
+    node
+      .upsertRate(Waves, 0, expectedStatusCode = BadRequest)
+      .message shouldBe "Asset rate should be positive"
+
+    node.getRates shouldBe defaultRateMap
+
+    node
+      .upsertRate(Waves, -0.1, expectedStatusCode = BadRequest)
+      .message shouldBe "Asset rate should be positive"
+
+    node.getRates shouldBe defaultRateMap
+  }
+
   "Changing rates affects order validation" in {
     // set rate for btc
     node.upsertRate(btcAsset, 1, expectedStatusCode = Created)

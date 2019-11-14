@@ -23,22 +23,22 @@ class WavesBlockchainCachingClient(channel: ManagedChannel, defaultCacheExpirati
 
   private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
 
-  private val nonExpiringBalancesCache       = new BalancesCache(super.spendableBalance)
-  private val expiringFeaturesCache          = new FeaturesCache(super.isFeatureActivated, cacheExpiration)
-  private val expiringAssetDescriptionsCache = new AssetDescriptionsCache(super.assetDescription, cacheExpiration)
+  private val balancesCache          = new BalancesCache(super.spendableBalance)
+  private val featuresCache          = new FeaturesCache(super.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
+  private val assetDescriptionsCache = new AssetDescriptionsCache(super.assetDescription, cacheExpiration)
 
   /** Updates balances cache by balances stream */
   super.spendableBalanceChanges.subscribe {
     new Observer[SpendableBalanceChanges] {
-      def onNext(elem: SpendableBalanceChanges): Future[Ack] = { nonExpiringBalancesCache.batchPut(elem); Continue }
+      def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchPut(elem); Continue }
       def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
       def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
     }
   }(monixScheduler)
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long] = nonExpiringBalancesCache.get(address -> asset).map(_.toLong)
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = balancesCache.get(address -> asset).map(_.toLong)
 
-  override def isFeatureActivated(id: Short): Future[Boolean] = expiringFeaturesCache.get(id) map Boolean2boolean
+  override def isFeatureActivated(id: Short): Future[Boolean] = featuresCache.get(id) map Boolean2boolean
 
-  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = expiringAssetDescriptionsCache.get(asset)
+  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = assetDescriptionsCache.get(asset)
 }

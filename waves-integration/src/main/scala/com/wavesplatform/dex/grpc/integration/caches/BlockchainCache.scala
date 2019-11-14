@@ -3,23 +3,44 @@ package com.wavesplatform.dex.grpc.integration.caches
 import java.time.Duration
 
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.wavesplatform.utils.ScorexLogging
 
-abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](loader: K => V, expiration: Option[Duration]) {
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
-  lazy private val cache: LoadingCache[K, V] = {
+/**
+  * Common logic for caching of the blockchain access results
+  *
+  * @param loader blockchain access function
+  * @param expiration living time of the each cache entry
+  * @param invalidationPredicate custom logic for value invalidation after it's loading to the cache
+  */
+abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](loader: K => Future[V], expiration: Option[Duration], invalidationPredicate: V => Boolean)(
+    implicit ec: ExecutionContext)
+    extends ScorexLogging {
+
+  lazy private val cache: LoadingCache[K, Future[V]] = {
     val builder = CacheBuilder.newBuilder
     expiration
       .fold(builder)(builder.expireAfterWrite)
       .build {
-        new CacheLoader[K, V] {
-          override def load(key: K): V = loader(key)
+        new CacheLoader[K, Future[V]] {
+          override def load(key: K): Future[V] = loader(key) andThen {
+            case Failure(exception) => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
+            case Success(value) if invalidationPredicate(value) =>
+              log.warn(s"Discarding value $value for the key $key according to the predicate")
+              cache.invalidate(key)
+          }
         }
       }
   }
 
-  def get(key: K): V = cache.get(key)
+  def get(key: K): Future[V] = cache.get(key)
 
-  def put(key: K, value: V): Unit = cache.put(key, value)
+  def put(key: K, value: Future[V]): Unit = cache.put(key, value)
+}
 
-  def size: Long = cache.size()
+object BlockchainCache {
+
+  def noCustomInvalidationLogic[V](value: V): Boolean = false
 }

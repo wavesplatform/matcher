@@ -148,6 +148,7 @@ checkPRRaw := {
     (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
+    (`waves-integration` / Test / test).value
     (`dex-generator` / Test / compile).value
   }
 }

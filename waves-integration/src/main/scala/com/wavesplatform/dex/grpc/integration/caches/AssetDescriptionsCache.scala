@@ -9,4 +9,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AssetDescriptionsCache(loader: IssuedAsset => Future[Option[BriefAssetDescription]], expiration: Duration)(
     implicit executionContext: ExecutionContext)
-    extends BlockchainCache[IssuedAsset, Future[Option[BriefAssetDescription]]](loader, Some(expiration))
+    extends BlockchainCache[IssuedAsset, Option[BriefAssetDescription]](loader,
+                                                                        Some(expiration),
+                                                                        invalidationPredicate = BlockchainCache.noCustomInvalidationLogic)

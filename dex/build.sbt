@@ -49,4 +49,5 @@ inTask(docker)(
       (Compile / sourceDirectory).value / "container" / "start.sh",
       (Compile / sourceDirectory).value / "container" / "default.conf"
     )
-  ))
+  )
+)

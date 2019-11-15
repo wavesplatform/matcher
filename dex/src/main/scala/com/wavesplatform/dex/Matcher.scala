@@ -320,7 +320,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         .props(
           settings.exchangeTransactionBroadcast,
           context.time,
-          tx => context.utx.putIfNew(tx).resultE.isRight,
+          tx => context.utx.putIfNew(tx).resultE.map(_ => Unit),
           context.blockchain.containsTransaction(_),
           txs => txs.foreach(context.broadcastTransaction)
         ),

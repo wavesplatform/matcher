@@ -4,12 +4,13 @@ import akka.actor.{Actor, Props}
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 
 class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSettings,
                                         time: Time,
-                                        isValid: ExchangeTransaction => Boolean,
+                                        check: ExchangeTransaction => Either[ValidationError, Unit],
                                         isConfirmed: ExchangeTransaction => Boolean,
                                         broadcast: Seq[ExchangeTransaction] => Unit)
     extends Actor
@@ -23,14 +24,21 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
   }
 
   private val default: Receive = {
-    case ExchangeTransactionCreated(tx) => if (isValid(tx)) broadcast(List(tx))
+    case ExchangeTransactionCreated(tx) =>
+      check(tx) match {
+        case Right(_) => broadcast(List(tx))
+        case Left(e)  => logError(tx, e)
+      }
   }
 
   private def watching(toCheck: Vector[ExchangeTransaction], next: Vector[ExchangeTransaction]): Receive = {
     case ExchangeTransactionCreated(tx) =>
-      if (isValid(tx)) {
-        broadcast(List(tx))
-        context.become(watching(toCheck, next :+ tx))
+      check(tx) match {
+        case Right(_) =>
+          broadcast(List(tx))
+          context.become(watching(toCheck, next :+ tx))
+
+        case Left(e) => logError(tx, e)
       }
 
     case Send =>
@@ -51,6 +59,8 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
   override val receive: Receive = if (settings.broadcastUntilConfirmed) watching(toCheck = Vector.empty, next = Vector.empty) else default
 
   private def scheduleSend(): Unit = context.system.scheduler.scheduleOnce(settings.interval, self, Send)
+
+  private def logError(tx: ExchangeTransaction, error: ValidationError): Unit = log.warn(s"Tx ${tx.id()} become invalid: $error")
 }
 
 object ExchangeTransactionBroadcastActor {
@@ -58,7 +68,7 @@ object ExchangeTransactionBroadcastActor {
 
   def props(settings: ExchangeTransactionBroadcastSettings,
             time: Time,
-            isValid: ExchangeTransaction => Boolean,
+            isValid: ExchangeTransaction => Either[ValidationError, Unit],
             isConfirmed: ExchangeTransaction => Boolean,
             broadcast: Seq[ExchangeTransaction] => Unit): Props =
     Props(new ExchangeTransactionBroadcastActor(settings, time, isValid, isConfirmed, broadcast))

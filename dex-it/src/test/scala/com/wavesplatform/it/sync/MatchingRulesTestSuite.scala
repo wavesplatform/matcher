@@ -109,18 +109,16 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
     dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 15 * price))
     dex1Api.place(mkOrder(alice, wctUsdPair, BUY, amount, 17 * price, matcherFee))
-    dex1Api.currentOffset shouldBe 7
+    dex1Api.waitForCurrentOffset(_ == 7)
 
     waitForOrderAtNode(sellOrder)
-
-    dex1Api.currentOffset shouldBe 7
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee)
     dex1Api.place(buyOrder)
 
     dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 8 * price))
     dex1Api.cancel(alice, buyOrder)
-    dex1Api.currentOffset shouldBe 9
+    dex1Api.waitForCurrentOffset(_ == 9)
 
     val anotherBuyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee)
     dex1Api.place(anotherBuyOrder)

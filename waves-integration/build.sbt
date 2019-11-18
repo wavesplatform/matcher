@@ -1,5 +1,6 @@
 name := "waves-integration"
 
+import com.typesafe.sbt.SbtNativePackager.Universal
 import sbtassembly.MergeStrategy
 
 enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
@@ -9,8 +10,12 @@ libraryDependencies ++= Dependencies.wavesIntegration
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
-  packageSummary := "waves-integration",
-  packageDescription := s"Node integration extension for the Waves DEX. Compatible with ${nodeVersion.value} node version"
+  name := "waves-dex-integration",
+  packageSummary := "waves-dex-integration",
+  packageDescription := s"Node integration extension for the Waves DEX. Compatible with ${nodeVersion.value} node version",
+  // For sbt-native-packager
+  normalizedName := name.value,
+  executableScriptName := packageName.value,
 )
 
 packageSettings
@@ -84,3 +89,15 @@ inTask(assembly)(
     mainClass := Some("com.wavesplatform.dex.grpc.integration.Main")
   )
 )
+
+// Packaging
+
+val packageMappings = Seq(
+  mappings += (Compile / sourceDirectory).value / "package" / "sample.conf" -> "doc/waves-dex-integration.conf.sample"
+)
+
+val allPackageSettings = packageSettings ++ packageMappings
+
+inConfig(Universal)(allPackageSettings)
+inConfig(Linux)(packageSettings)
+inConfig(Debian)(inTask(packageBin)(packageSettings) ++ packageSettings)

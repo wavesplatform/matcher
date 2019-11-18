@@ -12,7 +12,7 @@ import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
 
-object Cli {
+object WavesDexCli {
   // todo commands:
   // base64
   // get account by seed [and nonce]

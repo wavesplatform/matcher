@@ -86,3 +86,4 @@ case object DuringStart                                               extends Ma
 case object DuringShutdown                                            extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
 case object TimedOut                                                  extends MatcherResponse(C.RequestTimeout, error.RequestTimeout)
 case class InfoNotFound(error: MatcherError)                          extends MatcherResponse(C.NotFound, error)
+case class WavesNodeUnavailable(error: MatcherError)                  extends MatcherResponse(C.ServiceUnavailable, error)

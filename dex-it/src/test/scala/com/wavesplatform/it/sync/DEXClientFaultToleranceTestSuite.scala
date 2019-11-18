@@ -5,7 +5,7 @@ import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.it.docker.{WavesIntegrationItDocker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
@@ -20,7 +20,7 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
     s"""waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  grpc.integration.waves-node-grpc {
-       |    host = $wavesNodesDomain
+       |    host = ${WavesIntegrationItDocker.wavesNodesDomain}
        |    port = 6887
        |  }
        |}""".stripMargin
@@ -123,6 +123,26 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
     dex1Api.waitForOrderStatus(bobBuyOrder, OrderStatus.Cancelled)
+  }
+
+  "DEXClient should correctly handle gRPC errors" in {
+
+    val order = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300)
+
+    dockerClient.stop(wavesNode1Container)
+
+    dex1Api.tryPlace(order) should failWith(
+      105906177,
+      "Waves Node is unavailable, reason: Waves Node cannot be reached via gRPC. Please retry later or contact with the administrator"
+    )
+
+    dockerClient.start(wavesNode1Container)
+    invalidateCaches()
+
+    wavesNode1Api.waitReady
+
+    dex1Api.place(order)
+    dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

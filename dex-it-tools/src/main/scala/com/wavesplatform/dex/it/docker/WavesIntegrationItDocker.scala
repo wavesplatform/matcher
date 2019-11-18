@@ -9,6 +9,9 @@ import scala.io.Source
 import scala.util.Try
 
 object WavesIntegrationItDocker {
+
+  val wavesNodesDomain = "waves.nodes"
+
   private val wavesNodeImage = "com.wavesplatform/waves-integration-it:latest"
 
   def createContainer(

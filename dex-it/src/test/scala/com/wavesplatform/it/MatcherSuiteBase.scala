@@ -86,8 +86,6 @@ abstract class MatcherSuiteBase
   override protected def dockerClient: com.wavesplatform.dex.it.docker.Docker = internalDockerClient()
 
   // Waves miner node
-  protected val wavesNodesDomain = "waves.nodes"
-
   protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(GenesisConfig.config)
 
   protected val wavesNode1Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-1") }
@@ -164,7 +162,7 @@ abstract class MatcherSuiteBase
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig(),
                                 suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer = {
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(wavesNodesDomain))
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(WavesIntegrationItDocker.wavesNodesDomain))
   }
 
   protected def dexQueueConfig(queueId: Int): Config = {

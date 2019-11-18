@@ -20,6 +20,7 @@ import scala.concurrent.duration.DurationInt
 class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
   private val monixScheduler = Scheduler.singleThread("test")
+  private lazy val dexClient = new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds, monixScheduler, executionContext)
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -64,12 +65,12 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds, monixScheduler, executionContext).wavesBlockchainAsyncClient
+    dexClient.wavesBlockchainAsyncClient
       .unsafeTap { _.requestBalanceChanges() }
       .unsafeTap { _.spendableBalanceChanges.subscribe(eventsObserver)(monixScheduler) }
   }
 
-  "WavesBlockchainAsyncClient should send balance changes via gRPC" in {
+  "DEX client should receive balance changes via gRPC" in {
 
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
 

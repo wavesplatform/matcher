@@ -20,6 +20,7 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
 import com.wavesplatform.dex.market.MatcherActor.{
   ForceSaveSnapshots,
   ForceStartOrderBook,
@@ -155,6 +156,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
+  @inline private def wrapInFuture(response: MatcherResponse): Future[ToResponseMarshallable] = {
+    Future.successful[ToResponseMarshallable](response)
+  }
+
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
     (pathEndOrSingleSlash & entity(as[Order])) { order =>
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
@@ -163,7 +168,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             placeTimer.measureFuture {
               orderValidator(order).value flatMap {
                 case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+                case Left(e)  => wrapInFuture { OrderRejected(e) }
+              } recoverWith {
+                case ex => wrapInFuture { WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
               }
             }
           )

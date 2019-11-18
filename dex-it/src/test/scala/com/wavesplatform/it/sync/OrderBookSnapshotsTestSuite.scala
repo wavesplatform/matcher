@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt

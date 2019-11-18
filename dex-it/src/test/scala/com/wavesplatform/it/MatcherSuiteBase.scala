@@ -18,6 +18,7 @@ abstract class MatcherSuiteBase
     with ReportingTestName
     with NodesFromDocker
     with BeforeAndAfterAll
+    with BeforeAndAfterEach
     with MatcherNode {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global

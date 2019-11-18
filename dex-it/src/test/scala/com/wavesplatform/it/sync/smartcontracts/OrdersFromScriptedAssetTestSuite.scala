@@ -48,8 +48,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     node.waitOrderInBlockchain(submitted.message.id)
     node.waitForHeight(activationHeight + 1, 2.minutes)
-
-    node.cancelAllOrders(matcher)
   }
 
   "can place if the script returns TRUE" in {
@@ -57,8 +55,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val counterId =
       node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
     node.waitOrderStatus(pair, counterId, "Accepted")
-
-    node.cancelAllOrders(matcher)
   }
 
   "can't place if the script returns FALSE" in {
@@ -88,8 +84,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val submittedId =
       node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
     node.waitOrderStatus(pair, submittedId, "Filled")
-
-    node.cancelAllOrders(matcher)
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
@@ -108,8 +102,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     log.info("both orders are cancelled")
     node.waitOrderStatus(pair, submittedId, "Filled")
     node.waitOrderStatus(pair, counterId, "Filled")
-
-    node.cancelAllOrders(matcher)
   }
 
   "can't execute against unscripted, if the script returns FALSE" in {
@@ -136,8 +128,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = node.waitTransactionsByOrder(submittedId, 1)
     node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.Id
-
-    node.cancelAllOrders(matcher)
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -164,8 +154,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = node.waitTransactionsByOrder(submittedId, 1)
     node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.Id
-
-    node.cancelAllOrders(matcher)
   }
 
   private def issueAsset(): String = {
@@ -181,6 +169,11 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     super.beforeAll()
     val xs = Seq(UnscriptedAsset, AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(_.json()).map(node.broadcastRequest(_))
     xs.foreach(tx => node.waitForTransaction(tx.id))
+  }
+
+  override protected def afterEach(): Unit = {
+    super.afterEach()
+    node.cancelAllOrders(matcher)
   }
 }
 

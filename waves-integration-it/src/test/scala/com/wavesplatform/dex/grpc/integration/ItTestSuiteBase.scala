@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration
 
-import java.net.InetSocketAddress
-
 import cats.Id
 import cats.instances.try_._
 import com.softwaremill.sttp.TryHttpURLConnectionBackend

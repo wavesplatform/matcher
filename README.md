@@ -209,16 +209,17 @@ To run:
 
 #### Configuration
 
-There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
+1. There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
 
-```hocon
-# ... here many lines of your DEX's configuration
-waves.dex {
-  directory = "/full/path/to/base/dex/directory"
-  account = "3Q5GKPLkxXcEwGv6d57v8aksTjh1igHNNDd" # This account must be known at the Node, e.g. created through POST /addresses
-  # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
-}
-```
+    ```hocon
+    # ... here many lines of your DEX's configuration
+    waves.dex {
+      directory = "/full/path/to/base/dex/directory"
+      # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
+    }
+    ```
+
+2. Generate an [account storage](#81-generating-account-storage) and update your configuration.
 
 ## 7. Running an extension project locally during development
 
@@ -244,15 +245,36 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
-## 8. Useful commands
+## 8. CLI
 
-In SBT.
+We have CLI tools accompanying to DEX server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
 
-### Generate documentation
+* Generating an account storage (required to run DEX server);
+* Generating an account seed by base seed, and printing useful information about it;
 
+If you want to run CLI from SBT, use the following template:
+
+```bash
+dex/runMain com.wavesplatform.dex.WavesDexCli here-your-arguments
 ```
-sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /path/to/output/docs/dir"
+
+### 8.1. Generating account storage
+
+Example:
+
+```bash
+./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --create-account-storage-directory /Users/vsuharnikov/work/waves/dex-backend/_local/runtime/grpc-test/dex
 ```
+
+here:
+
+* `W` is mainnet;
+* `--account-nonce 3` - we suppose you will provide a base seed and DEX server should use the fourth account of it (numeration starts with 0). 
+  If you will provide an account seed, don't specify this option;
+* `--create-account-storage-directory` - where the `account.dat` file will be stored.
+
+After running this command you will see where your `account.dat` was saved and which settings do you have to add to the DEX server configuration.
+Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
 
 ## 9. Known issues
 

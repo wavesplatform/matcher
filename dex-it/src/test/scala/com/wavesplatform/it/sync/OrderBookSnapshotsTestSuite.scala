@@ -37,7 +37,6 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     .sample
     .get
 
-
   "Order books are created with right offsets" in {
     ordersPack1.foreach(node.placeOrder)
 
@@ -55,7 +54,6 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
     ordersPack2.foreach { order =>
       node.placeOrder(order)
-      println(node.getCurrentOffset)
     }
 
     node.waitFor[QueueEventWithMeta.Offset]("ordersPack2Size - all events are consumed")(

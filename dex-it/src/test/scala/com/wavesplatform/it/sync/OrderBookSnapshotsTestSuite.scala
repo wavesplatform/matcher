@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
@@ -37,6 +37,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     .sample
     .get
 
+
   "Order books are created with right offsets" in {
     ordersPack1.foreach(node.placeOrder)
 
@@ -54,6 +55,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
     ordersPack2.foreach { order =>
       node.placeOrder(order)
+      println(node.getCurrentOffset)
     }
 
     node.waitFor[QueueEventWithMeta.Offset]("ordersPack2Size - all events are consumed")(
@@ -61,7 +63,11 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
       _ == ordersPack1Size + ordersPack2Size - 1,
       300.millis
     )
+
     val allSnapshotOffsets2 = node.getAllSnapshotOffsets
+
+    allSnapshotOffsets2.last._2 should be (node.getOldestSnapshotOffset)
+
     withClue("Asset pairs has right offsets") {
       allSnapshotOffsets2.foreach {
         case (pair, offset) =>
@@ -73,7 +79,12 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   }
 
   "All events are processed after restart" in {
+    val oldestOffset = node.getOldestSnapshotOffset
+
     docker.killAndStartContainer(dockerNodes().head)
+
+    node.getOldestSnapshotOffset should be (oldestOffset)
+
     node.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(
       _.getCurrentOffset,
       _ == ordersPack1Size + ordersPack2Size - 1,

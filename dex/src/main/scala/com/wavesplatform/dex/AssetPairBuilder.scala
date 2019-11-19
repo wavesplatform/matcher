@@ -40,7 +40,7 @@ class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset 
 
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] = {
     asset.fold[FutureResult[Asset]] { liftValueAsync(Waves) } { asset =>
-      assetDescription(asset).subflatMap { desc =>
+      assetDescription(asset) subflatMap { desc =>
         if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
           Left(
             side match {

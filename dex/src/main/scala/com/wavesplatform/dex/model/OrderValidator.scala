@@ -6,6 +6,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
@@ -82,7 +83,7 @@ object OrderValidator extends ScorexLogging {
     liftFutureAsync { blockchain.hasScript(address) } ifM (verifyAddressScript, verifySignature(order))
   }
 
-  private def verifySmartToken(blockchain: AsyncBlockchain, asset: IssuedAsset, tx: ExchangeTransaction)(
+  private def verifySmartToken(blockchain: AsyncBlockchain, asset: IssuedAsset, tx: ExchangeTransaction, hasAssetScript: Asset => Boolean)(
       implicit ec: ExecutionContext): FutureResult[Unit] = {
 
     lazy val verifySmartAssetScript: FutureResult[Unit] = {
@@ -99,7 +100,7 @@ object OrderValidator extends ScorexLogging {
         .ifM(verifyScript, liftErrorAsync[Unit] { error.AssetFeatureUnsupported(BlockchainFeatures.SmartAssets, asset) })
     }
 
-    liftFutureAsync { blockchain.hasScript(asset) } ifM (verifySmartAssetScript, successAsync)
+    liftValueAsync { hasAssetScript(asset) } ifM (verifySmartAssetScript, successAsync)
   }
 
   private def validateDecimals(assetDecimals: Asset => Int, o: Order)(implicit ec: ExecutionContext): FutureResult[(Int, Int)] = liftAsync {
@@ -152,14 +153,16 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def blockchainAware(blockchain: AsyncBlockchain,
-                      transactionCreator: ExchangeTransactionCreator.CreateTransaction,
-                      matcherAddress: Address,
-                      time: Time,
-                      orderFeeSettings: OrderFeeSettings,
-                      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-                      assetDecimals: Asset => Int,
-                      rateCache: RateCache)(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =
+  def blockchainAware(
+      blockchain: AsyncBlockchain,
+      transactionCreator: ExchangeTransactionCreator.CreateTransaction,
+      matcherAddress: Address,
+      time: Time,
+      orderFeeSettings: OrderFeeSettings,
+      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+      assetDescriptions: Asset => AssetsDB.Item,
+      rateCache: RateCache,
+      hasMatcherAccountScript: Boolean)(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =
     timer.measure {
 
       import ExchangeTransactionCreator.minFee
@@ -169,16 +172,14 @@ object OrderValidator extends ScorexLogging {
       val priceAsset  = assetPair.priceAsset
       val feeAsset    = order.matcherFeeAssetId
 
-      lazy val exchangeTx: FutureResult[ExchangeTransaction] = EitherT {
+      lazy val exchangeTx: Result[ExchangeTransaction] = {
         val fakeOrder: Order  = order.updateType(order.orderType.opposite)
         val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime())
-        transactionCreator(oe) map {
-          _.leftMap(txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
-        }
+        transactionCreator(oe) leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
       }
 
       def verifyAssetScript(assetId: Asset): FutureResult[Unit] = assetId.fold { successAsync } { assetId =>
-        exchangeTx flatMap { verifySmartToken(blockchain, assetId, _) }
+        liftAsync { exchangeTx } flatMap { verifySmartToken(blockchain, assetId, _, assetDescriptions(_).hasScript) }
       }
 
       lazy val verifyMatcherFeeAssetScript: FutureResult[Unit] = {
@@ -189,8 +190,8 @@ object OrderValidator extends ScorexLogging {
       lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
         case DynamicSettings(baseFee) =>
           for {
-            minFee          <- liftFutureAsync { minFee(baseFee, blockchain.hasScript(matcherAddress), assetPair, blockchain.hasScript) }
-            minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDecimals(feeAsset), rateCache) }
+            minFee          <- liftValueAsync { minFee(baseFee, hasMatcherAccountScript, assetPair, assetDescriptions(_).hasScript) }
+            minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDescriptions(feeAsset).decimals, rateCache) }
             _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
           } yield order
         case _ => liftValueAsync { order }
@@ -199,7 +200,7 @@ object OrderValidator extends ScorexLogging {
       for {
         _            <- checkOrderVersion(order.version, blockchain)
         _            <- validateOrderFeeByTransactionRequirements
-        decimalsPair <- validateDecimals(assetDecimals, order)
+        decimalsPair <- validateDecimals(assetDescriptions(_).decimals, order)
         _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
         _            <- verifyOrderByAccountScript(blockchain, order.sender, order)
         _            <- verifyAssetScript(amountAsset)
@@ -462,13 +463,13 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def assetDecimalsAware(getDecimals: Asset => FutureResult[(Asset, Int)])(order: Order)(
-      implicit ec: ExecutionContext): FutureResult[Map[Asset, Int]] = {
+  def assetDescriptionAware(getDescription: Asset => FutureResult[AssetsDB.Item])(order: Order)(
+      implicit ec: ExecutionContext): FutureResult[Map[Asset, AssetsDB.Item]] = {
     List(
       order.assetPair.amountAsset,
       order.assetPair.priceAsset,
       order.matcherFeeAssetId
-    ).traverse(getDecimals).map(_.toMap)
+    ).traverse(asset => getDescription(asset) tupleLeft asset).map(_.toMap)
   }
 
   private def lift[T](x: T): Result[T]                 = x.asRight[MatcherError]

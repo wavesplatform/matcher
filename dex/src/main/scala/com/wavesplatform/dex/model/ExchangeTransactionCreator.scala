@@ -7,24 +7,21 @@ import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
                                  matcherSettings: MatcherSettings,
-                                 hasMatcherAccountScript: => Future[Boolean],
-                                 hasAssetScript: IssuedAsset => Future[Boolean],
-                                 isFeatureActivated: Short => Future[Boolean])(implicit ec: ExecutionContext) {
+                                 hasMatcherAccountScript: Boolean,
+                                 hasAssetScript: IssuedAsset => Boolean)(implicit ec: ExecutionContext) {
 
-  def createTransaction(orderExecutedEvent: OrderExecuted): Future[Either[ValidationError, ExchangeTransaction]] = {
+  def createTransaction(orderExecutedEvent: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
 
     import orderExecutedEvent._
 
@@ -35,10 +32,9 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
 
       import AcceptedOrder.partialFee
 
-      def ifSubmitted[A](tpe: OrderType)(ifTrue: A, ifFalse: A): A = if (submitted.order.orderType == tpe) ifTrue else ifFalse
-
-      def executedFee(tpe: OrderType): Long     = ifSubmitted(tpe)(submittedExecutedFee, counterExecutedFee)
-      def isFirstMatch(tpe: OrderType): Boolean = ifSubmitted(tpe)(submitted.amount == submitted.order.amount, counter.amount == counter.order.amount)
+      def isSubmitted[A](order: Order, s: A, c: A): A = if (order.orderType == submitted.order.orderType) s else c
+      def executedFee(order: Order): Long             = isSubmitted(order, submittedExecutedFee, counterExecutedFee)
+      def isFirstMatch(order: Order): Boolean         = isSubmitted(order, submitted.amount == submitted.order.amount, counter.amount == counter.order.amount)
 
       def getActualBuySellAmounts(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
 
@@ -63,8 +59,8 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
           )
 
         case _ =>
-          val (buyExecutedFee, sellExecutedFee)         = executedFee(BUY)  -> executedFee(SELL)
-          val (isFirstMatchForBuy, isFirstMatchForSell) = isFirstMatch(BUY) -> isFirstMatch(SELL)
+          val (buyExecutedFee, sellExecutedFee)         = executedFee(buy)  -> executedFee(sell)
+          val (isFirstMatchForBuy, isFirstMatchForSell) = isFirstMatch(buy) -> isFirstMatch(sell)
 
           (
             if (isFirstMatchForBuy) buyExecutedFee max 1L else buyExecutedFee,
@@ -76,19 +72,16 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
     val (buyFee, sellFee) = calculateMatcherFee
 
     // matcher always pays fee to the miners in Waves
-    for {
-      txFee                          <- minFee(matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
-      isSmartAccountTradingActivated <- isFeatureActivated(BlockchainFeatures.SmartAccountTrading.id)
-    } yield {
-      if (isSmartAccountTradingActivated)
-        ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
-      else
-        for {
-          v1Buy  <- toV1(buy)
-          v1Sell <- toV1(sell)
-          tx     <- ExchangeTransactionV1.create(matcherPrivateKey, v1Buy, v1Sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
-        } yield tx
-    }
+    val txFee = minFee(matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
+
+    if (buy.version >= 2 || sell.version >= 2) {
+      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
+    } else
+      for {
+        v1Buy  <- toV1(buy)
+        v1Sell <- toV1(sell)
+        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, v1Buy, v1Sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
+      } yield tx
   }
 
   private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
@@ -99,7 +92,7 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
 
 object ExchangeTransactionCreator {
 
-  type CreateTransaction = OrderExecuted => Future[Either[ValidationError, ExchangeTransaction]]
+  type CreateTransaction = OrderExecuted => Either[ValidationError, ExchangeTransaction]
 
   /**
     * This function is used for the following purposes:
@@ -109,24 +102,15 @@ object ExchangeTransactionCreator {
     *
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(baseFee: Long, hasMatcherAccountScript: Future[Boolean], assetPair: AssetPair, hasAssetScript: IssuedAsset => Future[Boolean])(
-      implicit ec: ExecutionContext): Future[Long] = {
+  def minFee(baseFee: Long, hasMatcherAccountScript: Boolean, assetPair: AssetPair, hasAssetScript: IssuedAsset => Boolean): Long = {
 
-    def assetFee(assetId: Asset): Future[Long] = assetId.fold { Future.successful(0L) } { issuedAsset =>
-      hasAssetScript(issuedAsset).map(getAdditionalFee)
-    }
+    def assetFee(assetId: Asset): Long = assetId.fold(0L)(hasAssetScript andThen getAdditionalFeeForScript)
 
-    for {
-      hasMatcherScript <- hasMatcherAccountScript
-      amountAssetFee   <- assetFee(assetPair.amountAsset)
-      priceAssetFee    <- assetFee(assetPair.priceAsset)
-    } yield {
-      baseFee +
-        getAdditionalFee(hasMatcherScript) +
-        amountAssetFee +
-        priceAssetFee
-    }
+    baseFee +
+      getAdditionalFeeForScript(hasMatcherAccountScript) +
+      assetFee(assetPair.amountAsset) +
+      assetFee(assetPair.priceAsset)
   }
 
-  def getAdditionalFee(hasScript: Boolean): Long = if (hasScript) FeeValidation.ScriptExtraFee else 0L
+  def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) FeeValidation.ScriptExtraFee else 0L
 }

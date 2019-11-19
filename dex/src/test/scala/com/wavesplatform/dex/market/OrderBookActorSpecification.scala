@@ -39,9 +39,8 @@ class OrderBookActorSpecification
 
   private val txFactory = new ExchangeTransactionCreator(MatcherAccount,
                                                          matcherSettings,
-                                                         Future.successful(false),
-                                                         _ => Future.successful(false),
-                                                         _ => Future.successful(false))
+                                                         false,
+                                                         _ => false)
 
   private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]

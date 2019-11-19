@@ -17,7 +17,7 @@ trait AssetsDB {
 
 object AssetsDB {
 
-  case class Item(name: String, decimals: Int)
+  case class Item(name: String, decimals: Int, hasScript: Boolean = false)
 
   def apply(db: DB): AssetsDB = new LevelDBAssets(db)
 
@@ -36,8 +36,9 @@ object AssetsDB {
   private val someWaves = Option(waves)
 
   final implicit class Ops(val self: AssetsDB) extends AnyVal {
-    def get(asset: Asset): Option[Item]      = asset.fold(someWaves)(self.get)
-    def unsafeGet(asset: Asset): Item        = get(asset).getOrElse(throw new RuntimeException(s"Unknown asset: ${AssetPair.assetIdStr(asset)}"))
-    def unsafeGetDecimals(asset: Asset): Int = unsafeGet(asset).decimals
+    def get(asset: Asset): Option[Item]           = asset.fold(someWaves)(self.get)
+    def unsafeGet(asset: Asset): Item             = get(asset).getOrElse(throw new RuntimeException(s"Unknown asset: ${AssetPair.assetIdStr(asset)}"))
+    def unsafeGetDecimals(asset: Asset): Int      = unsafeGet(asset).decimals
+    def unsafeGetHasScript(asset: Asset): Boolean = unsafeGet(asset).hasScript
   }
 }

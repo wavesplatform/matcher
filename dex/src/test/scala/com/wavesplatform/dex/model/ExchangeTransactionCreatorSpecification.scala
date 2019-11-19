@@ -4,8 +4,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2, OrderType}
@@ -16,7 +14,6 @@ import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 class ExchangeTransactionCreatorSpecification
     extends WordSpec
@@ -30,17 +27,12 @@ class ExchangeTransactionCreatorSpecification
   private val pair = AssetPair(Waves, mkAssetId("BTC"))
 
   private def getExchangeTransactionCreator(hasMatcherScript: Boolean = false,
-                                            hasAssetScripts: Asset => Boolean = _ => false,
-                                            isFeatureActivated: Short => Boolean = _ => false): ExchangeTransactionCreator = {
-    new ExchangeTransactionCreator(MatcherAccount,
-                                   matcherSettings,
-                                   Future.successful(hasMatcherScript),
-                                   hasAssetScripts andThen Future.successful,
-                                   isFeatureActivated andThen Future.successful)
+                                            hasAssetScripts: Asset => Boolean = _ => false): ExchangeTransactionCreator = {
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings, hasMatcherScript, hasAssetScripts)
   }
 
   "ExchangeTransactionCreator" when {
-    "SmartAccountTrading hasn't been activated yet" should {
+    "SmartAccountTrading has been activated" should {
       "create an ExchangeTransactionV1" in {
 
         val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
@@ -49,36 +41,18 @@ class ExchangeTransactionCreatorSpecification
         val tc = getExchangeTransactionCreator()
         val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
 
-        awaitResult { tc.createTransaction(oe) }.explicitGet() shouldBe a[ExchangeTransactionV1]
+        tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV1]
       }
 
-      "return an error" when {
-        List((1, 2), (2, 1), (2, 2)).foreach {
-          case (buyVersion, sellVersion) =>
-            s"buyV$buyVersion and sellV$sellVersion" in {
-
-              val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L), version = buyVersion.toByte)
-              val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L), version = sellVersion.toByte)
-
-              val tc = getExchangeTransactionCreator()
-              val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
-
-              awaitResult { tc.createTransaction(oe) } should produce("Smart Account Trading feature has not been activated yet")
-            }
-        }
-      }
-    }
-
-    "SmartAccountTrading has been activated" should {
       "create an ExchangeTransactionV2" in {
 
         val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L), version = 2)
         val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L), version = 2)
 
-        val tc = getExchangeTransactionCreator(isFeatureActivated = _ == BlockchainFeatures.SmartAccountTrading.id)
+        val tc = getExchangeTransactionCreator()
         val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
 
-        awaitResult { tc.createTransaction(oe) }.explicitGet() shouldBe a[ExchangeTransactionV2]
+        tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
       }
     }
   }
@@ -89,11 +63,9 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
-          import BlockchainFeatures._
-
-          val tc = getExchangeTransactionCreator(isFeatureActivated = Set(OrderV3, SmartAccountTrading).map(_.id).contains)
+          val tc = getExchangeTransactionCreator()
           val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
-          val tx = awaitResult { tc.createTransaction(oe) }.explicitGet()
+          val tx = tc.createTransaction(oe).explicitGet()
 
           tx.buyMatcherFee shouldBe buyOrder.matcherFee
           tx.sellMatcherFee shouldBe sellOrder.matcherFee
@@ -113,13 +85,10 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
-          val activeSmartAccountTrading =
-            if (buyOrder.version == 1 && sellOrder.version == 1) Map.empty[Short, Boolean]
-            else Map(BlockchainFeatures.SmartAccountTrading.id -> true)
 
-          val tc = getExchangeTransactionCreator(isFeatureActivated = activeSmartAccountTrading.getOrElse(_, false))
+          val tc = getExchangeTransactionCreator()
           val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
-          val tx = awaitResult { tc.createTransaction(oe) }
+          val tx = tc.createTransaction(oe)
 
           tx shouldBe 'right
       }
@@ -127,9 +96,7 @@ class ExchangeTransactionCreatorSpecification
 
     "create transactions with correct buyMatcherFee/sellMatcherFee for expensive matcherFeeAsset" in {
 
-      val tc = getExchangeTransactionCreator(
-        isFeatureActivated = Set(BlockchainFeatures.OrderV3, BlockchainFeatures.SmartAccountTrading).map(_.id).contains
-      )
+      val tc = getExchangeTransactionCreator()
 
       def test(submittedType: OrderType, submittedAmount: Long, submittedFee: Long)(countersAmounts: Long*)(expectedMatcherFees: Long*): Assertion = {
 
@@ -153,7 +120,7 @@ class ExchangeTransactionCreatorSpecification
           .foldLeft[(AcceptedOrder, Assertion)](submittedOrder -> Succeeded) {
             case ((submitted, _), (counter, expectedMatcherFee)) =>
               val oe = OrderExecuted(submitted, counter, System.currentTimeMillis)
-              val tx = awaitResult { tc.createTransaction(oe) }.explicitGet()
+              val tx = tc.createTransaction(oe).explicitGet()
               val rs = if (submittedType == BUY) tx.buyMatcherFee shouldBe expectedMatcherFee else tx.sellMatcherFee shouldBe expectedMatcherFee
 
               oe.submittedRemaining -> rs

@@ -36,7 +36,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
-import mouse.any._
+import mouse.any.anySyntaxMouse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
@@ -66,17 +66,15 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private val pairBuilder = new AssetPairBuilder(settings,
                                                  getDescription(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_),
                                                  settings.blacklistedAssets)(grpcExecutionContext)
+
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
-  private def hasMatcherAccountScript: Future[Boolean] = wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
-
-  private val transactionCreator = new ExchangeTransactionCreator(matcherKeyPair,
-                                                                  settings,
-                                                                  hasMatcherAccountScript,
-                                                                  wavesBlockchainAsyncClient.hasScript,
-                                                                  wavesBlockchainAsyncClient.isFeatureActivated)
+  private var hasMatcherAccountScript: Boolean = false
 
   private lazy val assetsDB: AssetsDB = AssetsDB(db)
+
+  private val transactionCreator = new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, assetsDB.unsafeGetHasScript)
+
   private implicit val errorContext: ErrorFormatterContext = {
     case Asset.Waves        => 8
     case asset: IssuedAsset => assetsDB.get(asset).map(_.decimals).getOrElse(throw new RuntimeException(s"${AssetPair.assetIdStr(asset)}"))
@@ -152,7 +150,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDecimals: Asset => Int)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
+    def asyncValidation(orderAssetsDescriptions: Asset => AssetsDB.Item)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
@@ -160,15 +158,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         time,
         settings.orderFee,
         settings.orderRestrictions,
-        orderAssetsDecimals,
-        rateCache
+        orderAssetsDescriptions,
+        rateCache,
+        hasMatcherAccountScript
       )(o)(grpcExecutionContext, efc)
     }
 
     for {
-      assetDecimals <- assetDecimalsAware(getDecimals(assetsDB, wavesBlockchainAsyncClient.assetDescription))(o)
-      _             <- liftAsync { syncValidation(assetDecimals) }
-      _             <- asyncValidation(assetDecimals)
+      assetsDescription <- assetDescriptionAware(getDescription(assetsDB, wavesBlockchainAsyncClient.assetDescription))(o)
+      _                 <- liftAsync { syncValidation(assetsDescription(_).decimals) }
+      _                 <- asyncValidation(assetsDescription)
     } yield o
   }
 
@@ -194,7 +193,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         time,
         () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
-        () => hasMatcherAccountScript.map { ExchangeTransactionCreator.getAdditionalFee },
+        ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
         keyHashStr,
         rateCache,
         Future
@@ -359,7 +358,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         }
     }
 
-    val startGuard = loadAllKnownAssets().flatMap { _ =>
+    val startGuard = for {
+      _                <- loadAllKnownAssets()
+      hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
+    } yield {
+
+      hasMatcherAccountScript = hasMatcherScript
       val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
       matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
 
@@ -467,9 +471,7 @@ object Matcher extends ScorexLogging {
                 .map {
                   _.toRight[MatcherError](error.AssetNotFound(asset))
                     .map { desc =>
-                      val r = AssetsDB.Item(desc.name, desc.decimals)
-                      assetsDB.put(asset, r)
-                      r
+                      AssetsDB.Item(desc.name, desc.decimals, desc.hasScript) unsafeTap { assetsDB.put(asset, _) }
                     }
                 }
             }

@@ -38,9 +38,9 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private val defaultAssetDescription = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+  private val defaultBriefAssetDescription = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
 
-  private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultAssetDescription }
+  private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultBriefAssetDescription }
 
   "MatcherActor" should {
     "return all open markets" in {
@@ -414,11 +414,7 @@ class MatcherActorSpecification
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
 
-    val txFactory = new ExchangeTransactionCreator(MatcherAccount,
-                                                   matcherSettings,
-                                                   Future.successful(false),
-                                                   _ => Future.successful(false),
-                                                   _ => Future.successful(true)).createTransaction _
+    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false).createTransaction _
 
     TestActorRef(
       new MatcherActor(

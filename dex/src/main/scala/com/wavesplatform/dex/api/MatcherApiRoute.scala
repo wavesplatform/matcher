@@ -4,8 +4,8 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
-import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import cats.implicits._
@@ -20,15 +20,7 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -50,7 +42,7 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -70,7 +62,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: () => Future[Long],
+                           matcherAccountFee: Long,
                            apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Future[Set[Byte]])
@@ -127,27 +119,39 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     case _          => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
   }
 
+  private def handlingConnectionErrors[T](blockchainAccess: FutureResult[T],
+                                          unliftedProcessing: Either[MatcherError, T] => Directive1[T]): Directive1[T] = {
+    FutureDirectives.onComplete(blockchainAccess.value) flatMap {
+      case Success(value) => unliftedProcessing(value)
+      case Failure(ex)    => complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
+    }
+  }
+
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
-    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
-      case Right(_) => provide(p)
-      case Left(e) if redirectToInverse =>
-        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
-          case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          case Left(_)  => complete { formatError(e) }
-        }
-      case Left(e) => complete { formatError(e) }
-    }
+    handlingConnectionErrors(
+      assetPairBuilder.validateAssetPair(p), {
+        case Right(_) => provide(p)
+        case Left(e) if redirectToInverse =>
+          handlingConnectionErrors(
+            assetPairBuilder.validateAssetPair(p.reverse), {
+              case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+              case Left(_)  => complete { formatError(e) }
+            }
+          )
+        case Left(e) => complete { formatError(e) }
+      }
+    )
   }
 
-  private def withAsset(a: Asset): Directive1[Asset] = {
-    FutureDirectives.onSuccess { assetPairBuilder.validateAssetId(a).value } flatMap {
+  private def withAsset(a: Asset): Directive1[Asset] = handlingConnectionErrors(
+    assetPairBuilder.validateAssetId(a), {
       case Right(_) => provide(a)
       case Left(e)  => complete { InfoNotFound(e) }
     }
-  }
+  )
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
@@ -215,10 +219,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     complete(
-      for {
-        allowedOrderVersions <- validatedAllowedOrderVersions
-        matcherAccountFee    <- matcherAccountFee()
-      } yield {
+      validatedAllowedOrderVersions map { allowedOrderVersions =>
         StatusCodes.OK -> Json.obj(
           "priceAssets"   -> matcherSettings.priceAssets,
           "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,

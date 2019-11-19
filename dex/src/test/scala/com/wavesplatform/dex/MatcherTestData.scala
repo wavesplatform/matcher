@@ -9,6 +9,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.AssetsDB
+import com.wavesplatform.dex.db.AssetsDB.Item
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderValidator.Result
@@ -34,13 +36,13 @@ import scala.util.Random
 trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   private val signatureSize = 32
 
-  val WalletSeed                   = ByteStr("Matcher".getBytes("utf-8"))
-  val MatcherSeed: Array[Byte]     = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
-  val MatcherAccount               = KeyPair(MatcherSeed)
-  val senderKeyPair                = KeyPair("seed".getBytes("utf-8"))
+  val WalletSeed               = ByteStr("Matcher".getBytes("utf-8"))
+  val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherAccount           = KeyPair(MatcherSeed)
+  val senderKeyPair            = KeyPair("seed".getBytes("utf-8"))
 
-  private val seqNr        = new AtomicLong(-1)
-  val defaultAssetDecimals = 8
+  private val seqNr           = new AtomicLong(-1)
+  val defaultAssetDescription = AssetsDB.Item("Asset", 8)
 
   val btc: IssuedAsset = mkAssetId("WBTC")
   val usd: IssuedAsset = mkAssetId("WUSD")
@@ -49,9 +51,19 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   val pairWavesBtc = AssetPair(Waves, btc)
   val pairWavesUsd = AssetPair(Waves, usd)
 
-  val defaultAssetDecimalsMap: Map[Asset, Int]                           = Map[Asset, Int](usd -> 2, btc -> 8).withDefaultValue(defaultAssetDecimals)
-  val getDefaultAssetDecimals: Asset => Int                              = defaultAssetDecimalsMap.apply
-  def getDefaultAssetDecimals(asset: Asset, decimals: Int): Asset => Int = defaultAssetDecimalsMap ++ Map(asset -> decimals)
+  val defaultAssetDescriptionsMap: Map[Asset, Item] = {
+    Map[Asset, AssetsDB.Item](usd -> Item("USD", 2), btc -> Item("BTC", 8)).withDefaultValue(defaultAssetDescription)
+  }
+
+  val getDefaultAssetDescriptions: Asset => AssetsDB.Item = defaultAssetDescriptionsMap.apply
+
+  def getDefaultAssetDescriptions(asset: Asset, description: AssetsDB.Item): Asset => AssetsDB.Item = {
+    defaultAssetDescriptionsMap ++ Map(asset -> description)
+  }
+
+  def getDefaultAssetDescriptions(assetAndDesc: (Asset, AssetsDB.Item)*): Asset => AssetsDB.Item = {
+    defaultAssetDescriptionsMap ++ Map(assetAndDesc: _*)
+  }
 
   val rateCache: RateCache = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
 
@@ -91,7 +103,9 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
       pair = pair,
       orderType = orderType,
       amount = amount,
-      price = Normalization.normalizePrice(price, getDefaultAssetDecimals(pair.amountAsset), getDefaultAssetDecimals(pair.priceAsset)),
+      price = Normalization.normalizePrice(price,
+                                           getDefaultAssetDescriptions(pair.amountAsset).decimals,
+                                           getDefaultAssetDescriptions(pair.priceAsset).decimals),
       timestamp = ntpNow,
       expiration = ntpNow + (1000 * 60 * 60 * 24),
       matcherFee = matcherFee,
@@ -407,7 +421,7 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
         order
           .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
           .updateFee {
-            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDecimals, rateCache).explicitGet()
+            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(_).decimals, rateCache).explicitGet()
           }
       case (_, DynamicSettings(baseFee)) =>
         order

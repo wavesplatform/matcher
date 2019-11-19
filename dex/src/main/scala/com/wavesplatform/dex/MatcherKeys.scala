@@ -120,12 +120,14 @@ object MatcherKeys {
         val nameLength = bb.getInt
         val name       = new Array[Byte](nameLength)
         bb.get(name)
-        val decimals = bb.getInt
-        AssetsDB.Item(new String(name, StandardCharsets.UTF_8), decimals)
+        val decimals  = bb.getInt
+        val hasScript = bb.get == 1
+
+        AssetsDB.Item(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
       },
       x => {
         val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
-        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
       }
     )
 }

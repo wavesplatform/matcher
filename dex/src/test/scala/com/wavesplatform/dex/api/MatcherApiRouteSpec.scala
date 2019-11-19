@@ -276,7 +276,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       time = ntpTime,
       currentOffset = () => 0L,
       lastOffset = () => Future.successful(0L),
-      matcherAccountFee = () => Future.successful(300000L),
+      matcherAccountFee = 300000L,
       apiKeyHashStr = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8"))),
       rateCache = rateCache,
       validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }

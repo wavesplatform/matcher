@@ -706,6 +706,44 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         .foreach(asset => node.deleteRate(asset, expectedStatusCode = StatusCodes.OK))
     }
 
+    "if v2 order filled partially by too low percent of amount" in {
+      val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
+      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
+
+      val buyOrder =
+        node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)).message.id
+
+      node.waitOrderProcessed(wavesUsdPair, buyOrder)
+      node.waitOrderProcessed(
+        wavesUsdPair,
+        node.placeOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)).message.id)
+      node.waitOrderStatusAndAmount(wavesUsdPair, buyOrder, "PartiallyFilled", Some(1.waves))
+
+      node.accountBalances(alice.toAddress.toString)._1 should be(aliceWavesBefore + 1.waves)
+      node.accountBalances(bob.toAddress.toString)._1 should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      node.cancelOrdersForPair(alice, wavesUsdPair)
+    }
+
+    "if v3 order filled partially by too low percent of amount" in {
+      val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
+      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
+
+      val buyOrder =
+        node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)).message.id
+
+      node.waitOrderProcessed(wavesUsdPair, buyOrder)
+      node.waitOrderProcessed(
+        wavesUsdPair,
+        node.placeOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)).message.id)
+      node.waitOrderStatusAndAmount(wavesUsdPair, buyOrder, "PartiallyFilled", Some(1.waves))
+
+      node.accountBalances(alice.toAddress.toString)._1 should be(aliceWavesBefore + 1.waves - 1)
+      node.accountBalances(bob.toAddress.toString)._1 should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      node.cancelOrdersForPair(alice, wavesUsdPair)
+    }
+
     "if order was filled partially" in {
       Array(btc, usd)
         .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))

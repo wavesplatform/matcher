@@ -1,6 +1,5 @@
 package com.wavesplatform.dex
 
-import java.io.File
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
@@ -37,6 +36,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
 import mouse.any._
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
@@ -324,22 +324,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info("Matcher shutdown successful")
   }
 
-  private def checkDirectory(directory: File): Unit = if (!directory.exists()) {
-    log.error(s"Failed to create directory '${directory.getPath}'")
-    sys.exit(1)
-  }
-
   override def start(): Unit = {
-
-    val journalDir  = new File(settings.journalDataDir)
-    val snapshotDir = new File(settings.snapshotsDataDir)
-
-    journalDir.mkdirs()
-    snapshotDir.mkdirs()
-
-    checkDirectory(journalDir)
-    checkDirectory(snapshotDir)
-
     log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
     def loadAllKnownAssets(): Future[Unit] = {

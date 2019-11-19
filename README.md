@@ -262,7 +262,7 @@ dex/runMain com.wavesplatform.dex.WavesDexCli here-your-arguments
 Example:
 
 ```bash
-./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --create-account-storage-directory /Users/vsuharnikov/work/waves/dex-backend/_local/runtime/grpc-test/dex
+./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /Users/vsuharnikov/work/waves/dex-backend/_local/runtime/grpc-test/dex
 ```
 
 here:
@@ -270,7 +270,7 @@ here:
 * `W` is mainnet;
 * `--account-nonce 3` - we suppose you will provide a base seed and DEX server should use the fourth account of it (numeration starts with 0). 
   If you will provide an account seed, don't specify this option;
-* `--create-account-storage-directory` - where the `account.dat` file will be stored.
+* `--output-directory` - where the `account.dat` file will be stored.
 
 After running this command you will see where your `account.dat` was saved and which settings do you have to add to the DEX server configuration.
 Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 

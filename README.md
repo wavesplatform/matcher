@@ -141,11 +141,10 @@ Run: `sudo dpkg -i deb-artifact.deb` . The extension will be automatically insta
 
 ##### ZIP
 
-To install a DEX extension from ZIP file, just extract this archive to the directory with Node's JAR. Its files will be added to the existed directories.
+To install a DEX extension from ZIP file:
 
-```bash
-bsdtar --strip-components=1 -xf waves-dex-integration-1.0.1.zip 
-```
+1. Copy the archive to the directory with Node's JAR
+2. Extract the archive. Its files will be added to the existed directories.
 
 Note, if you installed Node from a DEB package, DEX will be removed after update.
 

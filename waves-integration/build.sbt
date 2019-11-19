@@ -10,12 +10,8 @@ libraryDependencies ++= Dependencies.wavesIntegration
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
-  name := "waves-dex-integration",
-  packageSummary := "waves-dex-integration",
-  packageDescription := s"Node integration extension for the Waves DEX. Compatible with ${nodeVersion.value} node version",
-  // For sbt-native-packager
-  normalizedName := name.value,
-  executableScriptName := packageName.value,
+  packageSummary := "Node integration extension for the Waves DEX",
+  packageDescription := s"${packageSummary.value}. Compatible with ${nodeVersion.value} node version"
 )
 
 packageSettings
@@ -92,12 +88,16 @@ inTask(assembly)(
 
 // Packaging
 
-val packageMappings = Seq(
-  mappings += (Compile / sourceDirectory).value / "package" / "sample.conf" -> "doc/waves-dex-integration.conf.sample"
-)
+executableScriptName := "waves-dex-integration"
 
-val allPackageSettings = packageSettings ++ packageMappings
+// ZIP archive
+inConfig(Universal)(Seq(
+  packageName := s"waves-dex-integration${network.value.packageSuffix}-${version.value}", // An archive file name
+  mappings += (Compile / sourceDirectory).value / "package" / "sample.conf" -> "doc/waves-dex-integration.conf.sample",
+  topLevelDirectory := None
+))
 
-inConfig(Universal)(allPackageSettings)
-inConfig(Linux)(packageSettings)
-inConfig(Debian)(inTask(packageBin)(packageSettings) ++ packageSettings)
+// DEB package
+Linux / name := s"waves-dex-integration${network.value.packageSuffix}" // A staging directory name
+Linux / normalizedName := (Linux / name).value // An archive file name
+Linux / packageName := (Linux / name).value // In a control file

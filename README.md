@@ -164,7 +164,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_p
 
 #### Configration
 
-Add additional lines to the Node's configuration:
+Add lines to the Node's configuration:
 
 ```hocon
 waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"

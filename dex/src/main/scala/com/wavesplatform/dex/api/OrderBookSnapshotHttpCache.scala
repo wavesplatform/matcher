@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCache(settings: Settings,
                                  time: Time,
-                                 assetDecimals: Asset => Int,
+                                 assetDecimals: Asset => Option[Int],
                                  orderBookSnapshot: AssetPair => Option[OrderBook.AggregatedSnapshot])
     extends AutoCloseable {
   import OrderBookSnapshotHttpCache._
@@ -34,8 +34,12 @@ class OrderBookSnapshotHttpCache(settings: Settings,
           override def load(key: Key): HttpResponse = {
 
             val assetPairDecimals = key.format match {
-              case Denormalized => Some(assetDecimals(key.pair.amountAsset) -> assetDecimals(key.pair.priceAsset))
-              case _            => None
+              case Denormalized =>
+                for {
+                  ad <- assetDecimals(key.pair.amountAsset)
+                  pd <- assetDecimals(key.pair.priceAsset)
+                } yield ad -> pd
+              case _ => None
             }
 
             val orderBook = orderBookSnapshot(key.pair) getOrElse { OrderBook.AggregatedSnapshot() }

@@ -19,6 +19,7 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
@@ -41,7 +42,7 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -89,15 +90,26 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
       .result()
 
+  val gRPCExceptionsHandler: ExceptionHandler = ExceptionHandler {
+    case ex: WavesNodeConnectionLostException =>
+      log.error("Waves Node connection lost", ex)
+      complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken) }
+    case ex =>
+      log.error("An unexpected error occurred", ex)
+      complete { WavesNodeUnavailable(error.UnexpectedError) }
+  }
+
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        handleRejections(invalidJsonParsingRejectionsHandler) {
-          getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-            getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-            historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-            upsertRate ~ deleteRate ~ saveSnapshots
+        handleExceptions(gRPCExceptionsHandler) {
+          handleRejections(invalidJsonParsingRejectionsHandler) {
+            getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+              historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+              upsertRate ~ deleteRate ~ saveSnapshots
+          }
         }
       }
   }
@@ -118,39 +130,27 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     case _          => complete(OrderBookUnavailable(error.OrderBookBroken(p)))
   }
 
-  private def handlingConnectionErrors[T](blockchainAccess: FutureResult[T],
-                                          unliftedProcessing: Either[MatcherError, T] => Directive1[T]): Directive1[T] = {
-    FutureDirectives.onComplete(blockchainAccess.value) flatMap {
-      case Success(value) => unliftedProcessing(value)
-      case Failure(ex)    => complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
-    }
-  }
-
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean = false,
                             suffix: String = "",
                             formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
-    handlingConnectionErrors(
-      assetPairBuilder.validateAssetPair(p), {
-        case Right(_) => provide(p)
-        case Left(e) if redirectToInverse =>
-          handlingConnectionErrors(
-            assetPairBuilder.validateAssetPair(p.reverse), {
-              case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-              case Left(_)  => complete { formatError(e) }
-            }
-          )
-        case Left(e) => complete { formatError(e) }
-      }
-    )
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
+      case Right(_) => provide(p)
+      case Left(e) if redirectToInverse =>
+        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+          case Right(_) => redirect(s"/matcher/orderbook/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+          case Left(_)  => complete { formatError(e) }
+        }
+      case Left(e) => complete { formatError(e) }
+    }
   }
 
-  private def withAsset(a: Asset): Directive1[Asset] = handlingConnectionErrors(
-    assetPairBuilder.validateAssetId(a), {
+  private def withAsset(a: Asset): Directive1[Asset] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetId(a).value } flatMap {
       case Right(_) => provide(a)
       case Left(e)  => complete { InfoNotFound(e) }
     }
-  )
+  }
 
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
@@ -159,10 +159,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
-  @inline private def wrapInFuture(response: MatcherResponse): Future[ToResponseMarshallable] = {
-    Future.successful[ToResponseMarshallable](response)
-  }
-
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
     (pathEndOrSingleSlash & entity(as[Order])) { order =>
       withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
@@ -170,9 +166,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           complete(
             placeTimer.measureFuture {
               orderValidator(order).value flatMap {
-                case Right(o)     => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(e)      => wrapInFuture { OrderRejected(e) }
-              } recover { case ex => WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)): ToResponseMarshallable }
+                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
+                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+              }
             }
           )
         }
@@ -225,7 +221,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             "orderVersions" -> allowedOrderVersions.toSeq.sorted
           )
         )
-      } recover { case ex => WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
+      }
     )
   }
 
@@ -337,7 +333,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def orderBookInfoJson(pair: AssetPair): JsObject =
     Json.obj(
-      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.getJson.value },
+      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.json.value },
       "matchingRules" -> Json.obj(
         "tickSize" -> formatValue { getActualTickSize(pair) }
       )
@@ -409,11 +405,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
-    complete((timestamp, orderId) match {
-      case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
-      case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
-      case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
-    })
+    complete(
+      (timestamp, orderId) match {
+        case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
+        case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
+        case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
+      }
+    )
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>

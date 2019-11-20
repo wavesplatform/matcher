@@ -1,6 +1,5 @@
 package com.wavesplatform.dex
 
-import java.io.File
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
@@ -73,7 +72,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private lazy val assetsDB: AssetsDB = AssetsDB(db)
 
-  private val transactionCreator = new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, assetsDB.unsafeGetHasScript)
+  private lazy val transactionCreator = new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, assetsDB.unsafeGetHasScript)
 
   private implicit val errorContext: ErrorFormatterContext = {
     case Asset.Waves        => 8
@@ -88,7 +87,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     new OrderBookSnapshotHttpCache(
       settings.orderBookSnapshotHttpCache,
       time,
-      assetsDB.unsafeGetDecimals,
+      assetsDB.get(_).map(_.decimals),
       p => Option { orderBookCache.get(p) }
     )
 
@@ -331,22 +330,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info("Matcher shutdown successful")
   }
 
-  private def checkDirectory(directory: File): Unit = if (!directory.exists()) {
-    log.error(s"Failed to create directory '${directory.getPath}'")
-    sys.exit(1)
-  }
-
   override def start(): Unit = {
-
-    val journalDir  = new File(settings.journalDataDir)
-    val snapshotDir = new File(settings.snapshotsDataDir)
-
-    journalDir.mkdirs()
-    snapshotDir.mkdirs()
-
-    checkDirectory(journalDir)
-    checkDirectory(snapshotDir)
-
     log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
     def loadAllKnownAssets(): Future[Unit] = {

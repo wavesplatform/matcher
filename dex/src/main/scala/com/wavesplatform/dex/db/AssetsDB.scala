@@ -24,7 +24,7 @@ object AssetsDB {
     override def get(asset: IssuedAsset): Option[BriefAssetDescription]       = db.readOnly(_.get(MatcherKeys.asset(asset)))
   }
 
-  val waves                                            = BriefAssetDescription(name = AssetPair.WavesName, decimals = 8)
+  val waves                                            = BriefAssetDescription(name = AssetPair.WavesName, decimals = 8, hasScript = false)
   val wavesLifted: FutureResult[BriefAssetDescription] = liftValueAsync[BriefAssetDescription] { waves }
 
   private val someWaves = Option(waves)

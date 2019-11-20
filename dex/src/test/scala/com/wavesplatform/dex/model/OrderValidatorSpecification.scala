@@ -136,7 +136,7 @@ class OrderValidatorSpecification
         case (amountAsset, sender, amountDecimals) =>
           portfolioTest(
             p = Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty),
-            assetDescriptions = getDefaultAssetDescriptions(amountAsset, BriefAssetDescription("AssetName", amountDecimals))
+            assetDescriptions = getDefaultAssetDescriptions(amountAsset, BriefAssetDescription("AssetName", amountDecimals, hasScript = false))
           ) { (ov, bc) =>
             assignNoScript(bc, sender.toAddress)
             assignNoScript(bc, MatcherAccount.toAddress)
@@ -867,18 +867,19 @@ class OrderValidatorSpecification
 
   private def mkOrderValidator(bc: AsyncBlockchain,
                                tc: ExchangeTransactionCreator,
-                               assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions): Order => FutureResult[Order] = { order =>
-    OrderValidator.blockchainAware(
-      bc,
-      tc.createTransaction,
-      MatcherAccount,
-      ntpTime,
-      matcherSettings.orderFee,
-      matcherSettings.orderRestrictions,
-      assetDescriptions,
-      rateCache,
-      hasMatcherAccountScript = false
-    )(order)
+                               assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions): Order => FutureResult[Order] = {
+    order =>
+      OrderValidator.blockchainAware(
+        bc,
+        tc.createTransaction,
+        MatcherAccount,
+        ntpTime,
+        matcherSettings.orderFee,
+        matcherSettings.orderRestrictions,
+        assetDescriptions,
+        rateCache,
+        hasMatcherAccountScript = false
+      )(order)
   }
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))

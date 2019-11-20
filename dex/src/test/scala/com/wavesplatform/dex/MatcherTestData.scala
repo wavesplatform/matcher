@@ -41,7 +41,7 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   val senderKeyPair            = KeyPair("seed".getBytes("utf-8"))
 
   private val seqNr           = new AtomicLong(-1)
-  val defaultAssetDescription = BriefAssetDescription("Asset", 8)
+  val defaultAssetDescription = BriefAssetDescription("Asset", 8, hasScript = false)
 
   val btc: IssuedAsset = mkAssetId("WBTC")
   val usd: IssuedAsset = mkAssetId("WUSD")
@@ -51,8 +51,10 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   val pairWavesUsd = AssetPair(Waves, usd)
 
   val defaultAssetDescriptionsMap: Map[Asset, BriefAssetDescription] = {
-    Map[Asset, BriefAssetDescription](usd -> BriefAssetDescription("USD", 2), btc -> BriefAssetDescription("BTC", 8))
-      .withDefaultValue(defaultAssetDescription)
+    Map[Asset, BriefAssetDescription](
+      usd -> BriefAssetDescription("USD", 2, hasScript = false),
+      btc -> BriefAssetDescription("BTC", 8, hasScript = false)
+    ).withDefaultValue(defaultAssetDescription)
   }
 
   val getDefaultAssetDescriptions: Asset => BriefAssetDescription = defaultAssetDescriptionsMap.apply

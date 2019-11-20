@@ -16,8 +16,8 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime with TableDrivenPropertyChecks {
 
-  private val defaultAssetPair                    = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
-  private def getAssetDecimals(asset: Asset): Int = 8
+  private val defaultAssetPair                            = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
+  private def getAssetDecimals(asset: Asset): Option[Int] = Some(8)
 
   "OrderBookSnapshotHttpCache" - {
 

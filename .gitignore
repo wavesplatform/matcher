@@ -37,6 +37,4 @@ Dockerfile
 # logs
 *.log
 
-package
-!src/package
 native

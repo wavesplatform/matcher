@@ -31,29 +31,27 @@ class ExchangeTransactionCreatorSpecification
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings, hasMatcherScript, hasAssetScripts)
   }
 
-  "ExchangeTransactionCreator" when {
-    "SmartAccountTrading has been activated" should {
-      "create an ExchangeTransactionV1" in {
+  "ExchangeTransactionCreator" should {
+    "create an ExchangeTransactionV1" in {
 
-        val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
-        val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L))
+      val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
+      val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L))
 
-        val tc = getExchangeTransactionCreator()
-        val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
+      val tc = getExchangeTransactionCreator()
+      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
 
-        tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV1]
-      }
+      tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV1]
+    }
 
-      "create an ExchangeTransactionV2" in {
+    "create an ExchangeTransactionV2" in {
 
-        val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L), version = 2)
-        val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L), version = 2)
+      val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L), version = 2)
+      val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L), version = 2)
 
-        val tc = getExchangeTransactionCreator()
-        val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
+      val tc = getExchangeTransactionCreator()
+      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
 
-        tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
-      }
+      tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
     }
   }
 
@@ -85,7 +83,6 @@ class ExchangeTransactionCreatorSpecification
 
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
-
           val tc = getExchangeTransactionCreator()
           val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
           val tx = tc.createTransaction(oe)

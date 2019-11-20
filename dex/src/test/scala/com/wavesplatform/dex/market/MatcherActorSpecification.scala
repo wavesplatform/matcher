@@ -37,7 +37,9 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = Some(BriefAssetDescription(name = "Unknown", decimals = 8))
+  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = {
+    Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
+  }
 
   "MatcherActor" should {
     "return all open markets" in {

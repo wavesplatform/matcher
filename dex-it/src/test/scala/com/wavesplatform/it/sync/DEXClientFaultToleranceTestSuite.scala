@@ -133,13 +133,11 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
     dex1Api.tryPlace(order) should failWith(
       105906177,
-      "Waves Node is unavailable, reason: Waves Node cannot be reached via gRPC. Please retry later or contact with the administrator"
+      "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 
-    dockerClient.start(wavesNode1Container)
     invalidateCaches()
-
-    wavesNode1Api.waitReady
+    startAndWait(wavesNode1Container(), wavesNode1Api)
 
     dex1Api.place(order)
     dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)

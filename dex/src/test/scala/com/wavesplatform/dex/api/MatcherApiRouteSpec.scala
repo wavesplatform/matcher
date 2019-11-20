@@ -250,7 +250,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       assetPairBuilder = new AssetPairBuilder(
         settings,
         x => {
-          if (x == asset) liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals))
+          if (x == asset)
+            liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
           else liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
         },
         Set.empty
@@ -266,7 +267,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
-        x => if (x == asset) smartAssetDesc.decimals else throw new IllegalArgumentException(s"No information about $x"),
+        x => if (x == asset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
         _ => None
       ),
       matcherSettings = settings,

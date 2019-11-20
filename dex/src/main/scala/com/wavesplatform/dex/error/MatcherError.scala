@@ -435,11 +435,16 @@ case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutabl
 case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 
-case class WavesNodeConnectionBroken(reason: String)
-    extends MatcherError(nodeConnection,
-                         commonEntity,
-                         broken,
-                         e"Waves Node is unavailable, reason: ${'reason -> reason}. Please retry later or contact with the administrator")
+case object WavesNodeConnectionBroken
+    extends MatcherError(connectivity, commonEntity, broken, e"Waves Node is unavailable, please retry later or contact with the administrator")
+
+case object UnexpectedError
+    extends MatcherError(
+      commonEntity,
+      commonEntity,
+      unexpected,
+      e"An unexpected error occurred"
+    )
 
 sealed abstract class Entity(val code: Int)
 object Entity {
@@ -469,8 +474,8 @@ object Entity {
   object marketOrder extends Entity(19)
   object rate        extends Entity(20)
 
-  object producer       extends Entity(100)
-  object nodeConnection extends Entity(101)
+  object producer     extends Entity(100)
+  object connectivity extends Entity(101)
 }
 
 sealed abstract class Class(val code: Int)

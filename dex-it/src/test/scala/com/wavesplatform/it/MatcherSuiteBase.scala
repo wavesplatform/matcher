@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
-import cats.instances.future._
+import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder

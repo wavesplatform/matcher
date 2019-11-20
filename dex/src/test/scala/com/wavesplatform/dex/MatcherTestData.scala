@@ -9,9 +9,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.AssetsDB
-import com.wavesplatform.dex.db.AssetsDB.Item
 import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
@@ -42,7 +41,7 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   val senderKeyPair            = KeyPair("seed".getBytes("utf-8"))
 
   private val seqNr           = new AtomicLong(-1)
-  val defaultAssetDescription = AssetsDB.Item("Asset", 8)
+  val defaultAssetDescription = BriefAssetDescription("Asset", 8)
 
   val btc: IssuedAsset = mkAssetId("WBTC")
   val usd: IssuedAsset = mkAssetId("WUSD")
@@ -51,17 +50,18 @@ trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   val pairWavesBtc = AssetPair(Waves, btc)
   val pairWavesUsd = AssetPair(Waves, usd)
 
-  val defaultAssetDescriptionsMap: Map[Asset, Item] = {
-    Map[Asset, AssetsDB.Item](usd -> Item("USD", 2), btc -> Item("BTC", 8)).withDefaultValue(defaultAssetDescription)
+  val defaultAssetDescriptionsMap: Map[Asset, BriefAssetDescription] = {
+    Map[Asset, BriefAssetDescription](usd -> BriefAssetDescription("USD", 2), btc -> BriefAssetDescription("BTC", 8))
+      .withDefaultValue(defaultAssetDescription)
   }
 
-  val getDefaultAssetDescriptions: Asset => AssetsDB.Item = defaultAssetDescriptionsMap.apply
+  val getDefaultAssetDescriptions: Asset => BriefAssetDescription = defaultAssetDescriptionsMap.apply
 
-  def getDefaultAssetDescriptions(asset: Asset, description: AssetsDB.Item): Asset => AssetsDB.Item = {
+  def getDefaultAssetDescriptions(asset: Asset, description: BriefAssetDescription): Asset => BriefAssetDescription = {
     defaultAssetDescriptionsMap ++ Map(asset -> description)
   }
 
-  def getDefaultAssetDescriptions(assetAndDesc: (Asset, AssetsDB.Item)*): Asset => AssetsDB.Item = {
+  def getDefaultAssetDescriptions(assetAndDesc: (Asset, BriefAssetDescription)*): Asset => BriefAssetDescription = {
     defaultAssetDescriptionsMap ++ Map(assetAndDesc: _*)
   }
 

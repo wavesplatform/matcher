@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.apply._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.{ErrorsListOr, _}
 import monix.eval.Coeval

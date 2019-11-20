@@ -117,15 +117,15 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
       .map(parse)
   }
 
-  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = handlingErrors {
-    blockchainService
-      .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
-      .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
-  }
+  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
+    handlingErrors {
+      blockchainService
+        .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
+        .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
+    } recover { case _ => txIds.map(_ -> false).toMap }
 
-  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] = handlingErrors {
-    blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid)
-  }
+  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] =
+    handlingErrors { blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid) } recover { case _ => false }
 
   def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
     blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)

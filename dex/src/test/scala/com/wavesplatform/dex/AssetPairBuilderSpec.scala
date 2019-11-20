@@ -2,7 +2,6 @@ package com.wavesplatform.dex
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
@@ -62,8 +61,8 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     val assetDescription =
       knownAssets.toMap
         .map {
-          case (k, Some(x)) => k -> liftValueAsync[AssetsDB.Item](AssetsDB.Item(x.name, x.decimals))
-          case (k, None)    => k -> liftErrorAsync[AssetsDB.Item](error.AssetNotFound(k))
+          case (k, Some(x)) => k -> liftValueAsync[BriefAssetDescription](BriefAssetDescription(x.name, x.decimals))
+          case (k, None)    => k -> liftErrorAsync[BriefAssetDescription](error.AssetNotFound(k))
         }
         .withDefault { x =>
           throw new NoSuchElementException(s"Can't find '$x' asset")

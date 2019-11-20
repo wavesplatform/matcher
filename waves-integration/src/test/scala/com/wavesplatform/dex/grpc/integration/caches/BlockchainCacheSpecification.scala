@@ -20,6 +20,8 @@ class BlockchainCacheSpecification extends WordSpecLike with Matchers {
     new BlockchainCacheTest(loader, expiration, invalidationPredicate)
   }
 
+  private val andThenAwaitTimeout = 300
+
   "BlockchainCache" should {
 
     "not keep failed futures" in {
@@ -47,7 +49,7 @@ class BlockchainCacheSpecification extends WordSpecLike with Matchers {
             _ <- prev
             _ <- cache get goodKey
             r <- cache get badKey recover { case _ => "sad" }
-          } yield { Thread.sleep(100); r }
+          } yield { Thread.sleep(andThenAwaitTimeout); r }
         },
         scala.concurrent.duration.Duration.Inf
       )
@@ -76,7 +78,7 @@ class BlockchainCacheSpecification extends WordSpecLike with Matchers {
             _ <- prev
             _ <- cache get goodKey
             r <- cache get badKey
-          } yield { Thread.sleep(100); r }
+          } yield { Thread.sleep(andThenAwaitTimeout); r }
         },
         scala.concurrent.duration.Duration.Inf
       )

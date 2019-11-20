@@ -136,7 +136,7 @@ class OrderValidatorSpecification
         case (amountAsset, sender, amountDecimals) =>
           portfolioTest(
             p = Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty),
-            assetDescriptions = getDefaultAssetDescriptions(amountAsset, AssetsDB.Item("AssetName", amountDecimals))
+            assetDescriptions = getDefaultAssetDescriptions(amountAsset, BriefAssetDescription("AssetName", amountDecimals))
           ) { (ov, bc) =>
             assignNoScript(bc, sender.toAddress)
             assignNoScript(bc, MatcherAccount.toAddress)
@@ -804,7 +804,7 @@ class OrderValidatorSpecification
   }
 
   private def portfolioTest(p: Portfolio,
-                            assetDescriptions: Asset => AssetsDB.Item = getDefaultAssetDescriptions,
+                            assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
                             hasMatcherAccountScript: Boolean = false)(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
 
     val bc = stub[AsyncBlockchain]
@@ -867,7 +867,7 @@ class OrderValidatorSpecification
 
   private def mkOrderValidator(bc: AsyncBlockchain,
                                tc: ExchangeTransactionCreator,
-                               assetDescriptions: Asset => AssetsDB.Item = getDefaultAssetDescriptions): Order => FutureResult[Order] = { order =>
+                               assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions): Order => FutureResult[Order] = { order =>
     OrderValidator.blockchainAware(
       bc,
       tc.createTransaction,
@@ -936,7 +936,7 @@ class OrderValidatorSpecification
       priceAssetScript: Option[RunScriptResult] = None,
       matcherFeeAssetScript: Option[RunScriptResult] = None,
       matcherAccountScript: Option[RunScriptResult] = None,
-      assetDescriptions: Asset => AssetsDB.Item = getDefaultAssetDescriptions,
+      assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
       rateCache: RateCache = rateCache)(order: Order): FutureResult[Order] = {
 
     val blockchain = stub[AsyncBlockchain]

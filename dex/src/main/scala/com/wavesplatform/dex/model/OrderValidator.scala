@@ -1,17 +1,22 @@
 package com.wavesplatform.dex.model
 
 import cats.data.EitherT
-import cats.implicits._
+import cats.implicits.catsStdInstancesForFuture
+import cats.instances.long.catsKernelStdGroupForLong
+import cats.instances.map.catsKernelStdCommutativeMonoidForMap
+import cats.syntax.either._
+import cats.syntax.flatMap._
+import cats.syntax.semigroup.catsSyntaxSemigroup
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.MatcherModel.Normalization
@@ -138,10 +143,11 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  private[dex] def checkOrderVersion(version: Byte, blockchain: AsyncBlockchain)(implicit ec: ExecutionContext): FutureResult[Byte] = {
+  private[dex] def checkOrderVersion(version: Byte, isFeatureActivated: Short => Future[Boolean])(
+      implicit ec: ExecutionContext): FutureResult[Byte] = {
 
     def checkFeatureSupport(feature: BlockchainFeature): FutureResult[Byte] = {
-      liftFutureAsync { blockchain.isFeatureActivated(feature.id) }
+      liftFutureAsync { isFeatureActivated(feature.id) }
         .ifM(liftValueAsync(version), liftErrorAsync { error.OrderVersionUnsupported(version, feature) })
     }
 
@@ -160,7 +166,7 @@ object OrderValidator extends ScorexLogging {
       time: Time,
       orderFeeSettings: OrderFeeSettings,
       orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
-      assetDescriptions: Asset => AssetsDB.Item,
+      assetDescriptions: Asset => BriefAssetDescription,
       rateCache: RateCache,
       hasMatcherAccountScript: Boolean)(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =
     timer.measure {
@@ -198,7 +204,7 @@ object OrderValidator extends ScorexLogging {
       }
 
       for {
-        _            <- checkOrderVersion(order.version, blockchain)
+        _            <- checkOrderVersion(order.version, blockchain.isFeatureActivated)
         _            <- validateOrderFeeByTransactionRequirements
         decimalsPair <- validateDecimals(assetDescriptions(_).decimals, order)
         _            <- validateAmountAndPrice(order, decimalsPair, orderRestrictions)
@@ -461,15 +467,6 @@ object OrderValidator extends ScorexLogging {
     lift(order).ensure { error.OrderInvalidPriceLevel(order, actualNormalizedTickSize) } { o =>
       o.orderType == OrderType.SELL || OrderBook.correctPriceByTickSize(o.price, o.orderType, actualNormalizedTickSize) > 0
     }
-  }
-
-  def assetDescriptionAware(getDescription: Asset => FutureResult[AssetsDB.Item])(order: Order)(
-      implicit ec: ExecutionContext): FutureResult[Map[Asset, AssetsDB.Item]] = {
-    List(
-      order.assetPair.amountAsset,
-      order.assetPair.priceAsset,
-      order.matcherFeeAssetId
-    ).traverse(asset => getDescription(asset) tupleLeft asset).map(_.toMap)
   }
 
   private def lift[T](x: T): Result[T]                 = x.asRight[MatcherError]

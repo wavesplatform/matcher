@@ -25,7 +25,6 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class MatcherActorSpecification
@@ -38,9 +37,7 @@ class MatcherActorSpecification
     with Eventually
     with NTPTime {
 
-  private val defaultBriefAssetDescription = Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
-
-  private def assetDescription(assetId: Asset): Future[Option[BriefAssetDescription]] = Future.successful { defaultBriefAssetDescription }
+  private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = Some(BriefAssetDescription(name = "Unknown", decimals = 8))
 
   "MatcherActor" should {
     "return all open markets" in {

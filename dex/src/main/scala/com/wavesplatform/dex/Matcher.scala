@@ -77,7 +77,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private implicit val errorContext: ErrorFormatterContext = {
     case Asset.Waves        => 8
-    case asset: IssuedAsset => assetsDB.get(asset).map(_.decimals).getOrElse(throw new RuntimeException(s"${AssetPair.assetIdStr(asset)}"))
+    case asset: IssuedAsset => assetsDB.unsafeGetDecimals(asset)
   }
 
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
@@ -88,9 +88,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     new OrderBookSnapshotHttpCache(
       settings.orderBookSnapshotHttpCache,
       time,
-      wavesBlockchainAsyncClient.assetDecimals,
+      assetsDB.unsafeGetDecimals,
       p => Option { orderBookCache.get(p) }
-    )(grpcExecutionContext)
+    )
 
   private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
@@ -150,7 +150,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => AssetsDB.Item)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
+    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
@@ -165,9 +165,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     for {
-      assetsDescription <- assetDescriptionAware(getDescription(assetsDB, wavesBlockchainAsyncClient.assetDescription))(o)
-      _                 <- liftAsync { syncValidation(assetsDescription(_).decimals) }
-      _                 <- asyncValidation(assetsDescription)
+      _ <- liftAsync { syncValidation(assetsDB.unsafeGetDecimals) }
+      _ <- asyncValidation(assetsDB.unsafeGet)
     } yield o
   }
 
@@ -198,7 +197,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         rateCache,
         Future
           .sequence {
-            settings.allowedOrderVersions.map(version => OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient).value)
+            settings.allowedOrderVersions.map(version =>
+              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
           }
           .map { _.collect { case Right(version) => version } }
       ),
@@ -247,9 +247,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               xs =>
                 if (xs.isEmpty) Future.successful(Unit)
                 else {
+
                   val eventAssets = xs.flatMap(_.event.assets)
-                  val loadAssets  = Future.traverse(eventAssets)(loadAndStoreAssetInfo(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_).value)
-                  loadAssets.flatMap { _ =>
+                  val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_).value)
+
+                  loadAssets.flatMap[Unit] { _ =>
                     val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
                       log.debug(s"Consumed $eventWithMeta")
                       self ! eventWithMeta
@@ -261,13 +263,19 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                       .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
                       .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
                       .map(_ => Unit)
+
+                  } andThen {
+                    case Failure(ex) =>
+                      log.error("Error while event processing occurred: ", ex)
+                      forceStopApplication(ErrorStartingMatcher)
+                    case _ =>
                   }
               }
             )
         },
         orderBooks,
         (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, assetsDB.unsafeGetDecimals),
-        wavesBlockchainAsyncClient.assetDescription(_)
+        assetsDB.get(_)
       )(grpcExecutionContext),
       MatcherActor.name
     )
@@ -451,27 +459,24 @@ object Matcher extends ScorexLogging {
     case object Stopping extends Status
   }
 
-  private def loadAndStoreAssetInfo(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[Unit] = getDescription(assetsDB, assetDesc)(asset).map(_ => Unit)
-
   private def getDecimals(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
       implicit ec: ExecutionContext): FutureResult[(Asset, Int)] =
     getDescription(assetsDB, assetDesc)(asset).map(x => asset -> x.decimals)(catsStdInstancesForFuture)
 
   private def getDescription(assetsDB: AssetsDB, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[AssetsDB.Item] =
+      implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] =
     asset match {
       case Waves => AssetsDB.wavesLifted
       case asset: IssuedAsset =>
         assetsDB.get(asset) match {
-          case Some(x) => liftValueAsync[AssetsDB.Item](x)
+          case Some(x) => liftValueAsync[BriefAssetDescription](x)
           case None =>
             EitherT {
               assetDesc(asset)
                 .map {
                   _.toRight[MatcherError](error.AssetNotFound(asset))
                     .map { desc =>
-                      AssetsDB.Item(desc.name, desc.decimals, desc.hasScript) unsafeTap { assetsDB.put(asset, _) }
+                      BriefAssetDescription(desc.name, desc.decimals, desc.hasScript) unsafeTap { assetsDB.put(asset, _) }
                     }
                 }
             }

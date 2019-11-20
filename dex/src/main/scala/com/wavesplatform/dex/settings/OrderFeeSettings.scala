@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.Validated.Valid
-import cats.implicits._
+import cats.instances.string._
+import cats.syntax.apply._
+import cats.syntax.foldable._
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.FeeMode.FeeMode
 import com.wavesplatform.settings.Constants
@@ -89,7 +91,7 @@ object OrderFeeSettings {
       case FeeMode.PERCENT => validatePercentSettings
     }
 
-    cfgValidator.validate[FeeMode](s"$path.mode").toEither >>= (mode => getSettingsByMode(mode).toEither) match {
+    cfgValidator.validate[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
       case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString_(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }

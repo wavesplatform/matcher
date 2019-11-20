@@ -8,7 +8,6 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
-import cats.implicits._
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, _}
@@ -171,11 +170,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           complete(
             placeTimer.measureFuture {
               orderValidator(order).value flatMap {
-                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(e)  => wrapInFuture { OrderRejected(e) }
-              } recoverWith {
-                case ex => wrapInFuture { WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
-              }
+                case Right(o)     => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
+                case Left(e)      => wrapInFuture { OrderRejected(e) }
+              } recover { case ex => WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)): ToResponseMarshallable }
             }
           )
         }
@@ -220,12 +217,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions map { allowedOrderVersions =>
-        StatusCodes.OK -> Json.obj(
-          "priceAssets"   -> matcherSettings.priceAssets,
-          "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
-          "orderVersions" -> allowedOrderVersions.toSeq.sorted
+        SimpleResponse(
+          StatusCodes.OK,
+          Json.obj(
+            "priceAssets"   -> matcherSettings.priceAssets,
+            "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+            "orderVersions" -> allowedOrderVersions.toSeq.sorted
+          )
         )
-      }
+      } recover { case ex => WavesNodeUnavailable(error.WavesNodeConnectionBroken(ex.getMessage)) }
     )
   }
 

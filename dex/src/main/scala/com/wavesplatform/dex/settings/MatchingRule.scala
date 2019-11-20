@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.apply._
 import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset

@@ -13,7 +13,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
@@ -251,8 +250,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       assetPairBuilder = new AssetPairBuilder(
         settings,
         x => {
-          if (x == asset) liftValueAsync[AssetsDB.Item](AssetsDB.Item(smartAssetDesc.name, smartAssetDesc.decimals))
-          else liftErrorAsync[AssetsDB.Item](error.AssetNotFound(x))
+          if (x == asset) liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals))
+          else liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
         },
         Set.empty
       ),
@@ -267,7 +266,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
-        x => if (x == asset) Future.successful(Some(smartAssetDesc.decimals)) else throw new IllegalArgumentException(s"No information about $x"),
+        x => if (x == asset) smartAssetDesc.decimals else throw new IllegalArgumentException(s"No information about $x"),
         _ => None
       ),
       matcherSettings = settings,

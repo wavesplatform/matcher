@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
 import cats.Functor
-import cats.implicits._
+import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.it.fp.CanExtract

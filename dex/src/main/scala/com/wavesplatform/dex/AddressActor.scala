@@ -241,9 +241,7 @@ class AddressActor(owner: Address,
                 }
               }
 
-              validationResult recover {
-                case ex => Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken(ex.getMessage))
-              } pipeTo self
+              validationResult recover { case ex => Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken(ex.getMessage)) } pipeTo self
 
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }

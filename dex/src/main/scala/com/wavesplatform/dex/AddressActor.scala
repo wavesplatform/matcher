@@ -4,6 +4,7 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
+import com.google.common.cache.{Cache, CacheBuilder, RemovalCause, RemovalNotification}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.Matcher.StoreEvent
@@ -17,6 +18,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
+import mouse.any._
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
@@ -27,7 +29,7 @@ import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
                    spendableBalance: Asset => Long,
-                   cancelTimeout: FiniteDuration,
+                   requestTimeout: FiniteDuration,
                    time: Time,
                    orderDB: OrderDB,
                    hasOrder: Order.Id => Boolean,
@@ -42,8 +44,16 @@ class AddressActor(owner: Address,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
-  private val pendingCancellation = MutableMap.empty[ByteStr, Promise[Resp]]
-  private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
+  private val pendingCancellation, pendingPlacement = CacheBuilder
+    .newBuilder()
+    .expireAfterWrite(requestTimeout.length, requestTimeout.unit)
+    .removalListener { (x: RemovalNotification[ByteStr, Promise[Resp]]) =>
+      x.getCause match {
+        case RemovalCause.EXPIRED => x.getValue.trySuccess(api.TimedOut)
+        case _                    =>
+      }
+    }
+    .build[ByteStr, Promise[Resp]]()
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private val openVolume   = MutableMap.empty[Asset, Long].withDefaultValue(0L)
@@ -79,10 +89,8 @@ class AddressActor(owner: Address,
   }
 
   private def placeOrder(order: Order, isMarket: Boolean): Unit = {
-    pendingPlacement
-      .get(order.id())
+    Option(pendingPlacement.getIfPresent(order.id()))
       .fold {
-
         log.debug(s"New ${if (isMarket) "market order" else "order"}: ${order.json()}")
         val acceptedOrder = if (isMarket) MarketOrder(order, tradableBalance _) else LimitOrder(order)
 
@@ -92,7 +100,6 @@ class AddressActor(owner: Address,
             reserve(ao)
             storePlaced(ao)
         }
-
       }(_.future) pipeTo sender()
   }
 
@@ -110,8 +117,7 @@ class AddressActor(owner: Address,
     case PlaceMarketOrder(order) => placeOrder(order, isMarket = true)
 
     case CancelOrder(id) =>
-      pendingCancellation
-        .get(id)
+      Option(pendingCancellation.getIfPresent(id))
         .fold(
           activeOrders.get(id) match {
             case Some(ao) if ao.isLimit => storeCanceled(ao.order.assetPair, ao.order.id())
@@ -152,10 +158,10 @@ class AddressActor(owner: Address,
       }
   }
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] =
-    eventCache.get(id).map(_.future).getOrElse {
+  private def store(id: ByteStr, event: QueueEvent, eventCache: Cache[ByteStr, Promise[Resp]], storeError: Resp): Future[Resp] =
+    Option(eventCache.getIfPresent(id)).map(_.future).getOrElse {
       val promisedResponse = Promise[Resp]
-      eventCache += id -> promisedResponse
+      eventCache.put(id, promisedResponse)
       val withSave = storeEvent(event).transformWith {
         case Failure(e) =>
           log.error(s"Error persisting $event", e)
@@ -183,9 +189,9 @@ class AddressActor(owner: Address,
       storeError = api.OrderRejected(error.CanNotPersistEvent)
     )
 
-  private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
+  private def confirmPlacement(order: Order): Unit = for (p <- removePengingPlacement(order.id())) {
     log.trace(s"Confirming placement for ${order.id()}")
-    p.success(api.OrderAccepted(order))
+    p.trySuccess(api.OrderAccepted(order))
   }
 
   private def handleStatusRequests: Receive = {
@@ -230,7 +236,7 @@ class AddressActor(owner: Address,
       val id = ao.order.id()
       // submitted order gets canceled if it cannot be matched with the best counter order (e.g. due to rounding issues)
       confirmPlacement(ao.order)
-      pendingCancellation.remove(id).foreach(_.success(api.OrderCanceled(id)))
+      removePendingCancellation(id).foreach(_.trySuccess(api.OrderCanceled(id)))
       val isActive = activeOrders.contains(id)
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) {
@@ -239,8 +245,18 @@ class AddressActor(owner: Address,
       }
 
     case OrderCancelFailed(id, reason) =>
-      pendingCancellation.remove(id).foreach(_.success(api.OrderCancelRejected(reason)))
+      removePendingCancellation(id).foreach(_.trySuccess(api.OrderCancelRejected(reason)))
   }
+
+  private def removePendingCancellation(id: ByteStr): Option[Promise[Resp]] =
+    Option(pendingCancellation.getIfPresent(id)).unsafeTap { r =>
+      if (r.isDefined) pendingCancellation.invalidate(id)
+    }
+
+  private def removePengingPlacement(id: ByteStr): Option[Promise[Resp]] =
+    Option(pendingPlacement.getIfPresent(id)).unsafeTap { r =>
+      if (r.isDefined) pendingPlacement.invalidate(id)
+    }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
@@ -271,7 +287,7 @@ class AddressActor(owner: Address,
   private def handleOrderTerminated(ao: AcceptedOrder, status: OrderStatus.Final): Unit = {
     log.trace(s"Order ${ao.order.id()} terminated: $status")
     orderDB.saveOrder(ao.order)
-    pendingCancellation.remove(ao.order.id()).foreach(_.success(api.OrderCancelRejected(error.OrderFinalized(ao.order.id()))))
+    removePendingCancellation(ao.order.id()).foreach(_.trySuccess(api.OrderCancelRejected(error.OrderFinalized(ao.order.id()))))
     expiration.remove(ao.order.id()).foreach(_.cancel())
     activeOrders.remove(ao.order.id())
     orderDB.saveOrderInfo(
@@ -314,7 +330,9 @@ class AddressActor(owner: Address,
           remove(restBalance, requiredBalance) match {
             case Some(updatedRestBalance) => (updatedRestBalance, toDelete)
             case None =>
-              val updatedToDelete = if (pendingCancellation.contains(id)) toDelete else toDelete.enqueue(QueueEvent.Canceled(assetPair, id))
+              val updatedToDelete =
+                if (Option(pendingCancellation.getIfPresent(id)).nonEmpty) toDelete
+                else toDelete.enqueue(QueueEvent.Canceled(assetPair, id))
               (restBalance, updatedToDelete)
           }
       }

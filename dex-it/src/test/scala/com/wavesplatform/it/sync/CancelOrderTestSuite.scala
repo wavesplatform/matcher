@@ -32,7 +32,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         orders += order
       }
 
-      node.cancelAllOrders(alice)
+      node.cancelAllOrders(bob)
 
       orders.foreach(order => {
         node.waitOrderStatus(wavesBtcPair, order, "Cancelled")

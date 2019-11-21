@@ -44,16 +44,23 @@ class AddressActor(owner: Address,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
-  private val pendingCancellation, pendingPlacement = CacheBuilder
-    .newBuilder()
-    .expireAfterWrite(requestTimeout.length, requestTimeout.unit)
-    .removalListener { (x: RemovalNotification[ByteStr, Promise[Resp]]) =>
-      x.getCause match {
-        case RemovalCause.EXPIRED => x.getValue.trySuccess(api.TimedOut)
-        case _                    =>
+  private def mkPendingRequest(onExpired: ByteStr => Unit) =
+    CacheBuilder
+      .newBuilder()
+      .expireAfterWrite(requestTimeout.length, requestTimeout.unit)
+      .removalListener { (x: RemovalNotification[ByteStr, Promise[Resp]]) =>
+        x.getCause match {
+          case RemovalCause.EXPIRED =>
+            x.getValue.trySuccess(api.TimedOut)
+            onExpired(x.getKey)
+
+          case _ =>
+        }
       }
-    }
-    .build[ByteStr, Promise[Resp]]()
+      .build[ByteStr, Promise[Resp]]()
+
+  private val pendingCancellation = mkPendingRequest(_ => Unit)
+  private val pendingPlacement    = mkPendingRequest(release)
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private val openVolume   = MutableMap.empty[Asset, Long].withDefaultValue(0L)

@@ -15,6 +15,8 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorList
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
+import scala.util.Try
+
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
 
@@ -90,8 +92,9 @@ object DenormalizedMatchingRule extends ScorexLogging {
         assetPair,
         blockchain,
         defaultTickSize = { e =>
+          // DEX-488 TODO remove after found a reason of NPE
           val errorMsg =
-            s"""Can't convert matching rule for $assetPair: ${e.mkMessage(errorFormatterContext).text}.
+            s"""Can't convert matching rule for $assetPair: ${Try(e.mkMessage(errorFormatterContext).text).getOrElse(e.code)}.
                | Usually this happens when the blockchain was rolled back.""".stripMargin
           log.error(errorMsg)
           DenormalizedMatchingRule.DefaultTickSize

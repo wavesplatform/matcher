@@ -24,9 +24,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     "After cancelAllOrders (200) all of them should be cancelled" in {
       val orders = new ListBuffer[String]()
+      val time = System.currentTimeMillis
 
       for(i <- 1 to 200) {
-        val order = node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, i * 100000000L, i * 1000, 300000, version = 2:Byte)).message.id
+        val order = node.placeOrder(node.prepareOrder(bob, wavesBtcPair, OrderType.SELL, 1000000, 123450000L, 300000, version = 2:Byte, creationTime = time + i)).message.id
         node.waitOrderStatus(wavesUsdPair, order, "Accepted")
         orders += order
       }
@@ -34,7 +35,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       node.cancelAllOrders(alice)
 
       orders.foreach(order => {
-        node.waitOrderStatus(wavesUsdPair, order, "Cancelled")
+        node.waitOrderStatus(wavesBtcPair, order, "Cancelled")
       })
     }
 

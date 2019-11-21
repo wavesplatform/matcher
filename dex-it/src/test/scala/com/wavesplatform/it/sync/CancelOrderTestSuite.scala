@@ -8,6 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
@@ -20,6 +21,23 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Order can be canceled" - {
+
+    "After cancelAllOrders (200) all of them should be cancelled" in {
+      val orders = new ListBuffer[String]()
+
+      for(i <- 1 to 200) {
+        val order = node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, i * 100000000L, i * 1000, 300000)).message.id
+        node.waitOrderStatus(wavesUsdPair, order, "Accepted")
+        orders += order
+      }
+
+      node.cancelAllOrders(alice)
+
+      orders.foreach(order => {
+        node.waitOrderStatus(wavesUsdPair, order, "Cancelled")
+      })
+    }
+
     "by sender" in {
       val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)

@@ -196,6 +196,10 @@ class AddressActor(owner: Address,
         case _: TimeoutException =>
           self ! CancelationExpired(id)
           api.TimedOut
+
+        case e =>
+          log.warn(s"An error during $id cancellation", e)
+          api.InternalError
       }
 
   private def storePlaced(acceptedOrder: AcceptedOrder): Future[Resp] =
@@ -215,6 +219,10 @@ class AddressActor(owner: Address,
         case _: TimeoutException =>
           self ! PlacementExpired(acceptedOrder.order.id())
           api.TimedOut
+
+        case e =>
+          log.warn(s"An error during ${acceptedOrder.order.id()} placement", e)
+          api.InternalError
       }
 
   private def scheduleTimeout(delay: FiniteDuration): Future[Nothing] = {

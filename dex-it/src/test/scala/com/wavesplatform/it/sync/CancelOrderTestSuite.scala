@@ -26,7 +26,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val orders = new ListBuffer[String]()
 
       for(i <- 1 to 200) {
-        val order = node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, i * 100000000L, i * 1000, 300000)).message.id
+        val order = node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, i * 100000000L, i * 1000, 300000, version = 2:Byte)).message.id
         node.waitOrderStatus(wavesUsdPair, order, "Accepted")
         orders += order
       }

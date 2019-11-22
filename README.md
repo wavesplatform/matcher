@@ -133,9 +133,7 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 
 Artifacts of DEX extension have names like `waves-dex-integration{supported-network}{version}.{deb|zip}`.
 
-#### Installation
-
-##### 📦 Installation through DEB
+#### 📦 Installation through DEB
 
 *If the Node installed from DEB*
 
@@ -143,7 +141,7 @@ Run: `sudo dpkg -i deb-artifact.deb`
 
 The extension will be automatically installed to the Node.
 
-##### 🗜 Installation through ZIP
+#### 🗜 Installation through ZIP
 
 *If the Node is running manually.*
 
@@ -190,13 +188,11 @@ waves.dex {
 
 Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb|zip}`.
 
-#### Installation
-
-##### 📦 Installation through DEB
+#### 📦 Installation through DEB
 
 `sudo dpkg -i deb-artifact.deb`
 
-##### 🗜 Installation through ZIP
+#### 🗜 Installation through ZIP
 
 To install a DEX server from ZIP file, just extract it.
 

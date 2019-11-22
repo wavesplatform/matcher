@@ -133,18 +133,17 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 
 Artifacts of DEX extension have names like `waves-dex-integration{supported-network}{version}.{deb|zip}`.
 
-#### 📦 Installation through DEB
+#### a. 📦 Installation through DEB
 
-*If the Node installed from DEB*
+> If the Node installed from DEB
 
 Run: `sudo dpkg -i deb-artifact.deb` 
 
 The extension will be automatically installed to the Node.
 
-#### 🗜 Installation through ZIP
+#### b. 🗜 Installation through ZIP
 
-*If the Node is running manually.*
-
+> If the Node is running manually.
 > Note, if you installed Node from a DEB package, DEX will be removed after update.
 
 To install a DEX extension from ZIP file:
@@ -166,9 +165,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
----
-
-#### Configration of DEX extension
+#### 📃 Configration of DEX extension
 
 Add lines to the Node's configuration:
 
@@ -188,11 +185,11 @@ waves.dex {
 
 Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb|zip}`.
 
-#### 📦 Installation through DEB
+#### a. 📦 Installation through DEB
 
 `sudo dpkg -i deb-artifact.deb`
 
-#### 🗜 Installation through ZIP
+#### b. 🗜 Installation through ZIP
 
 To install a DEX server from ZIP file, just extract it.
 
@@ -210,9 +207,7 @@ To run:
 /path/to/dex/directory/bin/waves-dex.bat <your_JVM_options> /path/to/config.conf
 ```
 
----
-
-#### Configuration of DEX server
+#### 📃 Configuration of DEX server
 
 1. There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
 

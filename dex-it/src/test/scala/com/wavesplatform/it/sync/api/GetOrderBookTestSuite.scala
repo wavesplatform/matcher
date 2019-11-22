@@ -7,7 +7,6 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.IssueUsdTx
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.it.util._
 
 
 class GetOrderBookTestSuite extends MatcherSuiteBase{

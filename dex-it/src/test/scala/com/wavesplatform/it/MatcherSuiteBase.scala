@@ -3,10 +3,11 @@ package com.wavesplatform.it
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase.baseConfig
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.Decimals
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
 import org.scalatest._
 
 import scala.concurrent.ExecutionContext
@@ -32,6 +33,13 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
+  implicit class DoubleOps(value: Double) {
+    val wct: Long             = Normalization.normalizeAmountAndFee(value, Decimals)
+    val price: Long           = Normalization.normalizePrice(value, Decimals, Decimals)
+    val waves, eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long             = Normalization.normalizePrice(value, 8, 2)
+  }
+
   protected override def createDocker: Docker = new Docker(
     imageName = "com.wavesplatform/dex-it:latest",
     tag = getClass.getSimpleName,
@@ -53,6 +61,8 @@ object MatcherSuiteBase {
          |    servers = "$kafkaServer"
          |    topic = "dex-$seed"
          |  }
-         |}""".stripMargin)
+         |}
+         |waves.dex.allowed-order-versions = [1, 2, 3]
+         |""".stripMargin)
   }
 }

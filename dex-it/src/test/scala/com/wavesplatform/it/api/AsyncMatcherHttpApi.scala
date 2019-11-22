@@ -99,9 +99,9 @@ object AsyncMatcherHttpApi extends Assertions {
             .setHeader("Content-type", "application/json;charset=utf-8")
       )
 
-    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
+    def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponseWithFee] = {
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId", waitForStatus = waitForStatus)
-        .as[MatcherStatusResponse]
+        .as[MatcherStatusResponseWithFee]
     }
 
     def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] =
@@ -163,8 +163,8 @@ object AsyncMatcherHttpApi extends Assertions {
     def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/status").as[MarketStatusResponse]
 
-    def cancelOrder(sender: KeyPair, assetPair: AssetPair, orderId: String): Future[MatcherStatusResponse] =
-      matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", cancelRequest(sender, orderId)).as[MatcherStatusResponse]
+    def cancelOrder(sender: KeyPair, assetPair: AssetPair, orderId: String): Future[MatcherStatusResponseWithFee] =
+      matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", cancelRequest(sender, orderId)).as[MatcherStatusResponseWithFee]
 
     def expectCancelRejected(sender: KeyPair, assetPair: AssetPair, orderId: String): Future[Unit] = {
       val requestUri = s"/matcher/orderbook/${assetPair.toUri}/cancel"
@@ -176,9 +176,9 @@ object AsyncMatcherHttpApi extends Assertions {
       }
     }
 
-    def cancelOrdersForPair(sender: KeyPair, assetPair: AssetPair, timestamp: Long): Future[MatcherStatusResponse] =
+    def cancelOrdersForPair(sender: KeyPair, assetPair: AssetPair, timestamp: Long): Future[MatcherStatusResponseWithFee] =
       matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", Json.toJson(batchCancelRequest(sender, timestamp)))
-        .as[MatcherStatusResponse]
+        .as[MatcherStatusResponseWithFee]
 
     def cancelOrdersForPairOnce(sender: KeyPair, assetPair: AssetPair, timestamp: Long): Future[Response] =
       onceWithLoggedBody(
@@ -208,11 +208,11 @@ object AsyncMatcherHttpApi extends Assertions {
         .toScala
     }
 
-    def cancelAllOrders(sender: KeyPair, timestamp: Long): Future[MatcherStatusResponse] =
-      matcherPost(s"/matcher/orderbook/cancel", Json.toJson(batchCancelRequest(sender, timestamp))).as[MatcherStatusResponse]
+    def cancelAllOrders(sender: KeyPair, timestamp: Long): Future[MatcherStatusResponseWithFee] =
+      matcherPost(s"/matcher/orderbook/cancel", Json.toJson(batchCancelRequest(sender, timestamp))).as[MatcherStatusResponseWithFee]
 
-    def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] =
-      postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponse]
+    def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponseWithFee] =
+      postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponseWithFee]
 
     def fullOrdersHistory(sender: KeyPair, activeOnly: Option[Boolean] = None): Future[Seq[OrderbookHistory]] =
       activeOnly match {
@@ -239,20 +239,20 @@ object AsyncMatcherHttpApi extends Assertions {
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
-                        retryInterval: FiniteDuration = 5.second): Future[MatcherStatusResponse] = {
-      waitFor[MatcherStatusResponse](
+                        retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponseWithFee] = {
+      waitFor[MatcherStatusResponseWithFee](
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
         _.orderStatus(orderId, assetPair),
         _.status == expectedStatus,
-        retryInterval)
+        5.seconds)
     }
 
     def waitOrderStatusAndAmount(assetPair: AssetPair,
                                  orderId: String,
                                  expectedStatus: String,
                                  expectedFilledAmount: Option[Long],
-                                 retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponse] = {
-      waitFor[MatcherStatusResponse](
+                                 retryInterval: FiniteDuration = 1.second): Future[MatcherStatusResponseWithFee] = {
+      waitFor[MatcherStatusResponseWithFee](
         s"order(amountAsset=${assetPair.amountAsset}, priceAsset=${assetPair.priceAsset}, orderId=$orderId) status == $expectedStatus")(
         _.orderStatus(orderId, assetPair),
         s => s.status == expectedStatus && s.filledAmount == expectedFilledAmount,
@@ -302,7 +302,7 @@ object AsyncMatcherHttpApi extends Assertions {
         case Failure(UnexpectedStatusCodeException(_, _, `expectedStatusCode`, responseBody)) =>
           expectedMessage match {
             case None =>
-              Try(parse(responseBody).as[MatcherStatusResponse]) match {
+              Try(parse(responseBody).as[MatcherStatusResponseWithFee]) match {
                 case Success(mr) if mr.status == expectedStatus => Success(true)
                 case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
               }
@@ -382,22 +382,22 @@ object AsyncMatcherHttpApi extends Assertions {
       orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(_1 = v._1.copy(timestamp = 0L)) }
     )
 
-    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int, apiKey: String = matcherNode.apiKey): Future[RatesResponse] = {
+    def upsertRate(asset: Asset, rate: Double, expectedStatusCode: Int): Future[RatesResponse] = {
       put(
         s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}",
         (rb: RequestBuilder) =>
-          rb.withApiKey(apiKey)
+          rb.withApiKey(matcherNode.apiKey)
             .setHeader("Content-type", "application/json;charset=utf-8")
             .setBody(stringify(toJson(rate))),
         expectedStatusCode
       ).as[RatesResponse]
     }
 
-    def getRates(): Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
+    def getRates: Future[Map[Asset, Double]] = matcherGet("/matcher/settings/rates").as[Map[Asset, Double]]
 
-    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200, apiKey: String = matcherNode.apiKey): Future[RatesResponse] = {
+    def deleteRate(asset: Asset, expectedStatusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[RatesResponse] = {
       retrying(
-        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(apiKey).build(),
+        _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
         statusCode = expectedStatusCode
       ).as[RatesResponse]
     }

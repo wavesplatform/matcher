@@ -6,18 +6,13 @@ import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse}
+import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse, MatcherStatusResponseWithFee}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import mouse.any._
 
 class MarketOrderTestSuite extends MatcherSuiteBase {
-
-  implicit class DoubleOps(value: Double) {
-    val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long        = Normalization.normalizePrice(value, 8, 2)
-  }
 
   override protected def nodeConfigs: Seq[Config] = {
     super.nodeConfigs.map(ConfigFactory.parseString("waves.dex.allowed-order-versions = [1, 2, 3]").withFallback)
@@ -39,7 +34,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       }
     }
 
-    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): MatcherStatusResponse = {
+    def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): MatcherStatusResponseWithFee = {
       node.prepareOrder(sender, pair, orderType, amount, price, fee = 0.003.waves) |>
         (markerOrder => node.placeMarketOrder(markerOrder).message.id) |>
         (orderId => node.waitOrderStatus(pair, orderId, "Filled"))

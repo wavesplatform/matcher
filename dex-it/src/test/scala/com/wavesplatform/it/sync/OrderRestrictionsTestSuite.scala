@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
@@ -35,6 +36,15 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
       node.waitForTransaction(tx.id)
     }
+  }
+
+  "order info returns information event there is no such order book" in {
+    try node.orderbookInfo(ethBtcPair).restrictions should be(empty)
+    catch {
+      case e: UnexpectedStatusCodeException if e.statusCode == 404 => // ok
+    }
+    node.orderbookInfo(wavesBtcPair).restrictions should be(empty)
+    node.orderbookInfo(wctUsdPair).restrictions shouldNot be(empty)
   }
 
   "low amount order" in {
@@ -106,8 +116,10 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     node.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe "1000"
     node.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe "0.001"
 
-    node.orderbookInfo(wavesBtcPair).restrictions.isEmpty
+    node.orderbookInfo(wavesBtcPair).restrictions shouldBe empty
     node.placeOrder(bob, wavesBtcPair, BUY, 100000000, 100000, matcherFee)
-    node.tradingPairInfo(wavesBtcPair).get.restrictions.isEmpty
+
+    node.tradingPairInfo(wavesBtcPair) shouldNot be(empty)
+    node.tradingPairInfo(wavesBtcPair).get.restrictions shouldBe empty
   }
 }

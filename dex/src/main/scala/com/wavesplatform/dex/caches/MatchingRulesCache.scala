@@ -23,14 +23,18 @@ class MatchingRulesCache(matcherSettings: MatcherSettings, blockchain: Blockchai
   }
 
   // DEX-488 TODO remove after found a reason of NPE
-  def getDenormalizedRuleForNextOrder(assetPair: AssetPair, currentOffset: Long): DenormalizedMatchingRule =
-    Try {
-      getMatchingRules(assetPair).toList.reverse.collectFirst {
-        case mr @ DenormalizedMatchingRule(startOffset, _) if startOffset <= (currentOffset + 1) => mr
-      }
-    }.recover { case NonFatal(e) => log.error(s"Can't get a denormalized rule for a next order", e); None }
-      .getOrElse(None)
-      .getOrElse(DenormalizedMatchingRule.DefaultRule)
+  def getDenormalizedRuleForNextOrder(assetPair: AssetPair, currentOffset: Long): DenormalizedMatchingRule = {
+    val result =
+      Try {
+        getMatchingRules(assetPair).toList.reverse.collectFirst {
+          case mr @ DenormalizedMatchingRule(startOffset, _) if startOffset <= (currentOffset + 1) => mr
+        }
+      }.recover { case NonFatal(e) => log.error(s"Can't get a denormalized rule for a next order", e); None }
+        .getOrElse(None)
+        .getOrElse(DenormalizedMatchingRule.DefaultRule)
+
+    result.copy(tickSize = result.tickSize max DenormalizedMatchingRule.DefaultTickSize)
+  }
 
   def getNormalizedRuleForNextOrder(assetPair: AssetPair, currentOffset: Long): MatchingRule = {
     getDenormalizedRuleForNextOrder(assetPair, currentOffset).normalize(assetPair, blockchain)

@@ -91,9 +91,6 @@ object SyncMatcherHttpApi extends Assertions {
     def placeMarketOrder(order: Order): MatcherResponse =
       sync(async(m).placeMarketOrder(order))
 
-    def placeMarketOrder1(order: Order): MatcherResponse =
-      sync(async(m).placeMarketOrder(order))
-
     def placeMarketOrder(sender: KeyPair,
                          pair: AssetPair,
                          orderType: OrderType,

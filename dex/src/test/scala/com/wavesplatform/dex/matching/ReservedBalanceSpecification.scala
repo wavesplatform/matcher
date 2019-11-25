@@ -460,7 +460,7 @@ class ReservedBalanceSpecification
               new AddressActor(
                 owner = address,
                 spendableBalance = spendableBalance,
-                cancelTimeout = 5.seconds,
+                requestTimeout = 5.seconds,
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
                 hasOrder = _ => false,

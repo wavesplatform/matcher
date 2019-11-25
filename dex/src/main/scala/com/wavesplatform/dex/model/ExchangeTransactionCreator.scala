@@ -62,8 +62,8 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyP
           val (isFirstMatchForBuy, isFirstMatchForSell) = isFirstMatch(BUY) -> isFirstMatch(SELL)
 
           (
-            if (isFirstMatchForBuy) buyExecutedFee max 1L else buyExecutedFee,
-            if (isFirstMatchForSell) sellExecutedFee max 1L else sellExecutedFee
+            if (isFirstMatchForBuy && submitted.order.version >= 3) buyExecutedFee max 1L else buyExecutedFee,
+            if (isFirstMatchForSell && submitted.order.version >= 3) sellExecutedFee max 1L else sellExecutedFee
           )
       }
     }

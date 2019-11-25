@@ -249,7 +249,7 @@ object SyncMatcherHttpApi extends Assertions {
                      version: Byte = 1: Byte,
                      timeToLive: Duration = 30.days - 1.seconds,
                      feeAsset: Asset = Waves,
-                     creationTime: Long = System.currentTimeMillis()): Order = {
+                     creationTime: Long = System.currentTimeMillis): Order = {
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
 
       val unsigned =

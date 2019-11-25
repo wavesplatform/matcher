@@ -1,18 +1,20 @@
 package com.wavesplatform.dex
 
-import java.io.File
+import java.io.{File, PrintWriter}
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.{Base64, Scanner}
 
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.doc.MatcherErrorDoc
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
 
-object Cli {
+object WavesDexCli {
   // todo commands:
   // base64
   // get account by seed [and nonce]
@@ -47,21 +49,31 @@ object Cli {
           .action((_, s) => s.copy(command = Some(Command.CreateAccountStorage)))
           .text("Creates an encrypted account storage")
           .children(
-            opt[File]("create-account-storage-directory")
-              .abbr("cas-dir")
-              .text("The directory for account.dat file")
+            opt[File]("output-directory")
+              .abbr("od")
+              .text("The directory for a new account.dat file")
               .required()
-              .action((x, s) => s.copy(createAccountStorageDir = x)),
+              .action((x, s) => s.copy(outputDirectory = x)),
             opt[SeedFormat]("seed-format")
-              .abbr("seed-format")
+              .abbr("sf")
               .text("The format of seed to enter, 'raw-string' by default")
               .valueName("<raw-string,base64>")
               .action((x, s) => s.copy(seedFormat = x)),
             opt[Int]("account-nonce")
-              .abbr("account-nonce")
+              .abbr("an")
               .text("The nonce for account, the default value means you entered the account seed")
               .valueName("<number>")
               .action((x, s) => s.copy(accountNonce = Some(x)))
+          ),
+        cmd(Command.CreateDocumentation.name)
+          .action((_, s) => s.copy(command = Some(Command.CreateDocumentation)))
+          .text("Creates a documentation about errors and writes it to the output directory")
+          .children(
+            opt[File]("output-directory")
+              .abbr("od")
+              .text("Where to save the documentation")
+              .required()
+              .action((x, s) => s.copy(outputDirectory = x))
           )
       )
     }
@@ -99,7 +111,7 @@ object Cli {
                          |""".stripMargin)
 
             case Command.CreateAccountStorage =>
-              val accountFile = args.createAccountStorageDir.toPath.resolve("account.dat").toFile.getAbsoluteFile
+              val accountFile = args.outputDirectory.toPath.resolve("account.dat").toFile.getAbsoluteFile
               if (accountFile.isFile) {
                 System.err.println(s"The '$accountFile' is already exist. If you want to create a file with a new seed, delete the file before.")
                 System.exit(1)
@@ -130,6 +142,18 @@ object Cli {
                          |  }
                          |}
                          |""".stripMargin)
+
+            case Command.CreateDocumentation =>
+              val outputBasePath = args.outputDirectory.toPath
+              val errorsFile     = outputBasePath.resolve("errors.md").toFile
+              Files.createDirectories(outputBasePath)
+              val errors = new PrintWriter(errorsFile)
+              try {
+                errors.write(MatcherErrorDoc.mkMarkdown)
+                println(s"Saved errors documentation to $errorsFile")
+              } finally {
+                errors.close()
+              }
           }
           println("Done")
       }
@@ -147,6 +171,10 @@ object Cli {
 
     case object CreateAccountStorage extends Command {
       override def name: String = "create-account-storage"
+    }
+
+    case object CreateDocumentation extends Command {
+      override def name: String = "create-documentation"
     }
   }
 
@@ -167,8 +195,9 @@ object Cli {
                           seedFormat: SeedFormat = SeedFormat.RawString,
                           accountNonce: Option[Int] = None,
                           command: Option[Command] = None,
-                          createAccountStorageDir: File = defaultFile)
+                          outputDirectory: File = defaultFile)
 
+  @scala.annotation.tailrec
   private def readSeedFromFromStdIn(prompt: String, format: SeedFormat): ByteStr = {
     val rawSeed = readSecretFromStdIn(prompt)
     format match {
@@ -183,6 +212,7 @@ object Cli {
     }
   }
 
+  @scala.annotation.tailrec
   private def readSecretFromStdIn(prompt: String): String = {
     val r = Option(System.console()) match {
       case Some(console) => new String(console.readPassword(prompt))

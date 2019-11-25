@@ -8,6 +8,7 @@ import com.wavesplatform.dex.error.MatcherError
 import scala.concurrent.{ExecutionContext, Future}
 
 package object effect {
+
   type FutureResult[T] = EitherT[Future, MatcherError, T]
 
   val successAsync: FutureResult[Unit] = liftValueAsync(Unit)

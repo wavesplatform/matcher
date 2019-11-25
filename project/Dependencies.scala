@@ -124,7 +124,6 @@ object Dependencies {
       logback,
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       akkaModule("actor"),
-      akkaModule("persistence-query"),
       akkaModule("slf4j"),
       akkaHttp,
       "org.apache.kafka" % "kafka-clients" % "2.3.1",
@@ -132,12 +131,9 @@ object Dependencies {
       janino,
       mouse,
       "org.typelevel" %% "cats-tagless-macros" % "0.9",
-      wavesProtobufSchemas
-    ) ++ Seq(
-      akkaModule("testkit"),
-      akkaModule("persistence-tck"),
-      "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1"
-    ).map(_ % Test) ++ test ++ quill
+      wavesProtobufSchemas,
+      akkaModule("testkit") % Test
+    ) ++ test ++ quill
 
   lazy val wavesIntegration = Dependencies.grpc ++
     Seq(

@@ -15,8 +15,9 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
+import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.BatchOrderCancelActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
@@ -145,7 +146,12 @@ class AddressActor(owner: Address,
               case Event.ValidationFailed(_, reason) =>
                 pendingCommands.remove(orderId).foreach { command =>
                   log.trace(s"Confirming command for $orderId")
-                  command.client ! api.OrderRejected(reason)
+                  command.client ! (
+                    reason match {
+                      case WavesNodeConnectionBroken => api.WavesNodeUnavailable(reason)
+                      case _                         => api.OrderRejected(reason)
+                    }
+                  )
                 }
             }
 
@@ -225,7 +231,7 @@ class AddressActor(owner: Address,
         case Some(nextCommand) =>
           nextCommand.command match {
             case command: Command.PlaceOrder =>
-              val validationResult =
+              val validationResult = {
                 for {
                   hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
                   tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.matcherFeeAssetId))
@@ -236,8 +242,17 @@ class AddressActor(owner: Address,
                     case Right(_)    => Event.ValidationPassed(ao)
                   }
                 }
+              }
 
-              validationResult pipeTo self
+              validationResult recover {
+                case ex: WavesNodeConnectionLostException =>
+                  log.error("Waves Node connection lost", ex)
+                  Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
+                case ex =>
+                  log.error("An unexpected error occurred", ex)
+                  Event.ValidationFailed(command.order.id(), UnexpectedError)
+              } pipeTo self
+
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }
       }

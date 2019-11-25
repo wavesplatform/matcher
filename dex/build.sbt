@@ -1,6 +1,8 @@
 import java.nio.charset.StandardCharsets
 
 import DexDockerKeys._
+import com.typesafe.sbt.SbtNativePackager.Universal
+import CommonSettings.autoImport.network
 
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
@@ -10,7 +12,7 @@ libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "DEX",
-  packageDescription := s"Decentralized EXchange for Waves network. Compatible with ${nodeVersion.value} node version"
+  packageDescription := "Decentralized EXchange for Waves network"
 )
 
 packageSettings
@@ -38,7 +40,15 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
-Compile / sourceGenerators += versionSourceTask
+inConfig(Compile)(
+  Seq(
+    sourceGenerators += versionSourceTask,
+    discoveredMainClasses := Seq(
+      "com.wavesplatform.dex.Application",
+      "com.wavesplatform.dex.WavesDexCli"
+    ),
+    mainClass := discoveredMainClasses.value.headOption
+  ))
 
 // Docker
 
@@ -51,3 +61,25 @@ inTask(docker)(
     )
   )
 )
+
+// Packaging
+
+executableScriptName := "waves-dex"
+
+// ZIP archive
+inConfig(Universal)(Seq(
+  packageName := s"waves-dex${network.value.packageSuffix}-${version.value}", // An archive file name
+  mappings ++= {
+    val baseConfigName = s"${network.value}.conf"
+    val localFile      = (Compile / sourceDirectory).value / "package" / "samples" / baseConfigName
+    if (localFile.exists()) {
+      val artifactPath = "doc/dex.conf.sample"
+      Seq(localFile -> artifactPath)
+    } else Seq.empty
+  }
+))
+
+// DEB package
+Linux / name := s"waves-dex${network.value.packageSuffix}" // A staging directory name
+Linux / normalizedName := (Linux / name).value // An archive file name
+Linux / packageName := (Linux / name).value // In a control file

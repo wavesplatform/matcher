@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.settings
 
-import cats.implicits._
+import cats.syntax.apply._
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator._

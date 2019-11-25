@@ -37,8 +37,6 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
                            recoverOrderHistory: Boolean,
-                           journalDataDir: String,
-                           snapshotsDataDir: String,
                            snapshotsInterval: Int,
                            limitEventsDuringRecovery: Option[Int],
                            snapshotsLoadingTimeout: FiniteDuration,
@@ -112,8 +110,6 @@ object MatcherSettings {
     val actorResponseTimeout = config.as[FiniteDuration]("actor-response-timeout")
     val dataDirectory        = config.as[String]("data-directory")
     val recoverOrderHistory  = !new File(dataDirectory).exists()
-    val journalDirectory     = config.as[String]("journal-directory")
-    val snapshotsDirectory   = config.as[String]("snapshots-directory")
     val snapshotsInterval    = config.as[Int]("snapshots-interval")
 
     val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
@@ -159,8 +155,6 @@ object MatcherSettings {
       actorResponseTimeout,
       dataDirectory,
       recoverOrderHistory,
-      journalDirectory,
-      snapshotsDirectory,
       snapshotsInterval,
       limitEventsDuringRecovery,
       snapshotsLoadingTimeout,

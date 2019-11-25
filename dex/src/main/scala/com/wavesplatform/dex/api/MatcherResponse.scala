@@ -66,11 +66,16 @@ object MatcherResponseContent {
   case class Multiple(content: List[MatcherResponse]) extends MatcherResponseContent
 }
 
-case class SimpleResponse(code: StatusCode, message: String) extends MatcherResponse(code, Json.obj("message"       -> message))
-case object AlreadyProcessed                                 extends MatcherResponse(C.Accepted, Json.obj("message" -> "This event has been already processed"))
-case class OrderAccepted(order: Order)                       extends MatcherResponse(C.OK, Json.obj("message"       -> order.json()))
-case class OrderCanceled(orderId: ByteStr)                   extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
-case class OrderDeleted(orderId: ByteStr)                    extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
+case class SimpleResponse(code: StatusCode, js: JsObject) extends MatcherResponse(code, MatcherResponseContent.Js(js))
+
+object SimpleResponse {
+  def apply(code: StatusCode, message: String): SimpleResponse = new SimpleResponse(code, Json.obj("message" -> message))
+}
+
+case object AlreadyProcessed               extends MatcherResponse(C.Accepted, Json.obj("message" -> "This event has been already processed"))
+case class OrderAccepted(order: Order)     extends MatcherResponse(C.OK, Json.obj("message"       -> order.json()))
+case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
+case class OrderDeleted(orderId: ByteStr)  extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
 
 case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
     extends MatcherResponse(C.OK, MatcherResponseContent.Multiple(orders.values.toList))
@@ -86,3 +91,4 @@ case object DuringStart                                               extends Ma
 case object DuringShutdown                                            extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
 case object TimedOut                                                  extends MatcherResponse(C.RequestTimeout, error.RequestTimeout)
 case class InfoNotFound(error: MatcherError)                          extends MatcherResponse(C.NotFound, error)
+case class WavesNodeUnavailable(error: MatcherError)                  extends MatcherResponse(C.ServiceUnavailable, error)

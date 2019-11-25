@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration
 
-import java.net.InetSocketAddress
-
 import cats.Id
 import cats.instances.try_._
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
@@ -78,8 +76,8 @@ trait ItTestSuiteBase
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
   }
 
-  protected def createWavesNode(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer =
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, initialSuiteConfig)
+  protected def createWavesNode(name: String, runConfig: Config, suiteInitialConfig: Config): WavesNodeContainer =
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(WavesIntegrationItDocker.wavesNodesDomain))
 
   override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

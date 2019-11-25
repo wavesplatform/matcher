@@ -7,7 +7,7 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
-import com.wavesplatform.dex.db.AssetsDB
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -111,7 +111,7 @@ object MatcherKeys {
     )
 
   val AssetPrefix: Short = 26
-  def asset(x: IssuedAsset): Key[Option[AssetsDB.Item]] =
+  def asset(x: IssuedAsset): Key[Option[BriefAssetDescription]] =
     Key.opt(
       "matcher-asset",
       bytes(AssetPrefix, x.id.arr),
@@ -120,12 +120,14 @@ object MatcherKeys {
         val nameLength = bb.getInt
         val name       = new Array[Byte](nameLength)
         bb.get(name)
-        val decimals = bb.getInt
-        AssetsDB.Item(new String(name, StandardCharsets.UTF_8), decimals)
+        val decimals  = bb.getInt
+        val hasScript = bb.get == 1
+
+        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
       },
       x => {
         val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
-        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
       }
     )
 }

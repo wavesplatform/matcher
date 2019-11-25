@@ -1,11 +1,13 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 
+import mouse.any.anySyntaxMouse
 import org.scalatest.{Matchers, WordSpecLike}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 
 class BlockchainCacheSpecification extends WordSpecLike with Matchers {
 
@@ -18,58 +20,71 @@ class BlockchainCacheSpecification extends WordSpecLike with Matchers {
     new BlockchainCacheTest(loader, expiration, invalidationPredicate)
   }
 
+  private val andThenAwaitTimeout = 300
+
   "BlockchainCache" should {
 
     "not keep failed futures" in {
 
-      val keyAccessMap = collection.mutable.Map.empty[String, Int]
+      val goodKey = "good key"
+      val badKey  = "gRPC Error"
+
+      val keyAccessMap = new ConcurrentHashMap[String, Int] unsafeTap (m => { m.put(goodKey, 0); m.put(badKey, 0) })
       val gRPCError    = new RuntimeException("gRPC Error occurred")
-      val badKey       = "gRPC Error"
 
       val cache =
         createCache(
           key => {
-            keyAccessMap += key -> (keyAccessMap.getOrElse(key, 0) + 1)
-            if (key == badKey) Future.failed(gRPCError) else Future.successful(s"value = $key")
+            (if (key == badKey) Future.failed(gRPCError) else Future.successful(s"value = $key")) unsafeTap { _ =>
+              keyAccessMap.computeIfPresent(key, (_, prev) => prev + 1)
+            }
           }
         )
 
-      (1 to 5) foreach { _ =>
-        cache get "goodKey"
-        cache get badKey
-        Thread.sleep(100)
-      }
+      val badKeyAccessCount = 10
 
-      keyAccessMap shouldBe
-        Map(
-          "goodKey" -> 1,
-          badKey    -> 5
-        )
+      Await.result(
+        (1 to badKeyAccessCount).foldLeft { Future.successful("") } { (prev, _) =>
+          for {
+            _ <- prev
+            _ <- cache get goodKey
+            r <- cache get badKey recover { case _ => "sad" }
+          } yield { Thread.sleep(andThenAwaitTimeout); r }
+        },
+        scala.concurrent.duration.Duration.Inf
+      )
+
+      keyAccessMap.get(goodKey) shouldBe 1
+      keyAccessMap.get(badKey) should be > 1
     }
 
     "not keep values according to the predicate" in {
 
-      val keyAccessMap = collection.mutable.Map.empty[String, Int]
+      val goodKey = "111"
+      val badKey  = "222"
+
+      val keyAccessMap = new ConcurrentHashMap[String, Int] unsafeTap (m => { m.put(goodKey, 0); m.put(badKey, 0) })
 
       val cache = createCache(
-        key => {
-          keyAccessMap += key -> (keyAccessMap.getOrElse(key, 0) + 1)
-          Future.successful { Thread.sleep(50); key }
-        },
+        key => { Future.successful(key) unsafeTap (_ => keyAccessMap.computeIfPresent(key, (_, prev) => prev + 1)) },
         invalidationPredicate = result => result startsWith "2"
       )
 
-      (1 to 5) foreach { _ =>
-        cache get "111"
-        cache get "222"
-        Thread.sleep(100)
-      }
+      val badKeyAccessCount = 10
 
-      keyAccessMap shouldBe
-        Map(
-          "111" -> 1,
-          "222" -> 5
-        )
+      Await.result(
+        (1 to badKeyAccessCount).foldLeft { Future.successful("") } { (prev, _) =>
+          for {
+            _ <- prev
+            _ <- cache get goodKey
+            r <- cache get badKey
+          } yield { Thread.sleep(andThenAwaitTimeout); r }
+        },
+        scala.concurrent.duration.Duration.Inf
+      )
+
+      keyAccessMap.get(goodKey) shouldBe 1
+      keyAccessMap.get(badKey) should be > 1
     }
   }
 }

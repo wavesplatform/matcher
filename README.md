@@ -69,7 +69,7 @@ git clone git@github.com:wavesplatform/dex.git waves-dex
 cd waves-dex
 ```
 
-**NOTE**: the directory name must not be "dex" if you work in IntelliJ IDEA, see [Known issues](#10-known-issues).
+**NOTE**: the directory name must not be "dex" if you work in IntelliJ IDEA, see [Known issues](#9-known-issues).
 
 ## 3. Compilation and unit tests
 
@@ -116,17 +116,39 @@ sbt -Dnetwork=testnet packageAll
 
 ## 6. Installing and running
 
-Note, that the configuration [changes](#7-configuration) are required before run the Node with DEX.
+The DEX server runs as a separate service and communicates with a DEX extension on the Node. So:
 
-### DEB
+1. First of all, you need an installed Node.
+2. Then you need to install a DEX extension to the Node and update its configuration. This is a bridge between the DEX server and the Node.
+3. Next you should install DEX server and properly configure it.
+4. Run the Node, wait until it will be up with the network.
+5. Run the DEX.
 
-1. You need to install [Node with DEB](https://docs.wavesplatform.com/en/waves-full-node/how-to-install-a-node/on-ubuntu.html).
-2. Then you can install DEX: `sudo dpkg -i deb-artifact.deb`
+### 6.1. Node installation
 
-### TGZ
+See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
 
-To install just extract DEX's tgz artifact to the directory with Node's jar.
-To run:
+### 6.2. DEX extension installation and configuration 
+
+Its artifacts have names `waves-integration{version}.{extension}`.
+
+#### Installation
+
+##### DEB
+
+This is a preferred way to install DEX if your Node was installed from a DEB package.
+Run: `sudo dpkg -i deb-artifact.deb` . The extension will be automatically installed to the Node.
+
+##### ZIP
+
+To install a DEX extension from ZIP file:
+
+1. Copy the archive to the directory with Node's JAR
+2. Extract the archive. Its files will be added to the existed directories.
+
+Note, if you installed Node from a DEB package, DEX will be removed after update.
+
+To run the Node with DEX extension:
 
 *Debian/Ubuntu/macOS*:
 
@@ -140,25 +162,65 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
-## 7. Configuration
+#### Configration
 
-Update your configuration to enable DEX:
+Add lines to the Node's configuration:
 
 ```hocon
-# ... here many lines of your Node's configuration
- 
-waves.extensions = [
-  "com.wavesplatform.dex.Matcher"
-  # ... here may be other extensions
-]
- 
+waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"
+
 waves.dex {
-  account = "3Q5GKPLkxXcEwGv6d57v8aksTjh1igHNNDd" # This account must be known at the Node, e.g. created through POST /addresses
-  # bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
+  # gRPC integration settings for Waves Node
+  grpc.integration {
+    host = "127.0.0.1" # "0.0.0.0" if the DEX server connects to the DEX extension from other machine 
+    port = 6887
+  }
 }
+````
+
+### 6.3. DEX server installation and configuration
+
+Its artifacts have names like `dex{version}.{extension}`.
+
+#### Installation
+
+##### DEB
+
+`sudo dpkg -i deb-artifact.deb`
+
+#### ZIP
+
+To install a DEX server from ZIP file, just extract it.
+
+To run:
+
+*Debian/Ubuntu/macOS*:
+
+```
+/path/to/dex/directory/bin/waves-dex <your_JVM_options> /path/to/config.conf
 ```
 
-## 8. Running an extension project locally during development
+*Windows*:
+
+```
+/path/to/dex/directory/bin/waves-dex.bat <your_JVM_options> /path/to/config.conf
+```
+
+#### Configuration
+
+1. There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
+
+    ```hocon
+    # ... here many lines of your DEX's configuration
+    waves.dex {
+      directory = "/full/path/to/base/dex/directory"
+      # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
+    }
+    ```
+
+2. Generate an [account storage](#81-generating-account-storage) and update your configuration.
+
+## 7. Running an extension project locally during development
 
 ### SBT
 
@@ -182,17 +244,38 @@ sbt "dex/run /path/to/configuration"
 
 All files will be stored in `_local/runtime/mainnet`, including logs in the `log/` directory.
 
-## 9. Useful commands
+## 8. CLI
 
-In SBT.
+We have CLI tools accompanying to DEX server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
 
-### Generate documentation
+* Generating an account storage (required to run DEX server);
+* Generating an account seed by base seed, and printing useful information about it;
 
+If you want to run CLI from SBT, use the following template:
+
+```bash
+dex/runMain com.wavesplatform.dex.WavesDexCli here-your-arguments
 ```
-sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /path/to/output/docs/dir"
+
+### 8.1. Generating account storage
+
+Example:
+
+```bash
+./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /Users/vsuharnikov/work/waves/dex-backend/_local/runtime/grpc-test/dex
 ```
 
-## 10. Known issues
+here:
+
+* `W` is mainnet;
+* `--account-nonce 3` - we suppose you will provide a base seed and DEX server should use the fourth account of it (numeration starts with 0). 
+  If you will provide an account seed, don't specify this option;
+* `--output-directory` - where the `account.dat` file will be stored.
+
+After running this command you will see where your `account.dat` was saved and which settings do you have to add to the DEX server configuration.
+Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
+
+## 9. Known issues
 
 ### Common
 
@@ -239,7 +322,7 @@ sbt "dex/runMain com.wavesplatform.dex.MatcherTool /path/to/config gen-docs /pat
    2. Remove `javaagent` option
    3. Paste this into a terminal and run
 
-## 11. Production recommendations
+## 10. Production recommendations
 
 Recommended sections for your logback.xml
 
@@ -260,7 +343,7 @@ Recommended sections for your logback.xml
 <logger name="kamon.influxdb.CustomInfluxDBReporter" level="INFO"/>
 ```
 
-## 12. Contributor notes
+## 11. Contributor notes
 
 ### Branches
 

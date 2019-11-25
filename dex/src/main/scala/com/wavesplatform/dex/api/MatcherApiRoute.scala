@@ -4,11 +4,10 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
-import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
-import cats.implicits._
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.{ApiRoute, _}
@@ -20,14 +19,8 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -69,7 +62,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
-                           matcherAccountFee: () => Future[Long],
+                           matcherAccountFee: Long,
                            apiKeyHashStr: String, // TODO
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Future[Set[Byte]])
@@ -97,15 +90,26 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
       .result()
 
+  val gRPCExceptionsHandler: ExceptionHandler = ExceptionHandler {
+    case ex: WavesNodeConnectionLostException =>
+      log.error("Waves Node connection lost", ex)
+      complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken) }
+    case ex =>
+      log.error("An unexpected error occurred", ex)
+      complete { WavesNodeUnavailable(error.UnexpectedError) }
+  }
+
   override lazy val route: Route = pathPrefix("matcher") {
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        handleRejections(invalidJsonParsingRejectionsHandler) {
-          getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-            getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-            historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-            upsertRate ~ deleteRate ~ saveSnapshots
+        handleExceptions(gRPCExceptionsHandler) {
+          handleRejections(invalidJsonParsingRejectionsHandler) {
+            getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+              historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+              upsertRate ~ deleteRate ~ saveSnapshots
+          }
         }
       }
   }
@@ -208,14 +212,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     complete(
-      for {
-        allowedOrderVersions <- validatedAllowedOrderVersions
-        matcherAccountFee    <- matcherAccountFee()
-      } yield {
-        StatusCodes.OK -> Json.obj(
-          "priceAssets"   -> matcherSettings.priceAssets,
-          "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
-          "orderVersions" -> allowedOrderVersions.toSeq.sorted
+      validatedAllowedOrderVersions map { allowedOrderVersions =>
+        SimpleResponse(
+          StatusCodes.OK,
+          Json.obj(
+            "priceAssets"   -> matcherSettings.priceAssets,
+            "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+            "orderVersions" -> allowedOrderVersions.toSeq.sorted
+          )
         )
       }
     )
@@ -329,7 +333,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def orderBookInfoJson(pair: AssetPair): JsObject =
     Json.obj(
-      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.getJson.value },
+      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.json.value },
       "matchingRules" -> Json.obj(
         "tickSize" -> formatValue { getActualTickSize(pair) }
       )
@@ -401,11 +405,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
-    complete((timestamp, orderId) match {
-      case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
-      case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
-      case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
-    })
+    complete(
+      (timestamp, orderId) match {
+        case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
+        case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
+        case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
+      }
+    )
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
     withCancelRequest { req =>

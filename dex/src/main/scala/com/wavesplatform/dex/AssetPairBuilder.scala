@@ -1,10 +1,11 @@
 package com.wavesplatform.dex
 
-import cats.implicits._
+import cats.instances.future.catsStdInstancesForFuture
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
-import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect._
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics._
 import com.wavesplatform.transaction.Asset
@@ -14,8 +15,9 @@ import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
 
-class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset => FutureResult[AssetsDB.Item], blacklistedAssets: Set[IssuedAsset])(
-    implicit ec: ExecutionContext) {
+class AssetPairBuilder(settings: MatcherSettings,
+                       assetDescription: IssuedAsset => FutureResult[BriefAssetDescription],
+                       blacklistedAssets: Set[IssuedAsset])(implicit ec: ExecutionContext) {
 
   import com.wavesplatform.dex.model.OrderValidator._
 
@@ -33,14 +35,14 @@ class AssetPairBuilder(settings: MatcherSettings, assetDescription: IssuedAsset 
     case (Some(pi), Some(ai)) => pi < ai
   }
 
-  private def isBlacklistedByName(asset: IssuedAsset, desc: AssetsDB.Item): Boolean =
+  private def isBlacklistedByName(asset: IssuedAsset, desc: BriefAssetDescription): Boolean =
     settings.blacklistedNames.exists(_.findFirstIn(desc.name).nonEmpty)
 
   def validateAssetId(asset: Asset): FutureResult[Asset] = validateAssetId(asset, AssetSide.Unknown)
 
   private def validateAssetId(asset: Asset, side: AssetSide): FutureResult[Asset] = {
     asset.fold[FutureResult[Asset]] { liftValueAsync(Waves) } { asset =>
-      assetDescription(asset).subflatMap { desc =>
+      assetDescription(asset) subflatMap { desc =>
         if (blacklistedAssets.contains(asset) || isBlacklistedByName(asset, desc))
           Left(
             side match {

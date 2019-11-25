@@ -1,6 +1,6 @@
 package com.wavesplatform.it.async
 
-import cats.instances.future._
+import cats.instances.future.catsStdInstancesForFuture
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults

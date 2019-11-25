@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.apply._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.utils.ConfigSettingsValidator.{ErrorsListOr, _}
 import monix.eval.Coeval
@@ -16,7 +16,7 @@ case class OrderRestrictionsSettings(stepAmount: Double,
                                      minPrice: Double,
                                      maxPrice: Double) {
 
-  def getJson: Coeval[JsObject] = Coeval.evalOnce {
+  val json: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "stepAmount" -> formatValue(stepAmount),
       "minAmount"  -> formatValue(minAmount),

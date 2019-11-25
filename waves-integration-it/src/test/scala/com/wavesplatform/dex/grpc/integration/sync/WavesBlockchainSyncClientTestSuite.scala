@@ -99,7 +99,8 @@ class WavesBlockchainSyncClientTestSuite extends ItTestSuiteBase {
           name = new String(issueTx.name, StandardCharsets.UTF_8),
           decimals = issueTx.decimals,
           hasScript = issueTx.script.nonEmpty
-        ))
+        )
+      )
     }
   }
 

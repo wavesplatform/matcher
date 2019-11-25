@@ -8,6 +8,7 @@ import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsync
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
 import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
@@ -28,6 +29,13 @@ import scala.concurrent.{ExecutionContext, Future}
 class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Scheduler)(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainAsyncClient[Future]
     with ScorexLogging {
+
+  private def gRPCErrorsHandler(exception: Throwable): Throwable = exception match {
+    case ex: io.grpc.StatusRuntimeException => WavesNodeConnectionLostException("Waves Node cannot be reached via gRPC", ex)
+    case ex                                 => UnexpectedConnectionException("Unexpected connection error", ex)
+  }
+
+  private def handlingErrors[A](f: => Future[A]): Future[A] = { f transform (identity, gRPCErrorsHandler) }
 
   private val balancesService   = WavesBalancesApiGrpc.stub(channel)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
@@ -75,47 +83,51 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
   /** Returns stream of the balance changes as a sequence of batches */
   def spendableBalanceChanges: Observable[SpendableBalanceChanges] = spendableBalanceChangesSubject
 
-  def spendableBalance(address: Address, asset: Asset): Future[Long] = {
-    blockchainService.spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }.map(_.balance)
+  def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
+    blockchainService
+      .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
+      .map(_.balance)
   }
 
-  def isFeatureActivated(id: Short): Future[Boolean] = {
+  def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
     blockchainService.isFeatureActivated { IsFeatureActivatedRequest(id) }.map(_.isActivated)
   }
 
-  def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = {
+  def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = handlingErrors {
     blockchainService.assetDescription { AssetIdRequest(asset.toPB) }.map(_.maybeDescription.toVanilla)
   }
 
-  def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = {
+  def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = handlingErrors {
     blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.map(_.has)
   }
 
-  def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[WavesBlockchainClient.RunScriptResult] = {
+  def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[WavesBlockchainClient.RunScriptResult] = handlingErrors {
     blockchainService
       .runAssetScript { RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB)) }
       .map(parse)
   }
 
-  def hasScript(address: Address): Future[Boolean] = {
+  def hasScript(address: Address): Future[Boolean] = handlingErrors {
     blockchainService.hasAddressScript { HasAddressScriptRequest(address = address.toPB) }.map(_.has)
   }
 
-  def runScript(address: Address, input: Order): Future[WavesBlockchainClient.RunScriptResult] = {
+  def runScript(address: Address, input: Order): Future[WavesBlockchainClient.RunScriptResult] = handlingErrors {
     blockchainService
       .runAddressScript { RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB)) }
       .map(parse)
   }
 
-  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] = {
-    blockchainService
-      .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
-      .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
-  }
+  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
+    handlingErrors {
+      blockchainService
+        .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
+        .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
+    } recover { case _ => txIds.map(_ -> false).toMap }
 
-  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] = {
-    blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid)
-  }
+  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] =
+    handlingErrors { blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid) } recover { case _ => false }
 
-  def forgedOrder(orderId: ByteStr): Future[Boolean] = blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)
+  def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
+    blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)
+  }
 }

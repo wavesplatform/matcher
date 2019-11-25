@@ -81,6 +81,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val submitted = mkOrder(bob, oneSmartPair, BUY, amount, price, expectedFee, version = 2)
         dex1Api.place(submitted)
         waitForOrderAtNode(submitted)
+
         eventually {
           wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
           wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee
@@ -93,6 +94,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
           broadcastAndAwait(mkSetAccountScriptText(matcher, Some("true")))
+
+          restartContainer(dex1Container(), dex1Api) // matcher caches knowledge about it's script during start
 
           val bothSmartPair = createAssetPair(asset1, asset2)
 
@@ -116,6 +119,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           val submitted = mkOrder(bob, bothSmartPair, BUY, amount, price, expectedFee, version = 2)
           dex1Api.place(submitted)
           waitForOrderAtNode(submitted)
+
           eventually {
             wavesNode1Api.balance(alice, Waves) shouldBe aliceInitBalance - expectedFee
             wavesNode1Api.balance(bob, Waves) shouldBe bobInitBalance - expectedFee

@@ -3,7 +3,6 @@ package com.wavesplatform.dex.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
-import akka.pattern.pipe
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
@@ -20,14 +19,14 @@ import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 import scorex.utils._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class MatcherActor(settings: MatcherSettings,
                    assetPairsDB: AssetPairsDB,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: Asset => Future[Option[BriefAssetDescription]])(implicit ec: ExecutionContext)
+                   assetDescription: Asset => Option[BriefAssetDescription])(implicit ec: ExecutionContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -36,8 +35,8 @@ class MatcherActor(settings: MatcherSettings,
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  private var tradedPairs: Map[AssetPair, Future[MarketData]] = Map.empty
-  private var lastProcessedNr: Long                           = -1L
+  private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
+  private var lastProcessedNr: Long                   = -1L
 
   private var snapshotsState = SnapshotsState.empty
 
@@ -66,19 +65,21 @@ class MatcherActor(settings: MatcherSettings,
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
   }
 
-  private def createMarketData(pair: AssetPair): Future[MarketData] = {
-    for {
-      amountAssetDescription <- assetDescription(pair.amountAsset)
-      priceAssetDescription  <- assetDescription(pair.priceAsset)
-    } yield
-      MarketData(
-        pair,
-        getAssetName(pair.amountAsset, amountAssetDescription),
-        getAssetName(pair.priceAsset, priceAssetDescription),
-        System.currentTimeMillis(),
-        getAssetInfo(pair.amountAsset, amountAssetDescription),
-        getAssetInfo(pair.priceAsset, priceAssetDescription)
-      )
+  private def getAssetDesc(asset: Asset): Option[BriefAssetDescription] = asset.fold[Option[BriefAssetDescription]](None)(assetDescription)
+
+  private def createMarketData(pair: AssetPair): MarketData = {
+
+    val amountAssetDescription = getAssetDesc(pair.amountAsset)
+    val priceAssetDescription  = getAssetDesc(pair.priceAsset)
+
+    MarketData(
+      pair,
+      getAssetName(pair.amountAsset, amountAssetDescription),
+      getAssetName(pair.priceAsset, priceAssetDescription),
+      System.currentTimeMillis(),
+      getAssetInfo(pair.amountAsset, amountAssetDescription),
+      getAssetInfo(pair.priceAsset, priceAssetDescription)
+    )
   }
 
   private def createOrderBook(pair: AssetPair): ActorRef = {
@@ -131,7 +132,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def working: Receive = {
 
-    case GetMarkets         => Future.sequence(tradedPairs.values.toSeq).pipeTo(sender)
+    case GetMarkets         => sender ! tradedPairs.values.toSeq
     case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>
@@ -265,7 +266,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: Asset => Future[Option[BriefAssetDescription]])(implicit ec: ExecutionContext): Props = {
+            assetDescription: Asset => Option[BriefAssetDescription])(implicit ec: ExecutionContext): Props = {
     Props(
       new MatcherActor(
         matcherSettings,

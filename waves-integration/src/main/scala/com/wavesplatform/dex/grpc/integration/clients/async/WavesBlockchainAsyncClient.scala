@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.clients.async
 
-import cats.syntax.functor._
-import cats.{Applicative, Functor}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
@@ -16,17 +14,7 @@ object WavesBlockchainAsyncClient {
 
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
-
-  final implicit class Ops[F[_]: Functor: Applicative](val self: WavesBlockchainAsyncClient[F]) {
-
-    def assetDescription(asset: Asset): F[Option[BriefAssetDescription]] = {
-      asset.fold(Applicative[F].pure { BriefAssetDescription.someWavesDescription })(self.assetDescription)
-    }
-
-    def assetDecimals(asset: Asset.IssuedAsset): F[Option[Int]] = self.assetDescription(asset).map { _.map(_.decimals) }
-
-    def assetDecimals(asset: Asset): F[Option[Int]] = asset.fold { Applicative[F].pure(Option(8)) } { assetDecimals }
-  }
+  
 }
 
 trait WavesBlockchainAsyncClient[F[_]] {

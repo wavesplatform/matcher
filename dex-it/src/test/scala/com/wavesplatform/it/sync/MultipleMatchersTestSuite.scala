@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import cats.Id
-import cats.instances.future._
+import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair

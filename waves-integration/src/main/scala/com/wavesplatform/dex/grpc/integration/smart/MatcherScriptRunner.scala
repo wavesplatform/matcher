@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.smart
 
 import cats.Eval
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.v1.ExprScript

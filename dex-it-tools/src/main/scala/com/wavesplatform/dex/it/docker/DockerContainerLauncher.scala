@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.it.docker
 
-import cats.implicits._
+import cats.syntax.either._
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig

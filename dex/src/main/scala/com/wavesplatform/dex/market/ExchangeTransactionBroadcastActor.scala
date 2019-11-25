@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
-import cats.implicits._
+import cats.instances.future.catsStdInstancesForFuture
+import cats.syntax.functor._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated

@@ -125,6 +125,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def processEvents(events: Iterable[Event]): Unit = {
+
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
 
@@ -134,7 +135,7 @@ class OrderBookActor(owner: ActorRef,
         case Events.OrderCanceled(order, isSystemCancel, _) => log.info(s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)")
         case oe @ Events.OrderExecuted(submitted, counter, _) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
-          createTransaction(oe) foreach {
+          createTransaction(oe) match {
             case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex

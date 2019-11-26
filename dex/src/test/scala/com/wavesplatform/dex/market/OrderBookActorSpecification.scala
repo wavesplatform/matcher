@@ -22,10 +22,11 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification
@@ -36,9 +37,13 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-  private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
-  private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
+  private val txFactory = new ExchangeTransactionCreator(MatcherAccount,
+                                                         matcherSettings,
+                                                         false,
+                                                         _ => false)
+
+  private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
+  private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
@@ -84,11 +89,11 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        txFactory,
+        txFactory.createTransaction,
         ntpTime,
         matchingRules,
         _ => (),
-        raw => MatchingRule(raw.startOffset, (BigDecimal(raw.tickSize) * BigDecimal(10).pow(8)).toLongExact)
+        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact)
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)

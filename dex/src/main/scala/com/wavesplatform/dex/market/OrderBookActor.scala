@@ -22,6 +22,8 @@ import kamon.Kamon
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
+import scala.concurrent.ExecutionContext
+
 class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
                      snapshotStore: ActorRef,
@@ -32,7 +34,7 @@ class OrderBookActor(owner: ActorRef,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)
+                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)(implicit ec: ExecutionContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -123,6 +125,7 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def processEvents(events: Iterable[Event]): Unit = {
+
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
 
@@ -130,7 +133,7 @@ class OrderBookActor(owner: ActorRef,
       e match {
         case Events.OrderAdded(order, _)                    => log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
         case Events.OrderCanceled(order, isSystemCancel, _) => log.info(s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)")
-        case oe @ Events.OrderExecuted(submitted, counter, timestamp) =>
+        case oe @ Events.OrderExecuted(submitted, counter, _) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
           createTransaction(oe) match {
             case Right(tx) =>
@@ -197,7 +200,7 @@ object OrderBookActor {
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule): Props =
+            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)(implicit ec: ExecutionContext): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -219,7 +222,7 @@ object OrderBookActor {
   case class MarketStatus(
       lastTrade: Option[LastTrade],
       bestBid: Option[LevelAgg],
-      bestAsk: Option[LevelAgg],
+      bestAsk: Option[LevelAgg]
   )
 
   object MarketStatus {

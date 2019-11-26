@@ -1,11 +1,13 @@
 package com.wavesplatform.dex
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -89,7 +91,7 @@ object MatcherKeys {
 
   val AssetPairsPrefix: Short = 23
   def assetPair(pair: AssetPair): Key[Unit] =
-    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => (), _ => Array.emptyByteArray)
+    Key("matcher-asset-pair", bytes(AssetPairsPrefix, pair.bytes), _ => Unit, _ => Array.emptyByteArray)
 
   val OrderBookSnapshotOffsetPrefix: Short = 24
   def orderBookSnapshotOffset(pair: AssetPair): Key[Option[Long]] =
@@ -105,6 +107,27 @@ object MatcherKeys {
         val r = new mutable.ArrayBuilder.ofByte
         OrderBook.Snapshot.serialize(r, x)
         r.result()
+      }
+    )
+
+  val AssetPrefix: Short = 26
+  def asset(x: IssuedAsset): Key[Option[BriefAssetDescription]] =
+    Key.opt(
+      "matcher-asset",
+      bytes(AssetPrefix, x.id.arr),
+      bytes => {
+        val bb         = ByteBuffer.wrap(bytes)
+        val nameLength = bb.getInt
+        val name       = new Array[Byte](nameLength)
+        bb.get(name)
+        val decimals  = bb.getInt
+        val hasScript = bb.get == 1
+
+        BriefAssetDescription(new String(name, StandardCharsets.UTF_8), decimals, hasScript)
+      },
+      x => {
+        val nameBytes = x.name.getBytes(StandardCharsets.UTF_8)
+        Ints.toByteArray(nameBytes.length) ++ nameBytes ++ Ints.toByteArray(x.decimals) ++ Array[Byte](if (x.hasScript) 1 else 0)
       }
     )
 }

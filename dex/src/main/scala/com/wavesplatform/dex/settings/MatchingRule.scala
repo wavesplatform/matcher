@@ -1,12 +1,10 @@
 package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
-import cats.implicits._
-import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.model.MatcherModel
+import cats.syntax.apply._
 import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import future.com.wavesplatform.settings.nonEmptyListReader
@@ -20,17 +18,10 @@ import scala.util.Try
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
 
-  /**
-    * Denormalizes matching rule
-    * @param defaultTickSize lambda that describes returned tick size value when assets in the pair are absent from the blockchain
-    */
-  def denormalize(assetPair: AssetPair,
-                  blockchain: Blockchain,
-                  defaultTickSize: MatcherError => Double = _ => DenormalizedMatchingRule.DefaultTickSize): DenormalizedMatchingRule = {
-    val denormalizedTickSize = Denormalization.denormalizePrice(tickSize, assetPair, blockchain)
+  def denormalize(assetPair: AssetPair, getAssetDecimals: Asset => Int): DenormalizedMatchingRule = {
     DenormalizedMatchingRule(
-      startOffset = startOffset,
-      tickSize = denormalizedTickSize.leftMap { defaultTickSize }.merge
+      startOffset,
+      Denormalization.denormalizePrice(tickSize, getAssetDecimals(assetPair.amountAsset), getAssetDecimals(assetPair.priceAsset))
     )
   }
 }
@@ -41,18 +32,21 @@ object MatchingRule {
 }
 
 /** Denormalized representation of the matching rule passed from the application.conf */
-case class DenormalizedMatchingRule(startOffset: Long, tickSize: Double) {
+case class DenormalizedMatchingRule(startOffset: Long, tickSize: BigDecimal) {
 
-  def normalize(assetPair: AssetPair, blockchain: Blockchain): MatchingRule = {
-    val normalizedTickSize = Normalization.normalizePrice(tickSize, assetPair, MatcherModel.getPairDecimals(assetPair, blockchain).getOrElse(8 -> 8))
-    MatchingRule(startOffset, normalizedTickSize)
+  def normalize(assetPair: AssetPair, assetDecimals: Asset => Int): MatchingRule = {
+    MatchingRule(
+      startOffset,
+      Normalization.normalizePrice(tickSize, assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset))
+    )
   }
 }
 
 object DenormalizedMatchingRule extends ScorexLogging {
 
-  val DefaultTickSize: Double               = 0.00000001
-  val DefaultRule: DenormalizedMatchingRule = DenormalizedMatchingRule(0L, DefaultTickSize)
+  def getDefaultRule(assetPair: AssetPair, assetDecimals: Asset => Int): DenormalizedMatchingRule = {
+    MatchingRule.DefaultRule.denormalize(assetPair, assetDecimals)
+  }
 
   @annotation.tailrec
   def skipOutdated(currOffset: QueueEventWithMeta.Offset, rules: NonEmptyList[DenormalizedMatchingRule]): NonEmptyList[DenormalizedMatchingRule] =
@@ -69,7 +63,7 @@ object DenormalizedMatchingRule extends ScorexLogging {
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     val offsetValidated   = cfgValidator.validateByPredicate[Long](s"$path.start-offset")(_ >= 0, "required 0 <= start offset")
-    val tickSizeValidated = cfgValidator.validateByPredicate[Double](s"$path.tick-size")(_ > 0, "required 0 < tick size")
+    val tickSizeValidated = cfgValidator.validateByPredicate[BigDecimal](s"$path.tick-size")(_ > 0, "required 0 < tick size")
 
     (offsetValidated, tickSizeValidated) mapN DenormalizedMatchingRule.apply getValueOrThrowErrors
   }
@@ -85,23 +79,11 @@ object DenormalizedMatchingRule extends ScorexLogging {
     * Returns denormalized (from application.conf) matching rules for the specified asset pair.
     * Prepends default rule if matching rules list doesn't contain element with startOffset = 0
     */
-  def getDenormalizedMatchingRules(settings: MatcherSettings, blockchain: Blockchain, assetPair: AssetPair)(
-      implicit errorFormatterContext: ErrorFormatterContext): NonEmptyList[DenormalizedMatchingRule] = {
-    lazy val defaultRule =
-      MatchingRule.DefaultRule.denormalize(
-        assetPair,
-        blockchain,
-        defaultTickSize = { e =>
-          // DEX-488 TODO remove after found a reason of NPE
-          val errorMsg =
-            s"""Can't convert matching rule for $assetPair: ${Try(e.mkMessage(errorFormatterContext).text).getOrElse(e.code)}.
-               | Usually this happens when the blockchain was rolled back.""".stripMargin
-          log.error(errorMsg)
-          DenormalizedMatchingRule.DefaultTickSize
-        }
-      )
-
-    val rules = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
+  def getDenormalizedMatchingRules(settings: MatcherSettings,
+                                   assetDecimals: Asset => Int,
+                                   assetPair: AssetPair): NonEmptyList[DenormalizedMatchingRule] = {
+    lazy val defaultRule = getDefaultRule(assetPair, assetDecimals)
+    val rules            = settings.matchingRules.getOrElse(assetPair, NonEmptyList.one(defaultRule))
     if (rules.head.startOffset == 0) rules else defaultRule :: rules
   }
 }

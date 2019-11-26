@@ -1,7 +1,7 @@
 package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, Terminated}
-import com.wavesplatform.dex.WatchDistributedCompletionActor.TimedOut
+import com.wavesplatform.dex.actors.TimedOut
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
@@ -35,7 +35,7 @@ class WatchDistributedCompletionActor(workers: Set[ActorRef],
 
     case TimedOut =>
       val workerPairs = workers.iterator.map(_.path.name).mkString(", ")
-      log.error(s"PingAll is timed out! Pairs those didn't respond: $workerPairs")
+      log.error(s"$startWorkCommand is timed out! Workers those didn't respond: $workerPairs")
       stop(timer)
   }
 
@@ -52,6 +52,4 @@ class WatchDistributedCompletionActor(workers: Set[ActorRef],
 object WatchDistributedCompletionActor {
   def props(workers: Set[ActorRef], completionReceiver: ActorRef, startWorkCommand: Any, workCompleted: Any, timeout: FiniteDuration): Props =
     Props(new WatchDistributedCompletionActor(workers, completionReceiver, startWorkCommand, workCompleted, timeout))
-
-  private object TimedOut
 }

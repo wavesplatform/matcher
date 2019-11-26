@@ -12,7 +12,7 @@ case class OrderBookResult(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg]
 
 object OrderBookResult {
 
-  private def formatValue(value: Double, decimals: Int): String = new java.text.DecimalFormat(s"0.${"0" * decimals}").format(value)
+  private def formatValue(value: BigDecimal, decimals: Int): String = new java.text.DecimalFormat(s"0.${"0" * decimals}").format(value)
 
   private def denormalizeAndSerializeSide(side: Seq[LevelAgg], amountAssetDecimals: Int, priceAssetDecimals: Int, jg: JsonGenerator): Unit = {
     side.foreach { levelAgg =>

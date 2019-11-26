@@ -1,56 +1,70 @@
 package com.wavesplatform.it.sync
 
-import akka.http.scaladsl.model.StatusCodes
+import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.LevelResponse
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{wavesBtcPair, _}
-import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.OrderType
+import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
-import scala.concurrent.duration._
-
+// TODO refactor balances retrieving
 class OrderFeeTestSuite extends MatcherSuiteBase {
 
-  val baseFee = 300000
+  private val baseFee = 300000
 
-  override protected def nodeConfigs: Seq[Config] = {
-
-    val orderFeeSettingsStr =
-      s"""
-         |waves.dex {
-         |  allowed-order-versions = [1, 2, 3]
-         |  order-fee {
-         |    mode = dynamic
-         |    dynamic {
-         |      base-fee = $baseFee
-         |    }
-         |    percent {
-         |      asset-type = amount
-         |      min-fee = 10
-         |    }
-         |    fixed {
-         |      asset = "$EthId"
-         |      min-fee = 10
-         |    }
-         |  }
-         |}
+  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    s"""
+       |waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  allowed-order-versions = [1, 2, 3]
+       |  order-fee {
+       |    mode = dynamic
+       |    dynamic {
+       |      base-fee = $baseFee
+       |    }
+       |    percent {
+       |      asset-type = amount
+       |      min-fee = 10
+       |    }
+       |    fixed {
+       |      asset = $EthId
+       |      min-fee = 10
+       |    }
+       |  }
+       |}
        """.stripMargin
-
-    super.nodeConfigs.map(
-      ConfigFactory
-        .parseString(orderFeeSettingsStr)
-        .withFallback
-    )
-  }
+  )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    val txIds = Seq(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_).id)
-    txIds.foreach(node.waitForTransaction(_))
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+    broadcastAndAwait(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx)
+    startAndWait(dex1Container(), dex1Api)
+  }
+
+  private def mkBobOrder: Order = mkOrder(
+    owner = bob,
+    pair = wavesBtcPair,
+    orderType = OrderType.BUY,
+    amount = 1.waves,
+    price = 50000L,
+    matcherFee = 150L,
+    version = 3: Byte,
+    matcherFeeAssetId = btc
+  )
+
+  private def mkAliceOrder: Order = mkOrder(
+    owner = alice,
+    pair = wavesBtcPair,
+    orderType = OrderType.SELL,
+    amount = 1.waves,
+    price = 50000L,
+    matcherFee = 1920L,
+    version = 3,
+    matcherFeeAssetId = eth
+  )
+
+  def upsertRates(pairs: (IssuedAsset, Double)*): Unit = pairs.foreach {
+    case (asset, rate) => withClue(s"$asset")(dex1Api.upsertRate(asset, rate))
   }
 
   "supported non-waves order fee" - {
@@ -58,254 +72,196 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     val ethRate = 0.0064
 
     "is not enough" in {
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-
-      assertBadRequestAndResponse(
-        node.placeOrder(
-          sender = bob,
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      dex1Api.tryPlace(
+        mkOrder(
+          owner = bob,
           pair = wavesBtcPair,
           orderType = OrderType.BUY,
           amount = 1.waves,
           price = 50000L,
-          fee = 100L,
-          version = 3: Byte,
-          feeAsset = IssuedAsset(BtcId)
-        ),
+          matcherFee = 100L, // ^ 150
+          matcherFeeAssetId = btc
+        )
+      ) should failWith(
+        9441542, // FeeNotEnough
         s"Required 0.0000015 $BtcId as fee for this order, but given 0.000001 $BtcId"
-      )
+      ) // TODO
 
-      assertBadRequestAndResponse(
-        node.placeOrder(
-          sender = bob,
+      // TODO
+      val r = dex1Api.tryPlace(
+        mkOrder(
+          owner = bob,
           pair = wavesBtcPair,
           orderType = OrderType.BUY,
           amount = 1.waves,
           price = 50000L,
-          fee = 1920L,
-          version = 3: Byte,
-          feeAsset = IssuedAsset(EthId)
-        ),
-        s"Not enough tradable balance. The order requires 0.0000192 $EthId and 0.0005 $BtcId"
+          matcherFee = 1920L, // ^ 150
+          matcherFeeAssetId = eth // ^ BTC
+        )
       )
-      Array(BtcId, EthId)
-        .foreach(assetId => node.deleteRate(IssuedAsset(assetId)))
+
+      r should failWith(3147270, s"0.0000192 $EthId") // BalanceNotEnough
+      r should failWith(3147270, s"0.0005 $BtcId")    // BalanceNotEnough
+
+      List(btc, eth).foreach(dex1Api.deleteRate)
     }
 
     "is enough" in {
-      node.upsertRate(IssuedAsset(BtcId), btcRate, expectedStatusCode = StatusCodes.Created)
-      node.placeOrder(
-        sender = bob,
-        pair = wavesBtcPair,
-        orderType = OrderType.SELL,
-        amount = 1.waves,
-        price = 50000L,
-        fee = 150L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(BtcId)
-      )
-      node.reservedBalance(bob).keys shouldNot contain(BtcId.toString)
-      node.reservedBalance(bob)("WAVES") shouldEqual 100000000L
-      node.cancelAllOrders(bob)
 
-      node.placeOrder(
-        sender = bob,
-        pair = wavesBtcPair,
-        orderType = OrderType.BUY,
-        amount = 1.waves,
-        price = 50000L,
-        fee = 150L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(BtcId)
+      upsertRates(btc -> btcRate)
+      dex1Api.place(
+        mkOrder(
+          owner = bob,
+          pair = wavesBtcPair,
+          orderType = OrderType.SELL,
+          amount = 1.waves,
+          price = 50000L,
+          matcherFee = 150L,
+          matcherFeeAssetId = btc
+        )
       )
-      node.reservedBalance(bob)(BtcId.toString) shouldEqual 50150L
-      node.reservedBalance(bob).keys shouldNot contain("WAVES")
-      node.cancelAllOrders(bob)
-      node.deleteRate(IssuedAsset(BtcId))
+
+      val before = dex1Api.reservedBalance(bob)
+      before.keys shouldNot contain(btc)
+      before(Waves) shouldEqual 100000000L
+      dex1Api.cancelAll(bob)
+
+      dex1Api.place(mkBobOrder)
+      val after = dex1Api.reservedBalance(bob)
+      after(btc) shouldEqual 50150L
+      after.keys shouldNot contain(Waves)
+      dex1Api.cancelAll(bob)
+      dex1Api.deleteRate(btc)
     }
 
     "missing part of fee can be withdraw after order fill" in {
-      node.upsertRate(IssuedAsset(EthId), ethRate, expectedStatusCode = StatusCodes.Created)
-      val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
-      if (bobEthBalance > 0) {
-        node.broadcastTransfer(bob, alice.toAddress.toString, bobEthBalance, minFee, Option(EthId.toString), None, waitForTx = true)
-      }
-      val bobOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = ethWavesPair,
-          orderType = OrderType.BUY,
-          amount = 100000000L,
-          price = 156250000000L,
-          fee = 1920L,
-          version = 3: Byte,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      node.placeOrder(
-        sender = alice,
+      upsertRates(eth -> ethRate)
+      val bobEthBalance = wavesNode1Api.balance(bob, eth)
+      if (bobEthBalance > 0) wavesNode1Api.broadcast(mkTransfer(bob, alice, bobEthBalance, eth))
+      val bobOrder = mkOrder(
+        owner = bob,
         pair = ethWavesPair,
-        orderType = OrderType.SELL,
+        orderType = OrderType.BUY,
         amount = 100000000L,
         price = 156250000000L,
-        fee = 1920L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(EthId)
+        matcherFee = 1920L,
+        matcherFeeAssetId = eth
       )
-      node.waitOrderInBlockchain(bobOrderId)
-      node.assertAssetBalance(bob.toAddress.toString, EthId.toString, 100000000L - 1920L)
-      node.deleteRate(IssuedAsset(EthId))
+      dex1Api.place(bobOrder)
+      dex1Api.place(
+        mkOrder(
+          owner = alice,
+          pair = ethWavesPair,
+          orderType = OrderType.SELL,
+          amount = 100000000L,
+          price = 156250000000L,
+          matcherFee = 1920L,
+          matcherFeeAssetId = eth
+        ))
+      waitForOrderAtNode(bobOrder)
+      eventually {
+        wavesNode1Api.balance(bob, eth) shouldBe (100000000L - 1920L)
+      }
+      dex1Api.deleteRate(eth)
     }
   }
 
   "asset fee is not supported" - {
     val btcRate = 0.0005
     val ethRate = 0.0064
-    val order = node.prepareOrder(
-      sender = bob,
-      pair = wavesBtcPair,
-      orderType = OrderType.BUY,
-      amount = 1.waves,
-      price = 50000L,
-      fee = 150L,
-      version = 3: Byte,
-      feeAsset = IssuedAsset(BtcId)
-    )
+    val order   = mkBobOrder
 
     "only waves supported" in {
-      assertBadRequestAndResponse(node.placeOrder(order), s"Required one of the following fee asset: WAVES. But given $BtcId")
+      dex1Api.tryPlace(order) should failWith(
+        9441540, // UnexpectedFeeAsset
+        s"Required one of the following fee asset: WAVES. But given $BtcId"
+      )
     }
 
     "not only waves supported" in {
-      node.upsertRate(IssuedAsset(EthId), 0.1, expectedStatusCode = StatusCodes.Created)
-      assertBadRequestAndResponse(node.placeOrder(order), s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId")
-      node.deleteRate(IssuedAsset(EthId))
+      upsertRates(eth -> 0.1)
+      dex1Api.tryPlace(order) should failWith(
+        9441540, // UnexpectedFeeAsset
+        s"Required one of the following fee asset: $EthId, WAVES. But given $BtcId"
+      )
+      dex1Api.deleteRate(eth)
     }
 
     "asset became not supported after order was placed" in {
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-      val bobOrderId      = node.placeOrder(order).message.id
-      node.deleteRate(IssuedAsset(BtcId))
-      node
-        .placeOrder(
-          sender = alice,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      node.waitOrderStatus(wavesBtcPair, bobOrderId, "Filled", 500.millis)
-      node.waitOrderInBlockchain(bobOrderId)
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 150L - 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 1920L)
-      node.deleteRate(IssuedAsset(EthId))
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobBtcBalance   = wavesNode1Api.balance(bob, btc)
+      val aliceBtcBalance = wavesNode1Api.balance(alice, btc)
+      val aliceEthBalance = wavesNode1Api.balance(alice, eth)
+      dex1Api.place(order)
+      dex1Api.deleteRate(btc)
+      dex1Api.place(mkAliceOrder)
+      dex1Api.waitForOrderStatus(order, OrderStatus.Filled)
+      waitForOrderAtNode(order)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      }
+      dex1Api.deleteRate(eth)
     }
 
     "asset became not supported after order was partially filled" in {
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-      val aliceOrderId = node
-        .placeOrder(
-          sender = alice,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 2.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      node.reservedBalance(alice)(EthId.toString) shouldBe 1920L
-      node.placeOrder(
-        sender = bob,
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobBtcBalance   = wavesNode1Api.balance(bob, btc)
+      val aliceBtcBalance = wavesNode1Api.balance(alice, btc)
+      val aliceEthBalance = wavesNode1Api.balance(alice, eth)
+      val aliceOrder = mkOrder(
+        owner = alice,
+        matcher = matcher,
         pair = wavesBtcPair,
-        orderType = OrderType.BUY,
-        amount = 1.waves,
+        orderType = OrderType.SELL,
+        amount = 2.waves,
         price = 50000L,
-        fee = 150L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(BtcId)
+        matcherFee = 1920L,
+        matcherFeeAssetId = eth
       )
-      node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled", 500.millis)
-      node.waitOrderInBlockchain(aliceOrderId)
-      node.reservedBalance(alice)(EthId.toString) shouldBe 960L
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 150L - 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 960L)
-      node.deleteRate(IssuedAsset(EthId))
-      val bobSecondOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = wavesBtcPair,
-          orderType = OrderType.BUY,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3: Byte,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
-      node.waitOrderStatus(wavesBtcPair, aliceOrderId, "Filled", 500.millis)
-      node.waitOrderInBlockchain(bobSecondOrderId)
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 300L - 100000L)
-      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 100000L)
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 1920L)
-      node.deleteRate(IssuedAsset(BtcId))
+      dex1Api.place(aliceOrder)
+      dex1Api.reservedBalance(alice)(eth) shouldBe 1920L
+      dex1Api.place(mkBobOrder)
+      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.PartiallyFilled)
+      waitForOrderAtNode(aliceOrder)
+      eventually {
+        dex1Api.reservedBalance(alice)(eth) shouldBe 960L
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 150L - 50000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+      }
+
+      dex1Api.deleteRate(eth)
+
+      val bobSecondOrder = mkBobOrder
+      dex1Api.place(bobSecondOrder)
+      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+      waitForOrderAtNode(bobSecondOrder)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 300L - 100000L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 100000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+      }
+      dex1Api.deleteRate(btc)
     }
 
     "rates of asset pair was changed while order is placed" in {
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val bobOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = wavesBtcPair,
-          orderType = OrderType.BUY,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobBtcBalance = wavesNode1Api.balance(bob, btc)
+      val bobOrder      = mkBobOrder
+      dex1Api.place(bobOrder)
+
       val newBtcRate = btcRate * 2
-      node.upsertRate(IssuedAsset(BtcId), newBtcRate, expectedStatusCode = StatusCodes.OK)
-      node.reservedBalance(bob)(BtcId.toString) shouldBe 50150L
-      node
-        .placeOrder(
-          sender = alice,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      node.waitOrderInBlockchain(bobOrderId)
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 50150L)
-      Array(BtcId, EthId).foreach(assetId => node.deleteRate(IssuedAsset(assetId)))
+      dex1Api.upsertRate(btc, newBtcRate)._1 shouldBe StatusCodes.Ok
+      dex1Api.reservedBalance(bob)(btc) shouldBe 50150L
+      dex1Api.place(mkAliceOrder)
+      waitForOrderAtNode(bobOrder)
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+      }
+      List(btc, eth).foreach(dex1Api.deleteRate)
     }
   }
 
@@ -314,183 +270,115 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     val ethRate = 0.0064
 
     "are full filled" in {
-      val bobBtcBalance     = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-      val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
-      val matcherBtcBalance = node.assetBalance(matcher.toAddress.toString, BtcId.toString).balance
-      val bobWavesBalance   = node.accountBalances(bob.toAddress.toString)._1
-      val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
+      val bobBtcBalance     = wavesNode1Api.balance(bob, btc)
+      val aliceBtcBalance   = wavesNode1Api.balance(alice, btc)
+      val aliceEthBalance   = wavesNode1Api.balance(alice, eth)
+      val matcherEthBalance = wavesNode1Api.balance(matcher, eth)
+      val matcherBtcBalance = wavesNode1Api.balance(matcher, btc)
+      val bobWavesBalance   = wavesNode1Api.balance(bob, Waves)
+      val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
 
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = wavesBtcPair,
-          orderType = OrderType.BUY,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
-      node.waitOrderStatus(wavesBtcPair, bobOrderId, "Accepted")
-      node.reservedBalance(bob).keys should not contain "WAVES"
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobOrder = mkBobOrder
+      placeAndAwait(bobOrder)
+      dex1Api.reservedBalance(bob).keys should not contain Waves
 
-      val aliceOrderId = node
-        .placeOrder(
-          sender = alice,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      Array(bobOrderId, aliceOrderId)
-        .foreach(orderId => node.waitOrderStatus(wavesBtcPair, orderId, "Filled"))
-      Array(bobOrderId, aliceOrderId)
-        .foreach(orderId => node.waitOrderInBlockchain(orderId))
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 50150L)
-      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 1920L)
-      node.assertAssetBalance(matcher.toAddress.toString, EthId.toString, matcherEthBalance + 1920L)
-      node.assertAssetBalance(matcher.toAddress.toString, BtcId.toString, matcherBtcBalance + 150L)
-      node.assertBalances(bob.toAddress.toString, bobWavesBalance + 1.waves)
-      node.assertBalances(alice.toAddress.toString, aliceWavesBalance - 1.waves)
-      Array(BtcId, EthId)
-        .foreach(assetId => node.deleteRate(IssuedAsset(assetId)))
+      val aliceOrder = mkAliceOrder
+      dex1Api.place(aliceOrder)
+
+      List(bobOrder, aliceOrder).foreach(dex1Api.waitForOrderStatus(_, OrderStatus.Filled))
+      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
+
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 1920L)
+        wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 1920L)
+        wavesNode1Api.balance(matcher, btc) shouldBe (matcherBtcBalance + 150L)
+        wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
+      }
+      List(btc, eth).foreach(dex1Api.deleteRate)
     }
 
     "are partial filled" in {
-      val bobBtcBalance     = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-      val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
+      val bobBtcBalance     = wavesNode1Api.balance(bob, btc)
+      val aliceBtcBalance   = wavesNode1Api.balance(alice, btc)
+      val aliceEthBalance   = wavesNode1Api.balance(alice, eth)
+      val matcherEthBalance = wavesNode1Api.balance(matcher, eth)
 
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = wavesBtcPair,
-          orderType = OrderType.BUY,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
-      val aliceOrderId = node
-        .placeOrder(
-          sender = alice,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 2.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobOrder = mkBobOrder
+      dex1Api.place(bobOrder)
 
-      Map(bobOrderId -> "Filled", aliceOrderId -> "PartiallyFilled")
-        .foreach(order => node.waitOrderStatus(wavesBtcPair, order._1, order._2, 500.millis))
-      Array(bobOrderId, aliceOrderId)
-        .foreach(orderId => node.waitOrderInBlockchain(orderId))
+      val aliceOrder = mkOrder(
+        owner = alice,
+        pair = wavesBtcPair,
+        orderType = OrderType.SELL,
+        amount = 2.waves,
+        price = 50000L,
+        matcherFee = 1920L,
+        matcherFeeAssetId = eth
+      )
+      dex1Api.place(aliceOrder)
 
-      node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 50150L)
-      node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 960L)
-      node.assertAssetBalance(matcher.toAddress.toString, EthId.toString, matcherEthBalance + 960L)
+      Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1Api.waitForOrderStatus))
+      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
 
-      node.cancelAllOrders(alice)
-      Array(BtcId, EthId)
-        .foreach(assetId => node.deleteRate(IssuedAsset(assetId)))
+      eventually {
+        wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+        wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+        wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + 960L)
+      }
+
+      dex1Api.cancelAll(alice)
+      List(btc, eth).foreach(dex1Api.deleteRate)
     }
 
     "are partial filled both" in {
       val params = Map(9.waves -> 213L, 1900.waves -> 1L, 2000.waves -> 1L)
       for ((aliceOrderAmount, aliceBalanceDiff) <- params) {
 
-        val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+        val bobBtcBalance   = wavesNode1Api.balance(bob, btc)
+        val bobWavesBalance = wavesNode1Api.balance(bob, Waves)
 
-        val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-        val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+        val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
+        val aliceBtcBalance   = wavesNode1Api.balance(alice, btc)
+        val aliceEthBalance   = wavesNode1Api.balance(alice, eth)
 
-        val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
+        val matcherEthBalance = wavesNode1Api.balance(matcher, eth)
 
-        Map(btc -> btcRate, eth -> ethRate).foreach {
-          case (asset, rate) => node.upsertRate(asset, rate, expectedStatusCode = StatusCodes.Created)
+        upsertRates(btc -> btcRate, eth -> ethRate)
+        val bobOrder = mkBobOrder
+        placeAndAwait(bobOrder)
+        dex1Api.reservedBalance(bob).keys should not contain Waves
+
+        val aliceOrder = mkOrder(
+          owner = alice,
+          pair = wavesBtcPair,
+          orderType = OrderType.SELL,
+          amount = aliceOrderAmount,
+          price = 50000L,
+          matcherFee = 1920L,
+          matcherFeeAssetId = eth
+        )
+        dex1Api.place(aliceOrder)
+
+        Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1Api.waitForOrderStatus))
+        List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
+
+        eventually {
+          wavesNode1Api.balance(bob, btc) shouldBe (bobBtcBalance - 50150L)
+          wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 50000L)
+          wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - aliceBalanceDiff)
+          wavesNode1Api.balance(matcher, eth) shouldBe (matcherEthBalance + aliceBalanceDiff)
+          wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance + 1.waves)
+          wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 1.waves)
         }
 
-        val bobOrderId =
-          node
-            .placeOrder(
-              sender = bob,
-              pair = wavesBtcPair,
-              orderType = OrderType.BUY,
-              amount = 1.waves,
-              price = 50000L,
-              fee = 150L,
-              version = 3,
-              feeAsset = btc
-            )
-            .message
-            .id
-
-        node.waitOrderStatus(wavesBtcPair, bobOrderId, "Accepted")
-        node.reservedBalance(bob).keys should not contain "WAVES"
-
-        val aliceOrderId =
-          node
-            .placeOrder(
-              sender = alice,
-              pair = wavesBtcPair,
-              orderType = OrderType.SELL,
-              amount = aliceOrderAmount,
-              price = 50000L,
-              fee = 1920L,
-              version = 3,
-              feeAsset = eth
-            )
-            .message
-            .id
-
-        Map(bobOrderId -> "Filled", aliceOrderId -> "PartiallyFilled").foreach {
-          case (orderId, orderStatus) => node.waitOrderStatus(wavesBtcPair, orderId, orderStatus, 500.millis)
-        }
-
-        Array(bobOrderId, aliceOrderId).foreach {
-          node.waitOrderInBlockchain(_)
-        }
-
-        node.assertAssetBalance(bob.toAddress.toString, BtcId.toString, bobBtcBalance - 50150L)
-        node.assertAssetBalance(alice.toAddress.toString, BtcId.toString, aliceBtcBalance + 50000L)
-
-        withClue(s"Alice's ETH balance diff = $aliceBalanceDiff, alice's order amount = $aliceOrderAmount:\n") {
-          node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - aliceBalanceDiff)
-          node.assertAssetBalance(matcher.toAddress.toString, EthId.toString, matcherEthBalance + aliceBalanceDiff)
-        }
-
-        node.assertBalances(bob.toAddress.toString, bobWavesBalance + 1.waves)
-        node.assertBalances(alice.toAddress.toString, aliceWavesBalance - 1.waves)
-
-        node.cancelAllOrders(alice)
-        Array(btc, eth).foreach {
-          node.deleteRate(_)
-        }
+        dex1Api.cancelAll(alice)
+        List(btc, eth).foreach(dex1Api.deleteRate)
       }
     }
   }
@@ -499,478 +387,412 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     val btcRate = 0.0005
     val ethRate = 0.0064
     "order with non-waves fee" in {
-      val assetPair  = wavesBtcPair
-      val bobBalance = node.tradableBalance(bob, assetPair)
-      node.upsertRate(IssuedAsset(BtcId), btcRate, expectedStatusCode = StatusCodes.Created)
-      val orderId = node
-        .placeOrder(
-          sender = bob,
-          pair = wavesBtcPair,
-          orderType = OrderType.SELL,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3: Byte,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
-      node.cancelOrder(bob, assetPair, orderId).status shouldBe "OrderCanceled"
-      node.reservedBalance(bob).keys.size shouldBe 0
-      node.tradableBalance(bob, wavesBtcPair) shouldEqual bobBalance
-      node.deleteRate(IssuedAsset(BtcId))
+      val bobBalance = dex1Api.tradableBalance(bob, wavesBtcPair)
+      upsertRates(btc -> btcRate)
+      val order = mkOrder(
+        owner = bob,
+        pair = wavesBtcPair,
+        orderType = OrderType.SELL,
+        amount = 1.waves,
+        price = 50000L,
+        matcherFee = 150L,
+        matcherFeeAssetId = btc
+      )
+      dex1Api.place(order)
+      dex1Api.cancel(bob, order).status shouldBe "OrderCanceled"
+      dex1Api.reservedBalance(bob).keys.size shouldBe 0
+      dex1Api.tradableBalance(bob, wavesBtcPair) shouldEqual bobBalance
+      dex1Api.deleteRate(btc)
     }
 
     "partially filled order with non-waves fee" in {
-      val assetPair       = wavesBtcPair
-      val aliceEthBalance = node.tradableBalance(alice, ethWavesPair)(EthId.toString)
-      Map(BtcId -> btcRate, EthId -> ethRate)
-        .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobOrderId = node
-        .placeOrder(
-          sender = bob,
-          pair = assetPair,
-          orderType = OrderType.BUY,
-          amount = 1.waves,
-          price = 50000L,
-          fee = 150L,
-          version = 3,
-          feeAsset = IssuedAsset(BtcId)
-        )
-        .message
-        .id
-      val aliceOrderId = node
-        .placeOrder(
-          sender = alice,
-          pair = assetPair,
-          orderType = OrderType.SELL,
-          amount = 2.waves,
-          price = 50000L,
-          fee = 1920L,
-          version = 3,
-          feeAsset = IssuedAsset(EthId)
-        )
-        .message
-        .id
-      Array(bobOrderId, aliceOrderId)
-        .foreach(orderId => node.waitOrderInBlockchain(orderId))
-      node.cancelOrder(alice, assetPair, aliceOrderId).status shouldBe "OrderCanceled"
-      node.reservedBalance(alice).keys.size shouldBe 0
-      node.assertAssetBalance(alice.toAddress.toString, EthId.toString, aliceEthBalance - 960L)
-      Array(BtcId, EthId)
-        .foreach(assetId => node.deleteRate(IssuedAsset(assetId)))
+      val aliceEthBalance = dex1Api.tradableBalance(alice, ethWavesPair)(eth)
+      upsertRates(btc -> btcRate, eth -> ethRate)
+      val bobOrder = mkOrder(
+        owner = bob,
+        pair = wavesBtcPair,
+        orderType = OrderType.BUY,
+        amount = 1.waves,
+        price = 50000L,
+        matcherFee = 150L,
+        version = 3,
+        matcherFeeAssetId = btc
+      )
+      dex1Api.place(bobOrder)
+      val aliceOrder = mkOrder(
+        owner = alice,
+        pair = wavesBtcPair,
+        orderType = OrderType.SELL,
+        amount = 2.waves,
+        price = 50000L,
+        matcherFee = 1920L,
+        matcherFeeAssetId = eth
+      )
+      dex1Api.place(aliceOrder)
+      List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
+      dex1Api.cancel(alice, aliceOrder).status shouldBe "OrderCanceled"
+      dex1Api.reservedBalance(alice).keys.size shouldBe 0
+      wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 960L)
+      List(btc, eth).foreach(dex1Api.deleteRate)
     }
   }
 
   "fee in pairs with different decimals count" in {
-    node.upsertRate(IssuedAsset(UsdId), 5, expectedStatusCode = StatusCodes.Created)
-    assertBadRequestAndMessage(
-      node.placeOrder(
-        sender = bob,
-        pair = wavesUsdPair,
-        orderType = OrderType.SELL,
-        amount = 1.waves,
-        price = 300,
-        fee = 1L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(UsdId)
-      ),
+    upsertRates(usd -> 5d)
+    dex1Api.tryPlace(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, matcherFeeAssetId = usd)) should failWith(
+      9441542, // FeeNotEnough
       s"Required 0.02 $UsdId as fee for this order, but given 0.01 $UsdId"
     )
 
-    node.upsertRate(IssuedAsset(UsdId), 3, expectedStatusCode = StatusCodes.OK)
+    upsertRates(usd -> 3)
 
-    val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-    val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
-    val bobWavesBalance   = node.accountBalances(bob.toAddress.toString)._1
-    val bobUsdBalance     = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
-    val bobOrderId = node
-      .placeOrder(
-        sender = bob,
-        pair = wavesUsdPair,
-        orderType = OrderType.SELL,
-        amount = 1.waves,
-        price = 300,
-        fee = 1L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(UsdId)
-      )
-      .message
-      .id
-    node.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1.waves, 300))
-    node.reservedBalance(bob) shouldBe Map("WAVES" -> 1.waves)
-    node.cancelOrder(bob, wavesUsdPair, bobOrderId)
+    val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
+    val aliceUsdBalance   = wavesNode1Api.balance(alice, usd)
+    val bobWavesBalance   = wavesNode1Api.balance(bob, Waves)
+    val bobUsdBalance     = wavesNode1Api.balance(bob, usd)
 
-    node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance
-    node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance
-    node.accountBalances(bob.toAddress.toString)._1 shouldBe bobWavesBalance
-    node.assetBalance(bob.toAddress.toString, UsdId.toString).balance shouldBe bobUsdBalance
-    val aliceOrderId = node
-      .placeOrder(
-        sender = alice,
-        pair = wavesUsdPair,
-        orderType = OrderType.BUY,
-        amount = 1.waves,
-        price = 300,
-        fee = 1L,
-        version = 3: Byte,
-        feeAsset = IssuedAsset(UsdId)
-      )
-      .message
-      .id
-    node.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1.waves, 300))
-    node.reservedBalance(alice) shouldBe Map(UsdId.toString -> 301)
+    val bobOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, matcherFeeAssetId = usd)
+    dex1Api.place(bobOrder)
 
-    node.placeOrder(
-      sender = bob,
-      pair = wavesUsdPair,
-      orderType = OrderType.SELL,
-      amount = 1.waves,
-      price = 300,
-      fee = 1L,
-      version = 3: Byte,
-      feeAsset = IssuedAsset(UsdId)
-    )
-    node.waitOrderInBlockchain(aliceOrderId)
-    node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance + 1.waves
-    node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance - 301
-    node.accountBalances(bob.toAddress.toString)._1 shouldBe bobWavesBalance - 1.waves
-    node.assetBalance(bob.toAddress.toString, UsdId.toString).balance shouldBe bobUsdBalance + 299
+    dex1Api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1.waves, 300))
+    dex1Api.reservedBalance(bob) shouldBe Map(Waves -> 1.waves)
+    dex1Api.cancel(bob, bobOrder)
 
-    node.deleteRate(usd, StatusCodes.OK)
+    wavesNode1Api.balance(alice, Waves) shouldBe aliceWavesBalance
+    wavesNode1Api.balance(alice, usd) shouldBe aliceUsdBalance
+
+    wavesNode1Api.balance(bob, Waves) shouldBe bobWavesBalance
+    wavesNode1Api.balance(bob, usd) shouldBe bobUsdBalance
+
+    val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300, matcherFee = 1L, matcherFeeAssetId = usd)
+    dex1Api.place(aliceOrderId)
+
+    dex1Api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1.waves, 300))
+    dex1Api.reservedBalance(alice) shouldBe Map(usd -> 301)
+
+    dex1Api.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, 1L, matcherFeeAssetId = usd))
+
+    waitForOrderAtNode(aliceOrderId)
+    wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance + 1.waves)
+    wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 301)
+
+    wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance - 1.waves)
+    wavesNode1Api.balance(bob, usd) shouldBe (bobUsdBalance + 299)
+
+    dex1Api.deleteRate(usd)
   }
 
   "rounding fee to filled amount" - {
     "if amount cannot be filled" in {
-      Array(wct, btc, usd)
-        .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))
+
+      Seq(wct, btc, usd).foreach(asset => upsertRates(asset -> 0.000003D))
 
       withClue("price asset is fee asset") {
-        val bobWctBalance   = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
-        val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobUsdBalance   = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 238, 1, version = 3, feeAsset = wct).message.id
-        val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3).message.id
+        val bobWctBalance   = wavesNode1Api.balance(bob, wct)
+        val bobWavesBalance = wavesNode1Api.balance(bob, Waves)
+        val bobUsdBalance   = wavesNode1Api.balance(bob, usd)
 
-        node.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled")
-        node.waitOrderStatus(wavesUsdPair, aliceOrderId, "PartiallyFilled")
-        node.waitOrderInBlockchain(bobOrderId)
+        val bobOrderId   = mkOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 238, 1, matcherFeeAssetId = wct)
+        val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3)
 
-        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobWavesBalance - 420169L
-        node.assetBalance(bob.toAddress.toString, UsdId.toString).balance shouldBe bobUsdBalance + 1
-        node.assetBalance(bob.toAddress.toString, WctId.toString).balance shouldBe bobWctBalance - 1
+        dex1Api.place(bobOrderId)
+        dex1Api.place(aliceOrderId)
 
-        node.cancelOrder(alice, wavesUsdPair, aliceOrderId)
+        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+
+        waitForOrderAtNode(bobOrderId)
+
+        wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance - 420169L)
+        wavesNode1Api.balance(bob, usd) shouldBe (bobUsdBalance + 1)
+        wavesNode1Api.balance(bob, wct) shouldBe (bobWctBalance - 1)
+
+        dex1Api.cancel(alice, aliceOrderId)
       }
 
       withClue("price asset is not fee asset") {
-        val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobUsdBalance   = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 851064L, 238, 1, version = 3, feeAsset = usd).message.id
-        val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3).message.id
+        val bobWavesBalance = wavesNode1Api.balance(bob, Waves)
+        val bobUsdBalance   = wavesNode1Api.balance(bob, usd)
 
-        node.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled")
-        node.waitOrderStatus(wavesUsdPair, aliceOrderId, "PartiallyFilled")
-        node.waitOrderInBlockchain(bobOrderId)
+        val bobOrderId   = mkOrder(bob, wavesUsdPair, OrderType.SELL, 851064L, 238, 1, matcherFeeAssetId = usd)
+        val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3)
 
-        node.accountBalances(bob.toAddress.toString)._1 shouldBe bobWavesBalance - 840337L
-        node.assetBalance(bob.toAddress.toString, UsdId.toString).balance shouldBe bobUsdBalance + 1
+        dex1Api.place(bobOrderId)
+        dex1Api.place(aliceOrderId)
 
-        node.cancelOrder(alice, wavesUsdPair, aliceOrderId)
+        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+
+        waitForOrderAtNode(bobOrderId)
+
+        wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance - 840337L)
+        wavesNode1Api.balance(bob, usd) shouldBe (bobUsdBalance + 1)
+
+        dex1Api.cancel(alice, aliceOrderId)
       }
 
       withClue("buy order") {
-        node.broadcastTransfer(bob, alice.toAddress.toString, 1, 0.001.waves, Some(WctId.toString), None, waitForTx = true)
 
-        val aliceWctBalance   = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
-        val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-        val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+        broadcastAndAwait { mkTransfer(bob, alice, 1, wct, 0.001.waves) }
 
-        val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 851064L, 238, 1, version = 3, feeAsset = wct).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3).message.id
+        val aliceWctBalance   = wavesNode1Api.balance(alice, wct)
+        val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
+        val aliceUsdBalance   = wavesNode1Api.balance(alice, usd)
 
-        node.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled")
-        node.waitOrderStatus(wavesUsdPair, bobOrderId, "PartiallyFilled")
-        node.waitOrderInBlockchain(aliceOrderId)
+        val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 851064L, 238, 1, matcherFeeAssetId = wct)
+        val bobOrderId   = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3)
 
-        node.assetBalance(alice.toAddress.toString, WctId.toString).balance shouldBe aliceWctBalance - 1
-        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance + 840337L
-        node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance - 2
+        dex1Api.place(aliceOrderId)
+        dex1Api.place(bobOrderId)
 
-        node.cancelOrder(bob, wavesUsdPair, bobOrderId)
+        dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.PartiallyFilled)
+
+        waitForOrderAtNode(aliceOrderId)
+
+        wavesNode1Api.balance(alice, wct) shouldBe (aliceWctBalance - 1)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance + 840337L)
+        wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 2)
+
+        dex1Api.cancel(bob, bobOrderId)
       }
 
-      Array(wct, btc, usd)
-        .foreach(asset => node.deleteRate(asset, expectedStatusCode = StatusCodes.OK))
+      Seq(wct, btc, usd).foreach(dex1Api.deleteRate)
     }
 
     "if v2 order filled partially by too low percent of amount" in {
-      val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
-      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
 
-      val buyOrder =
-        node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)).message.id
+      val aliceWavesBefore = wavesNode1Api.balance(alice.toAddress, Waves)
+      val bobWavesBefore   = wavesNode1Api.balance(bob.toAddress, Waves)
 
-      node.waitOrderProcessed(wavesUsdPair, buyOrder)
-      node.waitOrderProcessed(
-        wavesUsdPair,
-        node.placeOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)).message.id)
-      node.waitOrderStatusAndAmount(wavesUsdPair, buyOrder, "PartiallyFilled", Some(1.waves))
+      val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)
 
-      node.accountBalances(alice.toAddress.toString)._1 should be(aliceWavesBefore + 1.waves)
-      node.accountBalances(bob.toAddress.toString)._1 should be(bobWavesBefore - 1.waves - 0.003.waves)
+      placeAndAwait(buyOrder)
 
-      node.cancelOrdersForPair(alice, wavesUsdPair)
+      val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)
+
+      placeAndAwait(sellOrder, OrderStatus.Filled)
+      waitForOrderAtNode(sellOrder)
+
+      dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+
+      wavesNode1Api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves)
+      wavesNode1Api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      dex1Api.cancelAll(alice)
     }
 
     "if v3 order filled partially by too low percent of amount" in {
-      val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
-      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
 
-      val buyOrder =
-        node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)).message.id
+      val aliceWavesBefore = wavesNode1Api.balance(alice.toAddress, Waves)
+      val bobWavesBefore   = wavesNode1Api.balance(bob.toAddress, Waves)
 
-      node.waitOrderProcessed(wavesUsdPair, buyOrder)
-      node.waitOrderProcessed(
-        wavesUsdPair,
-        node.placeOrder(node.prepareOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)).message.id)
-      node.waitOrderStatusAndAmount(wavesUsdPair, buyOrder, "PartiallyFilled", Some(1.waves))
+      val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)
 
-      node.accountBalances(alice.toAddress.toString)._1 should be(aliceWavesBefore + 1.waves - 1)
-      node.accountBalances(bob.toAddress.toString)._1 should be(bobWavesBefore - 1.waves - 0.003.waves)
+      placeAndAwait(buyOrder)
 
-      node.cancelOrdersForPair(alice, wavesUsdPair)
+      val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)
+
+      placeAndAwait(sellOrder, OrderStatus.Filled)
+      waitForOrderAtNode(sellOrder)
+
+      dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+
+      wavesNode1Api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves - 1)
+      wavesNode1Api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      dex1Api.cancelAll(alice)
     }
 
     "if order was filled partially" in {
-      Array(btc, usd)
-        .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))
+
+      Seq(btc, usd).foreach(asset => upsertRates(asset -> 0.000003D))
 
       withClue("price asset is fee asset") {
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-        val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
-        val aliceOrderId = node.placeOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, version = 3, feeAsset = btc).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
+        val aliceBtcBalance   = wavesNode1Api.balance(alice, btc)
+        val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
 
-        node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled")
-        node.waitOrderStatus(wavesBtcPair, bobOrderId, "Filled")
-        node.waitOrderInBlockchain(bobOrderId)
+        val aliceOrderId = mkOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, matcherFeeAssetId = btc)
+        val bobOrderId   = mkOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3)
 
-        node.assetBalance(alice.toAddress.toString, BtcId.toString).balance shouldBe aliceBtcBalance + 529549
-        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance - 50.waves
+        dex1Api.place(aliceOrderId)
+        dex1Api.place(bobOrderId)
 
-        val anotherBobOrderId = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
-        node.waitOrderInBlockchain(anotherBobOrderId)
-        node.waitOrderInBlockchain(aliceOrderId)
+        dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
 
-        node.assetBalance(alice.toAddress.toString, BtcId.toString).balance shouldBe aliceBtcBalance + 1059099L
-        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance - 100.waves
+        waitForOrderAtNode(bobOrderId)
+
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 529549)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 50.waves)
+
+        val anotherBobOrderId = mkOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3)
+        dex1Api.place(anotherBobOrderId)
+
+        waitForOrderAtNode(anotherBobOrderId)
+        waitForOrderAtNode(aliceOrderId)
+
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 1059099L)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 100.waves)
       }
 
       withClue("price asset is not fee asset") {
-        val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-        val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
-        val aliceOrderId = node.placeOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, version = 3, feeAsset = usd).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
+        val aliceUsdBalance   = wavesNode1Api.balance(alice, usd)
+        val aliceBtcBalance   = wavesNode1Api.balance(alice, btc)
+        val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
 
-        node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled")
-        node.waitOrderStatus(wavesBtcPair, bobOrderId, "Filled")
-        node.waitOrderInBlockchain(bobOrderId)
+        val aliceOrderId = mkOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, matcherFeeAssetId = usd)
+        val bobOrderId   = mkOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3)
 
-        node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance - 1
-        node.assetBalance(alice.toAddress.toString, BtcId.toString).balance shouldBe aliceBtcBalance + 529550
-        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance - 50.waves
+        dex1Api.place(aliceOrderId)
+        dex1Api.place(bobOrderId)
 
-        val anotherBobOrderId = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
-        node.waitOrderInBlockchain(anotherBobOrderId)
-        node.waitOrderInBlockchain(aliceOrderId)
+        dex1Api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+        dex1Api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
 
-        node.assetBalance(alice.toAddress.toString, UsdId.toString).balance shouldBe aliceUsdBalance - 1
-        node.assetBalance(alice.toAddress.toString, BtcId.toString).balance shouldBe aliceBtcBalance + 1059100L
-        node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceWavesBalance - 100.waves
+        waitForOrderAtNode(bobOrderId)
+
+        wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 1)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 529550)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 50.waves)
+
+        val anotherBobOrderId = mkOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3)
+        dex1Api.place(anotherBobOrderId)
+
+        waitForOrderAtNode(anotherBobOrderId)
+        waitForOrderAtNode(aliceOrderId)
+
+        wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 1)
+        wavesNode1Api.balance(alice, btc) shouldBe (aliceBtcBalance + 1059100L)
+        wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - 100.waves)
       }
 
-      Array(btc, usd)
-        .foreach(asset => node.deleteRate(asset, expectedStatusCode = StatusCodes.OK))
+      Seq(btc, usd).foreach(dex1Api.deleteRate)
     }
 
     "percent & fixed fee modes" in {
+
       def check(): Unit = {
         withClue("buy order") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
-          val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
-          val aliceOrderId = node
-            .placeOrder(
-              sender = alice,
-              pair = ethWavesPair,
-              orderType = OrderType.BUY,
-              amount = 100,
-              price = 100000000L,
-              fee = 10,
-              version = 3: Byte,
-              feeAsset = IssuedAsset(EthId)
-            )
-            .message
-            .id
-          node.reservedBalance(alice) shouldBe Map("WAVES" -> 100)
+          val aliceBalance    = wavesNode1Api.balance(alice, Waves)
+          val bobBalance      = wavesNode1Api.balance(bob, Waves)
+          val aliceEthBalance = wavesNode1Api.balance(alice, eth)
+          val bobEthBalance   = wavesNode1Api.balance(bob, eth)
 
-          node.placeOrder(
-            sender = bob,
-            pair = ethWavesPair,
-            orderType = OrderType.SELL,
-            amount = 100,
-            price = 100000000L,
-            fee = 10,
-            version = 3: Byte,
-            feeAsset = IssuedAsset(EthId)
-          )
-          node.waitOrderInBlockchain(aliceOrderId)
+          val aliceOrderId = mkOrder(alice, ethWavesPair, OrderType.BUY, 100, 100000000L, 10, matcherFeeAssetId = eth)
+          dex1Api.place(aliceOrderId)
 
-          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 100
-          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 100
-          node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance + 90
-          node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 110
-          node.reservedBalance(alice) shouldBe empty
-          node.reservedBalance(bob) shouldBe empty
+          dex1Api.reservedBalance(alice) shouldBe Map(Waves -> 100)
+
+          dex1Api.place(mkOrder(bob, ethWavesPair, OrderType.SELL, 100, 100000000L, 10, matcherFeeAssetId = eth))
+          waitForOrderAtNode(aliceOrderId)
+
+          wavesNode1Api.balance(alice, Waves) shouldBe (aliceBalance - 100)
+          wavesNode1Api.balance(bob, Waves) shouldBe (bobBalance + 100)
+
+          wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance + 90)
+          wavesNode1Api.balance(bob, eth) shouldBe (bobEthBalance - 110)
+
+          dex1Api.reservedBalance(alice) shouldBe empty
+          dex1Api.reservedBalance(bob) shouldBe empty
         }
 
         withClue("place buy order with amount less than fee") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
-          val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
-          val aliceOrderId = node
-            .placeOrder(
-              sender = alice,
-              pair = ethWavesPair,
-              orderType = OrderType.BUY,
-              amount = 3,
-              price = 100000000L,
-              fee = 10,
-              version = 3: Byte,
-              feeAsset = IssuedAsset(EthId)
-            )
-            .message
-            .id
-          node.reservedBalance(alice) shouldBe Map(EthId.toString -> 7, "WAVES" -> 3)
+          val aliceBalance    = wavesNode1Api.balance(alice, Waves)
+          val bobBalance      = wavesNode1Api.balance(bob, Waves)
+          val aliceEthBalance = wavesNode1Api.balance(alice, eth)
+          val bobEthBalance   = wavesNode1Api.balance(bob, eth)
 
-          node.placeOrder(
-            sender = bob,
-            pair = ethWavesPair,
-            orderType = OrderType.SELL,
-            amount = 3,
-            price = 100000000L,
-            fee = 10,
-            version = 3: Byte,
-            feeAsset = IssuedAsset(EthId)
-          )
-          node.waitOrderInBlockchain(aliceOrderId)
+          val aliceOrderId = mkOrder(alice, ethWavesPair, OrderType.BUY, 3, 100000000L, 10, matcherFeeAssetId = eth)
+          dex1Api.place(aliceOrderId)
 
-          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 3
-          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 3
-          node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance - 7
-          node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 13
-          node.reservedBalance(alice) shouldBe empty
-          node.reservedBalance(bob) shouldBe empty
+          dex1Api.reservedBalance(alice) shouldBe Map(eth -> 7, Waves -> 3)
+
+          dex1Api.place(mkOrder(bob, ethWavesPair, OrderType.SELL, 3, 100000000L, 10, matcherFeeAssetId = eth))
+
+          waitForOrderAtNode(aliceOrderId)
+
+          wavesNode1Api.balance(alice, Waves) shouldBe (aliceBalance - 3)
+          wavesNode1Api.balance(bob, Waves) shouldBe (bobBalance + 3)
+
+          wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance - 7)
+          wavesNode1Api.balance(bob, eth) shouldBe (bobEthBalance - 13)
+
+          dex1Api.reservedBalance(alice) shouldBe empty
+          dex1Api.reservedBalance(bob) shouldBe empty
         }
 
         withClue("place buy order after partial fill") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
-          val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
-          val aliceOrderId = node
-            .placeOrder(
-              sender = alice,
-              pair = ethWavesPair,
-              orderType = OrderType.BUY,
-              amount = 200,
-              price = 100000000L,
-              fee = 20,
-              version = 3: Byte,
-              feeAsset = IssuedAsset(EthId)
-            )
-            .message
-            .id
-          node.reservedBalance(alice) shouldBe Map("WAVES" -> 200)
+          val aliceBalance    = wavesNode1Api.balance(alice, Waves)
+          val bobBalance      = wavesNode1Api.balance(bob, Waves)
+          val aliceEthBalance = wavesNode1Api.balance(alice, eth)
+          val bobEthBalance   = wavesNode1Api.balance(bob, eth)
 
-          node.placeOrder(
-            sender = bob,
-            pair = ethWavesPair,
-            orderType = OrderType.SELL,
-            amount = 100,
-            price = 100000000L,
-            fee = 10,
-            version = 3: Byte,
-            feeAsset = IssuedAsset(EthId)
-          )
-          node.waitOrderInBlockchain(aliceOrderId)
+          val aliceOrderId = mkOrder(alice, ethWavesPair, OrderType.BUY, 200, 100000000L, 20, matcherFeeAssetId = eth)
+          dex1Api.place(aliceOrderId)
 
-          node.accountBalances(alice.toAddress.toString)._1 shouldBe aliceBalance - 100
-          node.accountBalances(bob.toAddress.toString)._1 shouldBe bobBalance + 100
-          node.assetBalance(alice.toAddress.toString, EthId.toString).balance shouldBe aliceEthBalance + 90
-          node.assetBalance(bob.toAddress.toString, EthId.toString).balance shouldBe bobEthBalance - 110
-          node.reservedBalance(alice) shouldBe Map("WAVES" -> 100)
-          node.reservedBalance(bob) shouldBe empty
+          dex1Api.reservedBalance(alice) shouldBe Map(Waves -> 200)
 
-          node.cancelOrder(alice, ethWavesPair, aliceOrderId)
+          dex1Api.place(mkOrder(bob, ethWavesPair, OrderType.SELL, 100, 100000000L, 10, matcherFeeAssetId = eth))
+          waitForOrderAtNode(aliceOrderId)
+
+          wavesNode1Api.balance(alice, Waves) shouldBe (aliceBalance - 100)
+          wavesNode1Api.balance(bob, Waves) shouldBe (bobBalance + 100)
+
+          wavesNode1Api.balance(alice, eth) shouldBe (aliceEthBalance + 90)
+          wavesNode1Api.balance(bob, eth) shouldBe (bobEthBalance - 110)
+
+          dex1Api.reservedBalance(alice) shouldBe Map(Waves -> 100)
+          dex1Api.reservedBalance(bob) shouldBe empty
+
+          dex1Api.cancel(alice, aliceOrderId)
         }
 
         withClue("place sell order") {
-          val aliceOrderId = node
-            .placeOrder(
-              sender = alice,
-              pair = ethWavesPair,
-              orderType = OrderType.SELL,
-              amount = 100,
-              price = 100000000L,
-              fee = 10,
-              version = 3: Byte,
-              feeAsset = IssuedAsset(EthId)
-            )
-            .message
-            .id
-          node.reservedBalance(alice) shouldBe Map(EthId.toString -> 110)
-          node.cancelOrder(alice, ethWavesPair, aliceOrderId)
+          val aliceOrderId = mkOrder(alice, ethWavesPair, OrderType.SELL, 100, 100000000L, 10, matcherFeeAssetId = eth)
+          dex1Api.place(aliceOrderId)
+
+          dex1Api.reservedBalance(alice) shouldBe Map(eth -> 110)
+          dex1Api.cancel(alice, aliceOrderId)
         }
       }
 
-      val transferId = node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(EthId.toString), None).id
-      node.waitForTransaction(transferId)
+      broadcastAndAwait { mkTransfer(alice, bob, defaultAssetQuantity / 2, eth, 0.005.waves) }
 
-      docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
+      replaceSuiteConfig(dex1Container(), ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
+      restartContainer(dex1Container(), dex1Api)
       check()
-      docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = fixed"))
+
+      replaceSuiteConfig(
+        dex1Container(),
+        ConfigFactory.parseString("waves.dex.order-fee.mode = fixed").withFallback(suiteInitialDexConfig)
+      )
+
+      restartContainer(dex1Container(), dex1Api)
       check()
-      docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))
+
+      replaceSuiteConfig(
+        dex1Container(),
+        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed").withFallback(suiteInitialDexConfig)
+      )
+
+      restartContainer(dex1Container(), dex1Api)
 
       withClue("fee asset isn't part of asset pair") {
-        val orderId = node
-          .placeOrder(
-            sender = alice,
-            pair = ethWavesPair,
-            orderType = OrderType.BUY,
-            amount = 200,
-            price = 100000000L,
-            fee = 20,
-            version = 3: Byte,
-            feeAsset = IssuedAsset(BtcId)
-          )
-          .message
-          .id
-        node.reservedBalance(alice) shouldBe Map("WAVES" -> 200, BtcId.toString -> 20)
-        node.cancelOrder(alice, ethWavesPair, orderId)
-        node.reservedBalance(alice) shouldBe empty
+        broadcastAndAwait(mkTransfer(bob, alice, 100000000, btc))
+        val orderId = mkOrder(alice, ethWavesPair, OrderType.BUY, 200, 100000000L, 20, matcherFeeAssetId = btc)
+        dex1Api.place(orderId)
+
+        dex1Api.reservedBalance(alice) shouldBe Map(Waves -> 200, btc -> 20)
+        dex1Api.cancel(alice, orderId)
+        dex1Api.reservedBalance(alice) shouldBe empty
       }
     }
   }

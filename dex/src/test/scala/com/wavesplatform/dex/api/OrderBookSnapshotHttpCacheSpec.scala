@@ -16,12 +16,13 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime with TableDrivenPropertyChecks {
 
-  private val defaultAssetPair               = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
-  private def getAssetDecimals(asset: Asset) = 8
+  private val defaultAssetPair                            = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
+  private def getAssetDecimals(asset: Asset): Option[Int] = Some(8)
 
   "OrderBookSnapshotHttpCache" - {
+
     "should cache" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized)
+      def get: HttpResponse = cache.get(defaultAssetPair, Some(1), MatcherModel.Denormalized)
 
       val a = get
       val b = get
@@ -30,7 +31,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
 
     "should not drop the cache if the timeout after an access was not reached" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1))
+      def get: HttpResponse = cache.get(defaultAssetPair, Some(1))
 
       val a = get
       Thread.sleep(30)
@@ -40,7 +41,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
 
     "should drop the cache after timeout" in using(createDefaultCache) { cache =>
-      def get = cache.get(defaultAssetPair, Some(1))
+      def get: HttpResponse = cache.get(defaultAssetPair, Some(1))
 
       val a = get
       Thread.sleep(70)
@@ -61,7 +62,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
               OrderBook.AggregatedSnapshot(
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
-              ))
+              )
+          )
         )
       } { cache =>
         "None -> 9" in {

@@ -29,15 +29,16 @@ trait RateCache {
 
 object RateCache {
 
+  private val WavesRate = Option(1d)
+
   def getJson(ratesMap: Map[Asset, Double]): JsObject = Json.obj(
     ratesMap.map { case (asset, rate) => AssetPair.assetIdStr(asset) -> Json.toJsFieldJsValueWrapper(rate) }.toSeq: _*
   )
 
   def apply(db: DB): RateCache = new RateCache {
 
-    private val rateDB    = RateDB(db)
-    private val rateMap   = new ConcurrentHashMap[IssuedAsset, Double](rateDB.getAllRates.asJava)
-    private val WavesRate = Option(1d)
+    private val rateDB  = RateDB(db)
+    private val rateMap = new ConcurrentHashMap[IssuedAsset, Double](rateDB.getAllRates.asJava)
 
     def upsertRate(asset: Asset, value: Double): Option[Double] =
       asset.fold { WavesRate } { issuedAsset =>
@@ -45,15 +46,13 @@ object RateCache {
         Option(rateMap.put(issuedAsset, value))
       }
 
-    def getRate(asset: Asset): Option[Double] = asset.fold { WavesRate } { asset =>
-      if (rateMap containsKey asset) Some(rateMap get asset) else None
-    }
+    def getRate(asset: Asset): Option[Double] = asset.fold(WavesRate)(asset => Option(rateMap get asset))
 
     def getAllRates: Map[Asset, Double] = {
       rateMap.asScala.toMap.map { case (issuedAsset, value) => Asset.fromCompatId(issuedAsset.compatId) -> value } + (Waves -> 1d)
     }
 
-    def deleteRate(asset: Asset): Option[Double] = asset.fold { WavesRate } { issuedAsset =>
+    def deleteRate(asset: Asset): Option[Double] = asset.fold(WavesRate) { issuedAsset =>
       rateDB.deleteRate(issuedAsset)
       Option(rateMap.remove(issuedAsset))
     }
@@ -64,7 +63,7 @@ object RateCache {
     private val rates: TrieMap[Asset, Double] = TrieMap(Waves -> 1d)
 
     def upsertRate(asset: Asset, value: Double): Option[Double] = {
-      asset.fold { Option(1d) } { issuedAsset =>
+      asset.fold { WavesRate } { issuedAsset =>
         val previousValue = rates.get(issuedAsset)
         rates += (asset -> value)
         previousValue

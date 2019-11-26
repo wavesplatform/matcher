@@ -73,19 +73,19 @@ class HistoryRouterSpecification
 
   def orderAdded(submitted: LimitOrder): OrderAdded                               = OrderAdded(submitted, ntpTime.getTimestamp())
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = OrderExecuted(submitted, counter, ntpTime.getTimestamp())
-  def orderCancelled(submitted: AcceptedOrder): OrderCanceled                     = OrderCanceled(submitted, false, ntpTime.getTimestamp())
+  def orderCancelled(submitted: AcceptedOrder): OrderCanceled                     = OrderCanceled(submitted, isSystemCancel = false, ntpTime.getTimestamp())
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used
-  def denormalizeAmountAndFee(value: Long, asset: Asset): Double = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)
-  def denormalizePrice(value: Long, pair: AssetPair): Double     = Denormalization.denormalizePrice(value, wavesDecimals, assetDecimals)
+  def denormalizeAmountAndFee(value: Long, asset: Asset): BigDecimal = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)
+  def denormalizePrice(value: Long, pair: AssetPair): BigDecimal     = Denormalization.denormalizePrice(value, wavesDecimals, assetDecimals)
 
   implicit class LimitOrderOps(limitOrder: LimitOrder) {
     def orderId: String         = limitOrder.order.id().toString
     def senderPublicKey: String = limitOrder.order.senderPublicKey.toString
   }
 
-  case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: Double, amount: Double)
-  case class EventShortenedInfo(orderId: String, eventType: Byte, filled: Double, totalFilled: Double, status: Byte)
+  case class OrderShortenedInfo(id: String, senderPublicKey: String, side: Byte, price: BigDecimal, amount: BigDecimal)
+  case class EventShortenedInfo(orderId: String, eventType: Byte, filled: BigDecimal, totalFilled: BigDecimal, status: Byte)
 
   def getOrderInfo(orderAddedEvent: OrderAdded): OrderShortenedInfo = {
     SaveOrder(orderAddedEvent.order, orderAddedEvent.timestamp)

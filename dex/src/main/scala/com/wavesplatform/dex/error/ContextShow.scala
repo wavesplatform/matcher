@@ -2,8 +2,9 @@ package com.wavesplatform.dex.error
 
 import cats.Contravariant
 
+// TODO: Replace by Show?
 trait ContextShow[-T] {
-  def show(input: T)(context: ErrorFormatterContext): String
+  def show(input: T): String
 }
 
 object ContextShow {
@@ -11,13 +12,13 @@ object ContextShow {
 
   def auto[T]: ContextShow[T] = show(_.toString)
 
-  def show[T](f: T => String): ContextShow[T] = contextShow((x, _) => f(x))
+  def show[T](f: T => String): ContextShow[T] = contextShow(f)
 
-  def contextShow[T](f: (T, ErrorFormatterContext) => String): ContextShow[T] = new ContextShow[T] {
-    override def show(input: T)(context: ErrorFormatterContext): String = f(input, context)
+  def contextShow[T](f: T => String): ContextShow[T] = new ContextShow[T] {
+    override def show(input: T): String = f(input)
   }
 
   implicit val contravariant = new Contravariant[ContextShow] {
-    override def contramap[A, B](fa: ContextShow[A])(f: B => A): ContextShow[B] = ContextShow.contextShow[B]((b, context) => fa.show(f(b))(context))
+    override def contramap[A, B](fa: ContextShow[A])(f: B => A): ContextShow[B] = ContextShow.contextShow[B](b => fa.show(f(b)))
   }
 }

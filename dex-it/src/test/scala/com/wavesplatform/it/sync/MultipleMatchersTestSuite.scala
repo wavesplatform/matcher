@@ -1,163 +1,163 @@
 package com.wavesplatform.it.sync
 
-import java.io.IOException
-
-import com.typesafe.config.{Config, ConfigFactory}
+import cats.Id
+import cats.instances.future.catsStdInstancesForFuture
+import cats.instances.try_._
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherCommand, MatcherState, OrderbookHistory, SyncMatcherHttpApi, UnexpectedStatusCodeException}
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.dex.it.cache.CachedData
+import com.wavesplatform.dex.it.fp
+import com.wavesplatform.dex.it.fp.CanExtract._
+import com.wavesplatform.it._
+import com.wavesplatform.it.api.dex.OrderStatus
+import com.wavesplatform.it.api.{DexApi, MatcherCommand, MatcherState}
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
+import com.wavesplatform.it.docker.DexContainer
 import com.wavesplatform.it.tags.DexItKafkaRequired
-import com.wavesplatform.it.{Node, _}
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import monix.eval.Coeval
 import org.scalacheck.Gen
-import play.api.libs.json.Json
 
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Random, Success}
+import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
+import scala.util.{Random, Try}
 
 @DexItKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
-  private def configOverrides = ConfigFactory.parseString("""waves.dex {
+
+  override protected def suiteInitialDexConfig = ConfigFactory.parseString("""waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = 51
       |}""".stripMargin)
 
-  private def matcher1NodeConfig = configOverrides.withFallback(Default.head)
-  private def matcher2NodeConfig =
-    ConfigFactory
-      .parseString("""
-      |waves {
-      |  network.node-name = node11
-      |  miner.miner.enable = no
-      |}
-      |waves.dex.events-queue.kafka.group = 1""".stripMargin)
-      .withFallback(matcher1NodeConfig)
+  protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
+    createDex("dex-2")
+  }
 
-  override protected def nodeConfigs: Seq[Config] = Seq(matcher1NodeConfig, matcher2NodeConfig)
+  private val cachedDex2ApiAddress = CachedData {
+    dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
+  }
 
-  private def matcher1Node = nodes.head
-  private def matcher2Node = nodes(1)
+  protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex2ApiAddress.get())
+  protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex2ApiAddress.get()))
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
 
-  private val (issue1, issue2, assetPair1) = issueAssetPair(alice, 8, 8)
-  private val assetPair2                   = AssetPair(assetPair1.amountAsset, Waves)
-  private val assetPair3                   = AssetPair(assetPair1.priceAsset, Waves)
-  private val assetPairs                   = Seq(assetPair1, assetPair2, assetPair3)
-
-  // Issue assets by Alice
-  private val assetIds = {
-    val txs = Seq(issue1, issue2).map(x => matcher1Node.broadcastRequest(x.json()).id -> x)
-    txs.map { case (id, info) => nodes.waitForTransaction(id).id -> info }.toMap
-  }
-
-  // Share assets with Bob
-  {
-    val xs = assetIds.map { case (id, info) => node.broadcastTransfer(alice, bob.toAddress.toString, info.quantity / 2, minFee, Some(id), None).id }
-    xs.foreach(nodes.waitForTransaction)
-  }
+  private val assetPairs = Seq(createAssetPair(eth, wct), ethWavesPair, wctWavesPair)
 
   private val aliceOrders = mkOrders(alice)
-  private val bobOrders   = mkOrders(alice)
+  private val bobOrders   = mkOrders(bob)
   private val orders      = aliceOrders ++ bobOrders
   private val lastOrder   = orderGen(matcher, alice, assetPairs).sample.get
 
+  private var successfulCommandsNumber = 0
+
+  override protected def beforeAll(): Unit = {
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+
+    broadcastAndAwait(IssueEthTx, IssueWctTx)
+    broadcastAndAwait(
+      mkTransfer(alice, bob, IssueEthTx.quantity / 2, eth),
+      mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
+    )
+
+    dockerClient.start(dex1Container)
+    dockerClient.start(dex2Container)
+
+    dex1Api.waitReady
+    dex2Api.waitReady
+  }
+
+  "Place, fill and cancel a lot of orders" in {
+
+    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1AsyncApi, _))
+    val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2AsyncApi, _))
+    val places      = Random.shuffle(alicePlaces ++ bobPlaces)
+
+    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
+    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(dex2AsyncApi, bob, _))
+    val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
+
+    successfulCommandsNumber = executeCommands(places ++ cancels)
+    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1AsyncApi, lastOrder)))
+  }
+
+  "Wait until all requests are processed" in {
+    try {
+      val offset1 = dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+      dex2Api.waitForCurrentOffset(_ == offset1)
+
+      withClue("Last command processed") {
+        List(dex1AsyncApi, dex2AsyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
+      }
+    } catch {
+      case NonFatal(e) =>
+        log.info(s"Last offsets: node1=${dex1Api.lastOffset}, node2=${dex2Api.lastOffset}")
+        throw e
+    }
+  }
+
+  "States on both matcher should be equal" in {
+    val state1 = state(dex1Api)
+    val state2 = state(dex2Api)
+    state1 shouldBe state2
+  }
+
   "Batch cancel and single cancels simultaneously" in {
+
+    dex1Api.cancelAll(alice)
+    dex1Api.cancelAll(bob)
+
     val allOrders =
       (Gen.containerOfN[Vector, Order](150, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
         Gen.containerOfN[Vector, Order](150, orderGen(matcher, alice, assetPairs, Seq(OrderType.BUY))).sample.get).toSet
 
     log.info(s"Total orders: ${allOrders.size}")
 
-    allOrders.foreach(matcher1Node.placeOrder)
-    allOrders.foreach(order => matcher1Node.waitOrderStatus(order.assetPair, order.idStr(), "Accepted"))
+    allOrders.foreach(dex1Api.place)
+    allOrders.foreach(order => dex1Api.waitForOrder(order)(_.status != OrderStatus.NotFound))
 
-    SyncMatcherHttpApi.sync(
-      {
-        import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
-
-        val asyncNode1 = async(matcher1Node)
-        val asyncNode2 = async(matcher2Node)
-
-        def singleCancels(owner: KeyPair, orders: Iterable[Order]) = Future.sequence {
-          orders.map { order =>
-            asyncNode1.cancelOrder(owner, order.assetPair, order.idStr()).transform {
-              case Success(_) => Success(())
-              case Failure(UnexpectedStatusCodeException(_, _, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" =>
-                Success(())
-              case Failure(cause) => Failure(cause)
-            }
-          }
+    def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Iterable[Unit.type]] = Future.sequence {
+      orders.map { order =>
+        dex1AsyncApi.tryCancel(owner, order).map {
+          case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
+          case _                             => Unit
         }
+      }
+    }
 
-        def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]) = Future.sequence {
-          assetPairs.map(asyncNode2.cancelOrdersForPairOnce(owner, _, System.currentTimeMillis()).map { response =>
-            if (response.getStatusCode == 503) throw new IOException(s"Unexpected status code: 503")
-            else Future.successful(())
-          })
-        }
+    def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[Unit]] = Future.sequence {
+      assetPairs.map(toDexExplicitGetOps(dex2AsyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
+    }
 
-        batchCancels(alice, assetPairs)
-          .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
-          .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
-          .zip(batchCancels(bob, assetPairs))
-      },
+    Await.result(
+      batchCancels(alice, assetPairs)
+        .zip(singleCancels(alice, allOrders.filter(_.sender == alice.publicKey)))
+        .zip(singleCancels(bob, allOrders.filter(_.sender == bob.publicKey)))
+        .zip(batchCancels(bob, assetPairs)),
       3.minutes
     )
 
-    matcher1Node.waitFor[Seq[OrderbookHistory]]("no alice orders")(_.ordersByAddress(alice, activeOnly = true), _.isEmpty, 5.seconds)
-    matcher1Node.waitFor[Seq[OrderbookHistory]]("no bob orders")(_.ordersByAddress(bob, activeOnly = true), _.isEmpty, 5.seconds)
+    // TODO implement .waitFor[Seq[OrderbookHistory]]
+    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
-  "Place, fill and cancel a lot of orders" in {
-    val alicePlaces = aliceOrders.map(MatcherCommand.Place(matcher1Node, _))
-    val bobPlaces   = bobOrders.map(MatcherCommand.Place(matcher2Node, _))
-    val places      = Random.shuffle(alicePlaces ++ bobPlaces)
-
-    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(matcher1Node, alice, _))
-    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(matcher2Node, bob, _))
-    val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
-
-    executeCommands(places ++ cancels)
-    executeCommands(List(MatcherCommand.Place(matcher1Node, lastOrder)))
-  }
-
-  "Wait until all requests are processed" in {
-    try {
-      val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
-      matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
-
-      withClue("Last command processed") {
-        matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-        matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
-      }
-    } catch {
-      case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${matcher1Node.getLastOffset}, node2=${matcher2Node.getLastOffset}")
-        throw e
-    }
-  }
-
-  "States on both matcher should be equal" in {
-    val state1 = state(matcher1Node)
-    val state2 = state(matcher2Node)
-    state1 shouldBe state2
-  }
-
-  private def mkOrders(account: KeyPair, number: Int = placesNumber) =
+  private def mkOrders(account: KeyPair, number: Int = placesNumber) = {
     Gen.containerOfN[Vector, Order](number, orderGen(matcher, account, assetPairs)).sample.get
+  }
 
-  private def state(node: Node) = clean(node.matcherState(assetPairs, orders, Seq(alice, bob)))
+  private def state(dexApi: DexApi[Id]) = clean(matcherState(assetPairs, orders, Seq(alice), dexApi))
 
   // Because we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
   private def clean(state: MatcherState): MatcherState = state.copy(
     snapshots = state.snapshots.map { case (k, _) => k -> 0L }
   )
+
+  override protected def invalidateCaches(): Unit = {
+    super.invalidateCaches()
+    cachedDex2ApiAddress.invalidate()
+  }
 }

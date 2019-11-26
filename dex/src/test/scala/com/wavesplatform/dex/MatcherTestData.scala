@@ -7,8 +7,12 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.effect.FutureResult
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
+import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
@@ -18,27 +22,26 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
-import com.wavesplatform.{NTPTime, crypto}
+import com.wavesplatform.{NTPTime, RequestGen, crypto => wcrypto}
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherTestData extends NTPTime { _: Suite =>
+trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
   private val signatureSize = 32
 
-  val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
-  val WalletSeed                   = ByteStr("Matcher".getBytes("utf-8"))
-  val MatcherSeed: Array[Byte]     = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
-  val MatcherAccount               = KeyPair(MatcherSeed)
-  val accountGen: Gen[KeyPair]     = bytes32gen.map(seed => KeyPair(seed))
-  val positiveLongGen: Gen[Long]   = Gen.choose(1, Long.MaxValue)
-  val senderKeyPair                = KeyPair("seed".getBytes("utf-8"))
+  val WalletSeed               = ByteStr("Matcher".getBytes("utf-8"))
+  val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherAccount           = KeyPair(MatcherSeed)
+  val senderKeyPair            = KeyPair("seed".getBytes("utf-8"))
 
-  private val seqNr        = new AtomicLong(-1)
-  val defaultAssetDecimals = 8
+  private val seqNr           = new AtomicLong(-1)
+  val defaultAssetDescription = BriefAssetDescription("Asset", 8, hasScript = false)
 
   val btc: IssuedAsset = mkAssetId("WBTC")
   val usd: IssuedAsset = mkAssetId("WUSD")
@@ -47,8 +50,24 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val pairWavesBtc = AssetPair(Waves, btc)
   val pairWavesUsd = AssetPair(Waves, usd)
 
-  val getDefaultAssetDecimals: Asset => Int = Map[Asset, Int](usd -> 2, btc -> 8).withDefaultValue(defaultAssetDecimals).apply _
-  val rateCache: RateCache                  = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
+  val defaultAssetDescriptionsMap: Map[Asset, BriefAssetDescription] = {
+    Map[Asset, BriefAssetDescription](
+      usd -> BriefAssetDescription("USD", 2, hasScript = false),
+      btc -> BriefAssetDescription("BTC", 8, hasScript = false)
+    ).withDefaultValue(defaultAssetDescription)
+  }
+
+  val getDefaultAssetDescriptions: Asset => BriefAssetDescription = defaultAssetDescriptionsMap.apply
+
+  def getDefaultAssetDescriptions(asset: Asset, description: BriefAssetDescription): Asset => BriefAssetDescription = {
+    defaultAssetDescriptionsMap ++ Map(asset -> description)
+  }
+
+  def getDefaultAssetDescriptions(assetAndDesc: (Asset, BriefAssetDescription)*): Asset => BriefAssetDescription = {
+    defaultAssetDescriptionsMap ++ Map(assetAndDesc: _*)
+  }
+
+  val rateCache: RateCache = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
 
   implicit class DoubleOps(value: Double) {
     val waves, btc, eth = Normalization.normalizeAmountAndFee(value, 8)
@@ -64,6 +83,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def wrapMarketOrder(n: Long, mo: MarketOrder): QueueEventWithMeta = wrapEvent(n, QueueEvent.PlacedMarket(mo))
 
   val smallFee = Some(toNormalized(1))
+
+  def awaitResult[A](result: FutureResult[A]): Result[A]            = Await.result(result.value, Duration.Inf)
+  def awaitResult[A, B](result: Future[Either[A, B]]): Either[A, B] = Await.result(result, Duration.Inf)
 
   def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
@@ -83,7 +105,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       pair = pair,
       orderType = orderType,
       amount = amount,
-      price = Normalization.normalizePrice(price, getDefaultAssetDecimals(pair.amountAsset), getDefaultAssetDecimals(pair.priceAsset)),
+      price = Normalization.normalizePrice(price,
+                                           getDefaultAssetDescriptions(pair.amountAsset).decimals,
+                                           getDefaultAssetDescriptions(pair.priceAsset).decimals),
       timestamp = ntpNow,
       expiration = ntpNow + (1000 * 60 * 60 * 24),
       matcherFee = matcherFee,
@@ -109,7 +133,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     IssuedAsset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
-  val assetPairGen: Gen[AssetPair] = {
+  override val assetPairGen: Gen[AssetPair] = {
     Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
   }
 
@@ -179,36 +203,36 @@ trait MatcherTestData extends NTPTime { _: Suite =>
           amount: Price,
           price: BigDecimal,
           sender: Option[KeyPair] = None,
-          matcherFee: Option[Price] = None,
-          ts: Option[Price] = None,
+          matcherFee: Option[Long] = None,
+          ts: Option[Long] = None,
           version: Byte = 1,
           feeAsset: Asset = Waves): Order = rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
 
   def rawBuy(pair: AssetPair,
-             amount: Price,
+             amount: Long,
              price: Price,
              sender: Option[KeyPair] = None,
-             matcherFee: Option[Price] = None,
-             ts: Option[Price] = None,
+             matcherFee: Option[Long] = None,
+             ts: Option[Long] = None,
              version: Byte = 1,
              feeAsset: Asset = Waves): Order =
     valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, version, ts, feeAsset))._1
 
   def sell(pair: AssetPair,
-           amount: Price,
+           amount: Long,
            price: BigDecimal,
            sender: Option[KeyPair] = None,
-           matcherFee: Option[Price] = None,
-           ts: Option[Price] = None,
+           matcherFee: Option[Long] = None,
+           ts: Option[Long] = None,
            version: Byte = 1,
            feeAsset: Asset = Waves): Order = rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts, version, feeAsset)
 
   def rawSell(pair: AssetPair,
-              amount: Price,
+              amount: Long,
               price: Price,
               sender: Option[KeyPair] = None,
-              matcherFee: Option[Price] = None,
-              ts: Option[Price] = None,
+              matcherFee: Option[Long] = None,
+              ts: Option[Long] = None,
               version: Byte = 1,
               feeAsset: Asset = Waves): Order =
     valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts, version, feeAsset))._1
@@ -363,40 +387,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     } yield orderFeeSettings
   }
 
-  val orderWithFeeSettingsGenerator: Gen[(Order, KeyPair, OrderFeeSettings)] = {
-    for {
-      orderFeeSettings <- orderFeeSettingsGenerator()
-      (order, sender)  <- orderGenerator
-    } yield {
-      val correctedOrder = correctOrderByFeeSettings(order, sender, orderFeeSettings)
-      (correctedOrder, sender, orderFeeSettings)
-    }
-  }
-
-  def orderWithFeeSettingsGenerator(tpe: OrderType, price: Long): Gen[(Order, OrderFeeSettings)] =
-    for {
-      sender: KeyPair    <- accountGen
-      pair               <- assetPairGen
-      amount: Long       <- maxWavesAmountGen
-      timestamp: Long    <- createdTimeGen
-      expiration: Long   <- maxTimeGen
-      matcherFee: Long   <- maxWavesAmountGen
-      orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
-      arbitraryAsset     <- arbitraryAssetIdGen
-      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
-      orderFeeSettings   <- orderFeeSettingsGenerator(Some(arbitraryAsset))
-    } yield {
-
-      val order =
-        if (orderVersion == 3)
-          Order(sender, MatcherAccount, pair, tpe, amount, price, timestamp, expiration, matcherFee, orderVersion, matcherFeeAssetId)
-        else Order(sender, MatcherAccount, pair, tpe, amount, price, timestamp, expiration, matcherFee, orderVersion)
-
-      val correctedOrder = correctOrderByFeeSettings(order, sender, orderFeeSettings)
-
-      correctedOrder -> orderFeeSettings
-    }
-
   val orderWithoutWavesInPairAndWithFeeSettingsGenerator: Gen[(Order, KeyPair, OrderFeeSettings)] = {
     for {
       sender: KeyPair  <- accountGen
@@ -419,18 +409,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  val orderV3WithDynamicFeeSettingsAndRateCacheGen: Gen[(Order, DynamicSettings, RateCache)] = {
-    for {
-      (sender, order) <- orderV3WithPredefinedFeeAssetGenerator()
-      dynamicSettings <- dynamicSettingsGenerator()
-      rate            <- Gen.choose[Double](0, 10).map(_ / 10)
-    } yield {
-      val ratesMap = rateCache
-      ratesMap.upsertRate(order.matcherFeeAssetId, rate)
-      (correctOrderByFeeSettings(order, sender, dynamicSettings, Some(order.matcherFeeAssetId), Some(rate)), dynamicSettings, ratesMap)
-    }
-  }
-
   private def correctOrderByFeeSettings(order: Order,
                                         sender: KeyPair,
                                         orderFeeSettings: OrderFeeSettings,
@@ -444,7 +422,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       case (3, percentSettings: PercentSettings) =>
         order
           .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings, rateCache).head)
-          .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price, rateCache, getDefaultAssetDecimals))
+          .updateFee {
+            OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(_).decimals, rateCache).explicitGet()
+          }
       case (_, DynamicSettings(baseFee)) =>
         order
           .updateMatcherFeeAssetId(matcherFeeAssetForDynamicSettings getOrElse Waves)

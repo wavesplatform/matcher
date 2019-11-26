@@ -1,5 +1,6 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
+import WavesExtensionDockerKeys.buildNodeContainer
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
@@ -12,12 +13,34 @@ lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeV
 
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
-lazy val dex = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val `dex-common` = project
 
-lazy val `dex-it` = project
+lazy val dex = project.dependsOn(
+  `waves-integration`,
+  `dex-common`,
+  node % "compile;test->test;runtime->provided"
+)
+
+lazy val `dex-it-tools` = project.dependsOn(
+  node % "compile;runtime->provided"
+)
+
+lazy val `dex-it` = project.dependsOn(
+  dex % "compile;test->test",
+  `waves-integration-it`,
+  `dex-it-tools`,
+  `dex-common`
+)
+
+lazy val `waves-integration` = project.dependsOn(
+  `dex-common`,
+  node % "compile;test->test;runtime->provided"
+)
+
+lazy val `waves-integration-it` = project
   .dependsOn(
-    dex       % "compile;test->test",
-    `node-it` % "compile;test->test"
+    `waves-integration`,
+    `dex-it-tools`
   )
 
 lazy val `dex-generator` = project.dependsOn(
@@ -32,7 +55,11 @@ lazy val it = project
     Test / test := Def
       .sequential(
         root / Compile / packageAll,
-        `dex-it` / Docker / docker,
+        Def.task {
+          val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
+          val dexDocker              = (`dex-it` / Docker / docker).value
+        },
+        `waves-integration-it` / Test / test,
         `dex-it` / Test / test
       )
       .value
@@ -91,7 +118,10 @@ inScope(Global)(
     },
     network := NodeNetwork(sys.props.get("network")),
     nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value
+    buildNodeContainer := (`node-it` / Docker / docker).value,
+    // To speedup the compilation
+    Compile / doc / sources := Seq.empty,
+    Compile / packageDoc / publishArtifact := false,
   )
 )
 
@@ -121,14 +151,16 @@ checkPRRaw := {
     (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
+    (`waves-integration` / Test / test).value
     (`dex-generator` / Test / compile).value
   }
 }
 
 commands += Command.command("checkPR") { state =>
-  val updatedState = Project
-    .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+  val updatedState =
+    Project
+      .extract(state)
+      .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }

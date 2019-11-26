@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
@@ -11,10 +12,10 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
-sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterContext => MatcherErrorMessage) {
-  def this(obj: Entity, part: Entity, klass: Class, mkMessage: ErrorFormatterContext => MatcherErrorMessage) = this(
+sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) extends Product with Serializable {
+  def this(obj: Entity, part: Entity, klass: Class, message: MatcherErrorMessage) = this(
     (obj.code << 20) + (part.code << 8) + klass.code, // 32 bits = (12 for object) + (12 for part) + (8 for class)
-    mkMessage
+    message
   )
 
   override def toString: String = s"${getClass.getCanonicalName}(error=$code)"
@@ -22,9 +23,8 @@ sealed abstract class MatcherError(val code: Int, val mkMessage: ErrorFormatterC
 
 object MatcherError {
   implicit final class Ops(val self: MatcherError) extends AnyVal {
-    def toJson(context: ErrorFormatterContext) = {
-      val obj = self.mkMessage(context)
-
+    def toJson = {
+      val obj           = self.message
       val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
       Json
         .obj(
@@ -37,8 +37,17 @@ object MatcherError {
   }
 }
 
-private[error] case class Amount(asset: Asset, volume: Long)
-private[error] case class Price(assetPair: AssetPair, volume: Long)
+case class Amount(asset: Asset, volume: BigDecimal)
+object Amount {
+  private[error] def apply(asset: Asset, volume: Long)(implicit efc: ErrorFormatterContext): Amount =
+    new Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.assetDecimals(asset)))
+}
+
+case class Price(assetPair: AssetPair, volume: BigDecimal)
+object Price {
+  private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
+    new Price(assetPair, Denormalization.denormalizePrice(volume, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)))
+}
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
 
@@ -93,13 +102,22 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
-case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
+case class FeeNotEnough(required: Amount, given: Amount)
     extends MatcherError(
       order,
       fee,
       notEnough,
-      e"Required ${'required -> Amount(theAsset, required)} as fee for this order, but given ${'given -> Amount(theAsset, given)}"
+      e"Required ${'required -> required} as fee for this order, but given ${'given -> given}"
     )
+object FeeNotEnough {
+  def apply(required: Long, given: Long, asset: Asset)(implicit efc: ErrorFormatterContext): FeeNotEnough = {
+    val decimals = efc.assetDecimals(asset)
+    new FeeNotEnough(
+      required = Amount(asset, Denormalization.denormalizeAmountAndFee(required, decimals)),
+      given = Amount(asset, Denormalization.denormalizeAmountAndFee(given, decimals))
+    )
+  }
+}
 
 case class AssetNotFound(theAsset: IssuedAsset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> theAsset} not found")
 
@@ -114,6 +132,15 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
       e"""The expiration should be at least
                      |${'currentTimestamp -> currentTs} + ${'minExpirationOffset -> minExpirationOffset} = ${'minExpiration -> (currentTs + minExpirationOffset)},
                      |but it is ${'given -> givenExpiration}"""
+    )
+
+case class InvalidJson(fields: List[String])
+    extends MatcherError(
+      request,
+      commonEntity,
+      broken,
+      if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
+      else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
     )
 
 case class OrderCommonValidationFailed(details: String)
@@ -137,13 +164,24 @@ case class FeeAssetBlacklisted(theAsset: IssuedAsset)
 case class AddressIsBlacklisted(address: Address)
     extends MatcherError(account, commonEntity, blacklisted, e"The account ${'address -> address} is blacklisted")
 
-case class BalanceNotEnough(required: Map[Asset, Long], actual: Map[Asset, Long])
+case class BalanceNotEnough(required: List[Amount], actual: List[Amount])
     extends MatcherError(
       account,
       balance,
       notEnough,
       e"Not enough tradable balance. The order requires ${'required -> required}, but available are ${'actual -> actual}"
     )
+
+object BalanceNotEnough {
+  def apply(required: Map[Asset, Long], actual: Map[Asset, Long])(implicit efc: ErrorFormatterContext): BalanceNotEnough =
+    new BalanceNotEnough(mk(required), mk(actual))
+
+  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] =
+    input
+      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
+      .toList
+      .sortBy(x => AssetPair.assetIdStr(x.asset))
+}
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
     extends MatcherError(account, order, limitReached, e"The limit of ${'limit -> maxActiveOrders} active orders has been reached")
@@ -247,33 +285,41 @@ case class AssetScriptException(theAsset: IssuedAsset, errorName: String, errorT
                    |The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"""
     )
 
-case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
+case class DeviantOrderPrice(orderType: OrderType, orderPrice: Price, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       price,
       outOfBound,
-      if (ord.orderType == OrderType.BUY)
-        e"""The buy order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+      if (orderType == OrderType.BUY)
+        e"""The buy order's price ${'price -> orderPrice} is out of deviation bounds. It should meet the following matcher's requirements:
          |${'bestBidPercent -> (100 - deviationSettings.maxPriceProfit)}% of best bid price <= order price <=
          |${'bestAskPercent -> (100 + deviationSettings.maxPriceLoss)}% of best ask price"""
       else
-        e"""The sell order's price ${'price -> Price(ord.assetPair, ord.price)} is out of deviation bounds. It should meet the following matcher's requirements:
+        e"""The sell order's price ${'price -> orderPrice} is out of deviation bounds. It should meet the following matcher's requirements:
            |${'bestBidPercent -> (100 - deviationSettings.maxPriceLoss)}% of best bid price <= order price <=
            |${'bestAskPercent -> (100 + deviationSettings.maxPriceProfit)}% of best ask price"""
     )
+object DeviantOrderPrice {
+  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderPrice =
+    DeviantOrderPrice(ord.orderType, Price(ord.assetPair, ord.price), deviationSettings)
+}
 
-case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
+case class DeviantOrderMatcherFee(orderType: OrderType, matcherFee: Amount, deviationSettings: DeviationsSettings)
     extends MatcherError(
       order,
       fee,
       outOfBound,
-      if (ord.orderType == OrderType.BUY)
-        e"""The buy order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+      if (orderType == OrderType.BUY)
+        e"""The buy order's matcher fee ${'matcherFee -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
        |matcher fee >= ${'bestAskFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best ask"""
       else
-        e"""The sell order's matcher fee ${'matcherFee -> Amount(ord.matcherFeeAssetId, ord.matcherFee)} is out of deviation bounds. It should meet the following matcher's requirements:
+        e"""The sell order's matcher fee ${'matcherFee -> matcherFee} is out of deviation bounds. It should meet the following matcher's requirements:
          |matcher fee >= ${'bestBidFeePercent -> (100 - deviationSettings.maxFeeDeviation)}% of fee which should be paid in case of matching with best bid"""
     )
+object DeviantOrderMatcherFee {
+  def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderMatcherFee =
+    DeviantOrderMatcherFee(ord.orderType, Amount(ord.matcherFeeAssetId, ord.matcherFee), deviationSettings)
+}
 
 case class AssetPairSameAssets(theAsset: Asset)
     extends MatcherError(
@@ -307,66 +353,94 @@ case class UnsupportedOrderVersion(theVersion: Byte)
                      |Supported order versions can be obtained via /matcher/settings GET method"""
     )
 
-case class OrderInvalidAmount(ord: Order, amtSettings: OrderRestrictionsSettings)
+case class OrderInvalidAmount(orderAmount: Amount, amtSettings: OrderRestrictionsSettings)
     extends MatcherError(
       order,
       amount,
       denied,
       e"""The order's amount
-                     |${'amount -> Amount(ord.assetPair.amountAsset, ord.amount)}
+                     |${'amount -> orderAmount}
                      |does not meet matcher's requirements:
                      |max amount = ${'max -> amtSettings.maxAmount},
                      |min amount = ${'min -> amtSettings.minAmount},
                      |step amount = ${'step -> amtSettings.stepAmount}"""
     )
 
+object OrderInvalidAmount {
+  def apply(ord: Order, amtSettings: OrderRestrictionsSettings)(implicit efc: ErrorFormatterContext): OrderInvalidAmount =
+    OrderInvalidAmount(Amount(ord.assetPair.amountAsset, ord.amount), amtSettings)
+}
+
 case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
     extends MatcherError(order, price, unexpected, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
 
-case class OrderInvalidPrice(ord: Order, prcSettings: OrderRestrictionsSettings)
+case class OrderInvalidPrice(orderPrice: Price, prcSettings: OrderRestrictionsSettings)
     extends MatcherError(
       order,
       price,
       denied,
       e"""The order's price
-                   |${'price -> Price(ord.assetPair, ord.price)}
+                   |${'price -> orderPrice}
                    |does not meet matcher's requirements:
                    |max price = ${'max -> prcSettings.maxPrice},
                    |min price = ${'min -> prcSettings.minPrice},
                    |step price = ${'step -> prcSettings.stepPrice}"""
     )
 
+object OrderInvalidPrice {
+  def apply(ord: Order, prcSettings: OrderRestrictionsSettings)(implicit efc: ErrorFormatterContext): OrderInvalidPrice =
+    OrderInvalidPrice(Price(ord.assetPair, ord.price), prcSettings)
+}
+
 case class MarketOrderCancel(id: Order.Id)
     extends MatcherError(marketOrder, commonEntity, disabled, e"The market order ${'id -> id} cannot be cancelled manually")
 
-case class InvalidMarketOrderPrice(mo: Order)
+case class InvalidMarketOrderPrice(orderType: OrderType, orderPrice: Price)
     extends MatcherError(
       marketOrder,
       price,
       outOfBound,
-      if (mo.orderType == OrderType.BUY)
+      if (orderType == OrderType.BUY)
         e"""Price of the buy market order
-         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |(${'orderPrice -> orderPrice})
          |is too low for its full execution with the current market state"""
       else
         e"""Price of the sell market order
-         |(${'orderPrice -> Price(mo.assetPair, mo.price)})
+         |(${'orderPrice -> orderPrice})
          |is too high for its full execution with the current market state"""
     )
 
-case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
+object InvalidMarketOrderPrice {
+  def apply(mo: Order)(implicit efc: ErrorFormatterContext): InvalidMarketOrderPrice =
+    InvalidMarketOrderPrice(mo.orderType, Price(mo.assetPair, mo.price))
+}
+
+case class OrderInvalidPriceLevel(orderPrice: Price, minOrderPrice: Price)
     extends MatcherError(
       order,
       price,
       notEnough,
       e"""The buy order's price
-       |${'price -> Price(ord.assetPair, ord.price)}
+       |${'price -> orderPrice}
        |does not meet matcher's requirements:
-       |price >= ${'tickSize -> Price(ord.assetPair, tickSize)} (actual tick size).
+       |price >= ${'tickSize -> minOrderPrice} (actual tick size).
        |Orders can not be placed into level with price 0"""
     )
+object OrderInvalidPriceLevel {
+  def apply(ord: Order, tickSize: Long)(implicit efc: ErrorFormatterContext): OrderInvalidPriceLevel =
+    OrderInvalidPriceLevel(Price(ord.assetPair, ord.price), Price(ord.assetPair, tickSize))
+}
 
-case object InvalidRateInput extends MatcherError(rate, commonEntity, broken, e"Invalid input for the asset rate")
+case object WavesNodeConnectionBroken
+    extends MatcherError(connectivity, commonEntity, broken, e"Waves Node is unavailable, please retry later or contact with the administrator")
+
+case object UnexpectedError
+    extends MatcherError(
+      commonEntity,
+      commonEntity,
+      unexpected,
+      e"An unexpected error occurred"
+    )
 
 case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
 
@@ -403,7 +477,8 @@ object Entity {
   object marketOrder extends Entity(19)
   object rate        extends Entity(20)
 
-  object producer extends Entity(100)
+  object producer     extends Entity(100)
+  object connectivity extends Entity(101)
 }
 
 sealed abstract class Class(val code: Int)

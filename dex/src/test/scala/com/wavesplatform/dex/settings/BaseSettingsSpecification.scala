@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.settings
 
-import cats.implicits._
+import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.settings.loadConfig
-import org.scalatest.FlatSpec
 import net.ceedubs.ficus.Ficus._
+import org.scalatest.FlatSpec
 
 import scala.util.Try
 
-class BaseSettingsSpecification extends FlatSpec{
+class BaseSettingsSpecification extends FlatSpec {
 
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)
@@ -65,9 +65,17 @@ class BaseSettingsSpecification extends FlatSpec{
       s"""waves {
          |  directory = /waves
          |  dex {
-         |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
-         |    bind-address = 127.0.0.1
-         |    port = 6886
+         |    account-storage {
+         |      type = "in-mem"
+         |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+         |    }
+         |    rest-api {
+         |      address = 127.1.2.3
+         |      port = 6880
+         |      api-key-hash = foobarhash
+         |      cors = no
+         |      api-key-different-host = no
+         |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s
          |    snapshots-interval = 999
@@ -82,7 +90,7 @@ class BaseSettingsSpecification extends FlatSpec{
          |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
          |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
          |    ]
-         |    blacklisted-assets = ["a"]
+         |    blacklisted-assets = ["AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck"]
          |    blacklisted-names = ["b"]
          |    blacklisted-addresses = [
          |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
@@ -109,14 +117,14 @@ class BaseSettingsSpecification extends FlatSpec{
          |        topic = "some-events"
          |
          |        consumer {
-         |          buffer-size = 100
-         |          min-backoff = 11s
-         |          max-backoff = 2d
+         |          fetch-max-duration = 10s
+         |          max-buffer-size = 777
+         |          client.foo = 2
          |        }
          |
          |        producer {
          |          enable = no
-         |          buffer-size = 200
+         |          client.bar = 3
          |        }
          |      }
          |    }

@@ -20,7 +20,14 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -79,14 +86,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
+  private def invalidJsonResponse(fields: List[String] = Nil) = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
+
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
       .newBuilder()
       .handle {
-        case ValidationRejection(_, Some(e: PlayJsonException)) =>
-          complete {
-            InvalidJsonResponse(error.InvalidJson(e.errors.map(_._1.toString()).toList))
-          }
+        case ValidationRejection(_, Some(e: PlayJsonException)) => invalidJsonResponse(e.errors.map(_._1.toString).toList)
+        case _: UnsupportedRequestContentTypeRejection          => invalidJsonResponse()
       }
       .result()
 
@@ -113,6 +120,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
       }
   }
+
+  private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
 
   private def matcherStatusBarrier: Directive0 = matcherStatus() match {
     case Matcher.Status.Working  => pass
@@ -241,19 +250,22 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            required = true)
     )
   )
-  def upsertRate: Route = (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
-    entity(as[Double]) { rate =>
-      withAsset(a) { asset =>
-        complete(
-          if (asset == Waves) SimpleErrorResponse(StatusCodes.BadRequest, error.WavesImmutableRate)
-          else {
-            val assetStr = AssetPair.assetIdStr(asset)
-            rateCache.upsertRate(asset, rate) match {
-              case None     => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
-              case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
-            }
+  def upsertRate: Route = {
+    (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
+      entity(as[Double]) { rate =>
+        if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
+          withAsset(a) { asset =>
+            complete(
+              if (asset == Waves) RateError(error.WavesImmutableRate)
+              else {
+                val assetStr = AssetPair.assetIdStr(asset)
+                rateCache.upsertRate(asset, rate) match {
+                  case None     => StatusCodes.Created -> wrapMessage(s"The rate $rate for the asset $assetStr added")
+                  case Some(pv) => StatusCodes.OK      -> wrapMessage(s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+                }
+              }
+            )
           }
-        )
       }
     }
   }
@@ -268,12 +280,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def deleteRate: Route = (path("settings" / "rates" / AssetPM) & delete & withAuth) { a =>
     withAsset(a) { asset =>
       complete(
-        if (asset == Waves) SimpleErrorResponse(StatusCodes.BadRequest, error.WavesImmutableRate)
+        if (asset == Waves) RateError(error.WavesImmutableRate)
         else {
           val assetStr = AssetPair.assetIdStr(asset)
           rateCache.deleteRate(asset) match {
-            case None     => SimpleErrorResponse(StatusCodes.NotFound, error.RateNotFound(asset))
-            case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
+            case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
+            case Some(pv) => StatusCodes.OK -> wrapMessage(s"The rate for the asset $assetStr deleted, old value = $pv")
           }
         }
       )

@@ -39,6 +39,7 @@ abstract class MatcherSuiteBase
     with Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll
+    with BeforeAndAfterEach
     with Eventually
     with HasWavesNode
     with MkWavesEntities
@@ -63,7 +64,9 @@ abstract class MatcherSuiteBase
         .setKeepAlive(false)
         .setRequestTimeout(10000)
         .build()
-    ))
+    )
+  )
+
   protected implicit val tryHttpBackend = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {

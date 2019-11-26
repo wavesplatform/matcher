@@ -43,6 +43,11 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     startAndWait(dex1Container(), dex1Api)
   }
 
+  override protected def afterEach(): Unit = {
+    super.afterEach()
+    dex1Api.cancelAll(matcher)
+  }
+
   "can match orders when SmartAccTrading is still not activated" in {
     val pair = AssetPair(Waves, allowAsset)
 
@@ -126,7 +131,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1Api.tryBroadcast(txs.head)
     r shouldBe 'left
-    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -153,7 +158,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1Api.tryBroadcast(txs.head)
     r shouldBe 'left
-    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
   }
 }
 

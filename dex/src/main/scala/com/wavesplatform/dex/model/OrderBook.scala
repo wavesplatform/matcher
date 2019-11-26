@@ -4,8 +4,8 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.Events._
-import com.wavesplatform.dex.model.MatcherModel.Price
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.MatcherModel._
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.lang.utils.Serialize.ByteBufferOps

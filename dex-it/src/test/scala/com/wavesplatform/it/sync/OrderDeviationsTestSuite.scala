@@ -44,9 +44,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   val scriptAssetTx = mkIssue(alice, "asset1", defaultAssetQuantity, fee = smartIssueFee, script = trueScript)
   val scriptAsset   = IssuedAsset(scriptAssetTx.id())
 
-  val anotherScriptAssetTx = mkIssue(alice, "asset2", defaultAssetQuantity, fee = smartIssueFee, script = trueScript)
-  val anotherScriptAsset   = IssuedAsset(anotherScriptAssetTx.id())
-
+  val anotherScriptAssetTx        = mkIssue(alice, "asset2", defaultAssetQuantity, fee = smartIssueFee, script = trueScript)
+  val anotherScriptAsset          = IssuedAsset(anotherScriptAssetTx.id())
   val scriptAssetsPair: AssetPair = createAssetPair(scriptAsset, anotherScriptAsset)
 
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(

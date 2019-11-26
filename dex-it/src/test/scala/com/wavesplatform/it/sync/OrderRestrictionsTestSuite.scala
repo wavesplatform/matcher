@@ -10,7 +10,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     ConfigFactory.parseString(
       s"""
          |waves.dex {
-         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId" ]
          |  order-restrictions = {
          |   "$WctId-$UsdId": {
          |     min-amount  = 0.1
@@ -27,8 +27,14 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     startAndWait(wavesNode1Container(), wavesNode1Api)
-    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx, IssueEthTx)
     startAndWait(dex1Container(), dex1Api)
+  }
+
+  "order info returns information event there is no such order book" in {
+    dex1Api.orderBookInfo(ethBtcPair).restrictions shouldBe empty
+    dex1Api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
+    dex1Api.orderBookInfo(wctUsdPair).restrictions shouldNot be(empty)
   }
 
   "low amount" in {
@@ -99,9 +105,9 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     dex1Api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe "1000"
     dex1Api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe "0.001"
 
-    dex1Api.orderBookInfo(wavesBtcPair).restrictions.isEmpty
+    dex1Api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
 
     dex1Api.place(mkOrder(bob, wavesBtcPair, BUY, 100000000, 100000, matcherFee))
-    dex1Api.tradingPairInfo(wavesBtcPair).get.restrictions.isEmpty
+    dex1Api.tradingPairInfo(wavesBtcPair).get.restrictions shouldBe empty
   }
 }

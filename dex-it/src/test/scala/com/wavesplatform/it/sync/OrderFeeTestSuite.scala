@@ -562,6 +562,50 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       Seq(wct, btc, usd).foreach(dex1Api.deleteRate)
     }
 
+    "if v2 order filled partially by too low percent of amount" in {
+
+      val aliceWavesBefore = wavesNode1Api.balance(alice.toAddress, Waves)
+      val bobWavesBefore   = wavesNode1Api.balance(bob.toAddress, Waves)
+
+      val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)
+
+      placeAndAwait(buyOrder)
+
+      val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)
+
+      placeAndAwait(sellOrder, OrderStatus.Filled)
+      waitForOrderAtNode(sellOrder)
+
+      dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+
+      wavesNode1Api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves)
+      wavesNode1Api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      dex1Api.cancelAll(alice)
+    }
+
+    "if v3 order filled partially by too low percent of amount" in {
+
+      val aliceWavesBefore = wavesNode1Api.balance(alice.toAddress, Waves)
+      val bobWavesBefore   = wavesNode1Api.balance(bob.toAddress, Waves)
+
+      val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)
+
+      placeAndAwait(buyOrder)
+
+      val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)
+
+      placeAndAwait(sellOrder, OrderStatus.Filled)
+      waitForOrderAtNode(sellOrder)
+
+      dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+
+      wavesNode1Api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves - 1)
+      wavesNode1Api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
+
+      dex1Api.cancelAll(alice)
+    }
+
     "if order was filled partially" in {
 
       Seq(btc, usd).foreach(asset => upsertRates(asset -> 0.000003D))

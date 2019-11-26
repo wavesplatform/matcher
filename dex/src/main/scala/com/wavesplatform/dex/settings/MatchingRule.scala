@@ -13,6 +13,8 @@ import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorList
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
+import scala.util.Try
+
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.smart
 
-import cats.Eval
 import cats.syntax.either._
+import cats.{Eval, Id}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -14,11 +14,11 @@ import com.wavesplatform.transaction.{Authorized, Proven}
 
 object MatcherScriptRunner {
 
-  def apply(script: Script, order: Order): (Log, Either[String, EVALUATED]) = script match {
+  def apply(script: Script, order: Order): (Log[Id], Either[String, EVALUATED]) = script match {
     case s: ExprScript =>
       MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Eval.later(order), isDApp = false) match {
         case Left(error) => (List.empty, Left(error))
-        case Right(ctx)  => EvaluatorV1.applyWithLogging(ctx, s.expr)
+        case Right(ctx)  => EvaluatorV1.apply().applyWithLogging(ctx, s.expr)
       }
 
     case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
@@ -31,7 +31,7 @@ object MatcherScriptRunner {
         case Left(error) => (List.empty, Left(error))
         case Right(ctx) =>
           val evalContract = ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(order))
-          EvaluatorV1.evalWithLogging(ctx, evalContract)
+          EvaluatorV1.apply().evalWithLogging(ctx, evalContract)
       }
 
     case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>

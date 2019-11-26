@@ -123,6 +123,7 @@ class ExchangeTransactionBroadcastActorSpecification
 
       actor ! ExchangeTransactionBroadcastActor.Send
       actor ! ExchangeTransactionBroadcastActor.Send
+
       eventually {
         broadcasted shouldBe empty
       }

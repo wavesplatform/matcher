@@ -124,7 +124,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1Api.tryBroadcast(txs.head)
         r shouldBe 'left
-        r.left.get.error shouldBe TransactionNotAllowedByAccountScript.ErrorCode
+        r.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
       }
     }
   }

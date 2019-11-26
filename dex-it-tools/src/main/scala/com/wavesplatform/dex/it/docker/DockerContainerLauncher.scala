@@ -1,5 +1,9 @@
 package com.wavesplatform.dex.it.docker
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.nio.charset.StandardCharsets
+import java.nio.file.Path
+
 import cats.syntax.either._
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
@@ -7,6 +11,7 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages.{ContainerConfig, EndpointConfig, HostConfig, PortBinding}
 import com.wavesplatform.dex.it.docker.DockerContainerLauncher.{ContainerIsNotStartedYetError, DockerError, VolumePair}
 import mouse.any._
+import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveOutputStream}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -16,7 +21,7 @@ class DockerContainerLauncher(imageName: String,
                               containerIp: String,
                               containerPort: String,
                               imageTag: String = "",
-                              env: String = "",
+                              env: List[String],
                               networkName: String = "",
                               hostPort: Option[String] = None,
                               volumePath: Option[VolumePair] = None,
@@ -51,7 +56,7 @@ class DockerContainerLauncher(imageName: String,
         .hostConfig(hostConfig)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(networkName -> endpointConfig).asJava))
         .exposedPorts(containerPort)
-        .image(image) |> (builder => if (env.nonEmpty) builder.env(env) else builder) |> (_.build)
+        .image(image) |> (builder => if (env.nonEmpty) builder.env(env: _*) else builder) |> (_.build)
     }
   }
 
@@ -71,6 +76,25 @@ class DockerContainerLauncher(imageName: String,
   def stopAndRemoveContainer(): Unit = {
     dockerClient.stopContainer(containerId, 0)
     dockerClient.removeContainer(containerId, RemoveContainerParam.removeVolumes())
+  }
+
+  def writeFile(to: Path, content: String): Unit = {
+
+    val os    = new ByteArrayOutputStream()
+    val s     = new TarArchiveOutputStream(os)
+    val bytes = content.getBytes(StandardCharsets.UTF_8)
+    val entry = new TarArchiveEntry(s"${to.getFileName}")
+
+    entry.setSize(bytes.size)
+    s.putArchiveEntry(entry)
+    s.write(bytes)
+    s.closeArchiveEntry()
+
+    val is = new ByteArrayInputStream(os.toByteArray)
+    s.close()
+
+    try dockerClient.copyToContainer(is, containerId, s"${to.getParent.toString}")
+    finally is.close()
   }
 }
 

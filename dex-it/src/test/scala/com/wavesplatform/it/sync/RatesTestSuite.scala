@@ -83,6 +83,14 @@ class RatesTestSuite extends MatcherSuiteBase {
     dex1Api.tryDeleteRate(wctAsset) should failWith(20971529, MatcherError.Params(assetId = Some(wctStr)))
   }
 
+  "Rates should not be changed by incorrect values" in {
+    dex1Api.tryUpsertRate(Waves, 0) should failWith(20971535, "Asset rate should be positive")
+    dex1Api.rates shouldBe defaultRateMap
+
+    dex1Api.tryUpsertRate(Waves, -0.1) should failWith(20971535, "Asset rate should be positive")
+    dex1Api.rates shouldBe defaultRateMap
+  }
+
   "Changing rates affects order validation" in {
     // set rate for btc
     dex1Api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Created

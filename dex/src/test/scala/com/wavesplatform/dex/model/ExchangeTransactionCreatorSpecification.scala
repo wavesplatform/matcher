@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.OrderExecuted
+import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2, OrderType}
@@ -91,38 +92,52 @@ class ExchangeTransactionCreatorSpecification
       }
     }
 
-    "create transactions with correct buyMatcherFee/sellMatcherFee for expensive matcherFeeAsset" in {
+    "create transactions with correct buyMatcherFee/sellMatcherFee for expensive matcherFeeAsset" when {
 
       val tc = getExchangeTransactionCreator()
 
-      def test(submittedType: OrderType, submittedAmount: Long, submittedFee: Long)(countersAmounts: Long*)(expectedMatcherFees: Long*): Assertion = {
+      def test(submittedType: OrderType, submittedAmount: Long, submittedFee: Long, orderVersion: Int)(countersAmounts: Long*)(
+          expectedSubmittedMatcherFees: Long*): Unit = {
 
-        require(countersAmounts.length == expectedMatcherFees.length)
+        require(countersAmounts.length == expectedSubmittedMatcherFees.length)
 
         val submittedOrder = LimitOrder(
-          createOrder(pairWavesBtc,
-                      submittedType,
-                      submittedAmount,
-                      0.00011131,
-                      matcherFee = submittedFee,
-                      matcherFeeAsset = mkAssetId("Very expensive asset"))
+          createOrder(
+            pairWavesBtc,
+            submittedType,
+            submittedAmount,
+            0.00011131,
+            matcherFee = submittedFee,
+            matcherFeeAsset = mkAssetId("Very expensive asset"),
+            version = orderVersion.toByte
+          )
         )
 
         val counterOrders = countersAmounts.map { amount =>
           LimitOrder(createOrder(pairWavesBtc, submittedType.opposite, amount, 0.00011131))
         }
 
-        counterOrders
-          .zip(expectedMatcherFees)
-          .foldLeft[(AcceptedOrder, Assertion)](submittedOrder -> Succeeded) {
-            case ((submitted, _), (counter, expectedMatcherFee)) =>
-              val oe = OrderExecuted(submitted, counter, System.currentTimeMillis)
-              val tx = tc.createTransaction(oe).explicitGet()
-              val rs = if (submittedType == BUY) tx.buyMatcherFee shouldBe expectedMatcherFee else tx.sellMatcherFee shouldBe expectedMatcherFee
+        val submittedDenormalizedAmount = Denormalization.denormalizeAmountAndFee(submittedOrder.amount, 8)
+        val denormalizedCounterAmounts  = countersAmounts.map(Denormalization.denormalizeAmountAndFee(_, 8))
 
-              oe.submittedRemaining -> rs
-          }
-          ._2
+        s"S: $submittedType $submittedDenormalizedAmount, C: ${denormalizedCounterAmounts.mkString("[", ", ", "]")}" in {
+          counterOrders
+            .zip(expectedSubmittedMatcherFees)
+            .zipWithIndex
+            .foldLeft[AcceptedOrder](submittedOrder) {
+              case (submitted, ((counter, expectedMatcherFee), i)) =>
+                val oe            = OrderExecuted(submitted, counter, System.currentTimeMillis)
+                val tx            = tc.createTransaction(oe).explicitGet()
+                val counterAmount = Denormalization.denormalizeAmountAndFee(counter.order.amount, 8)
+
+                withClue(s"C($i): ${counter.order.orderType} $counterAmount:\n") {
+                  if (submittedType == BUY) tx.buyMatcherFee shouldBe expectedMatcherFee
+                  else tx.sellMatcherFee shouldBe expectedMatcherFee
+                }
+
+                oe.submittedRemaining
+            }
+        }
       }
 
       /**
@@ -132,30 +147,30 @@ class ExchangeTransactionCreatorSpecification
         *
         * In case of partial filling of the submitted order (with fee = 1 fraction of the expensive asset)
         * ExchangeTransactionCreator has to correctly calculate buyMatcherFee/sellMatcherFee. They should have non-zero values
-        * after the first execution
+        * after the first execution.
+        *
+        * But only for orders with version >= 3, because there is a proportional checks of spent fee for older versions.
         */
-      withClue("S: BUY 100 (fee = 1), C: SELL 100, buyMatcherFee should be 1:\n") {
-        test(BUY, 100.waves, 1)(100.waves)(1)
+      (1 to 2).foreach { v =>
+        s"submitted order version is $v" when {
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(0)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(0, 0)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(0, 0)
+          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(0, 4)
+          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(0, 2)
+        }
       }
 
-      withClue("S: BUY 100 (fee = 1), C: SELL 99.99999999, buyMatcherFee should be 1:\n") {
-        test(BUY, 100.waves, 1)(99.99999999.waves)(1)
-      }
-
-      withClue("S: BUY 100 (fee = 1), C1: SELL 50, C2: SELL 50, buyMatcherFee should be 1, 0:\n") {
-        test(BUY, 100.waves, 1)(50.waves, 50.waves)(1, 0)
-      }
-
-      withClue("S: BUY 100 (fee = 1), C1: SELL 1, C2: SELL 120, buyMatcherFee should be 1, 0:\n") {
-        test(BUY, 100.waves, 1)(1.waves, 120.waves)(1, 0)
-      }
-
-      withClue("S: SELL 100 (fee = 1), C1: BUY 2, C2: BUY 500, sellMatcherFee should be 1, 4:\n") {
-        test(SELL, 100.waves, 5)(2.waves, 500.waves)(1, 4)
-      }
-
-      withClue("S: SELL 100 (fee = 1), C1: BUY 2, C2: BUY 50, sellMatcherFee should be 1, 2:\n") {
-        test(SELL, 100.waves, 5)(2.waves, 50.waves)(1, 2)
+      (3 to 3).foreach { v =>
+        s"submitted order version is $v" when {
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(1)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(1, 0)
+          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(1, 0)
+          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(1, 4)
+          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
+        }
       }
     }
   }

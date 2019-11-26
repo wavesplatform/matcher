@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
+import java.nio.file.Paths
 import java.sql.{Connection, DriverManager}
-import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
@@ -35,22 +35,24 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   //  5. up node (during start node checks connection to postgres)
   //  6. send messages from node to pgc
 
-  private val postgresImageName, postgresUser = "postgres"
-  private val postgresContainerName           = s"pgc-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
-  private val postgresPassword                = "docker"
-  private val postgresEnv                     = s"POSTGRES_PASSWORD=$postgresPassword"
-  private val postgresContainerPort           = "5432"
-  private val postgresContainerIp             = dockerClient.ipForNode(10)
+  val customDB       = "user_db"
+  val customUser     = "user"
+  val customPassword = "user"
 
-  private val postgresContainerLauncher =
+  val postgresImageName           = "postgres"
+  val postgresContainerName       = "pgc"
+  val postgresContainerPort       = "5432"
+  val postgresContainerIp: String = dockerClient.ipForNode(10)
+
+  val postgresContainerLauncher =
     new DockerContainerLauncher(
       imageName = postgresImageName,
       containerName = postgresContainerName,
       containerIp = postgresContainerIp,
       containerPort = postgresContainerPort,
-      env = postgresEnv,
-      networkName = dockerClient.network().name,
-      imageTag = "10"
+      imageTag = "10",
+      env = List(s"POSTGRES_DB=$customDB", s"POSTGRES_USER=$customUser", s"POSTGRES_PASSWORD=$customPassword"),
+      networkName = dockerClient.network().name
     )
 
   private val batchLingerMs: Int = OrderHistorySettings.defaultBatchLingerMs
@@ -67,21 +69,37 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def createTables(postgresAddress: String): Unit = {
-    val url                     = s"jdbc:postgresql://$postgresAddress/$postgresImageName"
+  def getFileContentStr(fileName: String): String = {
+    val fileStream = getClass.getResourceAsStream(fileName)
+    Source.fromInputStream(fileStream).getLines.toSeq.mkString
+  }
+
+  def createDatabase(): Unit = {
+
+    val createDatabaseFileName    = "init-user-db.sh"
+    val createDatabaseFileContent = getFileContentStr(s"/order-history/$createDatabaseFileName")
+
+    postgresContainerLauncher.writeFile(
+      to = Paths.get(s"/docker-entrypoint-initdb.d/$createDatabaseFileName"),
+      content = createDatabaseFileContent
+    )
+  }
+
+  def createTables(postgresAddress: String): Unit = {
+
+    val url                     = s"jdbc:postgresql://$postgresAddress/$customDB"
     val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
 
     def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
 
-      val fileStream            = getClass.getResourceAsStream(orderHistoryDDLFileName)
-      val createTablesDDL       = Source.fromInputStream(fileStream).getLines.toSeq.mkString
+      val createTablesDDL       = getFileContentStr(orderHistoryDDLFileName)
       val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
 
       createTablesStatement.executeUpdate()
       createTablesStatement.close()
     }
 
-    retry(10, 2000) { DriverManager.getConnection(url, postgresUser, postgresPassword) } flatMap { sqlConnection =>
+    retry(10, 2000) { DriverManager.getConnection(url, customUser, customPassword) } flatMap { sqlConnection =>
       executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
     } get
   }
@@ -91,8 +109,9 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
        |postgres {
        |  server-name = $serverName
        |  port-number = $port
-       |  user = $postgresUser
-       |  password = $postgresPassword
+       |  database = $customDB
+       |  user = $customUser
+       |  password = $customPassword
        |  data-source-class-name = "org.postgresql.ds.PGSimpleDataSource"
        |}
     """.stripMargin
@@ -101,7 +120,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     s"""
        |waves.dex {
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
-       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
        |  order-history {
        |    enabled = yes
        |    orders-batch-linger-ms = $batchLingerMs
@@ -117,6 +136,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     // DEX depends on Postgres, so it must start before
+    createDatabase()
     postgresContainerLauncher.startContainer()
     createTables(s"localhost:$getPostgresContainerHostPort")
 

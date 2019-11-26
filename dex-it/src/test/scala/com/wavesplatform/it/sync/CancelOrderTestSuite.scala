@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
+import mouse.any.anySyntaxMouse
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
 
@@ -16,6 +17,21 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Order can be canceled" - {
+
+    "After cancelAllOrders (200) all of them should be cancelled" in {
+      val time = System.currentTimeMillis
+
+      val orders = (1 to 200) map { i =>
+        mkOrder(bob, wavesBtcPair, OrderType.SELL, 1000000, 123450000L, 300000, version = 2: Byte, ts = time + i) unsafeTap { order =>
+          placeAndAwait(order)
+        }
+      }
+
+      dex1Api.cancelAll(bob)
+
+      orders.foreach(order => dex1Api.waitForOrderStatus(order, OrderStatus.Cancelled))
+    }
+
     "by sender" in {
       val order = mkBobOrder
       placeAndAwait(order)

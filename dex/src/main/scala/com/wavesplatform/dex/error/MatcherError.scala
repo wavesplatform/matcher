@@ -431,10 +431,6 @@ object OrderInvalidPriceLevel {
     OrderInvalidPriceLevel(Price(ord.assetPair, ord.price), Price(ord.assetPair, tickSize))
 }
 
-case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
-case class RateNotFound(theAsset: Asset)
-    extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
-
 case object WavesNodeConnectionBroken
     extends MatcherError(connectivity, commonEntity, broken, e"Waves Node is unavailable, please retry later or contact with the administrator")
 
@@ -445,6 +441,13 @@ case object UnexpectedError
       unexpected,
       e"An unexpected error occurred"
     )
+
+case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
+
+case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
+
+case class RateNotFound(theAsset: Asset)
+    extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 
 sealed abstract class Entity(val code: Int)
 object Entity {

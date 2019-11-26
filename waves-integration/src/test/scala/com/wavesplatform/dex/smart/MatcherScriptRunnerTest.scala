@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.smart
 
+import cats.Id
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -31,7 +32,7 @@ class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with Transactio
     matcherFee = 30000L
   )
 
-  private def run(script: Script): (Log, Either[String, Terms.EVALUATED]) = MatcherScriptRunner(script, sampleOrder)
+  private def run(script: Script): (Log[Id], Either[String, Terms.EVALUATED]) = MatcherScriptRunner(script, sampleOrder)
 
   "dApp sunny day" in {
     run(dAppScriptSunny)._2.explicitGet() shouldBe Terms.FALSE

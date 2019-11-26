@@ -136,7 +136,9 @@ class OrderBookActor(owner: ActorRef,
         case oe @ Events.OrderExecuted(submitted, counter, _) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
           createTransaction(oe) match {
-            case Right(tx) => context.system.eventStream.publish(ExchangeTransactionCreated(tx))
+            case Right(tx) =>
+              log.info(s"Created transaction: $tx")
+              context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             case Left(ex) =>
               log.warn(s"""Can't create tx: $ex
                    |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}

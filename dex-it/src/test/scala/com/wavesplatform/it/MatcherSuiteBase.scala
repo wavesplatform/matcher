@@ -1,10 +1,14 @@
 package com.wavesplatform.it
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase.baseConfig
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.alice
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -28,7 +32,7 @@ abstract class MatcherSuiteBase
   val issueFee         = 1.waves
   val smartIssueFee    = 1.waves + smartFee
   val leasingFee       = 0.002.waves + smartFee
-  val tradeFee         = 0.003.waves
+  val tradeFee         = 0.003.wavesz
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
@@ -41,7 +45,6 @@ abstract class MatcherSuiteBase
   protected def node = dockerNodes().head
 
   protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
-
 }
 
 object MatcherSuiteBase {

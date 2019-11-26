@@ -29,12 +29,13 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable.{AnyRefMap => MutableMap}
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.concurrent.duration._
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
                    spendableBalance: Asset => Future[Long],
+                   requestTimeout: FiniteDuration,
                    time: Time,
                    orderDB: OrderDB,
                    hasOrderInBlockchain: Order.Id => Future[Boolean],
@@ -58,14 +59,17 @@ class AddressActor(owner: Address,
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
+      import OrderValidator.MaxActiveOrders
       log.trace(s"Got $command")
       val orderId = command.order.id()
+
       if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      else if (totalActiveOrders >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
         pendingCommands.put(orderId, PendingCommand(command, sender))
-        if (shouldProcess) processFirstPlacement()
+        if (shouldProcess) processNextPlacement()
         else log.trace(s"${placementQueue.headOption} is processing, moving $orderId to the queue")
       }
 
@@ -132,7 +136,7 @@ class AddressActor(owner: Address,
 
     case event: Event.StoreFailed =>
       log.trace(s"Got $event")
-      pendingCommands.get(event.orderId).foreach { item =>
+      pendingCommands.remove(event.orderId).foreach { item =>
         item.client ! NotImplemented(event.reason) // error.FeatureDisabled
       }
 
@@ -156,7 +160,7 @@ class AddressActor(owner: Address,
             }
 
             placementQueue = restQueue
-            processFirstPlacement()
+            processNextPlacement()
           } else log.warn(s"Received stale $event for $orderId")
       }
 
@@ -221,7 +225,7 @@ class AddressActor(owner: Address,
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
-  private def processFirstPlacement(): Unit = placementQueue.dequeueOption.foreach {
+  private def processNextPlacement(): Unit = placementQueue.dequeueOption.foreach {
     case (firstOrderId, _) =>
       pendingCommands.get(firstOrderId) match {
         case None =>
@@ -331,27 +335,41 @@ class AddressActor(owner: Address,
   private def place(ao: AcceptedOrder): Unit = {
     openVolume = openVolume |+| ao.reservableBalance
     activeOrders.put(ao.order.id(), ao)
-    storeEvent(ao.order.id())(ao match {
-      case ao: LimitOrder  => QueueEvent.Placed(ao)
-      case ao: MarketOrder => QueueEvent.PlacedMarket(ao)
-    })
+    storeEvent(ao.order.id())(
+      ao match {
+        case ao: LimitOrder  => QueueEvent.Placed(ao)
+        case ao: MarketOrder => QueueEvent.PlacedMarket(ao)
+      }
+    )
   }
 
   private def cancel(o: AcceptedOrder): Unit =
     storeEvent(o.order.id())(QueueEvent.Canceled(o.order.assetPair, o.order.id()))
 
   private def storeEvent(orderId: Order.Id)(event: QueueEvent): Unit =
-    store(event)
+    Future
+      .firstCompletedOf(List(store(event), scheduleTimeout(requestTimeout)))
       .transform {
         case Success(None) => Success(Some(error.FeatureDisabled))
         case Success(_)    => Success(None)
-        case _             => Success(Some(error.CanNotPersistEvent))
+        case Failure(e) =>
+          e match {
+            case _: TimeoutException => log.warn(s"Timeout during storing $event for $orderId")
+            case _                   =>
+          }
+          Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
         case Success(None)        => log.trace(s"Order $orderId saved")
         case _                    =>
       }
+
+  private def scheduleTimeout(delay: FiniteDuration): Future[Nothing] = {
+    val p = Promise[Nothing]()
+    context.system.scheduler.scheduleOnce(delay)(p.failure(timeoutException))
+    p.future
+  }
 
   private def hasOrder(id: Order.Id, hasOrderInBlockchain: Boolean): Boolean =
     activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain
@@ -369,6 +387,7 @@ object AddressActor {
   type Resp = api.MatcherResponse
 
   private val ExpirationThreshold = 50.millis
+  private val timeoutException    = new TimeoutException
 
   private def activeStatus(ao: AcceptedOrder): OrderStatus =
     if (ao.amount == ao.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(ao.order.amount - ao.amount, ao.order.matcherFee - ao.fee)

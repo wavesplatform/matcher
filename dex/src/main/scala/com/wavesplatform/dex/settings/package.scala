@@ -6,7 +6,7 @@ package object settings {
 
   implicit def toConfigOps(config: Config): ConfigExtraOps = new ConfigExtraOps(config)
 
-  private val format = new java.text.DecimalFormat("#.##############")
+  private val format = new java.text.DecimalFormat("#.################")
 
   /** Formats amount or price */
   def formatValue(value: BigDecimal): String = format.format(value.bigDecimal)

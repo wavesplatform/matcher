@@ -250,7 +250,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                   val eventAssets = xs.flatMap(_.event.assets)
                   val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsDB, wavesBlockchainAsyncClient.assetDescription)(_).value)
 
-                  loadAssets.flatMap[Unit] { _ =>
+                  loadAssets.flatMap { _ =>
                     val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
                       log.debug(s"Consumed $eventWithMeta")
                       self ! eventWithMeta
@@ -261,7 +261,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
                     self
                       .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)
                       .recover { case NonFatal(e) => log.error("PingAll is timed out!", e) }
-                      .map(_ => Unit)
+                      .map(_ => ())
 
                   } andThen {
                     case Failure(ex) =>
@@ -295,6 +295,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
+                settings.actorResponseTimeout,
                 time,
                 orderDB,
                 wavesBlockchainAsyncClient.forgedOrder,

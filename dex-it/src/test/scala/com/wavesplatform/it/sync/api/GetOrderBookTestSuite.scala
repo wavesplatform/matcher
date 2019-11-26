@@ -6,6 +6,8 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 class GetOrderBookTestSuite extends MatcherSuiteBase {
 
+  val ordersCount = 0
+
   override protected val suiteInitialDexConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
@@ -25,43 +27,33 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     startAndWait(dex1Container(), dex1Api)
   }
 
+  def checkDepth(depth: Int, array: Array[Int] = Array()): Unit = {
+    val orderBook = dex1Api.orderBook(wavesUsdPair, depth)
+
+    if (depth < ordersCount) {
+      orderBook.asks.size shouldBe depth
+      orderBook.bids.size shouldBe depth
+    }
+
+    array.foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe orderBook)
+  }
+
   "response order book should contain right count of bids and asks" in {
 
-    (1 to 50).foreach { i =>
-      dex1Api.place(mkOrder(alice, wavesUsdPair, BUY, 1.waves, i, 300000))
+    for (i <- 1 to ordersCount) {
+      dex1Api.place(mkOrder(alice, wavesUsdPair, BUY, 1.waves, i, 300000, version = 3))
+      dex1Api.place(mkOrder(alice, wavesUsdPair, SELL, 1.waves, i + 51, 300000, version = 3))
     }
 
-    (51 to 101).foreach { i =>
-      dex1Api.place(mkOrder(alice, wavesUsdPair, SELL, 1.waves, i, 300000))
+    checkDepth(10, Array(0, 1, 8, 9))
+    checkDepth(20, Array(11, 12, 19))
+    checkDepth(50)
+    checkDepth(101, Array(102, 103, 999, 9999))
+
+    withClue("check default depth value") {
+      val defaultOrderBook = dex1Api.orderBook(wavesUsdPair)
+      defaultOrderBook shouldBe dex1Api.orderBook(wavesUsdPair, 100)
+      Array(44, 45, 60, 98, 99).foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe defaultOrderBook)
     }
-
-    val orderBookDepth10 = dex1Api.orderBook(wavesUsdPair, 10)
-    orderBookDepth10.asks.size shouldBe 10
-    orderBookDepth10.bids.size shouldBe 10
-    Array(0, 1, 8, 9).foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe orderBookDepth10)
-
-    val anotherOrderBookDepth = dex1Api.orderBook(wavesUsdPair, 20)
-    anotherOrderBookDepth.asks.size shouldBe 20
-    anotherOrderBookDepth.bids.size shouldBe 20
-    Array(11, 12, 19).foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe anotherOrderBookDepth)
-
-    val orderBookDepth40 = dex1Api.orderBook(wavesUsdPair, 40)
-    orderBookDepth40.asks.size shouldBe 40
-    orderBookDepth40.bids.size shouldBe 40
-
-    val orderBookDepth41 = dex1Api.orderBook(wavesUsdPair, 41)
-    orderBookDepth41.asks.size shouldBe 41
-    orderBookDepth41.bids.size shouldBe 41
-
-    val orderBookDepth43 = dex1Api.orderBook(wavesUsdPair, 43)
-    dex1Api.orderBook(wavesUsdPair, 42) shouldBe orderBookDepth43
-    orderBookDepth43.asks.size + orderBookDepth43.bids.size shouldBe 86
-
-    val defaultOrderBook = dex1Api.orderBook(wavesUsdPair)
-    defaultOrderBook shouldBe dex1Api.orderBook(wavesUsdPair, 100)
-    Array(44, 45, 60, 98, 99).foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe defaultOrderBook)
-
-    val hundredAndOneOrderBookDepth = dex1Api.orderBook(wavesUsdPair, 101)
-    Array(102, 103, 999, 9999).foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe hundredAndOneOrderBookDepth)
   }
 }

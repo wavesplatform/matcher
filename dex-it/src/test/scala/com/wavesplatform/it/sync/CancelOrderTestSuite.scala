@@ -149,7 +149,17 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Cancel is rejected" - {
+  "Cancel is rejected" - {    
+    "when order already cancelled" in {
+      val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
+      node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+
+      node.cancelOrder(bob, wavesUsdPair, orderId)
+      node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled")
+
+      assertBadRequestAndMessage(node.cancelOrder(bob, wavesUsdPair, orderId), s"The order ${orderId} is cancelled")
+    }
+    
     "when request sender is not the sender of and order" in {
       val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)

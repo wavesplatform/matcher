@@ -34,7 +34,8 @@ homebrew is preferable choice. You can install java and sbt with:
 
 ```
 brew tap AdoptOpenJDK/openjdk
-brew cask install adoptopenjdk8 sbt@1
+brew cask install adoptopenjdk8
+brew install sbt
 ```
 
 **Windows**:
@@ -130,25 +131,27 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 
 ### 6.2. DEX extension installation and configuration 
 
-Its artifacts have names `waves-integration{version}.{extension}`.
+Artifacts of DEX extension have names like `waves-dex-integration{supported-network}{version}.{deb|zip}`.
 
-#### Installation
+#### a. 📦 Installation through DEB
 
-##### DEB
+> If the Node installed from DEB
 
-This is a preferred way to install DEX if your Node was installed from a DEB package.
-Run: `sudo dpkg -i deb-artifact.deb` . The extension will be automatically installed to the Node.
+Run: `sudo dpkg -i deb-artifact.deb` 
 
-##### ZIP
+The extension will be automatically installed to the Node.
+
+#### b. 🗜 Installation through ZIP
+
+> If the Node is running manually.
+> Note, if you installed Node from a DEB package, DEX will be removed after update.
 
 To install a DEX extension from ZIP file:
 
 1. Copy the archive to the directory with Node's JAR
 2. Extract the archive. Its files will be added to the existed directories.
 
-Note, if you installed Node from a DEB package, DEX will be removed after update.
-
-To run the Node with DEX extension:
+To run the Node with DEX extension use following commands:
 
 *Debian/Ubuntu/macOS*:
 
@@ -162,7 +165,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
-#### Configration
+#### 📃 Configration of DEX extension
 
 Add lines to the Node's configuration:
 
@@ -180,15 +183,13 @@ waves.dex {
 
 ### 6.3. DEX server installation and configuration
 
-Its artifacts have names like `dex{version}.{extension}`.
+Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb|zip}`.
 
-#### Installation
-
-##### DEB
+#### a. 📦 Installation through DEB
 
 `sudo dpkg -i deb-artifact.deb`
 
-#### ZIP
+#### b. 🗜 Installation through ZIP
 
 To install a DEX server from ZIP file, just extract it.
 
@@ -206,7 +207,7 @@ To run:
 /path/to/dex/directory/bin/waves-dex.bat <your_JVM_options> /path/to/config.conf
 ```
 
-#### Configuration
+#### 📃 Configuration of DEX server
 
 1. There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
 
@@ -215,6 +216,11 @@ To run:
     waves.dex {
       directory = "/full/path/to/base/dex/directory"
       # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
+   
+      grpc.integration.waves-node-grpc {
+        host = "127.0.0.1" # Or IP of Waves-DEX gRPC server
+        port = 6887
+      }
     }
     ```
 
@@ -390,11 +396,3 @@ A new release is tagged to the commit in a `master` branch. If there is a bug:
 
   3. Click on publish.
   4. Update the errors' documentation in Wiki.
-
-# Acknowledgement
-
-[<img src="https://www.yourkit.com/images/yklogo.png">](http://www.yourkit.com/java/profiler/index.jsp)  
-We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.    
-Take a look at YourKit's leading software products: 
-<a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
-<a href="http://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>.

@@ -101,7 +101,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val orderBook = node.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
-      orderBook.asks shouldNot be(empty)
+      orderBook.asks should be(empty)
     }
 
 

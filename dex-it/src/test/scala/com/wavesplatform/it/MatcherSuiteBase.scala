@@ -32,7 +32,7 @@ abstract class MatcherSuiteBase
   val issueFee         = 1.waves
   val smartIssueFee    = 1.waves + smartFee
   val leasingFee       = 0.002.waves + smartFee
-  val tradeFee         = 0.003.wavesz
+  val tradeFee         = 0.003.waves
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 

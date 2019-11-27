@@ -147,15 +147,17 @@ class AddressActor(owner: Address,
       }
 
     case CancelationExpired(id) =>
-      pendingCancellation.remove(id).foreach { _ =>
+      pendingCancellation.remove(id).foreach { x =>
         log.warn(s"Cancelation expired for order $id")
+        x.trySuccess(api.TimedOut)
       }
 
     case PlacementExpired(id) =>
-      pendingPlacement.remove(id).foreach { _ =>
+      pendingPlacement.remove(id).foreach { x =>
         log.warn(s"Placement expired for order $id")
         release(id)
         activeOrders.remove(id)
+        x.trySuccess(api.TimedOut)
       }
 
     case AddressDirectory.StartSchedules =>

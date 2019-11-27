@@ -6,8 +6,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherResponse, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -31,14 +31,13 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
-      case (balance, asset) => {
-        if (asset != None)
+      case (balance, asset) =>
+        if (asset.isDefined)
           assert(
             node.assetBalance(alice.toAddress.toString, asset.get.toString).balance >= balance,
             s"Alice doesn't have enough balance in ${asset.get.toString} to make a transfer"
           )
         node.waitForTransaction(node.broadcastTransfer(alice, account.toAddress.toString, balance, 300000L, asset, None).id)
-      }
     }
     account
   }
@@ -59,42 +58,30 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
           val asyncNode = async(node)
 
-          def place(account: KeyPair, startPrice: Long): IndexedSeq[Future[MatcherResponse]] = {
+          def place(account: KeyPair, startPrice: Long): Future[Unit] = {
             val time = System.currentTimeMillis
 
             val futures = for {
               c <- 1 until 199
-            } yield {
-              Thread.sleep(50)
-              asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
-            }
+            } yield asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
 
-            futures
+            Future.sequence(futures).map(_ => ())
           }
 
-          def cancelAll(account: KeyPair): Unit = {
-            asyncNode.cancelAllOrders(account, System.currentTimeMillis)
-          }
+          def cancelAll(account: KeyPair): Future[Unit] = asyncNode.cancelAllOrders(account, System.currentTimeMillis).map(_ => ())
 
-          val p1 = place(account1, 1000)
-          val p2 = place(account2, 2000)
-          val p3 = place(account3, 3000)
-          cancelAll(account1)
-          cancelAll(account2)
-          val p4 = place(account4, 4000)
-          val p5 = place(account5, 5000)
-          cancelAll(account3)
-          val p6 = place(account6, 6000)
-          cancelAll(account4)
-          cancelAll(account5)
-          cancelAll(account6)
+//          def placeA
 
-          Future.sequence(p1)
-          Future.sequence(p2)
-          Future.sequence(p3)
-          Future.sequence(p4)
-          Future.sequence(p5)
-          Future.sequence(p6)
+          Future
+            .sequence(
+              List(
+                place(account1, 1000).flatMap(_ => cancelAll(account1)),
+                place(account2, 2000).flatMap(_ => cancelAll(account2)),
+                place(account3, 3000).flatMap(_ => cancelAll(account3)),
+                place(account4, 4000).flatMap(_ => cancelAll(account4)),
+                place(account5, 5000).flatMap(_ => cancelAll(account5)),
+                place(account6, 6000).flatMap(_ => cancelAll(account6))
+              ))
         },
         3.minutes
       )
@@ -104,22 +91,22 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       orderBook.asks should be(empty)
     }
 
-
     "After cancelAllOrders (200) all of them should be cancelled" in {
       val orders = new ListBuffer[String]()
-      val time = System.currentTimeMillis
+      val time   = System.currentTimeMillis
 
       for (i <- 1 to 200) {
-        val order = node.placeOrder(node.prepareOrder(bob, wavesBtcPair, OrderType.SELL, 1000000, 123450000L, 300000, version = 2: Byte, creationTime = time + i)).message.id
+        val order = node
+          .placeOrder(node.prepareOrder(bob, wavesBtcPair, OrderType.SELL, 1000000, 123450000L, 300000, version = 2: Byte, creationTime = time + i))
+          .message
+          .id
         node.waitOrderStatus(wavesUsdPair, order, "Accepted")
         orders += order
       }
 
       node.cancelAllOrders(bob)
 
-      orders.foreach(order => {
-        node.waitOrderStatus(wavesBtcPair, order, "Cancelled")
-      })
+      orders.foreach(order => node.waitOrderStatus(wavesBtcPair, order, "Cancelled"))
     }
 
     "by sender" in {
@@ -149,7 +136,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Cancel is rejected" - {    
+  "Cancel is rejected" - {
     "when order already cancelled" in {
       val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
@@ -157,9 +144,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       node.cancelOrder(bob, wavesUsdPair, orderId)
       node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled")
 
-      assertBadRequestAndMessage(node.cancelOrder(bob, wavesUsdPair, orderId), s"The order ${orderId} is cancelled")
+      assertBadRequestAndMessage(node.cancelOrder(bob, wavesUsdPair, orderId), s"The order ${orderId} is canceled")
     }
-    
+
     "when request sender is not the sender of and order" in {
       val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)

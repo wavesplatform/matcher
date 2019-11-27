@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+    <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n"/>
+    <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
+
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.swagger" level="INFO"/>
+
+    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
+
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
+
+    <logger name="org.apache.kafka" level="INFO"/>
+    <logger name="org.apache.kafka.common.network.Selector"
+            level="DEBUG"/> <!-- https://issues.apache.org/jira/browse/KAFKA-5133 -->
+
+    <logger name="org.aspectj" level="INFO"/>
+
+    <logger name="org.asynchttpclient" level="INFO"/>
+    <logger name="io.netty" level="DEBUG"/>
+    <logger name="org.apache.kafka" level="DEBUG"/>
+    <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE"/>
+    <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>
+
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <logger name="io.grpc.netty" level="ERROR"/>
+
+    <root level="TRACE"/>
+
+    <property name="logback.file.enabled" value="true"/>
+    <property name="logback.stdout.enabled" value="true"/>
+
+    <include optional="true" file="${waves.config.directory:-.}/logback.xml"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>${logback.stdout.level:-INFO}</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.pattern:-${default.pattern}}</pattern>
+        </encoder>
+    </appender>
+    <root>
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

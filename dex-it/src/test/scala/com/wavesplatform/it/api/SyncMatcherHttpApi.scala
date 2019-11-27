@@ -85,6 +85,9 @@ object SyncMatcherHttpApi extends Assertions {
     def activeOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly = Some(true)))
 
+    def placeOrder(orderStr: String): MatcherResponse =
+      sync(async(m).placeOrder(orderStr))
+
     def placeOrder(order: Order): MatcherResponse =
       sync(async(m).placeOrder(order))
 

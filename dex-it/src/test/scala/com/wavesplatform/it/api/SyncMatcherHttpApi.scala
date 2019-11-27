@@ -13,7 +13,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{Format, Json, Writes}
+import play.api.libs.json.{Format, JsObject, Json, Writes}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable}
@@ -85,8 +85,8 @@ object SyncMatcherHttpApi extends Assertions {
     def activeOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly = Some(true)))
 
-    def placeOrder(orderStr: String): MatcherResponse =
-      sync(async(m).placeOrder(orderStr))
+    def placeOrder(order: JsObject): MatcherResponse =
+      sync(async(m).placeOrder(order))
 
     def placeOrder(order: Order): MatcherResponse =
       sync(async(m).placeOrder(order))

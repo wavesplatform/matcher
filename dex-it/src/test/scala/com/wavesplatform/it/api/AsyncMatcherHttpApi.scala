@@ -23,7 +23,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{AsyncCompletionHandler, Request, RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.{Json, Writes}
+import play.api.libs.json.{JsObject, Json, Writes}
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -277,8 +277,8 @@ object AsyncMatcherHttpApi extends Assertions {
       Order.sign(unsigned, sender)
     }
 
-    def placeOrder(orderStr: String): Future[MatcherResponse] =
-      matcherPost("/matcher/orderbook", orderStr).as[MatcherResponse]
+    def placeOrder(order: JsObject): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook", order).as[MatcherResponse]
 
     def placeOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]

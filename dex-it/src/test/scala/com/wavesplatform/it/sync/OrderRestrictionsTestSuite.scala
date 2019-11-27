@@ -40,24 +40,26 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "order should be rejected with correct code and message when price is more then Long volume" in {
+
     val tooHighPrice = "10000000000000000000"
 
     assertBadRequestAndMessage(
       node.placeOrder(
-        (node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000000000000000L, 300000L).json.value() ++ Json.obj(
-          "price" -> tooHighPrice)).toString()),
-      "error message here"
+        node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000000000000000L).json.value() ++ Json.obj("price" -> tooHighPrice)
+      ),
+      "The provided JSON contains invalid fields: /price. Check the documentation"
     )
   }
 
   "order should be rejected with correct code and message when amount is more then Long volume" in {
+
     val tooLargeAmount = "10000000000000000000"
 
     assertBadRequestAndMessage(
       node.placeOrder(
-        (node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000L, 300000L).json.value() ++ Json.obj(
-          "amount" -> tooLargeAmount)).toString()),
-      "error message here"
+        node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000L).json.value() ++ Json.obj("amount" -> tooLargeAmount)
+      ),
+      "The provided JSON contains invalid fields: /amount. Check the documentation"
     )
   }
 

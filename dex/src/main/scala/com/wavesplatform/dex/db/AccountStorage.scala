@@ -16,9 +16,13 @@ import net.ceedubs.ficus.readers.ValueReader
 import scala.collection.mutable.ArrayBuffer
 
 case class AccountStorage(keyPair: KeyPair)
+
 object AccountStorage {
+
   sealed trait Settings
+
   object Settings {
+
     case class InMem(seed: ByteStr)                        extends Settings
     case class EncryptedFile(path: File, password: String) extends Settings
 

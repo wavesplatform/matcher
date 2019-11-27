@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.AssetsDB
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult

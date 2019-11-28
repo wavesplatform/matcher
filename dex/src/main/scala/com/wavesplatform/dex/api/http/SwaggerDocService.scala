@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
-import com.wavesplatform.Version
+import com.wavesplatform.dex.Version
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.models.{Scheme, Swagger}
 

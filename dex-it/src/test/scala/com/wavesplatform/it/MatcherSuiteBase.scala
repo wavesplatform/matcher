@@ -7,6 +7,7 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
@@ -50,6 +51,7 @@ abstract class MatcherSuiteBase
     with WavesFeeConstants
     with PredefinedAssets
     with PredefinedAccounts
+    with DiffMatcher
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()

@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
@@ -19,7 +19,14 @@ import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -38,7 +45,6 @@ import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 import scala.util.Success
@@ -64,7 +70,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHashStr: String,
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext)
+                           validatedAllowedOrderVersions: Set[Byte])(implicit val errorContext: ErrorFormatterContext, system: ActorSystem)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -72,6 +78,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import MatcherApiRoute._
   import PathMatchers._
 
+  private implicit val dispatcher                                 = system.dispatchers.lookup("akka.actor.api-dispatcher")
   private implicit val timeout: Timeout                           = matcherSettings.actorResponseTimeout
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 

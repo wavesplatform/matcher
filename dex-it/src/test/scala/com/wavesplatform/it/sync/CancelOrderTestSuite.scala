@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
@@ -19,7 +21,19 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
+
   private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
+
+  override protected def nodeConfigs: Seq[Config] =
+    super.nodeConfigs.map {
+      ConfigFactory
+        .parseString(
+          s"""waves.dex {
+             |  snapshots-interval = 100000
+             |}""".stripMargin
+        )
+        .withFallback
+    }
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -28,7 +42,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   def createAccountWithBalance(balances: (Long, Option[String])*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
+    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextLong()}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
       case (balance, asset) =>
@@ -45,45 +59,40 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Order can be canceled" - {
 
     "After cancelAllOrders all of them should be cancelled (ASYNC)" in {
-      val account1 = createAccountWithBalance(100000000000L -> None)
-      val account2 = createAccountWithBalance(100000000000L -> None)
-      val account3 = createAccountWithBalance(100000000000L -> None)
-      val account4 = createAccountWithBalance(100000000000L -> None)
-      val account5 = createAccountWithBalance(100000000000L -> None)
-      val account6 = createAccountWithBalance(100000000000L -> None)
+      val accounts = (1 to 20).map(_ => createAccountWithBalance(100000000000L -> None))
 
       SyncMatcherHttpApi.sync(
         {
           import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
           val asyncNode = async(node)
+          val ordersPerAccount = 200
 
           def place(account: KeyPair, startPrice: Long): Future[Unit] = {
             val time = System.currentTimeMillis
 
-            val futures = for {
-              c <- 1 until 199
-            } yield asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
+            val futures = (1 to ordersPerAccount).map { c =>
+              asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
+            }
 
             Future.sequence(futures).map(_ => ())
           }
 
           def cancelAll(account: KeyPair): Future[Unit] = asyncNode.cancelAllOrders(account, System.currentTimeMillis).map(_ => ())
 
-//          def placeA
+          def placeAndCancel(account: KeyPair, startPrice: Int): Future[Unit] =
+            for {
+              _           <- place(account, startPrice)
+              _           <- GlobalTimer.instance.sleep(10.seconds)
+              totalOrders <- asyncNode.orderHistoryByPair(account, wavesUsdPair)
+              _ = totalOrders.size shouldBe ordersPerAccount
+              _ <- cancelAll(account)
+            } yield ()
 
-          Future
-            .sequence(
-              List(
-                place(account1, 1000).flatMap(_ => cancelAll(account1)),
-                place(account2, 2000).flatMap(_ => cancelAll(account2)),
-                place(account3, 3000).flatMap(_ => cancelAll(account3)),
-                place(account4, 4000).flatMap(_ => cancelAll(account4)),
-                place(account5, 5000).flatMap(_ => cancelAll(account5)),
-                place(account6, 6000).flatMap(_ => cancelAll(account6))
-              ))
+          val requests = accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) }.map(Function.tupled(placeAndCancel))
+          Future.sequence(requests)
         },
-        3.minutes
+        5.minutes
       )
 
       val orderBook = node.orderBook(wavesUsdPair)

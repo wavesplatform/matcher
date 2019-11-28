@@ -2,6 +2,7 @@ package com.wavesplatform.dex.queue
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
+import akka.actor.ActorSystem
 import akka.kafka._
 import akka.kafka.scaladsl.{Consumer, Producer}
 import akka.pattern.ask
@@ -18,9 +19,11 @@ import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContextExecutor, Future, Promise}
+import scala.util.Failure
 
-class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) extends MatcherQueue with ScorexLogging {
-  private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatcher
+class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extends MatcherQueue with ScorexLogging {
+  private implicit val mat: ActorMaterializer               = ActorMaterializer()
+  private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatchers.lookup("akka.kafka.default-dispatcher")
 
   private val duringShutdown = new AtomicBoolean(false)
 
@@ -127,7 +130,7 @@ object KafkaMatcherQueue {
     override def close(): Unit                                                      = {}
   }
 
-  private class KafkaProducer(settings: Settings, duringShutdown: => Boolean)(implicit mat: ActorMaterializer) extends Producer {
+  private class KafkaProducer(settings: Settings, duringShutdown: => Boolean)(implicit mat: ActorMaterializer) extends Producer with ScorexLogging {
     private type InternalProducer = SourceQueueWithComplete[(QueueEvent, Promise[QueueEventWithMeta])]
 
     private implicit val dispatcher: ExecutionContextExecutor = mat.system.dispatcher
@@ -154,6 +157,7 @@ object KafkaMatcherQueue {
           case ProducerMessage.MultiResult(parts, passThrough) => throw new RuntimeException(s"MultiResult(parts=$parts, passThrough=$passThrough)")
           case ProducerMessage.PassThroughResult(passThrough)  => throw new RuntimeException(s"PassThroughResult(passThrough=$passThrough)")
         }
+        .mapError { case e => log.warn("Found an error during producing a message", e); e }
         .toMat(Sink.ignore)(Keep.left)
         .run()
 
@@ -166,7 +170,10 @@ object KafkaMatcherQueue {
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
       val p = Promise[QueueEventWithMeta]()
-      internal.offer((event, p))
+      internal.offer((event, p)).onComplete {
+        case Failure(e) => log.error(s"Can't send $event", e)
+        case _          =>
+      }
       p.future.map(Some(_))
     }
 

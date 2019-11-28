@@ -1,14 +1,10 @@
 package com.wavesplatform.it
 
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase.baseConfig
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.alice
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._

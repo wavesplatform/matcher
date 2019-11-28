@@ -4,7 +4,6 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
-import com.google.common.cache.{Cache, CacheBuilder, RemovalCause, RemovalNotification}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.Matcher.StoreEvent

@@ -122,7 +122,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
-      new KafkaMatcherQueue(settings.eventsQueue.kafka)(materializer)
+      new KafkaMatcherQueue(settings.eventsQueue.kafka)
 
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }

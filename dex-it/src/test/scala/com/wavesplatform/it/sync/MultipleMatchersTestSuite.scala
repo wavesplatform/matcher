@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.fp
@@ -26,18 +26,17 @@ import scala.util.{Random, Try}
 @DexItKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig = ConfigFactory.parseString("""waves.dex {
+  override protected def suiteInitialDexConfig: Config =
+    ConfigFactory.parseString(
+      """waves.dex {
       |  price-assets = ["WAVES"]
       |  snapshots-interval = 51
-      |}""".stripMargin)
+      |}""".stripMargin
+    )
 
-  protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce {
-    createDex("dex-2")
-  }
+  protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce { createDex("dex-2") }
 
-  private val cachedDex2ApiAddress = CachedData {
-    dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort)
-  }
+  private val cachedDex2ApiAddress = CachedData { dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort) }
 
   protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex2ApiAddress.get())
   protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex2ApiAddress.get()))

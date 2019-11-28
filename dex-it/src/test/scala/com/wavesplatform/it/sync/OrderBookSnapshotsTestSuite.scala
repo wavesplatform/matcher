@@ -38,12 +38,15 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   }
 
   "Order books are created with right offsets" in {
+
     ordersPack1.foreach(dex1Api.place)
     dex1Api.waitForCurrentOffset(_ == ordersPack1Size - 1)
+
     val allSnapshotOffsets1 = dex1Api.allSnapshotOffsets
+
     withClue("We doesn't show pairs, those have snapshot's offset equal to -1") {
-      if (allSnapshotOffsets1.contains(assetPair1.key)) allSnapshotOffsets1(assetPair1.key) should be < interval
-      if (allSnapshotOffsets1.contains(assetPair2.key)) allSnapshotOffsets1(assetPair2.key) should be < interval
+      if (allSnapshotOffsets1.contains(assetPair1)) allSnapshotOffsets1(assetPair1) should be < interval
+      if (allSnapshotOffsets1.contains(assetPair2)) allSnapshotOffsets1(assetPair2) should be < interval
     }
 
     ordersPack2.foreach(dex1Api.place)

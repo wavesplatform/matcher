@@ -172,8 +172,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     } yield o
   }
 
-  private lazy val matcherApiRoutes: Seq[ApiRoute] = {
-    val keyHashStr = settings.restApi.apiKeyHash
+  private def matcherApiRoutes(apiKeyHash: Option[Array[Byte]]): Seq[ApiRoute] = {
     Seq(
       MatcherApiRoute(
         pairBuilder,
@@ -195,7 +194,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
         ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
-        keyHashStr,
+        apiKeyHash,
         rateCache,
         Future
           .sequence {
@@ -208,7 +207,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         pairBuilder,
         orderBooksSnapshotCache,
         () => status.get(),
-        keyHashStr,
+        apiKeyHash,
         settings
       )
     )
@@ -335,6 +334,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   override def start(): Unit = {
+
     log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
 
     def loadAllKnownAssets(): Future[Unit] = {
@@ -354,13 +354,16 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         }
     }
 
+    def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
+
     val startGuard = for {
+      apiKeyHash       <- checkApiKeyHash()
       _                <- loadAllKnownAssets()
       hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
     } yield {
 
       hasMatcherAccountScript = hasMatcherScript
-      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
+      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
       matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
 
       log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")

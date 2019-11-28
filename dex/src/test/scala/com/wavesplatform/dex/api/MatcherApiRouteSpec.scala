@@ -185,13 +185,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "change rates with wrong api key" in test(
       { route =>
-        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "Provided API key is not correct"
         }
       },
-      "wrongApiKey"
+      apiKey
     )
 
     "deleting waves rate" in test(
@@ -218,13 +218,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "delete rates with wrong api key" in test(
       { route =>
-        Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "Provided API key is not correct"
         }
       },
-      "wrongApiKey"
+      apiKey
     )
 
     "delete rate for the asset that doesn't have rate" in test(
@@ -331,7 +331,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       currentOffset = () => 0L,
       lastOffset = () => Future.successful(0L),
       matcherAccountFee = 300000L,
-      apiKeyHashStr = Base58.encode(crypto.secureHash(apiKey.getBytes("UTF-8"))),
+      apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
       validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }
     ).route

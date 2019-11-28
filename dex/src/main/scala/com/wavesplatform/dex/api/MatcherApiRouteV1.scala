@@ -4,12 +4,12 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.ApiRoute
+import com.wavesplatform.dex.api.http.AuthRoute
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
@@ -20,7 +20,7 @@ import javax.ws.rs.Path
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              orderBookSnapshot: OrderBookSnapshotHttpCache,
                              matcherStatus: () => Matcher.Status,
-                             apiKeyHashStr: String,
+                             apiKeyHash: Option[Array[Byte]],
                              matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
@@ -77,17 +77,4 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
       }
     }
   }
-
-  // TODO remove AuthRoute
-  override def settings: RestAPISettings =
-    RestAPISettings(
-      true,
-      matcherSettings.restApi.address,
-      matcherSettings.restApi.port,
-      apiKeyHashStr,
-      true,
-      true,
-      100,
-      100
-    )
 }

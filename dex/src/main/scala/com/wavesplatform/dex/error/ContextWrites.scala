@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.error
 
-import cats.Contravariant
+import cats.{Contravariant, Show}
 import play.api.libs.json.{JsValue, Writes}
 
 // TODO: Replace by play's one
@@ -9,7 +9,7 @@ trait ContextWrites[-T] {
 }
 
 object ContextWrites {
-  def apply[T](implicit r: ContextShow[T]): ContextShow[T] = r
+  def apply[T](implicit r: Show[T]): Show[T] = r
 
   def auto[T](implicit w: Writes[T]): ContextWrites[T] = new ContextWrites[T] {
     override def writes(input: T): JsValue = w.writes(input)

@@ -76,7 +76,7 @@ case class NotImplemented(error: MatcherError)                             exten
 case class OrderBookUnavailable(error: MatcherError)                       extends MatcherResponse(C.ServiceUnavailable, error)
 case object DuringStart                                                    extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStarting)
 case object DuringShutdown                                                 extends MatcherResponse(C.ServiceUnavailable, error.MatcherIsStopping)
-case object TimedOut                                                       extends MatcherResponse(C.RequestTimeout, error.RequestTimeout)
+case object TimedOut                                                       extends MatcherResponse(C.InternalServerError, error.RequestTimeout)
 case class InfoNotFound(error: MatcherError)                               extends MatcherResponse(C.NotFound, error)
 case class RateError(error: MatcherError, code: StatusCode = C.BadRequest) extends MatcherResponse(code, error)
 case object InternalError                                                  extends MatcherResponse(C.ServiceUnavailable, MatcherResponseContent.Js(Json.obj("message" -> "Internal server error")))

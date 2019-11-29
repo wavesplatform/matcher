@@ -8,6 +8,7 @@ import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.ExecutionContext
 
@@ -19,6 +20,7 @@ abstract class MatcherSuiteBase
     with NodesFromDocker
     with BeforeAndAfterAll
     with BeforeAndAfterEach
+    with Eventually
     with MatcherNode {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
@@ -41,6 +43,18 @@ abstract class MatcherSuiteBase
   protected def node = dockerNodes().head
 
   protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
+
+  override protected def beforeAll(): Unit = {
+    // Hack because we haven't own Docker class
+    Map(
+      "org.asynchttpclient.keepAlive"       -> "false",
+      "org.asynchttpclient.maxRequestRetry" -> "0",
+      "org.asynchttpclient.readTimeout"     -> "120000",
+      "org.asynchttpclient.requestTimeout"  -> "120000",
+      "org.asynchttpclient.ioThreadsCount"  -> "15"
+    ).foreach(Function.tupled(System.setProperty))
+    super.beforeAll()
+  }
 }
 
 object MatcherSuiteBase {

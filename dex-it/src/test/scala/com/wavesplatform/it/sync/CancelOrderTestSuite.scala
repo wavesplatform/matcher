@@ -22,6 +22,11 @@ import scala.concurrent.duration._
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
 
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = 1.minute,
+    interval = 1.second
+  )
+
   private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
 
   override protected def nodeConfigs: Seq[Config] =
@@ -60,7 +65,6 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     "After cancelAllOrders all of them should be cancelled" in {
       val accounts = (1 to 20).map(_ => createAccountWithBalance(100000000000L -> None))
-      log.debug(s"Accounts: ${accounts.mkString(", ")}")
 
       SyncMatcherHttpApi.sync(
         {
@@ -82,8 +86,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           def cancelAll(account: KeyPair): Future[Unit] = asyncNode.cancelAllOrders(account, System.currentTimeMillis).map(_ => ())
 
           for {
-            _ <- Future
-              .inSeries(accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) })(Function.tupled(place(_, _, ordersPerAccount)))
+            _ <- {
+              val pairs = accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) }
+              Future.inSeries(pairs)(Function.tupled(place(_, _, ordersPerAccount)))
+            }
             _ <- Future.traverse(accounts) { account =>
               asyncNode.orderHistoryByPair(account, wavesUsdPair).map { orders =>
                 withClue(s"account $account: ") {
@@ -97,9 +103,11 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         5.minutes
       )
 
-      val orderBook = node.orderBook(wavesUsdPair)
-      orderBook.bids should be(empty)
-      orderBook.asks should be(empty)
+      eventually {
+        val orderBook = node.orderBook(wavesUsdPair)
+        orderBook.bids should be(empty)
+        orderBook.asks should be(empty)
+      }
     }
 
     "by sender" in {

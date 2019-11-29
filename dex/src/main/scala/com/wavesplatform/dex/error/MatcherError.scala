@@ -449,6 +449,11 @@ case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfB
 case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 
+case object ApiKeyIsNotProvided
+    extends MatcherError(auth, commonEntity, notProvided, e"API key is not provided in the configuration, please contact with the administrator")
+
+case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClass, e"Provided API key is not correct")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -479,6 +484,7 @@ object Entity {
 
   object producer     extends Entity(100)
   object connectivity extends Entity(101)
+  object auth         extends Entity(102)
 }
 
 sealed abstract class Class(val code: Int)
@@ -500,4 +506,5 @@ object Class {
   object stopping     extends Class(14)
   object outOfBound   extends Class(15)
   object disabled     extends Class(16)
+  object notProvided  extends Class(17)
 }

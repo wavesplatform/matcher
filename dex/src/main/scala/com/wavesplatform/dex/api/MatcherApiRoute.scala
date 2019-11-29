@@ -10,31 +10,24 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.{ApiRoute, _}
+import com.wavesplatform.api.http.{ApiRoute, jsonPost}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.api.http.AuthRoute
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -70,7 +63,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long,
-                           apiKeyHashStr: String, // TODO
+                           apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
                            validatedAllowedOrderVersions: Future[Set[Byte]])
     extends ApiRoute
@@ -777,19 +770,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       SimpleResponse(StatusCodes.OK, "Saving started")
     }
   }
-
-  // TODO remove AuthRoute
-  override def settings: RestAPISettings =
-    RestAPISettings(
-      true,
-      matcherSettings.restApi.address,
-      matcherSettings.restApi.port,
-      apiKeyHashStr,
-      true,
-      true,
-      100,
-      100
-    )
 }
 
 object MatcherApiRoute {

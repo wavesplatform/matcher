@@ -73,6 +73,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
             }
             process(xs).andThen { case _ => lastProcessedOffsetInternal = lastOffset }
           }
+          .mapError { case e => log.warn("Found an error consuming messages", e); e }
       }
       .runWith(Sink.ignore)
   }

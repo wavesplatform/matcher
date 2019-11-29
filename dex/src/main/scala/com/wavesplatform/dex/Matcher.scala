@@ -264,7 +264,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               new AddressActor(
                 address,
                 context.utx.spendableBalance(address, _),
-                settings.actorResponseTimeout,
+                context.settings.config.getInt("akka.kafka.producer.kafka-clients.delivery.timeout.ms").millis,
                 context.time,
                 orderDB,
                 id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,

@@ -46,6 +46,8 @@ abstract class MatcherSuiteBase
 object MatcherSuiteBase {
   private def baseConfig(seed: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
     ConfigFactory.parseString(s"""
+         |logback.configurationFile=/opt/waves/logback-container.xml
+         |
          |waves.dex.events-queue {
          |  type = kafka
          |  kafka {

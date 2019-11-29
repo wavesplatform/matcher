@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.util.FutureOps._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
@@ -16,7 +17,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -58,20 +58,21 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   "Order can be canceled" - {
 
-    "After cancelAllOrders all of them should be cancelled (ASYNC)" in {
+    "After cancelAllOrders all of them should be cancelled" in {
       val accounts = (1 to 20).map(_ => createAccountWithBalance(100000000000L -> None))
+      log.debug(s"Accounts: ${accounts.mkString(", ")}")
 
       SyncMatcherHttpApi.sync(
         {
           import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
-          val asyncNode = async(node)
+          val asyncNode        = async(node)
           val ordersPerAccount = 200
 
-          def place(account: KeyPair, startPrice: Long): Future[Unit] = {
+          def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Unit] = {
             val time = System.currentTimeMillis
 
-            val futures = (1 to ordersPerAccount).map { c =>
+            val futures = (1 to numOrders).map { c =>
               asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
             }
 
@@ -80,17 +81,18 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
           def cancelAll(account: KeyPair): Future[Unit] = asyncNode.cancelAllOrders(account, System.currentTimeMillis).map(_ => ())
 
-          def placeAndCancel(account: KeyPair, startPrice: Int): Future[Unit] =
-            for {
-              _           <- place(account, startPrice)
-              _           <- GlobalTimer.instance.sleep(10.seconds)
-              totalOrders <- asyncNode.orderHistoryByPair(account, wavesUsdPair)
-              _ = totalOrders.size shouldBe ordersPerAccount
-              _ <- cancelAll(account)
-            } yield ()
-
-          val requests = accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) }.map(Function.tupled(placeAndCancel))
-          Future.sequence(requests)
+          for {
+            _ <- Future
+              .inSeries(accounts.zipWithIndex.map { case (account, i) => (account, (i + 1) * 1000) })(Function.tupled(place(_, _, ordersPerAccount)))
+            _ <- Future.traverse(accounts) { account =>
+              asyncNode.orderHistoryByPair(account, wavesUsdPair).map { orders =>
+                withClue(s"account $account: ") {
+                  orders.size shouldBe ordersPerAccount
+                }
+              }
+            }
+            _ <- Future.traverse(accounts)(cancelAll)
+          } yield ()
         },
         5.minutes
       )
@@ -98,24 +100,6 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val orderBook = node.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
-    }
-
-    "After cancelAllOrders (200) all of them should be cancelled" in {
-      val orders = new ListBuffer[String]()
-      val time   = System.currentTimeMillis
-
-      for (i <- 1 to 200) {
-        val order = node
-          .placeOrder(node.prepareOrder(bob, wavesBtcPair, OrderType.SELL, 1000000, 123450000L, 300000, version = 2: Byte, creationTime = time + i))
-          .message
-          .id
-        node.waitOrderStatus(wavesUsdPair, order, "Accepted")
-        orders += order
-      }
-
-      node.cancelAllOrders(bob)
-
-      orders.foreach(order => node.waitOrderStatus(wavesBtcPair, order, "Cancelled"))
     }
 
     "by sender" in {

@@ -266,25 +266,19 @@ sealed trait MarketOrder extends AcceptedOrder {
 
 object MarketOrder {
 
-  def apply(o: Order, availableForSpending: Long): MarketOrder = {
-
-    val pf = AcceptedOrder.partialFee(o.matcherFee, o.amount, o.amount)
-
-    o.orderType match {
-      case OrderType.BUY  => BuyMarketOrder(o.amount, pf, o, availableForSpending)
-      case OrderType.SELL => SellMarketOrder(o.amount, pf, o, availableForSpending)
+  private def create(order: Order, availableForSpending: Long): MarketOrder = {
+    val pf = AcceptedOrder.partialFee(order.matcherFee, order.amount, order.amount)
+    order.orderType match {
+      case OrderType.BUY  => BuyMarketOrder(order.amount, pf, order, availableForSpending)
+      case OrderType.SELL => SellMarketOrder(order.amount, pf, order, availableForSpending)
     }
   }
 
+  def apply(o: Order, availableForSpending: Long): MarketOrder = create(o, availableForSpending)
+
   def apply(o: Order, tradableBalance: Asset => Long): MarketOrder = {
-
-    val pf                   = AcceptedOrder.partialFee(o.matcherFee, o.amount, o.amount)
     val availableForSpending = math.min(tradableBalance(o.getSpendAssetId), LimitOrder(o).requiredBalance(o.getSpendAssetId))
-
-    o.orderType match {
-      case OrderType.BUY  => BuyMarketOrder(o.amount, pf, o, availableForSpending)
-      case OrderType.SELL => SellMarketOrder(o.amount, pf, o, availableForSpending)
-    }
+    create(o, availableForSpending)
   }
 }
 

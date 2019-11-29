@@ -11,6 +11,7 @@ import org.scalatest._
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.DurationInt
 
 abstract class MatcherSuiteBase
     extends FreeSpec
@@ -24,6 +25,11 @@ abstract class MatcherSuiteBase
     with MatcherNode {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
+
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = 1.minute,
+    interval = 1.second
+  )
 
   val smartFee         = 0.004.waves
   val minFee           = 0.001.waves + smartFee

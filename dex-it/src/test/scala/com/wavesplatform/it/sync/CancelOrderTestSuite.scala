@@ -22,11 +22,6 @@ import scala.concurrent.duration._
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
 
-  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = 1.minute,
-    interval = 1.second
-  )
-
   private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
 
   override protected def nodeConfigs: Seq[Config] =

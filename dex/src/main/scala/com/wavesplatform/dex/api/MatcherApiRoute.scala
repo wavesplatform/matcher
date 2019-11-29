@@ -78,12 +78,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
-  private val rateParsingRejectionsHandler =
+  private def invalidJsonResponse(fields: List[String] = Nil) = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
+
+  private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
       .newBuilder()
       .handle {
-        case UnsupportedRequestContentTypeRejection(_) | ValidationRejection(_, Some(_: PlayJsonException)) =>
-          complete { RateError(error.InvalidRateInput) }
+        case ValidationRejection(_, Some(e: PlayJsonException)) => invalidJsonResponse(e.errors.map(_._1.toString).toList)
+        case _: UnsupportedRequestContentTypeRejection          => invalidJsonResponse()
       }
       .result()
 
@@ -91,10 +93,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     getMatcherPublicKey ~ orderBookInfo ~ getSettings ~ getRates ~ getCurrentOffset ~ getLastOffset ~
       getOldestSnapshotOffset ~ getAllSnapshotOffsets ~
       matcherStatusBarrier {
-        getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-          getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-          historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-          upsertRate ~ deleteRate ~ saveSnapshots
+        handleRejections(invalidJsonParsingRejectionsHandler) {
+          getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+            getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+            historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+            upsertRate ~ deleteRate ~ saveSnapshots
+        }
       }
   }
 
@@ -225,22 +229,20 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def upsertRate: Route = {
     (path("settings" / "rates" / AssetPM) & put & withAuth) { a =>
-      handleRejections(rateParsingRejectionsHandler) {
-        entity(as[Double]) { rate =>
-          if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
-            withAsset(a) { asset =>
-              complete(
-                if (asset == Waves) RateError(error.WavesImmutableRate)
-                else {
-                  val assetStr = AssetPair.assetIdStr(asset)
-                  rateCache.upsertRate(asset, rate) match {
-                    case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
-                    case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
-                  }
+      entity(as[Double]) { rate =>
+        if (rate <= 0) complete { RateError(error.NonPositiveAssetRate) } else
+          withAsset(a) { asset =>
+            complete(
+              if (asset == Waves) RateError(error.WavesImmutableRate)
+              else {
+                val assetStr = AssetPair.assetIdStr(asset)
+                rateCache.upsertRate(asset, rate) match {
+                  case None     => StatusCodes.Created -> wrapMessage(s"Rate $rate for the asset $assetStr added")
+                  case Some(pv) => StatusCodes.OK      -> wrapMessage(s"Rate for the asset $assetStr updated, old value = $pv, new value = $rate")
                 }
-              )
-            }
-        }
+              }
+            )
+          }
       }
     }
   }

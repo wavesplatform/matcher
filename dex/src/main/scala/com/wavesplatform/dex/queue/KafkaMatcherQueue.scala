@@ -3,7 +3,7 @@ package com.wavesplatform.dex.queue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import akka.actor.ActorSystem
-import akka.kafka._
+import akka.kafka.{ProducerSettings, _}
 import akka.kafka.scaladsl.{Consumer, Producer}
 import akka.pattern.ask
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source, SourceQueueWithComplete}
@@ -137,7 +137,11 @@ object KafkaMatcherQueue {
 
     private val producerSettings = {
       val config = mat.system.settings.config.getConfig("akka.kafka.producer")
-      akka.kafka.ProducerSettings(config, new ByteArraySerializer, eventSerializer)
+      akka.kafka.ProducerSettings(config, new ByteArraySerializer, eventSerializer).withProducerFactory { settings =>
+        val r = akka.kafka.ProducerSettings.createKafkaProducer(settings)
+        r.flush() // ???
+        r
+      }
     }
 
     private var internal = newInternal

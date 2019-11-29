@@ -27,7 +27,7 @@ object Implicits {
   implicit val longShow   = cats.instances.long.catsStdShowForLong
   implicit val stringShow = cats.instances.string.catsStdShowForString
 
-  implicit val doubleShow            = show[Double]((d: Double) => formatValue(d))
+  implicit val doubleShow            = show[Double](d => formatValue(d))
   implicit val byteStrShow           = show[ByteStr](_.toString)
   implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
   implicit val issuedAssetShow       = show[IssuedAsset](AssetPair.assetIdStr)
@@ -47,48 +47,37 @@ object Implicits {
   implicit def listShow[T: Show]: Show[List[T]] = traverseShow[List, T]
   implicit def setShow[T: Show]: Show[Set[T]]   = listShow[T].contramap[Set[T]](_.toList)
 
-  implicit val booleanWrites           = ContextWrites.auto[Boolean]
-  implicit val intWrites               = ContextWrites.auto[Int]
-  implicit val byteWrites              = intWrites.contramap[Byte](_.toInt)
-  implicit val longWrites              = ContextWrites.auto[Long]
-  implicit val doubleWrites            = ContextWrites.auto[String].contramap[Double](x => formatValue(BigDecimal(x)))
-  implicit val decimalWrites           = ContextWrites.auto[String].contramap[BigDecimal](formatValue)
-  implicit val strWrites               = ContextWrites.auto[String]
-  implicit val byteStrWrites           = strWrites.contramap[ByteStr](_.toString)
-  implicit val assetWrites             = strWrites.contramap[Asset](AssetPair.assetIdStr)
-  implicit val assetPairWrites         = ContextWrites.contextWrites[AssetPair](_.json)
-  implicit val publicKeyWrites         = strWrites.contramap[PublicKey](_.toString)
-  implicit val addressWrites           = strWrites.contramap[Address](_.stringRepr)
-  implicit val blockchainFeatureWrites = strWrites.contramap[BlockchainFeature](_.description)
+  implicit val byteWrites    = Writes.ByteWrites
+  implicit val intWrites     = Writes.IntWrites
+  implicit val longWrites    = Writes.LongWrites
+  implicit val stringWrites  = Writes.StringWrites
+  implicit val booleanWrites = Writes.BooleanWrites
 
-  implicit val amountWrites = new ContextWrites[Amount] {
-    override def writes(input: Amount): JsValue =
-      Json.obj(
-        "volume"  -> Json.toJson(input.volume),
-        "assetId" -> Json.toJson(input.asset)
-      )
+  implicit val doubleWrites            = stringWrites.contramap[Double](d => formatValue(d))
+  implicit val decimalWrites           = stringWrites.contramap[BigDecimal](formatValue)
+  implicit val byteStrWrites           = stringWrites.contramap[ByteStr](_.toString)
+  implicit val assetWrites             = stringWrites.contramap[Asset](AssetPair.assetIdStr)
+  implicit val assetPairWrites         = Writes[AssetPair](_.json)
+  implicit val publicKeyWrites         = stringWrites.contramap[PublicKey](_.toString)
+  implicit val addressWrites           = stringWrites.contramap[Address](_.stringRepr)
+  implicit val blockchainFeatureWrites = stringWrites.contramap[BlockchainFeature](_.description)
+
+  implicit val amountWrites = Writes[Amount] { amount: Amount =>
+    Json.obj("volume" -> Json.toJson(amount.volume), "assetId" -> Json.toJson(amount.asset))
   }
 
-  implicit val balanceWrites = new ContextWrites[List[Amount]] {
-    override def writes(input: List[Amount]): JsValue = {
-      val xs = input.map { x =>
-        assetShow.show(x.asset) -> Json.toJson(x.volume)
+  implicit val balanceWrites = Writes[List[Amount]] { balance: List[Amount] =>
+    JsObject(
+      balance.map { amount =>
+        assetShow.show(amount.asset) -> Json.toJson(amount.volume)
       }
-      JsObject(xs)
-    }
+    )
   }
 
   implicit val priceWrites = decimalWrites.contramap[Price](_.volume)
 
-  implicit def setWrites[T](implicit itemWrites: ContextWrites[T]): ContextWrites[Set[T]] = (input: Set[T]) => {
-    val xs = input.map(itemWrites.writes)
-    implicitly[Writes[Set[JsValue]]].writes(xs)
-  }
-
-  implicit def listWrites[T](implicit itemWrites: ContextWrites[T]): ContextWrites[List[T]] = (input: List[T]) => {
-    val xs = input.map(itemWrites.writes)
-    implicitly[Writes[List[JsValue]]].writes(xs)
-  }
+  implicit def listWrites[T: Writes]: Writes[List[T]] = Writes.traversableWrites[T].contramap[List[T]](_.toTraversable)
+  implicit def setWrites[T: Writes]: Writes[Set[T]]   = listWrites[T].contramap[Set[T]](_.toList)
 
   implicit class ErrorInterpolator(sc: StringContext) {
 
@@ -128,7 +117,8 @@ object Implicits {
   }
 
   object FormatArg extends Poly1 {
-    implicit def mapAt[T: Show](implicit json: ContextWrites[T]): Case.Aux[(Symbol, T), (String, String, JsValue)] =
-      at[(Symbol, T)] { case (name, x) => (name.name, x.show, json.writes(x)) }
+    implicit def mapAt[T: Show: Writes]: Case.Aux[(Symbol, T), (String, String, JsValue)] = at[(Symbol, T)] {
+      case (name, arg) => (name.name, arg.show, implicitly[Writes[T]] writes arg)
+    }
   }
 }

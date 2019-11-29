@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import cats.syntax.either._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
@@ -192,6 +193,18 @@ class OrderValidatorSpecification
         forAll(orderV3WithPredefinedFeeAssetGenerator()) {
           case (_, order) => validateByMatcherSettings(DynamicSettings(order.matcherFee))(order) should produce("UnexpectedFeeAsset")
         }
+      }
+
+      "matcherFeeAssetId specified as WAVES Base58 string" in {
+
+        import com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads
+        import play.api.libs.json.Json
+
+        val order = Json.fromJson[Order](createOrder(AssetPair(btc, usd), SELL, 100, 3.0).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")).get
+
+        validateByMatcherSettings { DynamicSettings(0.003.waves) }(order).leftMap(_.mkMessage(errorContext).text).left.get should include(
+          """But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
+        )
       }
 
       "matcherFee is not enough (percent mode)" in {

@@ -9,8 +9,11 @@ import com.wavesplatform.wallet.Wallet
 import scala.collection.JavaConverters._
 
 object PredefinedAccounts extends PredefinedAccounts
+
 trait PredefinedAccounts {
-  val accounts: Map[String, KeyPair] = {
+
+  private val accounts: Map[String, KeyPair] = {
+
     val distributionsKey = "genesis-generator.distributions"
     val distributions    = generatorConfig.getObject(distributionsKey)
 

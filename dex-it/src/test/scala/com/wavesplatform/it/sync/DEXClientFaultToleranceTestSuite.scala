@@ -5,7 +5,7 @@ import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.{WavesIntegrationItDocker, WavesNodeContainer}
+import com.wavesplatform.dex.it.docker.{Docker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
@@ -20,7 +20,7 @@ class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
     s"""waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  grpc.integration.waves-node-grpc {
-       |    host = ${WavesIntegrationItDocker.wavesNodesDomain}
+       |    host = ${Docker.wavesNodesDomain}
        |    port = 6887
        |  }
        |}""".stripMargin

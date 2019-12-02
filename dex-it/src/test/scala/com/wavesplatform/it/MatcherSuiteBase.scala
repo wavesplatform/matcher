@@ -52,6 +52,8 @@ abstract class MatcherSuiteBase
     with PredefinedAccounts
     with ScorexLogging {
 
+  GenesisConfig.setupAddressScheme()
+
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
@@ -77,8 +79,6 @@ abstract class MatcherSuiteBase
     timeout = 30.seconds,
     interval = 1.second
   )
-
-  GenesisConfig.setupAddressScheme()
 
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
@@ -165,7 +165,7 @@ abstract class MatcherSuiteBase
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig(),
                                 suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer = {
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(WavesIntegrationItDocker.wavesNodesDomain))
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(Docker.wavesNodesDomain))
   }
 
   protected def dexQueueConfig(queueId: Int): Config = {

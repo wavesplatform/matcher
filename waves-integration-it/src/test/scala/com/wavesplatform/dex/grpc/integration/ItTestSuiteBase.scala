@@ -8,7 +8,7 @@ import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
-import com.wavesplatform.dex.it.docker.{DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
+import com.wavesplatform.dex.it.docker.{Docker, DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.it.test.{HasWavesNode, WavesNodeApiExtensions}
@@ -50,7 +50,7 @@ trait ItTestSuiteBase
 
   protected def dockerClient: com.wavesplatform.dex.it.docker.Docker = internalDockerClient()
 
-  protected def allContainers: List[DockerContainer] = List(wavesNode1Container).map(x => x())
+  protected def allContainers: List[DockerContainer] = List(wavesNode1Container) map { _.value }
   protected def allApis: List[HasWaitReady[Id]]      = List(wavesNode1Api)
 
   protected val wavesNodeRunConfig: Coeval[Config] = Coeval.evalOnce(GenesisConfig.config)
@@ -70,14 +70,14 @@ trait ItTestSuiteBase
     val x = dockerClient.getExternalSocketAddress(wavesNode1Container(), wavesNode1Container().grpcApiPort)
     s"${x.getHostName}:${x.getPort}"
   }
-  protected def wavesNode1GrpcApiTarget = cachedWavesNode1GrpcApiTarget.get()
+  protected def wavesNode1GrpcApiTarget: String = cachedWavesNode1GrpcApiTarget.get()
 
   protected val cachedWavesNode1NetworkApiAddress = CachedData {
     dockerClient.getInternalSocketAddress(wavesNode1Container(), wavesNode1Container().networkApiPort)
   }
 
   protected def createWavesNode(name: String, runConfig: Config, suiteInitialConfig: Config): WavesNodeContainer =
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(WavesIntegrationItDocker.wavesNodesDomain))
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(Docker.wavesNodesDomain))
 
   override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

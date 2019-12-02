@@ -274,8 +274,7 @@ class AddressActor(owner: Address,
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
-      if (e.submittedRemaining.order.sender.toAddress == owner)
-        context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, e))
+      context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, e))
 
     case OrderCanceled(ao, isSystemCancel, _) =>
       val id = ao.order.id()

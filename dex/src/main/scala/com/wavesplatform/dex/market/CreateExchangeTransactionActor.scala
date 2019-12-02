@@ -13,9 +13,12 @@ import scala.collection.mutable
 class CreateExchangeTransactionActor(createTransaction: CreateTransaction) extends Actor with ScorexLogging {
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
 
+  override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[OrderExecutedObserved])
+
   override def receive: Receive = {
     case OrderExecutedObserved(sender, event) =>
-      log.debug(s"Execution observed at $sender")
+      log.debug(
+        s"Execution observed at $sender for OrderExecuted(${event.submitted.order.id()}, ${event.counter.order.id()}), amount=${event.executedAmount})")
       if (pendingEvents.contains(event)) {
         import event.{counter, submitted}
         createTransaction(event) match {

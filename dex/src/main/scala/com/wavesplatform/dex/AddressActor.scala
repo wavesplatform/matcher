@@ -104,7 +104,7 @@ class AddressActor(owner: Address,
         val msg = toCancel
           .map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}")
           .mkString(", ")
-        log.debug(s"Canceling (not enough balance): doesn't have $msg")
+        log.debug(s"Canceling ${toCancel.size} of ${activeOrders.size} (not enough balance): doesn't have $msg")
         toCancel.foreach(x => storeCanceled(x.order.assetPair, x.order.id()))
       }
 
@@ -365,7 +365,7 @@ class AddressActor(owner: Address,
             case Left((insufficientAmount, assetId)) =>
               val updatedToDelete =
                 if (pendingCancellation.contains(id)) toDelete
-                else toDelete.enqueue(InsufficientBalanceOrder(order, insufficientAmount, assetId))
+                else toDelete.enqueue(InsufficientBalanceOrder(order, -insufficientAmount, assetId))
               (restBalance, updatedToDelete)
           }
       }

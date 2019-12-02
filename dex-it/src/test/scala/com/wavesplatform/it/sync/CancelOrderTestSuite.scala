@@ -145,9 +145,11 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Auto cancel" - {
-    "wrong auto cancel when match on all coins" in {
+    // TODO: Uncomment after Node v1.1.6
+    "wrong auto cancel when match on all coins" ignore {
       val accounts       = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
       val oneOrderAmount = 10000
+      val orderPrice     = 3000000000000L
 
       val initialTransferIds = accounts
         .map { account =>
@@ -156,7 +158,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
               assetId = Waves,
               sender = alice,
               recipient = account,
-              amount = issueFee + matcherFee,
+              amount = issueFee,
               timestamp = System.currentTimeMillis(),
               feeAssetId = Waves,
               feeAmount = minFee,
@@ -201,7 +203,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
               pair = assetPair,
               orderType = OrderType.SELL,
               amount = oneOrderAmount,
-              price = 1.waves,
+              price = orderPrice,
               fee = matcherFee
             )
             .message
@@ -220,7 +222,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
             pair = AssetPair(IssuedAsset(asset.id()), Waves),
             orderType = OrderType.BUY,
             amount = oneOrderAmount / 10,
-            price = 1.waves,
+            price = orderPrice,
             fee = matcherFee,
             timeToLive = 30.days - i.seconds // to make different orders
           )

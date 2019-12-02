@@ -1,13 +1,13 @@
 package com.wavesplatform.dex
 
-import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.effect._
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
@@ -15,22 +15,29 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+
 class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
   import AssetPairBuilderSpec._
 
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
-  private val WAVES  = "WAVES"
-  private val WUSD   = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
-  private val WBTC   = IssuedAsset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
-  private val WEUR   = IssuedAsset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
-  private val WCNY   = IssuedAsset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
+  def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
+
+  private val WAVES = "WAVES"
+  private val WUSD  = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
+  private val WBTC  = IssuedAsset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
+  private val WEUR  = IssuedAsset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
+  private val WCNY  = IssuedAsset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
+
   private val Asset1 = mkAssetId(1)
   private val Asset2 = mkAssetId(2)
   private val Asset3 = mkAssetId(3)
 
   private val predefinedPriceAssets =
-    Seq(
+    List(
       WBTC,
       WUSD,
       WEUR,
@@ -39,7 +46,8 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     )
 
   private val blacklistedAssets = Set(Asset3)
-  private val priceAssets       = ConfigFactory.parseString(s"""waves.dex {
+
+  private val priceAssets = ConfigFactory.parseString(s"""waves.dex {
        |  blacklisted-assets  = [${blacklistedAssets.map(_.id.toString).mkString(",")}]
        |  blacklisted-names   = ["name$$"]
        |  price-assets        = [${predefinedPriceAssets.map(_.id.toString).mkString(",")}]
@@ -47,10 +55,20 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
        |  allowed-asset-pairs = [WAVES-${Asset3.id.toString}]
        |}""".stripMargin)
 
-  private val settings   = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
-  private val blockchain = stub[Blockchain]
+  private val settings = loadConfig(priceAssets).as[MatcherSettings]("waves.dex")
 
-  private val builder = new AssetPairBuilder(settings, blockchain, blacklistedAssets)
+  private def mkBuilder(knownAssets: (IssuedAsset, Option[BriefAssetDescription])*): AssetPairBuilder = {
+    val assetDescription =
+      knownAssets.toMap
+        .map {
+          case (k, Some(x)) => k -> liftValueAsync[BriefAssetDescription](BriefAssetDescription(x.name, x.decimals, hasScript = false))
+          case (k, None)    => k -> liftErrorAsync[BriefAssetDescription](error.AssetNotFound(k))
+        }
+        .withDefault { x =>
+          throw new NoSuchElementException(s"Can't find '$x' asset")
+        }
+    new AssetPairBuilder(settings, assetDescription, blacklistedAssets)
+  }
 
   private val pairs = Table(
     ("amount", "price", "result"),
@@ -69,17 +87,12 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
   "AssetPairBuilder" - {
     "correctly ordered and assets IDs are valid" in {
-      for (id <- predefinedPriceAssets) {
-        (blockchain.assetDescription _).when(id).returns(mkAssetDescription())
-      }
-
-      (blockchain.assetDescription _).when(Asset1).returns(mkAssetDescription())
-      (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
-      (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription())
+      val assets  = (Asset1 :: Asset2 :: Asset3 :: predefinedPriceAssets).map(_ -> mkAssetDescription())
+      val builder = mkBuilder(assets: _*)
 
       forAll(pairs) {
         case (amountAsset, priceAsset, isValid) =>
-          val pair = builder.createAssetPair(amountAsset, priceAsset)
+          val pair = awaitResult { builder.createAssetPair(amountAsset, priceAsset) }
           isValid match {
             case Right(_) => pair shouldBe 'right
             case Left(e)  => pair should produce(e)
@@ -89,31 +102,35 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
     "rejects a pair when" - {
       "blacklist" - {
         "contains asset id" in {
-          (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription())
-          builder.validateAssetPair(AssetPair(Asset3, Waves)) should produce("AmountAssetBlacklisted")
+          val builder = mkBuilder(Asset3 -> mkAssetDescription())
+          awaitResult { builder.validateAssetPair(AssetPair(Asset3, Waves)) } should produce("AmountAssetBlacklisted")
         }
         "matchers asset name" in {
-          (blockchain.assetDescription _).when(Asset1).returns(mkAssetDescription())
-          (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription("forbidden Asset name"))
-          (blockchain.assetDescription _).when(Asset3).returns(mkAssetDescription("name of an asset"))
+          val builder = mkBuilder(
+            Asset1 -> mkAssetDescription(),
+            Asset2 -> mkAssetDescription("forbidden Asset name"),
+            Asset3 -> mkAssetDescription("name of an asset")
+          )
 
-          builder.validateAssetPair(AssetPair(Asset3, Asset1)) should produce("AmountAssetBlacklisted")
-          builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("AmountAssetBlacklisted")
+          awaitResult { builder.validateAssetPair(AssetPair(Asset3, Asset1)) } should produce("AmountAssetBlacklisted")
+          awaitResult { builder.validateAssetPair(AssetPair(Asset2, Asset1)) } should produce("AmountAssetBlacklisted")
         }
       }
       "asset was not issued" in {
-        (blockchain.assetDescription _).when(Asset1).returns(None)
-        (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
+        val builder = mkBuilder(
+          Asset1 -> None,
+          Asset2 -> mkAssetDescription()
+        )
 
-        builder.validateAssetPair(AssetPair(Asset2, Asset1)) should produce("AssetNotFound")
+        awaitResult { builder.validateAssetPair(AssetPair(Asset2, Asset1)) } should produce("AssetNotFound")
       }
       "amount and price assets are the same" in {
-        builder.validateAssetPair(AssetPair(WUSD, WUSD)) should produce("AssetPairSameAsset")
+        awaitResult { mkBuilder().validateAssetPair(AssetPair(WUSD, WUSD)) } should produce("AssetPairSameAsset")
       }
       "pair is not in allowedAssetPairs and whiteListOnly is enabled" in {
-        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), blockchain, blacklistedAssets)
+        val builder   = new AssetPairBuilder(settings.copy(whiteListOnly = true), x => liftErrorAsync(error.AssetNotFound(x)), blacklistedAssets)
         val assetPair = AssetPair(Waves, WUSD)
-        builder.validateAssetPair(assetPair) should produce("AssetPairIsDenied")
+        awaitResult { builder.validateAssetPair(assetPair) } should produce("AssetPairIsDenied")
       }
     }
   }
@@ -121,14 +138,6 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 
 object AssetPairBuilderSpec {
   private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
-  private def mkAssetDescription(assetName: String = ""): Option[AssetDescription] =
-    Some(
-      AssetDescription(PublicKey(Array.emptyByteArray),
-                       assetName.getBytes(Charsets.UTF_8),
-                       Array.emptyByteArray,
-                       8,
-                       reissuable = false,
-                       BigInt(1),
-                       None,
-                       0))
+  private def mkAssetDescription(assetName: String = ""): Option[BriefAssetDescription] =
+    Some(BriefAssetDescription(name = assetName, decimals = 8, hasScript = false))
 }

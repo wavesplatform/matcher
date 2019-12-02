@@ -1,17 +1,21 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
+import cats.instances.future.catsStdInstancesForFuture
+import cats.syntax.functor._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.utils.{ScorexLogging, Time}
 
+import scala.concurrent.Future
+
 class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSettings,
                                         time: Time,
-                                        isValid: ExchangeTransaction => Boolean,
-                                        isConfirmed: ExchangeTransaction => Boolean,
-                                        broadcast: Seq[ExchangeTransaction] => Unit)
+                                        isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+                                        broadcast: ExchangeTransaction => Future[Boolean])
     extends Actor
     with ScorexLogging {
 
@@ -22,44 +26,48 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
     scheduleSend()
   }
 
-  private val default: Receive = {
-    case ExchangeTransactionCreated(tx) => if (isValid(tx)) broadcast(List(tx))
-  }
+  private val default: Receive = { case ExchangeTransactionCreated(tx) => broadcast(tx) }
 
-  private def watching(toCheck: Vector[ExchangeTransaction], next: Vector[ExchangeTransaction]): Receive = {
-    case ExchangeTransactionCreated(tx) =>
-      if (isValid(tx)) {
-        broadcast(List(tx))
-        context.become(watching(toCheck, next :+ tx))
-      }
-
+  private def watching(toCheck: Vector[ExchangeTransaction], broadcasted: Vector[ExchangeTransaction]): Receive = {
     case Send =>
       val nowMs    = time.getTimestamp()
       val expireMs = nowMs - settings.maxPendingTime.toMillis
 
-      val (confirmed, unconfirmed) = toCheck.partition(isConfirmed)
-      val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
+      isConfirmed { toCheck map (_.id()) }.flatMap { isTxConfirmed =>
+        val (confirmed, unconfirmed) = toCheck.partition(tx => isTxConfirmed(tx.id.value))
+        val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
-      broadcast(ready)
-      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent")
-      if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
+        Future.sequence { ready map (tx => broadcast(tx) tupleLeft tx) } map (_.toMap) map { isTxBroadcasted =>
+          val (validTxs, invalidTxs) = ready.partition(isTxBroadcasted)
 
-      scheduleSend()
-      context.become(watching(next ++ ready, Vector.empty))
+          log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent, ${validTxs.size} successful")
+          if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${format(expired)}; became invalid: ${format(invalidTxs)}")
+
+          validTxs
+        }
+      } foreach (broadcastedTxs => self ! CheckBroadcastedTransactions(broadcastedTxs))
+
+    case ExchangeTransactionCreated(tx)    => broadcast(tx) foreach { if (_) self ! TransactionIsBroadcasted(tx) }
+    case TransactionIsBroadcasted(tx)      => context.become { watching(toCheck, broadcasted :+ tx) }
+    case CheckBroadcastedTransactions(txs) => scheduleSend(); context.become { watching(broadcasted ++ txs, Vector.empty) }
   }
 
-  override val receive: Receive = if (settings.broadcastUntilConfirmed) watching(toCheck = Vector.empty, next = Vector.empty) else default
+  override val receive: Receive = if (settings.broadcastUntilConfirmed) watching(toCheck = Vector.empty, broadcasted = Vector.empty) else default
 
   private def scheduleSend(): Unit = context.system.scheduler.scheduleOnce(settings.interval, self, Send)
+
+  private def format(txs: Iterable[ExchangeTransaction]): String = txs.map(_.id().toString).mkString(", ")
 }
 
 object ExchangeTransactionBroadcastActor {
-  object Send
+
+  final case object Send
+  final case class TransactionIsBroadcasted(tx: ExchangeTransaction)
+  final case class CheckBroadcastedTransactions(txs: Seq[ExchangeTransaction])
 
   def props(settings: ExchangeTransactionBroadcastSettings,
             time: Time,
-            isValid: ExchangeTransaction => Boolean,
-            isConfirmed: ExchangeTransaction => Boolean,
-            broadcast: Seq[ExchangeTransaction] => Unit): Props =
-    Props(new ExchangeTransactionBroadcastActor(settings, time, isValid, isConfirmed, broadcast))
+            isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+            broadcast: ExchangeTransaction => Future[Boolean]): Props =
+    Props(new ExchangeTransactionBroadcastActor(settings, time, isConfirmed, broadcast))
 }

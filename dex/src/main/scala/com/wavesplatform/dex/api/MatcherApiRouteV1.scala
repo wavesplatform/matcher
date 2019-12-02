@@ -2,13 +2,14 @@ package com.wavesplatform.dex.api
 
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.ApiRoute
+import com.wavesplatform.dex.api.http.AuthRoute
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
@@ -19,7 +20,7 @@ import javax.ws.rs.Path
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              orderBookSnapshot: OrderBookSnapshotHttpCache,
                              matcherStatus: () => Matcher.Status,
-                             apiKeyHashStr: String,
+                             apiKeyHash: Option[Array[Byte]],
                              matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
@@ -44,18 +45,17 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   private def withAssetPair(p: AssetPair,
                             redirectToInverse: Boolean,
                             suffix: String = "",
-                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] =
-    assetPairBuilder.validateAssetPair(p) match {
+                            formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
       case Left(e) if redirectToInverse =>
-        assetPairBuilder
-          .validateAssetPair(p.reverse)
-          .fold(
-            _ => complete(formatError(e)),
-            _ => redirect(s"/api/v1/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
-          )
-      case Left(e) => complete(formatError(e))
+        FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p.reverse).value } flatMap {
+          case Right(_) => redirect(s"/api/v1/${p.priceAssetStr}/${p.amountAssetStr}$suffix", StatusCodes.MovedPermanently)
+          case Left(_)  => complete(formatError(e))
+        }
+      case Left(e) => complete { formatError(e) }
     }
+  }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair", notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")
@@ -73,21 +73,8 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete(orderBookSnapshot.get(pair, depth, MatcherModel.Denormalized))
+        complete { orderBookSnapshot.get(pair, depth, MatcherModel.Denormalized) }
       }
     }
   }
-
-  // TODO remove AuthRoute
-  override def settings: RestAPISettings =
-    RestAPISettings(
-      true,
-      matcherSettings.bindAddress,
-      matcherSettings.port,
-      apiKeyHashStr,
-      true,
-      true,
-      100,
-      100
-    )
 }

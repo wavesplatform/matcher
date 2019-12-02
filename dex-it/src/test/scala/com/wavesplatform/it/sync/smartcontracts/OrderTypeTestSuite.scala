@@ -1,29 +1,27 @@
 package com.wavesplatform.it.sync.smartcontracts
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import play.api.libs.json.Json
-
-import scala.concurrent.duration._
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
-  private val aliceAsset =
-    node
-      .broadcastIssue(alice, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, None)
-      .id
 
-  Seq(aliceAsset, node.broadcastRequest(IssueUsdTx.json()).id).map(node.waitForTransaction(_))
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+
+  private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
+  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
 
   private val predefAssetPair = wavesUsdPair
-  private val aliceWavesPair  = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+  private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
+
+  override protected def beforeAll(): Unit = {
+    startAndWait(wavesNode1Container(), wavesNode1Api)
+    broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
+    startAndWait(dex1Container(), dex1Api)
+  }
 
   "Order types verification with SmartContracts" - {
     val sco1 = s"""
@@ -58,100 +56,79 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
     "scenarios of order placement" - {
       "set contracts with only BUY type and then place order" in {
-        setContract(Some(sco1), alice)
+        setAliceScriptText(sco1)
 
-        val aliceOrd1 = node
-          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd1)
 
-        assertApiErrorRaised(
-          node
-            .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-            .message
-            .id)
+        dex1Api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+          3147522, // AccountScriptDeniedOrder
+          MatcherError.Params(address = Some(alice.toAddress.stringRepr))
+        )
 
-        node.cancelOrder(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
-
-        setContract(None, alice)
+        dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        resetAliceAccountScript()
       }
 
       "set contracts with only SELL type and then place order" in {
-        setContract(Some(sco2), alice)
+        setAliceScriptText(sco2)
 
-        assertApiErrorRaised(
-          node
-            .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-            .message
-            .id)
+        dex1Api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+          3147522, // AccountScriptDeniedOrder
+          MatcherError.Params(address = Some(alice.toAddress.stringRepr))
+        )
 
-        val aliceOrd2 = node
-          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd2)
 
-        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
-
-        setContract(None, alice)
+        dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        resetAliceAccountScript()
       }
 
       "set contracts with both SELL/BUY types and then place order" in {
-        setContract(Some(sco3), alice)
+        setAliceScriptText(sco3)
 
-        val aliceOrd1 = node
-          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd1)
 
-        val aliceOrd2 = node
-          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd2)
 
-        node.cancelOrder(alice, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
-        node.cancelOrder(alice, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
-
-        setContract(None, alice)
+        dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        resetAliceAccountScript()
       }
 
       "place order and then set contract on BUY type" in {
-        val aliceOrd1 = node
-          .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
+        val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd1)
 
-        val aliceOrd2 = node
-          .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
-          .message
-          .id
-        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
+        val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
+        placeAndAwait(aliceOrd2)
 
-        setContract(Some(sco1), alice)
+        setAliceScriptText(sco1)
 
-        val bobOrd1 = node
-          .placeOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1, 10.minutes)
-          .message
-          .id
-        val bobOrd2 = node
-          .placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1, 10.minutes)
-          .message
-          .id
+        val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
+        dex1Api.place(bobOrd1)
 
-        node.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
-        node.waitOrderStatus(aliceWavesPair, aliceOrd2, "Filled", 1.minute)
-        node.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
-        node.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
+        val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
+        dex1Api.place(bobOrd2)
 
-        node.waitOrderInBlockchain(bobOrd1)
+        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
+        dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-        val txs = node.waitTransactionsByOrder(bobOrd2, 1)
-        node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAccountScript.Id
+        waitForOrderAtNode(bobOrd1)
+
+        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
+        val r   = wavesNode1Api.tryBroadcast(txs.head)
+        r shouldBe 'left
+        r.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
       }
     }
   }
+
+  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText)))
+  private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
 }

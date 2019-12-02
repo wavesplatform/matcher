@@ -11,13 +11,13 @@ import akka.http.scaladsl.server.{Route, RouteResult}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.Application
 import com.wavesplatform.api.http.ApiRoute
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.dex.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 
 class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)(implicit system: ActorSystem)
     extends ScorexLogging {
 
-  private val swaggerService    = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
+  private val swaggerService    = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, s"${settings.address}:${settings.port}")
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
   private val swaggerRoute: Route = swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~

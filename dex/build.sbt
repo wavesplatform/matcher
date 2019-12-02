@@ -1,14 +1,18 @@
-import com.typesafe.sbt.packager.debian.DebianPlugin.autoImport.DebianConstants._
+import java.nio.charset.StandardCharsets
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
+import DexDockerKeys._
+import com.typesafe.sbt.SbtNativePackager.Universal
+import CommonSettings.autoImport.network
 
-resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.dex
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
+
+resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
+libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "DEX",
-  packageDescription := s"Decentralized EXchange for Waves network. Compatible with ${nodeVersion.value} node version"
+  packageDescription := "Decentralized EXchange for Waves network"
 )
 
 packageSettings
@@ -30,18 +34,52 @@ lazy val versionSourceTask = Def.task {
        |  val VersionString = "${version.value}"
        |  val VersionTuple = ($major, $minor, $patch)
        |}
-       |""".stripMargin
+       |""".stripMargin,
+    charset = StandardCharsets.UTF_8
   )
   Seq(versionFile)
 }
 
-inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
+inConfig(Compile)(
+  Seq(
+    sourceGenerators += versionSourceTask,
+    discoveredMainClasses := Seq(
+      "com.wavesplatform.dex.Application",
+      "com.wavesplatform.dex.WavesDexCli"
+    ),
+    mainClass := discoveredMainClasses.value.headOption
+  ))
 
-Debian / maintainerScripts := maintainerScriptsAppend((Debian / maintainerScripts).value - Postrm)(
-  Postrm ->
-    s"""#!/bin/sh
-       |set -e
-       |if [ "$$1" = purge ]; then
-       |  rm -rf /var/lib/${nodePackageName.value}/matcher
-       |fi""".stripMargin
+// Docker
+
+inTask(docker)(
+  Seq(
+    additionalFiles ++= Seq(
+      (Universal / stage).value,
+      (Compile / sourceDirectory).value / "container" / "start.sh",
+      (Compile / sourceDirectory).value / "container" / "default.conf"
+    )
+  )
 )
+
+// Packaging
+
+executableScriptName := "waves-dex"
+
+// ZIP archive
+inConfig(Universal)(Seq(
+  packageName := s"waves-dex${network.value.packageSuffix}-${version.value}", // An archive file name
+  mappings ++= {
+    val baseConfigName = s"${network.value}.conf"
+    val localFile      = (Compile / sourceDirectory).value / "package" / "samples" / baseConfigName
+    if (localFile.exists()) {
+      val artifactPath = "doc/dex.conf.sample"
+      Seq(localFile -> artifactPath)
+    } else Seq.empty
+  }
+))
+
+// DEB package
+Linux / name := s"waves-dex${network.value.packageSuffix}" // A staging directory name
+Linux / normalizedName := (Linux / name).value // An archive file name
+Linux / packageName := (Linux / name).value // In a control file

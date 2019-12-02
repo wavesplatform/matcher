@@ -5,14 +5,18 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.model.OrderValidator
+import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
 import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
+import com.wavesplatform.settings.GRPCSettings
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import future.com.wavesplatform.settings.utils.ConfigOps._
@@ -24,28 +28,27 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(account: String,
-                           bindAddress: String,
-                           port: Int,
+case class MatcherSettings(addressSchemeCharacter: Char,
+                           accountStorage: AccountStorage.Settings,
+                           wavesNodeGrpc: GRPCSettings,
+                           ntpServer: String,
+                           restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
                            recoverOrderHistory: Boolean,
-                           journalDataDir: String,
-                           snapshotsDataDir: String,
                            snapshotsInterval: Int,
                            limitEventsDuringRecovery: Option[Int],
                            snapshotsLoadingTimeout: FiniteDuration,
                            startEventsProcessingTimeout: FiniteDuration,
                            orderBooksRecoveringTimeout: FiniteDuration,
-                           priceAssets: Seq[String],
-                           blacklistedAssets: Set[String],
+                           priceAssets: Seq[Asset],
+                           blacklistedAssets: Set[Asset.IssuedAsset],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
-                           balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: OrderFeeSettings,
@@ -57,87 +60,112 @@ case class MatcherSettings(account: String,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings])
+                           orderHistory: Option[OrderHistorySettings],
+                           defaultGrpcCachesExpiration: FiniteDuration) {
+
+  def mentionedAssets: Set[Asset] = {
+    priceAssets.toSet ++
+      blacklistedAssets ++
+      orderRestrictions.keySet.flatMap(_.assets) ++
+      matchingRules.keySet.flatMap(_.assets) ++
+      allowedAssetPairs.flatMap(_.assets) ++ {
+      orderFee match {
+        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
+        case _                                 => Set.empty
+      }
+    }
+  }
+}
+
+case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)
 
 object MatcherSettings {
 
   implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
+  private def unsafeParseAsset(x: String): Asset = {
+    AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+  }
+
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
     import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
 
-    val account     = config.as[String]("account")
-    val bindAddress = config.as[String]("bind-address")
-    val port        = config.as[Int]("port")
+    val addressSchemeCharacter = config
+      .as[String]("address-scheme-character")
+      .headOption
+      .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
+
+    val accountStorage  = accountStorageSettingsReader.read(config, "account-storage")
+    val wavesNodeGrpc   = config.as[GRPCSettings]("grpc.integration.waves-node-grpc")
+    val ntpServer       = config.as[String]("ntp-server")
+    val restApiSettings = config.as[RestAPISettings]("rest-api")
 
     val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
       errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
     )
 
-    val actorResponseTimeout         = config.as[FiniteDuration]("actor-response-timeout")
-    val dataDirectory                = config.as[String]("data-directory")
-    val journalDirectory             = config.as[String]("journal-directory")
-    val snapshotsDirectory           = config.as[String]("snapshots-directory")
-    val snapshotsInterval            = config.as[Int]("snapshots-interval")
-    val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
-    val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
-    val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
-    val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
-    val baseAssets                   = config.as[List[String]]("price-assets")
-
-    val blacklistedAssets = config.as[List[String]]("blacklisted-assets")
-    val blacklistedNames  = config.as[List[String]]("blacklisted-names").map(_.r)
-
-    val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-
-    val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
-
-    val eventsQueue            = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout = config.as[FiniteDuration]("process-consumed-timeout")
-    val recoverOrderHistory    = !new File(dataDirectory).exists()
+    val actorResponseTimeout = config.as[FiniteDuration]("actor-response-timeout")
+    val dataDirectory        = config.as[String]("data-directory")
+    val recoverOrderHistory  = !new File(dataDirectory).exists()
+    val snapshotsInterval    = config.as[Int]("snapshots-interval")
 
     val limitEventsDuringRecovery = config.getAs[Int]("limit-events-during-recovery")
     require(limitEventsDuringRecovery.forall(_ >= snapshotsInterval), "limit-events-during-recovery should be >= snapshotsInterval")
 
-    val orderFee          = config.as[OrderFeeSettings]("order-fee")
-    val deviation         = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules     = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val allowedAssetPairs = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-
-    val whiteListOnly           = config.as[Boolean]("white-list-only")
-    val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-
-    val postgresConnection = config.as[PostgresConnection]("postgres")
-    val orderHistory       = config.as[Option[OrderHistorySettings]]("order-history")
+    val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
+    val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
+    val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
+    val priceAssets                  = config.as[List[String]]("price-assets").map(unsafeParseAsset)
+    val blacklistedAssets = config
+      .as[List[String]]("blacklisted-assets")
+      .map(unsafeParseAsset)
+      .map {
+        case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case x: Asset.IssuedAsset => x
+      }
+      .toSet
+    val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
+    val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
+    val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache  = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val eventsQueue                 = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout      = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                    = config.as[OrderFeeSettings]("order-fee")
+    val deviation                   = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions           = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules               = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly               = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs           = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions        = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection          = config.as[PostgresConnection]("postgres")
+    val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
+    val defaultGrpcCachesExpiration = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
 
     MatcherSettings(
-      account,
-      bindAddress,
-      port,
+      addressSchemeCharacter,
+      accountStorage,
+      wavesNodeGrpc,
+      ntpServer,
+      restApiSettings,
       exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,
       recoverOrderHistory,
-      journalDirectory,
-      snapshotsDirectory,
       snapshotsInterval,
       limitEventsDuringRecovery,
       snapshotsLoadingTimeout,
       startEventsProcessingTimeout,
       orderBooksRecoveringTimeout,
-      baseAssets,
-      blacklistedAssets.toSet,
+      priceAssets,
+      blacklistedAssets,
       blacklistedNames,
       maxOrdersPerRequest,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
-      balanceWatchingBufferInterval,
       eventsQueue,
       processConsumedTimeout,
       orderFee,
@@ -149,7 +177,8 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory
+      orderHistory,
+      defaultGrpcCachesExpiration
     )
   }
 }

@@ -2,12 +2,16 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.queue.LocalMatcherQueue
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import future.com.wavesplatform.transaction.assets.exchange.Implicits.AssetPairOps
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.Matchers
 
@@ -20,19 +24,27 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val config = configWithSettings()
 
     val settings = config.as[MatcherSettings]("waves.dex")
-    settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
-    settings.bindAddress should be("127.0.0.1")
-    settings.port should be(6886)
+    settings.accountStorage should be(AccountStorage.Settings.InMem(ByteStr.decodeBase64("c3lrYWJsZXlhdA==").get))
+    settings.restApi shouldBe RestAPISettings(
+      address = "127.1.2.3",
+      port = 6880,
+      apiKeyHash = "foobarhash",
+      cors = false,
+      apiKeyDifferentHost = false
+    )
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
-    settings.journalDataDir should be("/waves/matcher/journal")
-    settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
-    settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
-    settings.blacklistedAssets shouldBe Set("a")
+    settings.priceAssets should be(
+      Seq(
+        Waves,
+        AssetPair.extractAssetId("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get,
+        AssetPair.extractAssetId("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J").get
+      ))
+    settings.blacklistedAssets shouldBe Set(AssetPair.extractAssetId("AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck").get.asInstanceOf[IssuedAsset])
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
@@ -40,16 +52,13 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       depthRanges = List(1, 5, 333),
       defaultDepth = Some(5)
     )
-    settings.balanceWatchingBufferInterval should be(33.seconds)
-    settings.eventsQueue shouldBe EventsQueueSettings(
-      tpe = "kafka",
-      local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
-      kafka = KafkaMatcherQueue.Settings(
-        "some-events",
-        KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
-        KafkaMatcherQueue.ProducerSettings(enable = false, 200)
-      )
-    )
+    settings.eventsQueue.tpe shouldBe "kafka"
+    settings.eventsQueue.local shouldBe LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false)
+    settings.eventsQueue.kafka.topic shouldBe "some-events"
+    settings.eventsQueue.kafka.consumer.fetchMaxDuration shouldBe 10.seconds
+    settings.eventsQueue.kafka.consumer.maxBufferSize shouldBe 777
+    settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
+    settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
     settings.processConsumedTimeout shouldBe 663.seconds
 
     settings.orderFee match {
@@ -405,7 +414,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 
     withClue("nonempty correct") {
       getSettingByConfig(configStr(nonEmptyCorrect)).explicitGet().matchingRules shouldBe Map(
-        AssetPair.createAssetPair("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
+        AssetPair.fromString("WAVES-8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get ->
           NonEmptyList[DenormalizedMatchingRule](
             DenormalizedMatchingRule(100L, 0.002),
             List(

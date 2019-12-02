@@ -1,16 +1,16 @@
 import java.io.File
 
 import sbt.plugins.JvmPlugin
-import sbt.{AutoPlugin, Def, Plugins, inTask, taskKey}
+import sbt.{AutoPlugin, Def, PluginTrigger, Plugins, inTask, taskKey}
 import sbtdocker.DockerPlugin
 import sbtdocker.DockerPlugin.autoImport._
 
 object WavesExtensionDockerPlugin extends AutoPlugin {
 
-  object autoImport extends WavesExtensionDockerKeys
-  import autoImport._
+  import WavesExtensionDockerKeys._
 
-  override def requires: Plugins = JvmPlugin && DockerPlugin
+  override def requires: Plugins      = JvmPlugin && DockerPlugin
+  override def trigger: PluginTrigger = PluginTrigger.NoTrigger
 
   override def projectSettings: Seq[Def.Setting[_]] =
     inTask(docker)(
@@ -23,13 +23,16 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
             from(baseImage.value)
             add(additionalFiles.value, "/opt/waves/")
             expose(exposedPorts.value.toSeq: _*)
+            runShell("chmod", "+x", "/opt/waves/start-waves.sh")
           }
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
-      ))
+      )) ++ Seq(
+      docker := docker.dependsOn(buildNodeContainer).value
+    )
 }
 
-trait WavesExtensionDockerKeys {
+object WavesExtensionDockerKeys {
   val additionalFiles    = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
   val exposedPorts       = taskKey[Set[Int]]("Exposed ports")
   val buildNodeContainer = taskKey[Unit]("Builds a NODE container")

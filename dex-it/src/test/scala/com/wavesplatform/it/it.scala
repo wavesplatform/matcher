@@ -2,9 +2,8 @@ package com.wavesplatform
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.AsyncMatcherHttpApi._
+import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -22,16 +21,21 @@ import scala.util.Random
 import scala.util.control.NonFatal
 
 package object it {
-  def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Unit =
-    Await.ready(Future.sequence(xs.map(executeCommand(_))), timeout)
 
-  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Unit] = x match {
-    case MatcherCommand.Place(node, order) => node.placeOrder(order).map(_ => ())
-    case MatcherCommand.Cancel(node, owner, order) =>
-      try node.cancelOrder(owner, order.assetPair, order.idStr()).map(_ => ())
+  /**
+    * @return The number of successful commands
+    */
+  def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int = {
+    Await.result(Future.sequence(xs.map(executeCommand(_))), timeout).sum
+  }
+
+  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Int] = x match {
+    case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
+    case MatcherCommand.Cancel(api, owner, order) =>
+      try api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
       catch {
         case NonFatal(e) =>
-          if (ignoreErrors) Future.successful(())
+          if (ignoreErrors) Future.successful(0)
           else Future.failed(e)
       }
   }

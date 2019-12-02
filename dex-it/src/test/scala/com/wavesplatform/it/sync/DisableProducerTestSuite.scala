@@ -2,69 +2,46 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.SyncHttpApi.{sync => _, _}
-import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-
-import scala.concurrent.duration._
-import scala.util.Random
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class DisableProducerTestSuite extends MatcherSuiteBase {
-  private def matcherConfig = ConfigFactory.parseString(s"""waves.dex.events-queue {
-       |  local.enable-storing  = no
-       |  kafka.producer.enable = no
-       |}""".stripMargin)
+  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+    """waves.dex.events-queue {
+      |  local.enable-storing  = no
+      |  kafka.producer.enable = no
+      |}""".stripMargin
+  )
 
-  override protected def nodeConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback)
-  private def orderVersion                        = (Random.nextInt(2) + 1).toByte
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    broadcastAndAwait(IssueEthTx)
+  }
 
-  "check no events are written to queue" - {
-    // Alice issues new asset
-    val aliceAsset = node.signedBroadcast(IssueEthTx.json()).id
-    node.waitForTransaction(aliceAsset)
-    node.waitForHeight(node.height + 1)
-
-    val aliceWavesPair = AssetPair(IssuedAsset(IssueEthTx.id()), Waves)
-    // check assets's balances
-    node.assertAssetBalance(alice.toAddress.toString, aliceAsset, IssueEthTx.quantity)
-    node.assertAssetBalance(matcher.toAddress.toString, aliceAsset, 0)
+  "Check no commands are written to queue" - {
+    "check assets's balances" in {
+      wavesNode1Api.balance(alice, eth) shouldBe IssueEthTx.quantity
+      wavesNode1Api.balance(matcher, eth) shouldBe 0L
+    }
 
     "place an order and wait some time" in {
-      // Alice places sell order
-      val order1 =
-        node.prepareOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 20.days)
+      def test(order: Order): Unit = dex1Api.tryPlace(order) should failWith(528) // FeatureDisabled
 
-      node
-        .expectIncorrectOrderPlacement(
-          order1,
-          expectedStatusCode = 501,
-          expectedStatus = "NotImplemented",
-          expectedMessage = Some("This feature is disabled, contact with the administrator")
-        )
-
-      // Alice places buy order
-      val order2 =
-        node.prepareOrder(alice, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 21.days)
-
-      node
-        .expectIncorrectOrderPlacement(
-          order2,
-          expectedStatusCode = 501,
-          expectedStatus = "NotImplemented",
-          expectedMessage = Some("This feature is disabled, contact with the administrator")
-        )
+      List(
+        mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
+        mkOrder(alice, ethWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant)
+      ).foreach(test)
 
       Thread.sleep(5000)
-      node.getCurrentOffset should be(-1)
-      node.getLastOffset should be(-1)
 
-      docker.killAndStartContainer(dockerNodes().head)
+      dex1Api.currentOffset should be(-1)
+      dex1Api.lastOffset should be(-1)
+    }
 
-      node.getCurrentOffset should be(-1)
-      node.getLastOffset should be(-1)
+    "Commands aren't written to queue after restart" in {
+      restartContainer(dex1Container(), dex1Api)
+
+      dex1Api.currentOffset should be(-1)
+      dex1Api.lastOffset should be(-1)
     }
   }
 }

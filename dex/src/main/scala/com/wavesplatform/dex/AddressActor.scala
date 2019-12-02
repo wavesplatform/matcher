@@ -4,13 +4,13 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
-import com.google.common.cache.{Cache, CacheBuilder, RemovalCause, RemovalNotification}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.NotImplemented
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
+import com.wavesplatform.dex.market.CreateExchangeTransactionActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
@@ -101,10 +101,11 @@ class AddressActor(owner: Address,
     case evt: BalanceUpdated =>
       val toCancel = ordersToDelete(toSpendable(evt))
       if (toCancel.nonEmpty) {
-        log.debug(s"Canceling (not enough balance): $toCancel")
-        toCancel.foreach { x =>
-          storeCanceled(x.assetPair, x.orderId)
-        }
+        val msg = toCancel
+          .map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}")
+          .mkString(", ")
+        log.debug(s"Canceling (not enough balance): doesn't have $msg")
+        toCancel.foreach(x => storeCanceled(x.order.assetPair, x.order.id()))
       }
 
     case PlaceLimitOrder(order)  => placeOrder(order, isMarket = false)
@@ -273,6 +274,8 @@ class AddressActor(owner: Address,
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)
+      if (e.submittedRemaining.order.sender.toAddress == owner)
+        context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, e))
 
     case OrderCanceled(ao, isSystemCancel, _) =>
       val id = ao.order.id()
@@ -345,7 +348,7 @@ class AddressActor(owner: Address,
   /**
     * @param initBalance Contains only changed assets
     */
-  private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
+  private def ordersToDelete(initBalance: SpendableBalance): Queue[InsufficientBalanceOrder] = {
     def keepChanged(requiredBalance: Map[Asset, Long]) = requiredBalance.filter {
       case (requiredAssetId, _) => initBalance.contains(requiredAssetId)
     }
@@ -354,15 +357,16 @@ class AddressActor(owner: Address,
     val (_, r) = activeOrders.values.toSeq
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .view
-      .map { lo =>
-        (lo.order.id(), lo.order.assetPair, keepChanged(lo.requiredBalance))
-      }
-      .foldLeft((initBalance, Queue.empty[QueueEvent.Canceled])) {
-        case ((restBalance, toDelete), (id, assetPair, requiredBalance)) =>
+      .map(lo => (lo.order, keepChanged(lo.requiredBalance)))
+      .foldLeft((initBalance, Queue.empty[InsufficientBalanceOrder])) {
+        case ((restBalance, toDelete), (order, requiredBalance)) =>
+          val id = order.id()
           remove(restBalance, requiredBalance) match {
-            case Some(updatedRestBalance) => (updatedRestBalance, toDelete)
-            case None =>
-              val updatedToDelete = if (pendingCancellation.contains(id)) toDelete else toDelete.enqueue(QueueEvent.Canceled(assetPair, id))
+            case Right(updatedRestBalance) => (updatedRestBalance, toDelete)
+            case Left((insufficientAmount, assetId)) =>
+              val updatedToDelete =
+                if (pendingCancellation.contains(id)) toDelete
+                else toDelete.enqueue(InsufficientBalanceOrder(order, insufficientAmount, assetId))
               (restBalance, updatedToDelete)
           }
       }
@@ -374,14 +378,14 @@ class AddressActor(owner: Address,
     r.withDefaultValue(0)
   }
 
-  private def remove(from: SpendableBalance, xs: SpendableBalance): Option[SpendableBalance] =
-    xs.foldLeft[Option[SpendableBalance]](Some(from)) {
-      case (None, _)      => None
-      case (curr, (_, 0)) => curr
-      case (Some(curr), (assetId, amount)) =>
+  private def remove(from: SpendableBalance, xs: SpendableBalance): Either[(Long, Asset), SpendableBalance] =
+    xs.foldLeft[Either[(Long, Asset), SpendableBalance]](Right(from)) {
+      case (r @ Left(_), _) => r
+      case (curr, (_, 0))   => curr
+      case (Right(curr), (assetId, amount)) =>
         val updatedAmount = curr.getOrElse(assetId, 0L) - amount
-        if (updatedAmount < 0) None
-        else Some(curr.updated(assetId, updatedAmount))
+        if (updatedAmount < 0) Left((updatedAmount, assetId))
+        else Right(curr.updated(assetId, updatedAmount))
     }
 }
 
@@ -422,4 +426,6 @@ object AddressActor {
 
   private case class CancelationExpired(orderId: ByteStr)
   private case class PlacementExpired(orderId: ByteStr)
+
+  private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
 }

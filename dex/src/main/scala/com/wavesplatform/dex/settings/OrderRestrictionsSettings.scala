@@ -16,7 +16,7 @@ case class OrderRestrictionsSettings(stepAmount: Double,
                                      minPrice: Double,
                                      maxPrice: Double) {
 
-  def getJson: Coeval[JsObject] = Coeval.evalOnce {
+  val getJson: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "stepAmount" -> formatValue(stepAmount),
       "minAmount"  -> formatValue(minAmount),

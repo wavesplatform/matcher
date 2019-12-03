@@ -108,7 +108,7 @@ class ExchangeTransactionBroadcastActorSpecification
         maxPendingTime = 5.minute
       ),
       time = time,
-      _ => true,
+      _ => Right(Unit),
       isConfirmed = isConfirmed,
       broadcast = broadcast
     )

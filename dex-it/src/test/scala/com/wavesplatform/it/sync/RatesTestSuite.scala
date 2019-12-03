@@ -85,9 +85,8 @@ class RatesTestSuite extends MatcherSuiteBase {
     node.getRates shouldBe defaultRateMap
 
     // add rate for unexisted asset
-    assertNotFoundAndMessage(
-      node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
-      "The asset unexistedAsset not found")
+    assertNotFoundAndMessage(node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
+                             "The asset unexistedAsset not found")
 
     // add rate for wct
     node.upsertRate(wctAsset, wctRate, expectedStatusCode = Created).message shouldBe s"Rate $wctRate for the asset $wctStr added"
@@ -100,7 +99,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
 
     // update rate for Waves is not allowed
-    node.upsertRate(Waves, wctRateUpdated, expectedStatusCode = BadRequest).message shouldBe "Rate for Waves cannot be changed"
+    node.upsertRate(Waves, wctRateUpdated, expectedStatusCode = BadRequest).message shouldBe "The rate for WAVES cannot be changed"
     node.getRates shouldBe defaultRateMap + (wctAsset -> wctRateUpdated)
 
     // delete rate for wct
@@ -108,7 +107,22 @@ class RatesTestSuite extends MatcherSuiteBase {
     node.getRates shouldBe defaultRateMap
 
     // delete unexisted rate
-    assertNotFoundAndMessage(node.deleteRate(wctAsset), s"Rate for the asset $wctStr is not specified")
+    assertNotFoundAndMessage(node.deleteRate(wctAsset), s"The rate for the asset $wctStr was not specified")
+  }
+
+  "Rates should not be changed by incorrect values" in {
+
+    node
+      .upsertRate(Waves, 0, expectedStatusCode = BadRequest)
+      .message shouldBe "Asset rate should be positive"
+
+    node.getRates shouldBe defaultRateMap
+
+    node
+      .upsertRate(Waves, -0.1, expectedStatusCode = BadRequest)
+      .message shouldBe "Asset rate should be positive"
+
+    node.getRates shouldBe defaultRateMap
   }
 
   "Changing rates affects order validation" in {

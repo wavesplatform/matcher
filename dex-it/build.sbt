@@ -16,3 +16,5 @@ inTask(docker)(
       (Test / sourceDirectory).value / "container" / "wallet"
     )
   ))
+
+javaOptions in Test += s"-Dlogback.configurationFile=${(Test / resourceDirectory).value / "logback-test.xml"}"

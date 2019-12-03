@@ -7,7 +7,7 @@ import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
@@ -90,7 +90,9 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
+      if (AssetPair.assetIdStr(given) == "WAVES")
+        e"""Required one of the following fee asset: ${'required  -> required}. But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
+      else e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Long, given: Long, theAsset: Asset)
@@ -366,6 +368,22 @@ case class OrderInvalidPriceLevel(ord: Order, tickSize: Long)
        |Orders can not be placed into level with price 0"""
     )
 
+case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
+
+case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
+
+case class RateNotFound(theAsset: Asset)
+    extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
+
+case class InvalidJson(fields: List[String])
+  extends MatcherError(
+    request,
+    commonEntity,
+    broken,
+    if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
+    else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
+  )
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -392,6 +410,7 @@ object Entity {
   object fee         extends Entity(17)
   object expiration  extends Entity(18)
   object marketOrder extends Entity(19)
+  object rate        extends Entity(20)
 
   object producer extends Entity(100)
 }

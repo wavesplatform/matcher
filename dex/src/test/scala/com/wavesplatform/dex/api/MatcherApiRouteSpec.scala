@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
@@ -30,6 +30,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
+  private val smartAssetId   = smartAssetTx.id()
+  private val smartAsset     = IssuedAsset(smartAssetId)
 
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
@@ -84,11 +86,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
     val rateCache = RateCache.inMem
     "add rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/${smartAssetTx.id()}"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.Created
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate $rate for the asset ${smartAssetTx.id()} added"
-          rateCache.getAllRates(IssuedAsset(smartAssetTx.id())) shouldBe rate
+          message.value shouldEqual s"Rate $rate for the asset $smartAssetId added"
+          rateCache.getAllRates(smartAsset) shouldBe rate
         }
       },
       apiKey,
@@ -97,11 +99,48 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
     "update rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/${smartAssetTx.id()}"), updatedRate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate for the asset ${smartAssetTx.id()} updated, old value = $rate, new value = $updatedRate"
-          rateCache.getAllRates(IssuedAsset(smartAssetTx.id())) shouldBe updatedRate
+          message.value shouldEqual s"Rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"
+          rateCache.getAllRates(smartAsset) shouldBe updatedRate
+        }
+      },
+      apiKey,
+      rateCache
+    )
+
+    "update rate incorrectly (incorrect body)" in test(
+      { route =>
+        Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          val message = (responseAs[JsValue] \ "message").as[JsString]
+          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
+        }
+      },
+      apiKey,
+      rateCache
+    )
+
+    "update rate incorrectly (incorrect value)" in test(
+      { route =>
+        Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          val message = (responseAs[JsValue] \ "message").as[JsString]
+          message.value shouldEqual "Asset rate should be positive"
+        }
+      },
+      apiKey,
+      rateCache
+    )
+
+    "update rate incorrectly (incorrect content type)" in test(
+      { route =>
+        Put(routePath(s"/settings/rates/$smartAssetId"), HttpEntity(ContentTypes.`text/plain(UTF-8)`, "5"))
+          .withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          val message = (responseAs[JsValue] \ "message").as[JsString]
+          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
         }
       },
       apiKey,
@@ -110,11 +149,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
     "delete rate" in test(
       { route =>
-        Delete(routePath(s"/settings/rates/${smartAssetTx.id()}")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"Rate for the asset ${smartAssetTx.id()} deleted, old value = $updatedRate"
-          rateCache.getAllRates.keySet should not contain IssuedAsset(smartAssetTx.id())
+          message.value shouldEqual s"Rate for the asset $smartAssetId deleted, old value = $updatedRate"
+          rateCache.getAllRates.keySet should not contain smartAsset
         }
       },
       apiKey,
@@ -126,7 +165,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Rate for Waves cannot be changed"
+          message.value shouldEqual s"The rate for WAVES cannot be changed"
         }
       },
       apiKey
@@ -159,7 +198,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Rate for Waves cannot be deleted"
+          message.value shouldEqual s"The rate for WAVES cannot be changed"
         }
       },
       apiKey
@@ -167,7 +206,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
     "delete rates without api key" in test(
       { route =>
-        Delete(routePath("/settings/rates/WAVES"), rate) ~> route ~> check {
+        Delete(routePath("/settings/rates/WAVES")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "Provided API key is not correct"
@@ -178,7 +217,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
 
     "delete rates with wrong api key" in test(
       { route =>
-        Delete(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "Provided API key is not correct"
@@ -186,13 +225,27 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
       },
       "wrongApiKey"
     )
+
+    "delete rate for the asset that doesn't have rate" in test(
+      { route =>
+        rateCache.deleteRate(smartAsset)
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldBe StatusCodes.NotFound
+          val message = (responseAs[JsValue] \ "message").as[JsString]
+          message.value shouldEqual s"The rate for the asset $smartAssetId was not specified"
+        }
+      },
+      apiKey,
+      rateCache
+    )
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val blockchain   = stub[Blockchain]
     val addressActor = TestProbe("address")
-    (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
+
+    (blockchain.assetDescription _).when(smartAsset).onCall((_: IssuedAsset) => Some(smartAssetDesc))
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.GetReservedBalance) => sender ! Map.empty[Asset, Long]

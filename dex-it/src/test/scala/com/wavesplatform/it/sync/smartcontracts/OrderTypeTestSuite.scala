@@ -66,7 +66,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           .id
         node.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
-        assertBadRequest(
+        assertApiErrorRaised(
           node
             .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
             .message
@@ -80,7 +80,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       "set contracts with only SELL type and then place order" in {
         setContract(Some(sco2), alice)
 
-        assertBadRequest(
+        assertApiErrorRaised(
           node
             .placeOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
             .message
@@ -150,7 +150,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         node.waitOrderInBlockchain(bobOrd1)
 
         val txs = node.waitTransactionsByOrder(bobOrd2, 1)
-        node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAccountScript.ErrorCode
+        node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAccountScript.Id
       }
     }
   }

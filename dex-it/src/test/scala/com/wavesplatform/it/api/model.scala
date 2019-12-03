@@ -42,8 +42,8 @@ object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 }
 
-case class MatcherMarketDataInfo(matcherPublicKey: String, markets: Seq[MatcherMarketData])
-object MatcherMarketDataInfo {
+case class MatcherMarketDataInf(matcherPublicKey: String, markets: Seq[MatcherMarketData])
+object MatcherMarketDataInf {
   implicit val marketDataInfoResponseFormat: Format[MatcherMarketDataInfo] = Json.format
 }
 
@@ -265,6 +265,11 @@ object RatesResponse {
 case class MatcherErrorResponse(status: Option[String], message: Option[String])
 object MatcherErrorResponse {
   implicit val matcherErrorResponseFormat: Format[MatcherErrorResponse] = Json.format
+}
+
+case class MatcherMarketDataInfo(matcherPublicKey: String, markets: Seq[MatcherMarketData])
+object MatcherMarketDataInfo {
+  implicit val marketDataInfoResponseFormat: Format[MatcherMarketDataInfo] = Json.format
 }
 
 case class AssetDecimalsInfo(decimals: Byte)

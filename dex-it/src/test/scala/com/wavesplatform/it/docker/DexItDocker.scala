@@ -3,49 +3,56 @@ package com.wavesplatform.it.docker
 import java.io.FileNotFoundException
 import java.nio.file.Paths
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.it.docker.Docker
 
 import scala.io.Source
 import scala.util.Try
 
 object DexItDocker {
-  private val dexImage = "com.wavesplatform/dex-it:latest"
+
+  private val restApiPort         = 6886 // application.conf waves.dex.rest-api.port
+  private val dexBaseConfFileName = "dex-base.conf"
+  private val dexImage            = "com.wavesplatform/dex-it:latest"
+
+  private def getRawConfig(fileName: String): String = {
+    Try(Source fromResource fileName).getOrElse { throw new FileNotFoundException(s"Resource '$fileName'") }.mkString
+  }
 
   def createContainer(client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config): DexContainer = {
+
     val number   = getNumber(name)
     val basePath = "/opt/waves-dex"
-    val id = client.create(
-      number,
-      name,
-      dexImage,
-      Map(
-        "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
-        "WAVES_DEX_OPTS"       -> s" -J-Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml -Dsun.zip.disableMemoryMapping=true"
+
+    val id =
+      client.create(
+        number = number,
+        name = name,
+        imageName = dexImage,
+        env = Map(
+          "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
+          "WAVES_DEX_OPTS"       -> s" -J-Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml -Dsun.zip.disableMemoryMapping=true"
+        )
       )
-    )
 
-    val rawBaseConfig = Try(Source.fromResource(s"nodes/$name.conf"))
-      .getOrElse(throw new FileNotFoundException(s"Resource 'nodes/$name.conf'"))
-      .mkString
-
-    val baseConfig = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory.parseString(rawBaseConfig)).resolve()
-    val r = new DexContainer(
-      id = id,
-      number = number,
-      name = name,
-      basePath = basePath,
-      restApiPort = baseConfig.getInt("waves.dex.rest-api.port")
-    )
+    val dexContainer =
+      new DexContainer(
+        id = id,
+        number = number,
+        name = name,
+        basePath = basePath,
+        restApiPort = restApiPort
+      )
 
     Seq(
-      (s"$name.conf", rawBaseConfig, false),
+      (dexBaseConfFileName, getRawConfig(s"dex-servers/$dexBaseConfFileName"), false),
+      (s"$name.conf", getRawConfig(s"dex-servers/$name.conf"), false),
       ("run.conf", runConfig.resolve().root().render(), true),
       ("suite.conf", initialSuiteConfig.resolve().root().render(), true)
-    ).foreach { case (fileName, content, logContent) => client.writeFile(r, Paths.get(basePath, fileName), content, logContent) }
+    ).foreach { case (fileName, content, logContent) => client.writeFile(dexContainer, Paths.get(basePath, fileName), content, logContent) }
 
-    client.addKnownContainer(r)
-    r
+    client.addKnownContainer(dexContainer)
+    dexContainer
   }
 
   private def getNumber(name: String): Int = {

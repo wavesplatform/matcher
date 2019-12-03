@@ -86,6 +86,7 @@ abstract class MatcherSuiteBase
   protected val internalDockerClient: Coeval[com.wavesplatform.dex.it.docker.Docker] = Coeval.evalOnce {
     com.wavesplatform.dex.it.docker.Docker(getClass)
   }
+
   override protected def dockerClient: com.wavesplatform.dex.it.docker.Docker = internalDockerClient()
 
   // Waves miner node
@@ -116,9 +117,11 @@ abstract class MatcherSuiteBase
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
+
   private val cachedDex1ApiAddress = CachedData {
     dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
   }
+
   protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex1ApiAddress.get())
   protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex1ApiAddress.get()))
 

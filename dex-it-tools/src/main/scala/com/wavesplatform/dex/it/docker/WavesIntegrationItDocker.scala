@@ -3,12 +3,16 @@ package com.wavesplatform.dex.it.docker
 import java.io.FileNotFoundException
 import java.nio.file.Paths
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 
 import scala.io.Source
 import scala.util.Try
 
 object WavesIntegrationItDocker {
+
+  private val restApiPort          = 6869 // application.conf waves.rest-api.port
+  private val networkPort          = 6863 // application.conf waves.network.port
+  private val dexGrpcExtensionPort = 6887 // application.conf waves.dex.grpc.integration.port
 
   private val wavesBaseConfFileName = "waves-base.conf"
   private val wavesNodeImage        = "com.wavesplatform/waves-integration-it:latest"
@@ -35,22 +39,19 @@ object WavesIntegrationItDocker {
         netAlias = netAlias
       )
 
-    val rawBaseConfig = getRawConfig(s"nodes/$wavesBaseConfFileName")
-    val baseConfig    = initialSuiteConfig.withFallback(runConfig).withFallback(ConfigFactory parseString rawBaseConfig).resolve()
-
     val wavesNodeContainer =
       new WavesNodeContainer(
         id = id,
         number = number,
         name = name,
         basePath = basePath,
-        restApiPort = baseConfig.getInt("waves.rest-api.port"),
-        networkApiPort = baseConfig.getInt("waves.network.port"),
-        grpcApiPort = baseConfig.getInt("waves.dex.grpc.integration.port")
+        restApiPort = restApiPort,
+        networkApiPort = networkPort,
+        grpcApiPort = dexGrpcExtensionPort
       )
 
     Seq(
-      (wavesBaseConfFileName, rawBaseConfig, false),
+      (wavesBaseConfFileName, getRawConfig(s"nodes/$wavesBaseConfFileName"), false),
       (s"$name.conf", getRawConfig(s"nodes/$name.conf"), false),
       ("run.conf", runConfig.resolve().root().render(), true),
       ("suite.conf", initialSuiteConfig.resolve().root().render(), true)

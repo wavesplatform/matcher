@@ -75,15 +75,15 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 }
 
 object Application {
+
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): (Config, MatcherSettings) = {
+
     import com.wavesplatform.settings._
 
-    val config = loadConfig(external.map(ConfigFactory.parseFile))
-
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("waves.directory", config.getString("waves.directory"))
     System.setProperty("networkaddress.cache.ttl", "0")
 
+    val config   = loadConfig(external map ConfigFactory.parseFile)
     val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 
     // Initialize global var with actual address scheme
@@ -116,22 +116,18 @@ object Application {
     // http://www.eclipse.org/aspectj/doc/released/pdguide/trace.html
     System.setProperty("org.aspectj.tracing.factory", "default")
 
-    args.headOption.getOrElse("") match {
-      case "util"                   => UtilApp.main(args.tail)
-      case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption)
-    }
+    startDEX(args.headOption)
   }
 
-  private[this] def startNode(configFile: Option[String]): Unit = {
-    import com.wavesplatform.settings.Constants
-    val (config, settings) = loadApplicationConfig(configFile.map(new File(_)))
+  private[this] def startDEX(configFile: Option[String]): Unit = {
 
-    val log = LoggerFacade(LoggerFactory.getLogger(getClass))
+    import com.wavesplatform.settings.Constants
+
+    val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }
+    val log                = LoggerFacade(LoggerFactory getLogger getClass)
+
     log.info("Starting...")
-    sys.addShutdownHook {
-      SystemInformationReporter.report(config)
-    }
+    sys.addShutdownHook { SystemInformationReporter.report(config) }
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.addressSchemeCharacter}")

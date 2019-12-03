@@ -102,7 +102,6 @@ class BaseSettingsSpecification extends FlatSpec {
          |      depth-ranges = [1, 5, 333]
          |      default-depth = 5
          |    }
-         |    balance-watching-buffer-interval = 33s
          |    events-queue {
          |      type = "kafka"
          |

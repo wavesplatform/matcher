@@ -115,7 +115,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
         Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Invalid input for the asset rate"
+          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
         }
       },
       apiKey,
@@ -140,7 +140,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with RequestGen with Pat
           .withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Invalid input for the asset rate"
+          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
         }
       },
       apiKey,

@@ -163,7 +163,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
         matcherQueue.storeEvent,
         p => Option(orderBooks.get()).flatMap(_.get(p)),
         p => Option(marketStatuses.get(p)),
-        getActualTickSize = assetPair => matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset).tickSize,
+        getActualTickSize = { assetPair =>
+          matchingRulesCache
+            .getDenormalizedRuleForNextOrder(assetPair, matcherQueue.lastProcessedOffset)
+            .tickSize
+        },
         validateOrder,
         orderBooksSnapshotCache,
         settings,
@@ -260,7 +264,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               new AddressActor(
                 address,
                 context.utx.spendableBalance(address, _),
-                5.seconds,
+                settings.actorResponseTimeout,
                 context.time,
                 orderDB,
                 id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,

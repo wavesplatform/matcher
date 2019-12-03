@@ -23,7 +23,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{AsyncCompletionHandler, Request, RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.{Json, Writes}
+import play.api.libs.json.{JsObject, Json, Writes}
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -37,13 +37,13 @@ object AsyncMatcherHttpApi extends Assertions {
   val DefaultMatcherFee: Int = 300000
 
   def cancelRequest(sender: KeyPair, orderId: String): CancelOrderRequest = {
-    val req       = CancelOrderRequest(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
+    val req = CancelOrderRequest(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }
 
   def batchCancelRequest(sender: KeyPair, timestamp: Long): CancelOrderRequest = {
-    val req       = CancelOrderRequest(sender, None, Some(timestamp), Array.emptyByteArray)
+    val req = CancelOrderRequest(sender, None, Some(timestamp), Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }
@@ -115,10 +115,10 @@ object AsyncMatcherHttpApi extends Assertions {
         case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
             case Success(mr) if pred(mr) => Success(true)
-            case Failure(f)              => Failure(new RuntimeException(s"Failed to parse response: $f"))
+            case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
-        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+        case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
     }
 
@@ -130,10 +130,10 @@ object AsyncMatcherHttpApi extends Assertions {
         case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
             case Success(mr) if pred(mr) => Success(true)
-            case Failure(f)              => Failure(new RuntimeException(s"Failed to parse response: $f"))
+            case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
-        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+        case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
     def waitTransactionsByOrder(orderId: String, min: Int, retryInterval: FiniteDuration = 1.second): Future[Seq[ExchangeTransaction]] =
@@ -147,7 +147,9 @@ object AsyncMatcherHttpApi extends Assertions {
       waitTransactionsByOrder(orderId, 1, retryInterval)
         .flatMap { txs =>
           assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
-          Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
+          Future.sequence {
+            txs.map(tx => waitForTransaction(tx.id, retryInterval))
+          }
         }
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
@@ -172,7 +174,7 @@ object AsyncMatcherHttpApi extends Assertions {
         case Failure(UnexpectedStatusCodeException(_, _, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" =>
           Success(())
         case Failure(cause) => Failure(cause)
-        case Success(resp)  => Failure(UnexpectedStatusCodeException("POST", requestUri, resp.getStatusCode, resp.getResponseBody))
+        case Success(resp) => Failure(UnexpectedStatusCodeException("POST", requestUri, resp.getStatusCode, resp.getResponseBody))
       }
     }
 
@@ -266,7 +268,7 @@ object AsyncMatcherHttpApi extends Assertions {
                      price: Long,
                      fee: Long,
                      version: Byte,
-                     timestamp: Long = System.currentTimeMillis(),
+                     timestamp: Long = System.currentTimeMillis,
                      timeToLive: Duration = 30.days - 1.seconds,
                      feeAsset: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
@@ -275,11 +277,28 @@ object AsyncMatcherHttpApi extends Assertions {
       Order.sign(unsigned, sender)
     }
 
+    def placeOrder(order: JsObject): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook", order).as[MatcherResponse]
+
     def placeOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
     def placeMarketOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
+
+    def placeMarketOrder(sender: KeyPair,
+                         pair: AssetPair,
+                         orderType: OrderType,
+                         amount: Long,
+                         price: Long,
+                         fee: Long,
+                         version: Byte,
+                         timeToLive: Duration = 30.days - 1.seconds,
+                         feeAsset: Asset = Waves,
+                         timestamp: Long = System.currentTimeMillis): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset, timestamp = timestamp)
+      matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
+    }
 
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,
@@ -289,8 +308,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
+                   feeAsset: Asset = Waves,
+                   timestamp: Long = System.currentTimeMillis): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset, timestamp = timestamp)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
@@ -304,7 +324,7 @@ object AsyncMatcherHttpApi extends Assertions {
             case None =>
               Try(parse(responseBody).as[MatcherStatusResponseWithFee]) match {
                 case Success(mr) if mr.status == expectedStatus => Success(true)
-                case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+                case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
               }
             case _ =>
               Try(parse(responseBody).as[MatcherErrorResponse]) match {
@@ -316,16 +336,19 @@ object AsyncMatcherHttpApi extends Assertions {
 
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
-        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+        case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean): Future[Seq[OrderHistory]] =
       matcherGetWithApiKey(s"/matcher/orders/${sender.toAddress.toString}?activeOnly=$activeOnly").as[Seq[OrderHistory]]
 
     def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
-    def getLastOffset: Future[QueueEventWithMeta.Offset]    = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]
+
+    def getLastOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/lastOffset").as[QueueEventWithMeta.Offset]
+
     def getOldestSnapshotOffset: Future[QueueEventWithMeta.Offset] =
       matcherGetWithApiKey("/matcher/debug/oldestSnapshotOffset").as[QueueEventWithMeta.Offset]
+
     def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =
       matcherGetWithApiKey("/matcher/debug/allSnapshotOffsets").as[Map[String, QueueEventWithMeta.Offset]]
 
@@ -347,10 +370,10 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def matcherState(assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[KeyPair]): Future[MatcherState] =
       for {
-        offset           <- matcherNode.getCurrentOffset
-        snapshots        <- matcherNode.getAllSnapshotOffsets
-        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
-        orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
+        offset <- matcherNode.getCurrentOffset
+        snapshots <- matcherNode.getAllSnapshotOffsets
+        orderBooks <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).zip(matcherNode.marketStatus(x)).map(r => x -> r))
+        orderStatuses <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
         reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
         accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
         orderHistory <- Future.traverse(accountsOrderHistory) {
@@ -370,11 +393,11 @@ object AsyncMatcherHttpApi extends Assertions {
 
         clean {
           api.MatcherState(offset,
-                           TreeMap(snapshots.toSeq: _*),
-                           TreeMap(orderBooks: _*),
-                           TreeMap(orderStatuses: _*),
-                           TreeMap(reservedBalances: _*),
-                           TreeMap(orderHistoryMap.toSeq: _*))
+            TreeMap(snapshots.toSeq: _*),
+            TreeMap(orderBooks: _*),
+            TreeMap(orderStatuses: _*),
+            TreeMap(reservedBalances: _*),
+            TreeMap(orderHistoryMap.toSeq: _*))
         }
       }
 
@@ -416,5 +439,5 @@ object AsyncMatcherHttpApi extends Assertions {
   }
 
   private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
-  private implicit val KeyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
+  private implicit val KeyPairOrd: Ordering[KeyPair] = Ordering.by[KeyPair, String](_.stringRepr)
 }

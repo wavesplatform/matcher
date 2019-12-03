@@ -7,10 +7,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.MatcherStatusResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{LevelResponse, MatcherStatusResponse, MatcherStatusResponseWithFee}
+import com.wavesplatform.it.api.{MatcherStatusResponseWithFee}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -22,10 +21,6 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   val fixedFee = 0.003.waves
   val percentFee = 14
 
-  implicit class DoubleOps(value: Double) {
-    val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long = Normalization.normalizePrice(value, 8, 2)
-  }
 
   def tooLowPrice(orderType: String, price: String): String = {
     s"Price of the $orderType market order ($price) is too low for its full execution with the current market state"
@@ -91,7 +86,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     }
   }
 
-  def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): MatcherStatusResponse = {
+  def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): MatcherStatusResponseWithFee = {
     node.waitOrderStatus(pair, node.placeMarketOrder(sender, pair, orderType, amount, price, fee = fixedFee).message.id
       , "Filled"
     )

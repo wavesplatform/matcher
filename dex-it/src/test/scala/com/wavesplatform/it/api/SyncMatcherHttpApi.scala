@@ -175,8 +175,8 @@ object SyncMatcherHttpApi extends Assertions {
       sync(async(m).tradingMarkets(), waitTime)
 
     def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MatcherMarketData] =
-      tradingMarkets(waitTime).markets.find(marketData =>
-        marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
+      tradingMarkets(waitTime).markets.find(MatcherMarketData =>
+        MatcherMarketData.amountAsset == assetPair.amountAssetStr && MatcherMarketData.priceAsset == assetPair.priceAssetStr)
 
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
@@ -195,9 +195,9 @@ object SyncMatcherHttpApi extends Assertions {
                                      timeToLive: Duration = 30.days - 1.seconds,
                                      expectedMessage: Option[String] = None): Boolean =
       expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive),
-                                    400,
-                                    "OrderRejected",
-                                    expectedMessage)
+        400,
+        "OrderRejected",
+        expectedMessage)
 
     def expectCancelRejected(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
@@ -247,8 +247,8 @@ object SyncMatcherHttpApi extends Assertions {
                      version: Byte = 1: Byte,
                      timeToLive: Duration = 30.days - 1.seconds,
                      feeAsset: Asset = Waves,
+                     creationTime: Long = System.currentTimeMillis,
                      matcherFeeAssetId: Asset = Waves): Order = {
-      val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
 
       val unsigned =

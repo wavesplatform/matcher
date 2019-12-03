@@ -155,9 +155,6 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 
-    def orderBook(assetPair: AssetPair, depth: Int): Future[OrderBookResponse] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}?depth=$depth").as[OrderBookResponse]
-
     def deleteOrderBook(assetPair: AssetPair): Future[MessageMatcherResponse] =
       retrying(_delete(s"$matcherApiEndpoint/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(), statusCode = 202)
         .as[MessageMatcherResponse]
@@ -233,6 +230,9 @@ object AsyncMatcherHttpApi extends Assertions {
     def reservedBalance(sender: KeyPair): Future[Map[String, Long]] =
       matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
 
+    def orderBook(assetPair: AssetPair, depth: Int): Future[OrderBookResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}?depth=$depth").as[OrderBookResponse]
+
     def tradableBalance(sender: KeyPair, assetPair: AssetPair): Future[Map[String, Long]] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.toAddress.toString}").as[Map[String, Long]]
 
@@ -268,7 +268,7 @@ object AsyncMatcherHttpApi extends Assertions {
                      price: Long,
                      fee: Long,
                      version: Byte,
-                     timestamp: Long = System.currentTimeMillis,
+                     timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds,
                      feeAsset: Asset = Waves): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
@@ -276,12 +276,6 @@ object AsyncMatcherHttpApi extends Assertions {
         Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version, feeAsset)
       Order.sign(unsigned, sender)
     }
-
-    def placeOrder(order: JsObject): Future[MatcherResponse] =
-      matcherPost("/matcher/orderbook", order).as[MatcherResponse]
-
-    def placeOrder(order: Order): Future[MatcherResponse] =
-      matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
     def placeMarketOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
@@ -300,6 +294,12 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost("/matcher/orderbook/market", order.json()).as[MatcherResponse]
     }
 
+    def placeOrder(order: Order): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
+
+    def placeOrder(order: JsObject): Future[MatcherResponse] =
+      matcherPost("/matcher/orderbook", order).as[MatcherResponse]
+
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,
                    orderType: OrderType,
@@ -308,10 +308,13 @@ object AsyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   feeAsset: Asset = Waves,
-                   timestamp: Long = System.currentTimeMillis): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset, timestamp = timestamp)
+                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
+    }
+
+    def orderbookInfo(assetPair: AssetPair): Future[MatcherOrderbookInfo] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[MatcherOrderbookInfo]
     }
 
     def expectIncorrectOrderPlacement(order: Order,
@@ -423,10 +426,6 @@ object AsyncMatcherHttpApi extends Assertions {
         _delete(s"$matcherApiEndpoint/matcher/settings/rates/${AssetPair.assetIdStr(asset)}").withApiKey(matcherNode.apiKey).build(),
         statusCode = expectedStatusCode
       ).as[RatesResponse]
-    }
-
-    def orderbookInfo(assetPair: AssetPair): Future[MatcherOrderbookInfo] = {
-      matcherGet(s"/matcher/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/info").as[MatcherOrderbookInfo]
     }
   }
 

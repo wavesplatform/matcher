@@ -169,7 +169,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       price = 50000L,
       fee = 150L,
       version = 3: Byte,
-      feeAsset = IssuedAsset(BtcId)
+      feeAssetId = IssuedAsset(BtcId)
     )
 
     "only waves supported" in {

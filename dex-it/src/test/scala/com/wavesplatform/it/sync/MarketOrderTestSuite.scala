@@ -82,7 +82,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
           price = price,
           version = 3: Byte,
           fee = getFee(feeMode),
-          timestamp = System.currentTimeMillis + idx)
+          creationTime = System.currentTimeMillis + idx)
     }
   }
 

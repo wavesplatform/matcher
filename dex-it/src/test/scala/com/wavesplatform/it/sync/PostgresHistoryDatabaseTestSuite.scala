@@ -226,7 +226,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
-    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, matcherFeeAssetId = btc, version = 3)
+    def sellOrder: Order = node.prepareOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.price, fee = 0.00000030.btc, feeAssetId = btc, version = 3)
     val buyOrder         = node.placeOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.price, fee = 0.00001703.eth, feeAsset = eth, version = 3).message.id
 
     val sellOrder1 = node.placeOrder(sellOrder).message.id

@@ -55,9 +55,6 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       sync(async(m).orderBook(assetPair))
 
-    def orderBook(assetPair: AssetPair, depth: Int): OrderBookResponse =
-      sync(async(m).orderBook(assetPair, depth))
-
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Boolean =
       Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId), OrderRequestAwaitTime)
 
@@ -85,12 +82,6 @@ object SyncMatcherHttpApi extends Assertions {
     def activeOrderHistory(sender: KeyPair): Seq[OrderHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly = Some(true)))
 
-    def placeOrder(order: JsObject): MatcherResponse =
-      sync(async(m).placeOrder(order))
-
-    def placeOrder(order: Order): MatcherResponse =
-      sync(async(m).placeOrder(order))
-
     def placeMarketOrder(order: Order): MatcherResponse =
       sync(async(m).placeMarketOrder(order))
 
@@ -106,6 +97,10 @@ object SyncMatcherHttpApi extends Assertions {
                          creationTime: Long = System.currentTimeMillis()): MatcherResponse =
       sync(async(m).placeMarketOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset, creationTime))
 
+
+    def placeOrder(order: Order): MatcherResponse =
+      sync(async(m).placeOrder(order))
+
     def placeOrder(sender: KeyPair,
                    pair: AssetPair,
                    orderType: OrderType,
@@ -114,9 +109,9 @@ object SyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   feeAsset: Asset = Waves,
-                   timestamp: Long = System.currentTimeMillis): MatcherResponse =
-      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset, timestamp))
+                   creationTime: Long = System.currentTimeMillis,
+                   feeAsset: Asset = Waves): MatcherResponse =
+      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive, feeAsset))
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponseWithFee =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
@@ -173,10 +168,6 @@ object SyncMatcherHttpApi extends Assertions {
 
     def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MatcherMarketDataInfo =
       sync(async(m).tradingMarkets(), waitTime)
-
-    def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MatcherMarketData] =
-      tradingMarkets(waitTime).markets.find(MatcherMarketData =>
-        MatcherMarketData.amountAsset == assetPair.amountAssetStr && MatcherMarketData.priceAsset == assetPair.priceAssetStr)
 
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
@@ -238,6 +229,9 @@ object SyncMatcherHttpApi extends Assertions {
     def matcherPost[A: Writes](path: String, body: A, waitTime: Duration = RequestAwaitTime): Response =
       sync(async(m).matcherPost(path, body), waitTime)
 
+    def placeOrder(order: JsObject): MatcherResponse =
+      sync(async(m).placeOrder(order))
+
     def prepareOrder(sender: KeyPair,
                      pair: AssetPair,
                      orderType: OrderType,
@@ -246,9 +240,8 @@ object SyncMatcherHttpApi extends Assertions {
                      fee: Long = 300000L,
                      version: Byte = 1: Byte,
                      timeToLive: Duration = 30.days - 1.seconds,
-                     feeAsset: Asset = Waves,
                      creationTime: Long = System.currentTimeMillis,
-                     matcherFeeAssetId: Asset = Waves): Order = {
+                     feeAssetId: Asset = Waves): Order = {
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
 
       val unsigned =
@@ -264,10 +257,17 @@ object SyncMatcherHttpApi extends Assertions {
           fee,
           Proofs.empty,
           version,
-          feeAsset
+          feeAssetId
         )
       Order.sign(unsigned, sender)
     }
+
+    def orderBook(assetPair: AssetPair, depth: Int): OrderBookResponse =
+      sync(async(m).orderBook(assetPair, depth))
+
+    def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MatcherMarketData] =
+      tradingMarkets(waitTime).markets.find(MatcherMarketData =>
+        MatcherMarketData.amountAsset == assetPair.amountAssetStr && MatcherMarketData.priceAsset == assetPair.priceAssetStr)
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)

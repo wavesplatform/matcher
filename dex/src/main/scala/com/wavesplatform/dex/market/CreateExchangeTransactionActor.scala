@@ -17,9 +17,10 @@ class CreateExchangeTransactionActor(createTransaction: CreateTransaction) exten
 
   override def receive: Receive = {
     case OrderExecutedObserved(sender, event) =>
+      val sameOwner = event.counter.order.sender == event.submitted.order.sender
       log.debug(
-        s"Execution observed at $sender for OrderExecuted(${event.submitted.order.id()}, ${event.counter.order.id()}), amount=${event.executedAmount})")
-      if (pendingEvents.contains(event)) {
+        s"Execution observed at $sender for OrderExecuted(${event.submitted.order.id()}, ${event.counter.order.id()}), amount=${event.executedAmount})${if (sameOwner) " Same owner for both orders" else ""}")
+      if (sameOwner || pendingEvents.contains(event)) {
         import event.{counter, submitted}
         createTransaction(event) match {
           case Right(tx) =>

@@ -8,8 +8,7 @@ import com.wavesplatform.dex.api._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
-import com.wavesplatform.dex.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderCancelFailed}
-import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -19,6 +18,7 @@ import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import kamon.Kamon
+import mouse.any._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
@@ -28,7 +28,6 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
-                     createTransaction: CreateTransaction,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -125,25 +124,15 @@ class OrderBookActor(owner: ActorRef,
   private def processEvents(events: Iterable[Event]): Unit = {
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
+    events.foreach(addressActor ! _.unsafeTap(logEvent))
+  }
 
-    events.foreach { e =>
-      e match {
-        case Events.OrderAdded(order, _)                    => log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
-        case Events.OrderCanceled(order, isSystemCancel, _) => log.info(s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)")
-        case oe @ Events.OrderExecuted(submitted, counter, timestamp) =>
-          log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})")
-          createTransaction(oe) match {
-            case Right(tx) =>
-              log.info(s"Created transaction: $tx")
-              context.system.eventStream.publish(ExchangeTransactionCreated(tx))
-            case Left(ex) =>
-              log.warn(s"""Can't create tx: $ex
-                   |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
-                   |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
-          }
-      }
-
-      addressActor ! e
+  private def logEvent(e: Event): Unit = log.info {
+    import Events._
+    e match {
+      case e: OrderAdded    => s"OrderAdded(${e.order.order.id()}, amount=${e.order.amount})"
+      case e: OrderCanceled => s"OrderCanceled(${e.acceptedOrder.order.id()}, system=${e.isSystemCancel})"
+      case e: OrderExecuted => s"OrderExecuted(s=${e.submitted.order.id()}, c=${e.counter.order.id()}, amount=${e.executedAmount}, ts=${e.timestamp})"
     }
   }
 
@@ -193,7 +182,6 @@ object OrderBookActor {
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
             settings: MatcherSettings,
-            createTransaction: CreateTransaction,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -206,7 +194,6 @@ object OrderBookActor {
         assetPair,
         updateSnapshot,
         updateMarketStatus,
-        createTransaction,
         time,
         matchingRules,
         updateCurrentMatchingRules,

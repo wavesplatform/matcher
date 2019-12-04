@@ -107,7 +107,6 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
       settings,
-      transactionCreator.createTransaction,
       context.time,
       matchingRules = matchingRulesCache.getMatchingRules(assetPair),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
@@ -246,6 +245,11 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       context.blockchain.assetDescription
     ),
     MatcherActor.name
+  )
+
+  context.actorSystem.actorOf(
+    CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
+    CreateExchangeTransactionActor.name
   )
 
   private lazy val historyRouter = settings.orderHistory.map { orderHistorySettings =>

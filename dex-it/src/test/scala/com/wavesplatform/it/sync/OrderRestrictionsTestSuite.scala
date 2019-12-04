@@ -6,7 +6,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
+import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import play.api.libs.json.Json
 
 class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 
@@ -36,6 +37,30 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     Seq(IssueUsdTx, IssueWctTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_)).foreach { tx =>
       node.waitForTransaction(tx.id)
     }
+  }
+
+  "order should be rejected with correct code and message when price is more then Long volume" in {
+
+    val tooHighPrice = "10000000000000000000"
+
+    assertBadRequestAndMessage(
+      node.placeOrder(
+        node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000000000000000L).json.value() ++ Json.obj("price" -> tooHighPrice)
+      ),
+      "The provided JSON contains invalid fields: /price. Check the documentation"
+    )
+  }
+
+  "order should be rejected with correct code and message when amount is more then Long volume" in {
+
+    val tooLargeAmount = "10000000000000000000"
+
+    assertBadRequestAndMessage(
+      node.placeOrder(
+        node.prepareOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000L).json.value() ++ Json.obj("amount" -> tooLargeAmount)
+      ),
+      "The provided JSON contains invalid fields: /amount. Check the documentation"
+    )
   }
 
   "order info returns information event there is no such order book" in {

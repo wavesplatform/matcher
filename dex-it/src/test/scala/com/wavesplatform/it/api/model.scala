@@ -32,6 +32,11 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
+case class MatchingRules(tickSize: String)
+object MatchingRules {
+  implicit val matchingRules: Format[MatchingRules] = Json.format
+}
+
 case class OrderRestrictions(minAmount: String,
                              maxAmount: String,
                              stepAmount: String,

@@ -112,7 +112,6 @@ abstract class MatcherSuiteBase
   // Dex server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
     dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
-      .withFallback(ConfigFactory.parseString(s"waves.dex.rest-order-limit = ${DexTestConfig.orderLimit}"))
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))

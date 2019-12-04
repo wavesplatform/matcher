@@ -22,7 +22,6 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
                     |  broadcast-until-confirmed = yes
                     |  interval = 20s
                     |}""".stripMargin)
-      .withFallback(dexWavesGrpcConfig(wavesNode2Container())) // DEX connects to a waves validator node
 
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {

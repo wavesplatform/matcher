@@ -8,7 +8,7 @@ import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
-import com.wavesplatform.dex.it.docker.{Docker, DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
+import com.wavesplatform.dex.it.docker.{DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.it.test.{HasWavesNode, WavesNodeApiExtensions}
@@ -77,7 +77,7 @@ trait ItTestSuiteBase
   }
 
   protected def createWavesNode(name: String, runConfig: Config, suiteInitialConfig: Config): WavesNodeContainer =
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(Docker.wavesNodesDomain))
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig)
 
   override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

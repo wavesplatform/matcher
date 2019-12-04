@@ -21,8 +21,7 @@ object WavesIntegrationItDocker {
     Try(Source fromResource fileName).getOrElse { throw new FileNotFoundException(s"Resource '$fileName'") }.mkString
   }
 
-  def createContainer(
-      client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config, netAlias: Option[String] = None): WavesNodeContainer = {
+  def createContainer(client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config): WavesNodeContainer = {
 
     val number   = getNumber(name)
     val basePath = "/opt/waves"
@@ -36,7 +35,7 @@ object WavesIntegrationItDocker {
           "WAVES_NODE_CONFIGPATH" -> s"$basePath/$name.conf",
           "WAVES_OPTS"            -> s" -Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml"
         ),
-        netAlias = netAlias
+        netAlias = Some(Docker.wavesNodesDomain)
       )
 
     val wavesNodeContainer =

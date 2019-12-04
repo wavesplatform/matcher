@@ -166,7 +166,7 @@ object SyncMatcherHttpApi extends Assertions {
     def tradableBalance(sender: KeyPair, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).tradableBalance(sender, assetPair), waitTime)
 
-    def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MatcherMarketDataInfo =
+    def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MarketDataInfo =
       sync(async(m).tradingMarkets(), waitTime)
 
     def expectIncorrectOrderPlacement(order: Order,

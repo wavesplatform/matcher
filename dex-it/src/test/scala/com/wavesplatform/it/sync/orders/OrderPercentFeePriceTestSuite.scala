@@ -162,7 +162,7 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      assertBadRequest(
+      assertBadRequestAndMessage(
         node.placeOrder(
           createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString)),
           wavesUsdPair,
@@ -172,11 +172,11 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ))
+        ), "*")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      assertBadRequest(
+      assertBadRequestAndMessage(
         node.placeOrder(
           createAccountWithBalance(fullyAmountWaves -> None, minimalFee -> Some(UsdId.toString)),
           wavesUsdPair,
@@ -186,7 +186,7 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ))
+        ), "*")
     }
   }
 }

@@ -19,7 +19,7 @@ class V2OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(2.
 class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.toByte) {
 
   s"buy order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
-    assertBadRequest(
+    assertBadRequestAndMessage(
       node.placeOrder(
         createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString), minimalFee -> None),
         wavesUsdPair,
@@ -29,11 +29,11 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFee,
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
-      ))
+      ), "")
   }
 
   s"sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
-    assertBadRequest(
+    assertBadRequestAndMessage(
       node.placeOrder(
         createAccountWithBalance(minimalFee -> Some(UsdId.toString), fullyAmountWaves -> None),
         wavesUsdPair,
@@ -43,7 +43,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFee,
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
-      ))
+      ),"*")
   }
 }
 
@@ -178,7 +178,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      assertBadRequest(
+      assertBadRequestAndMessage(
         node.placeOrder(
           createAccountWithBalance(fullyAmountUsd -> Some(UsdId.toString), minimalFee -> None),
           wavesUsdPair,
@@ -187,12 +187,12 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
           price,
           tooLowFee,
           version
-        ))
+        ), "*")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      assertBadRequest(node
-        .placeOrder(createAccountWithBalance(fullyAmountWaves + minimalFee -> None), wavesUsdPair, SELL, fullyAmountWaves, price, tooLowFee, version))
+      assertBadRequestAndMessage(node
+        .placeOrder(createAccountWithBalance(fullyAmountWaves + minimalFee -> None), wavesUsdPair, SELL, fullyAmountWaves, price, tooLowFee, version), "*")
     }
   }
 }

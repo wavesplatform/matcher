@@ -66,7 +66,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       Map(BtcId -> btcRate, EthId -> ethRate)
         .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
 
-      assertBadRequestAndResponse(
+      assertBadRequestAndMessage(
         node.placeOrder(
           sender = bob,
           pair = wavesBtcPair,
@@ -80,7 +80,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         s"Required 0.0000015 $BtcId as fee for this order, but given 0.000001 $BtcId"
       )
 
-      assertBadRequestAndResponse(
+      assertBadRequestAndMessage(
         node.placeOrder(
           sender = bob,
           pair = wavesBtcPair,

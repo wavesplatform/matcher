@@ -132,7 +132,7 @@ object MatcherErrorResponse {
   implicit val matcherErrorResponseFormat: Format[MatcherErrorResponse] = Json.format
 }
 
-case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MatcherMarketData])
+case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
 
 object MarketDataInfo {
   implicit val marketDataInfoResponseFormat: Format[MarketDataInfo] = Json.format
@@ -150,7 +150,8 @@ case class MarketData(amountAsset: String,
                       priceAssetName: String,
                       created: Long,
                       amountAssetInfo: Option[AssetDecimalsInfo],
-                      priceAssetInfo: Option[AssetDecimalsInfo])
+                      priceAssetInfo: Option[AssetDecimalsInfo],
+                      matchingRules: MatchingRules)
 
 object MarketData {
   implicit val marketData: Format[MarketData] = Json.format

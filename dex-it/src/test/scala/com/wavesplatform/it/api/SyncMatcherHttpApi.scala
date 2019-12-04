@@ -265,9 +265,9 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair, depth: Int): OrderBookResponse =
       sync(async(m).orderBook(assetPair, depth))
 
-    def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MatcherMarketData] =
-      tradingMarkets(waitTime).markets.find(MatcherMarketData =>
-        MatcherMarketData.amountAsset == assetPair.amountAssetStr && MatcherMarketData.priceAsset == assetPair.priceAssetStr)
+    def tradingPairInfo(assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Option[MarketData] =
+      tradingMarkets(waitTime).markets.find(MarketData =>
+        MarketData.amountAsset == assetPair.amountAssetStr && MarketData.priceAsset == assetPair.priceAssetStr)
 
     def ordersByAddress(sender: KeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)

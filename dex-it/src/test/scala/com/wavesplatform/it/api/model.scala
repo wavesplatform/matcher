@@ -32,6 +32,16 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
+case class OrderRestrictions(minAmount: String,
+                             maxAmount: String,
+                             stepAmount: String,
+                             minPrice: String,
+                             maxPrice: String,
+                             stepPrice: String)
+object OrderRestrictions {
+  implicit val orderRestrictions: Format[OrderRestrictions] = Json.format
+}
+
 // TODO rename entities named "MatcherSomething" to "Something" after entities from model of node will be relocated
 case class MatcherOrderbookInfo(matchingRules: MatchingRules,
                                 restrictions: Option[OrderRestrictions])

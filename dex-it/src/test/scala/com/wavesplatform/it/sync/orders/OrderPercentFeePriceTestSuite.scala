@@ -172,7 +172,7 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ), "*")
+        ), s"Required 4.5 ${UsdId.toString} as fee for this order, but given 4.49 ${UsdId.toString}")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -186,7 +186,7 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ), "*")
+        ), s"Required 4.5 ${UsdId.toString} as fee for this order, but given 4.49 ${UsdId.toString}")
     }
   }
 }

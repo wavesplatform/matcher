@@ -29,7 +29,9 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFee,
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
-      ), "")
+      ),
+      ""
+    )
   }
 
   s"sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
@@ -43,7 +45,9 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         minimalFee,
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
-      ),"*")
+      ),
+      "*"
+    )
   }
 }
 
@@ -187,12 +191,23 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
           price,
           tooLowFee,
           version
-        ), "*")
+        ),
+        "Required 37.5 WAVES as fee for this order, but given 37.49999 WAVES"
+      )
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
-      assertBadRequestAndMessage(node
-        .placeOrder(createAccountWithBalance(fullyAmountWaves + minimalFee -> None), wavesUsdPair, SELL, fullyAmountWaves, price, tooLowFee, version), "*")
+      assertBadRequestAndMessage(
+        node
+          .placeOrder(createAccountWithBalance(fullyAmountWaves + minimalFee -> None),
+                      wavesUsdPair,
+                      SELL,
+                      fullyAmountWaves,
+                      price,
+                      tooLowFee,
+                      version),
+        "Required 37.5 WAVES as fee for this order, but given 37.49999 WAVES"
+      )
     }
   }
 }

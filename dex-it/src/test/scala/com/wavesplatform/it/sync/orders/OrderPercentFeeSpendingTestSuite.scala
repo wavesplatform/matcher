@@ -172,7 +172,7 @@ abstract class OrderPercentFeeSpendingTestSuite(version: Byte, feeAsset: Asset =
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ), "*")
+        ), s"Required 4.5 ${UsdId.toString} as fee for this order, but given 4.49 ${UsdId.toString}")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -185,7 +185,7 @@ abstract class OrderPercentFeeSpendingTestSuite(version: Byte, feeAsset: Asset =
           price,
           tooLowFeeWaves,
           version
-        ), "*")
+        ), s"Required 3.75 WAVES as fee for this order, but given 3.7499999 WAVES")
     }
   }
 }

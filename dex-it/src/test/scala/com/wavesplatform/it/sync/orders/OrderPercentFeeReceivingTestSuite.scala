@@ -172,7 +172,7 @@ abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset 
           tooLowFeeWaves,
           version,
           feeAsset = feeAsset
-        ), "*")
+        ), "Required 37.5 WAVES as fee for this order, but given 37.49999 WAVES")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -186,7 +186,7 @@ abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset 
           tooLowFee,
           version,
           feeAsset = feeAsset
-        ), "*")
+        ), "Required 37.5 WAVES as fee for this order, but given 37.49999 WAVES")
     }
   }
 }

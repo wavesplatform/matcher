@@ -43,7 +43,7 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
-  private val topicName = s"dex-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
+  private val topicName = s"dex-${getClass.hashCode()}-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
 
   protected override def createDocker: Docker = new Docker(
     imageName = "com.wavesplatform/dex-it:latest",

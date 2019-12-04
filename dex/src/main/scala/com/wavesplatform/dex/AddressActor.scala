@@ -383,8 +383,7 @@ class AddressActor(owner: Address,
       case (curr, (_, 0))   => curr
       case (Right(curr), (assetId, amount)) =>
         val updatedAmount = curr.getOrElse(assetId, 0L) - amount
-        if (updatedAmount < 0) Left((updatedAmount, assetId))
-        else Right(curr.updated(assetId, updatedAmount))
+        Either.cond(updatedAmount >= 0, curr.updated(assetId, updatedAmount), (updatedAmount, assetId))
     }
 }
 

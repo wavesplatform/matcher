@@ -10,6 +10,11 @@ import play.api.libs.json.Json
 
 import scala.collection.mutable
 
+/**
+  * This actor waits for OrderExecuted event observed in both owners of orders and then creates an ExchangeTransaction
+  * and broadcasts it further.
+  * If both orders have the same owner, an ExchangeTransaction is created immediately.
+  */
 class CreateExchangeTransactionActor(createTransaction: CreateTransaction) extends Actor with ScorexLogging {
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
 

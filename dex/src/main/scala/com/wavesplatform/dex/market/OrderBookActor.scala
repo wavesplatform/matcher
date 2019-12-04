@@ -18,6 +18,7 @@ import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import kamon.Kamon
+import mouse.any._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
@@ -123,18 +124,15 @@ class OrderBookActor(owner: ActorRef,
   private def processEvents(events: Iterable[Event]): Unit = {
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
+    events.foreach(addressActor ! _.unsafeTap(logEvent))
+  }
 
-    events.foreach { e =>
-      log.info(e match {
-        case Events.OrderAdded(order, _) =>
-          s"OrderAdded(${order.order.id()}, amount=${order.amount})"
-        case Events.OrderCanceled(order, isSystemCancel, _) =>
-          s"OrderCanceled(${order.order.idStr()}, system=$isSystemCancel)"
-        case oe @ Events.OrderExecuted(submitted, counter, timestamp) =>
-          s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${oe.executedAmount})"
-      })
-
-      addressActor ! e
+  private def logEvent(e: Event): Unit = log.info {
+    import Events._
+    e match {
+      case e: OrderAdded    => s"OrderAdded(${e.order.order.id()}, amount=${e.order.amount})"
+      case e: OrderCanceled => s"OrderCanceled(${e.acceptedOrder.order.id()}, system=${e.isSystemCancel})"
+      case e: OrderExecuted => s"OrderExecuted(s=${e.submitted.order.id()}, c=${e.counter.order.id()}, amount=${e.executedAmount}, ts=${e.timestamp})"
     }
   }
 

@@ -161,7 +161,8 @@ case class MarketData(amountAsset: String,
                       created: Long,
                       amountAssetInfo: Option[AssetDecimalsInfo],
                       priceAssetInfo: Option[AssetDecimalsInfo],
-                      matchingRules: MatchingRules)
+                      matchingRules: MatchingRules,
+                      restrictions: Option[OrderRestrictions])
 
 object MarketData {
   implicit val marketData: Format[MarketData] = Json.format

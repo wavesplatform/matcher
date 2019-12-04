@@ -10,9 +10,9 @@ import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.instances.map._
+import cats.instances.map.catsKernelStdMonoidForMap
 import cats.instances.string._
-import cats.kernel.Monoid
+import cats.syntax.monoid._
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
@@ -21,6 +21,7 @@ import com.spotify.docker.client.shaded.com.google.common.collect.ImmutableList
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
+import mouse.any._
 import org.apache.commons.compress.archivers.tar.{TarArchiveEntry, TarArchiveInputStream, TarArchiveOutputStream}
 import org.apache.commons.io.IOUtils
 
@@ -56,66 +57,78 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   /**
     * @return The address inside the network
     */
-  def getInternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = repeatUntilSuccess(10, {
-    val ns = client.inspectContainer(container.id).networkSettings()
-    new InetSocketAddress(ns.networks().get(network().name()).ipAddress(), internalPort)
-  })
+  def getInternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress =
+    repeatUntilSuccess(10, {
+      val ns = client.inspectContainer(container.id).networkSettings()
+      new InetSocketAddress(ns.networks().get(network().name()).ipAddress(), internalPort)
+    })
 
   /**
     * @return The address outside the network, from host machine
     */
-  def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress = repeatUntilSuccess(10, {
-    val ns = client.inspectContainer(container.id).networkSettings()
-    val binding = Option(ns.ports().get(s"$internalPort/tcp"))
-      .map(_.get(0))
-      .getOrElse(throw new IllegalStateException(s"There is no mapping '$internalPort/tcp' for '${container.name}'"))
+  def getExternalSocketAddress(container: DockerContainer, internalPort: Int): InetSocketAddress =
+    repeatUntilSuccess(
+      10, {
+        val ns = client.inspectContainer(container.id).networkSettings()
+        val binding = Option(ns.ports().get(s"$internalPort/tcp"))
+          .map(_.get(0))
+          .getOrElse(throw new IllegalStateException(s"There is no mapping '$internalPort/tcp' for '${container.name}'"))
 
-    new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
-  })
+        new InetSocketAddress("127.0.0.1", binding.hostPort().toInt)
+      }
+    )
 
-  def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
+  def ipForNode(nodeId: Int): String = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
   val network: Coeval[Network] = Coeval.evalOnce {
+
     val id          = Random.nextInt(Int.MaxValue)
     val networkName = s"waves-$id"
 
-    def network: Option[Network] =
+    def getNetwork: Option[Network] =
       try {
         val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
-        if (networks.isEmpty) None else Some(networks.get(0))
+        if (networks.isEmpty) None else Some(networks get 0)
       } catch {
-        case NonFatal(_) => network
+        case NonFatal(_) => getNetwork
       }
 
-    def attempt(rest: Int): Network =
+    def attempt(rest: Int): Network = {
       try {
-        network match {
-          case Some(n) =>
-            val ipam = n
-              .ipam()
-              .config()
-              .asScala
-              .map(n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}")
-              .mkString(", ")
-            log.info(s"Network '${n.name()}' (id: '${n.id()}') is created for '$suiteName', ipam: $ipam")
-            n
+        getNetwork match {
+          case Some(network) =>
+            network unsafeTap { _ =>
+              val ipam =
+                network
+                  .ipam()
+                  .config()
+                  .asScala
+                  .map(n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}")
+                  .mkString(", ")
+
+              log.info(s"Network '${network.name()}' (id: '${network.id()}') is created for '$suiteName', ipam: $ipam")
+            }
+
           case None =>
             log.debug(s"Creating network '$networkName' for '$suiteName'")
             // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
-            val r = client.createNetwork(
-              NetworkConfig
-                .builder()
-                .name(networkName)
-                .ipam(
-                  Ipam
-                    .builder()
-                    .driver("default")
-                    .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
-                    .build()
-                )
-                .checkDuplicate(true)
-                .build())
-            Option(r.warnings()).foreach(log.warn(_))
+            val networkCreation =
+              client.createNetwork(
+                NetworkConfig
+                  .builder()
+                  .name(networkName)
+                  .ipam(
+                    Ipam
+                      .builder()
+                      .driver("default")
+                      .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
+                      .build()
+                  )
+                  .checkDuplicate(true)
+                  .build()
+              )
+
+            Option(networkCreation.warnings).foreach(log.warn(_))
             attempt(rest - 1)
         }
       } catch {
@@ -123,16 +136,20 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
           log.warn(s"Can not create a network for $suiteName", e)
           if (rest == 0) throw e else attempt(rest - 1)
       }
+    }
 
     attempt(5)
   }
 
   def writeFile(container: DockerContainer, to: Path, content: String, logContent: Boolean = false): Unit = {
+
     if (logContent) log.trace(s"${prefix(container)} Write to '$to':\n$content")
+
     val os    = new ByteArrayOutputStream()
     val s     = new TarArchiveOutputStream(os)
     val bytes = content.getBytes(StandardCharsets.UTF_8)
     val entry = new TarArchiveEntry(s"${to.getFileName}")
+
     entry.setSize(bytes.size)
     s.putArchiveEntry(entry)
     s.write(bytes)
@@ -263,6 +280,7 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
   def addKnownContainer(container: DockerContainer): Unit = knownContainers.add(container)
 
   def create(number: Int, name: String, imageName: String, env: Map[String, String], netAlias: Option[String] = None): String = {
+
     val ip            = ipForNode(number)
     val containerName = s"${network().name()}-$name"
 
@@ -270,35 +288,36 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 
     try {
       val containersWithSameName = client.listContainers(DockerClient.ListContainersParam.filter("name", containerName))
+
       if (!containersWithSameName.isEmpty) {
         dumpContainers(containersWithSameName, "Containers with the same name")
         throw new IllegalStateException(s"There is containers with the same name!")
       }
 
-      val hostConfig = HostConfig
-        .builder()
-        .publishAllPorts(true)
-        .build()
+      val hostConfig =
+        HostConfig
+          .builder()
+          .publishAllPorts(true)
+          .build()
 
       // TODO
-      val fixedEnv = Monoid.combine(
-        env,
-        Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
-      )
+      val fixedEnv = env |+| Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
 
-      val containerConfig = ContainerConfig
-        .builder()
-        .image(imageName)
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number, netAlias)).asJava))
-        .hostConfig(hostConfig)
-        .env(fixedEnv.map { case (k, v) => s"$k=$v" }.toList.asJava)
-        .build()
+      val containerConfig =
+        ContainerConfig
+          .builder()
+          .image(imageName)
+          .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(network().name() -> endpointConfigFor(number, netAlias)).asJava))
+          .hostConfig(hostConfig)
+          .env(fixedEnv.map { case (k, v) => s"$k=$v" }.toList.asJava)
+          .build()
 
       log.debug(s"Creating container ${info()} ...")
-      val r = client.createContainer(containerConfig, containerName)
-      Option(r.warnings().asScala).toSeq.flatten.foreach(e => log.warn(s"""Error "$e", ${info(r.id())}"""))
+      val containerCreation = client.createContainer(containerConfig, containerName)
 
-      r.id()
+      Option(containerCreation.warnings.asScala).toSeq.flatten.foreach(e => log.warn(s"""Error "$e", ${info(containerCreation.id())}"""))
+      containerCreation.id()
+
     } catch {
       case NonFatal(e) =>
         log.error(s"Can't create a container ${info()}", e)
@@ -416,7 +435,10 @@ class Docker(suiteName: String = "") extends AutoCloseable with ScorexLogging {
 }
 
 object Docker {
-  private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
+
+  val wavesNodesDomain = "waves.nodes"
+
+  private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now))
 
   def apply(owner: Class[_]): Docker = new Docker(suiteName = owner.getSimpleName)
 }

@@ -22,11 +22,10 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
                     |  broadcast-until-confirmed = yes
                     |  interval = 20s
                     |}""".stripMargin)
-      .withFallback(dexWavesGrpcConfig(wavesNode2Container())) // DEX connects to a waves validator node
 
   // Validator node
   protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no").withFallback(suiteInitialWavesNodeConfig))
+    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no") withFallback suiteInitialWavesNodeConfig)
   }
 
   protected val refreshableWavesNode2ApiAddress = CachedData {

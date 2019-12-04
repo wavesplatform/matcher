@@ -5,7 +5,7 @@ import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.NodeApi
 import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.{WavesIntegrationItDocker, WavesNodeContainer}
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
@@ -16,15 +16,9 @@ import scala.util.Try
 
 class DEXClientFaultToleranceTestSuite extends MatcherSuiteBase {
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  price-assets = [ "$UsdId", "WAVES" ]
-       |  grpc.integration.waves-node-grpc {
-       |    host = ${WavesIntegrationItDocker.wavesNodesDomain}
-       |    port = 6887
-       |  }
-       |}""".stripMargin
-  )
+  override protected val suiteInitialDexConfig: Config = {
+    ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+  }
 
   private val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce { createWavesNode("waves-2") }
 

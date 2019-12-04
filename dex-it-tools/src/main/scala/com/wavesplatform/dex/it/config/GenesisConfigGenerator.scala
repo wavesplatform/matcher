@@ -17,6 +17,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import scala.concurrent.duration.FiniteDuration
 
 object GenesisConfigGenerator {
+
   private type AccountName = String
   private type SeedText    = String
   private type Share       = Long
@@ -47,12 +48,13 @@ object GenesisConfigGenerator {
                              accountAddress: Address)
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
-    val seedHash = item.seedText.getBytes("UTF-8")
-    val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
+
+    val seedBytes = item.seedText.getBytes("UTF-8")
+    val acc       = Wallet.generateNewAccount(seedBytes, item.nonce)
 
     FullAddressInfo(
       seedText = item.seedText,
-      seed = ByteStr(seedHash),
+      seed = ByteStr(seedBytes),
       accountSeed = ByteStr(acc.seed),
       accountPrivateKey = acc.privateKey,
       accountPublicKey = acc.publicKey,
@@ -60,25 +62,26 @@ object GenesisConfigGenerator {
     )
   }
 
-  def generate(genesisGeneratorSettings: Config): Config = {
-    val generatorSettings = genesisGeneratorSettings.as[Settings]("genesis-generator")
+  def generate(genesisGeneratorConfig: Config): Config = {
 
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = generatorSettings.chainId
-    }
+    val generatorSettings = genesisGeneratorConfig.as[Settings]("genesis-generator")
 
-    val shares: Seq[(AccountName, FullAddressInfo, Share)] = generatorSettings.distributions
-      .map { case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount) }
-      .toSeq
-      .sortBy(_._1)
+    AddressScheme.current = new AddressScheme { override val chainId: Byte = generatorSettings.chainId }
 
-    val timestamp = generatorSettings.timestamp.getOrElse(System.currentTimeMillis())
+    val shares: Seq[(AccountName, FullAddressInfo, Share)] =
+      generatorSettings.distributions
+        .map { case (accountName, distributionItem) => (accountName, toFullAddressInfo(distributionItem), distributionItem.amount) }
+        .toSeq
+        .sortBy(_._1)
+
+    val timestamp = generatorSettings.timestamp.getOrElse(System.currentTimeMillis)
 
     val genesisTxs: Seq[GenesisTransaction] = shares.map {
       case (_, addrInfo, part) => GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
     }
 
     val genesisBlock = {
+
       val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
       val genesisSigner = KeyPair(ByteStr.empty)
 
@@ -96,28 +99,29 @@ object GenesisConfigGenerator {
         .explicitGet()
     }
 
-    val settings = GenesisSettings(
-      genesisBlock.timestamp,
-      timestamp,
-      generatorSettings.initialBalance,
-      Some(genesisBlock.signerData.signature),
-      genesisTxs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
-      },
-      generatorSettings.baseTarget,
-      generatorSettings.averageBlockDelay
-    )
+    val settings =
+      GenesisSettings(
+        genesisBlock.timestamp,
+        timestamp,
+        generatorSettings.initialBalance,
+        Some(genesisBlock.signerData.signature),
+        genesisTxs.map { tx =>
+          GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
+        },
+        generatorSettings.baseTarget,
+        generatorSettings.averageBlockDelay
+      )
 
     ConfigFactory.parseString(
       s"""waves.blockchain.custom {
          |  address-scheme-character = "${generatorSettings.chainId.toChar}"
          |  genesis {
-         |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-         |    initial-base-target: ${settings.initialBaseTarget}
          |    timestamp: ${settings.timestamp}
-         |    block-timestamp: ${settings.blockTimestamp}
          |    signature: "${settings.signature.get}"
          |    initial-balance: ${settings.initialBalance}
+         |    initial-base-target: ${settings.initialBaseTarget}
+         |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms
+         |    block-timestamp: ${settings.blockTimestamp}
          |    transactions = [
          |      ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
          |    ]

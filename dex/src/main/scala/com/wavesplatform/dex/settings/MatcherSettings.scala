@@ -92,10 +92,11 @@ object MatcherSettings {
 
     import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
 
-    val addressSchemeCharacter = config
-      .as[String]("address-scheme-character")
-      .headOption
-      .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
+    val addressSchemeCharacter =
+      config
+        .as[String]("address-scheme-character")
+        .headOption
+        .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
 
     val accountStorage  = accountStorageSettingsReader.read(config, "account-storage")
     val wavesNodeGrpc   = config.as[GRPCSettings]("grpc.integration.waves-node-grpc")
@@ -119,14 +120,17 @@ object MatcherSettings {
     val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
     val orderBooksRecoveringTimeout  = config.as[FiniteDuration]("order-books-recovering-timeout")
     val priceAssets                  = config.as[List[String]]("price-assets").map(unsafeParseAsset)
-    val blacklistedAssets = config
-      .as[List[String]]("blacklisted-assets")
-      .map(unsafeParseAsset)
-      .map {
-        case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
-        case x: Asset.IssuedAsset => x
-      }
-      .toSet
+
+    val blacklistedAssets =
+      config
+        .as[List[String]]("blacklisted-assets")
+        .map(unsafeParseAsset)
+        .map {
+          case Asset.Waves          => throw new IllegalArgumentException("Can't blacklist the main coin")
+          case x: Asset.IssuedAsset => x
+        }
+        .toSet
+
     val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
     val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
     val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.grpc.integration.sync
 
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
@@ -26,8 +25,6 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
     timeout = 1.minute,
     interval = 1.second
   )
-
-  override val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString("waves.dex.grpc.integration.host = 0.0.0.0")
 
   private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 

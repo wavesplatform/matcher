@@ -52,6 +52,8 @@ abstract class MatcherSuiteBase
     with PredefinedAccounts
     with ScorexLogging {
 
+  GenesisConfig.setupAddressScheme()
+
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
   }
@@ -78,14 +80,13 @@ abstract class MatcherSuiteBase
     interval = 1.second
   )
 
-  GenesisConfig.setupAddressScheme()
-
   protected def suiteInitialWavesNodeConfig: Config = ConfigFactory.empty()
   protected def suiteInitialDexConfig: Config       = ConfigFactory.empty()
 
   protected val internalDockerClient: Coeval[com.wavesplatform.dex.it.docker.Docker] = Coeval.evalOnce {
     com.wavesplatform.dex.it.docker.Docker(getClass)
   }
+
   override protected def dockerClient: com.wavesplatform.dex.it.docker.Docker = internalDockerClient()
 
   // Waves miner node
@@ -111,14 +112,14 @@ abstract class MatcherSuiteBase
   // Dex server
   protected val dexRunConfig: Coeval[Config] = Coeval.evalOnce {
     dexQueueConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
-      .withFallback(dexWavesGrpcConfig(wavesNode1Container()))
-      .withFallback(ConfigFactory.parseString(s"waves.dex.rest-order-limit = ${DexTestConfig.orderLimit}"))
   }
 
   protected val dex1Container: Coeval[DexContainer] = Coeval.evalOnce(createDex("dex-1"))
+
   private val cachedDex1ApiAddress = CachedData {
     dockerClient.getExternalSocketAddress(dex1Container(), dex1Container().restApiPort)
   }
+
   protected def dex1AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex1ApiAddress.get())
   protected def dex1Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex1ApiAddress.get()))
 
@@ -165,7 +166,7 @@ abstract class MatcherSuiteBase
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig(),
                                 suiteInitialConfig: Config = suiteInitialWavesNodeConfig): WavesNodeContainer = {
-    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig, Some(WavesIntegrationItDocker.wavesNodesDomain))
+    WavesIntegrationItDocker.createContainer(dockerClient)(name, runConfig, suiteInitialConfig)
   }
 
   protected def dexQueueConfig(queueId: Int): Config = {
@@ -178,18 +179,5 @@ abstract class MatcherSuiteBase
                                    |  }
                                    |}""".stripMargin)
     }
-  }
-
-  protected def dexWavesGrpcConfig(target: WavesNodeContainer): Config = {
-    val grpcAddr = dockerClient.getInternalSocketAddress(target, target.grpcApiPort)
-    ConfigFactory
-      .parseString(s"""waves.dex {
-                      |  grpc.integration {
-                      |    waves-node-grpc {
-                      |      host = ${grpcAddr.getAddress.getHostAddress}
-                      |      port = ${grpcAddr.getPort}
-                      |    }
-                      |  }
-                      |}""".stripMargin)
   }
 }

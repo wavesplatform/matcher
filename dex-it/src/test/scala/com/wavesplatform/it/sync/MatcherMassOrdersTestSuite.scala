@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.dex.OrderStatus
-import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -12,11 +11,15 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
+
+  private val orderLimit = 10
+
   override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  rest-order-limit = $orderLimit
        |  price-assets = [ "$UsdId", "WAVES" ]
-       |}""".stripMargin)
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     startAndWait(wavesNode1Container(), wavesNode1Api)
@@ -134,5 +137,4 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       dex1Api.place(order)
       order.id()
     }
-
 }

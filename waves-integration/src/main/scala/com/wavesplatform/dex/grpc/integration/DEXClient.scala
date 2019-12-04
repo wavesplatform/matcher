@@ -24,7 +24,7 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration, val mon
       .maxRetryAttempts(20)
       .keepAliveWithoutCalls(true)
       .keepAliveTime(2, TimeUnit.SECONDS)
-      .keepAliveTimeout(1, TimeUnit.SECONDS)
+      .keepAliveTimeout(5, TimeUnit.SECONDS)
       .nameResolverFactory(new DnsNameResolverProvider)
       .defaultLoadBalancingPolicy("pick_first")
       .usePlaintext()

@@ -15,6 +15,8 @@ import org.scalatest.concurrent.Eventually
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
+import java.lang.management.ManagementFactory
+import java.lang.management.RuntimeMXBean
 
 abstract class MatcherSuiteBase
     extends FreeSpec
@@ -43,7 +45,15 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
-  private val topicName = s"dex-${getClass.hashCode()}-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
+  // pid is needed because ThreadLocalRandom generates same seed for different threads even in Java 8
+  private val topicName = s"dex-${getPid}-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
+
+  // TODO replace by ProcessHandle.current().pid() when move to Java 9+
+  private def getPid: String = {
+    val bean = ManagementFactory.getRuntimeMXBean
+    val jvmName = bean.getName
+    jvmName.split("@")(0)
+  }
 
   protected override def createDocker: Docker = new Docker(
     imageName = "com.wavesplatform/dex-it:latest",

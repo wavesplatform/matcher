@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{Executors, TimeoutException}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
@@ -88,12 +88,20 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
+  // TODO duration
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
-    Future(consumer.endOffsets(topicPartitions).get(topicPartition) - 1).recoverWith {
-      case e: KafkaTimeoutException =>
-        log.error("Can't receive information in time", e)
-        throw new TimeoutException("Can't receive information in time")
-    }
+    Future(consumer.listTopics())
+      .flatMap { topics =>
+        val partitions = topics.getOrDefault(settings.topic, java.util.Collections.emptyList()).asScala
+        if (partitions.size > 1) Future.failed(new IllegalStateException(s"DEX can work only with one partition, given: $partitions"))
+        else if (partitions.headOption.isEmpty) Future.successful(-1L)
+        else Future(consumer.endOffsets(topicPartitions).get(topicPartition) - 1L)
+      }
+      .recoverWith {
+        case e: KafkaTimeoutException =>
+          log.error("Can't receive information in time", e)
+          throw new TimeoutException("Can't receive information in time")
+      }
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)

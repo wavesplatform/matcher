@@ -1,4 +1,4 @@
-package future.com.wavesplatform.settings.utils
+package com.wavesplatform.dex.settings.utils
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.instances.list._
@@ -6,8 +6,8 @@ import cats.instances.string._
 import cats.syntax.foldable._
 import cats.syntax.traverse._
 import com.typesafe.config.{Config, ConfigException}
+import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import future.com.wavesplatform.transaction.assets.exchange.Implicits.AssetPairOps
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 

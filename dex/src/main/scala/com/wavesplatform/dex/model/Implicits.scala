@@ -5,6 +5,7 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import scala.util.{Failure, Try}
 
 object Implicits {
+
   implicit final class AssetPairOps(val self: AssetPair.type) extends AnyVal {
     def fromString(s: String): Try[AssetPair] = Try(s.split("-")).flatMap {
       case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)

@@ -40,3 +40,5 @@ Dockerfile
 package
 !src/package
 native
+
+dex/project

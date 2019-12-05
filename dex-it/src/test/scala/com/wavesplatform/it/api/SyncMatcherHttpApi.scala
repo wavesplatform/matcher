@@ -19,6 +19,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
+import org.slf4j.LoggerFactory
 
 object SyncMatcherHttpApi extends Assertions {
 

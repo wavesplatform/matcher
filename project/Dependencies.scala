@@ -115,7 +115,7 @@ object Dependencies {
     ("io.github.amrhassan" %% "scalacheck-cats" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
     "org.mockito"            % "mockito-all"                  % "1.10.19",
     "org.scalamock"          %% "scalamock-scalatest-support" % "3.6.0",
-    "com.softwaremill.diffx" %% "diffx-scalatest"             % "0.3.11"
+    "com.softwaremill.diffx" %% "diffx-scalatest"             % "0.3.12"
   ).map(_ % Test)
 
   lazy val dex =

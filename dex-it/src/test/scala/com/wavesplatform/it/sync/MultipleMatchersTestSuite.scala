@@ -101,10 +101,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   "States on both matcher should be equal" in {
     val state1 = state(dex1Api)
     val state2 = state(dex2Api)
-    state1 shouldBe state2
 
-    // TODO Doesn't work because of annotations in AssetPair, awaiting https://github.com/softwaremill/diffx/issues/45 solving
-//    state1 should matchTo(state2)
+    state1 should matchTo(state2)
   }
 
   "Batch cancel and single cancels simultaneously" in {

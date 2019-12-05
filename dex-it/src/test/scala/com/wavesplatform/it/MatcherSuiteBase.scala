@@ -7,7 +7,6 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import cats.{Functor, Id}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
@@ -21,8 +20,8 @@ import com.wavesplatform.dex.it.fp.CanExtract
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.it.test.HasWavesNode
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.it.api.{DexApi, DexApiOps}
-import com.wavesplatform.it.config.DexTestConfig
 import com.wavesplatform.it.docker.{DexContainer, DexItDocker}
 import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
 import com.wavesplatform.utils.ScorexLogging
@@ -51,7 +50,7 @@ abstract class MatcherSuiteBase
     with WavesFeeConstants
     with PredefinedAssets
     with PredefinedAccounts
-    with DiffMatcher
+    with DiffMatcherWithImplicits
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()

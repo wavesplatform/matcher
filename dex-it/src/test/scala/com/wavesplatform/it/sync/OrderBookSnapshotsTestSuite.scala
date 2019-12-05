@@ -51,7 +51,9 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
 
     ordersPack2.foreach(dex1Api.place)
     dex1Api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
+
     val allSnapshotOffsets2 = dex1Api.allSnapshotOffsets
+
     withClue("Asset pairs has right offsets") {
       allSnapshotOffsets2.foreach {
         case (pair, offset) =>

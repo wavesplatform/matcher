@@ -44,12 +44,11 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
-  // pid is needed because ThreadLocalRandom generates same seed for different threads even in Java 8
   private val topicName = {
     val secureRandom            = new SecureRandom(Longs.toByteArray(Thread.currentThread().getId))
     val randomPart              = secureRandom.nextInt(Int.MaxValue)
     val maxKafkaTopicNameLength = 249
-    s"dex-${getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1-")}-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
+    s"dex-${getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1")}-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
   }
 
   protected override def createDocker: Docker = new Docker(
@@ -104,7 +103,7 @@ object MatcherSuiteBase {
 
     val adminClient = AdminClient.create(properties)
     try {
-      val newTopic = new NewTopic(name, 0, 0.toShort)
+      val newTopic = new NewTopic(name, 1, 0.toShort)
       adminClient.createTopics(java.util.Collections.singletonList(newTopic))
     } finally {
       adminClient.close()

@@ -33,20 +33,21 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
     r
   }
 
-  private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
+  private val consumerControl    = new AtomicReference[Consumer.Control](Consumer.NoopControl)
+  private val consumerRootConfig = mat.system.settings.config.getConfig("akka.kafka.consumer")
+
   private val consumerSettings = {
-    val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer)
+    ConsumerSettings(consumerRootConfig, new ByteArrayDeserializer, eventDeserializer)
       .withClientId(s"consumer-${settings.topic}")
-      .withGroupId(s"${config.getString("akka.kafka.consumer.kafka-clients.group.id")}-${settings.topic}")
+      .withGroupId(s"${consumerRootConfig.getString("kafka-clients.group.id")}-${settings.topic}")
   }
 
   private val metadataConsumer = {
-    val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
     mat.system.actorOf(
-      KafkaConsumerActor.props(consumerSettings
-        .withClientId(s"meta-consumer-${settings.topic}")
-        .withGroupId(s"${config.getString("akka.kafka.consumer.kafka-clients.group.id")}-${settings.topic}")),
+      KafkaConsumerActor.props(
+        consumerSettings
+          .withClientId(s"meta-consumer-${settings.topic}")
+          .withGroupId(s"${consumerRootConfig.getString("kafka-clients.group.id")}-${settings.topic}")),
       "meta-consumer"
     )
   }

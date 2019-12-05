@@ -103,7 +103,7 @@ object MatcherSuiteBase {
 
     val adminClient = AdminClient.create(properties)
     try {
-      val newTopic = new NewTopic(name, 1, 0.toShort)
+      val newTopic = new NewTopic(name, 1, 1.toShort)
       adminClient.createTopics(java.util.Collections.singletonList(newTopic))
     } finally {
       adminClient.close()

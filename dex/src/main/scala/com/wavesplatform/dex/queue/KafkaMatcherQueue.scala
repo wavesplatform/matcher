@@ -25,8 +25,11 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
-  private implicit val executionContext =
+  private val producerExecutionContext =
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
+
+  private implicit val consumerExecutionContext =
+    ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
 
   private val duringShutdown = new AtomicBoolean(false)
 
@@ -40,20 +43,9 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   @volatile private var consumerTask: Cancelable = Cancelable.empty
 
-  // We need a separate metadata consumer because KafkaConsumer is not safe for multi-threaded access
-  private val metadataConsumer = {
-    val config = ConfigFactory
-      .parseString(s"""
-                      |client.id = metadata-consumer
-                      |group.id = meta-${consumerConfig.getString("group.id")}""".stripMargin)
-      .withFallback(consumerConfig)
-    new KafkaConsumer[String, QueueEvent](config.toProperties, new StringDeserializer, eventDeserializer)
-  }
-  metadataConsumer.assign(topicPartitions)
-
   private val producer: Producer = {
     val r =
-      if (settings.producer.enable) new KafkaProducer(settings.topic, settings.producer.client.toProperties)
+      if (settings.producer.enable) new KafkaProducer(settings.topic, settings.producer.client.toProperties)(producerExecutionContext)
       else IgnoreProducer
     log.info(s"Choosing ${r.getClass.getName} producer")
     r
@@ -74,7 +66,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   }
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
-    val scheduler = Scheduler(executionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
+    val scheduler = Scheduler(consumerExecutionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
     consumerTask = Observable
       .fromTask(Task {
         if (fromOffset > 0) consumer.seek(topicPartition, fromOffset)
@@ -97,8 +89,10 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
-    Future(metadataConsumer.endOffsets(topicPartitions).get(topicPartition) - 1).recoverWith {
-      case e: KafkaTimeoutException => throw new TimeoutException("Can't receive information in time")
+    Future(consumer.endOffsets(topicPartitions).get(topicPartition) - 1).recoverWith {
+      case e: KafkaTimeoutException =>
+        log.error("Can't receive information in time", e)
+        throw new TimeoutException("Can't receive information in time")
     }
 
   override def close(timeout: FiniteDuration): Unit = {
@@ -108,7 +102,6 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
     val duration = java.time.Duration.ofNanos(timeout.toNanos)
     consumer.close(duration)
-    metadataConsumer.close(duration)
 
     consumerTask.cancel()
   }

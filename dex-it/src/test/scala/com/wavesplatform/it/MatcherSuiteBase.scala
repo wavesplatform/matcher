@@ -96,7 +96,7 @@ object MatcherSuiteBase {
     properties.putAll(
       Map(
         "bootstrap.servers"  -> server,
-        "group.id"           -> s"create-$name",
+        "group.id"           -> s"create-$name", // random?
         "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
       ).asJava)

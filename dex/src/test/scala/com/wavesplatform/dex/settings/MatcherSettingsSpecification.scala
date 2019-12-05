@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.dex.queue.LocalMatcherQueue
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -41,15 +41,13 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       defaultDepth = Some(5)
     )
     settings.balanceWatchingBufferInterval should be(33.seconds)
-    settings.eventsQueue shouldBe EventsQueueSettings(
-      tpe = "kafka",
-      local = LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false),
-      kafka = KafkaMatcherQueue.Settings(
-        "some-events",
-        KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
-        KafkaMatcherQueue.ProducerSettings(enable = false, 200)
-      )
-    )
+    settings.eventsQueue.tpe shouldBe "kafka"
+    settings.eventsQueue.local shouldBe LocalMatcherQueue.Settings(enableStoring = false, 1.day, 99, cleanBeforeConsume = false)
+    settings.eventsQueue.kafka.topic shouldBe "some-events"
+    settings.eventsQueue.kafka.consumer.fetchMaxDuration shouldBe 10.seconds
+    settings.eventsQueue.kafka.consumer.maxBufferSize shouldBe 777
+    settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
+    settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
     settings.processConsumedTimeout shouldBe 663.seconds
 
     settings.orderFee match {

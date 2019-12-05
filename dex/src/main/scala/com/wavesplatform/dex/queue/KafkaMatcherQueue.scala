@@ -42,7 +42,9 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
       .withGroupId(s"${consumerRootConfig.getString("kafka-clients.group.id")}-${settings.topic}")
   }
 
-  private val metadataConsumer = {
+//  private var metadataConsumer: ActorRef = _
+//
+  private def mkConsumer = {
     mat.system.actorOf(
       KafkaConsumerActor.props(
         consumerSettings
@@ -93,6 +95,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
     implicit val timeout: Timeout = Timeout(consumerSettings.metadataRequestTimeout)
 
+    val metadataConsumer = mkConsumer
     // We need to list topic first, see the EndOffsets documentation
     (metadataConsumer ? Metadata.ListTopics).mapTo[Metadata.Topics].flatMap { topics =>
       topics.response.getOrElse(Map.empty).get(settings.topic) match {
@@ -110,12 +113,12 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
                 .getOrElse(topicPartition, throw new IllegalStateException(s"Unexpected behaviour, no info for $topicPartition: $r")) - 1
             }
       }
-    }
+    }.andThen { case _ => system.stop(metadataConsumer) }
   }
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)
-    mat.system.stop(metadataConsumer)
+    //mat.system.stop(metadataConsumer)
     val stoppingConsumer = consumerControl.get().shutdown()
     Await.result(stoppingConsumer, timeout)
   }

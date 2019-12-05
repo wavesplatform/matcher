@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.queue
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 
 import akka.actor.ActorSystem
 import akka.kafka._
@@ -44,13 +44,16 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
 
 //  private var metadataConsumer: ActorRef = _
 //
-  private def mkConsumer = {
+  private val metaConsumerId = new AtomicInteger(0)
+
+  private def mkMetaConsumer = {
+    val id = metaConsumerId.getAndIncrement()
     mat.system.actorOf(
       KafkaConsumerActor.props(
         consumerSettings
-          .withClientId(s"meta-consumer-${settings.topic}")
-          .withGroupId(s"${consumerRootConfig.getString("kafka-clients.group.id")}-${settings.topic}")),
-      "meta-consumer"
+          .withClientId(s"meta-consumer-${settings.topic}-$id")
+          .withGroupId(s"${consumerRootConfig.getString("kafka-clients.group.id")}-${settings.topic}-$id")),
+      s"meta-consumer-$id"
     )
   }
 
@@ -95,7 +98,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
     implicit val timeout: Timeout = Timeout(consumerSettings.metadataRequestTimeout)
 
-    val metadataConsumer = mkConsumer
+    val metadataConsumer = mkMetaConsumer
     // We need to list topic first, see the EndOffsets documentation
     (metadataConsumer ? Metadata.ListTopics).mapTo[Metadata.Topics].flatMap { topics =>
       topics.response.getOrElse(Map.empty).get(settings.topic) match {

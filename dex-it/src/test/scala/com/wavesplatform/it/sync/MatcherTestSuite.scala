@@ -2,19 +2,18 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
@@ -49,7 +48,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
-    val order1         = node.prepareOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, version = orderVersion, timeToLive = 2.minutes)
+    val order1         = node.prepareOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, version = orderVersion)
     val order1Response = node.placeOrder(order1)
 
     // Bob issues new asset

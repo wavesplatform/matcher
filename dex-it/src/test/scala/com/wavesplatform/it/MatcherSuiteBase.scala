@@ -1,8 +1,9 @@
 package com.wavesplatform.it
 
+import java.security.SecureRandom
 import java.util.Properties
-import java.util.concurrent.ThreadLocalRandom
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
@@ -15,8 +16,6 @@ import org.scalatest.concurrent.Eventually
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import java.lang.management.ManagementFactory
-import java.lang.management.RuntimeMXBean
 
 abstract class MatcherSuiteBase
     extends FreeSpec
@@ -46,13 +45,11 @@ abstract class MatcherSuiteBase
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
   // pid is needed because ThreadLocalRandom generates same seed for different threads even in Java 8
-  private val topicName = s"dex-${getPid}-${ThreadLocalRandom.current().nextInt(0, Int.MaxValue)}"
-
-  // TODO replace by ProcessHandle.current().pid() when move to Java 9+
-  private def getPid: String = {
-    val bean = ManagementFactory.getRuntimeMXBean
-    val jvmName = bean.getName
-    jvmName.split("@")(0)
+  private val topicName = {
+    val secureRandom            = new SecureRandom(Longs.toByteArray(Thread.currentThread().getId))
+    val randomPart              = secureRandom.nextInt(Int.MaxValue)
+    val maxKafkaTopicNameLength = 249
+    s"dex-${getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1-")}-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
   }
 
   protected override def createDocker: Docker = new Docker(

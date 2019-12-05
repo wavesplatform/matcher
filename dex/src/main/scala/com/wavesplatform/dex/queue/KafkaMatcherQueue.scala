@@ -36,13 +36,20 @@ class KafkaMatcherQueue(settings: Settings)(implicit system: ActorSystem) extend
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer).withClientId("consumer")
+    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer)
+      .withClientId(s"consumer-${settings.topic}")
+      .withGroupId(s"${config.getString("akka.kafka.consumer.kafka-clients.group.id")}-${settings.topic}")
   }
 
-  private val metadataConsumer = mat.system.actorOf(
-    KafkaConsumerActor.props(consumerSettings.withClientId("meta-consumer")),
-    "meta-consumer"
-  )
+  private val metadataConsumer = {
+    val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
+    mat.system.actorOf(
+      KafkaConsumerActor.props(consumerSettings
+        .withClientId(s"meta-consumer-${settings.topic}")
+        .withGroupId(s"${config.getString("akka.kafka.consumer.kafka-clients.group.id")}-${settings.topic}")),
+      "meta-consumer"
+    )
+  }
 
   @volatile private var lastProcessedOffsetInternal = -1L
 

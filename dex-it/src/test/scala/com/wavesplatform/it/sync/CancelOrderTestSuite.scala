@@ -20,7 +20,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 
-import scala.collection.immutable.Queue
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -149,7 +148,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       node.cancelOrder(bob, wavesUsdPair, orderId)
       node.waitOrderStatus(wavesUsdPair, orderId, "Cancelled")
 
-      assertBadRequestAndMessage(node.cancelOrder(bob, wavesUsdPair, orderId), s"The order ${orderId} is canceled")
+      assertBadRequestAndMessage(node.cancelOrder(bob, wavesUsdPair, orderId), s"The order $orderId is canceled")
     }
 
     "when request sender is not the sender of and order" in {
@@ -294,7 +293,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
           val asyncNode = async(node)
           Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-            inSeries(orders)(asyncNode.placeOrder(_).flatMap { _ =>
+            Future.inSeries(orders)(asyncNode.placeOrder(_).flatMap { _ =>
               val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
               GlobalTimer.instance.sleep(wait)
             })
@@ -322,13 +321,4 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       }
     }
   }
-
-  private def inSeries[A, B](xs: Seq[A])(f: A => Future[B]): Future[Seq[B]] =
-    xs.foldLeft(Future.successful(Queue.empty[B])) {
-      case (r, curr) =>
-        for {
-          xs <- r
-          x  <- f(curr)
-        } yield xs.enqueue(x)
-    }
 }

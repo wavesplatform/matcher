@@ -30,7 +30,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
       ),
-      ""
+      s"Required one of the following fee asset: WAVES. But given ${UsdId.toString}"
     )
   }
 
@@ -46,7 +46,7 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         3.toByte,
         feeAsset = IssuedAsset(UsdId)
       ),
-      "*"
+      s"Required one of the following fee asset: WAVES. But given ${UsdId.toString}"
     )
   }
 }

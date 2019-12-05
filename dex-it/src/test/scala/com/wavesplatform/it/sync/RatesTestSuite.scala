@@ -41,13 +41,13 @@ class RatesTestSuite extends MatcherSuiteBase {
 
   val defaultRateMap: Map[Asset, Double] = Map(Waves -> 1d)
 
-  val wctRate        = 0.2
+  val wctRate = 0.2
   val wctRateUpdated = 0.5
 
-  val wctStr   = WctId.toString
+  val wctStr = WctId.toString
   val wctAsset = IssuedAsset(WctId)
 
-  val btcStr   = BtcId.toString
+  val btcStr = BtcId.toString
   val btcAsset = IssuedAsset(BtcId)
 
   val usdStr = UsdId.toString
@@ -78,7 +78,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     node.waitForTransaction(transferTxId)
   }
 
-  def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, feeAsset = btcAsset)
+  def getOrder: Order = node.prepareOrder(alice, wctUsdPair, BUY, amount, price, fee = matcherFee, version = 3, feeAssetId = btcAsset)
 
   "Rates can be handled via REST" in {
     // default rates
@@ -86,7 +86,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // add rate for unexisted asset
     assertNotFoundAndMessage(node.upsertRate(IssuedAsset(ByteStr.decodeBase58("unexistedAsset").get), 0.2, expectedStatusCode = Created),
-                             "The asset unexistedAsset not found")
+      "The asset unexistedAsset not found")
 
     // add rate for wct
     node.upsertRate(wctAsset, wctRate, expectedStatusCode = Created).message shouldBe s"Rate $wctRate for the asset $wctStr added"

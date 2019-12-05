@@ -7,6 +7,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 case class MatcherState(offset: QueueEventWithMeta.Offset,
                         snapshots: Map[String, QueueEventWithMeta.Offset],
                         orderBooks: Map[AssetPair, (OrderBookResponse, MarketStatusResponse)],
-                        orderStatuses: Map[String, MatcherStatusResponse],
+                        orderStatuses: Map[String, MatcherStatusResponseWithFee],
                         reservedBalances: Map[KeyPair, Map[String, Long]],
-                        orderHistory: Map[KeyPair, Map[AssetPair, Seq[OrderbookHistory]]])
+                        orderHistory: Map[KeyPair, Map[AssetPair, Seq[OrderHistory]]])

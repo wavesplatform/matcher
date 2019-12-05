@@ -7,7 +7,6 @@ import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{wavesBtcPair, _}
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
@@ -170,7 +169,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       price = 50000L,
       fee = 150L,
       version = 3: Byte,
-      feeAsset = IssuedAsset(BtcId)
+      feeAssetId = IssuedAsset(BtcId)
     )
 
     "only waves supported" in {

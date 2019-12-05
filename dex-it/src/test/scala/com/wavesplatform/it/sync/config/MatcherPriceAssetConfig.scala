@@ -9,8 +9,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -42,6 +42,13 @@ object MatcherPriceAssetConfig {
         accountName -> Wallet.generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
       }
       .toMap
+  }
+
+  implicit class DoubleOps(value: Double) {
+    val wct: Long             = Normalization.normalizeAmountAndFee(value, Decimals)
+    val price: Long           = Normalization.normalizePrice(value, Decimals, Decimals)
+    val waves, eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long             = Normalization.normalizePrice(value, 8, 2)
   }
 
   val matcher: KeyPair = accounts("matcher")

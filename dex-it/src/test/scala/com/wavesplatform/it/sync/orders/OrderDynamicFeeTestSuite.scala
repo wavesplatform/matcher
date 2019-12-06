@@ -954,6 +954,7 @@ class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
       val transferId = node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(EthId.toString), None).id
       node.waitForTransaction(transferId)
 
+
       docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = fixed"))
       check()
       docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))

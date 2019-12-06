@@ -2,8 +2,8 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.syntax.apply._
-import com.wavesplatform.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.utils.ConfigSettingsValidator.{ErrorsListOr, _}
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.{ErrorsListOr, _}
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader

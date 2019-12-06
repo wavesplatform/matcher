@@ -3,9 +3,9 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import future.com.wavesplatform.transaction.assets.exchange.Implicits._
 import org.scalatest.Matchers
 
 class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers {

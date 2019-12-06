@@ -2,8 +2,8 @@ package com.wavesplatform.dex.settings
 
 import cats.syntax.apply._
 import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
-import com.wavesplatform.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.utils.ConfigSettingsValidator._
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 

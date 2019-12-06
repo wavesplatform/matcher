@@ -4,16 +4,14 @@ import cats.data.NonEmptyList
 import cats.syntax.apply._
 import com.wavesplatform.dex.model.MatcherModel.{Denormalization, Normalization}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.settings.Implicits.nonEmptyListReader
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorListOrOps
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
-import future.com.wavesplatform.settings.nonEmptyListReader
-import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
-import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
-
-import scala.util.Try
 
 /** Normalized representation of the matching rule */
 case class MatchingRule(startOffset: QueueEventWithMeta.Offset, tickSize: Long) {

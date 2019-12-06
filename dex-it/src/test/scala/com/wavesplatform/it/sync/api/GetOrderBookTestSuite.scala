@@ -35,7 +35,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
       orderBook.bids.size shouldBe depth
     }
 
-    array.foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) shouldBe orderBook)
+    array.foreach(depth => dex1Api.orderBook(wavesUsdPair, depth) should matchTo(orderBook))
   }
 
   "response order book should contain right count of bids and asks" in {

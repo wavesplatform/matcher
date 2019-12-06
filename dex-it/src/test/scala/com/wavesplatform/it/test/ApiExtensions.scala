@@ -44,6 +44,7 @@ trait ApiExtensions extends WavesNodeApiExtensions {
     val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
     val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
+
     val orderHistory = accountsOrderHistory.map {
       case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
     }

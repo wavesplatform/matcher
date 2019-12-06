@@ -15,12 +15,11 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
-import future.com.wavesplatform.settings.utils.ConfigOps._
-import future.com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}

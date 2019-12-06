@@ -11,6 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
@@ -32,7 +33,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherTestData extends RequestGen with NTPTime { _: Suite =>
+trait MatcherTestData extends RequestGen with NTPTime with DiffMatcherWithImplicits { _: Suite =>
   private val signatureSize = 32
 
   val WalletSeed               = ByteStr("Matcher".getBytes("utf-8"))

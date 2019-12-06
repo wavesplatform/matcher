@@ -76,9 +76,9 @@ object DexApiOps {
     def deleteRate(asset: Asset): F[RatesResponse]                             = explicitGet(self.tryDeleteRate(asset))
     def rates: F[Map[Asset, Double]]                                           = explicitGet(self.tryRates)
 
-    def currentOffset: F[Long]                   = explicitGet(self.tryCurrentOffset)
-    def lastOffset: F[Long]                      = explicitGet(self.tryLastOffset)
-    def oldestSnapshotOffset: F[Long]            = explicitGet(self.tryOldestSnapshotOffset)
-    def allSnapshotOffsets: F[Map[String, Long]] = explicitGet(self.tryAllSnapshotOffsets)
+    def currentOffset: F[Long]                      = explicitGet(self.tryCurrentOffset)
+    def lastOffset: F[Long]                         = explicitGet(self.tryLastOffset)
+    def oldestSnapshotOffset: F[Long]               = explicitGet(self.tryOldestSnapshotOffset)
+    def allSnapshotOffsets: F[Map[AssetPair, Long]] = explicitGet(self.tryAllSnapshotOffsets)
   }
 }

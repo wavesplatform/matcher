@@ -25,6 +25,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
+
   private implicit val executionContext =
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
 

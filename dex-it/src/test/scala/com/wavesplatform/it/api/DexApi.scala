@@ -21,9 +21,9 @@ import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import com.wavesplatform.it.api.dex._
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json._
 
 import scala.concurrent.duration.DurationInt
@@ -79,7 +79,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryCurrentOffset: F[Either[MatcherError, Long]]
   def tryLastOffset: F[Either[MatcherError, Long]]
   def tryOldestSnapshotOffset: F[Either[MatcherError, Long]]
-  def tryAllSnapshotOffsets: F[Either[MatcherError, Map[String, Long]]] // TODO Map[AssetPair, Long]
+  def tryAllSnapshotOffsets: F[Either[MatcherError, Map[AssetPair, Long]]]
 
   // TODO move
 
@@ -102,17 +102,6 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 object DexApi {
 
   implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
-
-  implicit val balanceReads: Reads[Map[Asset, Long]] = Reads.map[Long].map { xs =>
-    xs.map { case (k, v) => AssetPair.extractAssetId(k).get -> v }
-  }
-
-  // TODO
-  implicit val exchangeTxReads: Reads[exchange.ExchangeTransaction] = Reads { json =>
-    JsSuccess(TransactionFactory.fromSignedRequest(json).right.get.asInstanceOf[exchange.ExchangeTransaction])
-  }
-
-  implicit val orderWrites: Writes[Order] = Writes(_.json())
 
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
     def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
@@ -332,7 +321,7 @@ object DexApi {
           .response(asLong)
       }
 
-      override def tryAllSnapshotOffsets: F[Either[MatcherError, Map[String, Long]]] =
+      override def tryAllSnapshotOffsets: F[Either[MatcherError, Map[AssetPair, Long]]] =
         tryParseJson(sttp.get(uri"$apiUri/debug/allSnapshotOffsets").headers(apiKeyHeaders))
 
       override def waitReady: F[Unit] = {

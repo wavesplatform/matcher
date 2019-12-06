@@ -1,13 +1,16 @@
-package future.com.wavesplatform.settings.utils
+package com.wavesplatform.dex.settings.utils
+
+import java.util.Properties
 
 import cats.data.Validated
 import com.typesafe.config.Config
-import future.com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorListOrOps
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorListOrOps
+import mouse.any._
 import net.ceedubs.ficus.readers.ValueReader
 
 object ConfigOps {
 
-  implicit class ConfigOps(config: Config) {
+  final implicit class ConfigOps(config: Config) {
 
     val cfgValidator = ConfigSettingsValidator(config)
 
@@ -21,6 +24,12 @@ object ConfigOps {
 
     def getValidatedByPredicate[T: ValueReader](path: String)(predicate: T => Boolean, errorMsg: String): T = {
       cfgValidator.validateByPredicate(path)(predicate, errorMsg) getValueOrThrowErrors
+    }
+
+    def toProperties: Properties = new Properties() unsafeTap { properties =>
+      config.entrySet().forEach { entry =>
+        properties.setProperty(entry.getKey, config getString entry.getKey)
+      }
     }
   }
 }

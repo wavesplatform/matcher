@@ -6,9 +6,9 @@ import cats.syntax.apply._
 import cats.syntax.foldable._
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.FeeMode.FeeMode
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{Waves, _}
 import com.wavesplatform.transaction.assets.exchange.AssetPair

@@ -14,8 +14,7 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient
-import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.Events.OrderExecuted
@@ -42,7 +41,7 @@ import scala.math.BigDecimal.RoundingMode
 object OrderValidator extends ScorexLogging {
 
   type Result[T]       = Either[MatcherError, T]
-  type AsyncBlockchain = WavesBlockchainAsyncClient[Future]
+  type AsyncBlockchain = WavesBlockchainClient[Future]
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 

@@ -24,7 +24,6 @@ import scala.util.{Failure, Success, Try}
 trait ItTestSuiteBase
     extends FreeSpec
     with Matchers
-    with CancelAfterFailure
     with BeforeAndAfterAll
     with Eventually
     with HasWavesNode

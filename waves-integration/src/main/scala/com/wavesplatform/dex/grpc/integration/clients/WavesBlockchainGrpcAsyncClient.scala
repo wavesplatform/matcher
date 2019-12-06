@@ -1,12 +1,10 @@
-package com.wavesplatform.dex.grpc.integration.clients.async
+package com.wavesplatform.dex.grpc.integration.clients
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
-import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient
-import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
 import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
@@ -25,8 +23,8 @@ import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Scheduler)(implicit grpcExecutionContext: ExecutionContext)
-    extends WavesBlockchainAsyncClient[Future]
+class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixScheduler: Scheduler, grpcExecutionContext: ExecutionContext)
+    extends WavesBlockchainClient[Future]
     with ScorexLogging {
 
   private def gRPCErrorsHandler(exception: Throwable): Throwable = exception match {
@@ -99,7 +97,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
     blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.map(_.has)
   }
 
-  def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[WavesBlockchainClient.RunScriptResult] = handlingErrors {
+  def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
     blockchainService
       .runAssetScript { RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB)) }
       .map(parse)
@@ -109,7 +107,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
     blockchainService.hasAddressScript { HasAddressScriptRequest(address = address.toPB) }.map(_.has)
   }
 
-  def runScript(address: Address, input: Order): Future[WavesBlockchainClient.RunScriptResult] = handlingErrors {
+  def runScript(address: Address, input: Order): Future[RunScriptResult] = handlingErrors {
     blockchainService
       .runAddressScript { RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB)) }
       .map(parse)

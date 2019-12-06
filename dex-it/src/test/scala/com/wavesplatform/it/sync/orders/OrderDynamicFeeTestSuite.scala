@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.orderV3
+package com.wavesplatform.it.sync.orders
 
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 
 import scala.concurrent.duration._
 
-class DynamicModeMatcherTestSuite extends MatcherSuiteBase {
+class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
 
   val baseFee = 300000
 
@@ -645,6 +645,8 @@ class DynamicModeMatcherTestSuite extends MatcherSuiteBase {
   }
 
   "rounding fee to filled amount" - {
+    val matcherFee = 300000
+
     "if amount cannot be filled" in {
       Array(wct, btc, usd)
         .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))
@@ -712,7 +714,7 @@ class DynamicModeMatcherTestSuite extends MatcherSuiteBase {
 
     "if v2 order filled partially by too low percent of amount" in {
       val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
-      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
+      val bobWavesBefore = node.accountBalances(bob.toAddress.toString)._1
 
       val buyOrder =
         node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)).message.id
@@ -731,7 +733,7 @@ class DynamicModeMatcherTestSuite extends MatcherSuiteBase {
 
     "if v3 order filled partially by too low percent of amount" in {
       val aliceWavesBefore = node.accountBalances(alice.toAddress.toString)._1
-      val bobWavesBefore   = node.accountBalances(bob.toAddress.toString)._1
+      val bobWavesBefore = node.accountBalances(bob.toAddress.toString)._1
 
       val buyOrder =
         node.placeOrder(node.prepareOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)).message.id

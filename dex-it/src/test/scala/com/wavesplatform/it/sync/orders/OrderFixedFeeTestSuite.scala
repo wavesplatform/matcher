@@ -1,9 +1,10 @@
-package com.wavesplatform.it.sync.orderV3
+package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{matcher, _}
@@ -13,16 +14,16 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.duration._
 
-class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
-  import FixedModeMatcherTestSuite._
+class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
+
+  import OrderFixedFeeTestSuite._
 
   val minMatcherFee = 200000L
-  val price         = 100000000L
-  val script: Script       = ExprScript(Terms.TRUE).explicitGet()
+  val price = 100000000L
+  val script: Script = ExprScript(Terms.TRUE).explicitGet()
   val scriptBase64: String = script.bytes.value.base64
 
   val aliceAssetBase58: String = node
@@ -134,7 +135,6 @@ class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
           node.assetBalance(bobAddress, fixedAssetMatcherFeeBase58).balance shouldBe bobAssetBalanceBefore - minMatcherFee - orderAmount
           node.balanceDetails(aliceAddress).available shouldBe aliceWavesBalanceBefore - (orderAmount * price / 100000000)
           node.balanceDetails(bobAddress).available shouldBe bobWavesBalanceBefore + (orderAmount * price / 100000000)
-
         }
       }
 
@@ -177,8 +177,6 @@ class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
           .id
 
         node.waitOrderStatus(someWavesPair, bobOrderId, "Accepted")
-
-
       }
 
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {
@@ -189,8 +187,8 @@ class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
         val buy = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
         val sell = Order.sell(bob, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
 
-        assertBadRequestAndResponse(node.placeOrder(buy), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
-        assertBadRequestAndResponse(node.placeOrder(sell), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
+        assertBadRequestAndMessage(node.placeOrder(buy), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
+        assertBadRequestAndMessage(node.placeOrder(sell), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {
@@ -228,12 +226,12 @@ class FixedModeMatcherTestSuite extends MatcherSuiteBase with NTPTime {
       }
     }
   }
+
   private def orderStatus(sender: KeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     node.waitOrderStatus(assetPair, orderId, expectedStatus, waitTime = 2.minutes)
-
 }
 
-object FixedModeMatcherTestSuite {
+object OrderFixedFeeTestSuite {
 
   def configWithOrderFeeFixed(matcherFeeAssetId: String = "WAVES", minFee: Long): Config = {
     parseString(

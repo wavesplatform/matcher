@@ -8,9 +8,10 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponse, SyncMatcherHttpApi}
+import com.wavesplatform.it.api.{MatcherStatusResponse, MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -44,7 +45,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Order can be canceled" - {
     "After cancelAllOrders (200) all of them should be cancelled" in {
       val orders = new ListBuffer[String]()
-      val time   = System.currentTimeMillis
+      val time = System.currentTimeMillis
 
       for (i <- 1 to 200) {
         val order = node
@@ -146,9 +147,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Auto cancel" - {
     // TODO: Uncomment after Node v1.1.6
     "wrong auto cancel when match on all coins" ignore {
-      val accounts       = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
+      val accounts = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
       val oneOrderAmount = 10000
-      val orderPrice     = 3000000000000L
+      val orderPrice = 3000000000000L
 
       val initialTransferIds = accounts
         .map { account =>
@@ -213,7 +214,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val buyOrders = for {
         (_, asset) <- accountsAndAssets
-        i          <- 1 to 10
+        i <- 1 to 10
       } yield
         node
           .prepareOrder(
@@ -226,25 +227,25 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
             timeToLive = 30.days - i.seconds // to make different orders
           )
 
-      SyncMatcherHttpApi.sync(
-        {
-          import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
-
-          val asyncNode = async(node)
-          Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-            inSeries(orders)(asyncNode.placeOrder(_).flatMap { _ =>
-              val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
-              GlobalTimer.instance.sleep(wait)
-            })
-          }
-        },
-        5.minutes
-      )
+      //      SyncMatcherHttpApi.sync(
+      //        {
+      //          import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
+      //
+      //          val asyncNode = async(node)
+      //          Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
+      //            inSeries(orders)(asyncNode.placeOrder(_).flatMap { _ =>
+      //              val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
+      //              GlobalTimer.instance.sleep(wait)
+      //            })
+      //          }
+      //        },
+      //        5.minutes
+      //      )
 
       val statuses = sells.map {
         case (assetPair, orderId) =>
           orderId -> node
-            .waitFor[MatcherStatusResponse](s"$orderId status")(
+            .waitFor[MatcherStatusResponseWithFee](s"$orderId status")(
               _.orderStatus(orderId, assetPair, waitForStatus = false),
               r => r.status == "Cancelled" || r.status == "Filled",
               1.second
@@ -266,7 +267,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       case (r, curr) =>
         for {
           xs <- r
-          x  <- f(curr)
+          x <- f(curr)
         } yield xs.enqueue(x)
     }
 }

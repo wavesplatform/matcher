@@ -5,7 +5,6 @@ import com.wavesplatform.api.http.ApiError._
 import io.grpc.Metadata.AsciiMarshaller
 import io.grpc.{Metadata, Status, StatusException}
 
-// TODO
 object GRPCErrors {
   private[this] val IntMarshaller: AsciiMarshaller[Int] = new AsciiMarshaller[Int] {
     override def toAsciiString(value: Int): String         = value.toString
@@ -17,7 +16,7 @@ object GRPCErrors {
   def toStatusException(api: ApiError): StatusException = {
     val code = api match {
       case WalletNotExist | WalletAddressDoesNotExist | TransactionDoesNotExist | AliasDoesNotExist(_) | BlockDoesNotExist | MissingSenderPrivateKey |
-           DataKeyDoesNotExist =>
+          DataKeyDoesNotExist =>
         Status.NOT_FOUND
       case WalletAlreadyExists => Status.ALREADY_EXISTS
       case WalletLocked        => Status.PERMISSION_DENIED
@@ -29,6 +28,13 @@ object GRPCErrors {
     code.withDescription(api.message).asException(metadata)
   }
 
-  def toStatusException(exc: Throwable): StatusException =
-    new StatusException(Status.fromThrowable(exc).withDescription(exc.getMessage))
+  def toStatusException(exc: Throwable): StatusException = {
+    val status = exc match {
+      case _: IllegalArgumentException => Status.INVALID_ARGUMENT
+      case _: NoSuchElementException   => Status.NOT_FOUND
+      case _: IllegalStateException    => Status.FAILED_PRECONDITION
+      case _                           => Status.fromThrowable(exc)
+    }
+    new StatusException(status.withCause(exc).withDescription(exc.getMessage))
+  }
 }

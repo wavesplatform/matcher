@@ -36,7 +36,6 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
 
   private def handlingErrors[A](f: => Future[A]): Future[A] = { f transform (identity, gRPCErrorsHandler) }
 
-  private val balancesService   = WavesBalancesApiGrpc.stub(channel)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
 
   private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges](monixScheduler)
@@ -77,7 +76,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
   }
 
   /** Performs new gRPC call for receiving of the spendable balance changes stream */
-  def requestBalanceChanges(): Unit = balancesService.getBalanceChanges(Empty(), balanceChangesObserver)
+  def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
 
   /** Returns stream of the balance changes as a sequence of batches */
   def spendableBalanceChanges: Observable[SpendableBalanceChanges] = spendableBalanceChangesSubject

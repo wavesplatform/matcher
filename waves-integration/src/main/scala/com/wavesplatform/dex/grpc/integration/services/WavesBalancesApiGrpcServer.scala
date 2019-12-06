@@ -1,11 +1,10 @@
 package com.wavesplatform.dex.grpc.integration.services
 
 import com.google.protobuf.empty.Empty
+import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
-import mouse.any._
-import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -19,11 +18,9 @@ class WavesBalancesApiGrpcServer(context: ExtensionContext, balanceChangesBatchL
     */
   override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
     context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
-      changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) } |> { vanillaBatch =>
-        vanillaBatch.map {
-          case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance)
-        } |> BalanceChangesResponse.apply |> responseObserver.onNext
-      }
+      val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+      val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
+      responseObserver.onNext(BalanceChangesResponse(pbBatch))
     }
   }
 }

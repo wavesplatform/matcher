@@ -138,9 +138,8 @@ object Dependencies {
 
   lazy val wavesIntegration = Dependencies.grpc ++
     Seq(
-      Dependencies.mouse,
-      akkaModule("slf4j"),
-      wavesProtobufSchemas
+      wavesProtobufSchemas,
+      Dependencies.mouse % Test
     )
 
   lazy val grpc: Seq[ModuleID] = Seq(

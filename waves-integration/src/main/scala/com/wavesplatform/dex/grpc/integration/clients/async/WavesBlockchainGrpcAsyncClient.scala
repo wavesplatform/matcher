@@ -22,7 +22,6 @@ import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import mouse.any._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -60,7 +59,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Sc
   private val balanceChangesObserver: StreamObserver[BalanceChangesResponse] =
     new StreamObserver[BalanceChangesResponse] {
       override def onCompleted(): Unit                         = log.info("Balance changes stream completed!")
-      override def onNext(value: BalanceChangesResponse): Unit = groupByAddress(value) |> spendableBalanceChangesSubject.onNext
+      override def onNext(value: BalanceChangesResponse): Unit = spendableBalanceChangesSubject.onNext(groupByAddress(value))
       override def onError(t: Throwable): Unit = {
         log.warn(s"Error while listening to the balance changes stream occurred: ${t.getMessage}. New RPC call will be performed")
         channel.resetConnectBackoff()

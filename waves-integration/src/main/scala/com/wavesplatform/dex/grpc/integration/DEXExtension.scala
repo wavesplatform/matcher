@@ -10,7 +10,6 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
-import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.NameMapper
@@ -25,18 +24,20 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
   implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
-  private def startServer(settings: DEXExtensionSettings): Server =
-    new InetSocketAddress(settings.host, settings.port) |> { bindAddress =>
-      NettyServerBuilder
-        .forAddress(bindAddress)
-        .permitKeepAliveWithoutCalls(true)
-        .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
-        .addService(WavesBalancesApiGrpc.bindService(new WavesBalancesApiGrpcServer(context, settings.balanceChangesBatchLinger), apiScheduler))
-        .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcServer(context), apiScheduler))
-        .build()
-        .start()
-        .unsafeTap(_ => log.info(s"gRPC DEX extension was bound to $bindAddress"))
-    }
+  private def startServer(settings: DEXExtensionSettings): Server = {
+    val bindAddress = new InetSocketAddress(settings.host, settings.port)
+    val server = NettyServerBuilder
+      .forAddress(bindAddress)
+      .permitKeepAliveWithoutCalls(true)
+      .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
+      .addService(WavesBalancesApiGrpc.bindService(new WavesBalancesApiGrpcServer(context, settings.balanceChangesBatchLinger), apiScheduler))
+      .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcServer(context), apiScheduler))
+      .build()
+      .start()
+
+    log.info(s"gRPC DEX extension was bound to $bindAddress")
+    server
+  }
 
   override def start(): Unit = server = startServer(context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration"))
 

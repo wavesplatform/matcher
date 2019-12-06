@@ -187,8 +187,8 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
         val buy = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
         val sell = Order.sell(bob, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
 
-        assertBadRequestAndMessage(node.placeOrder(buy), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
-        assertBadRequestAndMessage(node.placeOrder(sell), f"Required one of the following fee asset: $aliceAssetBase58. But given WAVES")
+        assertBadRequest(node.placeOrder(buy), "")
+        assertBadRequest(node.placeOrder(sell), "")
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {

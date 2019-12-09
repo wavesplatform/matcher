@@ -1,150 +1,173 @@
 import sbt.Keys._
-import sbt._
+import sbt.{Def, _}
 
 object Dependencies {
 
-  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.5.20"
+  object Version {
 
-  private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
-  private def kamonModule(module: String, v: String)       = "io.kamon"                      %% s"kamon-$module"  % v
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
-  private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
+    val akka     = "2.5.20"
+    val akkaHttp = "10.1.8"
 
-  private def catsModule(module: String, version: String = "1.6.0") = Def.setting("org.typelevel" %% s"cats-$module" % version)
+    val scalaTest  = "3.0.6"
+    val scalaCheck = "1.14.0"
+    val scalaMock  = "3.6.0"
+    val diffx      = "0.3.12"
 
-  val silencerVersion = "1.4.1"
-  val silencer = Seq(
-    compilerPlugin("com.github.ghik" %% "silencer-plugin" % silencerVersion),
-    "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided
+    val cats              = "1.6.0"
+    val catsTaglessMacros = "0.9"
+    val kindProjector     = "0.9.6"
+    val mouse             = "0.22"
+    val shapeless         = "2.3.3"
+
+    val typesafeConfig = "1.3.3"
+    val scopt          = "4.0.0-RC2"
+
+    val logback = "1.2.3"
+    val slf4j   = "1.7.25"
+    val janino  = "3.0.12"
+
+    val silencer = "1.4.1"
+    val kamon    = "1.1.5"
+
+    val wavesProtobufSchemas = "1.0.0"
+
+    val postgresql = "9.4.1208"
+    val quillJdbc  = "3.1.0"
+
+    val spotify = "8.15.1"
+    val sttp    = "1.7.2"
+
+    val jackson     = "2.9.8"
+    val googleGuava = "27.0.1-jre"
+    val kafka       = "2.3.1"
+
+    val sourceCode = "0.1.7"
+  }
+
+  private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
+  private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang"                % module             % version
+  private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
+  private def sttpModule(module: String): ModuleID                   = "com.softwaremill.sttp"         %% module            % Version.sttp
+
+  private def catsModule(module: String, version: String): Def.Initialize[ModuleID] = Def.setting("org.typelevel" %% s"cats-$module" % version)
+
+  private val kindProjector     = compilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
+  private val logback           = "ch.qos.logback" % "logback-classic" % Version.logback
+  private val googleGuava       = "com.google.guava" % "guava" % Version.googleGuava
+  private val janino            = "org.codehaus.janino" % "janino" % Version.janino
+  private val spotify           = ("com.spotify" % "docker-client" % Version.spotify).classifier("shaded")
+  private val typesafeConfig    = "com.typesafe" % "config" % Version.typesafeConfig
+  private val scalaTest         = "org.scalatest" %% "scalatest" % Version.scalaTest
+  private val scalaCheck        = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
+  private val scalaMock         = "org.scalamock" %% "scalamock-scalatest-support" % Version.scalaMock
+  private val diffx             = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
+  private val slf4j             = "org.slf4j" % "slf4j-api" % Version.slf4j
+  private val grpcNetty         = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
+  private val catsTaglessMacros = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
+  private val mouse             = "org.typelevel" %% "mouse" % Version.mouse
+  private val scopt             = "com.github.scopt" %% "scopt" % Version.scopt
+  private val kafka             = "org.apache.kafka" % "kafka-clients" % Version.kafka
+  private val kamon             = "io.kamon" %% "kamon-core" % Version.kamon
+
+  private val logbackScalaJsExcluded = logback.exclude("org.scala-js", "scalajs-library_2.12")
+
+  private val catsCore: Def.Initialize[ModuleID]  = catsModule("core", Version.cats)
+  private val shapeless: Def.Initialize[ModuleID] = Def.setting("com.chuusai" %% "shapeless" % Version.shapeless)
+
+  private val quill: Seq[ModuleID] = Seq(
+    "org.postgresql" % "postgresql"  % Version.postgresql,
+    "io.getquill"    %% "quill-jdbc" % Version.quillJdbc
   )
 
-  private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
-
-  val akkaHttp                   = akkaHttpModule("akka-http")
-  private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core", "1.1.5")
-  private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
-  val mouse                      = "org.typelevel" %% "mouse" % "0.22"
-  val spotify                    = ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded")
-
-  private val catsEffect = catsModule("effect", "1.2.0")
-  val catsCore           = catsModule("core")
-  private val shapeless  = Def.setting("com.chuusai" %% "shapeless" % "2.3.3")
-
-  private val quill = Seq(
-    "org.postgresql" % "postgresql"  % "9.4.1208",
-    "io.getquill"    %% "quill-jdbc" % "3.1.0"
+  val silencer: Seq[ModuleID] = Seq(
+    compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
+    "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided
   )
-
-  val config = "com.typesafe" % "config" % "1.3.3"
-
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
   val enforcedVersions = Def.setting(
     Seq(
-      akkaModule("actor"),
-      akkaModule("stream"),
-      akkaHttp,
-      jacksonModuleScala,
-      scalaTest,
-      googleGuava,
-      "org.slf4j" % "slf4j-api" % "1.7.25",
+      akkaModule("akka-actor", Version.akka),
+      akkaModule("akka-stream", Version.akka),
+      akkaModule("akka-http", Version.akkaHttp),
       jacksonModule("core", "core"),
       jacksonModule("core", "annotations"),
       jacksonModule("core", "databind"),
       jacksonModule("dataformat", "dataformat-yaml"),
       jacksonModule("jaxrs", "jaxrs-base"),
       jacksonModule("jaxrs", "jaxrs-json-provider"),
-      kamonCore,
-      config,
-      machinist,
-      "com.squareup.okhttp3" % "okhttp"      % "3.11.0",
-      "com.squareup.okio"    % "okio"        % "1.14.0",
-      "com.lihaoyi"          %% "sourcecode" % "0.1.4",
-      nettyModule("handler"),
-      bouncyCastle("bcpkix"),
-      bouncyCastle("bcprov"),
-      "org.apache.httpcomponents" % "httpcore"         % "4.4.5",
-      "org.javassist"             % "javassist"        % "3.21.0-GA",
-      "org.reactivestreams"       % "reactive-streams" % "1.0.2",
-      "org.scala-lang"            % "scala-library"    % scalaVersion.value,
-      "org.scala-lang"            % "scala-reflect"    % scalaVersion.value,
-      catsEffect.value,
+      jacksonModule("module", "module-scala") withCrossVersion CrossVersion.Binary(),
+      scalaModule("scala-library", scalaVersion.value),
+      scalaModule("scala-reflect", scalaVersion.value),
+      catsModule("kernel", Version.cats).value,
+      catsModule("macros", Version.cats).value,
       catsCore.value,
-      catsModule("kernel").value,
-      catsModule("macros").value,
       shapeless.value,
-      "io.grpc" % "grpc-netty" % "1.20.0"
+      kamon,
+      typesafeConfig,
+      scalaTest % Test,
+      googleGuava,
+      slf4j,
+      grpcNetty
     )
   )
 
-  lazy val common = Seq(
-    "com.lihaoyi" %% "sourcecode" % "0.1.7"
-  )
+  lazy val common: Seq[ModuleID] = Seq("com.lihaoyi" %% "sourcecode" % Version.sourceCode)
 
-  lazy val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto") % "protobuf" // for teamcity
-
-  lazy val itTestCommon = Def.setting(
-    Seq(
-      config,
-      spotify,
-      catsCore.value,
-      mouse,
-      "com.softwaremill.sttp" %% "core"                             % "1.7.2",
-      "com.softwaremill.sttp" %% "play-json"                        % "1.7.2",
-      "com.softwaremill.sttp" %% "async-http-client-backend-future" % "1.7.2",
-      "org.typelevel"         %% "cats-tagless-macros"              % "0.9"
-    )
-  )
-
-  lazy val itTest = scalaTest +: Seq(
-    // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
-    spotify,
-    jacksonModule("dataformat", "dataformat-properties"),
-    "org.scalacheck" %% "scalacheck" % "1.14.0",
-    logback.exclude("org.scala-js", "scalajs-library_2.12")
-  ).map(_ % Test)
-
-  lazy val test = scalaTest +: Seq(
-    logback.exclude("org.scala-js", "scalajs-library_2.12"),
-    "org.scalacheck" %% "scalacheck" % "1.14.0",
-    ("io.github.amrhassan" %% "scalacheck-cats" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
-    "org.mockito"            % "mockito-all"                  % "1.10.19",
-    "org.scalamock"          %% "scalamock-scalatest-support" % "3.6.0",
-    "com.softwaremill.diffx" %% "diffx-scalatest"             % "0.3.12"
-  ).map(_ % Test)
-
-  lazy val dex =
-    Seq(
-      logback.exclude("org.scala-js", "scalajs-library_2.12"),
-      kindProjector,
-      logback,
-      "com.github.scopt" %% "scopt" % "4.0.0-RC2",
-      akkaModule("actor"),
-      akkaModule("slf4j"),
-      akkaHttp,
-      "org.apache.kafka" % "kafka-clients" % "2.3.1",
-      // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
-      janino,
-      mouse,
-      "org.typelevel" %% "cats-tagless-macros" % "0.9",
-      wavesProtobufSchemas,
-      akkaModule("testkit") % Test
-    ) ++ test ++ quill
-
-  lazy val wavesIntegration = Dependencies.grpc ++
-    Seq(
-      Dependencies.mouse,
-      akkaModule("slf4j"),
-      wavesProtobufSchemas
-    )
+  lazy val wavesProtobufSchemas: ModuleID = {
+    ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
+  }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty"            % scalapb.compiler.Version.grpcJavaVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
+    grpcNetty
   )
+
+  lazy val itTestCommon: Def.Initialize[Seq[ModuleID]] = Def.setting(
+    Seq(
+      sttpModule("core"),
+      sttpModule("play-json"),
+      sttpModule("async-http-client-backend-future"),
+      catsCore.value,
+      catsTaglessMacros,
+      typesafeConfig,
+      spotify,
+      mouse
+    )
+  )
+
+  lazy val itTest: Seq[ModuleID] = Seq(
+    jacksonModule("dataformat", "dataformat-properties"),
+    logbackScalaJsExcluded,
+    scalaTest,
+    scalaCheck,
+    spotify
+  ) map (_ % Test)
+
+  lazy val test: Seq[ModuleID] = Seq(
+    akkaModule("akka-testkit", Version.akka),
+    scalaTest,
+    scalaCheck,
+    scalaMock,
+    diffx
+  ) map (_ % Test)
+
+  lazy val dex: Seq[ModuleID] = Seq(
+    akkaModule("akka-actor", Version.akka),
+    akkaModule("akka-http", Version.akkaHttp),
+    akkaModule("akka-slf4j", Version.akka),
+    wavesProtobufSchemas,
+    logbackScalaJsExcluded,
+    logback,
+    kindProjector,
+    catsTaglessMacros,
+    mouse,
+    scopt,
+    kafka,
+    janino
+  ) ++ test ++ quill
+
+  lazy val wavesIntegration: Seq[ModuleID] = Seq(
+    wavesProtobufSchemas,
+    mouse
+  ) ++ grpc
 }

@@ -126,8 +126,8 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
             .message
             .id
 
-          orderStatus(alice, someWavesPair, aliceOrderIdFill, "Filled")
-          orderStatus(bob, someWavesPair, bobSellOrderId, "Filled")
+          node.waitOrderStatus(someWavesPair, aliceOrderIdFill, "Filled", waitTime = 2.minutes)
+          node.waitOrderStatus(someWavesPair, bobSellOrderId, "Filled", waitTime = 2.minutes)
 
           node.waitOrderInBlockchain(aliceOrderIdFill)
 
@@ -182,13 +182,12 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {
         val ts = ntpTime.correctedTime()
         val expirationTimestamp = ts + Order.MaxLiveTime
-        val amount = 1
         val aliceWavesPair = AssetPair(aliceAsset, Waves)
-        val buy = Order.buy(alice, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
-        val sell = Order.sell(bob, matcherPublicKey, aliceWavesPair, amount, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
+        val buy = Order.buy(alice, matcherPublicKey, aliceWavesPair, 1, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
+        val sell = Order.sell(bob, matcherPublicKey, aliceWavesPair, 1, price, ts, expirationTimestamp, minMatcherFee, version = 3, Waves)
 
-        assertBadRequest(node.placeOrder(buy), "")
-        assertBadRequest(node.placeOrder(sell), "")
+        assertBadRequestAndMessage(node.placeOrder(buy), "")
+        assertBadRequestAndMessage(node.placeOrder(sell), "")
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {
@@ -226,9 +225,6 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
       }
     }
   }
-
-  private def orderStatus(sender: KeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
-    node.waitOrderStatus(assetPair, orderId, expectedStatus, waitTime = 2.minutes)
 }
 
 object OrderFixedFeeTestSuite {

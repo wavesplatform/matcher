@@ -232,7 +232,6 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
 }
 
 object OrderFixedFeeTestSuite {
-
   def configWithOrderFeeFixed(matcherFeeAssetId: String = "WAVES", minFee: Long): Config = {
     parseString(
       s"""

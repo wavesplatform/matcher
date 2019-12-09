@@ -46,7 +46,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     extends Extension
     with ScorexLogging {
 
-  import actorSystem.dispatcher
   import com.wavesplatform.dex.Matcher._
   import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient}
 
@@ -289,7 +288,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          wavesBlockchainAsyncClient.unsafeTap { _.requestBalanceChanges() } |> { _.spendableBalanceChanges },
+          wavesBlockchainAsyncClient.spendableBalanceChanges,
           settings,
           orderDB,
           (address, startSchedules) =>

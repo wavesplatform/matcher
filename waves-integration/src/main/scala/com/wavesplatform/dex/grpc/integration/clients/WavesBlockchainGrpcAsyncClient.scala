@@ -64,6 +64,9 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
       }
     }
 
+  /** Performs new gRPC call for receiving of the spendable balance changes stream */
+  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
+
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message)   => throw new IllegalArgumentException(message)
     case Result.Empty                 => RunScriptResult.Allowed
@@ -73,57 +76,57 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
     case _: Result.Denied             => RunScriptResult.Denied
   }
 
-  /** Performs new gRPC call for receiving of the spendable balance changes stream */
-  def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
-
   /** Returns stream of the balance changes as a sequence of batches */
-  def spendableBalanceChanges: Observable[SpendableBalanceChanges] = spendableBalanceChangesSubject
+  override lazy val spendableBalanceChanges: Observable[SpendableBalanceChanges] = {
+    requestBalanceChanges()
+    spendableBalanceChangesSubject
+  }
 
-  def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
     blockchainService
       .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
       .map(_.balance)
   }
 
-  def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
+  override def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
     blockchainService.isFeatureActivated { IsFeatureActivatedRequest(id) }.map(_.isActivated)
   }
 
-  def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = handlingErrors {
+  override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]] = handlingErrors {
     blockchainService.assetDescription { AssetIdRequest(asset.toPB) }.map(_.maybeDescription.toVanilla)
   }
 
-  def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = handlingErrors {
+  override def hasScript(asset: Asset.IssuedAsset): Future[Boolean] = handlingErrors {
     blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.map(_.has)
   }
 
-  def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
+  override def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
     blockchainService
       .runAssetScript { RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB)) }
       .map(parse)
   }
 
-  def hasScript(address: Address): Future[Boolean] = handlingErrors {
+  override def hasScript(address: Address): Future[Boolean] = handlingErrors {
     blockchainService.hasAddressScript { HasAddressScriptRequest(address = address.toPB) }.map(_.has)
   }
 
-  def runScript(address: Address, input: Order): Future[RunScriptResult] = handlingErrors {
+  override def runScript(address: Address, input: Order): Future[RunScriptResult] = handlingErrors {
     blockchainService
       .runAddressScript { RunAddressScriptRequest(address = address.toPB, order = Some(input.toPB)) }
       .map(parse)
   }
 
-  def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
+  override def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
     handlingErrors {
       blockchainService
         .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }
         .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
     } recover { case _ => txIds.map(_ -> false).toMap }
 
-  def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] =
+  override def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] =
     handlingErrors { blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid) } recover { case _ => false }
 
-  def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
+  override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
     blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)
   }
 }

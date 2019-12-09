@@ -19,7 +19,6 @@ import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
-import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 import scala.util.Random
@@ -72,7 +71,6 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
     broadcastAndAwait(IssueUsdTx)
 
     client.spendableBalanceChanges.subscribe(eventsObserver)
-    client.requestBalanceChanges()
   }
 
   "DEX client should receive balance changes via gRPC" in {

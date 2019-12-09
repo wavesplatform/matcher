@@ -15,7 +15,7 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter, UtilApp}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter}
 import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -45,10 +45,8 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     val gRPCExtensionClient =
       new DEXClient(
         s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
-        settings.defaultGrpcCachesExpiration,
-        scheduler,
-        grpcExecutionContext
-      )
+        settings.defaultGrpcCachesExpiration
+      )(scheduler, grpcExecutionContext)
 
     matcher = new Matcher(settings, gRPCExtensionClient)
     matcher.start()

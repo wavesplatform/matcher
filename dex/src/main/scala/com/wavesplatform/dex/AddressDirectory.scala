@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
@@ -31,7 +31,9 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
 
   /** Sends balance changes to the AddressActors */
   spendableBalanceChanges.foreach {
-    _.foreach { case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances }) }
+    _.foreach {
+      case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances })
+    }
   } { Scheduler(context.dispatcher) }
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy

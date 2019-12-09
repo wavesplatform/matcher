@@ -10,7 +10,7 @@ import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook._

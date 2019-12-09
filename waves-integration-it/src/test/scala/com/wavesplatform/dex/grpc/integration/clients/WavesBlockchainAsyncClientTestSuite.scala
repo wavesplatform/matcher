@@ -20,12 +20,17 @@ import monix.reactive.Observer
 import org.scalatest.{Assertion, BeforeAndAfterEach}
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
 class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
 
-  private implicit val monixScheduler = Scheduler.singleThread("test")
+  private val runNow = new ExecutionContext {
+    override def execute(runnable: Runnable): Unit     = runnable.run()
+    override def reportFailure(cause: Throwable): Unit = throw cause
+  }
+
+  private implicit val monixScheduler = Scheduler(runNow)
   private lazy val client             = new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds).wavesBlockchainAsyncClient
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
@@ -33,7 +38,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
     interval = 1.second
   )
 
-  private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
+  @volatile private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
   private val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
     override def onError(ex: Throwable): Unit                       = Unit
@@ -42,7 +47,10 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   }
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
-    val actual   = simplify(balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet))
+    // Remove pairs (address, asset) those expectedBalanceChanges has not
+    val actual = simplify(balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
+      case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
+    })
     val expected = simplify(expectedBalanceChanges)
     log.trace(s"Compare:\nactual: $actual\nexpected: $expected")
     actual shouldBe expected
@@ -69,12 +77,10 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-
     client.spendableBalanceChanges.subscribe(eventsObserver)
   }
 
   "DEX client should receive balance changes via gRPC" in {
-
     val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
 
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)

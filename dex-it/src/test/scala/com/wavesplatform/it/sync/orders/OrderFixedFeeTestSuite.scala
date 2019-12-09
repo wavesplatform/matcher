@@ -138,7 +138,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase with NTPTime {
         }
       }
 
-      "should accept orders if sender received amount > then fee amount" in {
+      "should accept orders if sender received amount > than fee amount" in {
         docker.restartNode(node,
           configWithOrderFeeFixed(
             matcherFeeAssetId = aliceAssetBase58,

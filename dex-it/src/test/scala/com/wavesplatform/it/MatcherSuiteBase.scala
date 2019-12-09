@@ -24,6 +24,7 @@ abstract class MatcherSuiteBase
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
+  val baseFee          = 0.003.waves
   val smartFee         = 0.004.waves
   val minFee           = 0.001.waves + smartFee
   val issueFee         = 1.waves

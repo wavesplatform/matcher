@@ -8,9 +8,10 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponse, SyncMatcherHttpApi}
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.api.{MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -244,7 +245,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val statuses = sells.map {
         case (assetPair, orderId) =>
           orderId -> node
-            .waitFor[MatcherStatusResponse](s"$orderId status")(
+            .waitFor[MatcherStatusResponseWithFee](s"$orderId status")(
               _.orderStatus(orderId, assetPair, waitForStatus = false),
               r => r.status == "Cancelled" || r.status == "Filled",
               1.second

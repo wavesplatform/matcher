@@ -2,12 +2,12 @@ package com.wavesplatform.it.sync
 
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.{wavesBtcPair, _}
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
@@ -53,6 +53,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     txIds.foreach(node.waitForTransaction(_))
   }
 
+  def unexpectedFeeAsset(currentFeeAsset: ByteStr, expectedFeeAsset: String = "WAVES"): String = {
+    s"Required one of the following fee asset: ${currentFeeAsset}. But given ${expectedFeeAsset}"
+  }
+
   "supported non-waves order fee" - {
     val btcRate = 0.0005
     val ethRate = 0.0064
@@ -61,7 +65,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       Map(BtcId -> btcRate, EthId -> ethRate)
         .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
 
-      assertBadRequestAndResponse(
+      assertBadRequestAndMessage(
         node.placeOrder(
           sender = bob,
           pair = wavesBtcPair,
@@ -75,7 +79,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         s"Required 0.0000015 $BtcId as fee for this order, but given 0.000001 $BtcId"
       )
 
-      assertBadRequestAndResponse(
+      assertBadRequestAndMessage(
         node.placeOrder(
           sender = bob,
           pair = wavesBtcPair,
@@ -170,7 +174,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       price = 50000L,
       fee = 150L,
       version = 3: Byte,
-      feeAsset = IssuedAsset(BtcId)
+      feeAssetId = IssuedAsset(BtcId)
     )
 
     "only waves supported" in {
@@ -186,10 +190,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     "asset became not supported after order was placed" in {
       Map(BtcId -> btcRate, EthId -> ethRate)
         .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+      val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
       val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
       val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-      val bobOrderId      = node.placeOrder(order).message.id
+      val bobOrderId = node.placeOrder(order).message.id
       node.deleteRate(IssuedAsset(BtcId))
       node
         .placeOrder(
@@ -215,7 +219,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     "asset became not supported after order was partially filled" in {
       Map(BtcId -> btcRate, EthId -> ethRate)
         .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
-      val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+      val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
       val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
       val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
       val aliceOrderId = node
@@ -314,12 +318,12 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     val ethRate = 0.0064
 
     "are full filled" in {
-      val bobBtcBalance     = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+      val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+      val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
+      val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
       val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
       val matcherBtcBalance = node.assetBalance(matcher.toAddress.toString, BtcId.toString).balance
-      val bobWavesBalance   = node.accountBalances(bob.toAddress.toString)._1
+      val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
       val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
       Map(BtcId -> btcRate, EthId -> ethRate)
@@ -369,9 +373,9 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     }
 
     "are partial filled" in {
-      val bobBtcBalance     = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
-      val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-      val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+      val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+      val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
+      val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
       val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
 
       Map(BtcId -> btcRate, EthId -> ethRate)
@@ -423,11 +427,11 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       for ((aliceOrderAmount, aliceBalanceDiff) <- params) {
 
         val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobBtcBalance   = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
+        val bobBtcBalance = node.assetBalance(bob.toAddress.toString, BtcId.toString).balance
 
         val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
-        val aliceEthBalance   = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
+        val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
+        val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
 
         val matcherEthBalance = node.assetBalance(matcher.toAddress.toString, EthId.toString).balance
 
@@ -499,7 +503,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     val btcRate = 0.0005
     val ethRate = 0.0064
     "order with non-waves fee" in {
-      val assetPair  = wavesBtcPair
+      val assetPair = wavesBtcPair
       val bobBalance = node.tradableBalance(bob, assetPair)
       node.upsertRate(IssuedAsset(BtcId), btcRate, expectedStatusCode = StatusCodes.Created)
       val orderId = node
@@ -522,7 +526,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     }
 
     "partially filled order with non-waves fee" in {
-      val assetPair       = wavesBtcPair
+      val assetPair = wavesBtcPair
       val aliceEthBalance = node.tradableBalance(alice, ethWavesPair)(EthId.toString)
       Map(BtcId -> btcRate, EthId -> ethRate)
         .foreach(asset => node.upsertRate(IssuedAsset(asset._1), asset._2, expectedStatusCode = StatusCodes.Created))
@@ -581,9 +585,9 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     node.upsertRate(IssuedAsset(UsdId), 3, expectedStatusCode = StatusCodes.OK)
 
     val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-    val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
-    val bobWavesBalance   = node.accountBalances(bob.toAddress.toString)._1
-    val bobUsdBalance     = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+    val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+    val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
+    val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
     val bobOrderId = node
       .placeOrder(
         sender = bob,
@@ -646,11 +650,11 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))
 
       withClue("price asset is fee asset") {
-        val bobWctBalance   = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
+        val bobWctBalance = node.assetBalance(bob.toAddress.toString, WctId.toString).balance
         val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobUsdBalance   = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+        val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 238, 1, version = 3, feeAsset = wct).message.id
+        val bobOrderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 425532L, 238, 1, version = 3, feeAsset = wct).message.id
         val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3).message.id
 
         node.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled")
@@ -666,9 +670,9 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
       withClue("price asset is not fee asset") {
         val bobWavesBalance = node.accountBalances(bob.toAddress.toString)._1
-        val bobUsdBalance   = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
+        val bobUsdBalance = node.assetBalance(bob.toAddress.toString, UsdId.toString).balance
 
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 851064L, 238, 1, version = 3, feeAsset = usd).message.id
+        val bobOrderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 851064L, 238, 1, version = 3, feeAsset = usd).message.id
         val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 238, matcherFee, version = 3).message.id
 
         node.waitOrderStatus(wavesUsdPair, bobOrderId, "Filled")
@@ -684,12 +688,12 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       withClue("buy order") {
         node.broadcastTransfer(bob, alice.toAddress.toString, 1, 0.001.waves, Some(WctId.toString), None, waitForTx = true)
 
-        val aliceWctBalance   = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
+        val aliceWctBalance = node.assetBalance(alice.toAddress.toString, WctId.toString).balance
         val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
-        val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+        val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
 
         val aliceOrderId = node.placeOrder(alice, wavesUsdPair, OrderType.BUY, 851064L, 238, 1, version = 3, feeAsset = wct).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3).message.id
+        val bobOrderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 238, matcherFee, version = 3).message.id
 
         node.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled")
         node.waitOrderStatus(wavesUsdPair, bobOrderId, "PartiallyFilled")
@@ -749,11 +753,11 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         .foreach(asset => node.upsertRate(asset, 0.000003D, expectedStatusCode = StatusCodes.Created))
 
       withClue("price asset is fee asset") {
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
+        val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
         val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
         val aliceOrderId = node.placeOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, version = 3, feeAsset = btc).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
+        val bobOrderId = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
 
         node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled")
         node.waitOrderStatus(wavesBtcPair, bobOrderId, "Filled")
@@ -771,12 +775,12 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       }
 
       withClue("price asset is not fee asset") {
-        val aliceUsdBalance   = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
-        val aliceBtcBalance   = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
+        val aliceUsdBalance = node.assetBalance(alice.toAddress.toString, UsdId.toString).balance
+        val aliceBtcBalance = node.assetBalance(alice.toAddress.toString, BtcId.toString).balance
         val aliceWavesBalance = node.accountBalances(alice.toAddress.toString)._1
 
         val aliceOrderId = node.placeOrder(alice, wavesBtcPair, OrderType.SELL, 100.waves, 10591, 1, version = 3, feeAsset = usd).message.id
-        val bobOrderId   = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
+        val bobOrderId = node.placeOrder(bob, wavesBtcPair, OrderType.BUY, 50.waves, 10591, matcherFee, version = 3).message.id
 
         node.waitOrderStatus(wavesBtcPair, aliceOrderId, "PartiallyFilled")
         node.waitOrderStatus(wavesBtcPair, bobOrderId, "Filled")
@@ -802,10 +806,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     "percent & fixed fee modes" in {
       def check(): Unit = {
         withClue("buy order") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
+          val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
           val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+          val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
           val aliceOrderId = node
             .placeOrder(
@@ -843,10 +847,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         }
 
         withClue("place buy order with amount less than fee") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
+          val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
           val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+          val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
           val aliceOrderId = node
             .placeOrder(
@@ -884,10 +888,10 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
         }
 
         withClue("place buy order after partial fill") {
-          val aliceBalance    = node.accountBalances(alice.toAddress.toString)._1
-          val bobBalance      = node.accountBalances(bob.toAddress.toString)._1
+          val aliceBalance = node.accountBalances(alice.toAddress.toString)._1
+          val bobBalance = node.accountBalances(bob.toAddress.toString)._1
           val aliceEthBalance = node.assetBalance(alice.toAddress.toString, EthId.toString).balance
-          val bobEthBalance   = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
+          val bobEthBalance = node.assetBalance(bob.toAddress.toString, EthId.toString).balance
 
           val aliceOrderId = node
             .placeOrder(
@@ -948,8 +952,6 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
       val transferId = node.broadcastTransfer(alice, bob.toAddress.toString, defaultAssetQuantity / 2, 0.005.waves, Some(EthId.toString), None).id
       node.waitForTransaction(transferId)
 
-      docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
-      check()
       docker.restartNode(node, ConfigFactory.parseString("waves.dex.order-fee.mode = fixed"))
       check()
       docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed"))

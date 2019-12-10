@@ -8,7 +8,6 @@ import com.wavesplatform.it.api.AsyncMatcherHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.async.CorrectStatusAfterPlaceTestSuite._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -138,7 +137,7 @@ object CorrectStatusAfterPlaceTestSuite {
       quantity = Long.MaxValue,
       decimals = 0,
       reissuable = false,
-      fee = 1.waves,
+      fee = 100000000L,
       timestamp = System.currentTimeMillis()
     )
     .explicitGet()
@@ -151,7 +150,7 @@ object CorrectStatusAfterPlaceTestSuite {
       quantity = Long.MaxValue,
       decimals = 0,
       reissuable = false,
-      fee = 1.waves,
+      fee = 100000000L,
       timestamp = System.currentTimeMillis()
     )
     .explicitGet()

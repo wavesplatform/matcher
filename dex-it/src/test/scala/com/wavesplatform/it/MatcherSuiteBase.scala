@@ -5,10 +5,11 @@ import java.util.Properties
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.Decimals
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
@@ -43,6 +44,13 @@ abstract class MatcherSuiteBase
   val tradeFee         = 0.003.waves
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
+
+  implicit class DoubleOps(value: Double) {
+    val wct: Long             = Normalization.normalizeAmountAndFee(value, Decimals)
+    val price: Long           = Normalization.normalizePrice(value, Decimals, Decimals)
+    val waves, eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long             = Normalization.normalizePrice(value, 8, 2)
+  }
 
   private val topicName = {
     val secureRandom            = new SecureRandom(Longs.toByteArray(Thread.currentThread().getId))
@@ -88,7 +96,9 @@ object MatcherSuiteBase {
          |    servers = "$kafkaServer"
          |    topic = "$topicName"
          |  }
-         |}""".stripMargin)
+         |}
+         |waves.dex.allowed-order-versions = [1, 2, 3]
+         |""".stripMargin)
   }
 
   private def createKafkaTopic(name: String): Unit = kafkaServer.foreach { server =>

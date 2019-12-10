@@ -2,12 +2,12 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -59,7 +59,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     }
 
     val bidPrice  = 200
-    val bidAmount = 1.waves
+    val bidAmount = 100000000L
     val askPrice  = 400
     val askAmount = bidAmount / 2
 
@@ -141,6 +141,13 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 }
 
 object MatcherTickerTestSuite {
+
+  implicit class DoubleOps(value: Double) {
+    val wct: Long             = Normalization.normalizeAmountAndFee(value, Decimals)
+    val price: Long           = Normalization.normalizePrice(value, Decimals, Decimals)
+    val waves, eth, btc: Long = Normalization.normalizeAmountAndFee(value, 8)
+    val usd: Long             = Normalization.normalizePrice(value, 8, 2)
+  }
 
   import ConfigFactory._
 

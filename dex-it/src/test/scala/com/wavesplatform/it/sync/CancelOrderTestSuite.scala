@@ -11,9 +11,9 @@ import com.wavesplatform.dex.util.FutureOps._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponse, SyncMatcherHttpApi}
+import com.wavesplatform.it.api.{MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
@@ -79,8 +79,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
             val time = System.currentTimeMillis
 
             val futures = (1 to numOrders).map { c =>
-              asyncNode
-                .placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
+              asyncNode.placeOrder(account, wavesUsdPair, SELL, 100000000L, startPrice + c, 300000L, 2.toByte, timestamp = time + c)
             }
 
             Future.sequence(futures).map(_ => ())
@@ -305,7 +304,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val statuses = sells.map {
         case (assetPair, orderId) =>
           orderId -> node
-            .waitFor[MatcherStatusResponse](s"$orderId status")(
+            .waitFor[MatcherStatusResponseWithFee](s"$orderId status")(
               _.orderStatus(orderId, assetPair, waitForStatus = false),
               r => r.status == "Cancelled" || r.status == "Filled",
               1.second

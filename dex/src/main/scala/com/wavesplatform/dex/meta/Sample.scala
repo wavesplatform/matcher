@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderV3}
 import shapeless._
 

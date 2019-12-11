@@ -52,8 +52,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
       case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
     })
     val expected = simplify(expectedBalanceChanges)
-    log.trace(s"Compare:\nactual: $actual\nexpected: $expected")
-    actual shouldBe expected
+    actual should matchTo(expected)
   }
 
   private def simplify(xs: Map[Address, Map[Asset, Long]]): String =
@@ -178,13 +177,13 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
     "returns an information for created assets" in {
       val issueTx = IssueUsdTx
-      wait(client.assetDescription(IssuedAsset(issueTx.id()))) shouldBe Some(
+      wait(client.assetDescription(IssuedAsset(issueTx.id()))) should matchTo(Option(
         BriefAssetDescription(
           name = new String(issueTx.name, StandardCharsets.UTF_8),
           decimals = issueTx.decimals,
           hasScript = issueTx.script.nonEmpty
         )
-      )
+      ))
     }
   }
 

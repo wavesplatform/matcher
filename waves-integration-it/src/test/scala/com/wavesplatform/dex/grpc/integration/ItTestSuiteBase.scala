@@ -10,6 +10,7 @@ import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.docker.{DockerContainer, WavesIntegrationItDocker, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.it.test.{HasWavesNode, WavesNodeApiExtensions}
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
@@ -33,6 +34,7 @@ trait ItTestSuiteBase
     with PredefinedAssets
     with PredefinedAccounts
     with DoubleOps
+    with DiffMatcherWithImplicits
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()

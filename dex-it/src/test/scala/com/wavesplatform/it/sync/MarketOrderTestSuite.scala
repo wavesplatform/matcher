@@ -20,7 +20,6 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   val fixedFee = 0.003.waves
   val percentFee = 14
 
-
   def tooLowPrice(orderType: String, price: String): String = {
     s"Price of the $orderType market order ($price) is too low for its full execution with the current market state"
   }

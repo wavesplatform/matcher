@@ -93,6 +93,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
        |postgres {
        |  server-name = $serverName
        |  port-number = $port
+       |  database = $postgresUser
        |  user = $postgresUser
        |  password = $postgresPassword
        |  data-source-class-name = "org.postgresql.ds.PGSimpleDataSource"

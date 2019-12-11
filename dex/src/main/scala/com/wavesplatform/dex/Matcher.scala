@@ -371,7 +371,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
   }
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
-    case _: AskTimeoutException =>
+    case _: TimeoutException =>
       if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get last offset from queue"))
       else getLastOffset(deadline)
   }

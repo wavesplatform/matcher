@@ -1,24 +1,20 @@
-package com.wavesplatform.dex.grpc.integration.clients.async
+package com.wavesplatform.dex.grpc.integration.clients
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.grpc.integration.clients.async.WavesBlockchainAsyncClient.SpendableBalanceChanges
-import com.wavesplatform.dex.grpc.integration.clients.sync.WavesBlockchainClient.RunScriptResult
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import monix.reactive.Observable
 
-object WavesBlockchainAsyncClient {
-
+object WavesBlockchainClient {
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
-  
 }
 
-trait WavesBlockchainAsyncClient[F[_]] {
-
+trait WavesBlockchainClient[F[_]] {
   def spendableBalanceChanges: Observable[SpendableBalanceChanges]
   def spendableBalance(address: Address, asset: Asset): F[Long]
 

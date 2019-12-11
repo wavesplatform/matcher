@@ -135,6 +135,8 @@ object Dependencies {
     )
   )
 
+  lazy val testCommon: Def.Initialize[Seq[ModuleID]] = Def.setting(Seq(diffx))
+
   lazy val itTest: Seq[ModuleID] = Seq(
     jacksonModule("dataformat", "dataformat-properties"),
     logbackScalaJsExcluded,
@@ -147,8 +149,7 @@ object Dependencies {
     akkaModule("akka-testkit", Version.akka),
     scalaTest,
     scalaCheck,
-    scalaMock,
-    diffx
+    scalaMock
   ) map (_ % Test)
 
   lazy val dex: Seq[ModuleID] = Seq(
@@ -168,6 +169,6 @@ object Dependencies {
 
   lazy val wavesIntegration: Seq[ModuleID] = Seq(
     wavesProtobufSchemas,
-    mouse
+    mouse % Test
   ) ++ grpc
 }

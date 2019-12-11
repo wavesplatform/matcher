@@ -29,6 +29,8 @@ service WavesBlockchainApi {
     rpc SpendableAssetBalance (SpendableAssetBalanceRequest) returns (SpendableAssetBalanceResponse);
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
+
+    rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
 }
 
 // Common requests
@@ -101,7 +103,7 @@ message AssetDescriptionResponse {
 message AssetDescription {
     bytes name = 1;
     int32 decimals = 2;
-    bool has_script = 3; // TODO
+    bool has_script = 3;
 }
 
 message RunAssetScriptRequest {
@@ -135,6 +137,15 @@ message ForgedOrderResponse {
     bool is_forged = 1;
 }
 
+message BalanceChangesResponse {
+    message Record {
+        bytes address = 1;
+        bytes asset = 2;
+        int64 balance = 3;
+    }
+    repeated Record batch = 1;
+}
+
 // Other entities
 
 message Exception {
@@ -154,6 +165,7 @@ message ExchangeTransaction {
     int64 timestamp = 4;
     int32 version = 5;
 
+    // compatibility with wavesplatform/protobuf-schemas
     oneof data {
         waves.ExchangeTransactionData exchange = 107;
     }

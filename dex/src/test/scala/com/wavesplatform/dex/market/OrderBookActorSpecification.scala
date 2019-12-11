@@ -26,7 +26,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification

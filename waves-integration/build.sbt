@@ -101,3 +101,8 @@ inConfig(Universal)(Seq(
 Linux / name := s"waves-dex-integration${network.value.packageSuffix}" // A staging directory name
 Linux / normalizedName := (Linux / name).value // An archive file name
 Linux / packageName := (Linux / name).value // In a control file
+
+Debian / debianPackageConflicts := Seq(
+  "grpc-server",
+  "waves-node-grpc-server" // TODO NODE-1999
+)

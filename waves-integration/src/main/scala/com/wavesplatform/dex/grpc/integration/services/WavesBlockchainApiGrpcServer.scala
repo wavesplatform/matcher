@@ -6,6 +6,7 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
+import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.extensions.{Context => ExtensionContext}
@@ -18,13 +19,15 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import shapeless.Coproduct
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Scheduler)
+class WavesBlockchainApiGrpcServer(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 
@@ -127,6 +130,14 @@ class WavesBlockchainApiGrpcServer(context: ExtensionContext)(implicit sc: Sched
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
     val seen = context.blockchain.filledVolumeAndFee(request.orderId.toVanilla).volume > 0
     ForgedOrderResponse(isForged = seen)
+  }
+
+  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
+    context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
+      val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+      val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
+      responseObserver.onNext(BalanceChangesResponse(pbBatch))
+    }
   }
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {

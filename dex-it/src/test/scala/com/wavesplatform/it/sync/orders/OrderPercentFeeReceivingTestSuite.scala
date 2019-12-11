@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
-class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeeReceivingTestSuite(3.toByte)
+class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeePriceTestSuite(3.toByte)
 
 abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset = IssuedAsset(UsdId)) extends MatcherSuiteBase {
   val assetType = RECEIVING

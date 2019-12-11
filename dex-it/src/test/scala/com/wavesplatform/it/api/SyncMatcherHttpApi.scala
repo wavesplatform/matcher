@@ -2,10 +2,10 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, Proofs}
@@ -19,7 +19,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
-import org.slf4j.LoggerFactory
 
 object SyncMatcherHttpApi extends Assertions {
 

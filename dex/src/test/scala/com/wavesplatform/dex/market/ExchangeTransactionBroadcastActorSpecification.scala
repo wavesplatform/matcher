@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.market
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef}
 import com.typesafe.config.ConfigFactory
@@ -8,6 +10,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
@@ -96,9 +99,71 @@ class ExchangeTransactionBroadcastActorSpecification
         broadcasted shouldBe empty
       }
     }
+
+    "re-broadcasts transactions" when {
+      "failed to validate" in {
+        val firstProcessing = new AtomicBoolean(false)
+        var triedToBroadcast = Seq.empty[ExchangeTransaction]
+        val actor = defaultActor(
+          ntpTime,
+          check = _ => throw new RuntimeException("Can't do"),
+          isConfirmed = _ => false,
+          broadcast = {
+            firstProcessing.compareAndSet(false, true)
+            triedToBroadcast = _
+          }
+        )
+
+        val event = sampleEvent()
+        system.eventStream.publish(event)
+        eventually {
+          firstProcessing.get() shouldBe true
+        }
+        triedToBroadcast shouldBe empty // Because couldn't check
+
+        actor ! ExchangeTransactionBroadcastActor.Send
+        actor ! ExchangeTransactionBroadcastActor.Send
+        eventually {
+          triedToBroadcast should not be empty
+        }
+      }
+
+      "failed to broadcast" in {
+        val firstProcessing = new AtomicBoolean(false)
+        var triedToBroadcast = Seq.empty[ExchangeTransaction]
+        val actor = defaultActor(
+          ntpTime,
+          isConfirmed = _ => false,
+          broadcast = { txs =>
+            firstProcessing.compareAndSet(false, true)
+            triedToBroadcast = txs
+            throw new RuntimeException("Can't do")
+          }
+        )
+
+        val event = sampleEvent()
+        system.eventStream.publish(event)
+        eventually {
+          firstProcessing.get() shouldBe true
+        }
+
+        triedToBroadcast = Seq.empty
+        actor ! ExchangeTransactionBroadcastActor.Send
+        actor ! ExchangeTransactionBroadcastActor.Send
+        eventually {
+          triedToBroadcast should not be empty
+        }
+      }
+    }
   }
 
   private def defaultActor(time: Time,
+                           isConfirmed: ExchangeTransaction => Boolean,
+                           broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[ExchangeTransactionBroadcastActor] =
+    defaultActor(time, _ => Right(Unit), isConfirmed, broadcast)
+
+  private def defaultActor(time: Time,
+                           check: ExchangeTransaction => Either[ValidationError, Unit],
                            isConfirmed: ExchangeTransaction => Boolean,
                            broadcast: Seq[ExchangeTransaction] => Unit): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
     new ExchangeTransactionBroadcastActor(
@@ -108,7 +173,7 @@ class ExchangeTransactionBroadcastActorSpecification
         maxPendingTime = 5.minute
       ),
       time = time,
-      _ => Right(Unit),
+      check = check,
       isConfirmed = isConfirmed,
       broadcast = broadcast
     )

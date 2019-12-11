@@ -5,22 +5,20 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.MatcherModel.Normalization
+import com.wavesplatform.dex.settings.AssetType._
+import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.MatcherStatusResponseWithFee
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponseWithFee}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.dex.settings.FeeMode._
-import com.wavesplatform.dex.settings.AssetType._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class MarketOrderTestSuite extends MatcherSuiteBase {
   val fixedFee = 0.003.waves
   val percentFee = 14
-
 
   def tooLowPrice(orderType: String, price: String): String = {
     s"Price of the $orderType market order ($price) is too low for its full execution with the current market state"

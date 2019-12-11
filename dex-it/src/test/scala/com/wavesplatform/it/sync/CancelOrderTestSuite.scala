@@ -8,10 +8,10 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponse, MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.api.{MatcherStatusResponse, MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.util.GlobalTimer
+import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}

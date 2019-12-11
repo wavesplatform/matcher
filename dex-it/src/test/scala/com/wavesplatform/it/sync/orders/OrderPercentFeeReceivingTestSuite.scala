@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
-class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeePriceTestSuite(3.toByte)
+class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeeReceivingTestSuite(3.toByte)
 
 abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset = IssuedAsset(UsdId)) extends MatcherSuiteBase {
   val assetType = RECEIVING
@@ -40,10 +40,7 @@ abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset 
          |waves.dex {
          |  allowed-order-versions = [1, 2, 3]
          |  order-fee {
-         |    mode = $DYNAMIC
-         |    $DYNAMIC {
-         |      base-fee = 300000
-         |    }
+         |    mode = $PERCENT
          |    $PERCENT {
          |      asset-type = $assetType
          |      min-fee = $percentFee
@@ -104,8 +101,6 @@ abstract class OrderPercentFeeReceivingTestSuite(version: Byte, feeAsset: Asset 
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
-    docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.mode = $PERCENT"))
-
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled" in {
       val accountBuyer  = createAccountWithBalance(minimalFeeWaves  -> None, fullyAmountUsd -> Some(UsdId.toString))
       val accountSeller = createAccountWithBalance(fullyAmountWaves -> None)

@@ -36,10 +36,7 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
          |waves.dex {
          |  allowed-order-versions = [1, 2, 3]
          |  order-fee {
-         |    mode = $DYNAMIC
-         |    $DYNAMIC {
-         |      base-fee = 300000
-         |    }
+         |    mode = $PERCENT
          |    $PERCENT {
          |      asset-type = $assetType
          |      min-fee = $percentFee
@@ -100,8 +97,6 @@ abstract class OrderPercentFeePriceTestSuite(version: Byte, feeAsset: Asset = Is
   }
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
-    docker.restartNode(node, ConfigFactory.parseString(s"waves.dex.order-fee.mode = $PERCENT"))
-
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled" in {
       val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee -> Some(UsdId.toString))
       val accountSeller = createAccountWithBalance(fullyAmountWaves            -> None)

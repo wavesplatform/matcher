@@ -25,20 +25,26 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
   private val default: Receive = {
     case ExchangeTransactionCreated(tx) =>
-      check(tx) match {
+      try check(tx) match {
         case Right(_) => broadcast(List(tx))
         case Left(e)  => logError(tx, e)
+      } catch {
+        case e: Throwable => log.error(s"Can't check or broadcast the transaction ${tx.id()}", e)
       }
   }
 
   private def watching(toCheck: Vector[ExchangeTransaction], next: Vector[ExchangeTransaction]): Receive = {
     case ExchangeTransactionCreated(tx) =>
-      check(tx) match {
+      try check(tx) match {
         case Right(_) =>
           broadcast(List(tx))
           context.become(watching(toCheck, next :+ tx))
 
         case Left(e) => logError(tx, e)
+      } catch {
+        case e: Throwable =>
+          log.warn(s"Can't check or broadcast the transaction ${tx.id()}, will try later", e)
+          context.become(watching(toCheck, next :+ tx))
       }
 
     case Send =>
@@ -48,9 +54,13 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
       val (confirmed, unconfirmed) = toCheck.partition(isConfirmed)
       val (expired, ready)         = unconfirmed.partition(_.timestamp <= expireMs)
 
-      broadcast(ready)
-      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} sent")
-      if (expired.nonEmpty) log.warn(s"${expired.size} failed to send: ${expired.map(_.id().toString).mkString(", ")}")
+      log.debug(s"Stats: ${confirmed.size} confirmed, ${ready.size} ready")
+      if (expired.nonEmpty) log.warn(s"${expired.size} expired: ${expired.map(_.id().toString).mkString(", ")}")
+
+      try broadcast(ready)
+      catch {
+        case e: Throwable => log.warn(s"Can't broadcast one or more of transactions: ${ready.map(_.id()).mkString(", ")}. Will try later", e)
+      }
 
       scheduleSend()
       context.become(watching(next ++ ready, Vector.empty))

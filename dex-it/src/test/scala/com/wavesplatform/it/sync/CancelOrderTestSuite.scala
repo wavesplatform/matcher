@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponseWithFee, SyncMatcherHttpApi}
+import com.wavesplatform.it.api.{MatcherStatusResponse, MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -45,7 +45,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Order can be canceled" - {
     "After cancelAllOrders (200) all of them should be cancelled" in {
       val orders = new ListBuffer[String]()
-      val time   = System.currentTimeMillis
+      val time = System.currentTimeMillis
 
       for (i <- 1 to 200) {
         val order = node
@@ -143,131 +143,4 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       }
     }
   }
-
-  "Auto cancel" - {
-    // TODO: Uncomment after Node v1.1.6
-    "wrong auto cancel when match on all coins" ignore {
-      val accounts       = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
-      val oneOrderAmount = 10000
-      val orderPrice     = 3000000000000L
-
-      val initialTransferIds = accounts
-        .map { account =>
-          TransferTransactionV2
-            .selfSigned(
-              assetId = Waves,
-              sender = alice,
-              recipient = account,
-              amount = issueFee,
-              timestamp = System.currentTimeMillis(),
-              feeAssetId = Waves,
-              feeAmount = minFee,
-              attachment = Array.emptyByteArray
-            )
-            .explicitGet()
-        }
-        .map { tx =>
-          node.signedBroadcast(tx.json())
-          tx.id()
-        }
-
-      initialTransferIds.foreach(id => node.waitForTransaction(id.toString))
-
-      val accountsAndAssets = accounts.zipWithIndex.map {
-        case (account, i) =>
-          account -> IssueTransactionV2
-            .selfSigned(
-              chainId = AddressScheme.current.chainId,
-              sender = account,
-              name = s"WowSoMuchCoin-$i".getBytes(StandardCharsets.UTF_8),
-              description = Array.emptyByteArray,
-              quantity = oneOrderAmount,
-              decimals = 2,
-              reissuable = false,
-              script = None,
-              fee = issueFee,
-              timestamp = System.currentTimeMillis()
-            )
-            .explicitGet()
-      }
-
-      accountsAndAssets.foreach { case (_, tx) => node.signedBroadcast(tx.json()) }
-      accountsAndAssets.foreach { case (_, tx) => node.waitForTransaction(tx.id().toString) }
-
-      val sells = accountsAndAssets.map {
-        case (account, asset) =>
-          val assetPair = AssetPair(IssuedAsset(asset.id()), Waves)
-          assetPair -> node
-            .placeOrder(
-              sender = account,
-              pair = assetPair,
-              orderType = OrderType.SELL,
-              amount = oneOrderAmount,
-              price = orderPrice,
-              fee = matcherFee
-            )
-            .message
-            .id
-      }
-
-      sells.foreach(Function.tupled(node.waitOrderStatus(_, _, "Accepted")))
-
-      val buyOrders = for {
-        (_, asset) <- accountsAndAssets
-        i          <- 1 to 10
-      } yield
-        node
-          .prepareOrder(
-            sender = alice,
-            pair = AssetPair(IssuedAsset(asset.id()), Waves),
-            orderType = OrderType.BUY,
-            amount = oneOrderAmount / 10,
-            price = orderPrice,
-            fee = matcherFee,
-            timeToLive = 30.days - i.seconds // to make different orders
-          )
-
-      SyncMatcherHttpApi.sync(
-        {
-          import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
-
-          val asyncNode = async(node)
-          Future.traverse(buyOrders.groupBy(_.assetPair).values) { orders =>
-            inSeries(orders)(asyncNode.placeOrder(_).flatMap { _ =>
-              val wait = ThreadLocalRandom.current().nextInt(100, 1200).millis
-              GlobalTimer.instance.sleep(wait)
-            })
-          }
-        },
-        5.minutes
-      )
-
-      val statuses = sells.map {
-        case (assetPair, orderId) =>
-          orderId -> node
-            .waitFor[MatcherStatusResponseWithFee](s"$orderId status")(
-              _.orderStatus(orderId, assetPair, waitForStatus = false),
-              r => r.status == "Cancelled" || r.status == "Filled",
-              1.second
-            )
-            .status
-      }
-
-      statuses.foreach {
-        case (orderId, status) =>
-          withClue(s"$orderId: ") {
-            status shouldBe "Filled"
-          }
-      }
-    }
-  }
-
-  private def inSeries[A, B](xs: Seq[A])(f: A => Future[B]): Future[Seq[B]] =
-    xs.foldLeft(Future.successful(Queue.empty[B])) {
-      case (r, curr) =>
-        for {
-          xs <- r
-          x  <- f(curr)
-        } yield xs.enqueue(x)
-    }
 }

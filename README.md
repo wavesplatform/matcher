@@ -187,7 +187,11 @@ Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb
 
 #### a. 📦 Installation through DEB
 
-`sudo dpkg -i deb-artifact.deb`
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start it:
+* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex{supported-network-suffix}`
+* If you are using `init.d`: `sudo /etc/init.d/waves-dex{supported-network-suffix}`
 
 #### b. 🗜 Installation through ZIP
 
@@ -214,7 +218,7 @@ To run:
     ```hocon
     # ... here many lines of your DEX's configuration
     waves.dex {
-      directory = "/full/path/to/base/dex/directory"
+      root-directory = "/full/path/to/base/dex/directory"
       # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
    
       grpc.integration.waves-node-grpc {

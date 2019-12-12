@@ -3,6 +3,7 @@ import java.nio.charset.StandardCharsets
 import DexDockerKeys._
 import com.typesafe.sbt.SbtNativePackager.Universal
 import CommonSettings.autoImport.network
+import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
@@ -83,3 +84,31 @@ inConfig(Universal)(Seq(
 Linux / name := s"waves-dex${network.value.packageSuffix}" // A staging directory name
 Linux / normalizedName := (Linux / name).value // An archive file name
 Linux / packageName := (Linux / name).value // In a control file
+
+inConfig(Debian)(
+  Seq(
+    linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
+    debianPackageDependencies += "java8-runtime-headless",
+    serviceAutostart := false,
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
+    linuxPackageMappings ++= {
+      val upstartScript = {
+        val src    = packageSource.value / "upstart.conf"
+        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
+        IO.write(dest, result)
+        dest
+      }
+
+      Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
+    },
+    linuxScriptReplacements += "detect-loader" ->
+      """is_systemd() {
+        |    which systemctl >/dev/null 2>&1 && \
+        |    systemctl | grep -- -\.mount >/dev/null 2>&1
+        |}
+        |is_upstart() {
+        |    /sbin/init --version | grep upstart >/dev/null 2>&1
+        |}
+        |""".stripMargin
+  ))

@@ -2,7 +2,8 @@ ${{header}}
 ${{loader-functions}}
 ${{detect-loader}}
 
-config_file=/etc/${{app_name}}/main.conf
+config_dir=/etc/${{app_name}}
+config_file=$config_dir/main.conf
 
 if [ "$1" = configure ]; then
     # make sure the user exists
@@ -31,9 +32,10 @@ if [ "$1" = configure ]; then
 
     if [ ! -f "$config_file" ]; then
         echo Creating default config file ...
+        mkdir -p "$config_dir"
         cp /usr/share/${{app_name}}/doc/main.conf.sample "$config_file"
         chmod 600 "$config_file"
-        chown ${{app_name}}:${{app_name}} "$config_file"
+        chown -R ${{app_name}}:${{app_name}} "$config_dir"
     fi
 
     if is_systemd; then

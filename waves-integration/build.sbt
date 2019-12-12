@@ -1,5 +1,3 @@
-name := "waves-integration"
-
 import com.typesafe.sbt.SbtNativePackager.Universal
 import sbtassembly.MergeStrategy
 
@@ -9,7 +7,7 @@ resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.wavesIntegration
 
 val packageSettings = Seq(
-  maintainer := "wavesplatform.com",
+  maintainer := "waves.exchange",
   packageSummary := "Node integration extension for the Waves DEX",
   packageDescription := s"${packageSummary.value}. Compatible with ${nodeVersion.value} node version"
 )

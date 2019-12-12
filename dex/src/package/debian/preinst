@@ -1,0 +1,8 @@
+${{header}}
+${{loader-functions}}
+
+if [ "$1" = upgrade ]; then
+    echo Upgrading ...
+fi
+
+exit 0

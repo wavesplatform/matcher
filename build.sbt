@@ -81,9 +81,9 @@ lazy val root = (project in file("."))
 inScope(Global)(
   Seq(
     scalaVersion := "2.12.9",
-    organization := "com.wavesplatform",
-    organizationName := "Waves Platform",
-    organizationHomepage := Some(url("https://wavesplatform.com")),
+    organization := "waves.exchange",
+    organizationName := "Waves Exchange",
+    organizationHomepage := Some(url("https://waves.exchange/")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/dex"), "git@github.com:wavesplatform/dex.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/dex/blob/master/LICENSE"))),
     scalacOptions ++= Seq(

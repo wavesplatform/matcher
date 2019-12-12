@@ -10,7 +10,7 @@ resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
-  maintainer := "wavesplatform.com",
+  maintainer := "waves.exchange",
   packageSummary := "DEX",
   packageDescription := "Decentralized EXchange for Waves network"
 )
@@ -73,7 +73,7 @@ inConfig(Universal)(Seq(
     val baseConfigName = s"${network.value}.conf"
     val localFile      = (Compile / sourceDirectory).value / "package" / "samples" / baseConfigName
     if (localFile.exists()) {
-      val artifactPath = "doc/dex.conf.sample"
+      val artifactPath = "doc/main.conf.sample"
       Seq(localFile -> artifactPath)
     } else Seq.empty
   }

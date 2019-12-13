@@ -24,7 +24,7 @@ object Dependencies {
 
     val logback = "1.2.3"
     val slf4j   = "1.7.25"
-    val janino  = "3.0.12"
+    val janino  = "3.1.0"
 
     val silencer = "1.4.1"
     val kamon    = "1.1.5"

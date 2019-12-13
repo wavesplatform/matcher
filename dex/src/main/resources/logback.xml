@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+    <property name="waves.dex.config.directory" value="."/>
+    <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
+
+    <!-- STDOUT logs properties -->
+    <property name="logback.stdout.enabled" value="true"/>
+    <property name="logback.stdout.pattern" value="${default.pattern}"/>
+    <property name="logback.stdout.level" value="INFO"/>
+
+    <!-- FILE logs properties -->
+    <property name="logback.file.enabled" value="true"/>
+    <property name="logback.file.pattern" value="${default.pattern}"/>
+    <property name="logback.file.level" value="DEBUG"/>
+    <property name="logback.file.directory" value="${waves.directory}/log"/>
+
+    <!-- JRE -->
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <!-- Instrumentation -->
+    <logger name="org.aspectj" level="INFO"/>
+
+    <!-- Cryptography -->
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
+
+    <!-- Networking -->
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.grpc.netty" level="ERROR"/>
+
+    <!-- Queues -->
+    <logger name="org.apache.kafka" level="INFO"/>
+    <!-- Reason for Selector: https://issues.apache.org/jira/browse/KAFKA-5133 -->
+    <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>
+
+    <!-- DEX Actors -->
+    <logger name="com.wavesplatform.matcher.market.OrderBookActor" level="INFO"/>
+    <logger name="com.wavesplatform.matcher.market.MatcherActor" level="TRACE"/>
+
+    <!-- REST API -->
+    <logger name="io.swagger" level="INFO"/>
+    <logger name="com.wavesplatform.dex.api.http" level="WARN"/> <!-- Requests -->
+
+    <root level="TRACE"/>
+
+    <if condition='property("logback.stdout.enabled").contains("true")'>
+        <then>
+            <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+                <target>System.out</target>
+                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                    <level>${logback.stdout.level}</level>
+                </filter>
+                <encoder>
+                    <pattern>${logback.stdout.pattern}</pattern>
+                </encoder>
+            </appender>
+            <root>
+                <appender-ref ref="STDOUT"/>
+            </root>
+        </then>
+    </if>
+
+    <if condition='property("logback.file.enabled").contains("true")'>
+        <then>
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                    <level>${logback.file.level}</level>
+                </filter>
+                <file>${logback.file.directory}/dex.log</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                    <!-- daily rollover -->
+                    <fileNamePattern>${logback.file.directory}/dex.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+
+                    <!-- keep 30 days' worth of history capped at 1GB total size -->
+                    <maxHistory>30</maxHistory>
+                    <totalSizeCap>1GB</totalSizeCap>
+                </rollingPolicy>
+
+                <encoder>
+                    <pattern>${logback.file.pattern}</pattern>
+                </encoder>
+            </appender>
+
+            <root>
+                <appender-ref ref="FILE"/>
+            </root>
+        </then>
+    </if>
+
+    <include optional="true" file="${waves.dex.config.directory}"/>
+</configuration>

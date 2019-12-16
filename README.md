@@ -189,21 +189,21 @@ Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb
 
 Run: `sudo dpkg -i deb-artifact.deb`
 
-The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start it:
+The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
 * If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex{supported-network-suffix}`
 * If you are using `init.d`: `sudo /etc/init.d/waves-dex{supported-network-suffix}`
 
-If it was a fresh install, configurations will be copied to `/etc/waves-dex{supported-network-suffix}`.
+If it is a fresh install, configurations were copied to `/etc/waves-dex{supported-network-suffix}`.
 
 #### b. 🗜 Installation through ZIP
 
 To install a DEX server from ZIP file:
  
 1. Extract it
-2. There are samples configurations:
+2. There are sample configurations:
 
     * doc/main.conf is a sample DEX server configuration;
-    * doc/logback.xml is a sample of logging configuration.
+    * doc/logback.xml is a sample logging configuration.
     
     Copy them to a directory with production configurations. 
 

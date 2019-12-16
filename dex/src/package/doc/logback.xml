@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Add debug="true" to debug configuration -->
 <configuration scan="true" scanPeriod="30 seconds">
-    <property name="waves.dex.config.directory" value="."/>
-    <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
+    <property name="logback.include.file" value="${logback.include.file:-./logback.xml}"/>
+    <property name="logback.common.pattern" value="${logback.common.pattern:-%date %-5level [%.25thread] %logger{26} - %msg%n%ex}"/>
 
     <!-- STDOUT logs properties -->
-    <property name="logback.stdout.enabled" value="true"/>
-    <property name="logback.stdout.pattern" value="${default.pattern}"/>
-    <property name="logback.stdout.level" value="INFO"/>
+    <property name="logback.stdout.enabled" value="${logback.stdout.enabled:-true}"/>
+    <property name="logback.stdout.pattern" value="${logback.stdout.pattern:-${logback.common.pattern}}"/>
+    <property name="logback.stdout.level" value="${logback.stdout.level:-INFO}"/>
 
     <!-- FILE logs properties -->
-    <property name="logback.file.enabled" value="true"/>
-    <property name="logback.file.pattern" value="${default.pattern}"/>
-    <property name="logback.file.level" value="DEBUG"/>
-    <property name="logback.file.directory" value="${waves.directory}/log"/>
+    <property name="logback.file.enabled" value="${logback.file.enabled:-false}"/>
+    <property name="logback.file.pattern" value="${logback.file.pattern:-${logback.common.pattern}}"/>
+    <property name="logback.file.level" value="${logback.file.level:-DEBUG}"/>
+    <property name="logback.file.directory" value="${logback.file.directory:-${waves.directory}/log}"/>
 
     <!-- JRE -->
     <logger name="sun.rmi" level="INFO"/>
@@ -40,8 +41,6 @@
     <!-- REST API -->
     <logger name="io.swagger" level="INFO"/>
     <logger name="com.wavesplatform.dex.api.http" level="WARN"/> <!-- Requests -->
-
-    <root level="TRACE"/>
 
     <if condition='property("logback.stdout.enabled").contains("true")'>
         <then>
@@ -87,5 +86,7 @@
         </then>
     </if>
 
-    <include optional="true" file="${waves.dex.config.directory}"/>
+    <include optional="true" file="${logback.include.file}"/>
+
+    <root level="TRACE"/>
 </configuration>

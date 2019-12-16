@@ -4,6 +4,9 @@ ${{detect-loader}}
 
 config_dir=/etc/${{app_name}}
 config_file=$config_dir/main.conf
+logback_file=$config_dir/logback.xml
+
+install_dir=/usr/share/${{app_name}}
 
 if [ "$1" = configure ]; then
     # make sure the user exists
@@ -23,19 +26,31 @@ if [ "$1" = configure ]; then
     # ensure home directory ownership
     mkdir -p /var/lib/${{app_name}}
     chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
-    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} $install_dir
 
     # nicer log directory permissions
     mkdir -p /var/log/${{app_name}}
     chmod 770 /var/log/${{app_name}}
     chown root:${{app_name}} /var/log/${{app_name}}
 
-    if [ ! -f "$config_file" ]; then
-        echo Creating default config file ...
+    if [ ! -f "$config_dir" ]; then
+        echo Creating config directory ...
         mkdir -p "$config_dir"
-        cp /usr/share/${{app_name}}/doc/main.conf.sample "$config_file"
-        chmod 600 "$config_file"
         chown -R ${{app_name}}:${{app_name}} "$config_dir"
+    fi
+
+    if [ ! -f "$config_file" ]; then
+        echo Copying a default config file ...
+        cp $install_dir/doc/main.conf "$config_file"
+        chmod 600 "$config_file"
+        chown ${{app_name}}:${{app_name}} "$config_file"
+    fi
+
+    if [ ! -f "$logback_file" ]; then
+        echo Copying a default logback configuration ...
+        cp $install_dir/doc/logback.xml "$logback_file"
+        chmod 600 "$logback_file"
+        chown ${{app_name}}:${{app_name}} "$logback_file"
     fi
 
     if is_systemd; then

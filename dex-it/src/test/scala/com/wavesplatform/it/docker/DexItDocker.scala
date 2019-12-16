@@ -15,12 +15,11 @@ object DexItDocker {
   private val dexBaseConfFileName = "dex-base.conf"
   private val dexImage            = "com.wavesplatform/dex-it:latest"
 
-  private def getRawConfig(fileName: String): String = {
+  private def getRawContentFromResource(fileName: String): String = {
     Try(Source fromResource fileName).getOrElse { throw new FileNotFoundException(s"Resource '$fileName'") }.mkString
   }
 
   def createContainer(client: Docker)(name: String, runConfig: Config, initialSuiteConfig: Config): DexContainer = {
-
     val number   = getNumber(name)
     val basePath = "/opt/waves-dex"
 
@@ -31,7 +30,12 @@ object DexItDocker {
         imageName = dexImage,
         env = Map(
           "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
-          "WAVES_DEX_OPTS"       -> s" -J-Xmx1024M -Dlogback.configurationFile=$basePath/logback.xml -Dsun.zip.disableMemoryMapping=true"
+          "WAVES_DEX_OPTS"       -> Seq(
+            "-Dlogback.stdout.enable=false",
+            "-Dlogback.file.enable=false",
+            "-Dlogback.configurationFile=/opt/waves-dex/doc/logback.xml",
+            "-Dlogback.include.file=/opt/waves-dex/doc/logback-container.xml"
+          ).mkString(" ", " ", " ")
         )
       )
 
@@ -45,11 +49,17 @@ object DexItDocker {
       )
 
     Seq(
-      (dexBaseConfFileName, getRawConfig(s"dex-servers/$dexBaseConfFileName"), false),
-      (s"$name.conf", getRawConfig(s"dex-servers/$name.conf"), false),
+      (dexBaseConfFileName, getRawContentFromResource(s"dex-servers/$dexBaseConfFileName"), false),
+      (s"$name.conf", getRawContentFromResource(s"dex-servers/$name.conf"), false),
       ("run.conf", runConfig.resolve().root().render(), true),
       ("suite.conf", initialSuiteConfig.resolve().root().render(), true)
     ).foreach { case (fileName, content, logContent) => client.writeFile(dexContainer, Paths.get(basePath, fileName), content, logContent) }
+
+    client.writeFile(
+      container = dexContainer,
+      to = Paths.get("/opt/waves-dex/doc/logback-container.xml"),
+      content = getRawContentFromResource("logback-container.xml")
+    )
 
     client.addKnownContainer(dexContainer)
     dexContainer

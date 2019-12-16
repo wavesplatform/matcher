@@ -1,21 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Configuration for containers -->
-<configuration>
-    <property name="logback.stdout.level" value="TRACE"/>
-    <property name="logback.file.level" value="TRACE"/>
-    <property name="logback.file.directory" value="/opt/waves-dex"/>
+<!-- And additional file. The base configuration is dex/src/package/doc/logback.xml -->
+<included>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.common.pattern}</pattern>
+        </encoder>
+    </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${logback.file.directory}/system.log</file>
+        <file>/opt/waves-dex/system.log</file>
         <append>true</append>
         <immediateFlush>false</immediateFlush>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${logback.file.level}</level>
+            <level>TRACE</level>
         </filter>
         <encoder>
-            <pattern>${logback.file.pattern}</pattern>
+            <pattern>${logback.common.pattern}</pattern>
         </encoder>
     </appender>
+
+    <root>
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
 
     <!-- Networking -->
     <logger name="io.netty" level="DEBUG" additivity="false">
@@ -33,4 +44,4 @@
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
     </logger>
-</configuration>
+</included>

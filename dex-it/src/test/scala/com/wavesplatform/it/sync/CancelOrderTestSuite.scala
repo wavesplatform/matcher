@@ -11,7 +11,7 @@ import com.wavesplatform.dex.util.FutureOps._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponseWithFee, SyncMatcherHttpApi}
+import com.wavesplatform.it.api.{MatcherStatusResponse, MatcherStatusResponseWithFee, SyncMatcherHttpApi}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

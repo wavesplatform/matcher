@@ -36,6 +36,7 @@ abstract class MatcherSuiteBase
     interval = 1.second
   )
 
+  val baseFee          = 0.003.waves
   val smartFee         = 0.004.waves
   val minFee           = 0.001.waves + smartFee
   val issueFee         = 1.waves
@@ -106,7 +107,7 @@ object MatcherSuiteBase {
     properties.putAll(
       Map(
         "bootstrap.servers"  -> server,
-        "group.id"           -> s"create-$name", // random?
+        "group.id"           -> s"create-$name",
         "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
       ).asJava)

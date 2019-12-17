@@ -28,7 +28,6 @@ import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
                    spendableBalance: Asset => Long,
-                   requestTimeout: FiniteDuration,
                    time: Time,
                    orderDB: OrderDB,
                    hasOrder: Order.Id => Boolean,
@@ -189,50 +188,31 @@ class AddressActor(owner: Address,
     }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
-    Future
-      .firstCompletedOf(
-        Seq(
-          store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent)),
-          scheduleTimeout(requestTimeout)
-        ))
-      .recover {
-        case _: TimeoutException =>
-          self ! CancelationExpired(id)
-          api.TimedOut
+    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(error.CanNotPersistEvent)).recover {
+      case _: TimeoutException =>
+        self ! CancelationExpired(id)
+        api.TimedOut
 
-        case e =>
-          log.warn(s"An error during $id cancellation", e)
-          api.InternalError
-      }
+      case e =>
+        log.warn(s"An error during $id cancellation", e)
+        api.InternalError
+    }
 
   private def storePlaced(acceptedOrder: AcceptedOrder): Future[Resp] =
-    Future
-      .firstCompletedOf(
-        Seq(
-          store(
-            id = acceptedOrder.order.id(),
-            event = acceptedOrder.fold[QueueEvent] { QueueEvent.Placed } { QueueEvent.PlacedMarket },
-            eventCache = pendingPlacement,
-            storeError = api.OrderRejected(error.CanNotPersistEvent)
-          ),
-          scheduleTimeout(requestTimeout)
-        )
-      )
-      .recover {
-        case _: TimeoutException =>
-          self ! PlacementExpired(acceptedOrder.order.id())
-          api.TimedOut
+    store(
+      id = acceptedOrder.order.id(),
+      event = acceptedOrder.fold[QueueEvent] { QueueEvent.Placed } { QueueEvent.PlacedMarket },
+      eventCache = pendingPlacement,
+      storeError = api.OrderRejected(error.CanNotPersistEvent)
+    ).recover {
+      case _: TimeoutException =>
+        self ! PlacementExpired(acceptedOrder.order.id())
+        api.TimedOut
 
-        case e =>
-          log.warn(s"An error during ${acceptedOrder.order.id()} placement", e)
-          api.InternalError
-      }
-
-  private def scheduleTimeout(delay: FiniteDuration): Future[Nothing] = {
-    val p = Promise[Nothing]()
-    context.system.scheduler.scheduleOnce(delay)(p.failure(timeoutException))
-    p.future
-  }
+      case e =>
+        log.warn(s"An error during ${acceptedOrder.order.id()} placement", e)
+        api.InternalError
+    }
 
   private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
     log.trace(s"Confirming placement for ${order.id()}")
@@ -394,7 +374,6 @@ object AddressActor {
   private type Resp = api.MatcherResponse
 
   private val ExpirationThreshold = 50.millis
-  private val timeoutException    = new TimeoutException
 
   private def activeStatus(ao: AcceptedOrder): OrderStatus =
     if (ao.amount == ao.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(ao.order.amount - ao.amount, ao.order.matcherFee - ao.fee)

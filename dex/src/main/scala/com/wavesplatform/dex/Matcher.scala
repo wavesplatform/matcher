@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, ask, gracefulStop}
+import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.account.{Address, PublicKey}
@@ -270,7 +270,6 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
               new AddressActor(
                 address,
                 context.utx.spendableBalance(address, _),
-                context.settings.config.getInt("akka.kafka.producer.kafka-clients.delivery.timeout.ms").millis,
                 context.time,
                 orderDB,
                 id => context.blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,

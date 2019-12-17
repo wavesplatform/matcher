@@ -138,9 +138,7 @@ object KafkaMatcherQueue {
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
       log.trace(s"Storing $event")
-
       val p = Promise[QueueEventWithMeta]()
-
       try {
         producer.send(
           new ProducerRecord[String, QueueEvent](topic, event),
@@ -156,13 +154,18 @@ object KafkaMatcherQueue {
                   ))
               } else {
                 log.error(s"During storing $event", exception)
-                p.failure(exception)
+                p.failure(exception match {
+                  case _: KafkaTimeoutException => new TimeoutException(s"Can't store message $event")
+                  case _                        => exception
+                })
               }
             }
           }
         )
       } catch {
-        case e: Throwable => log.error(s"Can't store message $event", e)
+        case e: Throwable =>
+          log.error(s"Can't store message $event", e)
+          p.failure(e)
       }
 
       p.future.map(Some(_))

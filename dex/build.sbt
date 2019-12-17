@@ -11,7 +11,7 @@ resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
 
 val packageSettings = Seq(
-  maintainer := "waves.exchange",
+  maintainer := "wavesplatform.com",
   packageSummary := "DEX",
   packageDescription := "Decentralized EXchange for Waves network"
 )

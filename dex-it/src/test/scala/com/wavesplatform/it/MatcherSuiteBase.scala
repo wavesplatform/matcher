@@ -57,7 +57,8 @@ abstract class MatcherSuiteBase
     val secureRandom            = new SecureRandom(Longs.toByteArray(Thread.currentThread().getId))
     val randomPart              = secureRandom.nextInt(Int.MaxValue)
     val maxKafkaTopicNameLength = 249
-    s"dex-${getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1")}-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
+    val simplifiedClassName     = getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1")
+    s"dex-$simplifiedClassName-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
   }
 
   protected override def createDocker: Docker = new Docker(
@@ -71,7 +72,7 @@ abstract class MatcherSuiteBase
   protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
 
   override protected def beforeAll(): Unit = {
-    // Hack because we haven't own Docker class
+    // Hack to setup asynchttpclient settings, because we haven't own Docker class
     Map(
       "org.asynchttpclient.keepAlive"       -> "false",
       "org.asynchttpclient.maxRequestRetry" -> "0",

@@ -24,8 +24,8 @@
     <logger name="io.netty" level="DEBUG"/>
     <logger name="org.apache.kafka" level="TRACE"/>
     <logger name="org.apache.kafka.common.metrics.Metrics" level="INFO"/>
-<!--    <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE"/>-->
-<!--    <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>-->
+    <!--<logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE"/>-->
+    <!--<logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>-->
     <logger name="org.aspectj" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 

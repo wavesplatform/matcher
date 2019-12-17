@@ -88,7 +88,6 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
-  // TODO duration
   override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
     Future(consumer.listTopics())
       .flatMap { topics =>
@@ -108,6 +107,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
     producer.close(timeout)
 
+    // Fix by scala.jdk.DurationConverters after migration to Scala 2.13
     val duration = java.time.Duration.ofNanos(timeout.toNanos)
     consumer.close(duration)
 

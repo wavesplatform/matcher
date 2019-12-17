@@ -1,0 +1,21 @@
+[Unit]
+Description=${{descr}}
+Requires=${{start_facilities}}
+
+[Service]
+Type=simple
+EnvironmentFile=${{env_config}}
+ExecStart=/usr/share/${{app_name}}/bin/${{exec}} \
+  -Dlogback.configurationFile=/etc/${{app_name}}/logback.xml \
+  -Dlogback.file.directory=/var/log/${{app_name}} \
+  -- /etc/${{app_name}}/main.conf
+Restart=always
+RestartSec=${{retryTimeout}}
+RestartPreventExitStatus=10 74 128
+SuccessExitStatus=143
+User=${{daemon_user}}
+PermissionsStartOnly=true
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

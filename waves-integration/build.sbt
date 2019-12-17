@@ -1,5 +1,3 @@
-name := "waves-integration"
-
 import com.typesafe.sbt.SbtNativePackager.Universal
 import sbtassembly.MergeStrategy
 

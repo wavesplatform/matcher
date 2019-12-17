@@ -3,6 +3,7 @@ import java.nio.charset.StandardCharsets
 import DexDockerKeys._
 import com.typesafe.sbt.SbtNativePackager.Universal
 import CommonSettings.autoImport.network
+import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
@@ -66,20 +67,56 @@ inTask(docker)(
 
 executableScriptName := "waves-dex"
 
-// ZIP archive
-inConfig(Universal)(Seq(
-  packageName := s"waves-dex${network.value.packageSuffix}-${version.value}", // An archive file name
-  mappings ++= {
-    val baseConfigName = s"${network.value}.conf"
-    val localFile      = (Compile / sourceDirectory).value / "package" / "samples" / baseConfigName
-    if (localFile.exists()) {
-      val artifactPath = "doc/dex.conf.sample"
-      Seq(localFile -> artifactPath)
-    } else Seq.empty
-  }
-))
+// ZIP archive and mappings for all artifacts
+inConfig(Universal)(
+  Seq(
+    packageName := s"waves-dex${network.value.packageSuffix}-${version.value}", // An archive file name
+    mappings ++= {
+      val docDir = packageSource.value / "doc"
+
+      val baseDexConfigName  = s"${network.value}.conf"
+      val localDexConfigFile = docDir / baseDexConfigName
+      val dexConfigMapping = if (localDexConfigFile.exists()) {
+        val artifactPath = "doc/main.conf"
+        Some(localDexConfigFile -> artifactPath)
+      } else None
+
+      Seq(
+        (docDir / "README.md") -> "doc/README.md",
+        (docDir / "logback.xml") -> "doc/logback.xml",
+      ) ++ dexConfigMapping.toSeq
+    }
+  ))
 
 // DEB package
 Linux / name := s"waves-dex${network.value.packageSuffix}" // A staging directory name
 Linux / normalizedName := (Linux / name).value // An archive file name
-Linux / packageName := (Linux / name).value // In a control file
+Linux / packageName := (Linux / name).value    // In a control file
+
+inConfig(Debian)(
+  Seq(
+    linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
+    debianPackageDependencies += "java8-runtime-headless",
+    serviceAutostart := false,
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm")),
+    linuxPackageMappings ++= {
+      val upstartScript = {
+        val src    = packageSource.value / "upstart.conf"
+        val dest   = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+        val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
+        IO.write(dest, result)
+        dest
+      }
+
+      Seq(upstartScript -> s"/etc/init/${packageName.value}.conf").map(packageMapping(_).withConfig().withPerms("644"))
+    },
+    linuxScriptReplacements += "detect-loader" ->
+      """is_systemd() {
+        |    which systemctl >/dev/null 2>&1 && \
+        |    systemctl | grep -- -\.mount >/dev/null 2>&1
+        |}
+        |is_upstart() {
+        |    /sbin/init --version | grep upstart >/dev/null 2>&1
+        |}
+        |""".stripMargin
+  ))

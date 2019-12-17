@@ -1,0 +1,73 @@
+${{header}}
+${{loader-functions}}
+${{detect-loader}}
+
+config_dir=/etc/${{app_name}}
+config_file=$config_dir/main.conf
+logback_file=$config_dir/logback.xml
+
+install_dir=/usr/share/${{app_name}}
+
+if [ "$1" = configure ]; then
+    # make sure the user exists
+    if ! getent passwd ${{app_name}} > /dev/null; then
+        adduser --system $quiet --home /var/lib/${{app_name}} --no-create-home --shell /bin/false --group \
+            --gecos "${{app_name}} node" ${{app_name}}
+    fi
+    # if the user was created manually, make sure the group is there as well
+    if ! getent group ${{app_name}} > /dev/null; then
+        addgroup --system $quiet ${{app_name}}
+    fi
+    # make sure ${{app_name}} is in the ${{app_name}} group
+    if ! id -Gn ${{app_name}} | grep -qw ${{app_name}}; then
+        adduser $quiet ${{app_name}} ${{app_name}}
+    fi
+
+    # ensure home directory ownership
+    mkdir -p /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} $install_dir
+
+    # nicer log directory permissions
+    mkdir -p /var/log/${{app_name}}
+    chmod 770 /var/log/${{app_name}}
+    chown root:${{app_name}} /var/log/${{app_name}}
+
+    if [ ! -f "$config_dir" ]; then
+        echo Creating config directory ...
+        mkdir -p "$config_dir"
+        chown -R ${{app_name}}:${{app_name}} "$config_dir"
+    fi
+
+    if [ ! -f "$config_file" ]; then
+        echo Copying a default config file ...
+        cp $install_dir/doc/main.conf "$config_file"
+        chmod 600 "$config_file"
+        chown ${{app_name}}:${{app_name}} "$config_file"
+    fi
+
+    if [ ! -f "$logback_file" ]; then
+        echo Copying a default logback configuration ...
+        cp $install_dir/doc/logback.xml "$logback_file"
+        chmod 600 "$logback_file"
+        chown ${{app_name}}:${{app_name}} "$logback_file"
+    fi
+
+    if is_systemd; then
+        echo Installing systemd service ...
+        addService ${{app_name}}
+    elif is_upstart; then
+        echo Installing upstart service ...
+        initctl reload-configuration
+    fi
+fi
+
+if is_systemd; then
+    echo Restarting systemd service ...
+    restartService ${{app_name}} || true
+elif is_upstart; then
+    echo Restarting upstart service ...
+    service ${{app_name}} restart || true
+fi
+
+exit 0

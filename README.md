@@ -187,24 +187,38 @@ Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb
 
 #### a. 📦 Installation through DEB
 
-`sudo dpkg -i deb-artifact.deb`
+Run: `sudo dpkg -i deb-artifact.deb`
+
+The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
+* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex{supported-network-suffix}`
+* If you are using `init.d`: `sudo /etc/init.d/waves-dex{supported-network-suffix}`
+
+If it is a fresh install, configurations were copied to `/etc/waves-dex{supported-network-suffix}`.
 
 #### b. 🗜 Installation through ZIP
 
-To install a DEX server from ZIP file, just extract it.
+To install a DEX server from ZIP file:
+ 
+1. Extract it
+2. There are sample configurations:
+
+    * doc/main.conf is a sample DEX server configuration;
+    * doc/logback.xml is a sample logging configuration.
+    
+    Copy them to a directory with production configurations. 
 
 To run:
 
 *Debian/Ubuntu/macOS*:
 
 ```
-/path/to/dex/directory/bin/waves-dex <your_JVM_options> /path/to/config.conf
+/path/to/dex/directory/bin/waves-dex -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
 ```
 
 *Windows*:
 
 ```
-/path/to/dex/directory/bin/waves-dex.bat <your_JVM_options> /path/to/config.conf
+/path/to/dex/directory/bin/waves-dex.bat -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
 ```
 
 #### 📃 Configuration of DEX server
@@ -214,7 +228,7 @@ To run:
     ```hocon
     # ... here many lines of your DEX's configuration
     waves.dex {
-      directory = "/full/path/to/base/dex/directory"
+      root-directory = "/full/path/to/base/dex/directory"
       # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
    
       grpc.integration.waves-node-grpc {
@@ -330,24 +344,7 @@ Note, the shown settings contain a placeholder for your raw password, insert a r
 
 ## 10. Production recommendations
 
-Recommended sections for your logback.xml
-
-```xml
-<logger name="com.wavesplatform.network" level="OFF"/>
-<logger name="com.wavesplatform.api.http" level="OFF"/>
-<logger name="com.wavesplatform.mining.MinerImpl" level="DEBUG"/>
-<logger name="com.wavesplatform.utx.UtxPoolImpl" level="TRACE"/>
-<logger name="com.wavesplatform.matcher.market.OrderBookActor" level="INFO"/>
-<logger name="com.wavesplatform.matcher.market.MatcherActor" level="TRACE"/>
-<logger name="com.wavesplatform.transaction.smart" level="OFF"/>
-
-<logger name="scorex.api.http" level="OFF"/>
-<logger name="io.netty" level="INFO"/>
-<logger name="io.swagger" level="INFO"/>
-<logger name="org.asynchttpclient" level="INFO"/>
-<logger name="org.apache.kafka" level="INFO"/>
-<logger name="kamon.influxdb.CustomInfluxDBReporter" level="INFO"/>
-```
+Soon.
 
 ## 11. Contributor notes
 

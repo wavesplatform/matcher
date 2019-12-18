@@ -241,7 +241,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.asks should be(empty)
 
       /* market order fee value depends on matched orders in proportion */
-      node.accountBalances(bob.toAddress.toString)._1 should be(bobWBefore + ordersAmount - fixedFee * ordersAmount / marketOrderAmount)
+      eventually {
+        node.accountBalances(bob.toAddress.toString)._1 should be(bobWBefore + ordersAmount - fixedFee * ordersAmount / marketOrderAmount)
+      }
 
       node.assetBalance(bob.toAddress.toString, UsdId.toString).balance should be(
         bobUBefore - 0.3.usd * 30.waves / 1.waves - 0.4.usd * 40.waves / 1.waves - 0.5.usd * 50.waves / 1.waves)
@@ -269,7 +271,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
-      node.accountBalances(seller.toAddress.toString)._1 should be(fixedFee / (marketOrderAmount / ordersAmount))
+      eventually {
+        node.accountBalances(seller.toAddress.toString)._1 should be(fixedFee / (marketOrderAmount / ordersAmount))
+      }
 
       node.assetBalance(seller.toAddress.toString, UsdId.toString).balance should be(
         0.2.usd * 12.waves / 1.waves + 0.3.usd * 12.waves / 1.waves + 0.4.usd * 12.waves / 1.waves)
@@ -302,8 +306,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
-      node.accountBalances(account.toAddress.toString)._1 should be(
-        accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fixedFee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount)
+      eventually {
+        node.accountBalances(account.toAddress.toString)._1 should be(
+          accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fixedFee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount)
+      }
     }
 
     "should be accepted if price * amount > current balance, but it can be filled by offers with lower price" in {
@@ -330,7 +336,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.asks should have size 1
       orderBook.bids should be(empty)
 
-      node.accountBalances(account.toAddress.toString)._1 should be(marketOrderAmount - fixedFee)
+      eventually {
+        node.accountBalances(account.toAddress.toString)._1 should be(marketOrderAmount - fixedFee)
+      }
+
       node.assetBalance(account.toAddress.toString, UsdId.toString).balance should be(
         accountUsdBalance - 5 * 0.2.usd - 15 * 0.3.usd - 30 * 0.4.usd - 100 * 0.5.usd)
     }
@@ -363,7 +372,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       node.waitOrderProcessed(wavesUsdPair, node.placeMarketOrder(account, wavesUsdPair, BUY, amount, price, fixedFee).message.id)
 
-      node.accountBalances(account.toAddress.toString)._1 should be(amount - fixedFee)
+      eventually {
+        node.accountBalances(account.toAddress.toString)._1 should be(amount - fixedFee)
+      }
     }
 
     "should be rejected if the price is too low for completely filling by current opened orders (BUY)" in {

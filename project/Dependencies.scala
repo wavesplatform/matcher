@@ -97,7 +97,7 @@ object Dependencies {
       akkaModule("persistence-query"),
       akkaModule("slf4j"),
       akkaHttp,
-      "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.4",
+      "org.apache.kafka" % "kafka-clients" % "2.3.1",
       // "javax.xml.bind" % "jaxb-api" % "2.3.1", // javax.xml.bind replacement for jackson in swagger, will required in future
       janino,
       mouse

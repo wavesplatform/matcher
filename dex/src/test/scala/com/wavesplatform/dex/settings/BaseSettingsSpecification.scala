@@ -109,14 +109,14 @@ class BaseSettingsSpecification extends FlatSpec{
          |        topic = "some-events"
          |
          |        consumer {
-         |          buffer-size = 100
-         |          min-backoff = 11s
-         |          max-backoff = 2d
+         |          fetch-max-duration = 10s
+         |          max-buffer-size = 777
+         |          client.foo = 2
          |        }
          |
          |        producer {
          |          enable = no
-         |          buffer-size = 200
+         |          client.bar = 3
          |        }
          |      }
          |    }

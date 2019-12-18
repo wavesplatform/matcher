@@ -14,8 +14,6 @@ trait MatcherQueue {
     */
   def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]]
 
-  def lastProcessedOffset: QueueEventWithMeta.Offset
-
   /**
     * @return -1 if topic is empty or even it doesn't exist
     */

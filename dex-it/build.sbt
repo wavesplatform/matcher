@@ -13,6 +13,7 @@ inTask(docker)(
     additionalFiles ++= Seq(
       (LocalProject("dex") / Universal / stage).value,
       (Test / resourceDirectory).value / "template.conf",
+      (Test / resourceDirectory).value / "logback-container.xml",
       (Test / sourceDirectory).value / "container" / "wallet"
     )
   ))

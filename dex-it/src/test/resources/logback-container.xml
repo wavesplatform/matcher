@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configuration for containers -->
+<configuration>
+    <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.pattern:-${default.pattern}}</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="io.netty" level="DEBUG"/>
+    <logger name="io.swagger" level="INFO"/>
+
+    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
+
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
+
+    <logger name="io.netty" level="DEBUG"/>
+    <logger name="org.apache.kafka" level="TRACE"/>
+    <logger name="org.apache.kafka.common.metrics.Metrics" level="INFO"/>
+    <!--<logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE"/>-->
+    <!--<logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>-->
+    <logger name="org.aspectj" level="INFO"/>
+    <logger name="org.asynchttpclient" level="INFO"/>
+
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <logger name="io.grpc.netty" level="INFO"/>
+
+    <root level="TRACE">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

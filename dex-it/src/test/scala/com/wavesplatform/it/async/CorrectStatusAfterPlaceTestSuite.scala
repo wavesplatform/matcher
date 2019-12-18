@@ -31,13 +31,12 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
        |      }
        |
        |      kafka.consumer {
-       |        buffer-size = 100
+       |        fetch-max-duration = 1s
+       |        max-buffer-size = 100
        |      }
        |    }
        |  }
-       |}
-       |
-       |akka.kafka.consumer.poll-interval = 1s""".stripMargin
+       |}""".stripMargin
   )
 
   private val pairs = Seq(

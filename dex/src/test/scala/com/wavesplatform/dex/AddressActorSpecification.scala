@@ -19,7 +19,6 @@ import com.wavesplatform.wallet.Wallet
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 
 class AddressActorSpecification
     extends TestKit(ActorSystem("AddressActorSpecification"))
@@ -187,7 +186,6 @@ class AddressActorSpecification
         new AddressActor(
           address,
           x => currentPortfolio.get().spendableBalanceOf(x),
-          1.day,
           ntpTime,
           EmptyOrderDB,
           _ => false,

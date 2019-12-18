@@ -1,23 +1,17 @@
 package tools
 
 import java.io.File
-import java.util.concurrent.CountDownLatch
 
 import akka.actor.ActorSystem
-import akka.kafka.Metadata.PartitionsFor
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.{ConsumerSettings, KafkaConsumerActor, Metadata, Subscriptions}
-import akka.pattern.ask
-import akka.stream.ActorMaterializer
-import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.eventDeserializer
-import com.wavesplatform.dex.queue.QueueEventWithMeta
-import org.apache.kafka.clients.consumer.ConsumerConfig
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.toConfigOps
+import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.ByteArrayDeserializer
+import org.apache.kafka.common.serialization.StringDeserializer
 
-import scala.concurrent.Await
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationInt
 
 object KafkaTopicInfo extends App {
@@ -29,69 +23,68 @@ object KafkaTopicInfo extends App {
   val max        = args(3).toInt
 
   println(s"""configFile: ${configFile.getAbsolutePath}
-       |topic: $topic
-       |from: $from
-       |max: $max""".stripMargin)
+             |topic: $topic
+             |from: $from
+             |max: $max""".stripMargin)
+
+  val requestTimeout = java.time.Duration.ofNanos(5.seconds.toNanos)
+
+  val config = ConfigFactory
+    .parseString("""waves.dex.events-queue.kafka.consumer.client {
+                   |  client.id = "kafka-topics-info"
+                   |  enable.auto.commit = false
+                   |  auto.offset.reset = earliest
+                   |}
+                   |
+                   |""".stripMargin)
+    .withFallback {
+      ConfigFactory
+        .parseFile(configFile)
+        .withFallback(ConfigFactory.defaultApplication())
+        .withFallback(ConfigFactory.defaultReference())
+        .resolve()
+        .getConfig("waves.dex.events-queue.kafka")
+    }
+
+  val consumer = new KafkaConsumer[String, QueueEvent](
+    config.getConfig("waves.dex.events-queue.kafka.consumer.client").toProperties,
+    new StringDeserializer,
+    eventDeserializer
+  )
 
   try {
-    implicit val timeout: Timeout = Timeout(5.seconds)
-
-    val config = ConfigFactory
-      .parseFile(configFile)
-      .withFallback(ConfigFactory.defaultApplication())
-      .withFallback(ConfigFactory.defaultReference())
-      .resolve()
-      .getConfig("akka.kafka.consumer")
-
-    val consumerSettings =
-      ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer)
-        .withClientId("consumer")
-        .withGroupId("kafka-topics-info")
-        .withProperties(
-          Map(
-            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG -> "false",
-            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG  -> "earliest"
-          ))
-
-    val metadataConsumer = system.actorOf(
-      KafkaConsumerActor.props(consumerSettings),
-      "meta-consumer"
-    )
+    val topicPartition  = new TopicPartition(topic, 0)
+    val topicPartitions = java.util.Collections.singletonList(topicPartition)
+    consumer.assign(topicPartitions)
 
     {
-      val partitions = Await.result(metadataConsumer.ask(Metadata.GetPartitionsFor(topic)).mapTo[PartitionsFor], timeout.duration)
-      println(s"Partitions: ${partitions.response.toOption}")
+      val r = consumer.partitionsFor(topic, requestTimeout)
+      println(s"Partitions:\n${r.asScala.mkString("\n")}")
     }
-
-    val topicPartition = new TopicPartition(topic, 0)
 
     {
-      val r = Await.result(metadataConsumer
-                             .ask(Metadata.GetEndOffsets(Set(topicPartition)))
-                             .mapTo[Metadata.EndOffsets],
-                           timeout.duration)
-      println(s"Meta for $topicPartition: $r")
+      val r = consumer.endOffsets(topicPartitions, requestTimeout)
+      println(s"End offsets for $topicPartition: ${r.asScala.mkString(", ")}")
     }
 
-    implicit val mat: ActorMaterializer = ActorMaterializer()
+    consumer.seek(topicPartition, from)
 
-    val lock = new CountDownLatch(max)
+    val pollDuriation = java.time.Duration.ofNanos(1.seconds.toNanos)
+    val lastOffset    = from + max
+    var continue      = true
+    while (continue) {
+      println(s"Reading from Kafka")
 
-    println(s"Reading options: ${Subscriptions.assignmentWithOffset(topicPartition -> from)}")
-    val consumer = Consumer
-      .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition, from))
-      .take(max)
-      .map { msg =>
-        QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
+      val xs = consumer.poll(pollDuriation).asScala.toVector
+      xs.foreach { msg =>
+        println(QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value()))
       }
 
-    consumer.runForeach { x =>
-      println(x)
-      lock.countDown()
+      xs.lastOption.foreach { x =>
+        if (x.offset() == lastOffset) continue = false
+      }
     }
-
-    lock.await()
   } finally {
-    system.terminate()
+    consumer.close()
   }
 }

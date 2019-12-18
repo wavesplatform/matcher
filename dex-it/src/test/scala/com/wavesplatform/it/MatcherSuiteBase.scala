@@ -1,16 +1,22 @@
 package com.wavesplatform.it
 
-import java.util.concurrent.ThreadLocalRandom
+import java.security.SecureRandom
+import java.util.Properties
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.MatcherModel.Normalization
-import com.wavesplatform.it.MatcherSuiteBase.baseConfig
+import com.wavesplatform.it.MatcherSuiteBase._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig.Decimals
 import com.wavesplatform.it.transactions.NodesFromDocker
+import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.scalatest._
+import org.scalatest.concurrent.Eventually
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.DurationInt
 
 abstract class MatcherSuiteBase
     extends FreeSpec
@@ -20,9 +26,15 @@ abstract class MatcherSuiteBase
     with NodesFromDocker
     with BeforeAndAfterAll
     with BeforeAndAfterEach
+    with Eventually
     with MatcherNode {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
+
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = 1.minute,
+    interval = 1.second
+  )
 
   val baseFee          = 0.003.waves
   val smartFee         = 0.004.waves
@@ -41,29 +53,74 @@ abstract class MatcherSuiteBase
     val usd: Long             = Normalization.normalizePrice(value, 8, 2)
   }
 
+  private val topicName = {
+    val secureRandom            = new SecureRandom(Longs.toByteArray(Thread.currentThread().getId))
+    val randomPart              = secureRandom.nextInt(Int.MaxValue)
+    val maxKafkaTopicNameLength = 249
+    val simplifiedClassName     = getClass.getCanonicalName.replaceAll("""(\w)\w*\.""", "$1")
+    s"dex-$simplifiedClassName-${Thread.currentThread().getId}-$randomPart".take(maxKafkaTopicNameLength)
+  }
+
   protected override def createDocker: Docker = new Docker(
     imageName = "com.wavesplatform/dex-it:latest",
     tag = getClass.getSimpleName,
-    suiteConfig = baseConfig(ThreadLocalRandom.current().nextInt(0, Int.MaxValue))
+    suiteConfig = baseConfig(topicName)
   )
 
   protected def node = dockerNodes().head
 
   protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
 
+  override protected def beforeAll(): Unit = {
+    // Hack to setup asynchttpclient settings, because we haven't own Docker class
+    Map(
+      "org.asynchttpclient.keepAlive"       -> "false",
+      "org.asynchttpclient.maxRequestRetry" -> "0",
+      "org.asynchttpclient.readTimeout"     -> "120000",
+      "org.asynchttpclient.requestTimeout"  -> "120000",
+      "org.asynchttpclient.ioThreadsCount"  -> "15"
+    ).foreach(Function.tupled(System.setProperty))
+
+    createKafkaTopic(topicName)
+    super.beforeAll()
+  }
+
 }
 
 object MatcherSuiteBase {
-  private def baseConfig(seed: Int): Config = Option(System.getenv("KAFKA_SERVER")).fold(ConfigFactory.empty()) { kafkaServer =>
+  private def baseConfig(topicName: String): Config = kafkaServer.fold(ConfigFactory.empty()) { kafkaServer =>
     ConfigFactory.parseString(s"""
+         |logback.configurationFile=/opt/waves/logback-container.xml
+         |
          |waves.dex.events-queue {
          |  type = kafka
          |  kafka {
          |    servers = "$kafkaServer"
-         |    topic = "dex-$seed"
+         |    topic = "$topicName"
          |  }
          |}
          |waves.dex.allowed-order-versions = [1, 2, 3]
          |""".stripMargin)
   }
+
+  private def createKafkaTopic(name: String): Unit = kafkaServer.foreach { server =>
+    val properties = new Properties()
+    properties.putAll(
+      Map(
+        "bootstrap.servers"  -> server,
+        "group.id"           -> s"create-$name",
+        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
+        "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
+      ).asJava)
+
+    val adminClient = AdminClient.create(properties)
+    try {
+      val newTopic = new NewTopic(name, 1, 1.toShort)
+      adminClient.createTopics(java.util.Collections.singletonList(newTopic))
+    } finally {
+      adminClient.close()
+    }
+  }
+
+  private def kafkaServer: Option[String] = Option(System.getenv("KAFKA_SERVER"))
 }

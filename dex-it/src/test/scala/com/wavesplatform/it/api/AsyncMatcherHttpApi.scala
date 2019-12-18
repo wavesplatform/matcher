@@ -308,8 +308,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds,
-                   feeAsset: Asset = Waves): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset)
+                   feeAsset: Asset = Waves,
+                   timestamp: Long = System.currentTimeMillis): Future[MatcherResponse] = {
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive, feeAsset = feeAsset, timestamp = timestamp)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 

@@ -50,7 +50,8 @@ object ReleasePlugin extends AutoPlugin {
               artifacts
                 .map(_.toPath)
                 .foreach { source =>
-                  Files.move(source, destDir.resolve(source.getFileName))
+                  val dest = destDir.resolve(source.getFileName)
+                  if (!dest.toFile.isFile) Files.move(source, dest)
                 }
             }
           )

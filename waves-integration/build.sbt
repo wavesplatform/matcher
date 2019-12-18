@@ -89,16 +89,23 @@ inTask(assembly)(
 executableScriptName := "waves-dex-integration"
 
 // ZIP archive
-inConfig(Universal)(Seq(
-  packageName := s"waves-dex-integration${network.value.packageSuffix}-${version.value}", // An archive file name
-  mappings += (Compile / sourceDirectory).value / "package" / "sample.conf" -> "doc/waves-dex-integration.conf.sample",
-  topLevelDirectory := None
-))
+inConfig(Universal)(
+  Seq(
+    packageName := s"waves-dex-integration-${version.value}", // An archive file name
+    mappings ++= sbt.IO
+      .listFiles((Compile / packageSource).value / "doc")
+      .map { file =>
+        file -> s"doc/${file.getName}"
+      }
+      .toSeq,
+    topLevelDirectory := None
+  )
+)
 
 // DEB package
 Linux / name := s"waves-dex-integration${network.value.packageSuffix}" // A staging directory name
 Linux / normalizedName := (Linux / name).value // An archive file name
-Linux / packageName := (Linux / name).value // In a control file
+Linux / packageName := (Linux / name).value    // In a control file
 
 Debian / debianPackageConflicts := Seq(
   "grpc-server",

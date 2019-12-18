@@ -70,26 +70,17 @@ executableScriptName := "waves-dex"
 // ZIP archive and mappings for all artifacts
 inConfig(Universal)(
   Seq(
-    packageName := s"waves-dex${network.value.packageSuffix}-${version.value}", // An archive file name
-    mappings ++= {
-      val docDir = packageSource.value / "doc"
-
-      val baseDexConfigName  = s"${network.value}.conf"
-      val localDexConfigFile = docDir / baseDexConfigName
-      val dexConfigMapping = if (localDexConfigFile.exists()) {
-        val artifactPath = "doc/main.conf"
-        Some(localDexConfigFile -> artifactPath)
-      } else None
-
-      Seq(
-        (docDir / "README.md") -> "doc/README.md",
-        (docDir / "logback.xml") -> "doc/logback.xml",
-      ) ++ dexConfigMapping.toSeq
-    }
+    packageName := s"waves-dex-${version.value}", // An archive file name
+    mappings ++= sbt.IO
+      .listFiles((Compile / packageSource).value / "doc")
+      .map { file =>
+        file -> s"doc/${file.getName}"
+      }
+      .toSeq
   ))
 
 // DEB package
-Linux / name := s"waves-dex${network.value.packageSuffix}" // A staging directory name
+Linux / name := s"waves-dex" // A staging directory name
 Linux / normalizedName := (Linux / name).value // An archive file name
 Linux / packageName := (Linux / name).value    // In a control file
 

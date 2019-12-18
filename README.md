@@ -131,7 +131,9 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 
 ### 6.2. DEX extension installation and configuration 
 
-Artifacts of DEX extension have names like `waves-dex-integration{supported-network}{version}.{deb|zip}`.
+Artifacts of DEX extension have names like:
+* `waves-dex-integration{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `waves-dex-integration-{version}.zip` for ZIP artifact;
 
 #### a. 📦 Installation through DEB
 
@@ -183,17 +185,17 @@ waves.dex {
 
 ### 6.3. DEX server installation and configuration
 
-Artifacts of DEX extension have names like `dex{supported-network}{version}.{deb|zip}`.
+Artifacts of DEX extension have names like `dex{version}.{deb|zip}`.
 
 #### a. 📦 Installation through DEB
 
 Run: `sudo dpkg -i deb-artifact.deb`
 
 The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
-* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex{supported-network-suffix}`
-* If you are using `init.d`: `sudo /etc/init.d/waves-dex{supported-network-suffix}`
+* If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex`
+* If you are using `init.d`: `sudo /etc/init.d/waves-dex`
 
-If it is a fresh install, configurations were copied to `/etc/waves-dex{supported-network-suffix}`.
+If it is a fresh install, configurations were copied to `/etc/waves-dex`.
 
 #### b. 🗜 Installation through ZIP
 

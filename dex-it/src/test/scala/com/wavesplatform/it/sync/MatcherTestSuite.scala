@@ -6,7 +6,7 @@ import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
+import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse, OrderHistory}
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
@@ -55,6 +55,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       amountAsset = IssuedAsset(ByteStr.decodeBase58(bobAsset2).get),
       priceAsset = Waves
     )
+
+    "orderType should be limit for a limit order" in {
+      def validateHistory(label: String, orders: Seq[OrderHistory]): Unit = withClue(s"$label: ") {
+        orders should have size 1
+        orders.head.orderType shouldBe "limit"
+      }
+
+      validateHistory("by pair", node.orderHistoryByPair(alice, aliceWavesPair))
+      validateHistory("full", node.fullOrderHistory(alice))
+      validateHistory("admin", node.ordersByAddress(alice, activeOnly = false))
+    }
 
     "assert addresses balances" in {
       node.assertAssetBalance(alice.toAddress.toString, aliceAsset, AssetQuantity)

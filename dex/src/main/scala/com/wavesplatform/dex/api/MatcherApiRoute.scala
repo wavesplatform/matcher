@@ -487,6 +487,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           Json.obj(
             "id"        -> id.toString,
             "type"      -> oi.side.toString,
+            "orderType" -> oi.orderType,
             "amount"    -> oi.amount,
             "fee"       -> oi.matcherFee,
             "price"     -> oi.price,

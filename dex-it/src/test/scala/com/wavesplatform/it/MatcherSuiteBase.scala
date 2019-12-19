@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import java.net.InetSocketAddress
+import java.time.{LocalDateTime, ZoneId}
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
 import cats.instances.future.catsStdInstancesForFuture
@@ -155,7 +156,7 @@ abstract class MatcherSuiteBase
   }
 
   private def print(text: String): Unit = {
-    val formatted = s"---------- $text ----------"
+    val formatted = s"---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------"
     log.debug(formatted)
     dockerClient.printDebugMessage(formatted)
   }

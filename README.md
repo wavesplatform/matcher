@@ -284,7 +284,7 @@ dex/runMain com.wavesplatform.dex.WavesDexCli here-your-arguments
 Example:
 
 ```bash
-./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /Users/vsuharnikov/work/waves/dex-backend/_local/runtime/grpc-test/dex
+./bin/waves-dex-cli create-account-storage --address-scheme W --seed-format base64 --account-nonce 3 --output-directory /var/lib/waves-dex
 ```
 
 here:

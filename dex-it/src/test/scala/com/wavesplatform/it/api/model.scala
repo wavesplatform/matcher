@@ -196,7 +196,8 @@ case class OrderHistory(id: String,
                         filledFee: Long,
                         feeAsset: Asset,
                         status: String,
-                        assetPair: AssetPair) {
+                        assetPair: AssetPair,
+                        orderType: String) {
   def isActive: Boolean = status == "PartiallyFilled" || status == "Accepted"
 }
 

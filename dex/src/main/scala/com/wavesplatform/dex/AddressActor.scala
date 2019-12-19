@@ -309,7 +309,7 @@ class AddressActor(owner: Address,
     orderDB.saveOrderInfo(
       ao.order.id(),
       owner,
-      OrderInfo.v2(
+      OrderInfo.v3(
         ao.order.orderType,
         ao.order.amount,
         ao.order.price,
@@ -317,7 +317,8 @@ class AddressActor(owner: Address,
         ao.order.matcherFeeAssetId,
         ao.order.timestamp,
         status,
-        ao.order.assetPair
+        ao.order.assetPair,
+        if (ao.isLimit) AcceptedOrderType.Limit else AcceptedOrderType.Market
       )
     )
   }

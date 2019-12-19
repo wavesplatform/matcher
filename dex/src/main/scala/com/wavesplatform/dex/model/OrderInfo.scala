@@ -17,13 +17,14 @@ trait OrderInfo[+S <: OrderStatus] {
   def timestamp: Long
   def status: S
   def assetPair: AssetPair
+  def orderType: AcceptedOrderType
 }
 
 object OrderInfo {
   type FinalOrderInfo = OrderInfo[OrderStatus.Final]
 
   def v1[S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair): OrderInfo[S] =
-    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair)
+    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair, AcceptedOrderType.Limit)
 
   def v2[S <: OrderStatus](side: OrderType,
                            amount: Long,
@@ -33,7 +34,18 @@ object OrderInfo {
                            timestamp: Long,
                            status: S,
                            assetPair: AssetPair): OrderInfo[S] =
-    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair)
+    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, AcceptedOrderType.Limit)
+
+  def v3[S <: OrderStatus](side: OrderType,
+                           amount: Long,
+                           price: Long,
+                           matcherFee: Long,
+                           matcherFeeAssetId: Asset,
+                           timestamp: Long,
+                           status: S,
+                           assetPair: AssetPair,
+                           orderType: AcceptedOrderType): OrderInfo[S] =
+    Impl(3, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType)
 
   private case class Impl[+S <: OrderStatus](version: Byte,
                                              side: OrderType,
@@ -43,16 +55,23 @@ object OrderInfo {
                                              matcherFeeAssetId: Asset,
                                              timestamp: Long,
                                              status: S,
-                                             assetPair: AssetPair)
+                                             assetPair: AssetPair,
+                                             orderType: AcceptedOrderType)
       extends OrderInfo[S]
 
-  def encode(oi: FinalOrderInfo): Array[Byte] = if (oi.version <= 1) encodeV1(oi) else encodeV2(oi)
+  def encode(oi: FinalOrderInfo): Array[Byte] = oi.version match {
+    case x if x <= 1 => encodeV1(oi)
+    case 2           => encodeV2(oi)
+    case 3           => encodeV3(oi)
+    case x           => throw new IllegalArgumentException(s"An unknown order version: $x")
+  }
 
   def decode(bytes: Array[Byte]): FinalOrderInfo = {
     val buf = ByteBuffer.wrap(bytes)
     buf.get match {
       case side @ (0 | 1) => decodeV1(side, buf)
       case 2              => decodeV2(buf)
+      case 3              => decodeV3(buf)
       case x              => throw new IllegalStateException(s"An unknown version of order info: $x")
     }
   }
@@ -86,21 +105,27 @@ object OrderInfo {
     )
   }
 
-  private def encodeV2(oi: FinalOrderInfo): Array[Byte] =
+  private def encodeVersioned(version: Byte, size: Int, oi: FinalOrderInfo): ByteBuffer =
     // DON'T WRITE BYTES "oi.matcherFeeAssetId.byteRepr" to the buffer. It works another way :(
     ByteBuffer
-      .allocate(51 + oi.matcherFeeAssetId.byteRepr.length + oi.assetPair.bytes.length)
-      .put(2: Byte)
+      .allocate(size)
+      .put(version)
       .put(oi.side.bytes)
       .putLong(oi.amount)
       .putLong(oi.price)
       .putLong(oi.matcherFee)
       .putAssetId(oi.matcherFeeAssetId)
       .putLong(oi.timestamp)
-      .putFinalOrderStatus(2, oi.status)
+      .putFinalOrderStatus(version, oi.status)
       .putAssetId(oi.assetPair.amountAsset)
       .putAssetId(oi.assetPair.priceAsset)
-      .array()
+
+  private def encodeV2(oi: FinalOrderInfo): Array[Byte] =
+    encodeVersioned(
+      version = 2: Byte,
+      size = 51 + oi.matcherFeeAssetId.byteRepr.length + oi.assetPair.bytes.length,
+      oi = oi
+    ).array()
 
   private def decodeV2(buf: ByteBuffer): FinalOrderInfo = {
     val side        = OrderType(buf.get)
@@ -117,6 +142,33 @@ object OrderInfo {
       timestamp = buf.getLong,
       status = buf.getFinalOrderStatus(2, totalAmount, totalFee),
       assetPair = AssetPair(buf.getAssetId, buf.getAssetId)
+    )
+  }
+
+  private def encodeV3(oi: FinalOrderInfo): Array[Byte] =
+    encodeVersioned(
+      version = 3: Byte,
+      size = 52 + oi.matcherFeeAssetId.byteRepr.length + oi.assetPair.bytes.length,
+      oi = oi
+    ).putAcceptedOrderType(oi.orderType)
+      .array()
+
+  private def decodeV3(buf: ByteBuffer): FinalOrderInfo = {
+    val side        = OrderType(buf.get)
+    val totalAmount = buf.getLong
+    val price       = buf.getLong
+    val totalFee    = buf.getLong
+
+    OrderInfo.v3(
+      side = side,
+      amount = totalAmount,
+      price = price,
+      matcherFee = totalFee,
+      matcherFeeAssetId = buf.getAssetId,
+      timestamp = buf.getLong,
+      status = buf.getFinalOrderStatus(3, totalAmount, totalFee),
+      assetPair = AssetPair(buf.getAssetId, buf.getAssetId),
+      orderType = buf.getAcceptedOrderType
     )
   }
 }

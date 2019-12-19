@@ -3,7 +3,7 @@ package com.wavesplatform.dex.util
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.model.OrderStatus
+import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
@@ -48,6 +48,17 @@ object Codecs {
           OrderStatus.Cancelled(filledAmount, fee(filledAmount))
         case x => throw new IllegalArgumentException(s"Can't parse order status: $x")
       }
+    }
+
+    def putAcceptedOrderType(x: AcceptedOrderType): ByteBuffer = x match {
+      case AcceptedOrderType.Limit  => b.put(0: Byte)
+      case AcceptedOrderType.Market => b.put(1: Byte)
+    }
+
+    def getAcceptedOrderType: AcceptedOrderType = b.get match {
+      case 0 => AcceptedOrderType.Limit
+      case 1 => AcceptedOrderType.Market
+      case x => throw new IllegalArgumentException(s"Can't parse accepted order type: $x")
     }
   }
 }

@@ -42,7 +42,10 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     dockerClient.disconnectFromNetwork(wavesNode1Container())
 
     markup("Place orders, those should match")
-    dex1Api.place(aliceOrder)
+    eventually {
+      dex1Api.tryPlace(aliceOrder) shouldBe 'right
+    }
+
     dex1Api.place(bobOrder)
     dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
@@ -68,7 +71,8 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     wavesNode2Api.connect(wavesNode1NetworkApiAddress)
     wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
 
-    broadcastAndAwait(IssueEthTx)
+    broadcastAndAwait(wavesNode1Api, IssueEthTx)
+    wavesNode2Api.waitForTransaction(IssueEthTx)
   }
 
   override protected def invalidateCaches(): Unit = {

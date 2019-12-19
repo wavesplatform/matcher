@@ -31,8 +31,8 @@ object DexItDocker {
         env = Map(
           "WAVES_DEX_CONFIGPATH" -> s"$basePath/$name.conf",
           "WAVES_DEX_OPTS"       -> Seq(
-            "-Dlogback.stdout.enable=false",
-            "-Dlogback.file.enable=false",
+            "-Dlogback.stdout.enabled=false",
+            "-Dlogback.file.enabled=false",
             "-Dlogback.configurationFile=/opt/waves-dex/doc/logback.xml",
             "-Dlogback.include.file=/opt/waves-dex/doc/logback-container.xml"
           ).mkString(" ", " ", " ")

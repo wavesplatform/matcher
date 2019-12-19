@@ -1,110 +1,50 @@
 package com.wavesplatform.it.sync
 
-import java.nio.file.Paths
 import java.sql.{Connection, DriverManager}
 
+import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
-import com.wavesplatform.dex.it.docker.DockerContainerLauncher
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.docker.base.BaseContainer
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
+import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{OrderStatus, OrderStatusResponse}
+import com.wavesplatform.it.NewMatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
+import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration.DurationInt
 import scala.io.Source
-import scala.util.{Failure, Try}
+import scala.util.Try
 
-class OrderHistoryTestSuite extends MatcherSuiteBase {
+class OrderHistoryTestSuite extends NewMatcherSuiteBase {
 
-  // scenario:
-  //  1. create node network
-  //  2. create postgres container (pgc)
-  //  3. connect pgc to node network
-  //  4. up pgc
-  //  5. up node (during start node checks connection to postgres)
-  //  6. send messages from node to pgc
+  private val customDB       = "user_db"
+  private val customUser     = "user"
+  private val customPassword = "user"
 
-  val customDB       = "user_db"
-  val customUser     = "user"
-  val customPassword = "user"
+  private val postgresContainerName = "pgc"
+  private val postgresContainerPort = 5432
 
-  val postgresImageName           = "postgres"
-  val postgresContainerName       = "pgc"
-  val postgresContainerPort       = "5432"
-  val postgresContainerIp: String = dockerClient.ipForNode(10)
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""
+       |waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
+       |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
+       |  order-history.enabled = yes
+       |}
+    """.stripMargin
+  )
 
-  val postgresContainerLauncher =
-    new DockerContainerLauncher(
-      imageName = postgresImageName,
-      containerName = postgresContainerName,
-      containerIp = postgresContainerIp,
-      containerPort = postgresContainerPort,
-      imageTag = "10",
-      env = List(s"POSTGRES_DB=$customDB", s"POSTGRES_USER=$customUser", s"POSTGRES_PASSWORD=$customPassword"),
-      networkName = dockerClient.network().name
-    )
-
-  private val batchLingerMs: Int = OrderHistorySettings.defaultBatchLingerMs
-
-  private def getPostgresContainerHostPort: String = postgresContainerLauncher.getHostPort.explicitGet()
-
-  // TODO rewrite
-  @annotation.tailrec
-  private def retry[T](attemptsCount: Int, delayInMs: Int)(fn: => T): Try[T] = {
-    Try { fn } match {
-      case Failure(_) if attemptsCount > 1 => if (delayInMs != 0) Thread.sleep(delayInMs); retry(attemptsCount - 1, delayInMs)(fn)
-      case Failure(ex)                     => throw ex
-      case success                         => success
-    }
-  }
-
-  def getFileContentStr(fileName: String): String = {
-    val fileStream = getClass.getResourceAsStream(fileName)
-    Source.fromInputStream(fileStream).getLines.toSeq.mkString
-  }
-
-  def createDatabase(): Unit = {
-
-    val createDatabaseFileName    = "init-user-db.sh"
-    val createDatabaseFileContent = getFileContentStr(s"/order-history/$createDatabaseFileName")
-
-    postgresContainerLauncher.writeFile(
-      to = Paths.get(s"/docker-entrypoint-initdb.d/$createDatabaseFileName"),
-      content = createDatabaseFileContent
-    )
-  }
-
-  def createTables(postgresAddress: String): Unit = {
-
-    val url                     = s"jdbc:postgresql://$postgresAddress/$customDB"
-    val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
-
-    def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
-
-      val createTablesDDL       = getFileContentStr(orderHistoryDDLFileName)
-      val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
-
-      createTablesStatement.executeUpdate()
-      createTablesStatement.close()
-    }
-
-    retry(10, 2000) { DriverManager.getConnection(url, customUser, customPassword) } flatMap { sqlConnection =>
-      executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
-    } get
-  }
-
-  private def getPostgresConnectionCfgString(serverName: String, port: String): String =
+  private def getPostgresConnectionCfgString(serverName: String, port: Int): String =
     s"""
        |postgres {
        |  server-name = $serverName
@@ -116,50 +56,64 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
        |}
     """.stripMargin
 
-  private def getOrdersHistoryCfgString(batchLingerMs: Long): String =
-    s"""
-       |waves.dex {
-       |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
-       |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
-       |  order-history {
-       |    enabled = yes
-       |    orders-batch-linger-ms = $batchLingerMs
-       |    orders-batch-entries = 10000
-       |    events-batch-linger-ms = $batchLingerMs
-       |    events-batch-entries = 10000
-       |  },
-       |  allowed-order-versions = [1, 2, 3]
-       |}
-    """.stripMargin
+  private val postgres: PostgreSQLContainer =
+    PostgreSQLContainer(
+      databaseName = customDB,
+      username = customUser,
+      password = customPassword
+    ).configure { p =>
+      p.withNetwork(BaseContainer.network)
+      p.withNetworkAliases(postgresContainerName)
+      p.withCreateContainerCmdModifier { cmd =>
+        cmd withName postgresContainerName
+        cmd withIpv4Address BaseContainer.getIp(11)
+      }
+    }
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(getOrdersHistoryCfgString(batchLingerMs))
+  private def createTables(): Unit = {
+
+    val orderHistoryDDLFileName = "/order-history/order-history-ddl.sql"
+
+    def getFileContentStr(fileName: String): String = {
+      val fileStream = getClass.getResourceAsStream(fileName)
+      Source.fromInputStream(fileStream).getLines.toSeq.mkString
+    }
+
+    def executeCreateTablesStatement(sqlConnection: Connection): Try[Unit] = Try {
+
+      val createTablesDDL       = getFileContentStr(orderHistoryDDLFileName)
+      val createTablesStatement = sqlConnection.prepareStatement(createTablesDDL)
+
+      createTablesStatement.executeUpdate()
+      createTablesStatement.close()
+    }
+
+    DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password) unsafeTap { sqlConnection =>
+      executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
+    }
+  }
 
   override protected def beforeAll(): Unit = {
     // DEX depends on Postgres, so it must start before
-    createDatabase()
-    postgresContainerLauncher.startContainer()
-    createTables(s"localhost:$getPostgresContainerHostPort")
+    postgres.start()
+    createTables()
 
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    startAndWait(wavesNodeContainer(), wavesNodeApi)
 
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
 
-    startAndWait(dex1Container(), dex1Api)
-    dex1Api.upsertRate(eth, 0.00567593)
-    dex1Api.upsertRate(btc, 0.00009855)
-    dex1Api.upsertRate(usd, 0.5)
-  }
+    startAndWait(dexContainer(), dexApi)
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    postgresContainerLauncher.stopAndRemoveContainer()
+    dexApi.upsertRate(eth, 0.00567593)
+    dexApi.upsertRate(btc, 0.00009855)
+    dexApi.upsertRate(usd, 0.5)
   }
 
   private lazy val ctx =
     new PostgresJdbcContext(
       SnakeCase,
       ConfigFactory
-        .parseString(getPostgresConnectionCfgString("localhost", getPostgresContainerHostPort))
+        .parseString(getPostgresConnectionCfgString("localhost", postgres mappedPort postgresContainerPort))
         .as[PostgresConnection]("postgres")
         .getConfig
     )
@@ -236,11 +190,11 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     (1 to ordersCount)
       .foreach { i =>
-        dex1Api.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
-        dex1Api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dexApi.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dexApi.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
       }
 
-    retry(10, batchLingerMs) {
+    eventually {
       getOrdersCount shouldBe ordersCount * 2
       getEventsCount shouldBe ordersCount * 2
     }
@@ -251,27 +205,27 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, matcherFeeAssetId = btc)
     val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
 
-    dex1Api.place(buyOrder)
+    dexApi.place(buyOrder)
 
     val sellOrder1 = sellOrder
-    dex1Api.place(sellOrder1)
+    dexApi.place(sellOrder1)
 
-    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dex1Api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
+    dexApi.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+    dexApi.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
 
     val sellOrder2 = sellOrder
-    dex1Api.place(sellOrder2)
+    dexApi.place(sellOrder2)
 
-    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dex1Api.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
+    dexApi.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+    dexApi.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
 
-    dex1Api.cancel(alice, buyOrder)
+    dexApi.cancel(alice, buyOrder)
 
-    retry(10, batchLingerMs) {
+    eventually {
       withClue("checking info for 2 small submitted orders\n") {
 
         Set(sellOrder1, sellOrder2).foreach { order =>
-          getOrderInfoById(order.id()).get shouldBe
+          getOrderInfoById(order.id()).get shouldBe // TODO DIFFX
             OrderBriefInfo(order.idStr(),
                            limitOrderType,
                            bob.publicKey.toString,
@@ -316,13 +270,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, matcherFeeAssetId = Waves)
     val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, matcherFeeAssetId = usd)
 
-    dex1Api.place(buyOrder)
-    dex1Api.place(sellOrder)
+    dexApi.place(buyOrder)
+    dexApi.place(sellOrder)
 
-    dex1Api.waitForOrderStatus(buyOrder, OrderStatus.Filled)
-    dex1Api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+    dexApi.waitForOrderStatus(buyOrder, OrderStatus.Filled)
+    dexApi.waitForOrderStatus(sellOrder, OrderStatus.Filled)
 
-    retry(20, batchLingerMs) {
+    eventually {
       withClue("checking info for counter order\n") {
         getOrderInfoById(buyOrder.id()).get shouldBe OrderBriefInfo(buyOrder.idStr(),
                                                                     limitOrderType,
@@ -363,13 +317,13 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
     val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, matcherFeeAssetId = eth)
     val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, matcherFeeAssetId = btc)
 
-    dex1Api.place(smallBuyOrder)
-    dex1Api.place(bigSellOrder)
+    dexApi.place(smallBuyOrder)
+    dexApi.place(bigSellOrder)
 
-    dex1Api.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
-    dex1Api.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
+    dexApi.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
+    dexApi.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
 
-    retry(20, batchLingerMs) {
+    eventually {
       withClue("checking info for small counter order\n") {
         getOrderInfoById(smallBuyOrder.id()).get shouldBe
           OrderBriefInfo(smallBuyOrder.idStr(),
@@ -409,18 +363,18 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
   }
 
   "Order history should correctly save market orders and their events" in {
-    dex1Api.cancelAll(bob)
-    dex1Api.cancelAll(alice)
+    dexApi.cancelAll(bob)
+    dexApi.cancelAll(alice)
 
     def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
 
     withClue("place buy market order into empty order book") {
 
       val unmatchableMarketBuyOrder = bigBuyOrder
-      dex1Api.placeMarket(unmatchableMarketBuyOrder)
-      dex1Api.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
+      dexApi.placeMarket(unmatchableMarketBuyOrder)
+      dexApi.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
 
-      retry(20, batchLingerMs) {
+      eventually {
         getOrderInfoById(unmatchableMarketBuyOrder.id()) shouldBe Some(
           OrderBriefInfo(unmatchableMarketBuyOrder.idStr(),
                          marketOrderType,
@@ -450,15 +404,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       )
 
       orders.foreach { order =>
-        dex1Api.place(order)
-        dex1Api.waitForOrderStatus(order, OrderStatus.Accepted)
+        dexApi.place(order)
+        dexApi.waitForOrderStatus(order, OrderStatus.Accepted)
       }
 
       val marketBuyOrder = bigBuyOrder
-      dex1Api.placeMarket(marketBuyOrder)
-      dex1Api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
+      dexApi.placeMarket(marketBuyOrder)
+      dexApi.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
 
-      retry(15, batchLingerMs) {
+      eventually {
         getOrderInfoById(marketBuyOrder.id()).get shouldBe
           OrderBriefInfo(marketBuyOrder.idStr(),
                          marketOrderType,

@@ -37,6 +37,11 @@ object Dependencies {
     val spotify = "8.15.1"
     val sttp    = "1.7.2"
 
+    val testContainers         = "0.34.1"
+    val testContainersPostgres = "1.12.3"
+
+    val toxiProxy = "1.12.3"
+
     val jackson     = "2.9.8"
     val googleGuava = "27.0.1-jre"
     val kafka       = "2.3.1"
@@ -68,6 +73,7 @@ object Dependencies {
   private val scopt             = "com.github.scopt" %% "scopt" % Version.scopt
   private val kafka             = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val kamon             = "io.kamon" %% "kamon-core" % Version.kamon
+  private val toxiProxy         = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
 
   private val logbackScalaJsExcluded = logback.exclude("org.scala-js", "scalajs-library_2.12")
 
@@ -77,6 +83,11 @@ object Dependencies {
   private val quill: Seq[ModuleID] = Seq(
     "org.postgresql" % "postgresql"  % Version.postgresql,
     "io.getquill"    %% "quill-jdbc" % Version.quillJdbc
+  )
+
+  private val testContainers: Seq[ModuleID] = Seq(
+    "com.dimafeng"       %% "testcontainers-scala" % Version.testContainers,
+    "org.testcontainers" % "postgresql"            % Version.testContainersPostgres
   )
 
   val silencer: Seq[ModuleID] = Seq(
@@ -124,6 +135,7 @@ object Dependencies {
 
   lazy val itTestCommon: Def.Initialize[Seq[ModuleID]] = Def.setting(
     Seq(
+      scalaTest,
       sttpModule("core"),
       sttpModule("play-json"),
       sttpModule("async-http-client-backend-future"),
@@ -131,8 +143,9 @@ object Dependencies {
       catsTaglessMacros,
       typesafeConfig,
       spotify,
-      mouse
-    )
+      mouse,
+      toxiProxy
+    ) ++ testContainers
   )
 
   lazy val testCommon: Def.Initialize[Seq[ModuleID]] = Def.setting(Seq(diffx))

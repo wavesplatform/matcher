@@ -58,7 +58,6 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
       override def onCompleted(): Unit                         = log.info("Balance changes stream completed!")
       override def onNext(value: BalanceChangesResponse): Unit = spendableBalanceChangesSubject.onNext(groupByAddress(value))
       override def onError(t: Throwable): Unit = {
-        log.warn(s"Error while listening to the balance changes stream occurred: ${t.getMessage}. New RPC call will be performed")
         channel.resetConnectBackoff()
         requestBalanceChanges()
       }

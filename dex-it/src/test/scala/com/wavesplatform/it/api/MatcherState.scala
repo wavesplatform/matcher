@@ -1,8 +1,8 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.api.responses.dex.{MarketStatusResponse, OrderBookHistoryItem, OrderBookResponse, OrderStatusResponse}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.it.api.dex._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 

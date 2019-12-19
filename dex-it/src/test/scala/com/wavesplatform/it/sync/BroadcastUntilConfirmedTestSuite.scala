@@ -3,12 +3,12 @@ package com.wavesplatform.it.sync
 import cats.Id
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.api.node.NodeApi
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import monix.eval.Coeval
 

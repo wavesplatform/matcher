@@ -11,20 +11,20 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.NodeApi
+import com.wavesplatform.dex.it.api.dex.{DexApi, DexApiOps}
+import com.wavesplatform.dex.it.api.node.{HasWavesNode, NodeApi}
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.docker._
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.fp.CanExtract
+import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
-import com.wavesplatform.dex.it.test.HasWavesNode
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.it.api.{DexApi, DexApiOps}
 import com.wavesplatform.it.docker.{DexContainer, DexItDocker}
-import com.wavesplatform.it.test.{ApiExtensions, ItMatchers}
+import com.wavesplatform.it.test.ApiExtensions
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.asynchttpclient.DefaultAsyncHttpClientConfig

@@ -5,12 +5,13 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.api.dex.DexApi
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.dex.OrderStatus
-import com.wavesplatform.it.api.{DexApi, MatcherCommand, MatcherState}
+import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.docker.DexContainer
 import com.wavesplatform.it.tags.DexItKafkaRequired

@@ -78,9 +78,6 @@ object Application {
 
     import com.wavesplatform.settings._
 
-    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
-    System.setProperty("networkaddress.cache.ttl", "0")
-
     val config   = loadConfig(external map ConfigFactory.parseFile)
     val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 

@@ -2,10 +2,10 @@ package com.wavesplatform.it.test
 
 import cats.Id
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.dex.it.api.NodeApi
-import com.wavesplatform.dex.it.test.WavesNodeApiExtensions
-import com.wavesplatform.it.api.dex._
-import com.wavesplatform.it.api.{DexApi, MatcherState}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.api.dex.DexApi
+import com.wavesplatform.dex.it.api.node.{NodeApi, WavesNodeApiExtensions}
+import com.wavesplatform.it.api.MatcherState
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 

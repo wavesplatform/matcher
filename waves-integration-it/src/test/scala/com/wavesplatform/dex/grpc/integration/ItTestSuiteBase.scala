@@ -4,7 +4,8 @@ import cats.Id
 import cats.instances.try_._
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.{HasWaitReady, NodeApi}
+import com.wavesplatform.dex.it.api.node.{HasWavesNode, NodeApi, WavesNodeApiExtensions}
+import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
@@ -12,7 +13,6 @@ import com.wavesplatform.dex.it.docker.{DockerContainer, WavesIntegrationItDocke
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
-import com.wavesplatform.dex.it.test.{HasWavesNode, WavesNodeApiExtensions}
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval

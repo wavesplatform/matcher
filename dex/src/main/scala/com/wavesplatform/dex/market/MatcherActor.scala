@@ -181,7 +181,7 @@ class MatcherActor(settings: MatcherSettings,
     case PingAll(xs) =>
       val workers = xs.flatMap(pair => context.child(pair.key))
       val s       = sender()
-      context.actorOf(Props(new WatchDistributedCompletionActor(workers, s, Ping, Pong, settings.processConsumedTimeout)))
+      context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
     case ForceSaveSnapshots => context.children.foreach(_ ! SaveSnapshot(lastProcessedNr))
   }

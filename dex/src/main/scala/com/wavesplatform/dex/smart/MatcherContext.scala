@@ -105,6 +105,8 @@ object MatcherContext {
     override def accountScriptWithComplexity(address: Address): Option[(Script, Long)]                               = kill("accountScriptWithComplexity")
     override def assetScriptWithComplexity(id: Asset.IssuedAsset): Option[(Script, Long)]                            = kill("assetScriptWithComplexity")
     override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = kill("collectActiveLeases")
+
+    override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceOnlySnapshots")
   }
 
 }

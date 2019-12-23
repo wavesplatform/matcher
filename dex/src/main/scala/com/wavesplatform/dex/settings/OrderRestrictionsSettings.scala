@@ -2,31 +2,14 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import cats.syntax.apply._
+import com.wavesplatform.dex.json.stringAsDoubleFormat
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.{ErrorsListOr, _}
-import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json._
 
-case class OrderRestrictionsSettings(stepAmount: Double,
-                                     minAmount: Double,
-                                     maxAmount: Double,
-                                     stepPrice: Double,
-                                     minPrice: Double,
-                                     maxPrice: Double) {
-
-  val json: Coeval[JsObject] = Coeval.evalOnce {
-    Json.obj(
-      "stepAmount" -> formatValue(stepAmount),
-      "minAmount"  -> formatValue(minAmount),
-      "maxAmount"  -> formatValue(maxAmount),
-      "stepPrice"  -> formatValue(stepPrice),
-      "minPrice"   -> formatValue(minPrice),
-      "maxPrice"   -> formatValue(maxPrice)
-    )
-  }
-}
+case class OrderRestrictionsSettings(stepAmount: Double, minAmount: Double, maxAmount: Double, stepPrice: Double, minPrice: Double, maxPrice: Double)
 
 object OrderRestrictionsSettings {
 
@@ -39,6 +22,11 @@ object OrderRestrictionsSettings {
       minPrice = 0.00000001,
       maxPrice = 1000000
     )
+
+  implicit val orderRestrictionsSettingsFormat: Format[OrderRestrictionsSettings] = {
+    implicit val doubleFormat: Format[Double] = stringAsDoubleFormat
+    Json.format[OrderRestrictionsSettings]
+  }
 
   implicit val orderRestrictionsSettingsReader: ValueReader[OrderRestrictionsSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)

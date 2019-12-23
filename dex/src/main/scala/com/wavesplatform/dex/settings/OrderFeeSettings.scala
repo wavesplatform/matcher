@@ -11,42 +11,16 @@ import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{Waves, _}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{Reads, Writes}
 
 object OrderFeeSettings {
 
   val totalWavesAmount: Long = Constants.UnitsInWave * Constants.TotalWaves
 
-  sealed trait OrderFeeSettings {
-
-    def getJson(matcherAccountFee: Long, ratesJson: JsObject): Coeval[JsObject] = Coeval.evalOnce {
-      Json.obj(
-        this match {
-          case DynamicSettings(baseFee) =>
-            "dynamic" -> Json.obj(
-              "baseFee" -> (baseFee + matcherAccountFee),
-              "rates"   -> ratesJson
-            )
-          case FixedSettings(defaultAssetId, minFee) =>
-            "fixed" -> Json.obj(
-              "assetId" -> AssetPair.assetIdStr(defaultAssetId),
-              "minFee"  -> minFee
-            )
-          case PercentSettings(assetType, minFee) =>
-            "percent" -> Json.obj(
-              "type"   -> assetType,
-              "minFee" -> minFee
-            )
-        }
-      )
-    }
-  }
-
+  sealed trait OrderFeeSettings
   case class DynamicSettings(baseFee: Long)                        extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
   case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
@@ -105,6 +79,9 @@ object AssetType extends Enumeration {
   val PRICE     = Value("price")
   val SPENDING  = Value("spending")
   val RECEIVING = Value("receiving")
+
+  implicit val assetTypeReads: Reads[AssetType]   = Reads.enumNameReads(AssetType)
+  implicit val assetTypeWrites: Writes[AssetType] = Writes.enumNameWrites[AssetType.type]
 }
 
 object FeeMode extends Enumeration {
@@ -113,4 +90,7 @@ object FeeMode extends Enumeration {
   val DYNAMIC = Value("dynamic")
   val FIXED   = Value("fixed")
   val PERCENT = Value("percent")
+
+  implicit val feeModeReads: Reads[FeeMode]   = Reads.enumNameReads(FeeMode)
+  implicit val feeModeWrites: Writes[FeeMode] = Writes.enumNameWrites[FeeMode.type]
 }

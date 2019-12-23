@@ -15,20 +15,25 @@ import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.json.assetMapFormat
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue}
+import play.api.libs.json.{Format, JsString, JsValue}
 
 import scala.concurrent.Future
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData with PathMockFactory with Eventually with WithDB {
 
-  private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
+  private val apiKey       = "apiKey"
+  private val apiKeyHeader = RawHeader("X-API-KEY", apiKey)
+
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetId   = smartAssetTx.id()
@@ -42,6 +47,86 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     hasScript = false
   )
 
+  private val orderRestrictions = OrderRestrictionsSettings(
+    stepAmount = 0.00000001,
+    minAmount = 0.00000001,
+    maxAmount = 1000.0,
+    stepPrice = 0.00000001,
+    minPrice = 0.00000001,
+    maxPrice = 2000.0,
+  )
+
+  private val priceAssetTx = issueGen.sample.get
+  private val priceAssetId = priceAssetTx.id()
+  private val priceAsset   = IssuedAsset(priceAssetId)
+
+  private val settings = MatcherSettings.valueReader
+    .read(ConfigFactory.load(), "waves.dex")
+    .copy(
+      priceAssets = Seq(priceAsset),
+      orderRestrictions = Map(AssetPair(smartAsset, Waves) -> orderRestrictions)
+    )
+
+  // getMatcherPublicKey
+  routePath("/") - {
+    "returns a public key" in test { route =>
+      Get(routePath("/")) ~> route ~> check {
+        responseAs[JsString].value shouldBe "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf"
+      }
+    }
+  }
+
+  // orderBookInfo
+  routePath("/orderbook/{amountAsset}/{priceAsset}/info") - {
+    "returns an order book information" in test { route =>
+      Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
+        responseAs[JsValue].as[OrderBookInfo] should matchTo(
+          OrderBookInfo(
+            restrictions = Some(orderRestrictions),
+            matchingRules = OrderBookInfo.MatchingRuleSettings(0.1)
+          ))
+      }
+    }
+  }
+
+  // getSettings
+  routePath("/matcher/settings") - {
+    "returns matcher's settings" in test { route =>
+      Get(routePath("/settings")) ~> route ~> check {
+        responseAs[JsValue].as[MatcherPublicSettings] should matchTo(MatcherPublicSettings(
+          priceAssets = List(priceAsset),
+          orderFee = MatcherPublicSettings.OrderFeePublicSettings.Dynamic(
+            baseFee = 600000,
+            rates = Map(Waves -> 1.0)
+          ),
+          orderVersions = List[Byte](1, 2, 3)
+        ))
+      }
+    }
+  }
+
+  // getRates
+  routePath("/settings/rates") - {
+    "returns available rates for fee" in test { route =>
+      Get(routePath("/settings/rates")) ~> route ~> check {
+        implicit val ratesFormat: Format[Map[Asset, Double]] = assetMapFormat[Double]
+        responseAs[JsValue].as[Map[Asset, Double]] should matchTo(Map[Asset, Double](Waves -> 1.0))
+      }
+    }
+  }
+
+  // getCurrentOffset
+  routePath("/debug/currentOffset") - {
+    "returns a current offset in the queue" in test(
+      { route =>
+        Get(routePath("/debug/currentOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          responseAs[JsValue].as[Int] shouldBe 0
+        }
+      },
+      apiKey
+    )
+  }
+
   routePath("/balance/reserved/{publicKey}") - {
 
     val publicKey = matcherKeyPair.publicKey
@@ -54,11 +139,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         RawHeader("Signature", base58Signature)
       ) ~> route
 
-    "returns a reserved balance for specified publicKey" in test { route =>
+    "returns a reserved balance for specified publicKey" in test(f = { route =>
       mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
         status shouldBe StatusCodes.OK
       }
-    }
+    }, apiKey = apiKey)
 
     "returns HTTP 400 when provided a wrong base58-encoded" - {
       "signature" in test { route =>
@@ -78,8 +163,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   }
 
   routePath("/settings/rates/{assetId}") - {
-
-    val apiKey    = "apiKey"
     val rateCache = RateCache.inMem
 
     val rate        = 0.0055
@@ -87,7 +170,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "add rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.Created
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual s"The rate $rate for the asset $smartAssetId added"
@@ -100,7 +183,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "update rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"
@@ -113,7 +196,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "update rate incorrectly (incorrect body)" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "The provided JSON is invalid. Check the documentation"
@@ -125,7 +208,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "update rate incorrectly (incorrect value)" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "Asset rate should be positive"
@@ -138,7 +221,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     "update rate incorrectly (incorrect content type)" in test(
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), HttpEntity(ContentTypes.`text/plain(UTF-8)`, "5"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "The provided JSON is invalid. Check the documentation"
@@ -150,7 +233,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "delete rate" in test(
       { route =>
-        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"
@@ -163,7 +246,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "changing waves rate" in test(
       { route =>
-        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "The rate for WAVES cannot be changed"
@@ -196,7 +279,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
 
     "deleting waves rate" in test(
       { route =>
-        Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath("/settings/rates/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual "The rate for WAVES cannot be changed"
@@ -230,7 +313,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     "delete rate for the asset that doesn't have rate" in test(
       { route =>
         rateCache.deleteRate(smartAsset)
-        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.NotFound
           val message = (responseAs[JsValue] \ "message").as[JsString]
           message.value shouldEqual s"The rate for the asset $smartAssetId was not specified"

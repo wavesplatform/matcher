@@ -32,7 +32,7 @@ import com.wavesplatform.dex.market.MatcherActor.{
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.metrics.TimerExt
@@ -223,13 +223,22 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions map { allowedOrderVersions =>
+        import MatcherPublicSettings.OrderFeePublicSettings._
         SimpleResponse(
-          StatusCodes.OK,
-          Json.obj(
-            "priceAssets"   -> matcherSettings.priceAssets,
-            "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
-            "orderVersions" -> allowedOrderVersions.toSeq.sorted
-          )
+          code = StatusCodes.OK,
+          js = Json.toJson(
+            MatcherPublicSettings(
+              priceAssets = matcherSettings.priceAssets,
+              orderFee = matcherSettings.orderFee match {
+                case OrderFeeSettings.DynamicSettings(baseFee)              => Dynamic(baseFee + matcherAccountFee, rateCache.getAllRates)
+                case OrderFeeSettings.FixedSettings(defaultAssetId, minFee) => Fixed(defaultAssetId, minFee)
+                case OrderFeeSettings.PercentSettings(assetType, minFee)    => Percent(assetType, minFee)
+              },
+              orderVersions = allowedOrderVersions.toSeq.sorted
+            )) match {
+            case r: JsObject => r
+            case r           => throw new IllegalStateException(s"Imposibru! $r")
+          }
         )
       }
     )
@@ -344,13 +353,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
-  private def orderBookInfoJson(pair: AssetPair): JsObject =
-    Json.obj(
-      "restrictions" -> matcherSettings.orderRestrictions.get(pair).map { _.json.value },
-      "matchingRules" -> Json.obj(
-        "tickSize" -> formatValue { getActualTickSize(pair) }
-      )
+  private def orderBookInfoJson(pair: AssetPair): JsValue = Json.toJson(
+    OrderBookInfo(
+      restrictions = matcherSettings.orderRestrictions.get(pair),
+      matchingRules = OrderBookInfo.MatchingRuleSettings(tickSize = getActualTickSize(pair).toDouble)
     )
+  )
 
   @Path("/orderbook")
   @ApiOperation(value = "Place order",
@@ -409,7 +417,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                   "priceAssetInfo"  -> m.priceAssetinfo,
                   "created"         -> m.created
                 )
-                .deepMerge { orderBookInfoJson(m.pair) }
+                .deepMerge {
+                  orderBookInfoJson(m.pair) match {
+                    case x: JsObject => x
+                    case _           => throw new IllegalStateException("Impossibru!")
+                  }
+                }
             }
           )
         )

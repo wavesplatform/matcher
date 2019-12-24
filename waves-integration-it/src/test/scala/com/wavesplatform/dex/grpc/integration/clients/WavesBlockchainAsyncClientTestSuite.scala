@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.grpc.integration.{DEXClient, ItTestSuiteBase}
+import com.wavesplatform.dex.grpc.integration.{DEXClient, IntegrationSuiteBase}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -17,13 +17,13 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
-import org.scalatest.{Assertion, BeforeAndAfterEach}
+import org.scalatest.Assertion
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
-class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAndAfterEach {
+class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   private val runNow = new ExecutionContext {
     override def execute(runnable: Runnable): Unit     = runnable.run()
@@ -31,7 +31,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   }
 
   private implicit val monixScheduler = Scheduler(runNow)
-  private lazy val client             = new DEXClient(wavesNode1GrpcApiTarget, 100.milliseconds).wavesBlockchainAsyncClient
+  private lazy val client             = new DEXClient(wavesNode1.grpcApiTarget, 100.milliseconds).wavesBlockchainAsyncClient
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -80,7 +80,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
   }
 
   "DEX client should receive balance changes via gRPC" in {
-    val aliceInitialBalance = wavesNode1Api.balance(alice, Waves)
+    val aliceInitialBalance = wavesNode1.api.balance(alice, Waves)
 
     val issueAssetTx = mkIssue(alice, "name", someAssetAmount, 2)
     val issuedAsset  = IssuedAsset(issueAssetTx.id.value)
@@ -130,7 +130,7 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
       val exchangeTx = mkExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
       wait(client.broadcastTx(exchangeTx)) shouldBe true
-      wavesNode1Api.waitForTransaction(exchangeTx.id())
+      wavesNode1.api.waitForTransaction(exchangeTx.id())
     }
 
     "returns false if the transaction didn't pass the validation" in {
@@ -177,13 +177,14 @@ class WavesBlockchainAsyncClientTestSuite extends ItTestSuiteBase with BeforeAnd
 
     "returns an information for created assets" in {
       val issueTx = IssueUsdTx
-      wait(client.assetDescription(IssuedAsset(issueTx.id()))) should matchTo(Option(
-        BriefAssetDescription(
-          name = new String(issueTx.name, StandardCharsets.UTF_8),
-          decimals = issueTx.decimals,
-          hasScript = issueTx.script.nonEmpty
-        )
-      ))
+      wait(client.assetDescription(IssuedAsset(issueTx.id()))) should matchTo(
+        Option(
+          BriefAssetDescription(
+            name = new String(issueTx.name, StandardCharsets.UTF_8),
+            decimals = issueTx.decimals,
+            hasScript = issueTx.script.nonEmpty
+          )
+        ))
     }
   }
 

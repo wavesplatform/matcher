@@ -34,8 +34,7 @@ object Dependencies {
     val postgresql = "9.4.1208"
     val quillJdbc  = "3.1.0"
 
-    val spotify = "8.15.1"
-    val sttp    = "1.7.2"
+    val sttp = "1.7.2"
 
     val testContainers         = "0.34.1"
     val testContainersPostgres = "1.12.3"
@@ -60,7 +59,6 @@ object Dependencies {
   private val logback           = "ch.qos.logback" % "logback-classic" % Version.logback
   private val googleGuava       = "com.google.guava" % "guava" % Version.googleGuava
   private val janino            = "org.codehaus.janino" % "janino" % Version.janino
-  private val spotify           = ("com.spotify" % "docker-client" % Version.spotify).classifier("shaded")
   private val typesafeConfig    = "com.typesafe" % "config" % Version.typesafeConfig
   private val scalaTest         = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck        = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
@@ -142,7 +140,6 @@ object Dependencies {
       catsCore.value,
       catsTaglessMacros,
       typesafeConfig,
-      spotify,
       mouse,
       toxiProxy
     ) ++ testContainers
@@ -154,8 +151,7 @@ object Dependencies {
     jacksonModule("dataformat", "dataformat-properties"),
     logbackScalaJsExcluded,
     scalaTest,
-    scalaCheck,
-    spotify
+    scalaCheck
   ) map (_ % Test)
 
   lazy val test: Seq[ModuleID] = Seq(

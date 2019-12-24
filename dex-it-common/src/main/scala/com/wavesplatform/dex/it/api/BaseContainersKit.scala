@@ -16,15 +16,12 @@ import monix.eval.Coeval
 import mouse.any._
 import org.asynchttpclient.DefaultAsyncHttpClientConfig
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait BaseContainersKit extends ScorexLogging {
 
   protected val moduleName: String
-
-  protected val apiKey = "integration-test-rest-api"
 
   protected val knownContainers: ConcurrentHashMap.KeySetView[BaseContainer, lang.Boolean] = ConcurrentHashMap.newKeySet[BaseContainer]()
 
@@ -56,14 +53,13 @@ trait BaseContainersKit extends ScorexLogging {
     Option { System.getProperty("waves.it.logging.dir") }
       .map { Paths get _ }
       .getOrElse {
-        Paths.get(System.getProperty("user.dir"), moduleName, "target", "logs", runId, getClass.getSimpleName.replaceAll("""(\w)\w*\.""", "$1.")) // TODO
+        Paths.get(System.getProperty("user.dir"), moduleName, "target", "logs", runId, getClass.getSimpleName.replaceAll("""(\w)\w*\.""", "$1."))
       } unsafeTap { Files.createDirectories(_) }
   }
 
   protected def stopBaseContainers(): Unit = {
     log.debug("Stopping containers")
-    knownContainers.asScala.foreach { _.stopAndSaveLogs }
-    BaseContainer.dockerClient.close()
+    knownContainers.forEach { _.stopAndSaveLogs(withRemoving = true) }
     futureHttpBackend.close()
     tryHttpBackend.close()
   }

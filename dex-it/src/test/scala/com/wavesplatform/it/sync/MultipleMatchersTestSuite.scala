@@ -2,32 +2,28 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import cats.instances.future.catsStdInstancesForFuture
-import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.fp
+import com.wavesplatform.dex.it.docker.base
 import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
-import com.wavesplatform.it.docker.DexContainer
 import com.wavesplatform.it.tags.DexItKafkaRequired
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import monix.eval.Coeval
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import scala.util.Random
 import scala.util.control.NonFatal
-import scala.util.{Random, Try}
 
 @DexItKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig: Config =
+  override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       """waves.dex {
       |  price-assets = ["WAVES"]
@@ -35,12 +31,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       |}""".stripMargin
     )
 
-  protected val dex2Container: Coeval[DexContainer] = Coeval.evalOnce { createDex("dex-2") }
-
-  private val cachedDex2ApiAddress = CachedData { dockerClient.getExternalSocketAddress(dex2Container(), dex2Container().restApiPort) }
-
-  protected def dex2AsyncApi: DexApi[Future] = DexApi[Future]("integration-test-rest-api", cachedDex2ApiAddress.get())
-  protected def dex2Api: DexApi[Id]          = fp.sync(DexApi[Try]("integration-test-rest-api", cachedDex2ApiAddress.get()))
+  protected lazy val dex2: base.DexContainer = createDex("dex-2")
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10
@@ -55,7 +46,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private var successfulCommandsNumber = 0
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
 
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(
@@ -63,53 +54,50 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
     )
 
-    dockerClient.start(dex1Container)
-    dockerClient.start(dex2Container)
-
-    dex1Api.waitReady
-    dex2Api.waitReady
+    dex1.start()
+    dex2.start()
   }
 
   "Place, fill and cancel a lot of orders" in {
 
-    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1AsyncApi, _))
-    val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2AsyncApi, _))
+    val alicePlaces = aliceOrders.map(MatcherCommand.Place(dex1.asyncApi, _))
+    val bobPlaces   = bobOrders.map(MatcherCommand.Place(dex2.asyncApi, _))
     val places      = Random.shuffle(alicePlaces ++ bobPlaces)
 
-    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
-    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(dex2AsyncApi, bob, _))
+    val aliceCancels = (1 to cancelsNumber).map(_ => choose(aliceOrders)).map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+    val bobCancels   = (1 to cancelsNumber).map(_ => choose(bobOrders)).map(MatcherCommand.Cancel(dex2.asyncApi, bob, _))
     val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
 
     successfulCommandsNumber = executeCommands(places ++ cancels)
-    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1AsyncApi, lastOrder)))
+    successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1.asyncApi, lastOrder)))
   }
 
   "Wait until all requests are processed" in {
     try {
-      val offset1 = dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
-      dex2Api.waitForCurrentOffset(_ == offset1)
+      val offset1 = dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+      dex2.api.waitForCurrentOffset(_ == offset1)
 
       withClue("Last command processed") {
-        List(dex1AsyncApi, dex2AsyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
+        List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
       }
     } catch {
       case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1Api.lastOffset}, node2=${dex2Api.lastOffset}")
+        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
         throw e
     }
   }
 
   "States on both matcher should be equal" in {
-    val state1 = state(dex1Api)
-    val state2 = state(dex2Api)
+    val state1 = state(dex1.api)
+    val state2 = state(dex2.api)
 
     state1 should matchTo(state2)
   }
 
   "Batch cancel and single cancels simultaneously" in {
 
-    dex1Api.cancelAll(alice)
-    dex1Api.cancelAll(bob)
+    dex1.api.cancelAll(alice)
+    dex1.api.cancelAll(bob)
 
     val allOrders =
       (Gen.containerOfN[Vector, Order](150, orderGen(matcher, bob, assetPairs, Seq(OrderType.BUY))).sample.get ++
@@ -117,12 +105,12 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
     log.info(s"Total orders: ${allOrders.size}")
 
-    allOrders.foreach(dex1Api.place)
-    allOrders.foreach(order => dex1Api.waitForOrder(order)(_.status != OrderStatus.NotFound))
+    allOrders.foreach(dex1.api.place)
+    allOrders.foreach(order => dex1.api.waitForOrder(order)(_.status != OrderStatus.NotFound))
 
     def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Iterable[Unit.type]] = Future.sequence {
       orders.map { order =>
-        dex1AsyncApi.tryCancel(owner, order).map {
+        dex1.asyncApi.tryCancel(owner, order).map {
           case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
           case _                             => Unit
         }
@@ -130,7 +118,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     }
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[Unit]] = Future.sequence {
-      assetPairs.map(toDexExplicitGetOps(dex2AsyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
+      assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
     }
 
     Await.result(
@@ -142,8 +130,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     )
 
     // TODO implement .waitFor[Seq[OrderbookHistory]]
-    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
-    Await.result(toDexExplicitGetOps(dex1AsyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexExplicitGetOps(dex1.asyncApi).orderHistory(alice, Some(true)), 5.seconds) shouldBe empty
+    Await.result(toDexExplicitGetOps(dex1.asyncApi).orderHistory(bob, Some(true)), 5.seconds) shouldBe empty
   }
 
   private def mkOrders(account: KeyPair, number: Int = placesNumber) = {
@@ -156,9 +144,4 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private def clean(state: MatcherState): MatcherState = state.copy(
     snapshots = state.snapshots.map { case (k, _) => k -> 0L }
   )
-
-  override protected def invalidateCaches(): Unit = {
-    super.invalidateCaches()
-    cachedDex2ApiAddress.invalidate()
-  }
 }

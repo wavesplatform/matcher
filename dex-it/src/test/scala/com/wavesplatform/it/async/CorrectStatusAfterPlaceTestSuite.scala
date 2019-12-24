@@ -21,7 +21,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
   private val IssueResults(issueAsset2Tx, issuedAsset2Id, issuedAsset2) = mkIssueExtended(issuer, "asset2", Long.MaxValue, decimals = 0)
   private val issueAssetTxs                                             = List(issueAsset1Tx, issueAsset2Tx)
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
        |  price-assets = ["$issuedAsset1Id", "$issuedAsset2Id"]
        |  rest-order-limit = 100
@@ -55,8 +55,8 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
         traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, 100.waves))(collection.breakOut)
       )
 
-    startAndWait(wavesNode1Container(), wavesNode1Api)
-    wavesNode1Api.broadcast(transferWavesTx)
+    wavesNode1.start()
+    wavesNode1.api.broadcast(transferWavesTx)
     broadcastAndAwait(issueAssetTxs: _*)
 
     val transferAssetsTxs = issueAssetTxs.map { issueTx =>
@@ -66,9 +66,9 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
     }
 
     broadcastAndAwait(transferAssetsTxs: _*)
-    wavesNode1Api.waitForTransaction(transferWavesTx)
+    wavesNode1.api.waitForTransaction(transferWavesTx)
 
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   "place orders and check their statuses" in {
@@ -94,8 +94,8 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private def request(order: Order): Future[(Order.Id, OrderStatus)] = {
     for {
-      _      <- dex1AsyncApi.tryPlace(order).recover { case x => log.error("Some error with order placement occurred:", x) }
-      status <- dex1AsyncApi.orderStatus(order)
+      _      <- dex1.asyncApi.tryPlace(order).recover { case x => log.error("Some error with order placement occurred:", x) }
+      status <- dex1.asyncApi.orderStatus(order)
     } yield (order.id(), status.status)
   }
 

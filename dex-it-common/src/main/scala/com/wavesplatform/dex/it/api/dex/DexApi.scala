@@ -17,7 +17,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex._
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
+import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -39,7 +39,6 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]]
   def tryPlaceMarket(order: Order): F[Either[MatcherError, MatcherResponse]]
-  def retryPlace(order: Order): F[Either[MatcherError, MatcherResponse]]
 
   def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
@@ -86,6 +85,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
   def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse]
+
+  def waitForOrderPlacement(order: Order): F[MatcherResponse]
 
   def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(pred: List[OrderBookHistoryItem] => Boolean): F[List[OrderBookHistoryItem]]
 
@@ -157,10 +158,6 @@ object DexApi {
           .readTimeout(3.minutes) // TODO find way to decrease timeout!
           .followRedirects(false) // TODO move ?
           .body(order)
-      }
-
-      override def retryPlace(order: Order): F[Either[MatcherError, MatcherResponse]] = {
-        repeatUntil(tryPlace(order), RepeatRequestOptions(1.second, 60)) { _.isRight }
       }
 
       override def tryPlaceMarket(order: Order): F[Either[MatcherError, MatcherResponse]] =
@@ -336,7 +333,7 @@ object DexApi {
         }
 
         // Sometimes container start during 20 seconds! https://github.com/docker/for-mac/issues/1183
-        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
+        repeatUntil(request)(_ == true).map(_ => ())
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
@@ -344,6 +341,8 @@ object DexApi {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
+
+      override def waitForOrderPlacement(order: Order): F[MatcherResponse] = repeatUntil(tryPlace(order)) { _.isRight }.map(_.explicitGet())
 
       def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
           pred: List[OrderBookHistoryItem] => Boolean): F[List[OrderBookHistoryItem]] =

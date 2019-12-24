@@ -1,82 +1,58 @@
 package com.wavesplatform.it.sync
 
-import cats.Id
-import cats.instances.try_._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.cache.CachedData
-import com.wavesplatform.dex.it.docker.WavesNodeContainer
-import com.wavesplatform.dex.it.fp
+import com.wavesplatform.dex.it.docker.base
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.OrderType
-import monix.eval.Coeval
-
-import scala.util.Try
 
 class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig: Config =
+  override protected def dexInitialSuiteConfig: Config =
     ConfigFactory
       .parseString(s"""waves.dex.exchange-transaction-broadcast {
-                    |  broadcast-until-confirmed = yes
-                    |  interval = 20s
-                    |}""".stripMargin)
+                      |  broadcast-until-confirmed = yes
+                      |  interval = 10s
+                      |}""".stripMargin)
 
   // Validator node
-  protected val wavesNode2Container: Coeval[WavesNodeContainer] = Coeval.evalOnce {
-    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no") withFallback suiteInitialWavesNodeConfig)
+  protected lazy val wavesNode2: base.WavesNodeContainer = {
+    createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no") withFallback wavesNodeInitialSuiteConfig)
   }
-
-  protected val refreshableWavesNode2ApiAddress = CachedData {
-    dockerClient.getExternalSocketAddress(wavesNode2Container(), wavesNode2Container().restApiPort)
-  }
-
-  protected def wavesNode2Api: NodeApi[Id] = fp.sync(NodeApi[Try]("integration-test-rest-api", refreshableWavesNode2ApiAddress.get()))
 
   private val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 100000L, 80000L)
   private val bobOrder   = mkOrder(bob, ethWavesPair, OrderType.BUY, 200000L, 100000L)
 
   "BroadcastUntilConfirmed" in {
     markup("Disconnect a miner node from the network")
-    dockerClient.disconnectFromNetwork(wavesNode1Container())
+    wavesNode1.disconnectFromNetwork()
 
     markup("Place orders, those should match")
-    eventually {
-      dex1Api.tryPlace(aliceOrder) shouldBe 'right
-    }
+    eventually { dex1.api.tryPlace(aliceOrder) shouldBe 'right }
 
-    dex1Api.place(bobOrder)
-    dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+    dex1.api.place(bobOrder)
+    dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1Api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
+    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
 
     markup("Connect the miner node to the network")
-    dockerClient.connectToNetwork(wavesNode1Container())
+    wavesNode1.connectToNetwork()
 
     markup("Wait until it receives the transaction")
-    wavesNode2Api.waitForTransaction(exchangeTxId)
+    wavesNode2.api.waitForTransaction(exchangeTxId)
   }
 
   override protected def beforeAll(): Unit = {
-    dockerClient.start(wavesNode1Container)
-    dockerClient.start(wavesNode2Container)
+    wavesNode1.start()
+    wavesNode2.start()
 
-    wavesNode1Api.waitReady
+    wavesNode2.api.connect(wavesNode1.networkAddress)
+    wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
 
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
 
-    wavesNode2Api.waitReady
-    wavesNode2Api.connect(wavesNode1NetworkApiAddress)
-    wavesNode2Api.waitForConnectedPeer(wavesNode1NetworkApiAddress)
-
-    broadcastAndAwait(wavesNode1Api, IssueEthTx)
-    wavesNode2Api.waitForTransaction(IssueEthTx)
-  }
-
-  override protected def invalidateCaches(): Unit = {
-    super.invalidateCaches()
-    refreshableWavesNode2ApiAddress.invalidate()
+    broadcastAndAwait(IssueEthTx)
+    wavesNode2.api.waitForTransaction(IssueEthTx)
   }
 }

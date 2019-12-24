@@ -98,5 +98,4 @@ object DexTestConfig {
     } else
       assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)
   }
-
 }

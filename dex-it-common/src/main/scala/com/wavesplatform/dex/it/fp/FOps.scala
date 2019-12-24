@@ -11,6 +11,7 @@ import play.api.libs.json._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
+import scala.concurrent.duration._
 
 case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempts: Int) {
   def decreaseAttempts: RepeatRequestOptions = copy(maxAttempts = maxAttempts - 1)
@@ -18,8 +19,7 @@ case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempt
 
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 
-  // TODO Rename to Repeated
-  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions)(stopCond: T => Boolean): F[T] =
+  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions = RepeatRequestOptions(1.second, 60))(stopCond: T => Boolean): F[T] =
     f.flatMap { firstResp =>
         (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
           case (resp, currOptions) =>

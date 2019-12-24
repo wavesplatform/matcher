@@ -12,7 +12,7 @@ import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
-import com.wavesplatform.it.NewMatcherSuiteBase
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -25,7 +25,7 @@ import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.Try
 
-class OrderHistoryTestSuite extends NewMatcherSuiteBase {
+class OrderHistoryTestSuite extends MatcherSuiteBase {
 
   private val customDB       = "user_db"
   private val customUser     = "user"
@@ -98,15 +98,15 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     postgres.start()
     createTables()
 
-    startAndWait(wavesNodeContainer(), wavesNodeApi)
+    wavesNode1.start()
 
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx)
 
-    startAndWait(dexContainer(), dexApi)
+    dex1.start()
 
-    dexApi.upsertRate(eth, 0.00567593)
-    dexApi.upsertRate(btc, 0.00009855)
-    dexApi.upsertRate(usd, 0.5)
+    dex1.api.upsertRate(eth, 0.00567593)
+    dex1.api.upsertRate(btc, 0.00009855)
+    dex1.api.upsertRate(usd, 0.5)
   }
 
   private lazy val ctx =
@@ -190,8 +190,8 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
 
     (1 to ordersCount)
       .foreach { i =>
-        dexApi.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
-        dexApi.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dex1.api.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dex1.api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
       }
 
     eventually {
@@ -205,21 +205,21 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, matcherFeeAssetId = btc)
     val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
 
-    dexApi.place(buyOrder)
+    dex1.api.place(buyOrder)
 
     val sellOrder1 = sellOrder
-    dexApi.place(sellOrder1)
+    dex1.api.place(sellOrder1)
 
-    dexApi.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dexApi.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
 
     val sellOrder2 = sellOrder
-    dexApi.place(sellOrder2)
+    dex1.api.place(sellOrder2)
 
-    dexApi.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dexApi.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
 
-    dexApi.cancel(alice, buyOrder)
+    dex1.api.cancel(alice, buyOrder)
 
     eventually {
       withClue("checking info for 2 small submitted orders\n") {
@@ -270,11 +270,11 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, matcherFeeAssetId = Waves)
     val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, matcherFeeAssetId = usd)
 
-    dexApi.place(buyOrder)
-    dexApi.place(sellOrder)
+    dex1.api.place(buyOrder)
+    dex1.api.place(sellOrder)
 
-    dexApi.waitForOrderStatus(buyOrder, OrderStatus.Filled)
-    dexApi.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
 
     eventually {
       withClue("checking info for counter order\n") {
@@ -317,11 +317,11 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
     val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, matcherFeeAssetId = eth)
     val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, matcherFeeAssetId = btc)
 
-    dexApi.place(smallBuyOrder)
-    dexApi.place(bigSellOrder)
+    dex1.api.place(smallBuyOrder)
+    dex1.api.place(bigSellOrder)
 
-    dexApi.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
-    dexApi.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
 
     eventually {
       withClue("checking info for small counter order\n") {
@@ -363,16 +363,16 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
   }
 
   "Order history should correctly save market orders and their events" in {
-    dexApi.cancelAll(bob)
-    dexApi.cancelAll(alice)
+    dex1.api.cancelAll(bob)
+    dex1.api.cancelAll(alice)
 
     def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
 
     withClue("place buy market order into empty order book") {
 
       val unmatchableMarketBuyOrder = bigBuyOrder
-      dexApi.placeMarket(unmatchableMarketBuyOrder)
-      dexApi.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
+      dex1.api.placeMarket(unmatchableMarketBuyOrder)
+      dex1.api.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
 
       eventually {
         getOrderInfoById(unmatchableMarketBuyOrder.id()) shouldBe Some(
@@ -404,13 +404,13 @@ class OrderHistoryTestSuite extends NewMatcherSuiteBase {
       )
 
       orders.foreach { order =>
-        dexApi.place(order)
-        dexApi.waitForOrderStatus(order, OrderStatus.Accepted)
+        dex1.api.place(order)
+        dex1.api.waitForOrderStatus(order, OrderStatus.Accepted)
       }
 
       val marketBuyOrder = bigBuyOrder
-      dexApi.placeMarket(marketBuyOrder)
-      dexApi.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
+      dex1.api.placeMarket(marketBuyOrder)
+      dex1.api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
 
       eventually {
         getOrderInfoById(marketBuyOrder.id()).get shouldBe

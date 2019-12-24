@@ -5,7 +5,8 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class DisableProducerTestSuite extends MatcherSuiteBase {
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     """waves.dex.events-queue {
       |  local.enable-storing  = no
       |  kafka.producer.enable = no
@@ -19,12 +20,12 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
   "Check no commands are written to queue" - {
     "check assets's balances" in {
-      wavesNode1Api.balance(alice, eth) shouldBe IssueEthTx.quantity
-      wavesNode1Api.balance(matcher, eth) shouldBe 0L
+      wavesNode1.api.balance(alice, eth) shouldBe IssueEthTx.quantity
+      wavesNode1.api.balance(matcher, eth) shouldBe 0L
     }
 
     "place an order and wait some time" in {
-      def test(order: Order): Unit = dex1Api.tryPlace(order) should failWith(528) // FeatureDisabled
+      def test(order: Order): Unit = dex1.api.tryPlace(order) should failWith(528) // FeatureDisabled
 
       List(
         mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant),
@@ -33,15 +34,15 @@ class DisableProducerTestSuite extends MatcherSuiteBase {
 
       Thread.sleep(5000)
 
-      dex1Api.currentOffset should be(-1)
-      dex1Api.lastOffset should be(-1)
+      dex1.api.currentOffset should be(-1)
+      dex1.api.lastOffset should be(-1)
     }
 
     "Commands aren't written to queue after restart" in {
-      restartContainer(dex1Container(), dex1Api)
+      dex1.restart()
 
-      dex1Api.currentOffset should be(-1)
-      dex1Api.lastOffset should be(-1)
+      dex1.api.currentOffset should be(-1)
+      dex1.api.lastOffset should be(-1)
     }
   }
 }

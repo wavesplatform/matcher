@@ -1,17 +1,9 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.it.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.lang.directives.values.{Expression, V1}
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils.compilerContext
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import fastparse.core.Parsed
 import org.scalacheck.Gen
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -80,9 +72,4 @@ package object it {
     }
 
   def choose[T](xs: IndexedSeq[T]): T = xs(Random.nextInt(xs.size))
-
-  def createBoolScript(code: String): Script = {
-    val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
-  }
 }

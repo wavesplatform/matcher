@@ -7,6 +7,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 trait PredefinedAssets {
+
   val defaultAssetQuantity = 999999999999L
 
   val usdAssetName = "USD-X"

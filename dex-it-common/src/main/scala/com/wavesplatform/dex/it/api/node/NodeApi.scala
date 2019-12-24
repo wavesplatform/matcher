@@ -14,7 +14,7 @@ import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
+import com.wavesplatform.dex.it.fp.{CanWait, FOps}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -63,8 +63,6 @@ object NodeApi {
 
       def apiUri = s"http://${host.getAddress.getHostAddress}:${host.getPort}"
 
-//      override protected def readyCheck: F[Boolean] = tryCurrentHeight.map(_.isRight)
-
       override def tryWavesBalance(address: Address): F[Either[ErrorResponse, WavesBalanceResponse]] =
         tryParseJson(sttp.get(uri"$apiUri/addresses/balance/$address"))
 
@@ -94,7 +92,7 @@ object NodeApi {
         }.map(_ => ())
       }
 
-      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(tryTransactionInfo(id), 1.second)(_.isRight).map(_ => ())
+      override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
 
       override def waitForHeightArise(): F[Unit] =
         tryCurrentHeight
@@ -122,7 +120,7 @@ object NodeApi {
           case NonFatal(e)                               => M.raiseError(e)
         }
 
-        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
+        repeatUntil(request)(_ == true).map(_ => ())
       }
     }
 }

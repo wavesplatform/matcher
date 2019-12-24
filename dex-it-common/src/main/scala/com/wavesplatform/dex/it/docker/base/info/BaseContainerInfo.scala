@@ -11,6 +11,7 @@ trait BaseContainerInfo {
   val restApiPort: Int
   val exposedPorts: Seq[Int]
   val netAlias: String
+  val specificFiles: Seq[(String, String, Boolean)] = Seq.empty
 
   def getEnv(containerName: String): Map[String, String]
 }

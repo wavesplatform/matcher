@@ -3,14 +3,14 @@ package com.wavesplatform.dex.it.api.node
 import cats.Id
 import com.wavesplatform.transaction.Transaction
 
-trait WavesNodeApiExtensions {
+trait NodeApiExtensions {
 
   this: HasWavesNode =>
 
-  protected def broadcastAndAwait(txs: Transaction*): Unit = broadcastAndAwait(wavesNode1Api, txs: _*)
+  protected def broadcastAndAwait(txs: Transaction*): Unit = broadcastAndAwait(wavesNode1.api, txs: _*)
 
   protected def broadcastAndAwait(wavesNodeApi: NodeApi[Id], txs: Transaction*): Unit = {
-    txs map wavesNodeApi.broadcast
-    txs foreach wavesNodeApi.waitForTransaction
+    txs.map(wavesNodeApi.broadcast)
+    txs.foreach(wavesNodeApi.waitForTransaction)
   }
 }

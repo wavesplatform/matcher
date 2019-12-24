@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.cache
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 class CachedData[T <: AnyRef](getData: => T) {
+
   private val lock  = new ReentrantReadWriteLock()
   private val read  = lock.readLock()
   private val write = lock.writeLock()

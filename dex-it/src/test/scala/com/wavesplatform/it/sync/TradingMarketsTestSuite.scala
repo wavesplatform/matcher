@@ -15,9 +15,9 @@ class TradingMarketsTestSuite extends MatcherSuiteBase {
     "Trading markets have info about all asset pairs" in {
       placeAndAwait(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
-      restartContainer(dex1Container(), dex1Api)
+      dex1.restart()
 
-      val markets = dex1Api.allOrderBooks.markets
+      val markets = dex1.api.allOrderBooks.markets
       markets.size shouldBe 1
       markets.head.amountAssetName shouldNot be("Unknown")
       markets.head.priceAssetName shouldNot be("Unknown")

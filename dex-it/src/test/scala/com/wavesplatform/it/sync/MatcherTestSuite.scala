@@ -41,24 +41,24 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Check cross ordering between Alice and Bob" - {
     "/matcher should respond with the matcher's public key" in {
-      dex1Api.publicKey shouldBe matcher.publicKey
+      dex1.api.publicKey shouldBe matcher.publicKey
     }
 
     "sell order could be placed correctly" - {
       "alice places sell order" in {
-        dex1Api.place(order1).status shouldBe "OrderAccepted" // TODO
+        dex1.api.place(order1).status shouldBe "OrderAccepted" // TODO
 
         // Alice checks that the order in order book
-        dex1Api.waitForOrderStatus(order1, OrderStatus.Accepted)
+        dex1.api.waitForOrderStatus(order1, OrderStatus.Accepted)
 
         // Alice check that order is correct
-        val orders = dex1Api.orderBook(aliceWavesPair)
+        val orders = dex1.api.orderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe aliceSellAmount
         orders.asks.head.price shouldBe 2000.waves
       }
 
       "get opened trading markets" in {
-        val orderBooks = dex1Api.allOrderBooks
+        val orderBooks = dex1.api.allOrderBooks
         orderBooks.markets.size shouldBe 1
         val markets = orderBooks.markets.head
 
@@ -70,165 +70,165 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1Api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
-        dex1Api.reservedBalance(bob) shouldBe empty
+        dex1.api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalance(bob) shouldBe empty
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        dex1Api.orderHistory(alice).map(_.id) should contain(order1.id())
+        dex1.api.orderHistory(alice).map(_.id) should contain(order1.id())
       }
 
       "and should match with buy order" in {
-        val bobBalance     = wavesNode1Api.balance(bob, Waves)
-        val matcherBalance = wavesNode1Api.balance(matcher, Waves)
-        val aliceBalance   = wavesNode1Api.balance(alice, Waves)
+        val bobBalance     = wavesNode1.api.balance(bob, Waves)
+        val matcherBalance = wavesNode1.api.balance(matcher, Waves)
+        val aliceBalance   = wavesNode1.api.balance(alice, Waves)
 
         // Bob places a buy order
         val order2 = mkOrder(bob, aliceWavesPair, BUY, 200, 2.waves * Order.PriceConstant)
-        dex1Api.place(order2).status shouldBe "OrderAccepted"
+        dex1.api.place(order2).status shouldBe "OrderAccepted"
 
-        dex1Api.waitForOrderStatus(order1, OrderStatus.PartiallyFilled)
-        dex1Api.waitForOrderStatus(order2, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(order1, OrderStatus.PartiallyFilled)
+        dex1.api.waitForOrderStatus(order2, OrderStatus.Filled)
 
-        dex1Api.orderHistoryByPair(bob, aliceWavesPair).map(_.id) should contain(order2.id())
-        dex1Api.orderHistory(bob).map(_.id) should contain(order2.id())
+        dex1.api.orderHistoryByPair(bob, aliceWavesPair).map(_.id) should contain(order2.id())
+        dex1.api.orderHistory(bob).map(_.id) should contain(order2.id())
 
         waitForOrderAtNode(order2)
         eventually {
           // Bob checks that asset on his balance
-          wavesNode1Api.balance(bob, aliceAsset) shouldBe 200
+          wavesNode1.api.balance(bob, aliceAsset) shouldBe 200
         }
 
         // Alice checks that part of her order still in the order book
-        val orders = dex1Api.orderBook(aliceWavesPair)
+        val orders = dex1.api.orderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe 300
         orders.asks.head.price shouldBe 2000.waves
 
         // Alice checks that she sold some assets
-        wavesNode1Api.balance(alice, aliceAsset) shouldBe 800
+        wavesNode1.api.balance(alice, aliceAsset) shouldBe 800
 
         // Bob checks that he spent some Waves
-        val updatedBobBalance = wavesNode1Api.balance(bob, Waves)
+        val updatedBobBalance = wavesNode1.api.balance(bob, Waves)
         updatedBobBalance shouldBe (bobBalance - 2000 * 200 - matcherFee)
 
         // Alice checks that she received some Waves
-        val updatedAliceBalance = wavesNode1Api.balance(alice, Waves)
+        val updatedAliceBalance = wavesNode1.api.balance(alice, Waves)
         updatedAliceBalance shouldBe (aliceBalance + 2000 * 200 - (matcherFee * 200.0 / 500.0).toLong)
 
         // Matcher checks that it earn fees
-        val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
+        val updatedMatcherBalance = wavesNode1.api.balance(matcher, Waves)
         updatedMatcherBalance shouldBe (matcherBalance + matcherFee + (matcherFee * 200.0 / 500.0).toLong - exTxFee)
       }
 
       "request activeOnly orders" in {
-        val aliceOrders = dex1Api.orderHistory(alice, activeOnly = Some(true))
+        val aliceOrders = dex1.api.orderHistory(alice, activeOnly = Some(true))
         aliceOrders.map(_.id) shouldBe Seq(order1.id())
-        val bobOrders = dex1Api.orderHistory(bob, activeOnly = Some(true))
+        val bobOrders = dex1.api.orderHistory(bob, activeOnly = Some(true))
         bobOrders.map(_.id) shouldBe empty
       }
 
       "submitting sell orders should check availability of asset" in {
         // Bob trying to place order on more assets than he has - order rejected
         val badOrder = mkOrder(bob, aliceWavesPair, SELL, 300, 1900.waves)
-        dex1Api.tryPlace(badOrder) should failWith(3147270) // BalanceNotEnough
+        dex1.api.tryPlace(badOrder) should failWith(3147270) // BalanceNotEnough
 
         // Bob places order on available amount of assets - order accepted
         val order3 = mkOrder(bob, aliceWavesPair, SELL, 150, 1900.waves)
         placeAndAwait(order3)
 
         // Bob checks that the order in the order book
-        val orders = dex1Api.orderBook(aliceWavesPair)
+        val orders = dex1.api.orderBook(aliceWavesPair)
         orders.asks should contain(LevelResponse(150, 1900.waves))
       }
 
       "buy order should match on few price levels" in {
-        val matcherBalance = wavesNode1Api.balance(matcher, Waves)
-        val aliceBalance   = wavesNode1Api.balance(alice, Waves)
-        val bobBalance     = wavesNode1Api.balance(bob, Waves)
+        val matcherBalance = wavesNode1.api.balance(matcher, Waves)
+        val aliceBalance   = wavesNode1.api.balance(alice, Waves)
+        val bobBalance     = wavesNode1.api.balance(bob, Waves)
 
         // Alice places a buy order
         val order4 = mkOrder(alice, aliceWavesPair, BUY, 350, (21.waves / 10.0 * Order.PriceConstant).toLong)
-        dex1Api.place(order4).status shouldBe "OrderAccepted"
+        dex1.api.place(order4).status shouldBe "OrderAccepted"
 
         // Where were 2 sells that should fulfill placed order
-        dex1Api.waitForOrderStatus(order4, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(order4, OrderStatus.Filled)
 
         // Check balances
         waitForOrderAtNode(order4)
         eventually {
-          wavesNode1Api.balance(alice, aliceAsset) shouldBe 950
-          wavesNode1Api.balance(bob, aliceAsset) shouldBe 50
+          wavesNode1.api.balance(alice, aliceAsset) shouldBe 950
+          wavesNode1.api.balance(bob, aliceAsset) shouldBe 50
 
-          val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
+          val updatedMatcherBalance = wavesNode1.api.balance(matcher, Waves)
           updatedMatcherBalance should be(
             matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
         }
 
-        val updatedBobBalance = wavesNode1Api.balance(bob, Waves)
+        val updatedBobBalance = wavesNode1.api.balance(bob, Waves)
         updatedBobBalance should be(bobBalance - matcherFee + 150 * 1900)
 
-        val updatedAliceBalance = wavesNode1Api.balance(alice, Waves)
+        val updatedAliceBalance = wavesNode1.api.balance(alice, Waves)
         updatedAliceBalance should be(
           aliceBalance - (matcherFee * 200.0 / 350.0).toLong - (matcherFee * 150.0 / 350.0).toLong - (matcherFee * 200.0 / 500.0).toLong - 1900 * 150)
       }
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        dex1Api.cancel(alice, order1).status shouldBe "OrderCanceled"
+        dex1.api.cancel(alice, order1).status shouldBe "OrderCanceled"
 
         // Alice checks that the order book is empty
-        val orders1 = dex1Api.orderBook(aliceWavesPair)
+        val orders1 = dex1.api.orderBook(aliceWavesPair)
         orders1.asks.size should be(0)
         orders1.bids.size should be(0)
 
         // Alice places a new sell order on 100
-        dex1Api.place(mkOrder(alice, aliceWavesPair, SELL, 100, 2000.waves)).status shouldBe "OrderAccepted"
+        dex1.api.place(mkOrder(alice, aliceWavesPair, SELL, 100, 2000.waves)).status shouldBe "OrderAccepted"
 
         // Alice checks that the order is in the order book
-        val orders2 = dex1Api.orderBook(aliceWavesPair)
+        val orders2 = dex1.api.orderBook(aliceWavesPair)
         orders2.asks should contain(LevelResponse(100, 2000.waves))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
-        val matcherBalance = wavesNode1Api.balance(matcher, Waves)
-        val aliceBalance   = wavesNode1Api.balance(alice, Waves)
-        val bobBalance     = wavesNode1Api.balance(bob, Waves)
+        val matcherBalance = wavesNode1.api.balance(matcher, Waves)
+        val aliceBalance   = wavesNode1.api.balance(alice, Waves)
+        val bobBalance     = wavesNode1.api.balance(bob, Waves)
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = mkOrder(bob, aliceWavesPair, BUY, 130, 2000.waves)
         placeAndAwait(order5, OrderStatus.PartiallyFilled)
 
         // Check that remaining part of the order is in the order book
-        val orders = dex1Api.orderBook(aliceWavesPair)
+        val orders = dex1.api.orderBook(aliceWavesPair)
         orders.bids should contain(LevelResponse(30, 2000.waves))
 
         // Check balances
         waitForOrderAtNode(order5)
         eventually {
-          wavesNode1Api.balance(alice, aliceAsset) shouldBe 850
-          wavesNode1Api.balance(bob, aliceAsset) shouldBe 150
+          wavesNode1.api.balance(alice, aliceAsset) shouldBe 850
+          wavesNode1.api.balance(bob, aliceAsset) shouldBe 150
 
-          val updatedMatcherBalance = wavesNode1Api.balance(matcher, Waves)
+          val updatedMatcherBalance = wavesNode1.api.balance(matcher, Waves)
           updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
         }
 
-        val updatedBobBalance = wavesNode1Api.balance(bob, Waves)
+        val updatedBobBalance = wavesNode1.api.balance(bob, Waves)
         updatedBobBalance should be(bobBalance - (matcherFee * 100.0 / 130.0).toLong - 100 * 2000)
 
-        val updatedAliceBalance = wavesNode1Api.balance(alice, Waves)
+        val updatedAliceBalance = wavesNode1.api.balance(alice, Waves)
         updatedAliceBalance should be(aliceBalance - matcherFee + 2000 * 100)
       }
 
       "request order book for blacklisted pair" in {
-        dex1Api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
+        dex1.api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
           11534345,
           MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
       }
 
       "should consider UTX pool when checking the balance" in {
-        wavesNode1Api.balance(alice, bobAsset1) shouldBe 0
-        wavesNode1Api.balance(matcher, bobAsset1) shouldBe 0
-        wavesNode1Api.balance(bob, bobAsset1) shouldBe someAssetAmount
+        wavesNode1.api.balance(alice, bobAsset1) shouldBe 0
+        wavesNode1.api.balance(matcher, bobAsset1) shouldBe 0
+        wavesNode1.api.balance(bob, bobAsset1) shouldBe someAssetAmount
 
         def mkBobOrder = mkOrder(bob, bob1WavesPair, SELL, someAssetAmount, 0.005.waves)
 
@@ -241,14 +241,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
-        dex1Api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
+        dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 
       "trader can buy waves for assets with order without having waves" in {
-        val bobWavesBalance = wavesNode1Api.balance(bob, Waves)
-        wavesNode1Api.balance(alice, bobAsset2) shouldBe 0
-        wavesNode1Api.balance(matcher, bobAsset2) shouldBe 0
-        wavesNode1Api.balance(bob, bobAsset2) shouldBe someAssetAmount
+        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
+        wavesNode1.api.balance(alice, bobAsset2) shouldBe 0
+        wavesNode1.api.balance(matcher, bobAsset2) shouldBe 0
+        wavesNode1.api.balance(bob, bobAsset2) shouldBe someAssetAmount
 
         // Bob wants to sell all own assets for 1 Wave
         val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
@@ -258,13 +258,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val transferAmount = bobWavesBalance - minFee
         broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
 
-        wavesNode1Api.balance(bob, Waves) shouldBe 0
+        wavesNode1.api.balance(bob, Waves) shouldBe 0
 
         // Order should stay accepted
-        dex1Api.waitForOrderStatus(order8, OrderStatus.Accepted)
+        dex1.api.waitForOrderStatus(order8, OrderStatus.Accepted)
 
         // Cleanup
-        dex1Api.cancel(bob, order8).status shouldBe "OrderCanceled"
+        dex1.api.cancel(bob, order8).status shouldBe "OrderCanceled"
         broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
       }
 
@@ -275,9 +275,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val bid       = 10.waves
         val bidAmount = 10000000
 
-        dex1Api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
+        dex1.api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
 
-        val resp1 = dex1Api.orderBookStatus(bob2WavesPair)
+        val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
         resp1.lastPrice shouldBe None
         resp1.lastSide shouldBe None
         resp1.bid shouldBe None
@@ -285,9 +285,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         resp1.ask shouldBe Some(ask)
         resp1.askAmount shouldBe Some(askAmount)
 
-        dex1Api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
+        dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
-        val resp2 = dex1Api.orderBookStatus(bob2WavesPair)
+        val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
         resp2.lastPrice shouldBe Some(ask)
         resp2.lastSide shouldBe Some(OrderType.BUY.toString)
         resp2.bid shouldBe Some(bid)
@@ -322,8 +322,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val o1         = mkOrder(alice, pair, SELL, amount, minInvalid)
         val o2         = mkOrder(alice, pair, SELL, amount, maxInvalid)
 
-        dex1Api.tryPlace(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
-        dex1Api.tryPlace(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
+        dex1.api.tryPlace(o1) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
+        dex1.api.tryPlace(o2) should failWith(9441284, MatcherError.Params(insignificantDecimals = Some(6))) // PriceLastDecimalsMustBeZero
       }
     }
 
@@ -331,7 +331,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
         val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
         val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
-        dex1Api.place(mkOrder(alice, pair, BUY, amount, minNonZeroInvalid)).status shouldBe "OrderAccepted"
+        dex1.api.place(mkOrder(alice, pair, BUY, amount, minNonZeroInvalid)).status shouldBe "OrderAccepted"
       }
     }
   }
@@ -349,21 +349,21 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       )
     }
 
-    orders.foreach(dex1Api.place)
+    orders.foreach(dex1.api.place)
     orders.foreach { order =>
-      val status = dex1Api.orderStatus(order).status
+      val status = dex1.api.orderStatus(order).status
       withClue(order.idStr())(status should not be OrderStatus.NotFound)
     }
   }
 
   "Debug information was updated" in {
-    val currentOffset = dex1Api.currentOffset
+    val currentOffset = dex1.api.currentOffset
     currentOffset should be > 0L
 
-    val oldestSnapshotOffset = dex1Api.oldestSnapshotOffset
+    val oldestSnapshotOffset = dex1.api.oldestSnapshotOffset
     oldestSnapshotOffset should be <= currentOffset
 
-    val snapshotOffsets = dex1Api.allSnapshotOffsets
+    val snapshotOffsets = dex1.api.allSnapshotOffsets
     snapshotOffsets.foreach {
       case (assetPair, offset) =>
         withClue(assetPair) {

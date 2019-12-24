@@ -11,7 +11,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   private val activationHeight = 5
 
-  override protected val suiteInitialWavesNodeConfig: Config = ConfigFactory.parseString(
+  override protected val wavesNodeInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves {
        |  miner.minimal-block-generation-offset = 10s
        |
@@ -37,23 +37,23 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   "issue asset and run test" - {
     "trading is deprecated" in {
-      dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)) should failWith(
+      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1)) should failWith(
         2097923, // AccountFeatureUnsupported
         "An account's feature isn't yet supported"
       )
     }
 
     "can't place an OrderV2 before the activation" in {
-      dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
         2099459, // OrderVersionUnsupported
         "The order of version 2 isn't yet supported"
       )
     }
 
     "invalid setScript at account" in {
-      wavesNode1Api.waitForHeight(activationHeight)
+      wavesNode1.api.waitForHeight(activationHeight)
       updateBobScript("true && (height > 0)")
-      dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+      dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
         3147521, // AccountScriptException
         "An access to the blockchain.height is denied on DEX"
       )
@@ -65,7 +65,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
           |3)
           |x == 3""".stripMargin
       )
-      dex1Api
+      dex1.api
         .place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2))
         .status shouldBe "OrderAccepted"
     }
@@ -82,7 +82,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       )
 
       val bobOrder = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
-      dex1Api.place(bobOrder).status shouldBe "OrderAccepted"
+      dex1.api.place(bobOrder).status shouldBe "OrderAccepted"
     }
 
     "scripted dApp account" - {
@@ -101,13 +101,13 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       )
 
       "accept correct order" in {
-        dex1Api
+        dex1.api
           .place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 2000, 2.waves * Order.PriceConstant, smartTradeFee, version = 2))
           .status shouldBe "OrderAccepted"
       }
 
       "reject incorrect order" in {
-        dex1Api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
+        dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
           3147522 // AccountScriptDeniedOrder
         )
       }
@@ -116,11 +116,11 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "can trade from non-scripted account" in {
       // Alice places sell order
       val aliceOrder = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1)
-      dex1Api.place(aliceOrder).status shouldBe "OrderAccepted"
+      dex1.api.place(aliceOrder).status shouldBe "OrderAccepted"
 
       // Alice checks that the order in order book
-      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
-      dex1Api.orderHistory(alice).head.status shouldBe OrderStatus.Filled
+      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Filled
     }
   }
 }

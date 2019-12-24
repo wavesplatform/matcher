@@ -42,6 +42,7 @@ object Dependencies {
     val toxiProxy = "1.12.3"
 
     val jackson     = "2.9.8"
+    val playJson    = "2.7.4"
     val googleGuava = "27.0.1-jre"
     val kafka       = "2.3.1"
 
@@ -120,7 +121,10 @@ object Dependencies {
     )
   )
 
-  lazy val common: Seq[ModuleID] = Seq("com.lihaoyi" %% "sourcecode" % Version.sourceCode)
+  lazy val common: Seq[ModuleID] = Seq(
+    "com.lihaoyi"       %% "sourcecode" % Version.sourceCode,
+    "com.typesafe.play" %% "play-json"  % Version.playJson
+  )
 
   lazy val wavesProtobufSchemas: ModuleID = {
     ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity

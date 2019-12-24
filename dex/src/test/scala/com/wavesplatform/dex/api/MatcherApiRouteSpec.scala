@@ -13,9 +13,11 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.common.json.{assetRatesFormat, assetPairFormat}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.json.assetMapFormat
+import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.model.{LevelAgg, OrderBook}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -25,7 +27,7 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{Format, JsString, JsValue}
+import play.api.libs.json.{JsString, JsValue}
 
 import scala.concurrent.Future
 
@@ -60,11 +62,24 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   private val priceAssetId = priceAssetTx.id()
   private val priceAsset   = IssuedAsset(priceAssetId)
 
+  private val smartWavesPair = AssetPair(smartAsset, Waves)
+  private val smartWavesAggregatedSnapshot = OrderBook.AggregatedSnapshot(
+    bids = Seq(
+      LevelAgg(10000000000000L, 41),
+      LevelAgg(2500000000000L, 40),
+      LevelAgg(300000000000000L, 1),
+    ),
+    asks = Seq(
+      LevelAgg(50000000000L, 50),
+      LevelAgg(2500000000000L, 51)
+    )
+  )
+
   private val settings = MatcherSettings.valueReader
     .read(ConfigFactory.load(), "waves.dex")
     .copy(
-      priceAssets = Seq(priceAsset),
-      orderRestrictions = Map(AssetPair(smartAsset, Waves) -> orderRestrictions)
+      priceAssets = Seq(priceAsset, Waves),
+      orderRestrictions = Map(smartWavesPair -> orderRestrictions)
     )
 
   // getMatcherPublicKey
@@ -94,7 +109,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     "returns matcher's settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
         responseAs[JsValue].as[MatcherPublicSettings] should matchTo(MatcherPublicSettings(
-          priceAssets = List(priceAsset),
+          priceAssets = List(priceAsset, Waves),
           orderFee = MatcherPublicSettings.OrderFeePublicSettings.Dynamic(
             baseFee = 600000,
             rates = Map(Waves -> 1.0)
@@ -109,7 +124,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   routePath("/settings/rates") - {
     "returns available rates for fee" in test { route =>
       Get(routePath("/settings/rates")) ~> route ~> check {
-        implicit val ratesFormat: Format[Map[Asset, Double]] = assetMapFormat[Double]
         responseAs[JsValue].as[Map[Asset, Double]] should matchTo(Map[Asset, Double](Waves -> 1.0))
       }
     }
@@ -121,6 +135,75 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       { route =>
         Get(routePath("/debug/currentOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           responseAs[JsValue].as[Int] shouldBe 0
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getLastOffset
+  routePath("/debug/lastOffset") - {
+    "returns the last offset in the queue" in test(
+      { route =>
+        Get(routePath("/debug/lastOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          responseAs[JsValue].as[Int] shouldBe 0
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getOldestSnapshotOffset
+  routePath("/debug/oldestSnapshotOffset") - {
+    "returns the oldest snapshot offset among all order books" in test(
+      { route =>
+        Get(routePath("/debug/oldestSnapshotOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          responseAs[JsValue].as[Int] shouldBe 100
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getAllSnapshotOffsets
+  routePath("/debug/allSnapshotOffsets") - {
+    "returns a dictionary with order books offsets" in test(
+      { route =>
+        Get(routePath("/debug/allSnapshotOffsets")).withHeaders(apiKeyHeader) ~> route ~> check {
+          responseAs[JsValue].as[Map[String, Long]] should matchTo(
+            Map[String, Long](
+              s"WAVES-$priceAssetId" -> 100,
+              s"$smartAssetId-WAVES" -> 120
+            ))
+        }
+      },
+      apiKey
+    )
+  }
+
+  // saveSnapshots
+  routePath("/debug/saveSnapshots") - {
+    "returns that all is fine" in test(
+      { route =>
+        Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
+          (responseAs[JsValue] \ "message").as[String] shouldBe "Saving started"
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getOrderBook
+  // TODO DEX-552
+  routePath("/orderbook/{amountAsset}/{priceAsset}") - {
+    "returns an order book" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
+          val r = responseAs[JsValue]
+          (r \ "timestamp").as[Long] should be > 0L
+          (r \ "pair").as[AssetPair] should matchTo(smartWavesPair)
+          (r \ "bids").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.bids)
+          (r \ "asks").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.asks)
         }
       },
       apiKey
@@ -373,7 +456,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val addressActor = TestProbe("address")
-
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
@@ -381,6 +463,22 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       }
 
       TestActor.NoAutoPilot
+    }
+
+    val matcherActor = TestProbe("matcher")
+    matcherActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
+      msg match {
+        case GetSnapshotOffsets =>
+          sender ! SnapshotOffsetsResponse(
+            Map(
+              AssetPair(Waves, priceAsset)      -> Some(100L),
+              smartWavesPair                    -> Some(120L),
+              AssetPair(smartAsset, priceAsset) -> None,
+            ))
+        case _ =>
+      }
+
+      TestActor.KeepRunning
     }
 
     val route: Route = MatcherApiRoute(
@@ -394,7 +492,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         Set.empty
       ),
       matcherPublicKey = matcherKeyPair.publicKey,
-      matcher = ActorRef.noSender,
+      matcher = matcherActor.ref,
       addressActor = addressActor.ref,
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
       orderBook = _ => None,
@@ -405,7 +503,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         settings.orderBookSnapshotHttpCache,
         ntpTime,
         x => if (x == asset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
-        _ => None
+        x => if (x == smartWavesPair) Some(smartWavesAggregatedSnapshot) else None
       ),
       matcherSettings = settings,
       matcherStatus = () => Matcher.Status.Working,

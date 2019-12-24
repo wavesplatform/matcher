@@ -12,27 +12,4 @@ package object json {
     Reads.StringReads.map(_.toDouble),
     Writes.StringWrites.contramap[Double](formatValue(_))
   )
-
-  def assetMapFormat[V: Format]: Format[Map[Asset, V]] = mapFormat[Asset, V](
-    stringifyKey = AssetPair.assetIdStr,
-    parseKey = x => AssetPair.extractAssetId(x).fold(_ => JsError(s"Can't parse '$x' as key"), JsSuccess(_))
-  )
-
-  def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K]): Format[Map[K, V]] = {
-    val vReads = implicitly[Reads[V]]
-    Format(
-      fjs = Reads {
-        case JsObject(xs) =>
-          xs.foldLeft[JsResult[Map[K, V]]](JsSuccess(Map.empty[K, V])) {
-            case (r, (k, v)) =>
-              for {
-                r <- r
-                k <- parseKey(k)
-                v <- vReads.reads(v)
-              } yield r.updated(k, v)
-          }
-      },
-      tjs = Writes.map[V].contramap(_.map { case (k, v) => stringifyKey(k) -> v })
-    )
-  }
 }

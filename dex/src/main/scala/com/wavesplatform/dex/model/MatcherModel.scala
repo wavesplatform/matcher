@@ -9,7 +9,7 @@ import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange._
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json.{Format, JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -48,6 +48,9 @@ object MatcherModel {
 }
 
 case class LevelAgg(amount: Long, price: Long)
+object LevelAgg {
+  implicit val levelAggFormat: Format[LevelAgg] = Json.format
+}
 
 sealed trait AcceptedOrder {
 

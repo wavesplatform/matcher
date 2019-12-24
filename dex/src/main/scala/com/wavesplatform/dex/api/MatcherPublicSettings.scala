@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api
 
 import com.wavesplatform.dex.api.MatcherPublicSettings.OrderFeePublicSettings
-import com.wavesplatform.dex.json.assetMapFormat
+import com.wavesplatform.dex.common.json.assetRatesFormat
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.transaction.Asset
 import play.api.libs.json._
@@ -13,10 +13,7 @@ object MatcherPublicSettings {
   object OrderFeePublicSettings {
     case class Dynamic(baseFee: Long, rates: Map[Asset, Double]) extends OrderFeePublicSettings
     object Dynamic {
-      implicit val dynamicFormat: Format[Dynamic] = {
-        implicit val ratesFormat: Format[Map[Asset, Double]] = assetMapFormat[Double]
-        Json.format[Dynamic]
-      }
+      implicit val dynamicFormat: Format[Dynamic] = Json.format[Dynamic]
     }
 
     case class Fixed(assetId: Asset, minFee: Long) extends OrderFeePublicSettings

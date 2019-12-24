@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
-import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration.DurationInt
@@ -88,9 +87,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       createTablesStatement.close()
     }
 
-    DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password) unsafeTap { sqlConnection =>
-      executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
-    }
+    val sqlConnection = DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)
+    executeCreateTablesStatement(sqlConnection).map(_ => sqlConnection.close())
   }
 
   override protected def beforeAll(): Unit = {
@@ -161,20 +159,28 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       )
       .headOption
 
-  private def getEventsInfoByOrderId(orderId: Order.Id): Set[EventBriefInfo] =
+  private def getEventsInfoByOrderId(orderId: Order.Id): List[EventBriefInfo] =
     ctx
       .run(
-        querySchema[EventBriefInfo](
+        querySchema[EventRecord](
           "events",
           _.eventType      -> "event_type",
           _.filled         -> "filled",
           _.totalFilled    -> "total_filled",
           _.feeFilled      -> "fee_filled",
           _.feeTotalFilled -> "fee_total_filled",
-          _.status         -> "status"
+          _.status         -> "status",
+          _.timestamp      -> "timestamp"
         ).filter(_.orderId == lift(orderId.toString))
       )
-      .toSet
+      .sortWith { (l, r) =>
+        ((l.timestamp isBefore r.timestamp) || (l.timestamp isEqual r.timestamp)) &&
+        (l.status <= r.status) &&
+        (l.totalFilled <= r.totalFilled)
+      }
+      .map { r =>
+        EventBriefInfo(r.orderId, r.eventType, r.filled.toDouble, r.totalFilled.toDouble, r.feeFilled.toDouble, r.feeTotalFilled.toDouble, r.status)
+      }
 
   implicit class DoubleOps(value: Double) {
     val wct, usd: Long      = Normalization.normalizeAmountAndFee(value, 2)
@@ -225,7 +231,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       withClue("checking info for 2 small submitted orders\n") {
 
         Set(sellOrder1, sellOrder2).foreach { order =>
-          getOrderInfoById(order.id()).get shouldBe // TODO DIFFX
+          getOrderInfoById(order.id()).get should matchTo(
             OrderBriefInfo(order.idStr(),
                            limitOrderType,
                            bob.publicKey.toString,
@@ -236,15 +242,16 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                            100,
                            0.35,
                            0.00000030)
+          )
 
-          getEventsInfoByOrderId(order.id()) shouldBe Set {
-            EventBriefInfo(order.idStr(), eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled)
-          }
+          getEventsInfoByOrderId(order.id()) should matchTo(
+            List(EventBriefInfo(order.idStr(), eventTrade, 100, 100, 0.00000030, 0.00000030, statusFilled))
+          )
         }
       }
 
       withClue("checking info for 1 big counter order\n") {
-        getOrderInfoById(buyOrder.id()).get shouldBe
+        getOrderInfoById(buyOrder.id()).get should matchTo(
           OrderBriefInfo(buyOrder.idStr(),
                          limitOrderType,
                          alice.publicKey.toString,
@@ -255,13 +262,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                          300,
                          0.35,
                          0.00001703)
+        )
 
-        getEventsInfoByOrderId(buyOrder.id()) shouldBe
-          Set(
+        getEventsInfoByOrderId(buyOrder.id()) should matchTo(
+          List(
             EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 100, 0.00000567, 0.00000567, statusPartiallyFilled),
             EventBriefInfo(buyOrder.idStr(), eventTrade, 100, 200, 0.00000567, 0.00001134, statusPartiallyFilled),
             EventBriefInfo(buyOrder.idStr(), eventCancel, 0, 200, 0, 0.00001134, statusCancelled)
           )
+        )
       }
     }
   }
@@ -278,36 +287,31 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     eventually {
       withClue("checking info for counter order\n") {
-        getOrderInfoById(buyOrder.id()).get shouldBe OrderBriefInfo(buyOrder.idStr(),
-                                                                    limitOrderType,
-                                                                    alice.publicKey.toString,
-                                                                    buySide,
-                                                                    "WAVES",
-                                                                    stringify(usd),
-                                                                    "WAVES",
-                                                                    300,
-                                                                    0.35,
-                                                                    0.00370300)
-        getEventsInfoByOrderId(buyOrder.id()) shouldBe Set {
-          EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled)
-        }
+        getOrderInfoById(buyOrder.id()).get should matchTo(
+          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", stringify(usd), "WAVES", 300, 0.35, 0.00370300)
+        )
+        getEventsInfoByOrderId(buyOrder.id()) should matchTo(
+          List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled))
+        )
       }
 
       withClue("checking info for submitted order\n") {
-        getOrderInfoById(sellOrder.id()).get shouldBe OrderBriefInfo(sellOrder.idStr(),
-                                                                     limitOrderType,
-                                                                     bob.publicKey.toString,
-                                                                     sellSide,
-                                                                     "WAVES",
-                                                                     stringify(usd),
-                                                                     stringify(usd),
-                                                                     300,
-                                                                     0.35,
-                                                                     0.30)
+        getOrderInfoById(sellOrder.id()).get should matchTo(
+          OrderBriefInfo(sellOrder.idStr(),
+                         limitOrderType,
+                         bob.publicKey.toString,
+                         sellSide,
+                         "WAVES",
+                         stringify(usd),
+                         stringify(usd),
+                         300,
+                         0.35,
+                         0.30)
+        )
 
-        getEventsInfoByOrderId(sellOrder.id()) shouldBe Set {
-          EventBriefInfo(sellOrder.idStr(), eventTrade, 300, 300, 0.30, 0.30, statusFilled)
-        }
+        getEventsInfoByOrderId(sellOrder.id()) should matchTo(
+          List(EventBriefInfo(sellOrder.idStr(), eventTrade, 300, 300, 0.30, 0.30, statusFilled))
+        )
       }
     }
   }
@@ -325,7 +329,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
 
     eventually {
       withClue("checking info for small counter order\n") {
-        getOrderInfoById(smallBuyOrder.id()).get shouldBe
+        getOrderInfoById(smallBuyOrder.id()).get should matchTo(
           OrderBriefInfo(smallBuyOrder.idStr(),
                          limitOrderType,
                          alice.publicKey.toString,
@@ -336,14 +340,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                          300,
                          0.35,
                          0.00001703)
+        )
 
-        getEventsInfoByOrderId(smallBuyOrder.id()) shouldBe Set {
-          EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled)
-        }
+        getEventsInfoByOrderId(smallBuyOrder.id()) should matchTo(
+          List(EventBriefInfo(smallBuyOrder.idStr(), eventTrade, 300, 300, 0.00001703, 0.00001703, statusFilled))
+        )
       }
 
       withClue("checking info for big submitted order\n") {
-        getOrderInfoById(bigSellOrder.id()).get shouldBe
+        getOrderInfoById(bigSellOrder.id()).get should matchTo(
           OrderBriefInfo(bigSellOrder.idStr(),
                          limitOrderType,
                          bob.publicKey.toString,
@@ -354,15 +359,17 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                          900,
                          0.35,
                          0.00000030)
+        )
 
-        getEventsInfoByOrderId(bigSellOrder.id()) shouldBe Set {
-          EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled)
-        }
+        getEventsInfoByOrderId(bigSellOrder.id()) should matchTo(
+          List(EventBriefInfo(bigSellOrder.idStr(), eventTrade, 300, 300, 0.00000010, 0.00000010, statusPartiallyFilled))
+        )
       }
     }
   }
 
   "Order history should correctly save market orders and their events" in {
+
     dex1.api.cancelAll(bob)
     dex1.api.cancelAll(alice)
 
@@ -375,7 +382,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrder(unmatchableMarketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(0.wct)))
 
       eventually {
-        getOrderInfoById(unmatchableMarketBuyOrder.id()) shouldBe Some(
+        getOrderInfoById(unmatchableMarketBuyOrder.id()).get should matchTo(
           OrderBriefInfo(unmatchableMarketBuyOrder.idStr(),
                          marketOrderType,
                          alice.publicKey.toString,
@@ -388,19 +395,20 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                          0.00001703)
         )
 
-        getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) shouldBe Set(
-          EventBriefInfo(unmatchableMarketBuyOrder.idStr(), eventCancel, 0, 0, 0, 0, statusFilled)
+        getEventsInfoByOrderId(unmatchableMarketBuyOrder.id()) should matchTo(
+          List(EventBriefInfo(unmatchableMarketBuyOrder.idStr(), eventCancel, 0, 0, 0, 0, statusFilled))
         )
       }
     }
 
     withClue("place buy market order into nonempty order book") {
+
       val ts = System.currentTimeMillis()
 
       val orders = Seq(
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.wctUsdPrice, 0.003.waves),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 1)
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.wctUsdPrice, 0.003.waves, ts = ts),
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 100),
+        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 200)
       )
 
       orders.foreach { order =>
@@ -413,7 +421,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(300.wct)))
 
       eventually {
-        getOrderInfoById(marketBuyOrder.id()).get shouldBe
+        getOrderInfoById(marketBuyOrder.id()).get should matchTo(
           OrderBriefInfo(marketBuyOrder.idStr(),
                          marketOrderType,
                          alice.publicKey.toString,
@@ -424,14 +432,16 @@ class OrderHistoryTestSuite extends MatcherSuiteBase {
                          500,
                          0.35,
                          0.00001703)
+        )
 
-        getEventsInfoByOrderId(marketBuyOrder.id()) shouldBe
-          Set(
+        getEventsInfoByOrderId(marketBuyOrder.id()) should matchTo(
+          List(
             EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 100, 0.00000340, 0.00000340, statusPartiallyFilled),
             EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 200, 0.00000340, 0.00000680, statusPartiallyFilled),
             EventBriefInfo(marketBuyOrder.idStr(), eventTrade, 100, 300, 0.00000340, 0.00001020, statusPartiallyFilled),
             EventBriefInfo(marketBuyOrder.idStr(), eventCancel, 0, 300, 0, 0.00001020, statusFilled)
           )
+        )
       }
     }
   }

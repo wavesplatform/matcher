@@ -17,7 +17,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex._
-import com.wavesplatform.dex.it.fp.{CanWait, FOps, ThrowableMonadError}
+import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -333,7 +333,7 @@ object DexApi {
         }
 
         // Sometimes container start during 20 seconds! https://github.com/docker/for-mac/issues/1183
-        repeatUntil(request)(_ == true).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =

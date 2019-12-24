@@ -19,7 +19,7 @@ case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempt
 
 class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 
-  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions = RepeatRequestOptions(1.second, 60))(stopCond: T => Boolean): F[T] =
+  def repeatUntil[T](f: => F[T], options: RepeatRequestOptions = RepeatRequestOptions(1.second, 30))(stopCond: T => Boolean): F[T] =
     f.flatMap { firstResp =>
         (firstResp, options).tailRecM[F, (T, RepeatRequestOptions)] {
           case (resp, currOptions) =>

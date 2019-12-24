@@ -14,7 +14,7 @@ import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
-import com.wavesplatform.dex.it.fp.{CanWait, FOps}
+import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
@@ -120,7 +120,7 @@ object NodeApi {
           case NonFatal(e)                               => M.raiseError(e)
         }
 
-        repeatUntil(request)(_ == true).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
       }
     }
 }

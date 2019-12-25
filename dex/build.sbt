@@ -2,13 +2,12 @@ import java.nio.charset.StandardCharsets
 
 import DexDockerKeys._
 import com.typesafe.sbt.SbtNativePackager.Universal
-import CommonSettings.autoImport.network
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
 enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
+libraryDependencies ++= Dependencies.Module.dex
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

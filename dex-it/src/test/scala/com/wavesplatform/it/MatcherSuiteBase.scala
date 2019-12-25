@@ -17,7 +17,7 @@ import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration.DurationInt
 
-abstract class MatcherSuiteBase
+trait MatcherSuiteBase
     extends FreeSpec
     with Matchers
     with CancelAfterFailure

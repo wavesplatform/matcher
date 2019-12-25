@@ -4,7 +4,7 @@ enablePlugins(WavesExtensionDockerPlugin, ItTestPlugin)
 
 description := "Integration tests of the DEX gRPC extension for the Waves node"
 
-libraryDependencies ++= Dependencies.itTest ++ Dependencies.silencer
+libraryDependencies ++= Dependencies.Module.wavesIntegrationIt
 
 docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(

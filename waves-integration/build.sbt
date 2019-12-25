@@ -4,7 +4,7 @@ import sbtassembly.MergeStrategy
 enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.wavesIntegration
+libraryDependencies ++= Dependencies.Module.wavesIntegration
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

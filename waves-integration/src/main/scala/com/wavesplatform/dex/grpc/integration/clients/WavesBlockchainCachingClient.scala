@@ -35,7 +35,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
       new Observer[SpendableBalanceChanges] {
         def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balancesCache.batchPut(elem); Continue }
         def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
-        def onError(ex: Throwable): Unit                       = log.warn(s"Error while listening to the balance changes stream occurred: ${ex.getMessage}")
+        def onError(ex: Throwable): Unit                       = ()
       }
     }
     underlying.spendableBalanceChanges

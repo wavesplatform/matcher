@@ -10,7 +10,7 @@ import scala.util.Random
 
 class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig: Config = {
+  override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(
       s"""waves.dex {
        |  snapshots-interval = 51
@@ -29,12 +29,12 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   "Place, fill and cancel a lot of orders" in {
     val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
-    val commands = Random.shuffle(orders.map(MatcherCommand.Place(dex1AsyncApi, _))) ++ cancels.map(MatcherCommand.Cancel(dex1AsyncApi, alice, _))
+    val commands = Random.shuffle(orders.map(MatcherCommand.Place(dex1.asyncApi, _))) ++ cancels.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
     successfulCommandsNumber += executeCommands(commands)
   }
 
   "Wait until all requests are processed - 1" in {
-    dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
+    dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
   }
 
   private var stateBefore: MatcherState = _
@@ -52,9 +52,9 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Restart the matcher" in restartContainer(dex1Container(), dex1Api)
+  "Restart the matcher" in dex1.restart()
 
-  "Wait until all requests are processed - 2" in dex1Api.waitForCurrentOffset(_ == successfulCommandsNumber - 1)
+  "Wait until all requests are processed - 2" in dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1)
 
   "Verify the state" in {
     val stateAfter = state
@@ -66,8 +66,8 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   protected def cleanState(state: MatcherState): MatcherState = state
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(IssueEthTx, IssueUsdTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 }

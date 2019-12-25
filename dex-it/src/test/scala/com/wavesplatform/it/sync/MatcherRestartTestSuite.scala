@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.OrderStatus
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
@@ -18,38 +18,38 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       placeAndAwait(aliceOrder)
 
       // Check that order is correct
-      val orders = dex1Api.orderBook(ethWavesPair)
+      val orders = dex1.api.orderBook(ethWavesPair)
       orders.asks.head.amount shouldBe 500
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      // Sell order should be in the dex1Api.orderBook
-      dex1Api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
+      // Sell order should be in the dex1.api.orderBook
+      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
 
       // Reboot matcher's node
-      restartContainer(dex1Container(), dex1Api)
+      dex1.restart()
 
-      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
-      dex1Api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
+      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
+      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
 
-      val orders1 = dex1Api.orderBook(ethWavesPair)
+      val orders1 = dex1.api.orderBook(ethWavesPair)
       orders1.asks.head.amount shouldBe 500
       orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       placeAndAwait(mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant))
 
       eventually {
-        val orders2 = dex1Api.orderBook(ethWavesPair)
+        val orders2 = dex1.api.orderBook(ethWavesPair)
         orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
       }
 
-      val cancel = dex1Api.cancel(alice, aliceOrder)
+      val cancel = dex1.api.cancel(alice, aliceOrder)
       cancel.status should be("OrderCanceled") // TODO
 
-      val orders3 = dex1Api.orderBook(ethWavesPair)
+      val orders3 = dex1.api.orderBook(ethWavesPair)
       orders3.asks.head.amount shouldBe 500
 
-      dex1Api.waitForOrderStatus(aliceOrder, OrderStatus.Cancelled)
-      dex1Api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
+      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Cancelled)
+      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted
     }
   }
 }

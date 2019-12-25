@@ -5,11 +5,11 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -34,7 +34,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     s"Price of the $orderType market order ($price) is too high for its full execution with the current market state"
   }
 
-  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
        |  price-assets = [ "$UsdId", "WAVES", "$EthId", "$BtcId", "$WctId" ]
@@ -58,21 +58,21 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   )
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(IssueWctTx, IssueUsdTx, IssueEthTx, IssueBtcTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
     broadcastAndAwait(mkTransfer(alice, bob.toAddress, 10000.usd, usd, fixedFee))
   }
 
   override protected def afterEach(): Unit = {
-    dex1Api.cancelAll(alice)
-    dex1Api.cancelAll(bob)
+    dex1.api.cancelAll(alice)
+    dex1.api.cancelAll(bob)
   }
 
   def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: FeeMode = FIXED)(orders: (Long, Long)*): Unit = {
     orders.zipWithIndex.foreach {
       case ((amount, price), idx) =>
-        dex1Api.place(
+        dex1.api.place(
           mkOrder(sender, pair, orderType, amount, price, version = 3: Byte, matcherFee = getFee(feeMode), ts = System.currentTimeMillis + idx)
         )
     }
@@ -80,8 +80,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
   def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): OrderStatusResponse = {
     val mo = mkOrder(sender, pair, orderType, amount, price, matcherFee = fixedFee)
-    dex1Api.placeMarket(mo)
-    dex1Api.waitForOrderStatus(mo, OrderStatus.Filled)
+    dex1.api.placeMarket(mo)
+    dex1.api.waitForOrderStatus(mo, OrderStatus.Filled)
   }
 
   def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
@@ -91,7 +91,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       case (balance, asset) =>
         asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
           assert(
-            wavesNode1Api.assetBalance(alice.toAddress, issuedAsset).balance >= balance,
+            wavesNode1.api.assetBalance(alice.toAddress, issuedAsset).balance >= balance,
             s"Alice doesn't have enough balance in ${AssetPair.assetIdStr(issuedAsset)} to make a transfer"
           )
         }
@@ -132,15 +132,15 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(account2, wavesUsdPair, orderType, amount, price, getFee(feeMode))
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
-      dex1Api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(amount)
+      dex1.api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(amount)
 
-      wavesNode1Api.balance(account1.toAddress, Waves) should be(amount - calculateFeeValue(amount, feeMode))
-      wavesNode1Api.balance(account1.toAddress, usd) should be(200.usd - price * amount / 1.waves)
+      wavesNode1.api.balance(account1.toAddress, Waves) should be(amount - calculateFeeValue(amount, feeMode))
+      wavesNode1.api.balance(account1.toAddress, usd) should be(200.usd - price * amount / 1.waves)
 
-      wavesNode1Api.balance(account2.toAddress, Waves) should be(amount - calculateFeeValue(amount, feeMode))
-      wavesNode1Api.balance(account2.toAddress, usd) should be(price * amount / 1.waves)
+      wavesNode1.api.balance(account2.toAddress, Waves) should be(amount - calculateFeeValue(amount, feeMode))
+      wavesNode1.api.balance(account2.toAddress, usd) should be(price * amount / 1.waves)
     }
 
     "percent fee mode" - {
@@ -157,9 +157,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "fixed fee mode" - {
 
       "processing market order (SELL)" in {
-
-        replaceSuiteConfig(dex1Container(), ConfigFactory.parseString(s"waves.dex.order-fee.mode = $FIXED").withFallback(suiteInitialDexConfig))
-        restartContainer(dex1Container(), dex1Api)
+        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.mode = $FIXED").withFallback(dexInitialSuiteConfig))
 
         testFilledMarketOrder(SELL, FIXED)
       }
@@ -182,10 +180,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(bob, wavesUsdPair, BUY, amount, marketPrice, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks shouldNot be(empty)
 
@@ -207,10 +205,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(bob, wavesUsdPair, SELL, amount, marketPrice, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks should be(empty)
 
@@ -221,8 +219,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     "should be removed from order book when the restriction by tokens count has been reached (BUY)" in {
 
-      val bobWBefore        = wavesNode1Api.balance(bob.toAddress, Waves)
-      val bobUBefore        = wavesNode1Api.balance(bob.toAddress, usd)
+      val bobWBefore        = wavesNode1.api.balance(bob.toAddress, Waves)
+      val bobUBefore        = wavesNode1.api.balance(bob.toAddress, usd)
       val marketPrice       = 0.5.usd
       val marketOrderAmount = 150.waves
       val ordersAmount      = 120.waves
@@ -235,18 +233,18 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(bob, wavesUsdPair, BUY, marketOrderAmount, marketPrice, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
-      dex1Api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(ordersAmount)
+      dex1.api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(ordersAmount)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
       /* market order fee value depends on matched orders in proportion */
-      wavesNode1Api.balance(bob.toAddress, Waves) should be(bobWBefore + ordersAmount - fixedFee * ordersAmount / marketOrderAmount)
+      wavesNode1.api.balance(bob.toAddress, Waves) should be(bobWBefore + ordersAmount - fixedFee * ordersAmount / marketOrderAmount)
 
-      wavesNode1Api.balance(bob.toAddress, usd) should be(
+      wavesNode1.api.balance(bob.toAddress, usd) should be(
         bobUBefore - 0.3.usd * 30.waves / 1.waves - 0.4.usd * 40.waves / 1.waves - 0.5.usd * 50.waves / 1.waves)
     }
 
@@ -266,17 +264,17 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(seller, wavesUsdPair, SELL, marketOrderAmount, marketPrice, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
-      dex1Api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(ordersAmount)
+      dex1.api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(ordersAmount)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
-      wavesNode1Api.balance(seller.toAddress, Waves) should be(fixedFee / (marketOrderAmount / ordersAmount))
+      wavesNode1.api.balance(seller.toAddress, Waves) should be(fixedFee / (marketOrderAmount / ordersAmount))
 
-      wavesNode1Api.balance(seller.toAddress, usd) should be(
+      wavesNode1.api.balance(seller.toAddress, usd) should be(
         0.2.usd * 12.waves / 1.waves + 0.3.usd * 12.waves / 1.waves + 0.4.usd * 12.waves / 1.waves)
     }
 
@@ -293,19 +291,19 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val creationTime = System.currentTimeMillis
 
-      dex1Api.place(mkOrder(alice, wavesUsdPair, SELL, 200.waves, marketPrice, fixedFee))
-      dex1Api.place(mkOrder(bob, wavesUsdPair, BUY, 1.waves, marketPrice, fixedFee * 2, ts = creationTime))
+      dex1.api.place(mkOrder(alice, wavesUsdPair, SELL, 200.waves, marketPrice, fixedFee))
+      dex1.api.place(mkOrder(bob, wavesUsdPair, BUY, 1.waves, marketPrice, fixedFee * 2, ts = creationTime))
 
       val marketOrder = mkOrder(account, wavesUsdPair, BUY, marketOrderAmount, marketPrice, fixedFee, ts = creationTime)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.bids should be(empty)
       orderBook.asks should be(empty)
 
-      wavesNode1Api.balance(account.toAddress, Waves) should be(
+      wavesNode1.api.balance(account.toAddress, Waves) should be(
         accountBalanceWBefore + marketOrderAmount - anotherOrderAmount - fixedFee * (marketOrderAmount - anotherOrderAmount) / marketOrderAmount)
     }
 
@@ -325,16 +323,16 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(account, wavesUsdPair, BUY, marketOrderAmount, marketOrderPrice, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
-      dex1Api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(marketOrderAmount)
+      dex1.api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(marketOrderAmount)
 
-      val orderBook = dex1Api.orderBook(wavesUsdPair)
+      val orderBook = dex1.api.orderBook(wavesUsdPair)
       orderBook.asks should have size 1
       orderBook.bids should be(empty)
 
-      wavesNode1Api.balance(account.toAddress, Waves) should be(marketOrderAmount - fixedFee)
-      wavesNode1Api.balance(account.toAddress, usd) should be(accountUsdBalance - 5 * 0.2.usd - 15 * 0.3.usd - 30 * 0.4.usd - 100 * 0.5.usd)
+      wavesNode1.api.balance(account.toAddress, Waves) should be(marketOrderAmount - fixedFee)
+      wavesNode1.api.balance(account.toAddress, usd) should be(accountUsdBalance - 5 * 0.2.usd - 15 * 0.3.usd - 30 * 0.4.usd - 100 * 0.5.usd)
     }
   }
 
@@ -344,10 +342,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "should be accepted if there is no way to fill it completely (sum of all orders in order book < amount of market order" in {
       placeOrders(bob, wavesUsdPair, SELL)(100.waves -> price)
 
-      val total       = dex1Api.orderBook(wavesUsdPair).bids.map(_.amount).sum
+      val total       = dex1.api.orderBook(wavesUsdPair).bids.map(_.amount).sum
       val marketOrder = mkOrder(alice, wavesUsdPair, BUY, total + 1000.waves, price, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
     }
 
@@ -362,10 +360,10 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val marketOrder = mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)
 
-      dex1Api.placeMarket(marketOrder)
+      dex1.api.placeMarket(marketOrder)
       waitForOrderAtNode(marketOrder)
 
-      wavesNode1Api.balance(account.toAddress, Waves) should be(amount - fixedFee)
+      wavesNode1.api.balance(account.toAddress, Waves) should be(amount - fixedFee)
     }
 
     "should be rejected if the price is too low for completely filling by current opened orders (BUY)" in {
@@ -375,7 +373,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         1.waves -> 3.usd,
       )
 
-      dex1Api.tryPlaceMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(bob, wavesUsdPair, BUY, 3.waves, 2.usd, fixedFee)) should failWith(
         19927055,
         tooLowPrice("buy", "2")
       )
@@ -387,7 +385,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeOrders(bob, wavesUsdPair, BUY)(amount -> price)
 
-      dex1Api.tryPlaceMarket(mkOrder(alice, wavesUsdPair, SELL, amount, marketPrice, fixedFee)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(alice, wavesUsdPair, SELL, amount, marketPrice, fixedFee)) should failWith(
         19927055,
         tooHighPrice("sell", "0.5")
       )
@@ -402,7 +400,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeOrders(alice, wavesUsdPair, SELL)(amount -> price)
 
-      dex1Api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWith(
         3147270, // BalanceNotEnough
         s"111.1 ${UsdId.toString}"
       )
@@ -410,12 +408,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
 
-      replaceSuiteConfig(
-        dex1Container(),
-        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = $FIXED").withFallback(suiteInitialDexConfig)
+      dex1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = $FIXED").withFallback(dexInitialSuiteConfig)
       )
-
-      restartContainer(dex1Container(), dex1Api)
 
       val amount   = 10.waves
       val price    = 1.usd
@@ -425,7 +420,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeAndAwait { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, matcherFeeAssetId = btc, version = 3) }
 
-      dex1Api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, matcherFeeAssetId = btc)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, matcherFeeAssetId = btc)) should failWith(
         3147270,
         s"0.003 ${BtcId.toString}"
       )

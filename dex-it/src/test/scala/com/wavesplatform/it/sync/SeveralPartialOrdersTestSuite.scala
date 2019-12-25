@@ -1,19 +1,19 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
 class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 
-  override protected def suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   "Alice and Bob trade WAVES-USD" - {
@@ -23,12 +23,12 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-      val bobWavesBalanceBefore = wavesNode1Api.balance(bob, Waves)
+      val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwait(bobOrder1)
-      dex1Api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
-      dex1Api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
+      dex1.api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
+      dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       placeAndAwait(aliceOrder, OrderStatus.Filled)
@@ -37,64 +37,64 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       placeAndAwait(aliceOrder2, OrderStatus.Filled)
 
       // Bob wants to buy some USD
-      dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)
       eventually {
-        dex1Api.reservedBalance(bob) shouldBe empty
-        dex1Api.reservedBalance(alice) shouldBe empty
+        dex1.api.reservedBalance(bob) shouldBe empty
+        dex1.api.reservedBalance(alice) shouldBe empty
       }
 
       // Previously cancelled order should not affect new orders
-      val orderBook1 = dex1Api.orderBook(wavesUsdPair)
+      val orderBook1 = dex1.api.orderBook(wavesUsdPair)
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwait(bobOrder2)
 
-      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
+      val orderBook2 = dex1.api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
-      dex1Api.cancel(bob, bobOrder2)
-      dex1Api.waitForOrderStatus(bobOrder2, OrderStatus.Cancelled)
+      dex1.api.cancel(bob, bobOrder2)
+      dex1.api.waitForOrderStatus(bobOrder2, OrderStatus.Cancelled)
 
-      dex1Api.reservedBalance(bob) shouldBe empty
-      dex1Api.reservedBalance(alice) shouldBe empty
+      dex1.api.reservedBalance(bob) shouldBe empty
+      dex1.api.reservedBalance(alice) shouldBe empty
     }
 
     "place one submitted orders and two counter" in {
       val aliceOrder1 = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      dex1Api.place(aliceOrder1)
+      dex1.api.place(aliceOrder1)
 
       val aliceOrder2 = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      dex1Api.place(aliceOrder2)
+      dex1.api.place(aliceOrder2)
 
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      dex1Api.place(bobOrder1)
+      dex1.api.place(bobOrder1)
 
-      dex1Api.waitForOrderStatus(aliceOrder1, OrderStatus.Filled)
-      dex1Api.waitForOrderStatus(aliceOrder2, OrderStatus.Filled)
-      dex1Api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(aliceOrder1, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(aliceOrder2, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)
       eventually {
-        dex1Api.reservedBalance(bob) shouldBe empty
-        dex1Api.reservedBalance(alice) shouldBe empty
+        dex1.api.reservedBalance(bob) shouldBe empty
+        dex1.api.reservedBalance(alice) shouldBe empty
       }
 
       // Previously cancelled order should not affect new orders
-      val orderBook1 = dex1Api.orderBook(wavesUsdPair)
+      val orderBook1 = dex1.api.orderBook(wavesUsdPair)
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       placeAndAwait(bobOrder2)
 
-      val orderBook2 = dex1Api.orderBook(wavesUsdPair)
+      val orderBook2 = dex1.api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
     }

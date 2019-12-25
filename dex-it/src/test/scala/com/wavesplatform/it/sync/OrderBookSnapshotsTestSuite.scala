@@ -9,7 +9,7 @@ import org.scalacheck.Gen
 class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   private val interval = 50L
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
       |  price-assets = ["$UsdId", "WAVES"]
       |  snapshots-interval = $interval
@@ -32,27 +32,27 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     .get
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(IssueEthTx, IssueUsdTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   "Order books are created with right offsets" in {
 
-    ordersPack1.foreach(dex1Api.place)
-    dex1Api.waitForCurrentOffset(_ == ordersPack1Size - 1)
+    ordersPack1.foreach(dex1.api.place)
+    dex1.api.waitForCurrentOffset(_ == ordersPack1Size - 1)
 
-    val allSnapshotOffsets1 = dex1Api.allSnapshotOffsets
+    val allSnapshotOffsets1 = dex1.api.allSnapshotOffsets
 
     withClue("We doesn't show pairs, those have snapshot's offset equal to -1") {
       if (allSnapshotOffsets1.contains(assetPair1)) allSnapshotOffsets1(assetPair1) should be < interval
       if (allSnapshotOffsets1.contains(assetPair2)) allSnapshotOffsets1(assetPair2) should be < interval
     }
 
-    ordersPack2.foreach(dex1Api.place)
-    dex1Api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
+    ordersPack2.foreach(dex1.api.place)
+    dex1.api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
 
-    val allSnapshotOffsets2 = dex1Api.allSnapshotOffsets
+    val allSnapshotOffsets2 = dex1.api.allSnapshotOffsets
 
     withClue("Asset pairs has right offsets") {
       allSnapshotOffsets2.foreach {
@@ -65,10 +65,10 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
   }
 
   "All events are processed after restart" in {
-    restartContainer(dex1Container(), dex1Api)
-    dex1Api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
+    dex1.restart()
+    dex1.api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
     ordersPack1.foreach { order =>
-      dex1Api.orderStatus(order) should not be OrderStatus.NotFound.name
+      dex1.api.orderStatus(order) should not be OrderStatus.NotFound.name
     }
   }
 }

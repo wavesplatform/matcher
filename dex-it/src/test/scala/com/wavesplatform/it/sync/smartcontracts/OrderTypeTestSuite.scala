@@ -2,14 +2,14 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
+import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
 
-  override protected val suiteInitialDexConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
   private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
@@ -18,9 +18,9 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(issueAliceAssetTx, IssueUsdTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   "Order types verification with SmartContracts" - {
@@ -61,19 +61,19 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwait(aliceOrd1)
 
-        dex1Api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+        dex1.api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
 
-        dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        dex1.api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 
       "set contracts with only SELL type and then place order" in {
         setAliceScriptText(sco2)
 
-        dex1Api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
+        dex1.api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522, // AccountScriptDeniedOrder
           MatcherError.Params(address = Some(alice.toAddress.stringRepr))
         )
@@ -81,7 +81,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwait(aliceOrd2)
 
-        dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 
@@ -94,8 +94,8 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwait(aliceOrd2)
 
-        dex1Api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
-        dex1Api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
+        dex1.api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
+        dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
       }
 
@@ -109,20 +109,20 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setAliceScriptText(sco1)
 
         val bobOrd1 = mkOrder(bob, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
-        dex1Api.place(bobOrd1)
+        dex1.api.place(bobOrd1)
 
         val bobOrd2 = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 1)
-        dex1Api.place(bobOrd2)
+        dex1.api.place(bobOrd2)
 
-        dex1Api.waitForOrderStatus(aliceOrd1, OrderStatus.Filled)
-        dex1Api.waitForOrderStatus(aliceOrd2, OrderStatus.Filled)
-        dex1Api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
-        dex1Api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(aliceOrd1, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(aliceOrd2, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
         waitForOrderAtNode(bobOrd1)
 
-        val txs = dex1Api.waitForTransactionsByOrder(bobOrd2, 1)
-        val r   = wavesNode1Api.tryBroadcast(txs.head)
+        val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
+        val r   = wavesNode1.api.tryBroadcast(txs.head)
         r shouldBe 'left
         r.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
       }

@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 
-  override protected val suiteInitialDexConfig: Config =
+  override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
@@ -68,9 +68,9 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     // A custom initialization to guarantee that assets are in the blockchain
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   def priceAssetBalance(owner: KeyPair, assetPair: AssetPair): Long = {
@@ -82,49 +82,49 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   def assetBalance(owner: KeyPair, asset: Asset): Long = {
-    wavesNode1Api.balance(owner, asset)
+    wavesNode1.api.balance(owner, asset)
   }
 
   val (amount, price) = (1000L, PriceConstant)
 
   // offset is 0, after test - 6
   "Tick size isn't set" in {
-    dex1Api.allOrderBooks.markets.size shouldBe 0
+    dex1.api.allOrderBooks.markets.size shouldBe 0
     Seq(wctUsdPair -> "0.00000001", wavesBtcPair -> "0.00000001", wavesUsdPair -> "0.01").foreach {
       case (pair, defaultTs) =>
-        dex1Api.orderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs
+        dex1.api.orderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs
 
         val order = mkOrder(bob, pair, SELL, amount, price, matcherFee)
         placeAndAwait(order)
 
-        dex1Api.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
-        dex1Api.cancel(bob, order)
+        dex1.api.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
+        dex1.api.cancel(bob, order)
     }
   }
 
   // offset is 6, after test - 12
   "Start offset depends of order placing and cancelling but matching" in {
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee)
-    dex1Api.place(sellOrder)
+    dex1.api.place(sellOrder)
 
-    dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 15 * price))
-    dex1Api.place(mkOrder(alice, wctUsdPair, BUY, amount, 17 * price, matcherFee))
-    dex1Api.waitForCurrentOffset(_ == 7)
+    dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 15 * price))
+    dex1.api.place(mkOrder(alice, wctUsdPair, BUY, amount, 17 * price, matcherFee))
+    dex1.api.waitForCurrentOffset(_ == 7)
 
     waitForOrderAtNode(sellOrder)
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee)
-    dex1Api.place(buyOrder)
+    dex1.api.place(buyOrder)
 
-    dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 8 * price))
-    dex1Api.cancel(alice, buyOrder)
-    dex1Api.waitForCurrentOffset(_ == 9)
+    dex1.api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 8 * price))
+    dex1.api.cancel(alice, buyOrder)
+    dex1.api.waitForCurrentOffset(_ == 9)
 
     val anotherBuyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 10 * price, matcherFee)
-    dex1Api.place(anotherBuyOrder)
+    dex1.api.place(anotherBuyOrder)
 
-    dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 7 * price))
-    dex1Api.cancel(alice, anotherBuyOrder)
+    dex1.api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 7 * price))
+    dex1.api.cancel(alice, anotherBuyOrder)
   }
 
   // offset is 12, after test - 18
@@ -138,45 +138,45 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     val buyOrder2 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
     placeAndAwait(buyOrder2)
 
-    val aliceUsdBalance = wavesNode1Api.balance(alice, usd)
-    val aliceWctBalance = wavesNode1Api.balance(alice, wct)
+    val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
+    val aliceWctBalance = wavesNode1.api.balance(alice, wct)
 
     // here tick size = 5 (offset = 14), hence new order is placed into corrected price level 5, not 7
     val buyOrder3 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
     placeAndAwait(buyOrder3)
 
     // now there are 2 price levels
-    dex1Api.orderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
+    dex1.api.orderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
 
-    dex1Api.reservedBalance(alice)(Waves) shouldBe matcherFee * 3
-    dex1Api.reservedBalance(alice)(usd) shouldBe amount * 7 * 3 * price / PriceConstant
+    dex1.api.reservedBalance(alice)(Waves) shouldBe matcherFee * 3
+    dex1.api.reservedBalance(alice)(usd) shouldBe amount * 7 * 3 * price / PriceConstant
 
     // price level 5 will be deleted after cancelling of buyOrder3
     cancelAndAwait(alice, buyOrder3)
 
-    wavesNode1Api.balance(alice, usd) shouldBe aliceUsdBalance
-    wavesNode1Api.balance(alice, wct) shouldBe aliceWctBalance
+    wavesNode1.api.balance(alice, usd) shouldBe aliceUsdBalance
+    wavesNode1.api.balance(alice, wct) shouldBe aliceWctBalance
 
-    dex1Api.reservedBalance(alice)(Waves) shouldBe matcherFee * 2
-    dex1Api.reservedBalance(alice)(usd) shouldBe amount * 2 * 7 * price / PriceConstant
+    dex1.api.reservedBalance(alice)(Waves) shouldBe matcherFee * 2
+    dex1.api.reservedBalance(alice)(usd) shouldBe amount * 2 * 7 * price / PriceConstant
 
-    dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
-    Seq(buyOrder1, buyOrder2).foreach(order => dex1Api.cancel(alice, order))
+    dex1.api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(2 * amount, 7 * price))
+    Seq(buyOrder1, buyOrder2).foreach(order => dex1.api.cancel(alice, order))
   }
 
   // offset is 18, after test - 22
   "Matching on the same price level" in {
-    val bobUsdBalance     = wavesNode1Api.balance(bob, usd)
-    val bobWctBalance     = wavesNode1Api.balance(bob, wct)
-    val aliceUsdBalance   = wavesNode1Api.balance(alice, usd)
-    val aliceWctBalance   = wavesNode1Api.balance(alice, wct)
-    val bobWavesBalance   = wavesNode1Api.balance(bob, Waves)
-    val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
+    val bobUsdBalance     = wavesNode1.api.balance(bob, usd)
+    val bobWctBalance     = wavesNode1.api.balance(bob, wct)
+    val aliceUsdBalance   = wavesNode1.api.balance(alice, usd)
+    val aliceWctBalance   = wavesNode1.api.balance(alice, wct)
+    val bobWavesBalance   = wavesNode1.api.balance(bob, Waves)
+    val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 4 * price, matcherFee)
     placeAndAwait(sellOrder)
 
-    dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
+    dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
 
     val anotherSellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 3 * price, matcherFee)
     placeAndAwait(anotherSellOrder)
@@ -186,82 +186,82 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
     waitForOrderAtNode(buyOrder)
 
-    dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
-    dex1Api.orderBook(wctUsdPair).bids shouldBe Nil
+    dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
+    dex1.api.orderBook(wctUsdPair).bids shouldBe Nil
 
-    wavesNode1Api.balance(bob, usd) shouldBe (bobUsdBalance + 4 * amount)
-    wavesNode1Api.balance(bob, wct) shouldBe (bobWctBalance - amount)
-    wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 4 * amount)
-    wavesNode1Api.balance(alice, wct) shouldBe (aliceWctBalance + amount)
+    wavesNode1.api.balance(bob, usd) shouldBe (bobUsdBalance + 4 * amount)
+    wavesNode1.api.balance(bob, wct) shouldBe (bobWctBalance - amount)
+    wavesNode1.api.balance(alice, usd) shouldBe (aliceUsdBalance - 4 * amount)
+    wavesNode1.api.balance(alice, wct) shouldBe (aliceWctBalance + amount)
 
-    wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance - matcherFee)
-    wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - matcherFee)
+    wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance - matcherFee)
+    wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - matcherFee)
 
-    dex1Api.cancel(bob, anotherSellOrder)
+    dex1.api.cancel(bob, anotherSellOrder)
   }
 
   // offset is 22, after test - 25
   "Matching with old orders after tick size enabled" in {
-    val bobUsdBalance     = wavesNode1Api.balance(bob, usd)
-    val bobWctBalance     = wavesNode1Api.balance(bob, wct)
-    val aliceUsdBalance   = wavesNode1Api.balance(alice, usd)
-    val aliceWctBalance   = wavesNode1Api.balance(alice, wct)
-    val bobWavesBalance   = wavesNode1Api.balance(bob, Waves)
-    val aliceWavesBalance = wavesNode1Api.balance(alice, Waves)
+    val bobUsdBalance     = wavesNode1.api.balance(bob, usd)
+    val bobWctBalance     = wavesNode1.api.balance(bob, wct)
+    val aliceUsdBalance   = wavesNode1.api.balance(alice, usd)
+    val aliceWctBalance   = wavesNode1.api.balance(alice, wct)
+    val bobWavesBalance   = wavesNode1.api.balance(bob, Waves)
+    val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee)
     placeAndAwait(sellOrder)
 
-    dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 20 * price))
+    dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 20 * price))
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, 2 * amount, 20 * price, matcherFee)
     placeAndAwait(buyOrder, OrderStatus.PartiallyFilled)
-    dex1Api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
 
     waitForOrderAtNode(buyOrder)
 
-    wavesNode1Api.balance(bob, usd) shouldBe (bobUsdBalance + 15 * amount)
-    wavesNode1Api.balance(bob, wct) shouldBe (bobWctBalance - amount)
-    wavesNode1Api.balance(alice, usd) shouldBe (aliceUsdBalance - 15 * amount)
-    wavesNode1Api.balance(alice, wct) shouldBe (aliceWctBalance + amount)
-    wavesNode1Api.balance(bob, Waves) shouldBe (bobWavesBalance - matcherFee)
-    wavesNode1Api.balance(alice, Waves) shouldBe (aliceWavesBalance - matcherFee / 2)
+    wavesNode1.api.balance(bob, usd) shouldBe (bobUsdBalance + 15 * amount)
+    wavesNode1.api.balance(bob, wct) shouldBe (bobWctBalance - amount)
+    wavesNode1.api.balance(alice, usd) shouldBe (aliceUsdBalance - 15 * amount)
+    wavesNode1.api.balance(alice, wct) shouldBe (aliceWctBalance + amount)
+    wavesNode1.api.balance(bob, Waves) shouldBe (bobWavesBalance - matcherFee)
+    wavesNode1.api.balance(alice, Waves) shouldBe (aliceWavesBalance - matcherFee / 2)
 
     withClue("partially filled order cancellation") {
-      dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
-      dex1Api.reservedBalance(alice)(Waves) shouldBe matcherFee / 2
-      dex1Api.reservedBalance(alice)(usd) shouldBe 20 * price * amount / PriceConstant
-      dex1Api.cancel(alice, buyOrder)
-      dex1Api.reservedBalance(alice) shouldBe Map()
-      dex1Api.orderBook(wctUsdPair).bids shouldBe List()
+      dex1.api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
+      dex1.api.reservedBalance(alice)(Waves) shouldBe matcherFee / 2
+      dex1.api.reservedBalance(alice)(usd) shouldBe 20 * price * amount / PriceConstant
+      dex1.api.cancel(alice, buyOrder)
+      dex1.api.reservedBalance(alice) shouldBe Map()
+      dex1.api.orderBook(wctUsdPair).bids shouldBe List()
     }
   }
 
   // offset is 25, after test - 29
   "Matching orders of same price but neighbors levels" in {
     val bestAskOrderId = mkOrder(alice, wctUsdPair, SELL, amount, 17 * price, matcherFee)
-    dex1Api.place(bestAskOrderId)
+    dex1.api.place(bestAskOrderId)
 
-    dex1Api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
+    dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
 
     val bestBidOrderId = mkOrder(bob, wctUsdPair, BUY, amount, 17 * price, matcherFee)
-    dex1Api.place(bestBidOrderId)
+    dex1.api.place(bestBidOrderId)
 
-    dex1Api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
+    dex1.api.orderBook(wctUsdPair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
 
-    dex1Api.cancel(alice, bestAskOrderId)
-    dex1Api.cancel(bob, bestBidOrderId)
+    dex1.api.cancel(alice, bestAskOrderId)
+    dex1.api.cancel(bob, bestBidOrderId)
   }
 
   "Placing order on level 0" in {
-    dex1Api.tryPlace(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
+    dex1.api.tryPlace(mkOrder(bob, wctUsdPair, BUY, amount * 100000000L, 1, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
   }
 
   "Placing order on level 0 with virgin orderbook" in {
-    dex1Api.tryPlace(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
+    dex1.api.tryPlace(mkOrder(bob, wctWavesPair, BUY, amount * 100000000L, 1 * 1000000L, matcherFee)) should failWith(
       9441286, // OrderInvalidPriceLevel
       "The buy order's price 0.00000001 does not meet matcher's requirements: price >= 12 (actual tick size). Orders can not be placed into level with price 0"
     )
@@ -280,25 +280,25 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
             val bobWavesBalance    = assetBalance(bob, Waves)
 
             val bestAskOrderId = mkOrder(alice, pair, SELL, amount, 17 * price, matcherFee)
-            dex1Api.place(bestAskOrderId)
+            dex1.api.place(bestAskOrderId)
 
-            dex1Api.orderBook(pair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
+            dex1.api.orderBook(pair).asks shouldBe Seq(LevelResponse(amount, 24 * price))
             val bestBidOrderId = mkOrder(bob, pair, BUY, amount, 17 * price, matcherFee)
-            dex1Api.place(bestBidOrderId)
+            dex1.api.place(bestBidOrderId)
 
-            dex1Api.orderBook(pair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
+            dex1.api.orderBook(pair).bids shouldBe Seq(LevelResponse(amount, 12 * price))
 
-            dex1Api.cancel(alice, bestAskOrderId)
-            dex1Api.cancel(bob, bestBidOrderId)
+            dex1.api.cancel(alice, bestAskOrderId)
+            dex1.api.cancel(bob, bestBidOrderId)
 
             val filledOrderId = mkOrder(bob, pair, BUY, amount, 25 * price, matcherFee)
-            dex1Api.place(filledOrderId)
+            dex1.api.place(filledOrderId)
 
             val partiallyFilledOrderId = mkOrder(alice, pair, SELL, 2 * amount, 17 * price, matcherFee)
-            dex1Api.place(partiallyFilledOrderId)
+            dex1.api.place(partiallyFilledOrderId)
 
-            dex1Api.waitForOrderStatus(filledOrderId, OrderStatus.Filled)
-            dex1Api.waitForOrderStatus(partiallyFilledOrderId, OrderStatus.PartiallyFilled)
+            dex1.api.waitForOrderStatus(filledOrderId, OrderStatus.Filled)
+            dex1.api.waitForOrderStatus(partiallyFilledOrderId, OrderStatus.PartiallyFilled)
             waitForOrderAtNode(filledOrderId)
 
             pair match {
@@ -327,7 +327,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
               case _ => ???
             }
 
-            dex1Api.cancel(alice, partiallyFilledOrderId)
+            dex1.api.cancel(alice, partiallyFilledOrderId)
           }
       }
   }

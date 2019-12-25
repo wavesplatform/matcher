@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.concurrent.Future

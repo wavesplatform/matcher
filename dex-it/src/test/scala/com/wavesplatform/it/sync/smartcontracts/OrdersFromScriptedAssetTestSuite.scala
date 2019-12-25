@@ -3,10 +3,10 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.api.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -21,7 +21,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAssetTestSuite._
 
-  override protected val suiteInitialWavesNodeConfig: Config =
+  override protected val wavesNodeInitialSuiteConfig: Config =
     ConfigFactory
       .parseString(
         s"""waves {
@@ -34,18 +34,18 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
            |}""".stripMargin
       )
 
-  override protected val suiteInitialDexConfig: Config =
+  override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = ["${allowAsset.id}", "${denyAsset.id}", "${unscriptedAsset.id}"]""")
 
   override protected def beforeAll(): Unit = {
-    startAndWait(wavesNode1Container(), wavesNode1Api)
+    wavesNode1.start()
     broadcastAndAwait(issueUnscriptedAssetTx, issueAllowAssetTx, issueAllowAsset2Tx, issueAllowAsset3Tx, issueDenyAssetTx)
-    startAndWait(dex1Container(), dex1Api)
+    dex1.start()
   }
 
   override protected def afterEach(): Unit = {
     super.afterEach()
-    dex1Api.cancelAll(matcher)
+    dex1.api.cancelAll(matcher)
   }
 
   "can match orders when SmartAccTrading is still not activated" in {
@@ -60,19 +60,19 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     waitForOrderAtNode(submitted)
   }
 
-  "wait activation" in wavesNode1Api.waitForHeight(activationHeight)
+  "wait activation" in wavesNode1.api.waitForHeight(activationHeight)
 
   "can place if the script returns TRUE" in {
     val pair    = AssetPair(unscriptedAsset, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
     placeAndAwait(counter)
-    dex1Api.cancel(matcher, counter)
+    dex1.api.cancel(matcher, counter)
   }
 
   "can't place if the script returns FALSE" in {
     val pair  = AssetPair(unscriptedAsset, denyAsset)
     val order = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, matcherFee = smartTradeFee, version = 2)
-    dex1Api.tryPlace(order) should failWith(
+    dex1.api.tryPlace(order) should failWith(
       11536130, // AssetScriptDeniedOrder
       MatcherError.Params(assetId = Some(denyAsset.id.toString))
     )
@@ -100,11 +100,11 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    dex1Api.place(submitted)
+    dex1.api.place(submitted)
 
     info("both orders are cancelled")
-    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(submitted, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(counter, OrderStatus.Filled)
   }
 
   "can't execute against unscripted, if the script returns FALSE" in {
@@ -118,18 +118,18 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
-    dex1Api.orderStatus(counter).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(counter).status shouldBe OrderStatus.Accepted
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    dex1Api.place(submitted)
+    dex1.api.place(submitted)
 
     info("two orders form an invalid transaction")
-    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(submitted, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
 
-    val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
-    val r   = wavesNode1Api.tryBroadcast(txs.head)
+    val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
+    val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe 'left
     r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
   }
@@ -145,18 +145,18 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")
-    dex1Api.orderStatus(counter).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(counter).status shouldBe OrderStatus.Accepted
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    dex1Api.place(submitted)
+    dex1.api.place(submitted)
 
     info("two orders form an invalid transaction")
-    dex1Api.waitForOrderStatus(submitted, OrderStatus.Filled)
-    dex1Api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(submitted, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(counter, OrderStatus.PartiallyFilled)
 
-    val txs = dex1Api.waitForTransactionsByOrder(submitted, 1)
-    val r   = wavesNode1Api.tryBroadcast(txs.head)
+    val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
+    val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe 'left
     r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
   }

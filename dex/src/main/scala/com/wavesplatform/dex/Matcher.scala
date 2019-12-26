@@ -56,8 +56,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def matcherPublicKey: PublicKey = matcherKeyPair
-
   @volatile private var lastProcessedOffset   = -1L
+
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
@@ -111,7 +111,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
       settings,
-      transactionCreator.createTransaction,
       time,
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
@@ -296,7 +295,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
-                settings.actorResponseTimeout,
                 time,
                 orderDB,
                 wavesBlockchainAsyncClient.forgedOrder,
@@ -360,6 +358,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       _                <- loadAllKnownAssets()
       hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
     } yield {
+      actorSystem.actorOf(
+        CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
+        CreateExchangeTransactionActor.name
+      )
 
       hasMatcherAccountScript = hasMatcherScript
       val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
@@ -414,7 +416,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>
       log.warn(s"During receiving last offset", e)
-      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get the last offset from queue", e))
+      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
       else getLastOffset(deadline)
 
     case e: Throwable =>

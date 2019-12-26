@@ -12,7 +12,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
-import com.wavesplatform.dex.model.{Events, ExchangeTransactionCreator, OrderBook}
+import com.wavesplatform.dex.model.{Events, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.transaction.Asset
@@ -412,9 +412,6 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
-
-    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, false, _ => false).createTransaction _
-
     TestActorRef(
       new MatcherActor(
         matcherSettings,
@@ -430,7 +427,6 @@ class MatcherActorSpecification
             _ => {},
             _ => {},
             matcherSettings,
-            txFactory,
             ntpTime,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},

@@ -30,7 +30,10 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
        |      polling-interval = 1s
        |      max-elements-per-poll = 100
        |    }
-       |    kafka.consumer.buffer-size = 100
+       |    kafka.consumer {
+       |      fetch-max-duration = 1s
+       |      max-buffer-size = 100
+       |    }
        |  }
        |}
        |akka.kafka.consumer.poll-interval = 1s""".stripMargin

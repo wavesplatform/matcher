@@ -346,7 +346,30 @@ Note, the shown settings contain a placeholder for your raw password, insert a r
 
 ## 10. Production recommendations
 
-Soon.
+### Kafka's queue
+
+If all of these points are true:
+
+1. You are using Kafka queue
+2. Have a lot of Place and Cancel requests
+3. You face an issues when Consumer or Producer can't connect to Kafka
+
+There are recommendations for the OS-related system the DEX server runs on.
+Note, it is not recommended to change this options if you aren't face the issue.
+
+1. Add these lines to `/etc/sysctl.conf` (the admin rights are required):
+
+    ```
+    net.ipv4.tcp_fin_timeout = 30
+    net.ipv4.tcp_max_syn_backlog = 18196
+    net.ipv4.tcp_syncookies = 0
+    ```
+
+2. To apply changes, run:
+    
+    ```
+    sudo sysctl -p
+    ```
 
 ## 11. Contributor notes
 

@@ -99,7 +99,9 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
+      if (AssetPair.assetIdStr(given) == "WAVES")
+        e"""Required one of the following fee asset: ${'required  -> required}. But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
+      else e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Amount, given: Amount)
@@ -448,6 +450,15 @@ case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfB
 
 case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
+
+case class InvalidJson(fields: List[String])
+  extends MatcherError(
+    request,
+    commonEntity,
+    broken,
+    if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
+    else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
+  )
 
 case object ApiKeyIsNotProvided
     extends MatcherError(auth, commonEntity, notProvided, e"API key is not provided in the configuration, please contact with the administrator")

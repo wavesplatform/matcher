@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.orders
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 // TODO refactor balances retrieving
-class OrderFeeTestSuite extends MatcherSuiteBase {
+class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
 
   private val baseFee = 300000
 
@@ -108,7 +108,6 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     }
 
     "is enough" in {
-
       upsertRates(btc -> btcRate)
       dex1.api.place(
         mkOrder(

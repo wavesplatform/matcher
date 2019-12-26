@@ -111,7 +111,6 @@ class ReservedBalanceSpecification
             new AddressActor(
               address,
               _ => Future.successful(0L),
-              5.seconds,
               ntpTime,
               new TestOrderDB(100),
               _ => Future.successful(false),
@@ -493,7 +492,6 @@ class ReservedBalanceSpecification
               new AddressActor(
                 owner = address,
                 spendableBalance = spendableBalance,
-                requestTimeout = 5.seconds,
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
                 hasOrderInBlockchain = _ => Future.successful(false),

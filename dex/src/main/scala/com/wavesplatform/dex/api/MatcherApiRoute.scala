@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
@@ -39,7 +39,6 @@ import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 import scala.util.Success
@@ -65,7 +64,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Future[Set[Byte]])
+                           validatedAllowedOrderVersions: Future[Set[Byte]])(system: ActorSystem)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -73,6 +72,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import MatcherApiRoute._
   import PathMatchers._
 
+  private implicit val dispatcher                                 = system.dispatchers.lookup("akka.actor.api-dispatcher")
   private implicit val timeout: Timeout                           = matcherSettings.actorResponseTimeout
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
@@ -511,6 +511,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           Json.obj(
             "id"        -> id.toString,
             "type"      -> oi.side.toString,
+            "orderType" -> oi.orderType,
             "amount"    -> oi.amount,
             "fee"       -> oi.matcherFee,
             "price"     -> oi.price,

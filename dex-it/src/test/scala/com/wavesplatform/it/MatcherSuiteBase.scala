@@ -45,6 +45,7 @@ abstract class MatcherSuiteBase
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
+    // TODO it may be required to create a topic before
     wavesNode1.start()
     dex1.start()
   }

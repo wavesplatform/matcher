@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.dex.it.api.responses.dex.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex._
+import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -40,6 +41,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Check cross ordering between Alice and Bob" - {
+    "orderType should be limit for a limit order" in {
+      def validateHistory(label: String, orders: Seq[OrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+        orders should have size 1
+        orders.head.orderType shouldBe AcceptedOrderType.Limit
+      }
+
+      validateHistory("by pair", dex1.api.orderHistoryByPair(alice, aliceWavesPair))
+      validateHistory("full", dex1.api.orderHistory(alice))
+      validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
+    }
+
     "/matcher should respond with the matcher's public key" in {
       dex1.api.publicKey shouldBe matcher.publicKey
     }

@@ -28,7 +28,7 @@ trait WavesBlockchainClient[F[_]] {
   def hasScript(address: Address): F[Boolean]
   def runScript(address: Address, input: Order): F[RunScriptResult]
 
-  def wasForged(txIds: Seq[ByteStr]): F[Map[ByteStr, Boolean]]
+  def wereForged(txIds: Seq[ByteStr]): F[Map[ByteStr, Boolean]]
   def broadcastTx(tx: ExchangeTransaction): F[Boolean]
 
   def forgedOrder(orderId: ByteStr): F[Boolean]

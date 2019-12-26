@@ -115,7 +115,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
       .map(parse)
   }
 
-  override def wasForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
+  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]] =
     handlingErrors {
       blockchainService
         .getStatuses { TransactionsByIdRequest(txIds.map(id => ByteString copyFrom id.arr)) }

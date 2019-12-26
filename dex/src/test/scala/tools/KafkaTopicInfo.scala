@@ -52,31 +52,6 @@ object KafkaTopicInfo extends App {
     eventDeserializer
   )
 
-  val requestTimeout = java.time.Duration.ofNanos(5.seconds.toNanos)
-
-  val config = ConfigFactory
-    .parseString("""waves.dex.events-queue.kafka.consumer.client {
-      |  client.id = "kafka-topics-info"
-      |  enable.auto.commit = false
-      |  auto.offset.reset = earliest
-      |}
-      |
-      |""".stripMargin)
-    .withFallback {
-      ConfigFactory
-        .parseFile(configFile)
-        .withFallback(ConfigFactory.defaultApplication())
-        .withFallback(ConfigFactory.defaultReference())
-        .resolve()
-        .getConfig("waves.dex.events-queue.kafka")
-    }
-
-  val consumer = new KafkaConsumer[String, QueueEvent](
-    config.getConfig("waves.dex.events-queue.kafka.consumer.client").toProperties,
-    new StringDeserializer,
-    eventDeserializer
-  )
-
   try {
     val topicPartition  = new TopicPartition(topic, 0)
     val topicPartitions = java.util.Collections.singletonList(topicPartition)

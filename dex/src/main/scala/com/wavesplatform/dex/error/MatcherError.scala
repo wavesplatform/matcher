@@ -136,15 +136,6 @@ case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpi
                      |but it is ${'given -> givenExpiration}"""
     )
 
-case class InvalidJson(fields: List[String])
-    extends MatcherError(
-      request,
-      commonEntity,
-      broken,
-      if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
-      else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
-    )
-
 case class OrderCommonValidationFailed(details: String)
     extends MatcherError(order, commonEntity, commonClass, e"The order is invalid: ${'details -> details}")
 
@@ -452,13 +443,13 @@ case class RateNotFound(theAsset: Asset)
     extends MatcherError(rate, commonEntity, notFound, e"The rate for the asset ${'assetId -> theAsset} was not specified")
 
 case class InvalidJson(fields: List[String])
-  extends MatcherError(
-    request,
-    commonEntity,
-    broken,
-    if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
-    else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
-  )
+    extends MatcherError(
+      request,
+      commonEntity,
+      broken,
+      if (fields.isEmpty) e"The provided JSON is invalid. Check the documentation"
+      else e"The provided JSON contains invalid fields: ${'invalidFields -> fields}. Check the documentation"
+    )
 
 case object ApiKeyIsNotProvided
     extends MatcherError(auth, commonEntity, notProvided, e"API key is not provided in the configuration, please contact with the administrator")

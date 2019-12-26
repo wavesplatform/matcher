@@ -200,7 +200,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
           }
           .map { _.collect { case Right(version) => version } }
-      ),
+      )(actorSystem),
       MatcherApiRouteV1(
         pairBuilder,
         orderBooksSnapshotCache,
@@ -373,7 +373,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
           .props(
             settings.exchangeTransactionBroadcast,
             time,
-            wavesBlockchainAsyncClient.wasForged,
+            wavesBlockchainAsyncClient.wereForged,
             wavesBlockchainAsyncClient.broadcastTx
           ),
         "exchange-transaction-broadcast"

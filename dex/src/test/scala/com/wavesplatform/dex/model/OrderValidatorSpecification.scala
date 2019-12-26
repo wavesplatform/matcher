@@ -210,7 +210,7 @@ class OrderValidatorSpecification
 
         val order = Json.fromJson[Order](createOrder(AssetPair(btc, usd), SELL, 100, 3.0).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")).get
 
-        validateByMatcherSettings { DynamicSettings(0.003.waves) }(order).leftMap(_.mkMessage(errorContext).text).left.get should include(
+        validateByMatcherSettings { DynamicSettings(0.003.waves) }(order).left.get.message.text should include(
           """But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
         )
       }

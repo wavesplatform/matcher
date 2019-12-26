@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.api.dex
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Functor
+import cats.instances.FutureInstances
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.docker.base.info.DexContainerInfo
@@ -10,7 +11,7 @@ import com.wavesplatform.dex.it.docker.base.{BaseContainer, DexContainer}
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 
-trait HasDex { self: BaseContainersKit =>
+trait HasDex extends FutureInstances { self: BaseContainersKit =>
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)

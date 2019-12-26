@@ -27,8 +27,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 420169L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(filledAmount)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(filledAmount)))
+    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(filledAmount), filledFee = Some(0)))
+    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(0)))
 
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
@@ -58,8 +58,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 223344937L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(filledAmount)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(filledAmount)))
+    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(filledAmount), filledFee = Some(0)))
+    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(0)))
 
     withClue("Alice's reserved balance before cancel")(dex1.api.reservedBalance(alice) shouldBe empty)
 
@@ -79,8 +79,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val submitted = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     dex1.api.place(submitted)
 
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(99523810L)))
-    dex1.api.waitForOrder(counter2)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(2857143L)))
+    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(99523810L), filledFee = Some(0)))
+    dex1.api.waitForOrder(counter2)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(0)))
 
     withClue("orderBook check") {
       val ob = dex1.api.orderBook(wavesUsdPair)

@@ -48,11 +48,11 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       dex1.api.place(aliceOrder)
-      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(420169L)))
-      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, Some(420169L)))
+      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(420169L), filledFee = Some(0)))
+      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(420169L), filledFee = Some(0)))
 
       // Bob wants to buy some USD
-      dex1.api.waitForOrder(bobOrder1)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(420169L)))
+      dex1.api.waitForOrder(bobOrder1)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(420169L), filledFee = Some(0)))
 
       // Each side get fair amount of assets
       waitForOrderAtNode(aliceOrder)
@@ -286,7 +286,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000L, 1000L)
     dex1.api.place(aliceOrder)
 
-    dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Cancelled, Some(0)))
+    dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
 
     withClue("Alice's reserved balance:") {
       dex1.api.reservedBalance(alice) shouldBe empty

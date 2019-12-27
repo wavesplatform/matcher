@@ -33,7 +33,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val bobAsset2         = IssuedAsset(bobAsset2Id)
   private val bob2WavesPair     = AssetPair(bobAsset2, Waves)
 
-  private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 2.minutes) // TTL?
+  private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

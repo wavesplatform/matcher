@@ -41,17 +41,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Check cross ordering between Alice and Bob" - {
-    "orderType should be limit for a limit order" in {
-      def validateHistory(label: String, orders: Seq[OrderBookHistoryItem]): Unit = withClue(s"$label: ") {
-        orders should have size 1
-        orders.head.orderType shouldBe AcceptedOrderType.Limit
-      }
-
-      validateHistory("by pair", dex1.api.orderHistoryByPair(alice, aliceWavesPair))
-      validateHistory("full", dex1.api.orderHistory(alice))
-      validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
-    }
-
     "/matcher should respond with the matcher's public key" in {
       dex1.api.publicKey shouldBe matcher.publicKey
     }
@@ -67,6 +56,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val orders = dex1.api.orderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe aliceSellAmount
         orders.asks.head.price shouldBe 2000.waves
+      }
+
+      "orderType should be limit for a limit order" in {
+        def validateHistory(label: String, orders: Seq[OrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+          orders should have size 1
+          orders.head.orderType shouldBe AcceptedOrderType.Limit
+        }
+
+        validateHistory("by pair", dex1.api.orderHistoryByPair(alice, aliceWavesPair))
+        validateHistory("full", dex1.api.orderHistory(alice))
+        validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
       }
 
       "get opened trading markets" in {

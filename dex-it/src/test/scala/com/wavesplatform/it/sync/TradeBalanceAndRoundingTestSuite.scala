@@ -48,11 +48,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       dex1.api.place(aliceOrder)
-      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(420169L), filledFee = Some(0)))
-      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(420169L), filledFee = Some(0)))
+      dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(420169L), filledFee = Some(296219L)))
 
       // Bob wants to buy some USD
-      dex1.api.waitForOrder(bobOrder1)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(420169L), filledFee = Some(0)))
+      dex1.api.waitForOrder(bobOrder1)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(420169L), filledFee = Some(40L)))
 
       // Each side get fair amount of assets
       waitForOrderAtNode(aliceOrder)

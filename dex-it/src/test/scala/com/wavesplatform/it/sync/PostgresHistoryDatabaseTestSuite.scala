@@ -419,7 +419,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       val marketBuyOrder = bigBuyOrder
       dex1.api.placeMarket(marketBuyOrder)
-      dex1.api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(300.wct), filledFee = Some(0.003.waves)))
+      dex1.api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
 
       eventually {
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(

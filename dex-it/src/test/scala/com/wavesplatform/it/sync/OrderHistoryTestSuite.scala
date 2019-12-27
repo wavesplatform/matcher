@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.model.MatcherModel.Normalization
@@ -14,9 +15,12 @@ import scala.math.BigDecimal.RoundingMode.CEILING
 
 class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId" ]""")
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    broadcastAndAwait(IssueEthTx)
+    wavesNode1.start()
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueEthTx)
+    dex1.start()
     dex1.api.upsertRate(eth, 0.005)
   }
 
@@ -32,7 +36,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
   "Order history should save fee info" - {
     val feeAsset = eth
 
-    "in placed and cancelled order" in {
+    "in placed and cancelled order" - {
       List[(Byte, Asset)](
         (1, Waves),
         (2, Waves),
@@ -151,7 +155,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
     }
 
-    withClue("in partially filled and cancelled orders of different versions") {
+    "in partially filled and cancelled orders of different versions" in {
       val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
@@ -198,7 +202,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       }
     }
 
-    withClue("in partially filled orders with fractional filled amount") {
+    "in partially filled orders with fractional filled amount" in {
       val order   = mkOrder(alice, wctUsdPair, BUY, 9.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset)
       val orderId = order.id()
       dex1.api.place(order)
@@ -218,7 +222,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.cancel(alice, order)
     }
 
-    withClue("should should right fee if not enough amount before order execution and fee rounding") {
+    "should should right fee if not enough amount before order execution and fee rounding" in {
       val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
 
       broadcastAndAwait(mkTransfer(alice, bob, ethBalance - (BigDecimal(0.005) * matcherFee).toLong, eth))
@@ -263,7 +267,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
   private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[OrderBookHistoryItem]] = List(
     dex1.api.orderHistory(account, activeOnly),
-    dex1.api.orderHistoryByPair(account, wctUsdPair, activeOnly),
+    dex1.api.orderHistoryByPair(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)
   )
 }

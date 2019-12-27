@@ -93,7 +93,7 @@ trait MkWavesEntities {
   def mkMassTransfer(sender: KeyPair,
                      asset: Asset,
                      transfers: List[ParsedTransfer],
-                     fee: Long = setScriptFee,
+                     fee: Long = massTransferDefaultFee,
                      ts: Long = System.currentTimeMillis()): MassTransferTransaction =
     MassTransferTransaction
       .selfSigned(

@@ -10,7 +10,7 @@ trait NodeApiExtensions {
   protected def broadcastAndAwait(txs: Transaction*): Unit = broadcastAndAwait(wavesNode1.api, txs: _*)
 
   protected def broadcastAndAwait(wavesNodeApi: NodeApi[Id], txs: Transaction*): Unit = {
-    txs.map(wavesNodeApi.broadcast)
+    txs.foreach(wavesNodeApi.broadcast)
     txs.foreach(wavesNodeApi.waitForTransaction)
   }
 }

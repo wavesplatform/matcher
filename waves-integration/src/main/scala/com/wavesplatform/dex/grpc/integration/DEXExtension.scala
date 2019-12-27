@@ -42,10 +42,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
   override def shutdown(): Future[Unit] = {
     log.info("Shutting down gRPC DEX extension")
-
-    if (server != null) {
-      server.shutdown()
-      Future { server.awaitTermination() }
-    } else Future.successful { Unit }
+    if (server != null) server.shutdownNow()
+    Future.successful { Unit }
   }
 }

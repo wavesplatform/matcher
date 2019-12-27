@@ -39,7 +39,7 @@ trait BaseContainersKit extends ScorexLogging {
         .setReadTimeout(10000)
         .setKeepAlive(false)
         .setRequestTimeout(10000)
-        .setIoThreadsCount(15)
+        .setIoThreadsCount(5)
         .build()
     )
   )

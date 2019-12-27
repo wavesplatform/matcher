@@ -22,7 +22,7 @@ lazy val `dex-test-common` = project.dependsOn(
 
 lazy val dex = project.dependsOn(
   `waves-integration`,
-  `dex-common`,
+//  `dex-common`,
   `dex-test-common` % "test->compile",
   node % "compile;test->test;runtime->provided"
 )
@@ -37,11 +37,19 @@ lazy val `dex-it` = project.dependsOn(
   dex % "compile;test->test",
   `waves-integration-it`,
   `dex-it-common`,
-  `dex-common`
+//  `dex-common`
+)
+
+lazy val `waves-grpc` = project
+
+lazy val `waves-ext` = project.dependsOn(
+  `waves-grpc`,
+  node % "compile;test->test;runtime->provided"
 )
 
 lazy val `waves-integration` = project.dependsOn(
-  `dex-common`,
+  `waves-grpc`,
+//  `dex-common`,
   node % "compile;test->test;runtime->provided"
 )
 

@@ -89,6 +89,7 @@ object Dependencies {
   private val swagger                = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
   private val playJson               = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto           = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
+  private val grpcScalaPb            = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
@@ -103,11 +104,6 @@ object Dependencies {
   private val testContainers: Seq[ModuleID] = Seq(
     "com.dimafeng"       %% "testcontainers-scala" % Version.testContainers,
     "org.testcontainers" % "postgresql"            % Version.testContainersPostgres
-  )
-
-  private val grpc: Seq[ModuleID] = Seq(
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
-    grpcNetty
   )
 
   private val testKit: Seq[ModuleID] = Seq(
@@ -189,10 +185,11 @@ object Dependencies {
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx)
 
-    lazy val wavesIntegration: Seq[ModuleID] = Seq(
-      wavesProtobufSchemas,
-      mouse % Test
-    ) ++ grpc
+    lazy val wavesExt: Seq[ModuleID] = Seq(grpcNetty)
+
+    lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
+
+    lazy val wavesIntegration: Seq[ModuleID] = Seq(mouse % Test)
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = integrationTestKit
   }

@@ -18,7 +18,7 @@ import org.scalatest.{FreeSpecLike, Matchers}
 
 import scala.util.Try
 
-class MatcherScriptRunnerTest extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
+class MatcherScriptRunnerSpecification extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
 
   private val sampleOrder = OrderV1(
     sender = KeyPair("test".getBytes()),

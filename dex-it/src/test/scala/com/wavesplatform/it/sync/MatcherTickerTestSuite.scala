@@ -67,7 +67,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
     "place bid order for first pair" in {
       dex1.api.place(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
-      placeAndAwait(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
+      placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
       r.lastPrice shouldBe None
@@ -80,7 +80,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
     "place ask order for second pair" in {
       dex1.api.place(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
-      placeAndAwait(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
+      placeAndAwaitAtDex(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
 
       val r = dex1.api.orderBookStatus(btcWavesPair)
       r.lastPrice shouldBe None
@@ -93,7 +93,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
 
     "place ask order for first pair" in {
       dex1.api.place(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
-      placeAndAwait(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
+      placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
       r.lastPrice shouldBe None
@@ -105,7 +105,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     }
 
     "match bid order for first pair" in {
-      placeAndAwait(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice), OrderStatus.Filled)
+      placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice), OrderStatus.Filled)
 
       val r1 = dex1.api.orderBookStatus(btcUsdPair)
       r1.lastPrice shouldBe Some(bidPrice)
@@ -115,7 +115,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       r1.ask shouldBe Some(askPrice)
       r1.askAmount shouldBe Some(2 * askAmount)
 
-      placeAndAwait(mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice), OrderStatus.Filled)
+      placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice), OrderStatus.Filled)
 
       val r2 = dex1.api.orderBookStatus(btcUsdPair)
       r2.lastPrice shouldBe Some(bidPrice)
@@ -127,7 +127,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     }
 
     "match ask order for first pair" in {
-      placeAndAwait(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice), OrderStatus.Filled)
+      placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice), OrderStatus.Filled)
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
       r.lastPrice shouldBe Some(askPrice)

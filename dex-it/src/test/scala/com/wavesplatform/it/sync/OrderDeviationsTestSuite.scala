@@ -129,7 +129,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         Seq(90000 -> OrderStatus.Accepted, 800000 -> OrderStatus.Filled).foreach {
           case (price, status) =>
             val order = mkOrder(bob, assetPair, BUY, 1000.waves, price, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-            placeAndAwait(order, status)
+            placeAndAwaitAtDex(order, status)
         }
 
         waitForOrderAtNode(bestAskOrder)
@@ -157,7 +157,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         Seq(90 -> OrderStatus.Accepted, 800 -> OrderStatus.Filled).foreach {
           case (price, status) =>
             val order = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, price, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-            placeAndAwait(order, status)
+            placeAndAwaitAtDex(order, status)
         }
 
         waitForOrderAtNode(bestAskOrder)
@@ -173,7 +173,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       "-- too low" - {
         for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-          placeAndAwait(bestBidOrder)
+          placeAndAwaitAtDex(bestBidOrder)
 
           dex1.api.orderBook(assetPair).bids shouldBe List(LevelResponse(1000.waves, 300000))
           dex1.api.reservedBalance(bob)(assetPair.priceAsset) shouldBe 300600000L
@@ -193,7 +193,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         s"$wavesUsdPair" in {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-          placeAndAwait(bestBidOrder)
+          placeAndAwaitAtDex(bestBidOrder)
 
           dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1000.waves, 300))
 
@@ -213,7 +213,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       "-- too high" - {
         for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 4 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-          placeAndAwait(bestAskOrder)
+          placeAndAwaitAtDex(bestAskOrder)
 
           dex1.api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
@@ -230,7 +230,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         s"$wavesUsdPair" in {
           val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 500, 4 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-          placeAndAwait(bestAskOrder)
+          placeAndAwaitAtDex(bestAskOrder)
 
           dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1000.waves, 500))
 
@@ -254,7 +254,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 2000.waves, 300000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
 
         Seq(bestAskOrder, bestBidOrder).foreach { order =>
-          placeAndAwait(order)
+          placeAndAwaitAtDex(order)
         }
 
         dex1.api.orderBook(assetPair).asks shouldBe List(LevelResponse(2000.waves, 500000))
@@ -263,7 +263,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         Seq(850000 -> OrderStatus.Accepted, 120000 -> OrderStatus.Filled).foreach {
           case (price, status) =>
             val order = mkOrder(alice, assetPair, SELL, 1000.waves, price, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-            placeAndAwait(order, status)
+            placeAndAwaitAtDex(order, status)
         }
 
         waitForOrderAtNode(bestBidOrder)
@@ -279,7 +279,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       "-- too low" - {
         for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 300000, matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-          placeAndAwait(bestBidOrder)
+          placeAndAwaitAtDex(bestBidOrder)
 
           dex1.api.orderBook(assetPair).bids shouldBe List(LevelResponse(1000.waves, 300000))
 
@@ -295,7 +295,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         s"$wavesUsdPair" in {
           val bestBidOrder = mkOrder(bob, wavesUsdPair, BUY, 1000.waves, 300, 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-          placeAndAwait(bestBidOrder)
+          placeAndAwaitAtDex(bestBidOrder)
 
           dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1000.waves, 300))
 
@@ -313,7 +313,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
       "-- too high" - {
         for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
           val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 500000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-          placeAndAwait(bestAskOrder)
+          placeAndAwaitAtDex(bestAskOrder)
 
           dex1.api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 500000))
 
@@ -330,7 +330,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         s"$wavesUsdPair" in {
           val bestAskOrder = mkOrder(alice, wavesUsdPair, SELL, 1000.waves, 500, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-          placeAndAwait(bestAskOrder)
+          placeAndAwaitAtDex(bestAskOrder)
 
           dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1000.waves, 500))
 
@@ -351,19 +351,19 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     "in deviation bounds" - {
       for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
         val aliceOrder1 = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(aliceOrder1)
+        placeAndAwaitAtDex(aliceOrder1)
 
         dex1.api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 600000))
 
         val bobOrder1 = mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bobOrder1, OrderStatus.Filled)
+        placeAndAwaitAtDex(bobOrder1, OrderStatus.Filled)
 
         val aliceOrder2 = mkOrder(alice, assetPair, BUY, 1000.waves, 700000, 3 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(aliceOrder2)
+        placeAndAwaitAtDex(aliceOrder2)
         dex1.api.orderBook(assetPair).bids shouldBe List(LevelResponse(1000.waves, 700000))
 
         val bobOrder2 = mkOrder(bob, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bobOrder2, OrderStatus.Filled)
+        placeAndAwaitAtDex(bobOrder2, OrderStatus.Filled)
         waitForOrdersAtNode(aliceOrder1, aliceOrder2)
 
         cancelAll(alice, bob)
@@ -371,19 +371,19 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
       s"$wavesUsdPair" in {
         val bobOrder1 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 600, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bobOrder1)
+        placeAndAwaitAtDex(bobOrder1)
 
         dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1000.waves, 600))
 
         val aliceOrder1 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(aliceOrder1, OrderStatus.Filled)
+        placeAndAwaitAtDex(aliceOrder1, OrderStatus.Filled)
 
         val aliceOrder2 = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 700, 3 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(aliceOrder2)
+        placeAndAwaitAtDex(aliceOrder2)
         dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1000.waves, 700))
 
         val bobOrder2 = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bobOrder2, OrderStatus.Filled)
+        placeAndAwaitAtDex(bobOrder2, OrderStatus.Filled)
         waitForOrdersAtNode(bobOrder1, aliceOrder1, aliceOrder2, bobOrder2)
 
         cancelAll(alice, bob)
@@ -393,7 +393,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
     "out of deviation bounds" - {
       for (assetPair <- Seq(wavesBtcPair, ethWavesPair, scriptAssetsPair)) s"$assetPair" in {
         val bestAskOrder = mkOrder(alice, assetPair, SELL, 1000.waves, 600000, 2 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bestAskOrder)
+        placeAndAwaitAtDex(bestAskOrder)
 
         dex1.api.orderBook(assetPair).asks shouldBe List(LevelResponse(1000.waves, 600000))
 
@@ -405,7 +405,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         dex1.api.cancel(alice, bestAskOrder)
 
         val bestBidOrder = mkOrder(bob, assetPair, BUY, 1000.waves, 1200000, 4 * matcherFee, matcherFeeAssetId = assetPair.priceAsset)
-        placeAndAwait(bestBidOrder)
+        placeAndAwaitAtDex(bestBidOrder)
 
         dex1.api.orderBook(assetPair).bids shouldBe List(LevelResponse(1000.waves, 1200000))
 
@@ -419,7 +419,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
       s"$wavesUsdPair" in {
         val bestAskOrder = mkOrder(bob, wavesUsdPair, SELL, 1000.waves, 600, 2 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bestAskOrder)
+        placeAndAwaitAtDex(bestAskOrder)
 
         dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1000.waves, 600))
 
@@ -431,7 +431,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         dex1.api.cancel(bob, bestAskOrder)
 
         val bestBidOrder = mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 1200, 4 * 300, matcherFeeAssetId = wavesUsdPair.priceAsset)
-        placeAndAwait(bestBidOrder)
+        placeAndAwaitAtDex(bestBidOrder)
 
         dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1000.waves, 1200))
 

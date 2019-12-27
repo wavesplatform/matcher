@@ -103,7 +103,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "valid order" in {
-    placeAndAwait(mkOrder(alice, wctUsdPair, BUY, 100000000, 100000, matcherFee))
+    placeAndAwaitAtDex(mkOrder(alice, wctUsdPair, BUY, 100000000, 100000, matcherFee))
   }
 
   "order restrictions endpoints" in {

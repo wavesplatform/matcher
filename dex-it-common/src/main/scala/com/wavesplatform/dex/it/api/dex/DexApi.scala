@@ -337,7 +337,7 @@ object DexApi {
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
-        repeatUntil(tryOrderStatus(assetPair, id), 1.second) {
+        repeatUntil(tryOrderStatus(assetPair, id), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())

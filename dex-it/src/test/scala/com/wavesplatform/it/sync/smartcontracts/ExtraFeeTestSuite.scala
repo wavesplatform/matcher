@@ -73,7 +73,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           9441542, // FeeNotEnough
           "Required 0.007 WAVES as fee for this order, but given 0.00699999 WAVES")
 
-        placeAndAwait(mkOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, version = 2))
+        placeAndAwaitAtDex(mkOrder(alice, oneSmartPair, SELL, amount, price, expectedFee, version = 2))
 
         info("expected fee should be reserved")
         dex1.api.reservedBalance(alice)(Waves) shouldBe expectedFee
@@ -111,7 +111,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
             "Required 0.015 WAVES as fee for this order, but given 0.01499999 WAVES"
           )
 
-          placeAndAwait(mkOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, version = 2))
+          placeAndAwaitAtDex(mkOrder(alice, bothSmartPair, SELL, amount, price, expectedFee, version = 2))
 
           info("expected fee should be reserved")
           dex1.api.reservedBalance(alice)(Waves) shouldBe expectedFee
@@ -144,7 +144,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
         val expectedFee      = 550L                           // 1 x "smart asset" and 1 x "matcher script"
 
-        placeAndAwait(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, matcherFeeAssetId = feeAsset))
+        placeAndAwaitAtDex(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, matcherFeeAssetId = feeAsset))
 
         info("expected fee should be reserved")
         dex1.api.reservedBalance(bob)(feeAsset) shouldBe expectedFee

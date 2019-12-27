@@ -35,7 +35,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
       "should accept orders if orders' matcherFeeAsset equal to specified in config" - {
         List(
           "regular asset" -> aliceAsset,
-          "scriptedAsset" -> aliceScriptedAsset
+          "scripted asset" -> aliceScriptedAsset
         ).foreach {
           case (title, asset) =>
             s"$title" in {
@@ -43,7 +43,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
               val orderAmount = 1
 
               dex1.restartWithNewSuiteConfig { configWithOrderFeeFixed(asset) }
-              broadcastAndAwait(mkTransfer(alice, bob, wavesNode1.api.balance(alice, asset), asset))
+              broadcastAndAwait(mkTransfer(alice, bob, wavesNode1.api.balance(alice, asset) / 2, asset, feeAmount = minFee + smartFee))
 
               val aliceAssetBalanceBefore = wavesNode1.api.balance(alice, asset)
               val aliceWavesBalanceBefore = wavesNode1.api.balance(alice, Waves)
@@ -52,7 +52,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
               val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
               val aliceOrder = mkOrder(alice, pair, OrderType.BUY, orderAmount, price, matcherFee = minMatcherFee, matcherFeeAssetId = asset)
-              placeAndAwait(aliceOrder)
+              placeAndAwaitAtDex(aliceOrder)
 
               val reservedBalance1 = dex1.api.reservedBalance(alice)
               reservedBalance1(Waves) shouldBe orderAmount * price / 100000000
@@ -84,7 +84,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
         broadcastAndAwait(mkTransfer(bob, alice, wavesNode1.api.balance(bob, aliceAsset), aliceAsset))
 
         val pair = AssetPair(aliceAsset, Waves)
-        placeAndAwait(mkOrder(bob, pair, OrderType.BUY, amount = minMatcherFee, price, matcherFee = minMatcherFee, matcherFeeAssetId = aliceAsset))
+        placeAndAwaitAtDex(mkOrder(bob, pair, OrderType.BUY, amount = minMatcherFee, price, matcherFee = minMatcherFee, matcherFeeAssetId = aliceAsset))
       }
 
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {

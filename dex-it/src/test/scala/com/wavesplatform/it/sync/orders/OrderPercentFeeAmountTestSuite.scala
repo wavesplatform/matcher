@@ -68,12 +68,14 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
          |      min-fee = $percentFee
          |    }
          |  }
+         |  price-assets = [ "$UsdId" ]
          |}""".stripMargin
     )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
+    wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
+    dex1.start()
   }
 
   protected def createAccountWithBalance(balances: (Asset, Long)*): KeyPair = {
@@ -93,8 +95,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
       val accountBuyer  = createAccountWithBalance(usd   -> fullyAmountUsd)
       val accountSeller = createAccountWithBalance(Waves -> (fullyAmountWaves + minimalFee))
 
-      placeAndAwait(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
-      placeAndAwait(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, minimalFee, version = version))
+      placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
+      placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, minimalFee, version = version))
 
       balancesShouldBe(accountBuyer, usd  -> 0L, Waves             -> (fullyAmountWaves - minimalFee))
       balancesShouldBe(accountSeller, usd -> fullyAmountUsd, Waves -> 0L)
@@ -107,8 +109,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
       val accountBuyer  = createAccountWithBalance(usd   -> fullyAmountUsd)
       val accountSeller = createAccountWithBalance(Waves -> (partiallyAmountWaves + minimalFee))
 
-      placeAndAwait(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
-      placeAndAwait(mkOrder(accountSeller, wavesUsdPair, SELL, partiallyAmountWaves, price, minimalFee, version = version))
+      placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
+      placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, partiallyAmountWaves, price, minimalFee, version = version))
 
       balancesShouldBe(accountBuyer, usd  -> partiallyAmountUsd, Waves -> (partiallyAmountWaves - partiallyFeeWaves))
       balancesShouldBe(accountSeller, usd -> partiallyAmountUsd, Waves -> 0L)
@@ -123,8 +125,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
       val accountBuyer  = createAccountWithBalance(usd   -> fullyAmountUsd)
       val accountSeller = createAccountWithBalance(Waves -> (1.waves + fullyAmountWaves + tooHighFee))
 
-      placeAndAwait(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
-      placeAndAwait(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, tooHighFee, version = version))
+      placeAndAwaitAtDex(mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, minimalFee, version = version))
+      placeAndAwaitAtNode(mkOrder(accountSeller, wavesUsdPair, SELL, fullyAmountWaves, price, tooHighFee, version = version))
 
       balancesShouldBe(accountBuyer, usd  -> 0L, Waves             -> (fullyAmountWaves - minimalFee))
       balancesShouldBe(accountSeller, usd -> fullyAmountUsd, Waves -> 1.waves)

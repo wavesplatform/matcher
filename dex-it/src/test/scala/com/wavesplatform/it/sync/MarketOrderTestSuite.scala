@@ -432,7 +432,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val account = createAccountWithBalance { transfer -> usd }
 
-      placeAndAwait { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, matcherFeeAssetId = btc, version = 3) }
+      placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, matcherFeeAssetId = btc, version = 3) }
 
       dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, matcherFeeAssetId = btc)) should failWith(
         3147270,

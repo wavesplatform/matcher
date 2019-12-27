@@ -146,7 +146,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob places order on available amount of assets - order accepted
         val order3 = mkOrder(bob, aliceWavesPair, SELL, 150, 1900.waves)
-        placeAndAwait(order3)
+        placeAndAwaitAtDex(order3)
 
         // Bob checks that the order in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -208,7 +208,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = mkOrder(bob, aliceWavesPair, BUY, 130, 2000.waves)
-        placeAndAwait(order5, OrderStatus.PartiallyFilled)
+        placeAndAwaitAtDex(order5, OrderStatus.PartiallyFilled)
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -245,11 +245,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         def mkBobOrder = mkOrder(bob, bob1WavesPair, SELL, someAssetAmount, 0.005.waves)
 
         val order6 = mkBobOrder
-        placeAndAwait(order6)
+        placeAndAwaitAtDex(order6)
 
         // Alice wants to buy all Bob's assets for 1 Wave
         val order7 = mkOrder(alice, bob1WavesPair, BUY, someAssetAmount, 0.005.waves)
-        placeAndAwait(order7, OrderStatus.Filled)
+        placeAndAwaitAtDex(order7, OrderStatus.Filled)
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
@@ -264,7 +264,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob wants to sell all own assets for 1 Wave
         val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        placeAndAwait(order8)
+        placeAndAwaitAtDex(order8)
 
         // Bob moves all waves to Alice
         val transferAmount = bobWavesBalance - minFee

@@ -13,7 +13,7 @@ class TradingMarketsTestSuite extends MatcherSuiteBase {
 
   "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
-      placeAndAwait(mkOrder(alice, wctWavesPair, BUY, amount, price))
+      placeAndAwaitAtDex(mkOrder(alice, wctWavesPair, BUY, amount, price))
 
       dex1.restart()
 

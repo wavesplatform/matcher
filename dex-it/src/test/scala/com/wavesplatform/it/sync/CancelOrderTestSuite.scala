@@ -72,7 +72,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     "by sender" in {
       val order = mkBobOrder
-      placeAndAwait(order)
+      placeAndAwaitAtDex(order)
 
       dex1.api.cancel(bob, order)
       dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
@@ -84,7 +84,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
     "with API key" in {
       val order = mkBobOrder
-      placeAndAwait(order)
+      placeAndAwaitAtDex(order)
 
       dex1.api.cancelWithApiKey(order)
       dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
@@ -101,14 +101,14 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Cancel is rejected" - {
     "when order already cancelled" in {
       val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
-      placeAndAwait(order)
+      placeAndAwaitAtDex(order)
       cancelAndAwait(bob, order)
       dex1.api.tryCancel(bob, order) should failWith(9437194) // OrderCanceled
     }
 
     "when request sender is not the sender of and order" in {
       val order = mkBobOrder
-      placeAndAwait(order)
+      placeAndAwaitAtDex(order)
 
       val r = dex1.api.tryCancel(matcher, order)
       r shouldBe 'left

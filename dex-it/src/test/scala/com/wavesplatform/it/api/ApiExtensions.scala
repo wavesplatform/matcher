@@ -12,9 +12,16 @@ import scala.collection.immutable.TreeMap
 
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
-  protected def placeAndAwait(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted): OrderStatusResponse = {
+  protected def placeAndAwaitAtDex(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted): OrderStatusResponse = {
     dex1.api.place(order)
     dex1.api.waitForOrderStatus(order, expectedStatus)
+  }
+
+  protected def placeAndAwaitAtNode(order: Order,
+                                    dexApi: DexApi[Id] = dex1.api,
+                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api): Id[ExchangeTransaction] = {
+    dex1.api.place(order)
+    waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
   protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {

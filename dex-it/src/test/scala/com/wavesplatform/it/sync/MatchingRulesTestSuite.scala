@@ -95,7 +95,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
         dex1.api.orderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs
 
         val order = mkOrder(bob, pair, SELL, amount, price, matcherFee)
-        placeAndAwait(order)
+        placeAndAwaitAtDex(order)
 
         dex1.api.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
         dex1.api.cancel(bob, order)
@@ -132,18 +132,18 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
     // here tick size is disabled (offset = 12)
     val buyOrder1 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
-    placeAndAwait(buyOrder1)
+    placeAndAwaitAtDex(buyOrder1)
 
     // here tick size is disabled (offset = 13)
     val buyOrder2 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
-    placeAndAwait(buyOrder2)
+    placeAndAwaitAtDex(buyOrder2)
 
     val aliceUsdBalance = wavesNode1.api.balance(alice, usd)
     val aliceWctBalance = wavesNode1.api.balance(alice, wct)
 
     // here tick size = 5 (offset = 14), hence new order is placed into corrected price level 5, not 7
     val buyOrder3 = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
-    placeAndAwait(buyOrder3)
+    placeAndAwaitAtDex(buyOrder3)
 
     // now there are 2 price levels
     dex1.api.orderBook(wctUsdPair).bids.map(_.price) shouldBe Seq(7 * price, 5 * price)
@@ -174,15 +174,15 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 4 * price, matcherFee)
-    placeAndAwait(sellOrder)
+    placeAndAwaitAtDex(sellOrder)
 
     dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 5 * price))
 
     val anotherSellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 3 * price, matcherFee)
-    placeAndAwait(anotherSellOrder)
+    placeAndAwaitAtDex(anotherSellOrder)
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
-    placeAndAwait(buyOrder, OrderStatus.Filled)
+    placeAndAwaitAtDex(buyOrder, OrderStatus.Filled)
 
     waitForOrderAtNode(buyOrder)
 
@@ -210,12 +210,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
 
     val sellOrder = mkOrder(bob, wctUsdPair, SELL, amount, 15 * price, matcherFee)
-    placeAndAwait(sellOrder)
+    placeAndAwaitAtDex(sellOrder)
 
     dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelResponse(amount, 20 * price))
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, 2 * amount, 20 * price, matcherFee)
-    placeAndAwait(buyOrder, OrderStatus.PartiallyFilled)
+    placeAndAwaitAtDex(buyOrder, OrderStatus.PartiallyFilled)
     dex1.api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
 
     waitForOrderAtNode(buyOrder)

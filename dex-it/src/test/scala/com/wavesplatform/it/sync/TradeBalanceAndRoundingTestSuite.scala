@@ -42,7 +42,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      placeAndAwait(bobOrder1)
+      placeAndAwaitAtDex(bobOrder1)
       dex1.api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
       dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
@@ -129,13 +129,13 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
       dex1.api.tradableBalance(bob, wavesUsdPair)(Waves)
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount2, price2)
-      placeAndAwait(bobOrder1)
+      placeAndAwaitAtDex(bobOrder1)
 
       dex1.api.reservedBalance(bob)(Waves) shouldBe correctedSellAmount2 + matcherFee
       dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (correctedSellAmount2 + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount2, price2)
-      placeAndAwait(aliceOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder, OrderStatus.Filled)
 
       // Bob wants to buy some USD
       dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.PartiallyFilled)
@@ -155,10 +155,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val sellAmount = 56978
 
       val bobOrder = mkOrder(bob, wctUsdPair, SELL, sellAmount, sellPrice)
-      placeAndAwait(bobOrder)
+      placeAndAwaitAtDex(bobOrder)
 
       val aliceOrder = mkOrder(alice, wctUsdPair, BUY, buyAmount, buyPrice)
-      placeAndAwait(aliceOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder, OrderStatus.Filled)
 
       waitForOrderAtNode(aliceOrder)
       dex1.api.cancel(bob, bobOrder)
@@ -181,10 +181,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val bobWctInitBalance = wavesNode1.api.balance(bob, wct)
 
       val bobOrder = mkOrder(bob, wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice)
-      placeAndAwait(bobOrder)
+      placeAndAwaitAtDex(bobOrder)
 
       val aliceOrder = mkOrder(alice, wctUsdPair, BUY, wctUsdBuyAmount, wctUsdPrice)
-      placeAndAwait(aliceOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder, OrderStatus.Filled)
 
       waitForOrderAtNode(aliceOrder)
 
@@ -210,10 +210,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     "reserved balance is empty after the total execution" in {
       val aliceOrder = mkOrder(alice, wctUsdPair, BUY, 5000000, 100000)
-      placeAndAwait(aliceOrder)
+      placeAndAwaitAtDex(aliceOrder)
 
       val bobOrder = mkOrder(bob, wctUsdPair, SELL, 5000000, 99908)
-      placeAndAwait(bobOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(bobOrder, OrderStatus.Filled)
       dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
       waitForOrderAtNode(bobOrder)
@@ -245,7 +245,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
-      placeAndAwait(bobOrder)
+      placeAndAwaitAtDex(bobOrder)
 
       dex1.api.tradableBalance(bob, wctWavesPair)(Waves) shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
       dex1.api.cancel(bob, bobOrder)
@@ -259,10 +259,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   "Alice and Bob trade ETH-WAVES" - {
     "reserved balance is empty after the total execution" in {
       val counter1 = mkOrder(alice, ethWavesPair, SELL, 2864310, 300000)
-      placeAndAwait(counter1)
+      placeAndAwaitAtDex(counter1)
 
       val counter2 = mkOrder(alice, ethWavesPair, SELL, 7237977, 300000)
-      placeAndAwait(counter2)
+      placeAndAwaitAtDex(counter2)
 
       val submitted = mkOrder(bob, ethWavesPair, BUY, 4373667, 300000)
       dex1.api.place(submitted)
@@ -281,7 +281,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "Submitted order Canceled during match" in {
     val bobOrder = mkOrder(matcher, wavesUsdPair, OrderType.SELL, 10000000L, 10L)
-    placeAndAwait(bobOrder)
+    placeAndAwaitAtDex(bobOrder)
 
     val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000L, 1000L)
     dex1.api.place(aliceOrder)

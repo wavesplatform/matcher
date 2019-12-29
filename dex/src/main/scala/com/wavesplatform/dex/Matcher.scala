@@ -217,6 +217,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   )
 
   private val snapshotsRestore = Promise[Unit]()
+  snapshotsRestore.future.onComplete {
+    case Success(_) => log.info("Snapshots restored")
+    case Failure(_) => log.error("Can't restore snapshots")
+  }
 
   private lazy val db                  = openDB(settings.dataDir)
   private lazy val assetPairsDB        = AssetPairsDB(db)
@@ -240,6 +244,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             forceStopApplication(ErrorStartingMatcher)
 
           case Right((self, processedOffset)) =>
+            log.info("snapshotsRestore.trySuccess")
             snapshotsRestore.trySuccess(())
             matcherQueue.startConsume(
               processedOffset + 1,
@@ -358,16 +363,13 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       _                <- loadAllKnownAssets()
       hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
     } yield {
+      hasMatcherAccountScript = hasMatcherScript
+
       actorSystem.actorOf(
         CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
         CreateExchangeTransactionActor.name
       )
-
-      hasMatcherAccountScript = hasMatcherScript
-      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-      matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
-
-      log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
+      actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
       actorSystem.actorOf(
         ExchangeTransactionBroadcastActor
           .props(
@@ -379,7 +381,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         "exchange-transaction-broadcast"
       )
 
-      actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+      matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
+      log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
 
       for {
         _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)

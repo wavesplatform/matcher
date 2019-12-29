@@ -202,6 +202,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       orderBook.asks.filter(_.price == bestPrice) should be(empty)
       orderBook.asks should have size 2
+
+      waitForOrderAtNode(marketOrder)
     }
 
     "should be matched with order having the best price (SELL)" in {
@@ -227,6 +229,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.asks.filter(_.price == bestPrice) should be(empty)
       orderBook.bids.filter(order => order.price == secondPrice && order.amount == 10.waves) should have size 1
       orderBook.bids should have size 2
+
+      waitForOrderAtNode(marketOrder)
     }
 
     "should be removed from order book when the restriction by tokens count has been reached (BUY)" in {
@@ -236,7 +240,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketOrderAmount = 150.waves
       val ordersAmount      = 120.waves
 
-      val orders = placeOrders(alice, wavesUsdPair, SELL)(
+      placeOrders(alice, wavesUsdPair, SELL)(
         30.waves -> 0.3.usd,
         40.waves -> 0.4.usd,
         50.waves -> 0.5.usd,
@@ -251,7 +255,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       orderBook.asks should be(empty)
 
       /* market order fee value depends on matched orders in proportion */
-      orders.foreach(waitForOrderAtNode(_))
+      waitForOrderAtNode(marketOrder)
       eventually {
         wavesNode1.api.balance(bob, Waves) should be(bobWBefore + ordersAmount - fixedFee * ordersAmount / marketOrderAmount)
       }

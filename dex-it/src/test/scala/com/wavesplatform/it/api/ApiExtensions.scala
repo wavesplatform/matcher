@@ -19,7 +19,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtNode(order: Order,
                                     dexApi: DexApi[Id] = dex1.api,
-                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api): Id[ExchangeTransaction] = {
+                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] = {
     dex1.api.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
@@ -29,13 +29,13 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
 
-  protected def waitForOrderAtNode(order: Order, dexApi: DexApi[Id] = dex1.api, wavesNodeApi: NodeApi[Id] = wavesNode1.api): Id[ExchangeTransaction] =
+  protected def waitForOrderAtNode(order: Order, dexApi: DexApi[Id] = dex1.api, wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] =
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
-  protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Id[ExchangeTransaction] = {
-    val tx = dex1.api.waitForTransactionsByOrder(orderId, 1).head
-    wavesNodeApi.waitForTransaction(tx.id())
-    tx
+  protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] = {
+    val txs = dex1.api.waitForTransactionsByOrder(orderId, 1)
+    txs.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
+    txs
   }
 
   protected def matcherState(assetPairs: Seq[AssetPair],

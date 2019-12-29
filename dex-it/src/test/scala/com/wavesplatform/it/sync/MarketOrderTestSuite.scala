@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
@@ -65,14 +66,16 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   }
 
   override protected def afterEach(): Unit = {
+    super.afterEach()
     dex1.api.cancelAll(alice)
     dex1.api.cancelAll(bob)
   }
 
   def placeOrders(sender: KeyPair, pair: AssetPair, orderType: OrderType, feeMode: FeeMode = FIXED)(orders: (Long, Long)*): Seq[Order] = {
+    val now = System.currentTimeMillis
     orders.zipWithIndex.map {
       case ((amount, price), idx) =>
-        val o = mkOrder(sender, pair, orderType, amount, price, version = 3: Byte, matcherFee = getFee(feeMode), ts = System.currentTimeMillis + idx)
+        val o = mkOrder(sender, pair, orderType, amount, price, version = 3: Byte, matcherFee = getFee(feeMode), ts = now + idx)
         dex1.api.place(o)
         o
     }
@@ -85,7 +88,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
   }
 
   def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
+    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
       case (balance, asset) =>

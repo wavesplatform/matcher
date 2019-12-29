@@ -83,7 +83,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       withClue("Cleanup") {
         dex1.api.orderBook(wctWavesPair).bids shouldNot be(empty)
-        dex1.api.cancel(bob, correctBobOrder)
+        dex1.api.cancelAll(bob)
         dex1.api.waitForOrderStatus(correctBobOrder, OrderStatus.Cancelled)
       }
     }
@@ -112,7 +112,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
             withClue("Cleanup\n") {
               wavesNode1.api.waitForTransaction(transferTx)
-              dex1.api.cancel(bob, oldestOrder)
+              dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
               broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
             }
@@ -140,7 +140,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
             withClue("Cleanup") {
               wavesNode1.api.waitForTransaction(lease)
-              dex1.api.cancel(bob, oldestOrder)
+              dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
               broadcastAndAwait(mkLeaseCancel(bob, lease.id.value))
             }
@@ -168,7 +168,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
             withClue("Cleanup") {
               wavesNode1.api.waitForTransaction(transferTx)
-              dex1.api.cancel(bob, oldestOrder)
+              dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
               broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
             }
@@ -196,7 +196,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           withClue("Cleanup") {
             wavesNode1.api.waitForTransaction(lease)
-            dex1.api.cancel(bob, oldestOrder)
+            dex1.api.cancelAll(bob)
             dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
             broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
           }

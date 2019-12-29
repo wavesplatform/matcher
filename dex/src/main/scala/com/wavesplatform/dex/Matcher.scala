@@ -383,7 +383,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
       for {
         _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-        deadline = settings.startEventsProcessingTimeout.fromNow
+        deadline = {
+          log.info("Getting last queue offset")
+          settings.startEventsProcessingTimeout.fromNow
+        }
         lastOffsetQueue <- getLastOffset(deadline)
         _ = log.info(s"Last queue offset is $lastOffsetQueue")
         _ <- waitOffsetReached(lastOffsetQueue, deadline)

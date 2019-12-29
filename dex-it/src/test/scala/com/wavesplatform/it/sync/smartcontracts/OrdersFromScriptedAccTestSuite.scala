@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -18,7 +19,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
        |  utx.allow-skip-checks = false
        |
        |  blockchain.custom.functionality.pre-activated-features = {
-       |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight,
+       |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
        |    ${BlockchainFeatures.SmartAssets.id} = 1000
        |  }
        |}""".stripMargin
@@ -51,8 +52,11 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "invalid setScript at account" in {
-      wavesNode1.api.waitForHeight(activationHeight)
+      wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
+        x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
+      })
       updateBobScript("true && (height > 0)")
+      Thread.sleep(1000) // TODO Sometimes fail without this awaiting, probably issue in the cache
       dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
         3147521, // AccountScriptException
         "An access to the blockchain.height is denied on DEX"

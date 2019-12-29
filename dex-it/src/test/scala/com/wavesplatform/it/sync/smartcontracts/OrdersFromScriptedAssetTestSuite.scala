@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
@@ -60,7 +61,12 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     waitForOrderAtNode(submitted)
   }
 
-  "wait activation" in wavesNode1.api.waitForHeight(activationHeight)
+  "wait activation" in {
+    wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
+      x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
+    })
+    Thread.sleep(1000) // TODO See OrdersFromScriptedAccTestSuite
+  }
 
   "can place if the script returns TRUE" in {
     val pair    = AssetPair(unscriptedAsset, allowAsset)

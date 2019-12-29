@@ -18,6 +18,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
+import monix.execution.atomic.AtomicBoolean
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
@@ -53,15 +54,23 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
       .mapValues { _.map { case (_, asset, balance) => asset -> balance }.toMap.withDefaultValue(0) }
   }
 
-  private val balanceChangesObserver: StreamObserver[BalanceChangesResponse] =
-    new StreamObserver[BalanceChangesResponse] {
-      override def onCompleted(): Unit                         = log.info("Balance changes stream completed!")
-      override def onNext(value: BalanceChangesResponse): Unit = spendableBalanceChangesSubject.onNext(groupByAddress(value))
-      override def onError(t: Throwable): Unit = {
-        channel.resetConnectBackoff()
-        requestBalanceChanges()
-      }
+  private val isConnectionEstablished: AtomicBoolean = AtomicBoolean(true)
+
+  private val balanceChangesObserver: StreamObserver[BalanceChangesResponse] = new StreamObserver[BalanceChangesResponse] {
+
+    override def onCompleted(): Unit = log.info("Balance changes stream completed!")
+
+    override def onNext(value: BalanceChangesResponse): Unit = {
+      if (isConnectionEstablished.compareAndSet(false, true)) log.info("Connection with Node restored!")
+      spendableBalanceChangesSubject.onNext(groupByAddress(value))
     }
+
+    override def onError(t: Throwable): Unit = {
+      if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", t)
+      channel.resetConnectBackoff()
+      requestBalanceChanges()
+    }
+  }
 
   /** Performs new gRPC call for receiving of the spendable balance changes stream */
   private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)

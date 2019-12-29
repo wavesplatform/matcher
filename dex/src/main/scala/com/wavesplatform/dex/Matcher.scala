@@ -55,8 +55,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
 
-  private def matcherPublicKey: PublicKey = matcherKeyPair
-  @volatile private var lastProcessedOffset   = -1L
+  private def matcherPublicKey: PublicKey   = matcherKeyPair
+  @volatile private var lastProcessedOffset = -1L
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
@@ -358,45 +358,42 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
+    actorSystem.actorOf(
+      CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
+      CreateExchangeTransactionActor.name
+    )
+    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    actorSystem.actorOf(
+      ExchangeTransactionBroadcastActor
+        .props(
+          settings.exchangeTransactionBroadcast,
+          time,
+          wavesBlockchainAsyncClient.wereForged,
+          wavesBlockchainAsyncClient.broadcastTx
+        ),
+      "exchange-transaction-broadcast"
+    )
+
     val startGuard = for {
       apiKeyHash       <- checkApiKeyHash()
       _                <- loadAllKnownAssets()
       hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
-    } yield {
-      hasMatcherAccountScript = hasMatcherScript
-
-      actorSystem.actorOf(
-        CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
-        CreateExchangeTransactionActor.name
-      )
-      actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
-      actorSystem.actorOf(
-        ExchangeTransactionBroadcastActor
-          .props(
-            settings.exchangeTransactionBroadcast,
-            time,
-            wavesBlockchainAsyncClient.wereForged,
-            wavesBlockchainAsyncClient.broadcastTx
-          ),
-        "exchange-transaction-broadcast"
-      )
-
-      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-      matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
-      log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-
-      for {
-        _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-        deadline = {
-          log.info("Getting last queue offset")
-          settings.startEventsProcessingTimeout.fromNow
-        }
-        lastOffsetQueue <- getLastOffset(deadline)
-        _ = log.info(s"Last queue offset is $lastOffsetQueue")
-        _ <- waitOffsetReached(lastOffsetQueue, deadline)
-        _ = log.info("Last offset has been reached, notify addresses")
-      } yield addressActors ! AddressDirectory.StartSchedules
-    }
+      _ <- Future {
+        hasMatcherAccountScript = hasMatcherScript
+        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
+        log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
+      }
+      _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
+      deadline = {
+        log.info("Getting last queue offset")
+        settings.startEventsProcessingTimeout.fromNow
+      }
+      lastOffsetQueue <- getLastOffset(deadline)
+      _ = log.info(s"Last queue offset is $lastOffsetQueue")
+      _ <- waitOffsetReached(lastOffsetQueue, deadline)
+      _ = log.info("Last offset has been reached, notify addresses")
+    } yield addressActors ! AddressDirectory.StartSchedules
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)

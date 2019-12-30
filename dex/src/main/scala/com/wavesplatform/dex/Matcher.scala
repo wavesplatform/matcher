@@ -217,10 +217,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   )
 
   private val snapshotsRestore = Promise[Unit]()
-  snapshotsRestore.future.onComplete {
-    case Success(_) => log.info("Snapshots restored")
-    case Failure(_) => log.error("Can't restore snapshots")
-  }
 
   private lazy val db                  = openDB(settings.dataDir)
   private lazy val assetPairsDB        = AssetPairsDB(db)
@@ -244,7 +240,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
             forceStopApplication(ErrorStartingMatcher)
 
           case Right((self, processedOffset)) =>
-            log.info("snapshotsRestore.trySuccess")
             snapshotsRestore.trySuccess(())
             matcherQueue.startConsume(
               processedOffset + 1,
@@ -370,7 +365,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       "exchange-transaction-broadcast"
     )
 
-    log.info("checkApiKeyHash")
     val startGuard = for {
       apiKeyHash <- checkApiKeyHash()
       _ <- {
@@ -418,14 +412,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
-    val failure = Promise[Unit]()
-    actorSystem.scheduler.scheduleOnce(timeout) {
-      failure.failure(new TimeoutException(s"Can't restore snapshots in ${timeout.toSeconds} seconds"))
-    }
-
-    Future.firstCompletedOf[Unit](List(snapshotsRestore.future, failure.future))
-  }
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>
@@ -450,6 +437,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     val p = Promise[Unit]()
     loop(p)
     p.future
+  }
+
+  private def timeout(after: FiniteDuration): Future[Nothing] = {
+    val failure = Promise[Nothing]()
+    actorSystem.scheduler.scheduleOnce(after) {
+      failure.failure(new TimeoutException(s"$after is out"))
+    }
+    failure.future
   }
 }
 

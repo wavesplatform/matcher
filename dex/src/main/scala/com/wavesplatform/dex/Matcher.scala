@@ -30,11 +30,12 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.extensions.Extension
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{ErrorStartingMatcher, NTP, ScorexLogging, forceStopApplication}
+import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._

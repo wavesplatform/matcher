@@ -13,10 +13,11 @@ import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory

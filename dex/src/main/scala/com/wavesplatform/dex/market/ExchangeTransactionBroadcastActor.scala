@@ -7,8 +7,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal

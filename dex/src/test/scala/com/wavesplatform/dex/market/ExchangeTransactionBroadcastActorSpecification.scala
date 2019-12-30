@@ -11,11 +11,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, ExchangeTransactionV2, Order}
-import com.wavesplatform.utils.Time
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually

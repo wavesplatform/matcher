@@ -23,9 +23,10 @@ import com.wavesplatform.dex.market.{BatchOrderCancelActor, CreateExchangeTransa
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
@@ -448,7 +449,7 @@ object AddressActor {
     /**
       * @param newBalance Contains a new amount of changed assets
       */
-    case class CancelNotEnoughCoinsOrders(newBalance: Map[Asset, Long])  extends Command
+    case class CancelNotEnoughCoinsOrders(newBalance: Map[Asset, Long]) extends Command
   }
 
   sealed trait Event {

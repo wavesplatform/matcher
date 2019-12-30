@@ -7,9 +7,9 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized, Normalized}
 import com.wavesplatform.dex.model.{OrderBook, OrderBookResult}
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.Time
 import kamon.Kamon
 
 import scala.collection.JavaConverters._

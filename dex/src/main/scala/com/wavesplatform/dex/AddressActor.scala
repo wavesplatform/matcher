@@ -330,12 +330,11 @@ class AddressActor(owner: Address,
       .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {
         case ((restBalance, toDelete), (order, requiredBalance)) =>
-          val id = order.id()
           trySubtract(restBalance, requiredBalance) match {
             case Right(updatedRestBalance) => (updatedRestBalance, toDelete)
             case Left((insufficientAmount, assetId)) =>
               val updatedToDelete =
-                if (cancellationInProgress(id)) toDelete
+                if (cancellationInProgress(order.id())) toDelete
                 else toDelete.enqueue(InsufficientBalanceOrder(order, -insufficientAmount, assetId))
               (restBalance, updatedToDelete)
           }

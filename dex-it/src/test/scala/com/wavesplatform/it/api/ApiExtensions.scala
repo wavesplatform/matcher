@@ -7,6 +7,7 @@ import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import mouse.any._
 
 import scala.collection.immutable.TreeMap
 
@@ -29,14 +30,15 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
 
-  protected def waitForOrderAtNode(order: Order, dexApi: DexApi[Id] = dex1.api, wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] =
+  protected def waitForOrderAtNode(order: Order,
+                                   dexApi: DexApi[Id] = dex1.api,
+                                   wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] =
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
-  protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] = {
-    val txs = dex1.api.waitForTransactionsByOrder(orderId, 1)
-    txs.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
-    txs
-  }
+  protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
+    dex1.api.waitForTransactionsByOrder(orderId, 1).unsafeTap {
+      _.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
+    }
 
   protected def matcherState(assetPairs: Seq[AssetPair],
                              orders: IndexedSeq[Order],

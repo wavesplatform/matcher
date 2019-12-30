@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
-import java.util.Properties
-
+import cats.instances.FutureInstances
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
@@ -13,12 +12,10 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.it.api.ApiExtensions
 import com.wavesplatform.utils.ScorexLogging
-import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import org.scalatest._
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration.DurationInt
-import scala.collection.JavaConverters._
 
 abstract class MatcherSuiteBase
     extends FreeSpec
@@ -39,6 +36,7 @@ abstract class MatcherSuiteBase
     with PredefinedAccounts
     with DiffMatcherWithImplicits
     with InformativeTestStart
+    with FutureInstances
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()
@@ -61,25 +59,4 @@ abstract class MatcherSuiteBase
     stopBaseContainers()
     super.afterAll()
   }
-
-  private def createKafkaTopic(name: String): Unit = kafkaServer.foreach { server =>
-    val properties = new Properties()
-    properties.putAll(
-      Map(
-        "bootstrap.servers"  -> server,
-        "group.id"           -> s"create-$name",
-        "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
-        "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
-      ).asJava)
-
-    val adminClient = AdminClient.create(properties)
-    try {
-      val newTopic = new NewTopic(name, 1, 1.toShort)
-      adminClient.createTopics(java.util.Collections.singletonList(newTopic))
-    } finally {
-      adminClient.close()
-    }
-  }
-
-  private def kafkaServer: Option[String] = Option(System.getenv("KAFKA_SERVER"))
 }

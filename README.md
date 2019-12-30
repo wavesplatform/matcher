@@ -352,7 +352,7 @@ If all of these points are true:
 
 1. You are using Kafka queue
 2. Have a lot of Place and Cancel requests
-3. You face an issues when Consumer or Producer can't connect to Kafka
+3. You face issues when Consumer or Producer can't connect to Kafka
 
 There are recommendations for the OS-related system the DEX server runs on.
 Note, it is not recommended to change this options if you aren't face the issue.

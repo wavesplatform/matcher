@@ -65,7 +65,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends MatcherSuit
          |    mode = $PERCENT
          |    $PERCENT {
          |      asset-type = $assetType
-         |      min-fee = $percentFee
+         |      min-fee = 25
          |    }
          |  }
          |  price-assets = [ "$UsdId" ]

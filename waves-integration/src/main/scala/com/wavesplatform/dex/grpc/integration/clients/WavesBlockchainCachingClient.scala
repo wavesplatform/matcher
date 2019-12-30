@@ -48,7 +48,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   override def runScript(asset: Asset.IssuedAsset, input: ExchangeTransaction): Future[RunScriptResult] = underlying.runScript(asset, input)
   override def hasScript(address: Address): Future[Boolean]                                             = underlying.hasScript(address)
   override def runScript(address: Address, input: Order): Future[RunScriptResult]                       = underlying.runScript(address, input)
-  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]                            = underlying.wereForged(txIds)
+  override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]                           = underlying.wereForged(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean]                                    = underlying.broadcastTx(tx)
   override def forgedOrder(orderId: ByteStr): Future[Boolean]                                           = underlying.forgedOrder(orderId)
 }

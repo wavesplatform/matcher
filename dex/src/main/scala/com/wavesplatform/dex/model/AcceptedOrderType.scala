@@ -2,7 +2,7 @@ package com.wavesplatform.dex.model
 
 import play.api.libs.json._
 
-// TODO Rename OrderType to OrderSide and AcceptedOrderType to OrderType in master
+// TODO Rename OrderType to OrderSide and AcceptedOrderType to OrderType in master after DEX-526
 sealed trait AcceptedOrderType
 
 object AcceptedOrderType {

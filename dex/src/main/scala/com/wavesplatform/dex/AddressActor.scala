@@ -107,17 +107,22 @@ class AddressActor(owner: Address,
 
     case command: Command.CancelAllOrders =>
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.order.id())
-      log.trace(s"Got $command, ${if (toCancelIds.isEmpty) "nothing to cancel" else s"to cancel: ${toCancelIds.mkString(", ")}"}")
-      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(Map.empty)
-      else context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, batchCancelTimeout))
+      if (toCancelIds.isEmpty) {
+        log.trace(s"Got $command, nothing to cancel")
+        sender ! api.BatchCancelCompleted(Map.empty)
+      } else {
+        log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, batchCancelTimeout))
+      }
 
     case command: Command.CancelNotEnoughCoinsOrders =>
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
-      if (toCancel.nonEmpty) {
+      if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
+      else {
         val msg = toCancel
           .map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}")
           .mkString(", ")
-        log.debug(s"Canceling ${toCancel.size} of ${activeOrders.size} (not enough balance): doesn't have $msg")
+        log.debug(s"Got $command, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $msg")
         toCancel.foreach(x => cancel(x.order))
       }
 
@@ -440,6 +445,10 @@ object AddressActor {
 
     case class CancelOrder(orderId: ByteStr)                             extends OneOrderCommand
     case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
+
+    /**
+      * @param newBalance Contains a new amount of changed assets
+      */
     case class CancelNotEnoughCoinsOrders(newBalance: Map[Asset, Long])  extends Command
   }
 

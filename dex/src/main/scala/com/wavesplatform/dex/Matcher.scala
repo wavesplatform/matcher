@@ -331,14 +331,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     materializer.shutdown()
     log.debug("Matcher's actor system has been shut down")
     db.close()
-    log.debug("Matcher's database closed")
     log.info("Matcher shutdown successful")
   }
 
   override def start(): Unit = {
-
-    log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
-
     def loadAllKnownAssets(): Future[Unit] = {
       val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++ settings.mentionedAssets
 
@@ -374,22 +370,36 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       "exchange-transaction-broadcast"
     )
 
+    log.info("checkApiKeyHash")
     val startGuard = for {
-      apiKeyHash       <- checkApiKeyHash()
-      _                <- loadAllKnownAssets()
-      hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
-      _ <- Future {
+      apiKeyHash <- checkApiKeyHash()
+      _ <- {
+        log.info("Loading known assets ...")
+        loadAllKnownAssets()
+      }
+      hasMatcherScript <- {
+        log.info("Checking matcher's account script ...")
+        wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
+      }
+      serverBinding <- {
         hasMatcherAccountScript = hasMatcherScript
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-        matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
-        log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
+        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
+        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
       }
-      _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-      deadline = {
-        log.info("Getting last queue offset")
-        settings.startEventsProcessingTimeout.fromNow
+      _ = {
+        matcherServerBinding = serverBinding
+        log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
       }
-      lastOffsetQueue <- getLastOffset(deadline)
+      _ <- {
+        log.info("Waiting all snapshots are restored ...")
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
+      }
+      deadline = settings.startEventsProcessingTimeout.fromNow
+      lastOffsetQueue <- {
+        log.info("Getting last queue offset ...")
+        getLastOffset(deadline)
+      }
       _ = log.info(s"Last queue offset is $lastOffsetQueue")
       _ <- waitOffsetReached(lastOffsetQueue, deadline)
       _ = log.info("Last offset has been reached, notify addresses")

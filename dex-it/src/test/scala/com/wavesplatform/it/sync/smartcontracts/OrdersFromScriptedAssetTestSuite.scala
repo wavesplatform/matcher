@@ -65,7 +65,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
       x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
     })
-    Thread.sleep(1000) // TODO See OrdersFromScriptedAccTestSuite
+    Thread.sleep(3000) // TODO See OrdersFromScriptedAccTestSuite
   }
 
   "can place if the script returns TRUE" in {

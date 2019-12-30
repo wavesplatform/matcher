@@ -31,6 +31,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     dex1.start()
   }
 
+  // TODO DEX-547
   "order should be rejected with correct code and message when price is more then Long volume" ignore {
 //    val tooHighPrice = "10000000000000000000"
 //    dex1.api.tryPlace(

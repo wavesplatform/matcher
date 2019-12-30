@@ -23,8 +23,6 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
     extends WavesBlockchainClient[Future]
     with ScorexLogging {
 
-  log.info("1")
-
   private val cacheExpiration: Duration = Duration.ofMillis(defaultCacheExpiration.toMillis)
 
   private val balancesCache          = new BalancesCache(underlying.spendableBalance)
@@ -42,8 +40,6 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
     }
     underlying.spendableBalanceChanges
   }
-
-  log.info("2")
 
   override def spendableBalance(address: Address, asset: Asset): Future[Long]                           = balancesCache.get(address -> asset).map(_.toLong)
   override def isFeatureActivated(id: Short): Future[Boolean]                                           = featuresCache.get(id) map Boolean2boolean

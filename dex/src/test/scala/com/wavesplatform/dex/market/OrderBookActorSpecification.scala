@@ -36,11 +36,6 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val txFactory = new ExchangeTransactionCreator(MatcherAccount,
-                                                         matcherSettings,
-                                                         false,
-                                                         _ => false)
-
   private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
 
@@ -88,7 +83,6 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        txFactory.createTransaction,
         ntpTime,
         matchingRules,
         _ => (),

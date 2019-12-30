@@ -8,7 +8,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.it.api.responses.node.{AssetBalanceResponse, ConnectedPeersResponse, WavesBalanceResponse}
+import com.wavesplatform.dex.it.api.responses.node.{ActivationStatusResponse, AssetBalanceResponse, ConnectedPeersResponse, WavesBalanceResponse}
 import com.wavesplatform.dex.it.fp.CanExtract
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -40,6 +40,7 @@ object NodeApiOps {
         else throw new RuntimeException(s"Unexpected error: $e")
     }
 
+    def activationStatus: F[ActivationStatusResponse] = explicitGet(self.tryActivationStatus)
     def config: F[Config] = explicitGet(self.tryConfig)
   }
 }

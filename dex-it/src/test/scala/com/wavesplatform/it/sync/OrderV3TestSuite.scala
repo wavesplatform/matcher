@@ -25,7 +25,7 @@ class OrderV3TestSuite extends MatcherSuiteBase {
 
     "matching orderV1 and orderV3" in {
       val orderV1 = mkOrder(alice, wavesUsdPair, OrderType.BUY, 3, price, version = 1)
-      placeAndAwait(orderV1)
+      placeAndAwaitAtDex(orderV1)
 
       dex1.restartWithNewSuiteConfig(allowedOrderVersion(1, 2, 3))
 

@@ -31,6 +31,23 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
     dex1.start()
   }
 
+  // TODO DEX-547
+  "order should be rejected with correct code and message when price is more then Long volume" ignore {
+//    val tooHighPrice = "10000000000000000000"
+//    dex1.api.tryPlace(
+//      mkOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000000000000000L).json.value() ++ Json.obj("price" -> tooHighPrice),
+//      "The provided JSON contains invalid fields: /price. Check the documentation"
+//    )
+  }
+
+  "order should be rejected with correct code and message when amount is more then Long volume" ignore {
+//    val tooLargeAmount = "10000000000000000000"
+//    dex1.api.tryPlace(
+//      mkOrder(alice, wavesUsdPair, SELL, 1000000000L, 1000000L).json.value() ++ Json.obj("amount" -> tooLargeAmount),
+//      "The provided JSON contains invalid fields: /amount. Check the documentation"
+//    )
+  }
+
   "order info returns information event there is no such order book" in {
     dex1.api.orderBookInfo(ethBtcPair).restrictions shouldBe empty
     dex1.api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
@@ -87,7 +104,7 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "valid order" in {
-    placeAndAwait(mkOrder(alice, wctUsdPair, BUY, 100000000, 100000, matcherFee))
+    placeAndAwaitAtDex(mkOrder(alice, wctUsdPair, BUY, 100000000, 100000, matcherFee))
   }
 
   "order restrictions endpoints" in {

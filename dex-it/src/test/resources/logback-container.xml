@@ -40,6 +40,7 @@
     <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE" additivity="false">
         <appender-ref ref="FILE"/>
     </logger>
+    <logger name="org.apache.kafka.common.metrics.Metrics" level="INFO"/>
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG" additivity="false">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>

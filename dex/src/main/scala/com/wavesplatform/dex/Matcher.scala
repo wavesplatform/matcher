@@ -55,9 +55,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
   }
 
-  private def matcherPublicKey: PublicKey = matcherKeyPair
+  private def matcherPublicKey: PublicKey   = matcherKeyPair
+  @volatile private var lastProcessedOffset = -1L
 
-  @volatile private var lastProcessedOffset   = -1L
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
@@ -111,7 +111,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
       settings,
-      transactionCreator.createTransaction,
       time,
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
@@ -201,7 +200,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
           }
           .map { _.collect { case Right(version) => version } }
-      ),
+      )(actorSystem),
       MatcherApiRouteV1(
         pairBuilder,
         orderBooksSnapshotCache,
@@ -296,7 +295,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
-                settings.actorResponseTimeout,
                 time,
                 orderDB,
                 wavesBlockchainAsyncClient.forgedOrder,
@@ -328,14 +326,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     materializer.shutdown()
     log.debug("Matcher's actor system has been shut down")
     db.close()
-    log.debug("Matcher's database closed")
     log.info("Matcher shutdown successful")
   }
 
   override def start(): Unit = {
-
-    log.info(s"Starting matcher on: ${settings.restApi.address}:${settings.restApi.port} ...")
-
     def loadAllKnownAssets(): Future[Unit] = {
       val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++ settings.mentionedAssets
 
@@ -355,39 +349,55 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
+    actorSystem.actorOf(
+      CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
+      CreateExchangeTransactionActor.name
+    )
+    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    actorSystem.actorOf(
+      ExchangeTransactionBroadcastActor
+        .props(
+          settings.exchangeTransactionBroadcast,
+          time,
+          wavesBlockchainAsyncClient.wereForged,
+          wavesBlockchainAsyncClient.broadcastTx
+        ),
+      "exchange-transaction-broadcast"
+    )
+
     val startGuard = for {
-      apiKeyHash       <- checkApiKeyHash()
-      _                <- loadAllKnownAssets()
-      hasMatcherScript <- wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
-    } yield {
-
-      hasMatcherAccountScript = hasMatcherScript
-      val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-      matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port), 5.seconds)
-
-      log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
-      actorSystem.actorOf(
-        ExchangeTransactionBroadcastActor
-          .props(
-            settings.exchangeTransactionBroadcast,
-            time,
-            wavesBlockchainAsyncClient.wasForged,
-            wavesBlockchainAsyncClient.broadcastTx
-          ),
-        "exchange-transaction-broadcast"
-      )
-
-      actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
-
-      for {
-        _ <- waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-        deadline = settings.startEventsProcessingTimeout.fromNow
-        lastOffsetQueue <- getLastOffset(deadline)
-        _ = log.info(s"Last queue offset is $lastOffsetQueue")
-        _ <- waitOffsetReached(lastOffsetQueue, deadline)
-        _ = log.info("Last offset has been reached, notify addresses")
-      } yield addressActors ! AddressDirectory.StartSchedules
-    }
+      apiKeyHash <- checkApiKeyHash()
+      _ <- {
+        log.info("Loading known assets ...")
+        loadAllKnownAssets()
+      }
+      hasMatcherScript <- {
+        log.info("Checking matcher's account script ...")
+        wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
+      }
+      serverBinding <- {
+        hasMatcherAccountScript = hasMatcherScript
+        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
+        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+      }
+      _ = {
+        matcherServerBinding = serverBinding
+        log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+      }
+      _ <- {
+        log.info("Waiting all snapshots are restored ...")
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
+      }
+      deadline = settings.startEventsProcessingTimeout.fromNow
+      lastOffsetQueue <- {
+        log.info("Getting last queue offset ...")
+        getLastOffset(deadline)
+      }
+      _ = log.info(s"Last queue offset is $lastOffsetQueue")
+      _ <- waitOffsetReached(lastOffsetQueue, deadline)
+      _ = log.info("Last offset has been reached, notify addresses")
+    } yield addressActors ! AddressDirectory.StartSchedules
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)
@@ -402,19 +412,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
-    val failure = Promise[Unit]()
-    actorSystem.scheduler.scheduleOnce(timeout) {
-      failure.failure(new TimeoutException(s"Can't restore snapshots in ${timeout.toSeconds} seconds"))
-    }
-
-    Future.firstCompletedOf[Unit](List(snapshotsRestore.future, failure.future))
-  }
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>
       log.warn(s"During receiving last offset", e)
-      if (deadline.isOverdue()) Future.failed(new RuntimeException("Can't get the last offset from queue", e))
+      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
       else getLastOffset(deadline)
 
     case e: Throwable =>
@@ -434,6 +437,14 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     val p = Promise[Unit]()
     loop(p)
     p.future
+  }
+
+  private def timeout(after: FiniteDuration): Future[Nothing] = {
+    val failure = Promise[Nothing]()
+    actorSystem.scheduler.scheduleOnce(after) {
+      failure.failure(new TimeoutException(s"$after is out"))
+    }
+    failure.future
   }
 }
 

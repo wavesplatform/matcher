@@ -37,6 +37,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
 
   def tryCurrentHeight: F[Either[ErrorResponse, Int]]
 
+  def tryActivationStatus: F[Either[ErrorResponse, ActivationStatusResponse]]
   def tryConfig: F[Either[ErrorResponse, Config]]
 
   def tryConnect(toNode: InetSocketAddress): F[Either[ErrorResponse, Unit]]
@@ -48,6 +49,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
   def waitForTransaction(id: ByteStr): F[Unit]
   def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.id.value)
+  def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit]
 }
 
 object NodeApi {
@@ -76,6 +78,9 @@ object NodeApi {
       override def tryCurrentHeight: F[Either[ErrorResponse, Int]] =
         tryParseJson[HeightResponse](sttp.get(uri"$apiUri/blocks/height")).map(_.map(_.height))
 
+      override def tryActivationStatus: F[Either[ErrorResponse, ActivationStatusResponse]] =
+        tryParseJson[ActivationStatusResponse](sttp.get(uri"$apiUri/activation/status"))
+
       override def tryConfig: F[Either[ErrorResponse, Config]] = tryParse(sttp.get(uri"$apiUri/blocks/height").response(asConfig))
 
       override def tryConnect(toNode: InetSocketAddress): F[Either[ErrorResponse, Unit]] = tryUnit {
@@ -94,6 +99,12 @@ object NodeApi {
 
       override def waitForTransaction(id: ByteStr): F[Unit] = repeatUntil(tryTransactionInfo(id))(_.isRight).map(_ => ())
 
+      override def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit] =
+        repeatUntil(tryActivationStatus, RepeatRequestOptions(1.second, 180)) {
+          case Right(x) => f(x)
+          case _        => false
+        }.map(_ => ())
+
       override def waitForHeightArise(): F[Unit] =
         tryCurrentHeight
           .flatMap {
@@ -106,12 +117,10 @@ object NodeApi {
           }
 
       override def waitForHeight(height: Int): F[Unit] =
-        FOps[F]
-          .repeatUntil(tryCurrentHeight, 1.second) {
-            case Right(x) => x >= height
-            case _        => false
-          }
-          .map(_ => ())
+        repeatUntil(tryCurrentHeight, 1.second) {
+          case Right(x) => x >= height
+          case _        => false
+        }.map(_ => ())
 
       override def waitReady: F[Unit] = {
         // TODO hack, replace with socket's waitReady

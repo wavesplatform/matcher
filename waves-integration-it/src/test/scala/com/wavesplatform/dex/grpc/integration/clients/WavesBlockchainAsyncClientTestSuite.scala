@@ -115,12 +115,12 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   "wasForged" - {
     "false for unknown tx" in {
-      wait(client.wasForged(Seq(BtcId))).values.head shouldBe false
+      wait(client.wereForged(Seq(BtcId))).values.head shouldBe false
     }
 
     "true for forged tx" in {
       broadcastAndAwait(IssueBtcTx)
-      wait(client.wasForged(Seq(BtcId))).values.head shouldBe true
+      wait(client.wereForged(Seq(BtcId))).values.head shouldBe true
     }
   }
 

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.market
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef}
 import com.typesafe.config.ConfigFactory
@@ -45,7 +47,7 @@ class ExchangeTransactionBroadcastActorSpecification
       var broadcasted = Seq.empty[ExchangeTransaction]
       defaultActor(
         ntpTime,
-        isConfirmed = _ => getConfirmation(false),
+        confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
           Future.successful(true)
@@ -63,7 +65,7 @@ class ExchangeTransactionBroadcastActorSpecification
       var broadcasted = Seq.empty[ExchangeTransaction]
       val actor = defaultActor(
         ntpTime,
-        isConfirmed = _ => getConfirmation(false),
+        confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
           Future.successful(true)
@@ -75,8 +77,8 @@ class ExchangeTransactionBroadcastActorSpecification
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
-      actor ! ExchangeTransactionBroadcastActor.Send
-      actor ! ExchangeTransactionBroadcastActor.Send
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
       eventually {
         broadcasted shouldBe Seq(event.tx)
       }
@@ -87,7 +89,7 @@ class ExchangeTransactionBroadcastActorSpecification
       val actor =
         defaultActor(
           ntpTime,
-          isConfirmed = _ => getConfirmation(true),
+          confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
             Future.successful(true)
@@ -98,8 +100,8 @@ class ExchangeTransactionBroadcastActorSpecification
       system.eventStream.publish(event)
       broadcasted = Seq.empty
 
-      actor ! ExchangeTransactionBroadcastActor.Send
-      actor ! ExchangeTransactionBroadcastActor.Send
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
       eventually {
         broadcasted shouldBe empty
       }
@@ -110,7 +112,7 @@ class ExchangeTransactionBroadcastActorSpecification
       val actor =
         defaultActor(
           ntpTime,
-          isConfirmed = _ => getConfirmation(true),
+          confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
             Future.successful(true)
@@ -121,17 +123,81 @@ class ExchangeTransactionBroadcastActorSpecification
       system.eventStream.publish(event)
       broadcasted = Seq.empty
 
-      actor ! ExchangeTransactionBroadcastActor.Send
-      actor ! ExchangeTransactionBroadcastActor.Send
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+      actor ! ExchangeTransactionBroadcastActor.CheckAndSend
 
       eventually {
         broadcasted shouldBe empty
       }
     }
+
+    "retries" when {
+      "failed to confirm (retry checks)" in {
+        val firstProcessed  = new AtomicBoolean(false)
+        var triedToConfirm = Seq.empty[ByteStr]
+        val actor = defaultActor(
+          ntpTime,
+          confirmed = { txs =>
+            triedToConfirm = txs
+            if (!firstProcessed.get) Future.successful(txs.map(id => id -> false).toMap)
+            else Future.failed(new RuntimeException("Can't do this"))
+          },
+          broadcast = _ => {
+            firstProcessed.compareAndSet(false, true)
+            Future.successful(true)
+          }
+        )
+
+        val event = sampleEvent()
+        system.eventStream.publish(event)
+        eventually {
+          firstProcessed.get shouldBe true
+        }
+
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+        eventually {
+          triedToConfirm should not be empty
+        }
+        triedToConfirm = Seq.empty
+
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+        eventually {
+          triedToConfirm should not be empty
+        }
+      }
+
+      "failed to broadcast (retry)" in {
+        val firstProcessing  = new AtomicBoolean(false)
+        var triedToBroadcast = Seq.empty[ExchangeTransaction]
+        val actor = defaultActor(
+          ntpTime,
+          confirmed = _ => getConfirmation(false),
+          broadcast = { txs =>
+            firstProcessing.compareAndSet(false, true)
+            triedToBroadcast = List(txs)
+            Future.failed(new RuntimeException("Can't do"))
+          }
+        )
+
+        val event = sampleEvent()
+        system.eventStream.publish(event)
+        eventually {
+          firstProcessing.get() shouldBe true
+          triedToBroadcast should not be empty
+        }
+
+        triedToBroadcast = Seq.empty
+        actor ! ExchangeTransactionBroadcastActor.CheckAndSend
+        eventually {
+          triedToBroadcast should not be empty
+        }
+      }
+    }
   }
 
   private def defaultActor(time: Time,
-                           isConfirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
+                           confirmed: Seq[ByteStr] => Future[Map[ByteStr, Boolean]],
                            broadcast: ExchangeTransaction => Future[Boolean]): TestActorRef[ExchangeTransactionBroadcastActor] = TestActorRef(
     new ExchangeTransactionBroadcastActor(
       settings = ExchangeTransactionBroadcastSettings(
@@ -140,7 +206,7 @@ class ExchangeTransactionBroadcastActorSpecification
         maxPendingTime = 5.minute
       ),
       time = time,
-      isConfirmed,
+      confirmed = confirmed,
       broadcast = broadcast
     )
   )

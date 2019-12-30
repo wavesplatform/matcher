@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import cats.Id
-import cats.instances.future.catsStdInstancesForFuture
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.dex.DexApi

@@ -63,7 +63,7 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future.successful(store.newestOffset.getOrElse(-1L))
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = Future(store.newestOffset.getOrElse(-1L))
 
   override def close(timeout: FiniteDuration): Unit = {
     timer.cancel()

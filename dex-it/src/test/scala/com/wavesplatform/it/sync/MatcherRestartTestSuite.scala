@@ -15,7 +15,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
     "make order and after matcher's restart try to cancel it" in {
       // Alice places sell order
       val aliceOrder = mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant)
-      placeAndAwait(aliceOrder)
+      placeAndAwaitAtDex(aliceOrder)
 
       // Check that order is correct
       val orders = dex1.api.orderBook(ethWavesPair)
@@ -35,7 +35,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders1.asks.head.amount shouldBe 500
       orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      placeAndAwait(mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant))
+      placeAndAwaitAtDex(mkOrder(alice, ethWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant))
 
       eventually {
         val orders2 = dex1.api.orderBook(ethWavesPair)

@@ -98,7 +98,7 @@ class RatesTestSuite extends MatcherSuiteBase {
 
     // place order with admissible fee (according to btc rate = 1)
     val order1 = newOrder
-    placeAndAwait(order1)
+    placeAndAwaitAtDex(order1)
 
     // slightly increase rate for btc
     dex1.api.upsertRate(btcAsset, 1.1)._1 shouldBe StatusCodes.Ok
@@ -112,7 +112,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     // return previous rate for btc
     dex1.api.upsertRate(btcAsset, 1)._1 shouldBe StatusCodes.Ok
 
-    placeAndAwait(newOrder)
+    placeAndAwaitAtDex(newOrder)
 
     dex1.api.deleteRate(btcAsset)
   }

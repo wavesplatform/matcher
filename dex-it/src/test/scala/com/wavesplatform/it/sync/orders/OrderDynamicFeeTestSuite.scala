@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.orders
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 // TODO refactor balances retrieving
-class OrderFeeTestSuite extends MatcherSuiteBase {
+class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
 
   private val baseFee = 300000
 
@@ -108,7 +108,6 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
     }
 
     "is enough" in {
-
       upsertRates(btc -> btcRate)
       dex1.api.place(
         mkOrder(
@@ -280,7 +279,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
       upsertRates(btc -> btcRate, eth -> ethRate)
       val bobOrder = mkBobOrder
-      placeAndAwait(bobOrder)
+      placeAndAwaitAtDex(bobOrder)
       dex1.api.reservedBalance(bob).keys should not contain Waves
 
       val aliceOrder = mkAliceOrder
@@ -351,7 +350,7 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
         upsertRates(btc -> btcRate, eth -> ethRate)
         val bobOrder = mkBobOrder
-        placeAndAwait(bobOrder)
+        placeAndAwaitAtDex(bobOrder)
         dex1.api.reservedBalance(bob).keys should not contain Waves
 
         val aliceOrder = mkOrder(
@@ -569,11 +568,11 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
       val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 2: Byte)
 
-      placeAndAwait(buyOrder)
+      placeAndAwaitAtDex(buyOrder)
 
       val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)
 
-      placeAndAwait(sellOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(sellOrder, OrderStatus.Filled)
       waitForOrderAtNode(sellOrder)
 
       dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
@@ -591,11 +590,11 @@ class OrderFeeTestSuite extends MatcherSuiteBase {
 
       val buyOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1000000000.waves, 100, 0.003.waves, version = 3: Byte)
 
-      placeAndAwait(buyOrder)
+      placeAndAwaitAtDex(buyOrder)
 
       val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)
 
-      placeAndAwait(sellOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(sellOrder, OrderStatus.Filled)
       waitForOrderAtNode(sellOrder)
 
       dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)

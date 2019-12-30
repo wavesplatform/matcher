@@ -26,15 +26,15 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      placeAndAwait(bobOrder1)
+      placeAndAwaitAtDex(bobOrder1)
       dex1.api.reservedBalance(bob)(Waves) shouldBe sellOrderAmount + matcherFee
       dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      placeAndAwait(aliceOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder, OrderStatus.Filled)
 
       val aliceOrder2 = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      placeAndAwait(aliceOrder2, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder2, OrderStatus.Filled)
 
       // Bob wants to buy some USD
       dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
@@ -52,7 +52,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      placeAndAwait(bobOrder2)
+      placeAndAwaitAtDex(bobOrder2)
 
       val orderBook2 = dex1.api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
@@ -92,7 +92,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       orderBook1.bids shouldBe empty
 
       val bobOrder2 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
-      placeAndAwait(bobOrder2)
+      placeAndAwaitAtDex(bobOrder2)
 
       val orderBook2 = dex1.api.orderBook(wavesUsdPair)
       orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))

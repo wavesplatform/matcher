@@ -337,7 +337,7 @@ object DexApi {
       }
 
       override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
-        repeatUntil(tryOrderStatus(assetPair, id), 1.second) {
+        repeatUntil(tryOrderStatus(assetPair, id), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
@@ -346,7 +346,7 @@ object DexApi {
 
       def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
           pred: List[OrderBookHistoryItem] => Boolean): F[List[OrderBookHistoryItem]] =
-        repeatUntil[Either[MatcherError, List[OrderBookHistoryItem]]](tryOrderHistory(owner, activeOnly), 1.second) {
+        repeatUntil[Either[MatcherError, List[OrderBookHistoryItem]]](tryOrderHistory(owner, activeOnly), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
@@ -359,13 +359,13 @@ object DexApi {
 
       override def waitForTransactionsByOrder(id: Order.Id)(
           pred: List[exchange.ExchangeTransaction] => Boolean): F[List[exchange.ExchangeTransaction]] =
-        repeatUntil[Either[MatcherError, List[exchange.ExchangeTransaction]]](tryTransactionsByOrder(id), 1.second) {
+        repeatUntil[Either[MatcherError, List[exchange.ExchangeTransaction]]](tryTransactionsByOrder(id), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
       override def waitForCurrentOffset(pred: Long => Boolean): F[Long] =
-        repeatUntil[Either[MatcherError, Long]](tryCurrentOffset, 1.second) {
+        repeatUntil[Either[MatcherError, Long]](tryCurrentOffset, RepeatRequestOptions(1.second, 120)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())

@@ -1,7 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.dex.it.api.responses.dex.{AssetDecimalsInfo, LevelResponse, MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex._
+import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -32,7 +33,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val bobAsset2         = IssuedAsset(bobAsset2Id)
   private val bob2WavesPair     = AssetPair(bobAsset2, Waves)
 
-  private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 2.minutes) // TTL?
+  private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -55,6 +56,17 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val orders = dex1.api.orderBook(aliceWavesPair)
         orders.asks.head.amount shouldBe aliceSellAmount
         orders.asks.head.price shouldBe 2000.waves
+      }
+
+      "orderType should be limit for a limit order" in {
+        def validateHistory(label: String, orders: Seq[OrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+          orders should have size 1
+          orders.head.orderType shouldBe AcceptedOrderType.Limit
+        }
+
+        validateHistory("by pair", dex1.api.orderHistoryByPair(alice, aliceWavesPair))
+        validateHistory("full", dex1.api.orderHistory(alice))
+        validateHistory("admin", dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)))
       }
 
       "get opened trading markets" in {
@@ -134,7 +146,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob places order on available amount of assets - order accepted
         val order3 = mkOrder(bob, aliceWavesPair, SELL, 150, 1900.waves)
-        placeAndAwait(order3)
+        placeAndAwaitAtDex(order3)
 
         // Bob checks that the order in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -196,7 +208,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = mkOrder(bob, aliceWavesPair, BUY, 130, 2000.waves)
-        placeAndAwait(order5, OrderStatus.PartiallyFilled)
+        placeAndAwaitAtDex(order5, OrderStatus.PartiallyFilled)
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -233,11 +245,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         def mkBobOrder = mkOrder(bob, bob1WavesPair, SELL, someAssetAmount, 0.005.waves)
 
         val order6 = mkBobOrder
-        placeAndAwait(order6)
+        placeAndAwaitAtDex(order6)
 
         // Alice wants to buy all Bob's assets for 1 Wave
         val order7 = mkOrder(alice, bob1WavesPair, BUY, someAssetAmount, 0.005.waves)
-        placeAndAwait(order7, OrderStatus.Filled)
+        placeAndAwaitAtDex(order7, OrderStatus.Filled)
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
@@ -252,7 +264,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob wants to sell all own assets for 1 Wave
         val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        placeAndAwait(order8)
+        placeAndAwaitAtDex(order8)
 
         // Bob moves all waves to Alice
         val transferAmount = bobWavesBalance - minFee

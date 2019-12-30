@@ -7,6 +7,7 @@ import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 
 object TimerOps {
+  // TODO move to GlobalTimer
   implicit class TimerOpsImplicits(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
       val p = Promise[A]

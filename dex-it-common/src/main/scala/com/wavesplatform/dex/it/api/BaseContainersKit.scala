@@ -35,10 +35,11 @@ trait BaseContainersKit extends ScorexLogging {
   protected implicit val futureHttpBackend: LoggingSttpBackend[Future, Nothing] = new LoggingSttpBackend[Future, Nothing](
     AsyncHttpClientFutureBackend.usingConfig(
       new DefaultAsyncHttpClientConfig.Builder()
-        .setMaxRequestRetry(1)
+        .setMaxRequestRetry(0)
         .setReadTimeout(10000)
         .setKeepAlive(false)
         .setRequestTimeout(10000)
+        .setIoThreadsCount(5)
         .build()
     )
   )

@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
@@ -52,20 +53,25 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val pair = AssetPair(Waves, allowAsset)
 
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    placeAndAwait(counter)
+    placeAndAwaitAtDex(counter)
 
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    placeAndAwait(submitted, OrderStatus.Filled)
+    placeAndAwaitAtDex(submitted, OrderStatus.Filled)
 
     waitForOrderAtNode(submitted)
   }
 
-  "wait activation" in wavesNode1.api.waitForHeight(activationHeight)
+  "wait activation" in {
+    wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
+      x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
+    })
+    Thread.sleep(3000) // TODO See OrdersFromScriptedAccTestSuite
+  }
 
   "can place if the script returns TRUE" in {
     val pair    = AssetPair(unscriptedAsset, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    placeAndAwait(counter)
+    placeAndAwaitAtDex(counter)
     dex1.api.cancel(matcher, counter)
   }
 
@@ -82,10 +88,10 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val pair = AssetPair(unscriptedAsset, allowAsset)
 
     info("place counter")
-    placeAndAwait(mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee))
+    placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee))
 
     info("place a submitted order")
-    placeAndAwait(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee), OrderStatus.Filled)
+    placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee), OrderStatus.Filled)
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
@@ -96,7 +102,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     info("place a counter order")
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    placeAndAwait(counter)
+    placeAndAwaitAtDex(counter)
 
     info("place a submitted order")
     val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
@@ -111,7 +117,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     info("place a counter order")
     val pair    = AssetPair(allowAsset2, unscriptedAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee)
-    placeAndAwait(counter)
+    placeAndAwaitAtDex(counter)
 
     info("update a script")
     val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, DenyBigAmountScript)
@@ -138,7 +144,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     info("place a counter order")
     val pair    = AssetPair(allowAsset3, allowAsset)
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
-    placeAndAwait(counter)
+    placeAndAwaitAtDex(counter)
 
     info("update a script")
     val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, DenyBigAmountScript)

@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import cats.instances.FutureInstances
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
@@ -35,6 +36,7 @@ abstract class MatcherSuiteBase
     with PredefinedAccounts
     with DiffMatcherWithImplicits
     with InformativeTestStart
+    with FutureInstances
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()
@@ -45,6 +47,9 @@ abstract class MatcherSuiteBase
 
   override protected def beforeAll(): Unit = {
     log.debug(s"Perform beforeAll")
+    kafkaServer.foreach { _ =>
+      createKafkaTopic(dexRunConfig.getString("waves.dex.events-queue.kafka.topic"))
+    }
     wavesNode1.start()
     dex1.start()
   }

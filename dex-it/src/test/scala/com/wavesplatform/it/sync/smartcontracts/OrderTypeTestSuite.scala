@@ -59,7 +59,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setAliceScriptText(sco1)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd1)
+        placeAndAwaitAtDex(aliceOrd1)
 
         dex1.api.tryPlace(mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522, // AccountScriptDeniedOrder
@@ -79,7 +79,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         )
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd2)
+        placeAndAwaitAtDex(aliceOrd2)
 
         dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
         resetAliceAccountScript()
@@ -89,10 +89,10 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setAliceScriptText(sco3)
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd1)
+        placeAndAwaitAtDex(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd2)
+        placeAndAwaitAtDex(aliceOrd2)
 
         dex1.api.cancel(alice, aliceOrd1).status shouldBe "OrderCanceled"
         dex1.api.cancel(alice, aliceOrd2).status shouldBe "OrderCanceled"
@@ -101,10 +101,10 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract on BUY type" in {
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd1)
+        placeAndAwaitAtDex(aliceOrd1)
 
         val aliceOrd2 = mkOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
-        placeAndAwait(aliceOrd2)
+        placeAndAwaitAtDex(aliceOrd2)
 
         setAliceScriptText(sco1)
 

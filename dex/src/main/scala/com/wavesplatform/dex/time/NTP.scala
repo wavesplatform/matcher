@@ -24,6 +24,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   log.info("3")
 
   @volatile private var offset = 0L
+  log.info("4")
   private val updateTask: Task[Unit] = {
     def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
@@ -54,10 +55,12 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
       case _ => Task.unit
     }
   }
+  log.info("5")
 
   def correctedTime(): Long = System.currentTimeMillis() + offset
 
   private var txTime: Long = 0
+  log.info("6")
 
   def getTimestamp(): Long = {
     txTime = Math.max(correctedTime(), txTime + 1)
@@ -65,6 +68,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   }
 
   private val taskHandle = updateTask.runAsyncLogErr
+  log.info("7")
 
   override def close(): Unit = {
     log.info("Shutting down Time")

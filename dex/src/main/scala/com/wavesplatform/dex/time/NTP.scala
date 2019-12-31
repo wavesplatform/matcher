@@ -3,9 +3,10 @@ import java.net.{InetAddress, SocketTimeoutException}
 
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import org.apache.commons.net.ntp.NTPUDPClient
+
 import scala.concurrent.duration.DurationInt
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
@@ -67,7 +68,17 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     txTime
   }
 
-  private val taskHandle = updateTask.runAsyncLogErr
+  def runAsyncLogErr[A](t: Task[A])(implicit s: Scheduler): CancelableFuture[A] =
+    logErr(t).runToFuture(s)
+
+  def logErr[A](t: Task[A]): Task[A] = {
+    t.onErrorHandleWith(ex => {
+      log.error(s"Error executing task", ex)
+      Task.raiseError[A](ex)
+    })
+  }
+
+  private val taskHandle = runAsyncLogErr(updateTask)
   log.info("7")
 
   override def close(): Unit = {

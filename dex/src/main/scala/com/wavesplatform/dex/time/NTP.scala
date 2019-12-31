@@ -68,17 +68,21 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     txTime
   }
 
-  def runAsyncLogErr[A](t: Task[A])(implicit s: Scheduler): CancelableFuture[A] =
-    logErr(t).runToFuture(s)
+//  def runAsyncLogErr[A](t: Task[A])(implicit s: Scheduler): CancelableFuture[A] =
+//    logErr(t).runAsync(_ => ())
+//
+//  def logErr[A](t: Task[A]): Task[A] = {
+//    t.onErrorHandleWith(ex => {
+//      log.error(s"Error executing task", ex)
+//      Task.raiseError[A](ex)
+//    })
+//  }
 
-  def logErr[A](t: Task[A]): Task[A] = {
-    t.onErrorHandleWith(ex => {
-      log.error(s"Error executing task", ex)
-      Task.raiseError[A](ex)
-    })
+  private val taskHandle = updateTask.runAsync {
+    case Left(e) => log.error(s"Error executing task", e)
+    case _ =>
   }
 
-  private val taskHandle = runAsyncLogErr(updateTask)
   log.info("7")
 
   override def close(): Unit = {

@@ -3,8 +3,8 @@ import java.net.{InetAddress, SocketTimeoutException}
 
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.{CancelableFuture, ExecutionModel, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{ExecutionModel, Scheduler}
 import org.apache.commons.net.ntp.NTPUDPClient
 
 import scala.concurrent.duration.DurationInt
@@ -18,14 +18,10 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
 
   private implicit val scheduler: SchedulerService = Scheduler.singleThread(name = "time-impl", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
-  log.info("1")
   private val client = new NTPUDPClient()
-  log.info("2")
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
-  log.info("3")
 
   @volatile private var offset = 0L
-  log.info("4")
   private val updateTask: Task[Unit] = {
     def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
@@ -56,34 +52,20 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
       case _ => Task.unit
     }
   }
-  log.info("5")
 
   def correctedTime(): Long = System.currentTimeMillis() + offset
 
   private var txTime: Long = 0
-  log.info("6")
 
   def getTimestamp(): Long = {
     txTime = Math.max(correctedTime(), txTime + 1)
     txTime
   }
 
-//  def runAsyncLogErr[A](t: Task[A])(implicit s: Scheduler): CancelableFuture[A] =
-//    logErr(t).runAsync(_ => ())
-//
-//  def logErr[A](t: Task[A]): Task[A] = {
-//    t.onErrorHandleWith(ex => {
-//      log.error(s"Error executing task", ex)
-//      Task.raiseError[A](ex)
-//    })
-//  }
-
   private val taskHandle = updateTask.runAsync {
     case Left(e) => log.error(s"Error executing task", e)
-    case _ =>
+    case _       =>
   }
-
-  log.info("7")
 
   override def close(): Unit = {
     log.info("Shutting down Time")

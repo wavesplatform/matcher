@@ -51,7 +51,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient}
 
   private val time = new NTP(settings.ntpServer)
-  log.info("8")
 
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.model
 
-import cats.syntax.either._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
@@ -17,6 +16,7 @@ import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.time.TestTime
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
-import com.wavesplatform.{NoShrink, TestTime, WithDB}
+import com.wavesplatform.{NoShrink, WithDB}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._

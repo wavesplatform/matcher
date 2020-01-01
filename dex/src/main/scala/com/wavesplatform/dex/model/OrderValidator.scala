@@ -22,6 +22,7 @@ import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.MatcherModel.Normalization._
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.diffs.FeeValidation
@@ -30,7 +31,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 
 import scala.Either.cond

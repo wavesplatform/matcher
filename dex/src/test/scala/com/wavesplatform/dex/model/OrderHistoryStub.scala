@@ -7,8 +7,8 @@ import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.time.Time
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
 import scala.concurrent.Future

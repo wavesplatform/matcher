@@ -5,6 +5,7 @@ import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import com.wavesplatform.dex.api._
+import com.wavesplatform.dex.common.json._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
@@ -21,6 +22,7 @@ import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory
+import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
@@ -213,7 +215,7 @@ object OrderBookActor {
   )
 
   object MarketStatus {
-    implicit val fmt: Writes[MarketStatus] = { ms =>
+    implicit val marketStatusWrites: Writes[MarketStatus] = { ms =>
       Json.obj(
         "lastPrice"  -> ms.lastTrade.map(_.price),
         "lastAmount" -> ms.lastTrade.map(_.amount),
@@ -224,6 +226,21 @@ object OrderBookActor {
         "askAmount"  -> ms.bestAsk.map(_.amount)
       )
     }
+
+    implicit val marketStatusReads: Reads[MarketStatus] =
+      ((JsPath \ "lastPrice").readNullable[Long] and
+        (JsPath \ "lastAmount").readNullable[Long] and
+        (JsPath \ "lastSide").readNullable[OrderType] and
+        (JsPath \ "bid").readNullable[Long] and
+        (JsPath \ "bidAmount").readNullable[Long] and
+        (JsPath \ "ask").readNullable[Long] and
+        (JsPath \ "askAmount").readNullable[Long]) { (lastPrice, lastAmount, lastSide, bid, bidAmount, ask, askAmount) =>
+        MarketStatus(
+          lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(LastTrade.apply)),
+          bestBid = (bidAmount, bid).tupled.map(Function.tupled(LevelAgg.apply)),
+          bestAsk = (askAmount, ask).tupled.map(Function.tupled(LevelAgg.apply))
+        )
+      }
 
     def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.getLastTrade, ob.bestBid, ob.bestAsk)
   }

@@ -3,8 +3,8 @@ package com.wavesplatform.dex.common
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionFactory}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderJson, OrderType}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TransactionFactory}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -93,4 +93,13 @@ package object json {
   }
 
   implicit val orderWrites: Writes[Order] = Writes(_.json())
+
+  implicit val proofsReads: Reads[Proofs] = Reads.seq[ByteStr].map(Proofs(_))
+
+  implicit val orderReads: Reads[Order] = OrderJson.orderReads
+
+  implicit val orderTypeReads: Reads[OrderType] = Reads {
+    case JsString(x) => JsSuccess(OrderType(x))
+    case x           => JsError(s"Can't parse '$x' as OrderType")
+  }
 }

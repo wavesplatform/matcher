@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.api
 
 import com.wavesplatform.dex.api.MatcherPublicSettings.OrderFeePublicSettings
-import com.wavesplatform.dex.common.json.assetRatesFormat
 import com.wavesplatform.dex.settings.AssetType.AssetType
+import com.wavesplatform.dex.common.json._
 import com.wavesplatform.transaction.Asset
 import play.api.libs.json._
 
@@ -41,5 +41,5 @@ object MatcherPublicSettings {
     private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
   }
 
-  implicit val matcherPublicSettingsFormat: Format[MatcherPublicSettings] = Json.format[MatcherPublicSettings]
+  implicit val matcherPublicSettingsFormat: OFormat[MatcherPublicSettings] = Json.format[MatcherPublicSettings]
 }

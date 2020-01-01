@@ -11,23 +11,26 @@ import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.common.json.{assetRatesFormat, assetPairFormat}
+import com.wavesplatform.dex.common.json._
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model.{LevelAgg, OrderBook}
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue}
+import play.api.libs.json.{JsString, JsValue, Json}
 
 import scala.concurrent.Future
 
@@ -75,10 +78,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     )
   )
 
+  private val smartWavesMarketStatus = MarketStatus(
+    lastTrade = Some(LastTrade(1000, 2000, OrderType.SELL)),
+    bestBid = Some(LevelAgg(1111, 2222)),
+    bestAsk = Some(LevelAgg(3333, 4444))
+  )
+
+  private val order = orderGen.sample.get
+
   private val settings = MatcherSettings.valueReader
     .read(ConfigFactory.load(), "waves.dex")
     .copy(
-      priceAssets = Seq(priceAsset, Waves),
+      priceAssets = Seq(order.assetPair.priceAsset, priceAsset, Waves),
       orderRestrictions = Map(smartWavesPair -> orderRestrictions)
     )
 
@@ -109,7 +120,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     "returns matcher's settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
         responseAs[JsValue].as[MatcherPublicSettings] should matchTo(MatcherPublicSettings(
-          priceAssets = List(priceAsset, Waves),
+          priceAssets = List(order.assetPair.priceAsset, priceAsset, Waves),
           orderFee = MatcherPublicSettings.OrderFeePublicSettings.Dynamic(
             baseFee = 600000,
             rates = Map(Waves -> 1.0)
@@ -204,6 +215,31 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
           (r \ "pair").as[AssetPair] should matchTo(smartWavesPair)
           (r \ "bids").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.bids)
           (r \ "asks").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.asks)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // marketStatus
+  routePath("/orderbook/[amountAsset]/[priceAsset]/status") - {
+    "returns an order book status" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
+          responseAs[MarketStatus] should matchTo(smartWavesMarketStatus)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // placeLimitOrder
+  routePath("/orderbook") - {
+    "returns a placed order" in test(
+      { route =>
+        Post(routePath(s"/orderbook"), Json.toJson(order)) ~> route ~> check {
+          println(responseAs[String])
+          (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
         }
       },
       apiKey
@@ -459,6 +495,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
+        case AddressDirectory.Envelope(_, PlaceOrder(x, _))                      => sender ! OrderAccepted(x)
         case _                                                                   =>
       }
 
@@ -481,13 +518,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       TestActor.KeepRunning
     }
 
+    val orderBookActor = TestProbe("orderBook")
+
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(
-        settings,
-        x => {
-          if (x == asset)
+        settings, {
+          case `asset` =>
             liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
-          else liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+          case x if x == order.assetPair.amountAsset =>
+            liftValueAsync[BriefAssetDescription](BriefAssetDescription("AmountAsset", 8, hasScript = false))
+          case x if x == order.assetPair.priceAsset =>
+            liftValueAsync[BriefAssetDescription](BriefAssetDescription("PriceAsset", 8, hasScript = false))
+          case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
         },
         Set.empty
       ),
@@ -495,10 +537,19 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       matcher = matcherActor.ref,
       addressActor = addressActor.ref,
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
-      orderBook = _ => None,
-      getMarketStatus = _ => None,
+      orderBook = {
+        case x if x == order.assetPair => Some(Right(orderBookActor.ref))
+        case _                         => None
+      },
+      getMarketStatus = {
+        case `smartWavesPair` => Some(smartWavesMarketStatus)
+        case _                => None
+      },
       getActualTickSize = _ => 0.1,
-      orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
+      orderValidator = {
+        case x if x == order => liftValueAsync(x)
+        case _               => liftErrorAsync(error.FeatureNotImplemented)
+      },
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,

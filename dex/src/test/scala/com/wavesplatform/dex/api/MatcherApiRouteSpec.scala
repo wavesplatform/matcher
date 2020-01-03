@@ -20,7 +20,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.LastTrade
-import com.wavesplatform.dex.model.{LevelAgg, OrderBook}
+import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.RouteSpec
@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 
 import scala.concurrent.Future
 
@@ -84,7 +84,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     bestAsk = Some(LevelAgg(3333, 4444))
   )
 
-  private val order = orderGen.sample.get
+  private val (order, senderPrivateKey) = orderGenerator.sample.get
 
   private val settings = MatcherSettings.valueReader
     .read(ConfigFactory.load(), "waves.dex")
@@ -237,9 +237,41 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   routePath("/orderbook") - {
     "returns a placed order" in test(
       { route =>
-        Post(routePath(s"/orderbook"), Json.toJson(order)) ~> route ~> check {
-          println(responseAs[String])
+        Post(routePath("/orderbook"), Json.toJson(order)) ~> route ~> check {
           (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // placeMarketOrder
+  routePath("/orderbook/market") - {
+    "returns a placed order" in test(
+      { route =>
+        Post(routePath("/orderbook/market"), Json.toJson(order)) ~> route ~> check {
+          (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getAssetPairAndPublicKeyOrderHistory
+  routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
+    "returns an order history" in test(
+      { route =>
+        val now       = System.currentTimeMillis()
+        val signature = crypto.sign(senderPrivateKey, order.senderPublicKey ++ Longs.toByteArray(now))
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/publicKey/${order.senderPublicKey}"))
+          .withHeaders(
+            RawHeader("Timestamp", s"$now"),
+            RawHeader("Signature", s"$signature")
+          ) ~> route ~> check {
+          // TODO
+          val r = responseAs[JsArray]
+          r.value.size shouldBe 1
+          (r.value.head \ "id").as[String] shouldBe order.idStr()
         }
       },
       apiKey
@@ -490,16 +522,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
-
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
         case AddressDirectory.Envelope(_, PlaceOrder(x, _))                      => sender ! OrderAccepted(x)
-        case _                                                                   =>
+        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrdersStatuses(assetPair, onlyActive)) =>
+          sender ! AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
+        case x => println(s"$x")
       }
 
-      TestActor.NoAutoPilot
+      TestActor.KeepRunning
     }
 
     val matcherActor = TestProbe("matcher")

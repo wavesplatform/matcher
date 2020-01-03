@@ -1,18 +1,24 @@
 package com.wavesplatform.dex.domain.transaction
 
-import com.wavesplatform.account.PublicKey
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2, Order, OrderType}
-import io.swagger.annotations.ApiModelProperty
+import cats.syntax.either._
+import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.crypto.Proven
+import com.wavesplatform.dex.domain.error.ValidationError
+import com.wavesplatform.dex.domain.error.ValidationError._
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
+import com.wavesplatform.dex.domain.utils._
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json._
 
 import scala.util.{Failure, Try}
 
-trait ExchangeTransaction extends FastHashId with ProvenTransaction {
+trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
 
   def buyOrder: Order
   def sellOrder: Order
@@ -24,16 +30,29 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   def timestamp: Long
   def version: Byte
 
-  override val assetFee: (Asset, Long) = (Waves, fee)
+  val id: Coeval[ByteStr] = Coeval.evalOnce { ByteStr(crypto fastHash this.bodyBytes()) }
 
-  @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
-  override val bodyBytes: Coeval[Array[Byte]]
+  def assetFee: (Asset, Long) = (Waves, fee)
+  def chainByte: Option[Byte] = None
 
-  override val bytes: Coeval[Array[Byte]]
+  def checkedAssets(): Seq[IssuedAsset] = buyOrder.assetPair.assets.toSeq collect { case a: IssuedAsset => a }
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
+  protected def proofField: Seq[(String, JsValue)] = Seq("proofs" -> JsArray { this.proofs.proofs.map(p => JsString(p.base58)) })
+
+  protected def jsonBase(): JsObject =
+    Json.obj(
+      "type"            -> ExchangeTransaction.typeId,
+      "id"              -> id().base58,
+      "sender"          -> sender.stringRepr,
+      "senderPublicKey" -> Base58.encode(sender),
+      "fee"             -> assetFee._2,
+      "feeAssetId"      -> assetFee._1.maybeBase58Repr,
+      "timestamp"       -> timestamp
+    ) ++ JsObject(proofField)
+
+  override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj(
       "version"        -> version,
       "order1"         -> buyOrder.json(),
@@ -42,11 +61,19 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
       "price"          -> price,
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
-    ))
-  override def checkedAssets(): Seq[IssuedAsset] = {
-    val pair = buyOrder.assetPair
-    Seq(pair.priceAsset, pair.amountAsset) collect { case a:IssuedAsset => a }
+    )
   }
+
+  override def toString: String = json().toString
+
+  def toPrettyString: String = json.map(Json.prettyPrint).value
+
+  override def equals(other: Any): Boolean = other match {
+    case tx: ExchangeTransaction => id() == tx.id()
+    case _                       => false
+  }
+
+  override def hashCode(): Int = id().hashCode()
 }
 
 object ExchangeTransaction {
@@ -55,13 +82,12 @@ object ExchangeTransaction {
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption
-      .fold(Failure(new Exception("Empty array")): Try[ExchangeTransaction]) { b =>
-        if (b == 0) ExchangeTransactionV2.parseBytes(bytes)
-        else ExchangeTransactionV1.parseBytes(bytes)
+      .fold { Failure(new Exception("Empty array")): Try[ExchangeTransaction] } { b =>
+        val etp = if (b == 0) ExchangeTransactionV2 else ExchangeTransactionV1; etp parseBytes bytes flatMap { validateExchangeParams(_).foldToTry }
       }
 
-  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, Unit] = {
-    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp)
+  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, ExchangeTransaction] = {
+    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp).map(_ => tx)
   }
 
   def validateExchangeParams(buyOrder: Order,
@@ -72,38 +98,22 @@ object ExchangeTransaction {
                              sellMatcherFee: Long,
                              fee: Long,
                              timestamp: Long): Either[ValidationError, Unit] = {
-    lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
-
-    if (fee <= 0) {
-      Left(InsufficientFee())
-    } else if (amount <= 0) {
-      Left(NonPositiveAmount(amount, "assets"))
-    } else if (amount > Order.MaxAmount) {
-      Left(GenericError("amount too large"))
-    } else if (price <= 0) {
-      Left(GenericError("price should be > 0"))
-    } else if (price > Order.MaxAmount) {
-      Left(GenericError("price too large"))
-    } else if (sellMatcherFee > Order.MaxAmount) {
-      Left(GenericError("sellMatcherFee too large"))
-    } else if (buyMatcherFee > Order.MaxAmount) {
-      Left(GenericError("buyMatcherFee too large"))
-    } else if (fee > Order.MaxAmount) {
-      Left(GenericError("fee too large"))
-    } else if (buyOrder.orderType != OrderType.BUY) {
-      Left(GenericError("buyOrder should has OrderType.BUY"))
-    } else if (sellOrder.orderType != OrderType.SELL) {
-      Left(GenericError("sellOrder should has OrderType.SELL"))
-    } else if (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) {
-      Left(GenericError("buyOrder.matcher should be the same as sellOrder.matcher"))
-    } else if (buyOrder.assetPair != sellOrder.assetPair) {
-      Left(GenericError("Both orders should have same AssetPair"))
-    } else if (!buyOrder.isValid(timestamp)) {
-      Left(OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
-    } else if (!sellOrder.isValid(timestamp)) {
-      Left(OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
-    } else if (!priceIsValid) {
-      Left(GenericError("priceIsValid"))
-    } else Right(())
+    Seq(
+      (fee <= 0)                                                -> InsufficientFee(),
+      (amount <= 0)                                             -> NonPositiveAmount(amount, "assets"),
+      (amount > Order.MaxAmount)                                -> GenericError("amount too large"),
+      (price <= 0)                                              -> GenericError("price should be > 0"),
+      (price > Order.MaxAmount)                                 -> GenericError("price too large"),
+      (sellMatcherFee > Order.MaxAmount)                        -> GenericError("sellMatcherFee too large"),
+      (buyMatcherFee > Order.MaxAmount)                         -> GenericError("buyMatcherFee too large"),
+      (fee > Order.MaxAmount)                                   -> GenericError("fee too large"),
+      (buyOrder.orderType != OrderType.BUY)                     -> GenericError("buyOrder should has OrderType.BUY"),
+      (sellOrder.orderType != OrderType.SELL)                   -> GenericError("sellOrder should has OrderType.SELL"),
+      (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) -> GenericError("buyOrder.matcher should be the same as sellOrder.matcher"),
+      (buyOrder.assetPair != sellOrder.assetPair)               -> GenericError("Both orders should have same AssetPair"),
+      (!buyOrder.isValid(timestamp))                            -> OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()),
+      (!sellOrder.isValid(timestamp))                           -> OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")),
+      (!(price <= buyOrder.price && price >= sellOrder.price))  -> GenericError("priceIsValid"),
+    ).foldLeft { ().asRight[ValidationError] } { case (result, (hasError, error)) => result.ensure(error)(_ => !hasError) }
   }
 }

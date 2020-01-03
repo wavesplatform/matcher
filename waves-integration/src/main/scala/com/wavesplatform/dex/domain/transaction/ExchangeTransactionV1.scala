@@ -1,20 +1,17 @@
 package com.wavesplatform.dex.domain.transaction
 
-import cats.implicits._
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.account.{PrivateKey, PublicKey}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransactionV1.{TransactionT, tailIndex}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, OrderV1}
-import com.wavesplatform.transaction.description.{ByteEntity, IntBytes, LongBytes, OrderV1Bytes, SignatureBytes}
-import io.swagger.annotations.ApiModelProperty
+import com.wavesplatform.dex.domain.account.PrivateKey
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.crypto.{Proofs, Signed}
+import com.wavesplatform.dex.domain.error.ValidationError
+import com.wavesplatform.dex.domain.order.OrderV1
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
 import monix.eval.Coeval
+import play.api.libs.json.{JsArray, JsString, JsValue}
 
 import scala.util.Try
 
@@ -27,19 +24,24 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  fee: Long,
                                  timestamp: Long,
                                  signature: ByteStr)
-  extends ExchangeTransaction
-    with SignedTransaction {
+    extends ExchangeTransaction
+    with Signed {
 
-  override def version: Byte           = 1
-  override val builder                 = ExchangeTransactionV1
-  override val assetFee: (Asset, Long) = (Waves, fee)
+  override def version: Byte = 1
 
-  @ApiModelProperty(hidden = true)
-  override val sender: PublicKey = buyOrder.matcherPublicKey
+  protected override def proofField: Seq[(String, JsValue)] = {
+    val sig = JsString(signature.base58)
+    Seq(
+      "signature" -> sig,
+      "proofs"    -> JsArray { Seq(sig) }
+    )
+  }
+
+  def proofs: Proofs = Proofs.create(Seq(signature)).explicitGet()
 
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
-      Array(builder.typeId) ++
+      Array(ExchangeTransaction.typeId) ++
         Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
         buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
         Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
@@ -48,12 +50,12 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
+
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
-object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1] with TransactionParser.HardcodedVersion1 {
-
-  override val typeId: Byte = ExchangeTransaction.typeId
+object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {
 
   def create(matcher: PrivateKey,
              buyOrder: OrderV1,
@@ -63,7 +65,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] = {
+             timestamp: Long): Either[ValidationError, ExchangeTransactionV1] = {
     create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher, unverified.bodyBytes())))
     }
@@ -77,7 +79,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+             signature: ByteStr): Either[ValidationError, ExchangeTransactionV1] = {
     validateExchangeParams(
       buyOrder,
       sellOrder,
@@ -92,41 +94,26 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     }
   }
 
-  override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      ExchangeTransaction
-        .validateExchangeParams(tx)
-        .map(_ => tx)
-        .foldToTry
-    }
+  override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
+    if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
+    val parsedTypeId = bytes.head
+    if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+    1
   }
 
-  val byteTailDescription: ByteEntity[ExchangeTransactionV1] = {
-    (
-      IntBytes(tailIndex(1), "Buy order object length (BN)"),
-      IntBytes(tailIndex(2), "Sell order object length (SN)"),
-      OrderV1Bytes(tailIndex(3), "Buy order object", "BN, see OrderV1 structure"),
-      OrderV1Bytes(tailIndex(4), "Sell order object", "SN, see OrderV1 structure"),
-      LongBytes(tailIndex(5), "Price"),
-      LongBytes(tailIndex(6), "Amount"),
-      LongBytes(tailIndex(7), "Buy matcher fee"),
-      LongBytes(tailIndex(8), "Sell matcher fee"),
-      LongBytes(tailIndex(9), "Fee"),
-      LongBytes(tailIndex(10), "Timestamp"),
-      SignatureBytes(tailIndex(11), "Signature")
-    ) mapN {
-      case (_, _, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature) =>
-        ExchangeTransactionV1(
-          buyOrder = buyOrder,
-          sellOrder = sellOrder,
-          amount = amount,
-          price = price,
-          buyMatcherFee = buyMatcherFee,
-          sellMatcherFee = sellMatcherFee,
-          fee = fee,
-          timestamp = timestamp,
-          signature = signature
-        )
-    }
+  override def statefulParse: Stateful[ExchangeTransactionV1] = {
+    for {
+      _              <- read[Int] // legacy buy order length
+      _              <- read[Int] // legacy sell order length
+      buyOrder       <- OrderV1.statefulParse
+      sellOrder      <- OrderV1.statefulParse
+      price          <- read[Long]
+      amount         <- read[Long]
+      buyMatcherFee  <- read[Long]
+      sellMatcherFee <- read[Long]
+      fee            <- read[Long]
+      timestamp      <- read[Long]
+      signature      <- read[Signature]
+    } yield ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
   }
 }

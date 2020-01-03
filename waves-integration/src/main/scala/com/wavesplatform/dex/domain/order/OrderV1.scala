@@ -1,17 +1,15 @@
 package com.wavesplatform.dex.domain.order
 
-import cats.data.State
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
-import com.wavesplatform.dex.domain.assets.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.assets.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
-
-import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
@@ -63,7 +61,7 @@ case class OrderV1(@ApiModelProperty(
   override def version: Byte = 1
 
   @ApiModelProperty(hidden = true)
-  override def signature: Array[Byte] = proofs.proofs(0).arr
+  override def signature: Array[Byte] = proofs.proofs.head.arr
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
@@ -81,7 +79,7 @@ case class OrderV1(@ApiModelProperty(
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature)
 }
 
-object OrderV1 {
+object OrderV1 extends EntityParser[OrderV1] {
 
   def apply(senderPublicKey: PublicKey,
             matcherPublicKey: PublicKey,
@@ -145,52 +143,20 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[OrderV1] = Try {
-    val readByte: State[Int, Byte] = State { from =>
-      (from + 1, bytes(from))
-    }
-    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
-      val end = from + size
-      (end, f(bytes.slice(from, end)))
-    }
-    def parse[T](f: (Array[Byte], Int, Int) => (T, Int), size: Int): State[Int, T] = State { from =>
-      val (res, off) = f(bytes, from, size)
-      (off, res)
-    }
-    val makeOrder = for {
-      sender  <- read(PublicKey.apply, KeyLength)
-      matcher <- read(PublicKey.apply, KeyLength)
-      amountAssetId <- parse(deser.parseByteArrayOption, Asset.AssetIdLength)
-        .map {
-          case Some(arr) => IssuedAsset(ByteStr(arr))
-          case None      => Waves
-        }
-      priceAssetId <- parse(deser.parseByteArrayOption, Asset.AssetIdLength)
-        .map {
-          case Some(arr) => IssuedAsset(ByteStr(arr))
-          case None      => Waves
-        }
-      orderType  <- readByte
-      price      <- read(Longs.fromByteArray _, 8)
-      amount     <- read(Longs.fromByteArray _, 8)
-      timestamp  <- read(Longs.fromByteArray _, 8)
-      expiration <- read(Longs.fromByteArray _, 8)
-      matcherFee <- read(Longs.fromByteArray _, 8)
-      signature  <- read(identity, SignatureLength)
-    } yield {
-      OrderV1(
-        sender,
-        matcher,
-        AssetPair(amountAssetId, priceAssetId),
-        OrderType(orderType),
-        amount,
-        price,
-        timestamp,
-        expiration,
-        matcherFee,
-        signature
-      )
-    }
-    makeOrder.run(0).value._2
+  override def statefulParse: Stateful[OrderV1] = {
+    for {
+      sender      <- read[PublicKey]
+      matcher     <- read[PublicKey]
+      amountAsset <- read[Asset]
+      priceAsset  <- read[Asset]
+      orderType   <- read[Byte]
+      price       <- read[Long]
+      amount      <- read[Long]
+      timestamp   <- read[Long]
+      expiration  <- read[Long]
+      matcherFee  <- read[Long]
+      signature   <- read[Signature]
+    } yield
+      OrderV1(sender, matcher, AssetPair(amountAsset, priceAsset), OrderType(orderType), amount, price, timestamp, expiration, matcherFee, signature)
   }
 }

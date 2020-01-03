@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.bytes.deser
 import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import com.wavesplatform.dex.domain.utils.base58Length
 import monix.eval.Coeval
+import cats.syntax.either._
 
 import scala.util.Try
 
@@ -49,12 +50,19 @@ object Proofs {
 
   def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] = validate(proofs).map(_ => Proofs(proofs.toList))
 
-  def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
+//  def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
+//    for {
+//      _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
+//      arrs <- Try(deser parseArrays ab.tail).toEither.leftMap { GenericError(_.toString) }
+//      r    <- createWithBytes(arrs.map(ByteStr.apply), ab)
+//    } yield r
+
+  def fromBytes(ab: Array[Byte]): Either[ValidationError, (Proofs, Int)] =
     for {
-      _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
-      arrs <- Try(deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
-      r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
-    } yield r
+      _                <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
+      (arrays, length) <- Try(deser parseArrays ab.tail).toEither.leftMap[ValidationError](GenericError.apply)
+      proofs           <- createWithBytes(arrays.map(ByteStr.apply), ab)
+    } yield proofs -> (length + 1)
 
   implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs.toList)
   implicit def toSeq(proofs: Proofs): Seq[ByteStr] = proofs.proofs

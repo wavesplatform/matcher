@@ -47,19 +47,18 @@ package object deser {
     } else (None, position + 1)
   }
 
-  def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
+  def parseArrays(bytes: Array[Byte]): (Seq[Array[Byte]], Int) = {
+
     val arraysCount = Shorts.fromByteArray(bytes.slice(0, 2))
+
     require(arraysCount >= 0, s"Arrays count should be non-negative, but $arraysCount found")
-    require(
-      arraysCount <= (bytes.length - 2) / 2,
-      s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)"
-    )
-    val r = (0 until arraysCount).foldLeft((Seq.empty[Array[Byte]], 2)) {
+    require(arraysCount <= (bytes.length - 2) / 2, s"Bytes with length = ${bytes.length - 2} can't contain $arraysCount array(s)")
+
+    (0 until arraysCount).foldLeft { (Seq.empty[Array[Byte]], 2) } {
       case ((acc, pos), _) =>
         val (arr, nextPos) = parseArrayWithLength(bytes, pos)
         (acc :+ arr, nextPos)
     }
-    r._1
   }
 
   def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =

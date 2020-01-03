@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.domain.assets
+package com.wavesplatform.dex.domain.asset
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58

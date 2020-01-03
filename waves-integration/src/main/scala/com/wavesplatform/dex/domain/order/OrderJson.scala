@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.domain.order
 
 import com.wavesplatform.dex.domain.account.PublicKey
-import com.wavesplatform.dex.domain.assets.Asset.Waves
-import com.wavesplatform.dex.domain.assets.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto.{Proofs, SignatureLength}

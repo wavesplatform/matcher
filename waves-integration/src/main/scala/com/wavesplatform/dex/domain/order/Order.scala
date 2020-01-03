@@ -1,11 +1,13 @@
 package com.wavesplatform.dex.domain.order
 
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
-import com.wavesplatform.dex.domain.assets.Asset.Waves
-import com.wavesplatform.dex.domain.assets.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.{Proofs, Proven}
 import com.wavesplatform.dex.domain.error.ValidationError
@@ -56,7 +58,6 @@ trait Order extends ByteAndJsonSerializable with Proven {
     (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
-  //  @ApiModelProperty(hidden = true)
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
@@ -156,12 +157,12 @@ trait Order extends ByteAndJsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   override def toString: String = {
-    val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${feeAsset.fold("Waves")(_.toString)}," else ""
-    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr proofs=$proofs)"
+    val feeAssetStr = if (version == 3) s" feeAsset=${feeAsset.toString}," else ""
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$feeAssetStr proofs=$proofs)"
   }
 }
 
-object Order {
+object Order extends EntityParser[Order] {
 
   type Id = ByteStr
 
@@ -267,15 +268,26 @@ object Order {
 
   def splitByType(o1: Order, o2: Order): (Order, Order) = {
     require(o1.orderType != o2.orderType)
-    if (o1.orderType == OrderType.BUY) (o1, o2)
-    else (o2, o1)
+    if (o1.orderType == OrderType.BUY) (o1, o2) else (o2, o1)
   }
 
-  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
-    case 1     => OrderV1.parseBytes(xs).get
-    case 2     => OrderV2.parseBytes(xs).get
-    case 3     => OrderV3.parseBytes(xs).get
-    case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
-  }
+//  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
+//    case 1     => OrderV1.parseBytes(xs).get
+//    case 2     => OrderV2.parseBytes(xs).get
+//    case 3     => OrderV3.parseBytes(xs).get
+//    case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
+//  }
 
+  override def statefulParse: Stateful[Order] =
+    for {
+      version <- read[Byte].transform { case (s, v) => s.copy(offset = s.offset - (if (v != 1) 1 else 0)) -> v }
+      order <- {
+        val ep = version match {
+          case 1     => OrderV1
+          case 2     => OrderV2
+          case 3     => OrderV3
+          case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
+        }; ep.statefulParse.map[Order](identity)
+      }
+    } yield order
 }

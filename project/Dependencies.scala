@@ -1,5 +1,5 @@
 import sbt.Keys._
-import sbt.{Def, _}
+import sbt.{Def, compilerPlugin, _}
 
 object Dependencies {
 
@@ -16,6 +16,7 @@ object Dependencies {
     val cats              = "1.6.0"
     val catsTaglessMacros = "0.9"
     val kindProjector     = "0.9.6"
+    val betterMonadicFor  = "0.3.1"
     val mouse             = "0.22"
     val shapeless         = "2.3.3"
 
@@ -71,6 +72,7 @@ object Dependencies {
   private val catsCore               = catsModule("core", Version.cats)
   private val catsTaglessMacros      = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
   private val kindProjector          = compilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
+  private val betterMonadicFor       = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
   private val mouse                  = "org.typelevel" %% "mouse" % Version.mouse
   private val shapeless              = "com.chuusai" %% "shapeless" % Version.shapeless
   private val typesafeConfig         = "com.typesafe" % "config" % Version.typesafeConfig
@@ -189,7 +191,10 @@ object Dependencies {
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
 
-    lazy val wavesIntegration: Seq[ModuleID] = Seq(mouse % Test)
+    lazy val wavesIntegration: Seq[ModuleID] = Seq(
+      betterMonadicFor,
+      mouse % Test
+    )
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = integrationTestKit
   }

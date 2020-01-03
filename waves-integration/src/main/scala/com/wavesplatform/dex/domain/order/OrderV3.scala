@@ -3,9 +3,11 @@ package com.wavesplatform.dex.domain.order
 import cats.data.State
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
-import com.wavesplatform.dex.domain.assets.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser
+import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
 import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.{KeyLength, Proofs}
@@ -75,7 +77,7 @@ case class OrderV3(senderPublicKey: PublicKey,
     )
 }
 
-object OrderV3 {
+object OrderV3 extends EntityParser[OrderV3] {
 
   private val AssetIdLength = 32
 
@@ -128,7 +130,7 @@ object OrderV3 {
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
+  def parseBytes1(bytes: Array[Byte]): Try[Order] = Try {
 
     val longLength = 8
 
@@ -177,10 +179,39 @@ object OrderV3 {
         expiration = expiration,
         matcherFee = matcherFee,
         feeAsset = matcherFeeAssetId,
-        proofs = maybeProofs.right.get
+        proofs = maybeProofs.right.get._1
       )
     }
 
     makeOrder.runA(0).value
+  }
+
+  override def statefulParse: Stateful[OrderV3] = {
+    for {
+      _           <- read[Byte].map(v => if (v != 3) throw new Exception(s"Incorrect order version: expect 3 but found $v"))
+      sender      <- read[PublicKey]
+      matcher     <- read[PublicKey]
+      amountAsset <- read[Asset]
+      priceAsset  <- read[Asset]
+      orderType   <- read[Byte]
+      price       <- read[Long]
+      amount      <- read[Long]
+      timestamp   <- read[Long]
+      expiration  <- read[Long]
+      matcherFee  <- read[Long]
+      feeAsset    <- read[Asset]
+      proofs      <- read[Proofs]
+    } yield
+      OrderV3(sender,
+              matcher,
+              AssetPair(amountAsset, priceAsset),
+              OrderType(orderType),
+              amount,
+              price,
+              timestamp,
+              expiration,
+              matcherFee,
+              feeAsset,
+              proofs)
   }
 }

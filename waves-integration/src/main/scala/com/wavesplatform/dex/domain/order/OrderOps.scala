@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.domain.order
 
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.assets.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.crypto.Proofs
 
 class OrderOps(val o: Order) extends AnyVal {

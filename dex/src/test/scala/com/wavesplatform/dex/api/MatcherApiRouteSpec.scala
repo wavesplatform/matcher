@@ -12,6 +12,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
+import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
+import com.wavesplatform.dex.AddressActor.Reply.Balance
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.common.json._
@@ -30,7 +32,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.libs.json._
 
 import scala.concurrent.Future
 
@@ -216,8 +218,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
           (r \ "bids").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.bids)
           (r \ "asks").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.asks)
         }
-      },
-      apiKey
+      }
     )
   }
 
@@ -228,8 +229,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
           responseAs[MarketStatus] should matchTo(smartWavesMarketStatus)
         }
-      },
-      apiKey
+      }
     )
   }
 
@@ -240,8 +240,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         Post(routePath("/orderbook"), Json.toJson(order)) ~> route ~> check {
           (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
         }
-      },
-      apiKey
+      }
     )
   }
 
@@ -252,14 +251,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         Post(routePath("/orderbook/market"), Json.toJson(order)) ~> route ~> check {
           (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
         }
-      },
-      apiKey
+      }
     )
   }
 
   // getAssetPairAndPublicKeyOrderHistory
   routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
-    "returns an order history" in test(
+    "returns an order history filtered  by asset pair" in test(
       { route =>
         val now       = System.currentTimeMillis()
         val signature = crypto.sign(senderPrivateKey, order.senderPublicKey ++ Longs.toByteArray(now))
@@ -273,8 +271,55 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
           r.value.size shouldBe 1
           (r.value.head \ "id").as[String] shouldBe order.idStr()
         }
+      }
+    )
+  }
+
+  // getPublicKeyOrderHistory
+  routePath("/orderbook/{publicKey}") - {
+    "returns an order history" in test(
+      { route =>
+        val now       = System.currentTimeMillis()
+        val signature = crypto.sign(senderPrivateKey, order.senderPublicKey ++ Longs.toByteArray(now))
+        Get(routePath(s"/orderbook/${order.senderPublicKey}"))
+          .withHeaders(
+            RawHeader("Timestamp", s"$now"),
+            RawHeader("Signature", s"$signature")
+          ) ~> route ~> check {
+          val r = responseAs[JsArray]
+          r.value.size shouldBe 1
+          (r.value.head \ "id").as[String] shouldBe order.idStr()
+        }
+      }
+    )
+  }
+
+  // getAllOrderHistory
+  routePath("/orders/[address]") - {
+    "returns an order history by api key" in test(
+      { route =>
+        Get(routePath(s"/orders/${order.senderPublicKey.toAddress}")).withHeaders(apiKeyHeader) ~> route ~> check {
+          val r = responseAs[JsArray]
+          r.value.size shouldBe 1
+          (r.value.head \ "id").as[String] shouldBe order.idStr()
+        }
       },
       apiKey
+    )
+  }
+
+  // tradableBalance
+  routePath("/orderbook/[amountAsset]/[priceAsset]/tradableBalance/[address]") - {
+    "returns a tradable balance" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${order.senderPublicKey.toAddress}")) ~> route ~> check {
+          responseAs[JsObject].as[Map[String, Long]] should matchTo(
+            Map(
+              smartAssetId.toString -> 100L,
+              "WAVES"               -> 100L
+            ))
+        }
+      }
     )
   }
 
@@ -290,11 +335,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         RawHeader("Signature", base58Signature)
       ) ~> route
 
-    "returns a reserved balance for specified publicKey" in test(f = { route =>
-      mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
-        status shouldBe StatusCodes.OK
-      }
-    }, apiKey = apiKey)
+    "returns a reserved balance for specified publicKey" in test(
+      f = { route =>
+        mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject].as[Map[String, Long]] shouldBe Map("WAVES" -> 350L)
+        }
+      },
+      apiKey = apiKey
+    )
 
     "returns HTTP 400 when provided a wrong base58-encoded" - {
       "signature" in test { route =>
@@ -525,11 +574,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
-        case AddressDirectory.Envelope(_, PlaceOrder(x, _))                      => sender ! OrderAccepted(x)
+        case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) =>
+          sender ! AddressActor.Reply.Balance(Map(Waves -> 350L))
+        case AddressDirectory.Envelope(_, PlaceOrder(x, _)) => sender ! OrderAccepted(x)
         case AddressDirectory.Envelope(_, AddressActor.Query.GetOrdersStatuses(assetPair, onlyActive)) =>
           sender ! AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
-        case x => println(s"$x")
+        case AddressDirectory.Envelope(_, GetTradableBalance(xs)) => sender ! Balance(xs.map(_ -> 100L).toMap)
+        case x                                                    => println(s"$x")
       }
 
       TestActor.KeepRunning

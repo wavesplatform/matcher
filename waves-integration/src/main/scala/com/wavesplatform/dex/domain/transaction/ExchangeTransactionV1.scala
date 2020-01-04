@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.domain.transaction
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
@@ -10,6 +9,7 @@ import com.wavesplatform.dex.domain.crypto.{Proofs, Signed}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderV1
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
+import com.wavesplatform.dex.domain.utils._
 import monix.eval.Coeval
 import play.api.libs.json.{JsArray, JsString, JsValue}
 

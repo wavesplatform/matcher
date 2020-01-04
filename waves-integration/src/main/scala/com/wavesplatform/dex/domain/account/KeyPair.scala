@@ -4,7 +4,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr._
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import play.api.libs.json.{Format, Json, Writes}
 
 import scala.util.{Failure, Success}

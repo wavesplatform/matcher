@@ -54,11 +54,13 @@ object Dependencies {
     val scorexCrypto = "2.0.4"
 
     val monix = "3.0.0"
+
+    val supertagged = "1.4"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
   private def scalaModule(module: String, version: String): ModuleID = "org.scala-lang"                % module             % version
-  private def catsModule(module: String, version: String): ModuleID  = "org.typelevel"                 %% s"cats-$module"   % version
+  private def catsModule(module: String): ModuleID                   = "org.typelevel"                 %% s"cats-$module"   % Version.cats
   private def sttpModule(module: String): ModuleID                   = "com.softwaremill.sttp"         %% module            % Version.sttp
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID                  = "io.monix"                      %% s"monix-$module"  % Version.monix
@@ -69,7 +71,7 @@ object Dependencies {
   private val scalaCheck             = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
   private val scalaMock              = "org.scalamock" %% "scalamock-scalatest-support" % Version.scalaMock
   private val diffx                  = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
-  private val catsCore               = catsModule("core", Version.cats)
+  private val catsCore               = catsModule("core")
   private val catsTaglessMacros      = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
   private val kindProjector          = compilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
   private val betterMonadicFor       = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
@@ -92,6 +94,8 @@ object Dependencies {
   private val playJson               = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto           = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb            = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  private val monixReactive          = monixModule("reactive")
+  private val supertagged            = ("org.rudogma" %% "supertagged" % Version.supertagged)
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
@@ -131,8 +135,8 @@ object Dependencies {
       jacksonModule("module", "module-scala") withCrossVersion CrossVersion.Binary(),
       scalaModule("scala-library", scalaVersion.value),
       scalaModule("scala-reflect", scalaVersion.value),
-      catsModule("kernel", Version.cats),
-      catsModule("macros", Version.cats),
+      catsModule("kernel"),
+      catsModule("macros"),
       catsCore,
       shapeless,
       kamon,
@@ -168,7 +172,7 @@ object Dependencies {
       scorexCrypto,
       catsCore,
       monixModule("eval"),
-      monixModule("reactive")
+      monixReactive
     )
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
@@ -192,6 +196,13 @@ object Dependencies {
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
 
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
+      swagger,
+      playJson,
+      ficus,
+      scorexCrypto,
+      catsCore,
+      supertagged,
+      monixReactive,
       betterMonadicFor,
       mouse % Test
     )

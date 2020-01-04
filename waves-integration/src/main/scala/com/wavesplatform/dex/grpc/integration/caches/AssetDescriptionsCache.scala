@@ -3,7 +3,7 @@ package com.wavesplatform.dex.grpc.integration.caches
 import java.time.Duration
 
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 
 import scala.concurrent.{ExecutionContext, Future}
 

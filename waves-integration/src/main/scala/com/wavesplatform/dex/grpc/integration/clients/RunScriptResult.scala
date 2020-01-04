@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 sealed trait RunScriptResult
+
 object RunScriptResult {
   case class ScriptError(message: String)             extends RunScriptResult
   case object Denied                                  extends RunScriptResult

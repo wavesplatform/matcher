@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.domain.account
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.dex.domain.error.ValidationError.GenericError
 import play.api.libs.json.{Format, Writes}
 import supertagged._
 

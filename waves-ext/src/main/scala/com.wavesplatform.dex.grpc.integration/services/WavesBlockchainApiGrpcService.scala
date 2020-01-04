@@ -27,7 +27,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class WavesBlockchainApiGrpcServer(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
+class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
 

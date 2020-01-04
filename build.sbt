@@ -13,8 +13,6 @@ lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeV
 
 lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
-lazy val `dex-common` = project
-
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(
   node % "compile;runtime->provided"
@@ -36,9 +34,7 @@ lazy val `dex-it-common` = project.dependsOn(
 lazy val `dex-it` = project.dependsOn(
   dex % "compile;test->test",
   `waves-integration-it`,
-  `dex-it-common`,
-//  `dex-common`
-)
+  `dex-it-common`)
 
 lazy val `waves-grpc` = project
 
@@ -48,9 +44,7 @@ lazy val `waves-ext` = project.dependsOn(
 )
 
 lazy val `waves-integration` = project.dependsOn(
-  `waves-grpc`,
-//  `dex-common`,
-  node % "compile;test->test;runtime->provided"
+  `waves-grpc`
 )
 
 lazy val `waves-integration-it` = project

@@ -7,6 +7,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.internal.DnsNameResolverProvider
 import io.grpc.netty.NettyChannelBuilder
 import io.netty.channel.ChannelOption
+import io.netty.channel.nio.NioEventLoopGroup
 import monix.execution.Scheduler
 
 import scala.concurrent.ExecutionContext
@@ -14,9 +15,11 @@ import scala.concurrent.duration.FiniteDuration
 
 class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implicit val monixScheduler: Scheduler,
                                                                          val grpcExecutionContext: ExecutionContext)
-    extends ScorexLogging {
+    extends AutoCloseable with ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")
+
+  private val eventLoopGroup = new NioEventLoopGroup
 
   private val channel =
     NettyChannelBuilder
@@ -28,6 +31,8 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
       .keepAliveTimeout(5, TimeUnit.SECONDS)
       .nameResolverFactory(new DnsNameResolverProvider)
       .defaultLoadBalancingPolicy("pick_first")
+      .executor(grpcExecutionContext.execute)
+      .eventLoopGroup(eventLoopGroup)
       .withOption[Integer](ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
       .usePlaintext()
       .build
@@ -36,4 +41,8 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
     new WavesBlockchainGrpcAsyncClient(channel),
     defaultCachesExpiration
   )
+
+  override def close(): Unit = {
+    eventLoopGroup.shutdownGracefully() // We will ignore "graceful" part
+  }
 }

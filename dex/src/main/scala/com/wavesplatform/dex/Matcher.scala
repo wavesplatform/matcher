@@ -318,6 +318,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     setStatus(Status.Stopping)
 
     Await.result(matcherServerBinding.unbind(), 10.seconds)
+    gRPCExtensionClient.close()
 
     val stopMatcherTimeout = 5.minutes
     matcherQueue.close(stopMatcherTimeout)

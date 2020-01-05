@@ -67,7 +67,7 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
 
     override def onError(t: Throwable): Unit = {
       if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", t)
-      channel.resetConnectBackoff()
+      //channel.resetConnectBackoff()
       requestBalanceChanges()
     }
   }

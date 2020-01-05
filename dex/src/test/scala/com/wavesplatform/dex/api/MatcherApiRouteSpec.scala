@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
@@ -295,7 +295,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   }
 
   // getAllOrderHistory
-  routePath("/orders/[address]") - {
+  routePath("/orders/{address}") - {
     "returns an order history by api key" in test(
       { route =>
         Get(routePath(s"/orders/${order.senderPublicKey.toAddress}")).withHeaders(apiKeyHeader) ~> route ~> check {
@@ -309,7 +309,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
   }
 
   // tradableBalance
-  routePath("/orderbook/[amountAsset]/[priceAsset]/tradableBalance/[address]") - {
+  routePath("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}") - {
     "returns a tradable balance" in test(
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${order.senderPublicKey.toAddress}")) ~> route ~> check {
@@ -360,6 +360,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         }
       }
     }
+  }
+
+  // orderStatus
+  routePath("/orderbook/{amountAsset}/{priceAsset}/{orderId}") - {
+    "returns an order status" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/${order.id()}")) ~> route ~> check {
+          responseAs[JsObject] should matchTo(Json.obj("status" -> "Accepted"))
+        }
+      }
+    )
   }
 
   routePath("/settings/rates/{assetId}") - {
@@ -570,6 +581,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     }
   }
 
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+
+    val orderKey = MatcherKeys.order(order.id())
+    db.put(orderKey.keyBytes, orderKey.encode(Some(order)))
+  }
+
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
@@ -577,10 +595,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
         case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) =>
           sender ! AddressActor.Reply.Balance(Map(Waves -> 350L))
         case AddressDirectory.Envelope(_, PlaceOrder(x, _)) => sender ! OrderAccepted(x)
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrdersStatuses(assetPair, onlyActive)) =>
+        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrdersStatuses(assetPair, _)) =>
           sender ! AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
+        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrderStatus(orderId)) =>
+          sender ! { if (orderId == order.id()) OrderStatus.Accepted else Status.Failure(new RuntimeException(s"Unknown order $orderId")) }
         case AddressDirectory.Envelope(_, GetTradableBalance(xs)) => sender ! Balance(xs.map(_ -> 100L).toMap)
-        case x                                                    => println(s"$x")
+        case x                                                    => sender ! Status.Failure(new RuntimeException(s"Unknown command: $x"))
       }
 
       TestActor.KeepRunning

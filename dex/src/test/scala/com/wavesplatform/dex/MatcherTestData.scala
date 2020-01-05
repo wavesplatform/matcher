@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
-import com.wavesplatform.{NTPTime, RequestGen, crypto => wcrypto}
+import com.wavesplatform.{crypto => wcrypto}
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
@@ -33,7 +33,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherTestData extends RequestGen with NTPTime with DiffMatcherWithImplicits { _: Suite =>
+trait MatcherTestData extends RequestGen with DiffMatcherWithImplicits { _: Suite =>
   private val signatureSize = 32
 
   val WalletSeed               = ByteStr("Matcher".getBytes("utf-8"))

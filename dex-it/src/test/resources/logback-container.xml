@@ -32,7 +32,7 @@
     <logger name="io.netty" level="DEBUG" additivity="false">
         <appender-ref ref="FILE"/>
     </logger>
-    <logger name="io.grpc.netty" level="ERROR" additivity="false">
+    <logger name="io.grpc.netty" level="TRACE" additivity="false">
         <appender-ref ref="FILE"/>
     </logger>
 

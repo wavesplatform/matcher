@@ -29,6 +29,7 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
       .keepAliveWithoutCalls(true)
       .keepAliveTime(2, TimeUnit.SECONDS)
       .keepAliveTimeout(5, TimeUnit.SECONDS)
+      .idleTimeout(7, TimeUnit.SECONDS)
       .nameResolverFactory(new DnsNameResolverProvider)
       .defaultLoadBalancingPolicy("pick_first")
       .executor(grpcExecutionContext.execute)
@@ -43,6 +44,6 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
   )
 
   override def close(): Unit = {
-    eventLoopGroup.shutdownGracefully() // We will ignore "graceful" part
+    eventLoopGroup.shutdownGracefully() // We ignore "graceful" part
   }
 }

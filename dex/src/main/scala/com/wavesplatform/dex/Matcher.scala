@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.settings.ServerSettings
+import akka.io.Inet
 import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -317,7 +319,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info("Shutting down matcher")
     setStatus(Status.Stopping)
 
-    Await.result(matcherServerBinding.unbind(), 10.seconds)
+    matcherServerBinding.terminate(10.seconds)
     gRPCExtensionClient.close()
 
     val stopMatcherTimeout = 5.minutes
@@ -381,7 +383,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         hasMatcherAccountScript = hasMatcherScript
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
-        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+        // TODO now issue here
+        Http().bindAndHandle(combinedRoute,
+                             settings.restApi.address,
+                             settings.restApi.port,
+                             settings = ServerSettings(actorSystem).withSocketOptions(List(Inet.SO.ReuseAddress(true))))
       }
       _ = {
         matcherServerBinding = serverBinding

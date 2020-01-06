@@ -35,6 +35,9 @@
     <logger name="io.grpc.netty" level="TRACE" additivity="false">
         <appender-ref ref="FILE"/>
     </logger>
+    <logger name="akka.http" level="TRACE" additivity="false">
+        <appender-ref ref="FILE"/>
+    </logger>
 
     <!-- Queue -->
     <logger name="org.apache.kafka" level="DEBUG" additivity="false">

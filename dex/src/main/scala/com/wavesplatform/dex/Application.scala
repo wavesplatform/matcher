@@ -13,10 +13,8 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.network._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter}
-import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
@@ -24,8 +22,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
   app =>
@@ -41,7 +38,6 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   private var matcher: Matcher = _
 
   def run(): Unit = {
-
     val gRPCExtensionClient =
       new DEXClient(
         s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
@@ -53,29 +49,34 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
     // on unexpected shutdown
     sys.addShutdownHook {
-      Await.ready(Kamon.stopAllReporters(), 20.seconds)
-      Metrics.shutdown()
+      shutdown()
     }
   }
 
   private val shutdownInProgress             = new AtomicBoolean(false)
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit =
+  def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-      Await.ready(matcher.shutdown(), 5.minutes) // @TODO settings
-
       spendableBalanceChanged.onComplete()
-      utx.close()
+      val matcherShutdown = matcher.shutdown()
 
-      log.info("Shutdown complete")
+      log.info("Shutting down metrics...")
+      Metrics.shutdown()
+
+      log.info("Shutting down reporters...")
+      val kamonShutdown = Kamon.stopAllReporters()
+
+      matcherShutdown.zip(kamonShutdown).onComplete {
+        case Success(_) => log.info("Shutdown complete")
+        case Failure(e) => log.error("Can't stop DEX correctly", e)
+      }
     }
 }
 
 object Application {
 
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): (Config, MatcherSettings) = {
-
     import com.wavesplatform.settings._
 
     val config   = loadConfig(external map ConfigFactory.parseFile)
@@ -99,7 +100,6 @@ object Application {
   }
 
   def main(args: Array[String]): Unit = {
-
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")
@@ -115,7 +115,6 @@ object Application {
   }
 
   private[this] def startDEX(configFile: Option[String]): Unit = {
-
     import com.wavesplatform.settings.Constants
 
     val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }

@@ -6,8 +6,6 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.settings.ServerSettings
-import akka.io.Inet
 import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
@@ -41,7 +39,7 @@ import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopAp
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -315,22 +313,38 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   @volatile var matcherServerBinding: ServerBinding = _
 
-  override def shutdown(): Future[Unit] = Future {
-    log.info("Shutting down matcher")
+  override def shutdown(): Future[Unit] = {
     setStatus(Status.Stopping)
-
-    matcherServerBinding.terminate(10.seconds)
-    gRPCExtensionClient.close()
-
-    val stopMatcherTimeout = 5.minutes
-    matcherQueue.close(stopMatcherTimeout)
-
-    orderBooksSnapshotCache.close()
-    Await.result(gracefulStop(matcherActor, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
-    materializer.shutdown()
-    log.debug("Matcher's actor system has been shut down")
-    db.close()
-    log.info("Matcher shutdown successful")
+    for {
+      _ <- {
+        log.info("Shutting down HTTP server...")
+        matcherServerBinding.terminate(1.second)
+      }
+      _ <- {
+        log.info("Shutting down gRPC client...")
+        gRPCExtensionClient.close()
+      }
+      _ <- {
+        log.info("Shutting down queue...")
+        Future(blocking(matcherQueue.close(5.seconds)))
+      }
+      _ <- {
+        log.info("Shutting down caches...")
+        Future.successful(orderBooksSnapshotCache.close())
+      }
+      _ <- {
+        log.info("Shutting down actors...")
+        gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown)
+      }
+      _ <- {
+        log.info("Shutting down materializer...")
+        Future.successful(materializer.shutdown())
+      }
+      _ <- {
+        log.debug("Shutting down DB...")
+        Future(blocking(db.close()))
+      }
+    } yield ()
   }
 
   override def start(): Unit = {
@@ -384,10 +398,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
         // TODO now issue here
-        Http().bindAndHandle(combinedRoute,
-                             settings.restApi.address,
-                             settings.restApi.port,
-                             settings = ServerSettings(actorSystem).withSocketOptions(List(Inet.SO.ReuseAddress(true))))
+        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
       }
       _ = {
         matcherServerBinding = serverBinding

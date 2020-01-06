@@ -10,12 +10,12 @@ import io.netty.channel.ChannelOption
 import io.netty.channel.nio.NioEventLoopGroup
 import monix.execution.Scheduler
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implicit val monixScheduler: Scheduler,
                                                                          val grpcExecutionContext: ExecutionContext)
-    extends AutoCloseable with ScorexLogging {
+    extends ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")
 
@@ -43,7 +43,5 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
     defaultCachesExpiration
   )
 
-  override def close(): Unit = {
-    eventLoopGroup.shutdownGracefully() // We ignore "graceful" part
-  }
+  def close(): Future[Unit] = Future(blocking(eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS)))
 }

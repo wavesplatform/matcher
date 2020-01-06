@@ -176,7 +176,18 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
     }
   }
 
-  private def sendStopCmd(): Unit  = dockerClient.stopContainerCmd(underlying.containerId).exec()
+  private def sendStopCmd(): Unit = {
+    dockerClient.stopContainerCmd(underlying.containerId).withTimeout(20).exec()
+    Iterator
+      .continually {
+        Thread.sleep(1000)
+        dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
+      }
+      .zipWithIndex
+      .find { case (state, attempt) => !state.getRunning || attempt == 20 }
+      .fold(log.warn(s"Can't stop ${underlying.containerId}"))(_ => ())
+  }
+
   private def sendStartCmd(): Unit = dockerClient.startContainerCmd(underlying.containerId).exec()
 
   def disconnectFromNetwork(): Unit = {

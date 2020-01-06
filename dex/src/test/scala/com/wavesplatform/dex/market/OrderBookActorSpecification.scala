@@ -8,7 +8,6 @@ import cats.data.NonEmptyList
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.api.AlreadyProcessed
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
@@ -242,7 +241,7 @@ class OrderBookActorSpecification
       (1 to 10).foreach { i =>
         actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
       }
-      all(receiveN(10)) shouldBe AlreadyProcessed
+      tp.expectNoMessage(100.millis)
     }
 
     "respond on SaveSnapshotCommand" in obcTest { (pair, actor, tp) =>

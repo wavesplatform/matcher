@@ -4,7 +4,6 @@ import akka.actor.{Actor, ActorRef, Props}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
-import com.wavesplatform.dex.api._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
@@ -91,7 +90,7 @@ class OrderBookActor(owner: ActorRef,
     case request: QueueEventWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
-        case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
+        case Some(lastProcessed) if request.offset <= lastProcessed => // Already processed
         case _ =>
           lastProcessedOffset = Some(request.offset)
           request.event match {

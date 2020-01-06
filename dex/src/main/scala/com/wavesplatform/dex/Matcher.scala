@@ -7,7 +7,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{ask, gracefulStop}
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future.catsStdInstancesForFuture
@@ -43,7 +43,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem, val materializer: ActorMaterializer)
+class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem)
     extends Extension
     with ScorexLogging {
 
@@ -51,6 +51,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient}
 
   private val time = new NTP(settings.ntpServer)
+
+  private implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(actorSystem))
 
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
@@ -398,7 +400,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
         // TODO now issue here
-        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+        Future.firstCompletedOf(List(
+          Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port),
+          timeout(10.seconds, "Can't bind HTTP in 10 seconds")
+        ))
       }
       _ = {
         matcherServerBinding = serverBinding
@@ -458,10 +463,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     p.future
   }
 
-  private def timeout(after: FiniteDuration): Future[Nothing] = {
+  private def timeout(after: FiniteDuration, label: String = ""): Future[Nothing] = {
     val failure = Promise[Nothing]()
     actorSystem.scheduler.scheduleOnce(after) {
-      failure.failure(new TimeoutException(s"$after is out"))
+      failure.failure(new TimeoutException(s"$after is out${if (label.isEmpty) "" else s": $label"}"))
     }
     failure.future
   }

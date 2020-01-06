@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http.ServerBinding
-import akka.stream.ActorMaterializer
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -28,8 +27,6 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   app =>
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
-
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 

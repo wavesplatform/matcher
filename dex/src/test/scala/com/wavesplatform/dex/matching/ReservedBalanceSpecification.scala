@@ -4,11 +4,14 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.api.OrderRejected
-import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
+import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
+import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.market.MatcherSpecLike
@@ -16,18 +19,16 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecu
 import com.wavesplatform.dex.model.OrderBook._
 import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderHistoryStub}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.dex.{AssetPairDecimals, MatcherTestData, _}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.{NTPTime, WithDB}
+import com.wavesplatform.dex.{MatcherSpecBase, _}
 import monix.reactive.subjects.Subject
 import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Future}
+import scala.math.BigDecimal.RoundingMode.CEILING
 
 /**
   * Tests for reserved balance
@@ -78,27 +79,22 @@ class ReservedBalanceSpecification
     extends PropSpecLike
     with MatcherSpecLike
     with WithDB
-    with MatcherTestData
+    with MatcherSpecBase
     with TableDrivenPropertyChecks
     with NTPTime {
 
   override protected def actorSystemName: String = getSimpleName(this)
 
-  private implicit val efc = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = 8
-  }
+  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val timeout: Timeout           = 5.seconds
 
-  import com.wavesplatform.utils.Implicits._
+  import com.wavesplatform.dex.util.Implicits._
   import system.dispatcher
 
-  private val ignoreSpendableBalanceChanges = Subject.empty[SpendableBalanceChanges]
+  private val ignoreSpendableBalanceChanges: Subject[SpendableBalanceChanges, SpendableBalanceChanges] = Subject.empty[SpendableBalanceChanges]
 
-  private implicit val timeout: Timeout = 5.seconds
-
-  val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  val p    = AssetPairDecimals(8, 2)
-
-  var oh = new OrderHistoryStub(system, ntpTime)
+  private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
+  private var oh: OrderHistoryStub = new OrderHistoryStub(system, ntpTime)
 
   private val addressDir = system.actorOf(
     Props(
@@ -123,6 +119,10 @@ class ReservedBalanceSpecification
       )
     )
   )
+
+  private def minAmountFor(price: Long, amountDecimals: Int = 8): Long = { BigDecimal(Math.pow(10, amountDecimals)) / BigDecimal(price) }
+    .setScale(0, CEILING)
+    .toLong
 
   private def openVolume(senderPublicKey: PublicKey, assetId: Asset, addressDirectory: ActorRef = addressDir): Long = {
     Await
@@ -152,10 +152,10 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2), p.price(2.3)),
-      (SELL, p.amount(2), p.price(2.3), p.amount(2), p.price(2.3)),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2), p.price(2.2)),
-      (SELL, p.amount(2), p.price(2.2), p.amount(2), p.price(2.3))
+      (BUY, 2.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (SELL, 2.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (BUY, 2.waves, 2.3.usd, 2.waves, 2.2.usd),
+      (SELL, 2.waves, 2.2.usd, 2.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(s"Reserves should be 0 when remains are 0: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
@@ -187,10 +187,10 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2.00434782), p.price(2.3), p.amount(2), p.price(2.3)),
-      (SELL, p.amount(2.00434782), p.price(2.3), p.amount(2), p.price(2.3)),
-      (BUY, p.amount(2.00434782), p.price(2.3), p.amount(2), p.price(2.2)),
-      (SELL, p.amount(2.00454545), p.price(2.2), p.amount(2), p.price(2.3))
+      (BUY, 2.00434782.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (SELL, 2.00434782.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (BUY, 2.00434782.waves, 2.3.usd, 2.waves, 2.2.usd),
+      (SELL, 2.00454545.waves, 2.2.usd, 2.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -205,7 +205,7 @@ class ReservedBalanceSpecification
       }
 
       withClue("Counter remain should be (minAmount - 1):") {
-        exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
+        exec.counterRemainingAmount shouldBe minAmountFor(counterPrice) - 1
         exec.submittedRemainingAmount shouldBe 0
       }
 
@@ -224,10 +224,10 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2.00434782), p.price(2.3)),
-      (SELL, p.amount(2), p.price(2.3), p.amount(2.00434782), p.price(2.3)),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2.00454545), p.price(2.2)),
-      (SELL, p.amount(2), p.price(2.2), p.amount(2.00434782), p.price(2.3))
+      (BUY, 2.waves, 2.3.usd, 2.00434782.waves, 2.3.usd),
+      (SELL, 2.waves, 2.3.usd, 2.00434782.waves, 2.3.usd),
+      (BUY, 2.waves, 2.3.usd, 2.00454545.waves, 2.2.usd),
+      (SELL, 2.waves, 2.2.usd, 2.00434782.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -243,7 +243,7 @@ class ReservedBalanceSpecification
 
       withClue("Submitted remain should be (minAmount - 1):") {
         exec.counterRemainingAmount shouldBe 0
-        exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
+        exec.submittedRemainingAmount shouldBe minAmountFor(submittedPrice) - 1
       }
 
       withClue(s"Counter sender should not have reserves:") {
@@ -261,10 +261,10 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2.00434783), p.price(2.3), p.amount(2), p.price(2.3)),
-      (SELL, p.amount(2.00434783), p.price(2.3), p.amount(2), p.price(2.3)),
-      (BUY, p.amount(2.00434783), p.price(2.3), p.amount(2), p.price(2.2)),
-      (SELL, p.amount(2.00454546), p.price(2.2), p.amount(2), p.price(2.3))
+      (BUY, 2.00434783.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (SELL, 2.00434783.waves, 2.3.usd, 2.waves, 2.3.usd),
+      (BUY, 2.00434783.waves, 2.3.usd, 2.waves, 2.2.usd),
+      (SELL, 2.00454546.waves, 2.2.usd, 2.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -279,12 +279,12 @@ class ReservedBalanceSpecification
       }
 
       withClue("Counter remain should be minAmount:") {
-        exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice)
+        exec.counterRemainingAmount shouldBe minAmountFor(counterPrice)
         exec.submittedRemainingAmount shouldBe 0
       }
 
       withClue(s"Counter sender should have reserved asset:") {
-        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (p.minAmountFor(counterPrice), 0)
+        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (minAmountFor(counterPrice), 0)
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
         openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
@@ -299,10 +299,10 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2.00434783), p.price(2.3)),
-      (SELL, p.amount(2), p.price(2.3), p.amount(2.00434783), p.price(2.3)),
-      (BUY, p.amount(2), p.price(2.3), p.amount(2.00454546), p.price(2.2)),
-      (SELL, p.amount(2), p.price(2.2), p.amount(2.00434783), p.price(2.3))
+      (BUY, 2.waves, 2.3.usd, 2.00434783.waves, 2.3.usd),
+      (SELL, 2.waves, 2.3.usd, 2.00434783.waves, 2.3.usd),
+      (BUY, 2.waves, 2.3.usd, 2.00454546.waves, 2.2.usd),
+      (SELL, 2.waves, 2.2.usd, 2.00434783.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -318,7 +318,7 @@ class ReservedBalanceSpecification
 
       withClue("Submitted remain should be minAmount:") {
         exec.counterRemainingAmount shouldBe 0
-        exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice)
+        exec.submittedRemainingAmount shouldBe minAmountFor(submittedPrice)
       }
 
       withClue(s"Counter sender should not have reserves:") {
@@ -327,7 +327,7 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Submitted sender should have reserved asset:") {
-        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (p.minAmountFor(submittedPrice), 0) else (0, 1)
+        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (minAmountFor(submittedPrice), 0) else (0, 1)
         openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
         openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
@@ -337,8 +337,8 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2.00434782), p.price(2.3), p.amount(2.00434782), p.price(2.3)),
-      (SELL, p.amount(2.00434782), p.price(2.3), p.amount(2.00434782), p.price(2.3))
+      (BUY, 2.00434782.waves, 2.3.usd, 2.00434782.waves, 2.3.usd),
+      (SELL, 2.00434782.waves, 2.3.usd, 2.00434782.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -348,10 +348,10 @@ class ReservedBalanceSpecification
       val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
-      exec.executedAmount shouldBe p.amount(2)
+      exec.executedAmount shouldBe 2.waves
 
-      exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
-      exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
+      exec.counterRemainingAmount shouldBe minAmountFor(counterPrice) - 1
+      exec.submittedRemainingAmount shouldBe minAmountFor(submittedPrice) - 1
 
       withClue(s"Counter sender should not have reserves:") {
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
@@ -368,8 +368,8 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2.00434782), p.price(2.3), p.amount(2.00434783), p.price(2.3)),
-      (SELL, p.amount(2.00434782), p.price(2.3), p.amount(2.00434783), p.price(2.3))
+      (BUY, 2.00434782.waves, 2.3.usd, 2.00434783.waves, 2.3.usd),
+      (SELL, 2.00434782.waves, 2.3.usd, 2.00434783.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -379,10 +379,10 @@ class ReservedBalanceSpecification
       val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
-      exec.executedAmount shouldBe p.amount(2)
+      exec.executedAmount shouldBe 2.waves
 
-      exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
-      exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice)
+      exec.counterRemainingAmount shouldBe minAmountFor(counterPrice) - 1
+      exec.submittedRemainingAmount shouldBe minAmountFor(submittedPrice)
 
       withClue(s"Counter sender should not have reserves:") {
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
@@ -390,7 +390,7 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Submitted sender should have reserved asset:") {
-        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (p.minAmountFor(submittedPrice), 0) else (0, 1)
+        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (minAmountFor(submittedPrice), 0) else (0, 1)
         openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
         openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
@@ -400,8 +400,8 @@ class ReservedBalanceSpecification
   forAll(
     Table(
       ("counter type", "counter amount", "counter price", "submitted amount", "submitted price"),
-      (BUY, p.amount(2.00434783), p.price(2.3), p.amount(2.00434782), p.price(2.3)),
-      (SELL, p.amount(2.00434783), p.price(2.3), p.amount(2.00434782), p.price(2.3))
+      (BUY, 2.00434783.waves, 2.3.usd, 2.00434782.waves, 2.3.usd),
+      (SELL, 2.00434783.waves, 2.3.usd, 2.00434782.waves, 2.3.usd)
     )
   ) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
@@ -411,13 +411,13 @@ class ReservedBalanceSpecification
       val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
-      exec.executedAmount shouldBe p.amount(2)
+      exec.executedAmount shouldBe 2.waves
 
-      exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice)
-      exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
+      exec.counterRemainingAmount shouldBe minAmountFor(counterPrice)
+      exec.submittedRemainingAmount shouldBe minAmountFor(submittedPrice) - 1
 
       withClue(s"Counter sender should have reserved asset:") {
-        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (p.minAmountFor(submittedPrice), 0)
+        val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (minAmountFor(submittedPrice), 0)
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
         openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }

@@ -69,7 +69,7 @@ object NodeApi {
         tryParseJson(sttp.get(uri"$apiUri/addresses/balance/$address"))
 
       override def tryAssetBalance(address: Address, asset: IssuedAsset): F[Either[ErrorResponse, AssetBalanceResponse]] =
-        tryParseJson(sttp.get(uri"$apiUri/assets/balance/$address/${AssetPair.assetIdStr(asset)}"))
+        tryParseJson(sttp.get(uri"$apiUri/assets/balance/$address/${asset.toString}"))
 
       override def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]] = tryUnit(sttp.post(uri"$apiUri/transactions/broadcast").body(tx))
 

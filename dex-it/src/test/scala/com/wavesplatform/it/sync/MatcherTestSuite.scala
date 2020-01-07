@@ -234,7 +234,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       "request order book for blacklisted pair" in {
         dex1.api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
           11534345,
-          MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
+          MatcherError.Params(assetId = Some(ForbiddenAsset.toString))) // AssetNotFound
       }
 
       "should consider UTX pool when checking the balance" in {

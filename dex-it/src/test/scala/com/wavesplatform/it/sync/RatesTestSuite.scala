@@ -7,8 +7,8 @@ import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
 class RatesTestSuite extends MatcherSuiteBase {

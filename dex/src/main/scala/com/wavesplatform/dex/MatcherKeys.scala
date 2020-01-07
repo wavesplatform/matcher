@@ -4,27 +4,29 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.Key
+import com.wavesplatform.dex.db.leveldb.Key
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange._
 
 import scala.collection.mutable
 
 object MatcherKeys {
-  import com.wavesplatform.database.KeyHelpers._
+  import com.wavesplatform.dex.db.leveldb.KeyHelpers._
 
   val version: Key[Int] = intKey("matcher-version", 0, default = 1)
 
   def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
     "matcher-order",
     bytes(1, orderId.arr),
-    xs => Order.fromBytes(xs.head, xs.tail),
+    xs => Order.parseBytes(xs).get,
     o => o.version +: o.bytes()
   )
 

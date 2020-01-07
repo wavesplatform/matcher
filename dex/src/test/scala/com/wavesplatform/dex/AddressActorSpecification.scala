@@ -5,20 +5,19 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
-import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor.Command.{CancelNotEnoughCoinsOrders, PlaceOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
+import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.Future
@@ -243,7 +242,7 @@ class AddressActorSpecification
   }
 
   private def addr(seed: String): Address       = privateKey(seed).toAddress
-  private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes("utf-8"), 0)
+  private def privateKey(seed: String): KeyPair = KeyPair(seed.getBytes("utf-8"))
 
   private def PlaceLimitOrder(o: Order): AddressActor.Command.PlaceOrder = PlaceOrder(o, isMarket = false)
 

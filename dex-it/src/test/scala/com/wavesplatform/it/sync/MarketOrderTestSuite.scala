@@ -8,13 +8,13 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.AcceptedOrderType
-import com.wavesplatform.dex.model.MatcherModel.Normalization
+import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest
 
@@ -95,7 +95,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
           assert(
             wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
-            s"Alice doesn't have enough balance in ${AssetPair.assetIdStr(issuedAsset)} to make a transfer"
+            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
           )
         }
         broadcastAndAwait { mkTransfer(alice, account, balance, asset, fixedFee) }

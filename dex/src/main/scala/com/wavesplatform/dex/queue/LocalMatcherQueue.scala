@@ -4,10 +4,10 @@ import java.util.concurrent.Executors
 import java.util.{Timer, TimerTask}
 
 import com.wavesplatform.dex.LocalQueueStore
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.LocalMatcherQueue._
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}

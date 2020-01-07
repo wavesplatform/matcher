@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.time
+
 import java.net.{InetAddress, SocketTimeoutException}
 
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler}

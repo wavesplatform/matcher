@@ -12,7 +12,7 @@
 //import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 //import com.wavesplatform.transaction.Asset
 //import com.wavesplatform.transaction.Asset.IssuedAsset
-//import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+//import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 //import com.wavesplatform.dex.settings.FeeMode._
 //import com.wavesplatform.dex.settings.AssetType._
 //

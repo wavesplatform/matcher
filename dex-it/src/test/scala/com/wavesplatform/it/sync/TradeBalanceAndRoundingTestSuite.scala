@@ -5,7 +5,7 @@ import com.wavesplatform.dex.it.api.responses.dex.{AssetDecimalsInfo, OrderStatu
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 import scala.math.BigDecimal.RoundingMode

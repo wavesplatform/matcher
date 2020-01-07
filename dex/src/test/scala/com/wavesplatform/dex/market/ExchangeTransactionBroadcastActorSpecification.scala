@@ -5,17 +5,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
-import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
+import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, ExchangeTransactionV2, Order}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -25,7 +26,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class ExchangeTransactionBroadcastActorSpecification
     extends MatcherSpec("ExchangeTransactionBroadcastActor")
-    with MatcherTestData
+    with MatcherSpecBase
     with BeforeAndAfterEach
     with PathMockFactory
     with ImplicitSender
@@ -212,7 +213,7 @@ class ExchangeTransactionBroadcastActorSpecification
   )
 
   private def sampleEvent(expiration: FiniteDuration = 1.day): ExchangeTransactionCreated = {
-    val ts = ntpTime.getTimestamp()
+    val ts = ntpTime.getTimestamp
     ExchangeTransactionCreated(
       ExchangeTransactionV2
         .create(

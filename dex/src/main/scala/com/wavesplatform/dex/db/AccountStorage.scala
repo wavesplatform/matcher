@@ -6,9 +6,9 @@ import java.util.Base64
 
 import cats.syntax.either._
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.crypto.Enigma
 import com.wavesplatform.dex.db.AccountStorage.Settings.EncryptedFile
 import net.ceedubs.ficus.readers.ValueReader

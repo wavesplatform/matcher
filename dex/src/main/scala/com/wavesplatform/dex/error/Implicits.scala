@@ -7,13 +7,13 @@ import cats.syntax.foldable._
 import cats.syntax.functor._
 import cats.syntax.show._
 import cats.{Show, Traverse}
-import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.settings.formatValue
-import com.wavesplatform.features.BlockchainFeature
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.domain.feature.BlockchainFeature
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}
@@ -29,8 +29,8 @@ object Implicits {
 
   implicit val doubleShow            = show[Double](d => formatValue(d))
   implicit val byteStrShow           = show[ByteStr](_.toString)
-  implicit val assetShow             = show[Asset](AssetPair.assetIdStr)
-  implicit val issuedAssetShow       = show[IssuedAsset](AssetPair.assetIdStr)
+  implicit val assetShow             = show[Asset](_.toString)
+  implicit val issuedAssetShow       = show[IssuedAsset](_.toString)
   implicit val wavesShow             = show[Waves.type](_ => "WAVES")
   implicit val assetPairShow         = show[AssetPair](_.key)
   implicit val publicKeyShow         = show[PublicKey](_.toString)
@@ -56,7 +56,7 @@ object Implicits {
   implicit val doubleWrites            = stringWrites.contramap[Double](d => formatValue(d))
   implicit val decimalWrites           = stringWrites.contramap[BigDecimal](formatValue)
   implicit val byteStrWrites           = stringWrites.contramap[ByteStr](_.toString)
-  implicit val assetWrites             = stringWrites.contramap[Asset](AssetPair.assetIdStr)
+  implicit val assetWrites             = stringWrites.contramap[Asset](_.toString)
   implicit val assetPairWrites         = Writes[AssetPair](_.json)
   implicit val publicKeyWrites         = stringWrites.contramap[PublicKey](_.toString)
   implicit val addressWrites           = stringWrites.contramap[Address](_.stringRepr)

@@ -1,15 +1,16 @@
 package com.wavesplatform.it
 
 import cats.instances.FutureInstances
+import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
-import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.test.InformativeTestStart
-import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest._

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
-import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.dex.domain.order.Order
 import org.scalacheck.Gen
 
 class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {

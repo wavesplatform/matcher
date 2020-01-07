@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.util
 
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.domain.asset.AssetPair
 
 import scala.util.{Failure, Try}
 

@@ -5,11 +5,11 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
 
-import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}

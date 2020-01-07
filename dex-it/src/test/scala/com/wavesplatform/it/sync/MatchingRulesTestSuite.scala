@@ -7,8 +7,8 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 

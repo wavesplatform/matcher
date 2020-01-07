@@ -8,14 +8,14 @@ import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.it.docker.base.BaseContainer
-import com.wavesplatform.dex.model.MatcherModel.Normalization
+import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
@@ -189,7 +189,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, 2)
   }
 
-  def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)
+  def stringify(asset: Asset): String = asset.toString
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders

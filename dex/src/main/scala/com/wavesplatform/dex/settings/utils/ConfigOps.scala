@@ -12,7 +12,7 @@ object ConfigOps {
 
   final implicit class ConfigOps(config: Config) {
 
-    val cfgValidator = ConfigSettingsValidator(config)
+    val cfgValidator: ConfigSettingsValidator = ConfigSettingsValidator(config)
 
     def getValidatedSet[T: ValueReader](path: String): Set[T] = {
       cfgValidator.validateList[T](path).map(_.toSet) getValueOrThrowErrors

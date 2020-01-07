@@ -6,6 +6,7 @@ import com.wavesplatform.dex.util.getSimpleName
 import play.api.libs.json.Json
 
 object MatcherErrorDoc {
+
   object entitySamples extends DescendantSamples[Entity]
   object classSamples  extends DescendantSamples[Class]
   object errorSamples  extends DescendantSamples[MatcherError]

@@ -4,7 +4,7 @@ import cats.Id
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.error.ProduceError.produce
+import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -39,7 +39,7 @@ class MatcherScriptRunnerSpecification extends FreeSpecLike with Matchers with T
   }
 
   "Blockchain functions are disabled in dApp" in {
-    Try(run(dAppScriptBlockchain)).toEither should produce("""An access to the blockchain\.accountData is denied on DEX""".r)
+    Try(run(dAppScriptBlockchain)).toEither should produce("accountData is denied on DEX")
   }
 
   private def dAppScriptSunny: Script =

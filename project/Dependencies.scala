@@ -28,8 +28,10 @@ object Dependencies {
     val slf4j   = "1.7.25"
     val janino  = "3.1.0"
 
-    val silencer = "1.4.1"
-    val kamon    = "1.1.5"
+    val silencer           = "1.4.1"
+    val kamonCore          = "1.1.5"
+    val kamonInfluxDb      = "1.0.3"
+    val kamonSystemMetrics = "1.0.1"
 
     val wavesProtobufSchemas = "1.0.0"
 
@@ -56,6 +58,11 @@ object Dependencies {
     val monix = "3.0.0"
 
     val supertagged = "1.4"
+
+    val levelDb  = "0.12"
+    val influxDb = "2.14"
+
+    val commonsNet = "3.6"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -64,6 +71,7 @@ object Dependencies {
   private def sttpModule(module: String): ModuleID                   = "com.softwaremill.sttp"         %% module            % Version.sttp
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID                  = "io.monix"                      %% s"monix-$module"  % Version.monix
+  private def kamonModule(module: String, version: String): ModuleID = "io.kamon"                      %% s"kamon-$module"  % version
 
   private val akkaActor              = akkaModule("akka-actor", Version.akka)
   private val akkaHttp               = akkaModule("akka-http", Version.akkaHttp)
@@ -84,7 +92,7 @@ object Dependencies {
   private val slf4j                  = "org.slf4j" % "slf4j-api" % Version.slf4j
   private val logbackScalaJsExcluded = logback.exclude("org.scala-js", "scalajs-library_2.12")
   private val janino                 = "org.codehaus.janino" % "janino" % Version.janino
-  private val kamon                  = "io.kamon" %% "kamon-core" % Version.kamon
+  private val kamonCore              = kamonModule("core", Version.kamonCore)
   private val wavesProtobufSchemas   = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
   private val toxiProxy              = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
   private val googleGuava            = "com.google.guava" % "guava" % Version.googleGuava
@@ -95,7 +103,10 @@ object Dependencies {
   private val scorexCrypto           = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb            = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   private val monixReactive          = monixModule("reactive")
-  private val supertagged            = ("org.rudogma" %% "supertagged" % Version.supertagged)
+  private val supertagged            = "org.rudogma" %% "supertagged" % Version.supertagged
+  private val levelDb                = "org.iq80.leveldb" % "leveldb" % Version.levelDb
+  private val influxDb               = "org.influxdb" % "influxdb-java" % Version.influxDb
+  private val commonsNet             = "commons-net" % "commons-net" % Version.commonsNet
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
@@ -114,6 +125,7 @@ object Dependencies {
 
   private val testKit: Seq[ModuleID] = Seq(
     akkaModule("akka-testkit", Version.akka),
+    akkaModule("akka-http-testkit", Version.akkaHttp),
     scalaTest,
     scalaCheck,
     scalaMock
@@ -139,7 +151,7 @@ object Dependencies {
       catsModule("macros"),
       catsCore,
       shapeless,
-      kamon,
+      kamonCore,
       typesafeConfig,
       scalaTest % Test,
       googleGuava,
@@ -159,21 +171,18 @@ object Dependencies {
       logback,
       kindProjector,
       catsTaglessMacros,
+      shapeless,
       mouse,
       scopt,
       kafka,
-      janino
+      janino,
+      levelDb,
+      kamonCore,
+      kamonModule("influxdb", Version.kamonInfluxDb),
+      kamonModule("system-metrics", Version.kamonSystemMetrics),
+      influxDb,
+      commonsNet
     ) ++ testKit ++ quill ++ silencer
-
-    lazy val dexCommon: Seq[ModuleID] = Seq(
-      swagger,
-      playJson,
-      ficus,
-      scorexCrypto,
-      catsCore,
-      monixModule("eval"),
-      monixReactive
-    )
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 
@@ -204,8 +213,8 @@ object Dependencies {
       supertagged,
       monixReactive,
       betterMonadicFor,
-      mouse % Test
-    )
+      mouse
+    ) ++ testKit
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = integrationTestKit
   }

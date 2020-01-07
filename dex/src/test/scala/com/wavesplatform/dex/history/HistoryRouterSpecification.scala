@@ -2,18 +2,18 @@ package com.wavesplatform.dex.history
 
 import akka.actor.ActorSystem
 import akka.testkit.TestKit
-import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.MatcherTestData
+import com.google.common.base.Charsets
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 class HistoryRouterSpecification
@@ -22,14 +22,14 @@ class HistoryRouterSpecification
     with Matchers
     with BeforeAndAfterAll
     with NTPTime
-    with MatcherTestData {
+    with MatcherSpecBase {
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
     super.afterAll()
   }
 
-  def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes(), 0)
+  def getKeyPair(seed: String): KeyPair = KeyPair(seed.getBytes(Charsets.UTF_8))
 
   val assetId    = ByteStr("asset".getBytes)
   val matcherFee = 30000L
@@ -58,7 +58,7 @@ class HistoryRouterSpecification
   def getOrder(senderSeed: String, orderType: OrderType, amount: Long, timestamp: Long): LimitOrder = {
     LimitOrder(
       OrderV1(
-        sender = privateKey(senderSeed),
+        sender = getKeyPair(senderSeed),
         matcher = PublicKey("matcher".getBytes()),
         pair = AssetPair(Waves, IssuedAsset(assetId)),
         orderType = orderType,

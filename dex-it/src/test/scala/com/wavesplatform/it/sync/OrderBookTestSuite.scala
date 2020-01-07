@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 
 import scala.concurrent.Await

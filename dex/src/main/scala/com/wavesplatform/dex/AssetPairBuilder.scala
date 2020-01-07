@@ -2,15 +2,14 @@ package com.wavesplatform.dex
 
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.either._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AssetPairBuilder.AssetSide
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.metrics._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
 import scala.concurrent.ExecutionContext
@@ -70,8 +69,8 @@ class AssetPairBuilder(settings: MatcherSettings,
 
   def createAssetPair(a1: String, a2: String): FutureResult[AssetPair] = create.measure {
     for {
-      a1 <- liftAsync { AssetPair.extractAssetId(a1).toEither.leftMap(_ => error.InvalidAsset(a1)) }
-      a2 <- liftAsync { AssetPair.extractAssetId(a2).toEither.leftMap(_ => error.InvalidAsset(a2)) }
+      a1 <- liftAsync { AssetPair.extractAsset(a1).toEither.leftMap(_ => error.InvalidAsset(a1)) }
+      a2 <- liftAsync { AssetPair.extractAsset(a2).toEither.leftMap(_ => error.InvalidAsset(a2)) }
       p  <- validateAssetPair { AssetPair(a1, a2) }
     } yield p
   }

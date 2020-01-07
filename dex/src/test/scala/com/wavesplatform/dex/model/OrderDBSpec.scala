@@ -1,15 +1,15 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.db.OrderDB
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.{NoShrink, WithDB}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.db.{OrderDB, WithDB}
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestData with PropertyChecks with NoShrink {
+class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
   import OrderDBSpec._
 
   private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo[OrderStatus.Final])] =
@@ -62,8 +62,8 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
       } yield
         (
           o,
-          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s1, o.assetPair),
-          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, s2, o.assetPair),
+          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, s1, o.assetPair),
+          OrderInfo.v2(o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, s2, o.assetPair),
         )
 
       forAll(dualFinalizedOrderInfoGen) {
@@ -114,6 +114,6 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
 object OrderDBSpec {
   private implicit class OrderExt(val o: Order) extends AnyVal {
     def toInfo[A <: OrderStatus](status: A) =
-      OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.matcherFeeAssetId, o.timestamp, status, o.assetPair)
+      OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair)
   }
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.domain.order
 
+import cats.syntax.functor._
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -45,7 +46,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
   import Order._
 
   @ApiModelProperty(hidden = true)
-  val sender = senderPublicKey
+  val sender: PublicKey = senderPublicKey
 
   @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
@@ -112,8 +113,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  override val json: Coeval[JsObject] = Coeval.evalOnce({
-    val sig = Base58.encode(signature)
+  override val json: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "version"          -> version,
       "id"               -> idStr(),
@@ -127,10 +127,10 @@ trait Order extends ByteAndJsonSerializable with Proven {
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
       "matcherFee"       -> matcherFee,
-      "signature"        -> sig,
+      "signature"        -> Base58.encode(signature),
       "proofs"           -> proofs.proofs
     )
-  })
+  }
 
   @ApiModelProperty(hidden = true)
   def jsonStr: String = Json.stringify(json())
@@ -271,23 +271,16 @@ object Order extends EntityParser[Order] {
     if (o1.orderType == OrderType.BUY) (o1, o2) else (o2, o1)
   }
 
-//  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
-//    case 1     => OrderV1.parseBytes(xs).get
-//    case 2     => OrderV2.parseBytes(xs).get
-//    case 3     => OrderV3.parseBytes(xs).get
-//    case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
-//  }
-
   override def statefulParse: Stateful[Order] =
-    for {
-      version <- read[Byte].transform { case (s, v) => s.copy(offset = s.offset - (if (v != 1) 1 else 0)) -> v }
-      order <- {
+    read[Byte]
+      .transform { case (s, v) => s.copy(offset = s.offset - (if (v != 1) 1 else 0)) -> v }
+      .flatMap { version =>
         val ep = version match {
           case 1     => OrderV1
           case 2     => OrderV2
           case 3     => OrderV3
           case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
-        }; ep.statefulParse.map[Order](identity)
+        }
+        ep.statefulParse.widen[Order]
       }
-    } yield order
 }

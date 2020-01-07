@@ -3,13 +3,14 @@ package com.wavesplatform.dex.model
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Price
+import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.MatcherModel._
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
-import com.wavesplatform.lang.utils.Serialize.ByteBufferOps
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -112,8 +113,8 @@ object OrderBook {
 
     def loFromBytes(bb: ByteBuffer): LimitOrder =
       OrderType(bb.get) match {
-        case OrderType.SELL => SellLimitOrder(bb.getLong, bb.getLong, Order.fromBytes(bb.get, bb.getBytes))
-        case OrderType.BUY  => BuyLimitOrder(bb.getLong, bb.getLong, Order.fromBytes(bb.get, bb.getBytes))
+        case OrderType.SELL => SellLimitOrder(bb.getLong, bb.getLong, Order.parseBytes(bb.getBytes).get)
+        case OrderType.BUY  => BuyLimitOrder(bb.getLong, bb.getLong, Order.parseBytes(bb.getBytes).get)
       }
   }
 
@@ -313,8 +314,6 @@ object OrderBook {
 
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
-
-  import com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
   private def limitOrder(remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = o.orderType match {
     case OrderType.BUY  => BuyLimitOrder(remainingAmount, remainingFee, o)

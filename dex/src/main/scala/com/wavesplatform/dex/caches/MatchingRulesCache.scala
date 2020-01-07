@@ -4,9 +4,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import scala.util.Try
 import scala.util.control.NonFatal

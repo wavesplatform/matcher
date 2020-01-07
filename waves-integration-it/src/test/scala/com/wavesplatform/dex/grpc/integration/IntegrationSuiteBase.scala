@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.node.{HasWavesNode, NodeApiExtensions}
-import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.test.InformativeTestStart
-import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest._
 import org.scalatest.concurrent.Eventually

@@ -3,9 +3,9 @@ package com.wavesplatform.dex.caches
 import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.dex.db.RateDB
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import org.iq80.leveldb.DB
 import play.api.libs.json.{JsObject, Json}
 
@@ -32,7 +32,7 @@ object RateCache {
   private val WavesRate = Option(1d)
 
   def getJson(ratesMap: Map[Asset, Double]): JsObject = Json.obj(
-    ratesMap.map { case (asset, rate) => AssetPair.assetIdStr(asset) -> Json.toJsFieldJsValueWrapper(rate) }.toSeq: _*
+    ratesMap.map { case (asset, rate) => asset.toString -> Json.toJsFieldJsValueWrapper(rate) }.toSeq: _*
   )
 
   def apply(db: DB): RateCache = new RateCache {

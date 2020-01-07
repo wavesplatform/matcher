@@ -15,14 +15,13 @@ lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$
 
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(
-  node % "compile;runtime->provided"
+  `waves-integration`
 )
 
 lazy val dex = project.dependsOn(
   `waves-integration`,
-//  `dex-common`,
-  `dex-test-common` % "test->compile",
-  node % "compile;test->test;runtime->provided"
+  `dex-test-common` % "test->compile"
+//  node % "compile;test->test;runtime->provided"
 )
 
 lazy val `dex-it-common` = project.dependsOn(
@@ -53,12 +52,6 @@ lazy val `waves-integration-it` = project
     `dex-it-common`
   )
 
-lazy val `dex-generator` = project.dependsOn(
-  dex,
-  `node-it` % "compile->test", // Without this IDEA doesn't find classes
-  `dex-it`  % "compile->test"
-)
-
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
@@ -79,8 +72,7 @@ lazy val root = (project in file("."))
   .settings(name := "dex-root")
   .aggregate(
     dex,
-    `dex-it`,
-    `dex-generator`
+    `dex-it`
   )
 
 inScope(Global)(
@@ -162,7 +154,6 @@ checkPRRaw := {
   } finally {
     (dex / Test / test).value
     (`waves-integration` / Test / test).value
-    (`dex-generator` / Test / compile).value
   }
 }
 

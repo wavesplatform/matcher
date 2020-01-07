@@ -2,8 +2,8 @@ package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.wavesplatform.NTPTime
 import com.wavesplatform.dex.WatchDistributedCompletionActorSpecification._
+import com.wavesplatform.dex.time.NTPTime
 import org.scalacheck.Gen
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => DrivenPropertyChecks}

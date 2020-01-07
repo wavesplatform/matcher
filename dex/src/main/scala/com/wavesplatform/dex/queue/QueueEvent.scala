@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.queue
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.DigestSize
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.DigestSize
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 sealed trait QueueEvent extends Product with Serializable {
   def assetPair: AssetPair
@@ -26,8 +26,8 @@ object QueueEvent {
 
   implicit final class Ops(val self: QueueEvent) extends AnyVal {
     def assets: Set[Asset] = self match {
-      case x: Placed           => x.assetPair.assets + x.limitOrder.order.matcherFeeAssetId
-      case x: PlacedMarket     => x.assetPair.assets + x.marketOrder.order.matcherFeeAssetId
+      case x: Placed           => x.assetPair.assets + x.limitOrder.order.feeAsset
+      case x: PlacedMarket     => x.assetPair.assets + x.marketOrder.order.feeAsset
       case x: Canceled         => x.assetPair.assets
       case x: OrderBookDeleted => x.assetPair.assets
     }
@@ -41,10 +41,10 @@ object QueueEvent {
   }
 
   def fromBytes(xs: Array[Byte]): QueueEvent = xs.head match {
-    case 1 => Placed(LimitOrder(Order.fromBytes(xs(1), xs.slice(2, Int.MaxValue))))
+    case 1 => Placed(LimitOrder(Order.parseBytes(xs.tail).get))
     case 2 => Canceled(AssetPair.fromBytes(xs.tail), ByteStr(xs.takeRight(DigestSize)))
     case 3 => OrderBookDeleted(AssetPair.fromBytes(xs.tail))
-    case 4 => val afs = Longs.fromByteArray(xs.slice(1, 9)); PlacedMarket(MarketOrder(Order.fromBytes(xs(9), xs.slice(10, Int.MaxValue)), afs))
+    case 4 => val afs = Longs.fromByteArray(xs.slice(1, 9)); PlacedMarket(MarketOrder(Order.parseBytes(xs.drop(8)).get, afs))
     case x => throw new IllegalArgumentException(s"Unknown event type: $x")
   }
 }

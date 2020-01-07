@@ -100,12 +100,12 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
 
         dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, amount, price, matcherFee = insufficientMatcherFee, matcherFeeAssetId = aliceAsset)) should failWith(
           9441542, // FeeNotEnough
-          s"Required $minMatcherFee ${AssetPair.assetIdStr(aliceAsset)}"
+          s"Required $minMatcherFee ${aliceAsset.toString}"
         )
 
         dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, amount, price, matcherFee = insufficientMatcherFee, matcherFeeAssetId = aliceAsset)) should failWith(
           9441542, // FeeNotEnough
-          s"Required $minMatcherFee ${AssetPair.assetIdStr(aliceAsset)}"
+          s"Required $minMatcherFee ${aliceAsset.toString}"
         )
       }
     }
@@ -117,7 +117,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
                    |  order-fee {
                    |    mode = fixed
                    |    fixed {
-                   |      asset = ${AssetPair.assetIdStr(matcherFeeAsset)}
+                   |      asset = ${matcherFeeAsset.toString}
                    |      min-fee = $minMatcherFee
                    |   }
                    |  }

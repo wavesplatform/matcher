@@ -2,7 +2,8 @@ package com.wavesplatform.dex.grpc.integration.clients
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
@@ -60,7 +61,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       .map {
         case (address, assets) =>
           val xs = assets
-            .map { case (asset, v) => AssetPair.assetIdStr(asset) -> v }
+            .map { case (asset, v) => asset.toString -> v }
             .toList
             .sortBy(_._1)
             .map { case (asset, v) => s"$v $asset" }

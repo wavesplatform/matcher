@@ -2,13 +2,13 @@ package com.wavesplatform.dex.db
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.database.DBExt
+import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.MatcherKeys
 import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
 import org.iq80.leveldb.DB
 
 trait AssetsStorage {
@@ -44,7 +44,7 @@ object AssetsStorage {
     def get(asset: Asset): Option[BriefAssetDescription] = asset.fold(BriefAssetDescription.someWavesDescription)(self.get)
 
     def unsafeGet(asset: Asset): BriefAssetDescription = {
-      get(asset).getOrElse(throw new RuntimeException(s"Unknown asset: ${AssetPair.assetIdStr(asset)}"))
+      get(asset).getOrElse(throw new RuntimeException(s"Unknown asset: ${asset.toString}"))
     }
 
     def unsafeGetDecimals(asset: Asset): Int      = unsafeGet(asset).decimals

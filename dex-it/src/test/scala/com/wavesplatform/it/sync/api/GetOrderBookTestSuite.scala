@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.api
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 
 class GetOrderBookTestSuite extends MatcherSuiteBase {
 

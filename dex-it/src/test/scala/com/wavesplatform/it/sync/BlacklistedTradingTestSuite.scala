@@ -2,7 +2,8 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
@@ -117,7 +118,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     failedDueAssetBlacklist(dex1.api.tryOrderBook(assetPair), assetPair, blacklistedAsset)
 
   private def failedDueAssetBlacklist(r: Either[MatcherError, Any], assetPair: AssetPair, blacklistedAsset: Asset) =
-    r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(AssetPair.assetIdStr(blacklistedAsset))))
+    r should failWith(expectedErrorCode(assetPair, blacklistedAsset), MatcherError.Params(assetId = Some(blacklistedAsset.toString)))
 
   private def expectedErrorCode(assetPair: AssetPair, blacklistedAsset: Asset): Int =
     if (blacklistedAsset == assetPair.amountAsset) 11538181 // AmountAssetBlacklisted

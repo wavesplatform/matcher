@@ -106,7 +106,7 @@ object DexApi {
   implicit val functorK: FunctorK[DexApi] = Derive.functorK[DexApi]
 
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
-    def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
+    def toUri: String = s"${p.amountAsset.toString}/${p.priceAsset.toString}"
   }
 
   private def cancelRequest(sender: KeyPair, orderId: String): CancelOrderRequest = {
@@ -279,7 +279,7 @@ object DexApi {
       override def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, RatesResponse)]] = {
         val req =
           sttp
-            .put(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+            .put(uri"$apiUri/settings/rates/${asset.toString}")
             .body(Json.stringify(Json.toJson(rate)))
             .contentType("application/json", "UTF-8")
             .headers(apiKeyHeaders)
@@ -294,7 +294,7 @@ object DexApi {
 
       override def tryDeleteRate(asset: Asset): F[Either[MatcherError, RatesResponse]] = tryParseJson {
         sttp
-          .delete(uri"$apiUri/settings/rates/${AssetPair.assetIdStr(asset)}")
+          .delete(uri"$apiUri/settings/rates/${asset.toString}")
           .contentType("application/json", "UTF-8")
           .headers(apiKeyHeaders)
       }

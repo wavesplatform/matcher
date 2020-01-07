@@ -4,6 +4,7 @@ import akka.actor.Actor
 import com.wavesplatform.dex.fixtures.RestartableActor.{RestartActor, RestartActorException}
 
 trait RestartableActor extends Actor {
+
   override def unhandled(message: Any): Unit = {
     message match {
       case RestartActor => throw RestartActorException

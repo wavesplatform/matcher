@@ -2,7 +2,7 @@ package com.wavesplatform.dex.test.matchers
 
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import com.softwaremill.diffx.{Derived, Diff, DiffResultValue, FieldPath, Identical}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr
 
 trait DiffMatcherWithImplicits extends DiffMatcher {
 

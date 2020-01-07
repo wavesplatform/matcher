@@ -10,7 +10,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{Cancelable, ExecutionModel, Scheduler}
 import monix.reactive.Observable

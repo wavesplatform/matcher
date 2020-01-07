@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.market
 
-import com.wavesplatform.NoShrink
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpecLike}
 import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => DrivenPropertyChecks}

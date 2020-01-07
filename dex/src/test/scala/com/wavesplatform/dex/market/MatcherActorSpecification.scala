@@ -5,9 +5,11 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB}
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, WithDB}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
@@ -15,11 +17,7 @@ import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBoo
 import com.wavesplatform.dex.model.{Events, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.randomBytes
-import com.wavesplatform.{NTPTime, WithDB}
+import com.wavesplatform.dex.time.NTPTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -29,7 +27,7 @@ import scala.concurrent.duration.DurationInt
 
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
-    with MatcherTestData
+    with MatcherSpecBase
     with WithDB
     with BeforeAndAfterEach
     with PathMockFactory

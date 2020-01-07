@@ -4,14 +4,12 @@ import cats.data.Validated.Valid
 import cats.instances.string._
 import cats.syntax.apply._
 import cats.syntax.foldable._
+import com.wavesplatform.dex.domain.asset.Asset.{Waves, _}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.FeeMode.FeeMode
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorsListOr
-import com.wavesplatform.settings.Constants
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{Waves, _}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
@@ -19,8 +17,6 @@ import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
 object OrderFeeSettings {
-
-  val totalWavesAmount: Long = Constants.UnitsInWave * Constants.TotalWaves
 
   sealed trait OrderFeeSettings {
 
@@ -34,7 +30,7 @@ object OrderFeeSettings {
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
-              "assetId" -> AssetPair.assetIdStr(defaultAssetId),
+              "assetId" -> defaultAssetId.toString,
               "minFee"  -> minFee
             )
           case PercentSettings(assetType, minFee) =>
@@ -58,8 +54,8 @@ object OrderFeeSettings {
 
     def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
       cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(FeeMode.DYNAMIC)}.base-fee")(
-        predicate = fee => 0 < fee && fee <= totalWavesAmount,
-        errorMsg = s"required 0 < base fee <= $totalWavesAmount"
+        predicate = fee => 0 < fee,
+        errorMsg = s"required 0 < base fee"
       ) map DynamicSettings
     }
 
@@ -70,7 +66,7 @@ object OrderFeeSettings {
       val assetValidated = cfgValidator.validate[Asset](s"$prefix.asset")
 
       val feeValidated = assetValidated match {
-        case Valid(Waves) => feeValidator(fee => 0 < fee && fee <= totalWavesAmount, s"required 0 < fee <= $totalWavesAmount")
+        case Valid(Waves) => feeValidator(fee => 0 < fee, s"required 0 < fee")
         case _            => feeValidator(_ > 0, "required 0 < fee")
       }
 

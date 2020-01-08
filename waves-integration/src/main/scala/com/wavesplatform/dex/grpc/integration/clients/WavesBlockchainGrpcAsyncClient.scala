@@ -61,16 +61,14 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
 
     override def onNext(value: BalanceChangesResponse): Unit = {
-      if (isConnectionEstablished.compareAndSet(false, true)) {
-        log.info("Connection with Node restored!")
-        requestBalanceChanges()
-      }
+      if (isConnectionEstablished.compareAndSet(false, true)) log.info("Connection with Node restored!")
       spendableBalanceChangesSubject.onNext(groupByAddress(value))
     }
 
     override def onError(t: Throwable): Unit = {
       if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", t)
-      //channel.resetConnectBackoff() // ???
+      requestBalanceChanges()
+      channel.resetConnectBackoff()
     }
   }
 

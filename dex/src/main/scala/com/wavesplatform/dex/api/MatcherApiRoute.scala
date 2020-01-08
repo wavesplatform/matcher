@@ -72,7 +72,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: Future[Set[Byte]])(system: ActorSystem)
+                           validatedAllowedOrderVersions: () => Future[Set[Byte]])(system: ActorSystem)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -222,7 +222,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
     complete(
-      validatedAllowedOrderVersions map { allowedOrderVersions =>
+      validatedAllowedOrderVersions() map { allowedOrderVersions =>
         SimpleResponse(
           StatusCodes.OK,
           Json.obj(

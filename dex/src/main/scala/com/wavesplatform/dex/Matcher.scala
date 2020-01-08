@@ -43,14 +43,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem)
-    extends Extension
-    with ScorexLogging {
+class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem) extends Extension with ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
-  import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient}
+  import gRPCExtensionClient.wavesBlockchainAsyncClient
 
-  private val time = new NTP(settings.ntpServer)
+  private val time      = new NTP(settings.ntpServer)
+  private val opContext = scala.concurrent.ExecutionContext.Implicits.global
 
   private implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(actorSystem))
 
@@ -65,9 +64,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
-  private val pairBuilder = new AssetPairBuilder(settings,
-                                                 getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_),
-                                                 settings.blacklistedAssets)(grpcExecutionContext)
+  private val pairBuilder = {
+    import gRPCExtensionClient.grpcExecutionContext
+    new AssetPairBuilder(settings, getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_), settings.blacklistedAssets)
+  }
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
@@ -76,6 +76,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private lazy val assetsCache = AssetsStorage.cache { AssetsStorage.levelDB(db) }
 
   private lazy val transactionCreator = {
+    import gRPCExtensionClient.grpcExecutionContext
     new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, assetsCache.unsafeGetHasScript)
   }
 
@@ -105,6 +106,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
+    import gRPCExtensionClient.grpcExecutionContext
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
       matcherActor,
@@ -118,13 +120,13 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-    )(grpcExecutionContext)
+    )
   }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
     case "local" =>
       log.info("Events will be stored locally")
-      new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)
+      new LocalMatcherQueue(settings.eventsQueue.local, new LocalQueueStore(db), time)(opContext)
 
     case "kafka" =>
       log.info("Events will be stored in Kafka")
@@ -136,6 +138,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   private def validateOrder(o: Order): FutureResult[Order] = {
 
     import OrderValidator._
+    import gRPCExtensionClient.grpcExecutionContext
 
     /** Does not need additional access to the blockchain via gRPC */
     def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
@@ -153,7 +156,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
+    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription)(implicit efc: ErrorFormatterContext): FutureResult[Order] =
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
@@ -165,7 +168,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         rateCache,
         hasMatcherAccountScript
       )(o)(grpcExecutionContext, efc)
-    }
 
     for {
       _ <- liftAsync { syncValidation(assetsCache.unsafeGetDecimals) }
@@ -197,12 +199,15 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
         apiKeyHash,
         rateCache,
-        Future
-          .sequence {
-            settings.allowedOrderVersions.map(version =>
-              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
-          }
-          .map { _.collect { case Right(version) => version } }
+        validatedAllowedOrderVersions = () => {
+          import gRPCExtensionClient.grpcExecutionContext
+          Future
+            .sequence {
+              settings.allowedOrderVersions.map(version =>
+                OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
+            }
+            .map { _.collect { case Right(version) => version } }
+        }
       )(actorSystem),
       MatcherApiRouteV1(
         pairBuilder,
@@ -249,9 +254,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               xs =>
                 if (xs.isEmpty) Future.successful(Unit)
                 else {
-
-                  val eventAssets = xs.flatMap(_.event.assets)
-                  val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
+                  implicit val ctx = opContext
+                  val eventAssets  = xs.flatMap(_.event.assets)
+                  val loadAssets   = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
 
                   loadAssets.flatMap { _ =>
                     val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
@@ -278,7 +283,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         orderBooks,
         (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, assetsCache.unsafeGetDecimals),
         assetsCache.get(_)
-      )(grpcExecutionContext),
+      ),
       MatcherActor.name
     )
 
@@ -316,6 +321,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   @volatile var matcherServerBinding: ServerBinding = _
 
   override def shutdown(): Future[Unit] = {
+    implicit val ctx = opContext
     setStatus(Status.Stopping)
     for {
       _ <- {
@@ -350,6 +356,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   override def start(): Unit = {
+    implicit val ctx = opContext
+
     def loadAllKnownAssets(): Future[Unit] = {
       val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++ settings.mentionedAssets
 
@@ -400,10 +408,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
         // TODO now issue here
-        Future.firstCompletedOf(List(
-          Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port),
-          timeout(10.seconds, "Can't bind HTTP in 10 seconds")
-        ))
+        Future.firstCompletedOf(
+          List(
+            Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port),
+            timeout(10.seconds, "Can't bind HTTP in 10 seconds")
+          ))
       }
       _ = {
         matcherServerBinding = serverBinding
@@ -436,20 +445,26 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
-
-  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
-    case e: TimeoutException =>
-      log.warn(s"During receiving last offset", e)
-      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
-      else getLastOffset(deadline)
-
-    case e: Throwable =>
-      log.error(s"Can't catch ${e.getClass.getName}", e)
-      throw e
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = {
+    implicit val ctx = opContext
+    Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
   }
 
+  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] =
+    matcherQueue.lastEventOffset.recoverWith {
+      case e: TimeoutException =>
+        log.warn(s"During receiving last offset", e)
+        if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
+        else getLastOffset(deadline)
+
+      case e: Throwable =>
+        log.error(s"Can't catch ${e.getClass.getName}", e)
+        throw e
+    }(opContext)
+
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
+    implicit val ctx = opContext
+
     def loop(p: Promise[Unit]): Unit = {
       log.trace(s"offsets: $lastProcessedOffset >= $lastQueueOffset, deadline: ${deadline.isOverdue()}")
       if (lastProcessedOffset >= lastQueueOffset) p.success(())
@@ -464,7 +479,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   private def timeout(after: FiniteDuration, label: String = ""): Future[Nothing] = {
-    val failure = Promise[Nothing]()
+    implicit val ctx = opContext
+    val failure      = Promise[Nothing]()
     actorSystem.scheduler.scheduleOnce(after) {
       failure.failure(new TimeoutException(s"$after is out${if (label.isEmpty) "" else s": $label"}"))
     }

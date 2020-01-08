@@ -333,7 +333,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       matcherAccountFee = 300000L,
       apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }
+      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) }
     )(system).route
 
     f(route)

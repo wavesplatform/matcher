@@ -31,7 +31,7 @@ object ItTestPlugin extends AutoPlugin {
            * F - show full stack traces
            * W - without color
            */
-          val args        = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
+          val args        = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution in Test := true,

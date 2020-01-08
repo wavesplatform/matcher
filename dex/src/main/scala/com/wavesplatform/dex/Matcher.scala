@@ -398,29 +398,21 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       _ <- {
         log.info("Loading known assets ...")
         loadAllKnownAssets()
-      }
-      hasMatcherScript <- {
+      }.zip {
         log.info("Checking matcher's account script ...")
-        wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
-      }
-      serverBinding <- {
-        hasMatcherAccountScript = hasMatcherScript
-        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
-        // TODO now issue here
-        Future.firstCompletedOf(
-          List(
-            Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port),
-            timeout(10.seconds, "Can't bind HTTP in 10 seconds")
-          ))
-      }
-      _ = {
-        matcherServerBinding = serverBinding
-        log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+        wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
       }
       _ <- {
         log.info("Waiting all snapshots are restored ...")
         waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
+      }.zip {
+        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
+        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        // TODO now issue here
+        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port).map { serverBinding =>
+          matcherServerBinding = serverBinding
+          log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+        }
       }
       deadline = settings.startEventsProcessingTimeout.fromNow
       lastOffsetQueue <- {

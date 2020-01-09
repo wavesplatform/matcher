@@ -34,5 +34,13 @@ final case class DexContainer(name: String, underlying: GenericContainer)(implic
 
     log.info(s"$prefix Loading system log from '$containerSystemLogPath' to '$localSystemLogPath'")
     copyFileToLocalPath(containerSystemLogPath, localSystemLogPath)
+
+    // TODO
+    if (BaseContainer.isProfilingEnabled) {
+      val containerProfilerLogPath = Paths.get(DexContainerInfo.baseContainerPath, s"$name.snapshot")
+      val localProfilerLogPath = localLogsDir.resolve(s"container-$name.snapshot")
+      log.info(s"$prefix Loading profiler log from '$containerProfilerLogPath' to '$localProfilerLogPath'")
+      copyFileToLocalPath(containerProfilerLogPath, localProfilerLogPath)
+    }
   }
 }

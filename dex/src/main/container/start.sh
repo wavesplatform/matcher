@@ -7,7 +7,7 @@ echo Options: ${WAVES_DEX_OPTS}
 /opt/waves-dex/bin/waves-dex -J-Xmx1024M \
   -Dsun.zip.disableMemoryMapping=true \
   ${WAVES_DEX_OPTS} \
-  -main com.wavesplatform.dex.Application ${WAVES_DEX_CONFIGPATH} &
+  -main com.wavesplatform.dex.Application -- ${WAVES_DEX_CONFIGPATH} &
 PID=$!
 wait ${PID}
 trap - TERM INT

@@ -20,7 +20,7 @@ import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.base.BaseContainer.{getIp, getNumber}
-import com.wavesplatform.dex.it.docker.base.info.{BaseContainerInfo, WavesNodeContainerInfo}
+import com.wavesplatform.dex.it.docker.base.info.{BaseContainerInfo, DexContainerInfo, WavesNodeContainerInfo}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import mouse.any._
@@ -235,7 +235,8 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
 
 object BaseContainer extends ScorexLogging {
 
-  val apiKey = "integration-test-rest-api"
+  val apiKey                      = "integration-test-rest-api"
+  val isProfilingEnabled: Boolean = true //System.getProperty("WAVES_DEX_PROFILING", "true").toBoolean
 
   private val networkSeed         = Random.nextInt(0x100000) << 4 | 0x0A000000 // a random network in 10.x.x.x range
   private val networkPrefix       = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes
@@ -260,10 +261,20 @@ object BaseContainer extends ScorexLogging {
     val ip: String                               = getIp(getNumber(name))
     val ignoreWaitStrategy: AbstractWaitStrategy = () => ()
 
-    val env = containerInfo match {
-      case WavesNodeContainerInfo => getEnv(name) |+| Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
-      case _                      => getEnv(name)
-    }
+    val env = {
+      containerInfo match {
+        case WavesNodeContainerInfo => Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
+        case DexContainerInfo =>
+          if (isProfilingEnabled) {
+            // https://www.yourkit.com/docs/java/help/startup_options.jsp
+            Map(
+              "WAVES_DEX_OPTS" ->
+                s" -J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all,sampling,monitors,sessionname=$name,snapshot_name_format={sessionname},dir=${containerInfo.baseContainerPath},logdir=${containerInfo.baseContainerPath},onexit=snapshot "
+              //""".stripMargin.replace("\n", "").replace("\r", "")
+            )
+          } else Map.empty[String, String]
+      }
+    } |+| getEnv(name)
 
     GenericContainer(
       dockerImage = image,

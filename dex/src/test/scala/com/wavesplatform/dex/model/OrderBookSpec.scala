@@ -20,6 +20,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.collection.{SortedSet, mutable}
 
 class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with MatcherSpecBase with NTPTime with NoShrink {
+
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {

@@ -45,7 +45,7 @@ object EntityParser {
   }
 
   implicit val readAsset: Stateful[Asset] = State[S, Asset] { s =>
-    val (byteArr, resOffset) = deser.parseByteArrayOption(s.bytes, s.offset, Asset.AssetIdLength)
-    s.copy(offset = resOffset) -> byteArr.fold[Asset](Waves)(ByteStr.apply _ andThen IssuedAsset.apply)
+    val (maybeByteArr, resultOffset) = deser.parseByteArrayOption(s.bytes, s.offset, Asset.AssetIdLength)
+    s.copy(offset = resultOffset) -> maybeByteArr.fold[Asset](Waves)(arr => IssuedAsset(ByteStr(arr)))
   }
 }

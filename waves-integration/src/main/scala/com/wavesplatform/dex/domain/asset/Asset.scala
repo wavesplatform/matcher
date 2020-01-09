@@ -59,7 +59,7 @@ object Asset {
     maybeBStr.fold[Asset](Waves)(IssuedAsset)
   }
 
-  implicit class AssetIdOps(private val ai: Asset) extends AnyVal {
+  implicit class AssetOps(private val ai: Asset) extends AnyVal {
 
     def byteRepr: Array[Byte] = ai match {
       case Waves           => Array(0: Byte)

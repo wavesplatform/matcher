@@ -30,9 +30,7 @@ class AddressActorSpecification
     with ImplicitSender
     with NTPTime {
 
-  private implicit val efc = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = 8
-  }
+  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
   private val assetId    = ByteStr("asset".getBytes("utf-8"))
   private val matcherFee = 30000L
@@ -203,7 +201,6 @@ class AddressActorSpecification
           new AddressActor(
             address,
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
-
             ntpTime,
             EmptyOrderDB,
             _ => Future.successful(false),

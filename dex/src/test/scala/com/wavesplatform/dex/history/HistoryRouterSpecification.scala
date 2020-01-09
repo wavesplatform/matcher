@@ -31,8 +31,7 @@ class HistoryRouterSpecification
 
   def getKeyPair(seed: String): KeyPair = KeyPair(seed.getBytes(Charsets.UTF_8))
 
-  val assetId    = ByteStr("asset".getBytes)
-  val matcherFee = 30000L
+  val assetId: ByteStr = ByteStr("asset".getBytes)
 
   val assetDecimals: Byte = 8
   val wavesDecimals: Byte = 8

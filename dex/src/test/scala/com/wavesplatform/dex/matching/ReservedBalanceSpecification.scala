@@ -429,7 +429,7 @@ class ReservedBalanceSpecification
     }
   }
 
-  private val matcherFee = 1L
+  override val matcherFee = 1L
 
   private def printLimitOrderInfo(orderType: OrderType, amount: Long, price: Long): String = {
     val denormalizedAmount = pair.amountAsset.dAmt(amount)

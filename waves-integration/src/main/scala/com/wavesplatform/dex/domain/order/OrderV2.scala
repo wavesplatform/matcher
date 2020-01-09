@@ -27,7 +27,7 @@ case class OrderV2(senderPublicKey: PublicKey,
 
   override def version: Byte = 2
 
-  override def signature: Array[Byte] = proofs.proofs(0).arr
+  override def signature: Array[Byte] = proofs.proofs.head.arr
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     (version +: senderPublicKey.arr) ++ matcherPublicKey.arr ++

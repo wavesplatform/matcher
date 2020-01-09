@@ -111,7 +111,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
 
   protected def assetGen(prefix: Byte): Gen[IssuedAsset] = {
     Gen
-      .listOfN(wcrypto.SignatureLength - 1, Arbitrary.arbitrary[Byte])
+      .listOfN(Asset.AssetIdLength - 1, Arbitrary.arbitrary[Byte])
       .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
   }
 

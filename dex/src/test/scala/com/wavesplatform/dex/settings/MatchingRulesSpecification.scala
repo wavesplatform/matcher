@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.error.ProduceError.produce
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import org.scalatest.Matchers
 

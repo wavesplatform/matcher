@@ -32,12 +32,4 @@ trait ScorexLogging {
       Task.raiseError[A](ex)
     }
   }
-
-  implicit class ObservableExt[A](o: Observable[A]) {
-
-    def logErr: Observable[A] = o.onErrorHandleWith { ex =>
-      log.error(s"Error observing item", ex)
-      Observable.raiseError[A](ex)
-    }
-  }
 }

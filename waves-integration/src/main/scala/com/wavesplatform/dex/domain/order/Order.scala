@@ -271,9 +271,19 @@ object Order extends EntityParser[Order] {
     if (o1.orderType == OrderType.BUY) (o1, o2) else (o2, o1)
   }
 
+  def fromBytes(version: Byte, bytes: Array[Byte]): Order = {
+    val order = version match {
+      case 1 => OrderV1
+      case 2 => OrderV2
+      case 3 => OrderV3
+    }
+    order.parseBytes(bytes).get
+  }
+
+  /** Can be used whenever Order V1 is serialized with prepended version, see [[com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2]] */
   override def statefulParse: Stateful[Order] =
     read[Byte]
-      .transform { case (s, v) => s.copy(offset = s.offset - (if (v != 1) 1 else 0)) -> v }
+      .transform { case (s, v) => s.copy(offset = s.offset - (if (v == 1) 0 else 1)) -> v }
       .flatMap { version =>
         val ep = version match {
           case 1     => OrderV1

@@ -90,7 +90,6 @@ object Dependencies {
   private val ficus                  = "com.iheart" %% "ficus" % Version.ficus
   private val logback                = "ch.qos.logback" % "logback-classic" % Version.logback
   private val slf4j                  = "org.slf4j" % "slf4j-api" % Version.slf4j
-  private val logbackScalaJsExcluded = logback.exclude("org.scala-js", "scalajs-library_2.12")
   private val janino                 = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore              = kamonModule("core", Version.kamonCore)
   private val wavesProtobufSchemas   = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
@@ -167,7 +166,6 @@ object Dependencies {
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
       wavesProtobufSchemas,
-      logbackScalaJsExcluded,
       logback,
       kindProjector,
       catsTaglessMacros,
@@ -205,6 +203,7 @@ object Dependencies {
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
 
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
+      logback,
       swagger,
       playJson,
       ficus,

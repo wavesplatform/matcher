@@ -75,6 +75,7 @@ object OrderBook {
   type SideSnapshot = Map[Price, Seq[LimitOrder]]
 
   object SideSnapshot {
+
     def serialize(dest: mutable.ArrayBuilder[Byte], snapshot: SideSnapshot): Unit = {
       dest ++= Ints.toByteArray(snapshot.size)
       snapshot.foreach {
@@ -98,24 +99,31 @@ object OrderBook {
     }
 
     def serialize(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
-      val orderType = lo match {
-        case _: SellLimitOrder => OrderType.SELL
-        case _: BuyLimitOrder  => OrderType.BUY
-      }
-      dest ++= orderType.bytes
+
+      dest ++= lo.order.orderType.bytes
       dest ++= Longs.toByteArray(lo.amount)
       dest ++= Longs.toByteArray(lo.fee)
       dest += lo.order.version
+
       val orderBytes = lo.order.bytes()
+
       dest ++= Ints.toByteArray(orderBytes.length)
       dest ++= orderBytes
     }
 
-    def loFromBytes(bb: ByteBuffer): LimitOrder =
-      OrderType(bb.get) match {
-        case OrderType.SELL => SellLimitOrder(bb.getLong, bb.getLong, Order.parseBytes(bb.getBytes).get)
-        case OrderType.BUY  => BuyLimitOrder(bb.getLong, bb.getLong, Order.parseBytes(bb.getBytes).get)
+    def loFromBytes(bb: ByteBuffer): LimitOrder = {
+
+      val orderType = OrderType(bb.get)
+      val amount    = bb.getLong
+      val fee       = bb.getLong
+      val version   = bb.get
+      val order     = Order.fromBytes(version, bb.getBytes)
+
+      orderType match {
+        case OrderType.SELL => SellLimitOrder(amount, fee, order)
+        case OrderType.BUY  => BuyLimitOrder(amount, fee, order)
       }
+    }
   }
 
   case class LastTrade(price: Long, amount: Long, side: OrderType)

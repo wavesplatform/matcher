@@ -3,7 +3,7 @@ package com.wavesplatform.dex.settings
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.error.ProduceError.produce
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import org.scalatest.Matchers
 
 class OrderRestrictionSpecification extends BaseSettingsSpecification with Matchers {

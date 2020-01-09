@@ -5,15 +5,15 @@ object Dependencies {
 
   object Version {
 
-    val akka     = "2.5.20"
-    val akkaHttp = "10.1.8"
+    val akka     = "2.5.27"
+    val akkaHttp = "10.1.11"
 
     val scalaTest  = "3.0.6"
     val scalaCheck = "1.14.0"
     val scalaMock  = "3.6.0"
     val diffx      = "0.3.12"
 
-    val cats              = "1.6.0"
+    val cats              = "2.0.0"
     val catsTaglessMacros = "0.9"
     val kindProjector     = "0.9.6"
     val mouse             = "0.22"
@@ -27,7 +27,7 @@ object Dependencies {
     val janino  = "3.1.0"
 
     val silencer = "1.4.1"
-    val kamon    = "1.1.5"
+    val kamon    = "1.1.6"
 
     val wavesProtobufSchemas = "1.0.0"
 

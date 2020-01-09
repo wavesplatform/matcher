@@ -5,10 +5,11 @@ import com.typesafe.sbt.SbtNativePackager.Universal
 import CommonSettings.autoImport.network
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
+enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
+dependencyOverrides ++= Dependencies.enforcedVersions.value // TODO remove after DEX-526
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
@@ -48,7 +49,8 @@ inConfig(Compile)(
       "com.wavesplatform.dex.Application",
       "com.wavesplatform.dex.WavesDexCli"
     ),
-    mainClass := discoveredMainClasses.value.headOption
+    mainClass := discoveredMainClasses.value.headOption,
+    run / fork := true
   ))
 
 // Docker

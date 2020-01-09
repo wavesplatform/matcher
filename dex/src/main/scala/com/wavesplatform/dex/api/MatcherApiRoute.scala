@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.api
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.pattern.{AskTimeoutException, ask}
+import akka.stream.Materializer
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKey}
@@ -21,14 +22,7 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -47,7 +41,7 @@ import kamon.Kamon
 import org.iq80.leveldb.DB
 import play.api.libs.json._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.Success
 
@@ -72,7 +66,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: () => Future[Set[Byte]])(system: ActorSystem)
+                           validatedAllowedOrderVersions: () => Future[Set[Byte]])(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -80,7 +74,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import MatcherApiRoute._
   import PathMatchers._
 
-  private implicit val dispatcher                                 = system.dispatchers.lookup("akka.actor.api-dispatcher")
+  private implicit val executionContext: ExecutionContext         = mat.executionContext
   private implicit val timeout: Timeout                           = matcherSettings.actorResponseTimeout
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 

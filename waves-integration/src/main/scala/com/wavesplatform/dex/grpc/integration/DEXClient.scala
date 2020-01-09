@@ -14,7 +14,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implicit val monixScheduler: Scheduler,
-                                                                         val grpcExecutionContext: ExecutionContext)
+                                                                         private val grpcExecutionContext: ExecutionContext)
     extends ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")

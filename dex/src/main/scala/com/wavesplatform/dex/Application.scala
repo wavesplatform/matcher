@@ -74,9 +74,14 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 object Application {
 
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): (Config, MatcherSettings) = {
+    import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
     import com.wavesplatform.settings._
+    import scala.collection.JavaConverters._
 
-    val config   = loadConfig(external map ConfigFactory.parseFile)
+    val config           = loadConfig(external map ConfigFactory.parseFile)
+    val scalaContextPath = "scala.concurrent.context"
+    config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
+
     val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 
     // Initialize global var with actual address scheme

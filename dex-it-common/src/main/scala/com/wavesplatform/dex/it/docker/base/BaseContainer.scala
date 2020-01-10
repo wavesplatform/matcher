@@ -205,7 +205,7 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
 object BaseContainer extends ScorexLogging {
 
   val apiKey                      = "integration-test-rest-api"
-  val isProfilingEnabled: Boolean = true //System.getProperty("WAVES_DEX_PROFILING", "true").toBoolean
+  val isProfilingEnabled: Boolean = false //System.getProperty("WAVES_DEX_PROFILING", "true").toBoolean
 
   private val networkSeed         = Random.nextInt(0x100000) << 4 | 0x0A000000 // a random network in 10.x.x.x range
   private val networkPrefix       = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28" // 10.x.x.x/28 network will accommodate up to 13 nodes

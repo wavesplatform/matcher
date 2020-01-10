@@ -129,7 +129,7 @@ object NodeApi {
           case NonFatal(e)                               => M.raiseError(e)
         }
 
-        repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
+        repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
     }
 }

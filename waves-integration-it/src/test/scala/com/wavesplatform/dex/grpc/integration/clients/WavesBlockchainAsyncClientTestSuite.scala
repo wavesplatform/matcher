@@ -31,7 +31,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   private implicit val monixScheduler = Scheduler(runNow)
-  private lazy val client             = new DEXClient(wavesNode1.grpcApiTarget, 100.milliseconds).wavesBlockchainAsyncClient
+  private lazy val client             = new DEXClient(wavesNode1.grpcApiTarget, 100.milliseconds, monixScheduler).wavesBlockchainAsyncClient
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,

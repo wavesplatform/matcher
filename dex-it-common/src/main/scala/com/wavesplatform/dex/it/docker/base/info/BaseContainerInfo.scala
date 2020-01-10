@@ -8,6 +8,8 @@ trait BaseContainerInfo {
   val baseLocalConfDir: String
   val baseConfFileName: String
   val baseContainerPath: String
+  def containerLogsPath: String = s"$baseContainerPath/logs"
+
   val restApiPort: Int
   val exposedPorts: Seq[Int]
   val netAlias: String

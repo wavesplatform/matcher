@@ -5,24 +5,25 @@ import com.wavesplatform.dex.it.docker.base.BaseContainer
 
 object DexContainerInfo extends BaseContainerInfo {
 
-  val image: DockerImage = "com.wavesplatform/dex-it:latest"
+  override val image: DockerImage = "com.wavesplatform/dex-it:latest"
 
-  val baseLocalConfDir: String  = "dex-servers"
-  val baseConfFileName: String  = "dex-base.conf"
-  val baseContainerPath: String = "/opt/waves-dex"
+  override val baseLocalConfDir: String  = "dex-servers"
+  override val baseConfFileName: String  = "dex-base.conf"
+  override val baseContainerPath: String = "/opt/waves-dex"
 
-  val restApiPort: Int       = 6886 // application.conf waves.dex.rest-api.port
-  val exposedPorts: Seq[Int] = Seq(restApiPort)
-  val netAlias: String       = "d3x"
+  override val restApiPort: Int       = 6886 // application.conf waves.dex.rest-api.port
+  override val exposedPorts: Seq[Int] = Seq(restApiPort)
+  override val netAlias: String       = "d3x"
 
   // file name, content, to log content
   override val specificFiles: Seq[(String, String, Boolean)] = Seq(
     ("/doc/logback-container.xml", BaseContainer.getRawContentFromResource("logback-container.xml"), false)
   )
 
-  def getEnv(containerName: String): Map[String, String] = Map(
+  override def getEnv(containerName: String): Map[String, String] = Map(
     "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_DEX_OPTS" -> Seq(
+      "-J-Xmx1024M",
       "-Dlogback.stdout.enabled=false",
       "-Dlogback.file.enabled=false",
       s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",

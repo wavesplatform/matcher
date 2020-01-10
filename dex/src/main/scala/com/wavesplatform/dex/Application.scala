@@ -64,6 +64,8 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
       log.info("Shutting down reporters...")
       val kamonShutdown = Kamon.stopAllReporters()
 
+      // TODO logback flush
+
       matcherShutdown.zip(kamonShutdown).onComplete {
         case Success(_) => log.info("Shutdown complete")
         case Failure(e) => log.error("Can't stop DEX correctly", e)

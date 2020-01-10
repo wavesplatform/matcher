@@ -47,20 +47,19 @@ trait BaseContainersKit extends ScorexLogging {
   protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
 
   /** A location for logs from containers on local machine */
-  protected implicit val localLogsDir: Coeval[Path] = Coeval.evalOnce {
-
+  protected lazy val localLogsDir: Path = {
     val runId: String = Option { System.getenv("RUN_ID") } getOrElse DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now)
+    def defaultDir =
+      Paths.get(System.getProperty("user.dir"), moduleName, "target", "logs", runId, getClass.getSimpleName.replaceAll("""(\w)\w*\.""", "$1."))
 
     Option { System.getProperty("waves.it.logging.dir") }
       .map { Paths get _ }
-      .getOrElse {
-        Paths.get(System.getProperty("user.dir"), moduleName, "target", "logs", runId, getClass.getSimpleName.replaceAll("""(\w)\w*\.""", "$1."))
-      } unsafeTap { Files.createDirectories(_) }
+      .getOrElse { defaultDir }
+      .unsafeTap { Files.createDirectories(_) }
   }
 
   protected def stopBaseContainers(): Unit = {
     log.debug("Stopping containers")
-    knownContainers.forEach { _.stopAndSaveLogs(withRemoving = true) }
     futureHttpBackend.close()
     tryHttpBackend.close()
   }

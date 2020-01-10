@@ -9,6 +9,7 @@ import com.wavesplatform.dex.it.docker.base.info.WavesNodeContainerInfo
 import com.wavesplatform.dex.it.docker.base.{BaseContainer, WavesNodeContainer}
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
+import org.testcontainers.containers.BindMode
 
 trait HasWavesNode { self: BaseContainersKit =>
 
@@ -23,7 +24,9 @@ trait HasWavesNode { self: BaseContainersKit =>
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig,
                                 suiteInitialConfig: Config = wavesNodeInitialSuiteConfig): base.WavesNodeContainer = {
-    WavesNodeContainer(name, BaseContainer.create(WavesNodeContainerInfo)(name, runConfig, suiteInitialConfig)) unsafeTap addKnownContainer
+    val baseContainer = BaseContainer.create(WavesNodeContainerInfo)(name, runConfig, suiteInitialConfig)
+    baseContainer.configure(_.withFileSystemBind(localLogsDir.toFile.getAbsolutePath, WavesNodeContainerInfo.containerLogsPath, BindMode.READ_WRITE))
+    WavesNodeContainer(name, baseContainer) unsafeTap addKnownContainer
   }
 
   lazy val wavesNode1: base.WavesNodeContainer = createWavesNode("waves-1")

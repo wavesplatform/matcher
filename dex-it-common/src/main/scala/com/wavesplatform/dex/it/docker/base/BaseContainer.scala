@@ -22,7 +22,6 @@ import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.base.BaseContainer.{getIp, getNumber}
 import com.wavesplatform.dex.it.docker.base.info.{BaseContainerInfo, DexContainerInfo, WavesNodeContainerInfo}
 import com.wavesplatform.utils.ScorexLogging
-import monix.eval.Coeval
 import mouse.any._
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.testcontainers.containers.Network
@@ -122,30 +121,6 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
       case e: NotFoundException => log.warn(s"File '$containerPath' not found: ${e.getMessage}")
     }
 
-  protected def saveSystemLogs(localLogsDir: Path): Unit = ()
-
-  private def saveLogs(localLogsDir: Path): Unit = {
-
-    val localDestination   = localLogsDir.resolve(s"container-$name.log")
-    val containerLogsLines = container.getLogs.split("\n\n")
-
-    def writeLines(lines: Array[String], openOption: OpenOption): Unit = {
-      Files.write(localDestination, lines.mkString("\n") getBytes StandardCharsets.UTF_8, openOption)
-    }
-
-    log.info(s"$prefix Writing log to '${localDestination.toAbsolutePath}'")
-
-    if (Files exists localDestination) {
-
-      val existedLines = Files.readAllLines(localDestination).asScala.toArray
-      val linesToWrite = containerLogsLines.drop(existedLines.length)
-
-      writeLines(linesToWrite, StandardOpenOption.APPEND)
-    } else writeLines(containerLogsLines, StandardOpenOption.CREATE)
-
-    saveSystemLogs(localLogsDir)
-  }
-
   def printDebugMessage(text: String): Unit = {
     try {
       if (dockerClient.inspectContainerCmd(underlying.containerId).exec().getState.getRunning) {
@@ -164,11 +139,11 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
     }
   }
 
-  def stopAndSaveLogs(withRemoving: Boolean = false)(implicit localLogsDir: Coeval[Path]): Unit = {
+  // TODO
+  def stopAndSaveLogs(withRemoving: Boolean = false): Unit = {
     printState()
     log.debug(s"$prefix Stopping...")
     sendStopCmd()
-    saveLogs(localLogsDir.value)
 
     if (withRemoving) {
       stop() // stops and REMOVES container
@@ -222,12 +197,12 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
     api.waitReady
   }
 
-  def restart(withRemove: Boolean = false)(implicit localLogsDir: Coeval[Path]): Unit = {
+  def restart(withRemove: Boolean = false): Unit = {
     stopAndSaveLogs(withRemove)
     start()
   }
 
-  def restartWithNewSuiteConfig(newSuiteConfig: Config)(implicit localLogsDir: Coeval[Path]): Unit = {
+  def restartWithNewSuiteConfig(newSuiteConfig: Config): Unit = {
     replaceSuiteConfig(newSuiteConfig)
     restart()
   }
@@ -261,20 +236,30 @@ object BaseContainer extends ScorexLogging {
     val ip: String                               = getIp(getNumber(name))
     val ignoreWaitStrategy: AbstractWaitStrategy = () => ()
 
-    val env = {
+    val env = getEnv(name) |+| {
+      val commonOpts = List(
+        s"-Dlogback.brief.fullPath=${containerInfo.containerLogsPath}/container-$name.log",
+        s"-Dlogback.detailed.fullPath=${containerInfo.containerLogsPath}/container-$name.detailed.log"
+      )
+
       containerInfo match {
-        case WavesNodeContainerInfo => Map("WAVES_OPTS" -> s" -Dwaves.network.declared-address=$ip:6883")
+        case WavesNodeContainerInfo =>
+          val opts = s"-Dwaves.network.declared-address=$ip:6883" :: commonOpts
+          Map("WAVES_OPTS" -> opts.mkString(" ", " ", " "))
         case DexContainerInfo =>
-          if (isProfilingEnabled) {
+          val opts = {
             // https://www.yourkit.com/docs/java/help/startup_options.jsp
-            Map(
-              "WAVES_DEX_OPTS" ->
-                s" -J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all,sampling,monitors,sessionname=$name,snapshot_name_format={sessionname},dir=${containerInfo.baseContainerPath},logdir=${containerInfo.baseContainerPath},onexit=snapshot "
-              //""".stripMargin.replace("\n", "").replace("\r", "")
-            )
-          } else Map.empty[String, String]
+            if (isProfilingEnabled)
+              List(
+                s"-J-agentpath:/usr/local/YourKit-JavaProfiler-2019.8/bin/linux-x86-64/libyjpagent.so=port=10001,listen=all" +
+                  s",sampling,monitors,sessionname=prof-$name,snapshot_name_format={sessionname}," +
+                  s"dir=${containerInfo.containerLogsPath},logdir=${containerInfo.containerLogsPath},onexit=snapshot"
+              )
+            else List.empty[String]
+          } ::: commonOpts
+          Map("WAVES_DEX_OPTS" -> opts.mkString(" ", " ", " "))
       }
-    } |+| getEnv(name)
+    }
 
     GenericContainer(
       dockerImage = image,
@@ -282,28 +267,26 @@ object BaseContainer extends ScorexLogging {
       env = env,
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
-      (
-        Seq(
-          (baseConfFileName, getRawContentFromResource(s"$baseLocalConfDir/$baseConfFileName"), false),
-          (s"$name.conf", getRawContentFromResource(s"$baseLocalConfDir/$name.conf"), false),
-          ("run.conf", runConfig.resolve().root().render(), true),
-          ("suite.conf", suiteInitialConfig.resolve().root().render(), true)
-        ) ++ containerInfo.specificFiles
-      ).foreach {
+      c.withNetwork(network)
+      c.withNetworkAliases(containerInfo.netAlias)
+      c.withCreateContainerCmdModifier { cmd =>
+        cmd withName s"$networkName-$name"
+        cmd withIpv4Address ip
+      }
+
+      val filesToCopy = containerInfo.specificFiles ++ Seq(
+        (baseConfFileName, getRawContentFromResource(s"$baseLocalConfDir/$baseConfFileName"), false),
+        (s"$name.conf", getRawContentFromResource(s"$baseLocalConfDir/$name.conf"), false),
+        ("run.conf", runConfig.resolve().root().render(), true),
+        ("suite.conf", suiteInitialConfig.resolve().root().render(), true)
+      )
+
+      filesToCopy.foreach {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString
-
-          if (logContent) log.trace(s"${getPrefix(name, c.getContainerId)} Write to '$containerPath':\n$content")
-
+          val msg = s"${getPrefix(name, c.getContainerId)} Write to '$containerPath'"
+          log.trace(s"$msg${if (logContent) s":\n$content" else ""}")
           c.withCopyFileToContainer(getMountableFileFromContent(content), containerPath)
-
-          c.withNetwork(network)
-          c.withNetworkAliases(containerInfo.netAlias)
-
-          c.withCreateContainerCmdModifier { cmd =>
-            cmd withName s"$networkName-$name"
-            cmd withIpv4Address ip
-          }
       }
     }
   }

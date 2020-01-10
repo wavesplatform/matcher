@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.it.docker.base
 
 import java.net.InetSocketAddress
-import java.nio.file.{Path, Paths}
 
 import cats.Id
 import cats.instances.future.catsStdInstancesForFuture
@@ -26,21 +25,4 @@ final case class DexContainer(name: String, underlying: GenericContainer)(implic
 
   override def api: DexApi[Id]          = fp.sync { DexApi[Try](BaseContainer.apiKey, cachedRestApiAddress.get()) }
   override def asyncApi: DexApi[Future] = DexApi[Future](BaseContainer.apiKey, cachedRestApiAddress.get())
-
-  override protected def saveSystemLogs(localLogsDir: Path): Unit = {
-
-    val containerSystemLogPath = Paths.get(DexContainerInfo.baseContainerPath, "system.log")
-    val localSystemLogPath     = localLogsDir.resolve(s"container-$name.system.log")
-
-    log.info(s"$prefix Loading system log from '$containerSystemLogPath' to '$localSystemLogPath'")
-    copyFileToLocalPath(containerSystemLogPath, localSystemLogPath)
-
-    // TODO
-    if (BaseContainer.isProfilingEnabled) {
-      val containerProfilerLogPath = Paths.get(DexContainerInfo.baseContainerPath, s"$name.snapshot")
-      val localProfilerLogPath = localLogsDir.resolve(s"container-$name.snapshot")
-      log.info(s"$prefix Loading profiler log from '$containerProfilerLogPath' to '$localProfilerLogPath'")
-      copyFileToLocalPath(containerProfilerLogPath, localProfilerLogPath)
-    }
-  }
 }

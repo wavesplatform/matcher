@@ -11,6 +11,7 @@ import com.wavesplatform.dex.it.docker.base.{BaseContainer, DexContainer}
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
+import org.testcontainers.containers.BindMode
 
 import scala.collection.JavaConverters._
 
@@ -37,7 +38,9 @@ trait HasDex { self: BaseContainersKit =>
   }
 
   protected def createDex(name: String, runConfig: Config = dexRunConfig, suiteInitialConfig: Config = dexInitialSuiteConfig): DexContainer = {
-    DexContainer(name, BaseContainer.create(DexContainerInfo)(name, runConfig, suiteInitialConfig)) unsafeTap addKnownContainer
+    val baseContainer = BaseContainer.create(DexContainerInfo)(name, runConfig, suiteInitialConfig)
+    baseContainer.configure(_.withFileSystemBind(localLogsDir.toFile.getAbsolutePath, DexContainerInfo.containerLogsPath, BindMode.READ_WRITE))
+    DexContainer(name, baseContainer) unsafeTap addKnownContainer
   }
 
   lazy val dex1: DexContainer = createDex("dex-1")

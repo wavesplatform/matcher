@@ -388,23 +388,22 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       (_, http) <- {
         log.info("Loading known assets ...")
         loadAllKnownAssets()
-      }.zip {
-          log.info("Checking matcher's account script ...")
-          wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
-        }
-        .zip {
-          Future(blocking {
-            log.info(s"Initializing HTTP ...")
-            Http() // Takes 3+ seconds
-          })
-        }
+      } zip {
+        log.info("Checking matcher's account script ...")
+        wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
+      } zip {
+        Future(blocking {
+          log.info(s"Initializing HTTP ...")
+          Http() // Takes 3+ seconds
+        })
+      }
 
       (_, combinedRoute) <- {
         log.info("Waiting all snapshots are restored ...")
         waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
           log.info("All snapshots re restored")
         }
-      }.zip {
+      } zip {
         Future(blocking {
           log.info("Preparing HTTP service ...")
           // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
@@ -416,7 +415,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       _ <- {
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
-      }.map { serverBinding =>
+      } map { serverBinding =>
         matcherServerBinding = serverBinding
         log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
       }

@@ -349,22 +349,21 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
   }
 
   override def start(): Unit = {
-    def loadAllKnownAssets(): Future[Unit] = {
-      val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++ settings.mentionedAssets
-
-      Future
-        .traverse(assetsToLoad) { asset =>
-          getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
-        }
-        .map { xs =>
-          val notFoundAssets = xs.collect { case (id, Left(_)) => id }
-          if (notFoundAssets.isEmpty) Unit
-          else {
-            log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
-            forceStopApplication(ErrorStartingMatcher)
+    def loadAllKnownAssets(): Future[Unit] =
+      Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+        Future
+          .traverse(assetsToLoad) { asset =>
+            getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
           }
-        }
-    }
+          .map { xs =>
+            val notFoundAssets = xs.collect { case (id, Left(_)) => id }
+            if (notFoundAssets.isEmpty) ()
+            else {
+              log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
+              forceStopApplication(ErrorStartingMatcher)
+            }
+          }
+      }
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
@@ -386,25 +385,42 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     val startGuard = for {
       apiKeyHash <- checkApiKeyHash()
-      _ <- {
+      (_, http) <- {
         log.info("Loading known assets ...")
         loadAllKnownAssets()
       }.zip {
-        log.info("Checking matcher's account script ...")
-        wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
-      }
-      _ <- {
-        log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-      }.zip {
-        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
-        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
-        // TODO now issue here
-        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port).map { serverBinding =>
-          matcherServerBinding = serverBinding
-          log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+          log.info("Checking matcher's account script ...")
+          wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
         }
+        .zip {
+          Future(blocking {
+            log.info(s"Initializing HTTP ...")
+            Http() // Takes 3+ seconds
+          })
+        }
+
+      (_, combinedRoute) <- {
+        log.info("Waiting all snapshots are restored ...")
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
+          log.info("All snapshots re restored")
+        }
+      }.zip {
+        Future(blocking {
+          log.info("Preparing HTTP service ...")
+          // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
+          // Takes 3+ seconds
+          new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        })
       }
+
+      _ <- {
+        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
+        http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+      }.map { serverBinding =>
+        matcherServerBinding = serverBinding
+        log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+      }
+
       deadline = settings.startEventsProcessingTimeout.fromNow
       lastOffsetQueue <- {
         log.info("Getting last queue offset ...")

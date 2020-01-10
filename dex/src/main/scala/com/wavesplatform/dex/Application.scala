@@ -21,16 +21,17 @@ import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
   app =>
 
-  import monix.execution.Scheduler.Implicits.{global => scheduler}
+  private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  private val monixScheduler                              = monix.execution.Scheduler.Implicits.global
+  private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
-  private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
+  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)](monixScheduler)
 
   private var matcher: Matcher = _
 
@@ -38,8 +39,9 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     val gRPCExtensionClient =
       new DEXClient(
         s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
-        settings.defaultGrpcCachesExpiration
-      )(scheduler, grpcExecutionContext)
+        settings.defaultGrpcCachesExpiration,
+        monixScheduler
+      )(grpcExecutionContext)
 
     matcher = new Matcher(settings, gRPCExtensionClient)
     matcher.start()

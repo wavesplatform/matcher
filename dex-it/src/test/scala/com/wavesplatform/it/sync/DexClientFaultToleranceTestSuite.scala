@@ -85,7 +85,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
     markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
-    wavesNode1.stopAndSaveLogs()
+    wavesNode1.stopWithoutRemove()
 
     broadcastAndAwait(wavesNode2.api, alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
@@ -105,7 +105,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     wavesNode1.api.waitForTransaction(alice2BobTransferTx)
 
     markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
-    wavesNode2.stopAndSaveLogs()
+    wavesNode2.stopWithoutRemove()
     forgetContainer(wavesNode2)
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)

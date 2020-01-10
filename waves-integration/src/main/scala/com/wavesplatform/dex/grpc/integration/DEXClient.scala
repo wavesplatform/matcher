@@ -13,8 +13,8 @@ import monix.execution.Scheduler
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
-class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implicit val monixScheduler: Scheduler,
-                                                                         private val grpcExecutionContext: ExecutionContext)
+class DEXClient(target: String, defaultCachesExpiration: FiniteDuration, monixScheduler: Scheduler)(
+    implicit private val grpcExecutionContext: ExecutionContext)
     extends ScorexLogging {
 
   log.info(s"NODE gRPC server: $target")
@@ -38,10 +38,14 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration)(implici
       .usePlaintext()
       .build
 
-  lazy val wavesBlockchainAsyncClient = new WavesBlockchainCachingClient(
-    new WavesBlockchainGrpcAsyncClient(channel),
-    defaultCachesExpiration
+  val wavesBlockchainAsyncClient = new WavesBlockchainCachingClient(
+    new WavesBlockchainGrpcAsyncClient(channel, monixScheduler),
+    defaultCachesExpiration,
+    monixScheduler
   )
 
-  def close(): Future[Unit] = Future(blocking(eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS)))
+  def close(): Future[Unit] = {
+    channel.shutdownNow()
+    Future(blocking(eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS)))
+  }
 }

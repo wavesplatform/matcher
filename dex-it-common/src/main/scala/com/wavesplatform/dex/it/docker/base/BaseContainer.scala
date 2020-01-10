@@ -139,16 +139,10 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
     }
   }
 
-  // TODO
-  def stopAndSaveLogs(withRemoving: Boolean = false): Unit = {
+  def stopWithoutRemove(): Unit = {
     printState()
     log.debug(s"$prefix Stopping...")
     sendStopCmd()
-
-    if (withRemoving) {
-      stop() // stops and REMOVES container
-      dockerClient.close()
-    }
   }
 
   private def sendStopCmd(): Unit = {
@@ -197,8 +191,8 @@ abstract class BaseContainer(underlying: GenericContainer, baseContainerInfo: Ba
     api.waitReady
   }
 
-  def restart(withRemove: Boolean = false): Unit = {
-    stopAndSaveLogs(withRemove)
+  def restart(): Unit = {
+    stopWithoutRemove()
     start()
   }
 

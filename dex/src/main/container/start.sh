@@ -2,6 +2,7 @@
 
 trap 'kill -TERM $PID' TERM INT
 
+date -u
 echo Config file: ${WAVES_DEX_CONFIGPATH}
 echo Options: ${WAVES_DEX_OPTS}
 /opt/waves-dex/bin/waves-dex \

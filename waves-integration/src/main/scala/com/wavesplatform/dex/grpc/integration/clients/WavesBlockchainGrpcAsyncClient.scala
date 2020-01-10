@@ -24,7 +24,7 @@ import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixScheduler: Scheduler, grpcExecutionContext: ExecutionContext)
+class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel, monixScheduler: Scheduler)(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient[Future]
     with ScorexLogging {
 

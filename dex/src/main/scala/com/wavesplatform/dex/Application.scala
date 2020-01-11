@@ -5,19 +5,15 @@ import java.security.Security
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http.ServerBinding
-import com.typesafe.config._
-import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.actor.RootActorSystem
 import ch.qos.logback.classic.LoggerContext
-import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.typesafe.config._
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter}
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
@@ -29,37 +25,19 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
   app =>
 
   private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-  private val monixScheduler                              = monix.execution.Scheduler.Implicits.global
-  private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)](monixScheduler)
+  private val shutdownInProgress = new AtomicBoolean(false)
+  private val matcher: Matcher   = new Matcher(settings)
+  matcher.start()
 
-  private var matcher: Matcher = _
-
-  def run(): Unit = {
-    val gRPCExtensionClient =
-      new DEXClient(
-        s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
-        settings.defaultGrpcCachesExpiration,
-        monixScheduler
-      )(grpcExecutionContext)
-
-    matcher = new Matcher(settings, gRPCExtensionClient)
-    matcher.start()
-
-    // on unexpected shutdown
-    sys.addShutdownHook {
-      shutdown()
-    }
+  // on unexpected shutdown
+  sys.addShutdownHook {
+    shutdown()
   }
-
-  private val shutdownInProgress             = new AtomicBoolean(false)
-  @volatile var serverBinding: ServerBinding = _
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
       log.info("Shutting down initiated")
-      spendableBalanceChanged.onComplete()
 
       log.info("Shutting down reporters...")
       val kamonShutdown = Kamon.stopAllReporters().andThen {
@@ -139,7 +117,7 @@ object Application {
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.addressSchemeCharacter}")
-      new Application(settings).run()
+      new Application(settings)
     }
   }
 }

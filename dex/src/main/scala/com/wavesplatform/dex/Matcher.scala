@@ -22,7 +22,7 @@ import com.wavesplatform.dex.caches.{MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -43,13 +43,22 @@ import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem) extends Extension with ScorexLogging {
+// TODO Remove start, merge with Application
+class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends Extension with ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
-  import gRPCExtensionClient.wavesBlockchainAsyncClient
 
   private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-  private val time                                        = new NTP(settings.ntpServer)
+  private val monixScheduler                              = monix.execution.Scheduler.Implicits.global
+  private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
+
+  private val time = new NTP(settings.ntpServer)
+  private val wavesBlockchainAsyncClient = WavesBlockchainClientBuilder.async(
+    s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
+    settings.defaultGrpcCachesExpiration,
+    monixScheduler,
+    grpcExecutionContext
+  )
 
   private implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(actorSystem))
 
@@ -323,7 +332,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       }
       _ <- {
         log.info("Shutting down gRPC client...")
-        gRPCExtensionClient.close()
+        wavesBlockchainAsyncClient.close()
       }
       _ <- {
         log.info("Shutting down queue...")
@@ -348,7 +357,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     } yield ()
 
     r.andThen {
-      case Success(_) => log.info("Matcher stoppped")
+      case Success(_) => log.info("Matcher stopped")
       case Failure(e) => log.error("Failed to stop matcher", e)
     }
   }
@@ -448,10 +457,12 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(
-    snapshotsRestore.future,
-    timeout(wait, "wait snapshots restored")
-  ))
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] =
+    Future.firstCompletedOf[Unit](
+      List(
+        snapshotsRestore.future,
+        timeout(wait, "wait snapshots restored")
+      ))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>

@@ -7,7 +7,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.dex.it.docker.base.BaseContainer
 import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
@@ -61,11 +60,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
       username = customUser,
       password = customPassword
     ).configure { p =>
-      p.withNetwork(BaseContainer.network)
+      p.withNetwork(network)
       p.withNetworkAliases(postgresContainerName)
       p.withCreateContainerCmdModifier { cmd =>
         cmd withName postgresContainerName
-        cmd withIpv4Address BaseContainer.getIp(11)
+        cmd withIpv4Address getIp(11)
       }
     }
 

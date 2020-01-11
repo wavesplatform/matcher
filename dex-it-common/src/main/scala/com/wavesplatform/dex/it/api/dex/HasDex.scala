@@ -6,12 +6,10 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.docker.base.info.DexContainerInfo
-import com.wavesplatform.dex.it.docker.base.{BaseContainer, DexContainer}
+import com.wavesplatform.dex.it.docker.base.DexContainer
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
-import org.testcontainers.containers.BindMode
 
 import scala.collection.JavaConverters._
 
@@ -37,11 +35,8 @@ trait HasDex { self: BaseContainersKit =>
     }
   }
 
-  protected def createDex(name: String, runConfig: Config = dexRunConfig, suiteInitialConfig: Config = dexInitialSuiteConfig): DexContainer = {
-    val baseContainer = BaseContainer.create(DexContainerInfo)(name, runConfig, suiteInitialConfig)
-    baseContainer.configure(_.withFileSystemBind(localLogsDir.toFile.getAbsolutePath, DexContainerInfo.containerLogsPath, BindMode.READ_WRITE))
-    DexContainer(name, baseContainer) unsafeTap addKnownContainer
-  }
+  protected def createDex(name: String, runConfig: Config = dexRunConfig, suiteInitialConfig: Config = dexInitialSuiteConfig): DexContainer =
+    DexContainer(name, networkName, network, getIp(name), dexRunConfig, dexInitialSuiteConfig, localLogsDir) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")
 

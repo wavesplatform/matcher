@@ -2,26 +2,26 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.docker.base.info.WavesNodeContainerInfo
-import com.wavesplatform.dex.it.docker.{ToxiProxy, base}
+import com.wavesplatform.dex.it.docker.base
+import com.wavesplatform.dex.it.docker.base.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
-class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
+class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  val toxiproxy: ToxiProxy  = new ToxiProxy().start()
-  val proxy: ContainerProxy = toxiproxy.container.getProxy(WavesNodeContainerInfo.netAlias, WavesNodeContainerInfo.dexGrpcExtensionPort)
+  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  grpc.integration {
          |    waves-node-grpc {
-         |      host = ${toxiproxy.name}
-         |      port = ${toxiproxy.getInnerProxyPort(proxy)}
+         |      host = $toxiProxyHostName
+         |      port = ${getInnerToxiProxyPort(wavesNodeProxy)}
          |    }
          |  }
          |}""".stripMargin)
@@ -47,13 +47,13 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
 
     markup(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
-    proxy.setConnectionCut(true)
+    wavesNodeProxy.setConnectionCut(true)
 
     broadcastAndAwait(alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode1.api, 0, defaultAssetQuantity)
 
     markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
-    proxy.setConnectionCut(false)
+    wavesNodeProxy.setConnectionCut(false)
 
     dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
 

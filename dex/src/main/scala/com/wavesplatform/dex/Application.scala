@@ -9,9 +9,9 @@ import akka.http.scaladsl.Http.ServerBinding
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import ch.qos.logback.classic.LoggerContext
 import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter}
 import kamon.Kamon
@@ -21,7 +21,8 @@ import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
@@ -57,21 +58,26 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
+      log.info("Shutting down initiated")
       spendableBalanceChanged.onComplete()
-      val matcherShutdown = matcher.shutdown()
-
-      log.info("Shutting down metrics...")
-      Metrics.shutdown()
 
       log.info("Shutting down reporters...")
-      val kamonShutdown = Kamon.stopAllReporters()
-
-      // TODO logback flush
-
-      matcherShutdown.zip(kamonShutdown).onComplete {
-        case Success(_) => log.info("Shutdown complete")
-        case Failure(e) => log.error("Can't stop DEX correctly", e)
+      val kamonShutdown = Kamon.stopAllReporters().andThen {
+        case Success(_) => log.info("Reporters stopped")
+        case Failure(e) => log.error("Failed to stop reporters", e)
       }
+
+      val task = matcher
+        .shutdown()
+        .zip(kamonShutdown)
+        .andThen {
+          case Success(_) => log.info("Shutdown complete")
+          case Failure(e) => log.error("Can't stop DEX correctly", e)
+        }
+
+      Await.ready(task, Duration.Inf)
+      val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+      loggerContext.stop()
     }
 }
 
@@ -106,6 +112,7 @@ object Application {
   }
 
   def main(args: Array[String]): Unit = {
+
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")
@@ -121,6 +128,7 @@ object Application {
   }
 
   private[this] def startDEX(configFile: Option[String]): Unit = {
+
     import com.wavesplatform.settings.Constants
 
     val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }

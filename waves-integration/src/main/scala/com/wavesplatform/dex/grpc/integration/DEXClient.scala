@@ -3,6 +3,7 @@ package com.wavesplatform.dex.grpc.integration
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.dex.grpc.integration.clients.{WavesBlockchainCachingClient, WavesBlockchainGrpcAsyncClient}
+import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.internal.DnsNameResolverProvider
 import io.grpc.netty.NettyChannelBuilder
@@ -11,8 +12,12 @@ import io.netty.channel.nio.NioEventLoopGroup
 import monix.execution.Scheduler
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 
+// TODO refactor to Builder
+/**
+  * @param monixScheduler Is not an implicit, because it is ExecutionContext too
+  */
 class DEXClient(target: String, defaultCachesExpiration: FiniteDuration, monixScheduler: Scheduler)(
     implicit private val grpcExecutionContext: ExecutionContext)
     extends ScorexLogging {
@@ -46,6 +51,6 @@ class DEXClient(target: String, defaultCachesExpiration: FiniteDuration, monixSc
 
   def close(): Future[Unit] = {
     channel.shutdownNow()
-    Future(blocking(eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS)))
+    eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
 }

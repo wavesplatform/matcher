@@ -14,13 +14,17 @@ object DexDockerPlugin extends AutoPlugin {
       Seq(
         imageNames := Seq(ImageName("com.wavesplatform/waves-dex:latest")),
         additionalFiles := Seq.empty,
-        exposedPorts := Set(6886),
+        exposedPorts := Set(
+          6886, // REST API
+          10001 // Profiler
+        ),
         baseImage := "anapsix/alpine-java:8_server-jre",
         dockerfile := new Dockerfile {
           from(baseImage.value)
           val yourKitArchive = "YourKit-JavaProfiler-2019.8-docker.zip"
           val bin            = "/opt/waves-dex/start.sh"
 
+          // See https://www.yourkit.com/docs/java/help/docker.jsp
           runRaw(s"""mkdir -p /opt/waves-dex && \\
                     |apk update && \\
                     |apk add --no-cache openssl ca-certificates && \\

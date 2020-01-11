@@ -129,6 +129,7 @@ object NodeApi {
           case NonFatal(e)                               => M.raiseError(e)
         }
 
+        // See DexApi
         repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
     }

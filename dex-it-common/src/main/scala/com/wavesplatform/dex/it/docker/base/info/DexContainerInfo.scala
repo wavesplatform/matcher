@@ -21,6 +21,7 @@ object DexContainerInfo extends BaseContainerInfo {
   )
 
   override def getEnv(containerName: String): Map[String, String] = Map(
+    "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
     "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_DEX_OPTS" -> Seq(
       "-J-Xmx1024M",

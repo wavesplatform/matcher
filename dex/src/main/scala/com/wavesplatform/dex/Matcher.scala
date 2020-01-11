@@ -316,7 +316,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   override def shutdown(): Future[Unit] = {
     setStatus(Status.Stopping)
-    for {
+    val r = for {
       _ <- {
         log.info("Shutting down HTTP server...")
         Option(matcherServerBinding).fold[Future[HttpTerminated]](Future.successful(HttpServerTerminated))(_.terminate(1.second))
@@ -346,6 +346,11 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         Future(blocking(db.close()))
       }
     } yield ()
+
+    r.andThen {
+      case Success(_) => log.info("Matcher stoppped")
+      case Failure(e) => log.error("Failed to stop matcher", e)
+    }
   }
 
   override def start(): Unit = {
@@ -394,25 +399,15 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       } zip {
         Future(blocking {
           log.info(s"Initializing HTTP ...")
-          Http() // Takes 3+ seconds
-        })
-      }
-
-      (_, combinedRoute) <- {
-        log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
-          log.info("All snapshots re restored")
-        }
-      } zip {
-        Future(blocking {
-          log.info("Preparing HTTP service ...")
-          // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
-          // Takes 3+ seconds
-          new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+          Http() // May take 3+ seconds
         })
       }
 
       _ <- {
+        log.info("Preparing HTTP service ...")
+        // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
+        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
       } map { serverBinding =>
@@ -421,14 +416,24 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       }
 
       deadline = settings.startEventsProcessingTimeout.fromNow
-      lastOffsetQueue <- {
+      (_, lastOffsetQueue) <- {
+        log.info("Waiting all snapshots are restored ...")
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
+          log.info("All snapshots re restored")
+        }
+      } zip {
         log.info("Getting last queue offset ...")
         getLastOffset(deadline)
       }
-      _ = log.info(s"Last queue offset is $lastOffsetQueue")
-      _ <- waitOffsetReached(lastOffsetQueue, deadline)
-      _ = log.info("Last offset has been reached, notify addresses")
-    } yield addressActors ! AddressDirectory.StartSchedules
+
+      _ <- {
+        log.info(s"Last queue offset is $lastOffsetQueue")
+        waitOffsetReached(lastOffsetQueue, deadline)
+      }
+    } yield {
+      log.info("Last offset has been reached, notify addresses")
+      addressActors ! AddressDirectory.StartSchedules
+    }
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)
@@ -443,19 +448,21 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(
+    snapshotsRestore.future,
+    timeout(wait, "wait snapshots restored")
+  ))
 
-  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] =
-    matcherQueue.lastEventOffset.recoverWith {
-      case e: TimeoutException =>
-        log.warn(s"During receiving last offset", e)
-        if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
-        else getLastOffset(deadline)
+  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
+    case e: TimeoutException =>
+      log.warn(s"During receiving last offset", e)
+      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get the last offset from queue"))
+      else getLastOffset(deadline)
 
-      case e: Throwable =>
-        log.error(s"Can't catch ${e.getClass.getName}", e)
-        throw e
-    }
+    case e: Throwable =>
+      log.error(s"Can't catch ${e.getClass.getName}", e)
+      throw e
+  }
 
   private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
     def loop(p: Promise[Unit]): Unit = {
@@ -471,7 +478,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     p.future
   }
 
-  private def timeout(after: FiniteDuration, label: String = ""): Future[Nothing] = {
+  private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {
     val failure = Promise[Nothing]()
     actorSystem.scheduler.scheduleOnce(after) {
       failure.failure(new TimeoutException(s"$after is out${if (label.isEmpty) "" else s": $label"}"))

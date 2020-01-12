@@ -150,7 +150,3 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     restart()
   }
 }
-
-object BaseContainer {
-
-}

@@ -76,6 +76,21 @@ class BaseSettingsSpecification extends FlatSpec {
          |      cors = no
          |      api-key-different-host = no
          |    }
+         |    waves-blockchain-client {
+         |      grpc {
+         |        target = "127.1.2.9:6333"
+         |        max-hedged-attempts = 9
+         |        max-retry-attempts = 13
+         |        keep-alive-without-calls = false
+         |        keep-alive-time = 8s
+         |        keep-alive-timeout = 11s
+         |        idle-timeout = 20s
+         |        channel-options {
+         |          connect-timeout = 99s
+         |        }
+         |      }
+         |      default-caches-expiration = 101ms
+         |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s
          |    snapshots-interval = 999

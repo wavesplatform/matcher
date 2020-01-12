@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesBlockchainClientBuilder}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -31,7 +32,25 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   private implicit val monixScheduler = Scheduler(runNow)
-  private lazy val client             = WavesBlockchainClientBuilder.async(wavesNode1.grpcApiTarget, 100.milliseconds, monixScheduler, runNow)
+  private lazy val client = WavesBlockchainClientBuilder.async(
+    WavesBlockchainClientSettings(
+      grpc = GrpcClientSettings(
+        target = wavesNode1.grpcApiTarget,
+        maxHedgedAttempts = 5,
+        maxRetryAttempts = 5,
+        keepAliveWithoutCalls = true,
+        keepAliveTime = 2.seconds,
+        keepAliveTimeout = 5.seconds,
+        idleTimeout = 7.seconds,
+        channelOptions = GrpcClientSettings.ChannelOptionsSettings(
+          connectTimeout = 5.seconds
+        )
+      ),
+      defaultCachesExpiration = 100.milliseconds
+    ),
+    monixScheduler,
+    runNow
+  )
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,

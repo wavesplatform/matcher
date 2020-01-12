@@ -54,8 +54,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val time = new NTP(settings.ntpServer)
   private val wavesBlockchainAsyncClient = WavesBlockchainClientBuilder.async(
-    s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
-    settings.defaultGrpcCachesExpiration,
+    settings.wavesBlockchainClient,
     monixScheduler,
     grpcExecutionContext
   )

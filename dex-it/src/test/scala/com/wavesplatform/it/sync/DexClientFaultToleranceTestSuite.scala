@@ -5,8 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.docker.base
-import com.wavesplatform.dex.it.docker.base.WavesNodeContainer
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
@@ -27,7 +26,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
          |}""".stripMargin)
   }
 
-  lazy val wavesNode2: base.WavesNodeContainer = createWavesNode("waves-2")
+  lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

@@ -458,11 +458,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   }
 
   private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] =
-    Future.firstCompletedOf[Unit](
-      List(
-        snapshotsRestore.future,
-        timeout(wait, "wait snapshots restored")
-      ))
+    Future.firstCompletedOf(List(snapshotsRestore.future, timeout(wait, "wait snapshots restored")))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>
@@ -492,7 +488,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {
     val failure = Promise[Nothing]()
     actorSystem.scheduler.scheduleOnce(after) {
-      failure.failure(new TimeoutException(s"$after is out${if (label.isEmpty) "" else s": $label"}"))
+      failure.failure(new TimeoutException(s"$after is out: $label"))
     }
     failure.future
   }

@@ -13,7 +13,7 @@ import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
-import com.wavesplatform.dex.it.docker.base.BaseContainer
+import com.wavesplatform.dex.it.docker.BaseContainer
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.utils.ScorexLogging
 import mouse.any._

@@ -1,6 +1,7 @@
-package com.wavesplatform.dex.it.docker.base
+package com.wavesplatform.dex.it.docker
 
 import java.net.InetSocketAddress
+import java.nio.charset.StandardCharsets
 import java.nio.file._
 
 import cats.Id
@@ -12,16 +13,17 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.config.Implicits.ConfigOps
-import com.wavesplatform.dex.it.docker.Implicits.GenericContainerOps
 import com.wavesplatform.utils.ScorexLogging
+import org.testcontainers.images.builder.Transferable
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-abstract class BaseContainer(private val underlying: GenericContainer) extends GenericContainer(underlying) with ScorexLogging {
+abstract class BaseContainer(protected val baseContainerPath: String, private val underlying: GenericContainer)
+    extends GenericContainer(underlying)
+    with ScorexLogging {
 
-  protected def baseContainerPath: String
   protected def internalIp: String
 
   protected def prefix: String = s"[name=${underlying.containerInfo.getName}, id=${underlying.containerInfo.getId}]"
@@ -69,7 +71,7 @@ abstract class BaseContainer(private val underlying: GenericContainer) extends G
     val containerPath = Paths.get(baseContainerPath, "suite.conf").toString
     val content       = newSuiteConfig.rendered
     log.trace(s"$prefix Write to '$containerPath':\n$content")
-    c.copyFileToContainer(containerPath, content)
+    c.copyFileToContainer(Transferable.of(content.getBytes(StandardCharsets.UTF_8)), containerPath)
   }
 
   def printDebugMessage(text: String): Unit = {
@@ -107,32 +109,27 @@ abstract class BaseContainer(private val underlying: GenericContainer) extends G
 
   private def sendStartCmd(): Unit = dockerClient.startContainerCmd(underlying.containerId).exec()
 
-  def disconnectFromNetwork(): Unit = {
-    println(s"$prefix Before disconnect: $internalIp")
+  def disconnectFromNetwork(): Unit =
     dockerClient
       .disconnectFromNetworkCmd()
       .withContainerId(underlying.containerId)
       .withNetworkId(underlying.network.getId)
       .exec()
-    println(s"$prefix After disconnect: $internalIp")
-  }
 
   def invalidateCaches(): Unit = cachedRestApiAddress.invalidate()
 
   def connectToNetwork(): Unit = {
     invalidateCaches()
 
-    println(s"$prefix Before connect: $internalIp")
     dockerClient
       .connectToNetworkCmd()
       .withContainerId(underlying.containerId)
-      .withNetworkId(underlying.network.getId) // TODO ???
+      .withNetworkId(underlying.network.getId)
       .withContainerNetwork(
         new ContainerNetwork()
           .withIpamConfig(new ContainerNetwork.Ipam().withIpv4Address(internalIp))
           .withAliases(underlying.networkAliases.asJava))
       .exec()
-    println(s"$prefix After connect: $internalIp")
 
     api.waitReady
   }
@@ -155,5 +152,5 @@ abstract class BaseContainer(private val underlying: GenericContainer) extends G
 }
 
 object BaseContainer {
-  val apiKey = "integration-test-rest-api"
+
 }

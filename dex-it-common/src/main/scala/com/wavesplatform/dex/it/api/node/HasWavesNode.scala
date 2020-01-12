@@ -4,7 +4,7 @@ import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.config.GenesisConfig
-import com.wavesplatform.dex.it.docker.base.WavesNodeContainer
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 

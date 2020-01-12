@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.docker.base
+package com.wavesplatform.dex.it.docker
 
 import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
@@ -11,43 +11,37 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.docker.Implicits.GenericContainerOps
+import com.wavesplatform.dex.it.config.Implicits.ConfigOps
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.utils.ScorexLogging
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl
-import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-final case class DexContainer private (underlying: GenericContainer)(implicit
-                                                                     tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                                                                     futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                                                                     ec: ExecutionContext)
-    extends BaseContainer(underlying) {
-
-  override protected val baseContainerPath: String = DexContainer.baseContainerPath
-  override protected val internalIp: String        = underlying.containerIpAddress // ???
+final case class DexContainer private (override val internalIp: String, underlying: GenericContainer)(
+    implicit
+    tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+    futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+    ec: ExecutionContext)
+    extends BaseContainer(DexContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
 
-  override def api: DexApi[Id]          = fp.sync { DexApi[Try](BaseContainer.apiKey, cachedRestApiAddress.get()) }
-  override def asyncApi: DexApi[Future] = DexApi[Future](BaseContainer.apiKey, cachedRestApiAddress.get())
+  override def api: DexApi[Id]          = fp.sync { DexApi[Try](apiKey, cachedRestApiAddress.get()) }
+  override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, cachedRestApiAddress.get())
 }
 
 object DexContainer extends ScorexLogging {
 
-  val isProfilingEnabled: Boolean = Option(System.getenv("WAVES_DEX_PROFILING")).getOrElse("false").toBoolean
-  val baseContainerPath: String   = "/opt/waves-dex"
+  private val isProfilingEnabled: Boolean = Option(System.getenv("WAVES_DEX_PROFILING")).getOrElse("false").toBoolean
+  private val baseContainerPath: String   = "/opt/waves-dex"
+  private val containerLogsPath: String   = s"$baseContainerPath/logs"
 
-  private val containerLogsPath: String                = s"$baseContainerPath/logs"
-  private val ignoreWaitStrategy: AbstractWaitStrategy = () => ()
-
-  val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
-  val netAlias: String = "d3x"
+  private val restApiPort: Int = 6886 // application.conf waves.dex.rest-api.port
 
   def apply(name: String,
             networkName: String,
@@ -67,8 +61,8 @@ object DexContainer extends ScorexLogging {
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      c.withNetworkAliases(netAlias)
-      c.withFileSystemBind(localLogsDir.toFile.getAbsolutePath, containerLogsPath, BindMode.READ_WRITE)
+      c.withNetworkAliases("d3x")
+      c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id
           .withIpv4Address(internalIp): Unit
@@ -78,18 +72,18 @@ object DexContainer extends ScorexLogging {
       List(
         ("dex-base.conf", getRawContentFromResource(s"dex-servers/dex-base.conf"), false),
         (s"$name.conf", getRawContentFromResource(s"dex-servers/$name.conf"), false),
-        ("run.conf", runConfig.resolve().root().render(), true),
-        ("suite.conf", suiteInitialConfig.resolve().root().render(), true),
+        ("run.conf", runConfig.rendered, true),
+        ("suite.conf", suiteInitialConfig.rendered, true),
         ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false)
       ).map {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString
           log.trace(s"[name=$name] Write to '$containerPath'${if (logContent) s":\n$content" else ""}")
-          c.withCopyFileToContainer(containerPath, content)
+          c.withCopyFileToContainer(MountableFileOps.fromContent(content), containerPath)
       }
     }
 
-    DexContainer(underlying)
+    DexContainer(internalIp, underlying)
   }
 
   private def getEnv(containerName: String): Map[String, String] = Map(

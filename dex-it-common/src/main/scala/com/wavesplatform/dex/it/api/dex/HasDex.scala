@@ -6,7 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.docker.base.DexContainer
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}

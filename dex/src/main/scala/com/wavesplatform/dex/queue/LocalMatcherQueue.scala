@@ -28,7 +28,6 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) 
   private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private val timer = new Timer("local-dex-queue", true)
-
   private val producer: Producer = {
     val r = if (settings.enableStoring) new LocalProducer(store, time) else IgnoreProducer
     log.info(s"Choosing ${r.getClass.getName} producer")

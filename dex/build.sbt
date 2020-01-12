@@ -9,7 +9,6 @@ enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, Syst
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
-dependencyOverrides ++= Dependencies.enforcedVersions.value // TODO remove after DEX-526
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",

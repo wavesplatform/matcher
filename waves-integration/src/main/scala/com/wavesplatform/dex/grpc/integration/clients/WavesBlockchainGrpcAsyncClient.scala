@@ -76,8 +76,8 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
 
     override def onError(t: Throwable): Unit = {
       if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", t)
-      requestBalanceChanges()
       channel.resetConnectBackoff()
+      requestBalanceChanges()
     }
   }
 

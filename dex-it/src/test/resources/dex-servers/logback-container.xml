@@ -16,7 +16,7 @@
     <appender name="DETAILED" class="ch.qos.logback.core.FileAppender">
         <file>${logback.detailed.fullPath}</file>
         <append>true</append>
-        <immediateFlush>true</immediateFlush> <!-- TODO -->
+        <immediateFlush>false</immediateFlush>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>TRACE</level>
         </filter>

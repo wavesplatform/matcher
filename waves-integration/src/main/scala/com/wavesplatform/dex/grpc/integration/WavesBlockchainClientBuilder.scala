@@ -18,7 +18,6 @@ object WavesBlockchainClientBuilder extends ScorexLogging {
     val eventLoopGroup = new NioEventLoopGroup
     val channel = wavesBlockchainClientSettings.grpc.toNettyChannelBuilder
       .nameResolverFactory(new DnsNameResolverProvider)
-      .defaultLoadBalancingPolicy("pick_first")
       .executor(grpcExecutionContext.execute)
       .eventLoopGroup(eventLoopGroup)
       .usePlaintext()

@@ -427,7 +427,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       (_, lastOffsetQueue) <- {
         log.info("Waiting all snapshots are restored ...")
         waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
-          log.info("All snapshots re restored")
+          log.info("All snapshots are restored")
         }
       } zip {
         log.info("Getting last queue offset ...")

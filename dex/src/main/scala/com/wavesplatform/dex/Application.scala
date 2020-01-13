@@ -13,7 +13,6 @@ import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.grpc.integration.DEXClient
-import com.wavesplatform.dex.metrics.Metrics
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.SystemInformationReporter
 import kamon.Kamon
@@ -53,7 +52,6 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
     // on unexpected shutdown
     sys.addShutdownHook {
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
-      Metrics.shutdown()
     }
   }
 

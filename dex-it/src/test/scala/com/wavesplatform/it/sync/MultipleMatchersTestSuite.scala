@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.base

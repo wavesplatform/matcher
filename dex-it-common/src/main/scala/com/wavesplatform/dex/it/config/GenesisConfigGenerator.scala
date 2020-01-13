@@ -1,18 +1,13 @@
 package com.wavesplatform.dex.it.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.crypto
-import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.settings.{GenesisSettings, _}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.it.config.genesis.{Block, GenesisSettings, GenesisTransaction, GenesisTransactionSettings, NxtLikeConsensusBlockData}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import com.wavesplatform.dex.domain.utils.EitherExt2
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -50,7 +45,7 @@ object GenesisConfigGenerator {
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
 
     val seedBytes = item.seedText.getBytes("UTF-8")
-    val acc       = Wallet.generateNewAccount(seedBytes, item.nonce)
+    val acc       = PredefinedAccounts.generateNewAccount(seedBytes, item.nonce)
 
     FullAddressInfo(
       seedText = item.seedText,
@@ -82,7 +77,7 @@ object GenesisConfigGenerator {
 
     val genesisBlock = {
 
-      val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
+      val reference     = ByteStr(Array.fill(crypto.SignatureLength)(-1: Byte))
       val genesisSigner = KeyPair(ByteStr.empty)
 
       Block
@@ -117,7 +112,7 @@ object GenesisConfigGenerator {
          |  address-scheme-character = "${generatorSettings.chainId.toChar}"
          |  genesis {
          |    timestamp: ${settings.timestamp}
-         |    signature: "${settings.signature.get}"
+         |    signature: null
          |    initial-balance: ${settings.initialBalance}
          |    initial-base-target: ${settings.initialBaseTarget}
          |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms

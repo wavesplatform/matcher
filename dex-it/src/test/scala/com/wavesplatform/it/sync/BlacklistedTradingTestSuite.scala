@@ -6,8 +6,8 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._

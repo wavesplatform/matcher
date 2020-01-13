@@ -9,9 +9,9 @@ import java.util.concurrent.{ConcurrentHashMap, Executors}
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.base.BaseContainer
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import mouse.any._
 import org.asynchttpclient.DefaultAsyncHttpClientConfig

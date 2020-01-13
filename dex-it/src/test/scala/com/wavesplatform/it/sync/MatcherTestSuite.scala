@@ -5,7 +5,7 @@ import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
 import org.scalatest.prop.TableDrivenPropertyChecks

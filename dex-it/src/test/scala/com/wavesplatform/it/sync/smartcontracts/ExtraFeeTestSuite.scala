@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
@@ -52,7 +52,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset1, 0.009.waves),
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
-    broadcastAndAwait(mkSetAccountScriptText(alice, Some("true")))
+    broadcastAndAwait(mkSetAccountScript(alice, Some("true")))
 
     dex1.start()
   }
@@ -93,7 +93,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     "with one Smart Account, two Smart Assets and scripted Matcher" - {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
-          broadcastAndAwait(mkSetAccountScriptText(matcher, Some("true")))
+          broadcastAndAwait(mkSetAccountScript(matcher, Some("true")))
 
           dex1.restart() // matcher caches knowledge about it's script during start
 
@@ -144,7 +144,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
         val expectedFee      = 550L                           // 1 x "smart asset" and 1 x "matcher script"
 
-        placeAndAwaitAtDex(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, matcherFeeAssetId = feeAsset))
+        placeAndAwaitAtDex(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, feeAsset = feeAsset))
 
         info("expected fee should be reserved")
         dex1.api.reservedBalance(bob)(feeAsset) shouldBe expectedFee
@@ -170,7 +170,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         val aliceWavesBalance = wavesNode1.api.balance(alice, Waves)
         val aliceAssetBalance = wavesNode1.api.balance(alice, assetWith2Dec)
 
-        dex1.api.tryPlace(mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 4, matcherFeeAssetId = assetWith2Dec)) should failWith(
+        dex1.api.tryPlace(mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 4, feeAsset = assetWith2Dec)) should failWith(
           9441542, // FeeNotEnough
           s"Required 0.05 ${assetWith2DecTx.id()} as fee for this order, but given 0.04 ${assetWith2DecTx.id()}"
         )
@@ -180,11 +180,11 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         wavesNode1.api.balance(alice, Waves) shouldBe aliceWavesBalance
         wavesNode1.api.balance(alice, assetWith2Dec) shouldBe aliceAssetBalance
 
-        val bobOrder = mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
+        val bobOrder = mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 5, feeAsset = assetWith2Dec)
         dex1.api.place(bobOrder)
         dex1.api.reservedBalance(bob)(assetWith2Dec) shouldBe 10005L
 
-        val aliceOrder = mkOrder(alice, asset2WithDecWavesPair, BUY, 20000L, 300.waves * 1000000L, 5, matcherFeeAssetId = assetWith2Dec)
+        val aliceOrder = mkOrder(alice, asset2WithDecWavesPair, BUY, 20000L, 300.waves * 1000000L, 5, feeAsset = assetWith2Dec)
         dex1.api.place(aliceOrder)
         waitForOrderAtNode(bobOrder)
 
@@ -215,7 +215,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
     dex1.api.upsertRate(falseFeeAsset, feeAssetRate)
 
-    dex1.api.tryPlace(mkOrder(bob, oneSmartPair, SELL, amount, price, 550, version = 3, matcherFeeAssetId = falseFeeAsset)) should failWith(
+    dex1.api.tryPlace(mkOrder(bob, oneSmartPair, SELL, amount, price, 550, version = 3, feeAsset = falseFeeAsset)) should failWith(
       11536130, // AssetScriptDeniedOrder
       s"The asset's script of ${falseFeeAssetTx.id()} rejected the order")
   }

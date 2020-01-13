@@ -48,11 +48,9 @@ trait ApiMarshallers {
         case (data, charset)       => data.decodeString(charset.nioCharset.name)
       }
 
-  private[this] lazy val jsonStringMarshaller =
-    Marshaller.stringMarshaller(`application/json`)
+  private[this] lazy val jsonStringMarshaller = Marshaller.stringMarshaller(`application/json`)
 
-  private[this] lazy val customJsonStringMarshaller =
-    Marshaller.stringMarshaller(CustomJson.jsonWithNumbersAsStrings)
+  private[this] lazy val customJsonStringMarshaller = Marshaller.stringMarshaller(CustomJson.jsonWithNumbersAsStrings)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] =
     jsonStringUnmarshaller.map { data =>

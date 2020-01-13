@@ -10,20 +10,21 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
-import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction}
 import play.api.libs.json._
 
 import scala.concurrent.duration.DurationInt
@@ -50,13 +51,12 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
 
-  def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[exchange.ExchangeTransaction]]]
+  def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[JExchangeTransaction]]]
 
   def tryOrderHistory(owner: KeyPair,
                       activeOnly: Option[Boolean] = None,
                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
-  def tryOrderHistoryWithApiKey(owner: com.wavesplatform.account.Address,
-                                activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+  def tryOrderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
   def tryOrderHistoryByPair(owner: KeyPair,
                             assetPair: AssetPair,
                             activeOnly: Option[Boolean] = None,
@@ -93,10 +93,10 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForOrderStatus(order: Order, status: OrderStatus): F[OrderStatusResponse] = waitForOrderStatus(order.assetPair, order.id(), status)
   def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse]
 
-  def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[exchange.ExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
-  def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[exchange.ExchangeTransaction]]
+  def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[JExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
+  def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[JExchangeTransaction]]
 
-  def waitForTransactionsByOrder(id: Order.Id)(pred: List[exchange.ExchangeTransaction] => Boolean): F[List[exchange.ExchangeTransaction]]
+  def waitForTransactionsByOrder(id: Order.Id)(pred: List[JExchangeTransaction] => Boolean): F[List[JExchangeTransaction]]
 
   def waitForCurrentOffset(pred: Long => Boolean): F[Long]
 }
@@ -208,7 +208,7 @@ object DexApi {
         }
       }
 
-      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[exchange.ExchangeTransaction]]] =
+      override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[JExchangeTransaction]]] =
         tryParseJson(sttp.get(uri"$apiUri/transactions/$id"))
 
       override def tryOrderHistory(owner: KeyPair,
@@ -219,7 +219,7 @@ object DexApi {
           .headers(timestampAndSignatureHeaders(owner, timestamp))
       }
 
-      override def tryOrderHistoryWithApiKey(owner: com.wavesplatform.account.Address,
+      override def tryOrderHistoryWithApiKey(owner: Address,
                                              activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]] = tryParseJson {
         sttp
           .get(appendActiveOnly(uri"$apiUri/orders/${owner.stringRepr}", activeOnly))
@@ -354,12 +354,11 @@ object DexApi {
       override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse] =
         waitForOrder(assetPair, id)(_.status == status)
 
-      override def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[exchange.ExchangeTransaction]] =
+      override def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[JExchangeTransaction]] =
         waitForTransactionsByOrder(id)(_.lengthCompare(atLeast) >= 0)
 
-      override def waitForTransactionsByOrder(id: Order.Id)(
-          pred: List[exchange.ExchangeTransaction] => Boolean): F[List[exchange.ExchangeTransaction]] =
-        repeatUntil[Either[MatcherError, List[exchange.ExchangeTransaction]]](tryTransactionsByOrder(id), RepeatRequestOptions(1.second, 60)) {
+      override def waitForTransactionsByOrder(id: Order.Id)(pred: List[JExchangeTransaction] => Boolean): F[List[JExchangeTransaction]] =
+        repeatUntil[Either[MatcherError, List[JExchangeTransaction]]](tryTransactionsByOrder(id), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())

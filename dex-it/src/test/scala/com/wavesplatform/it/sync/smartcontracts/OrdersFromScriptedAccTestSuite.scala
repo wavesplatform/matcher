@@ -5,7 +5,7 @@ import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
@@ -29,11 +29,11 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
-  private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(bob, Some(codeText), fee = setScriptFee + smartFee))
+  private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScript(bob, Some(codeText), fee = setScriptFee + smartFee))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(aliceAssetTx, mkSetAccountScriptText(bob, Some("true")))
+    broadcastAndAwait(aliceAssetTx, mkSetAccountScript(bob, Some("true")))
   }
 
   "issue asset and run test" - {

@@ -3,12 +3,12 @@ package com.wavesplatform.dex.it.api.dex
 import cats.Functor
 import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.CanExtract
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction}
 
 object DexApiOps {
   // TODO replace by a macros
@@ -43,15 +43,15 @@ object DexApiOps {
     def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
 
-    def transactionsByOrder(order: Order): F[List[exchange.ExchangeTransaction]] = transactionsByOrder(order.id())
-    def transactionsByOrder(id: Order.Id): F[List[exchange.ExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
+    def transactionsByOrder(order: Order): F[List[JExchangeTransaction]] = transactionsByOrder(order.id())
+    def transactionsByOrder(id: Order.Id): F[List[JExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
 
     def orderHistory(owner: KeyPair,
                      activeOnly: Option[Boolean] = None,
                      timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistory(owner, activeOnly, timestamp))
 
-    def orderHistoryWithApiKey(owner: com.wavesplatform.account.Address, activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] =
+    def orderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly))
 
     def orderHistoryByPair(owner: KeyPair,

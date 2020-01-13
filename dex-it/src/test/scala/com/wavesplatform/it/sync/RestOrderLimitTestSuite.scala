@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 

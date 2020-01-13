@@ -179,11 +179,11 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   private def buyGenerator(pair: AssetPair,
                            amount: Long,
                            price: Long,
-                           sender: Option[KeyPair] = None,
-                           matcherFee: Option[Long] = None,
-                           version: Byte = 1,
+                           sender: Option[KeyPair],
+                           matcherFee: Option[Long],
+                           version: Byte,
                            timestamp: Option[Long],
-                           feeAsset: Asset = Waves): Gen[(Order, KeyPair)] =
+                           feeAsset: Asset): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair  <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long  <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
@@ -194,11 +194,11 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   private def sellGenerator(pair: AssetPair,
                             amount: Price,
                             price: Price,
-                            sender: Option[KeyPair] = None,
-                            matcherFee: Option[Price] = None,
+                            sender: Option[KeyPair],
+                            matcherFee: Option[Price],
                             timestamp: Option[Price],
-                            version: Byte = 1,
-                            feeAsset: Asset = Waves): Gen[(Order, KeyPair)] =
+                            version: Byte,
+                            feeAsset: Asset): Gen[(Order, KeyPair)] =
     for {
       sender: KeyPair  <- sender.map(Gen.const).getOrElse(accountGen)
       timestamp: Long  <- timestamp.map(Gen.const).getOrElse(createdTimeGen)

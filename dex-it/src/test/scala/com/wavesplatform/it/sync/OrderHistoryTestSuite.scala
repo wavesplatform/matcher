@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange._
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -45,7 +45,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       ).foreach {
         case (version, feeAsset) =>
           s"version=$version, asset=$feeAsset" in {
-            val order   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset, version = version)
+            val order   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset, version = version)
             val orderId = order.id()
             dex1.api.place(order)
             dex1.api.orderStatus(order).filledFee shouldBe None
@@ -77,7 +77,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in filled orders of different versions" in {
-      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset)
+      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 1.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
@@ -156,7 +156,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in partially filled and cancelled orders of different versions" in {
-      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset)
+      val aliceOrder   = mkOrder(alice, wctUsdPair, BUY, 2.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
@@ -203,7 +203,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
 
     "in partially filled orders with fractional filled amount" in {
-      val order   = mkOrder(alice, wctUsdPair, BUY, 9.wct, 1.price, matcherFee = matcherFee, matcherFeeAssetId = feeAsset)
+      val order   = mkOrder(alice, wctUsdPair, BUY, 9.wct, 1.price, matcherFee = matcherFee, feeAsset = feeAsset)
       val orderId = order.id()
       dex1.api.place(order)
 
@@ -231,7 +231,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.upsertRate(feeAsset, rate)
       val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
-      val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, matcherFeeAssetId = feeAsset)
+      val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
       dex1.api.place(aliceOrder)
 
@@ -242,7 +242,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.feeAsset shouldBe feeAsset
       }
 
-      val bobOrder   = mkOrder(bob, ethUsdPair, SELL, 1.eth, 0.5.price, matcherFee, matcherFeeAssetId = feeAsset)
+      val bobOrder   = mkOrder(bob, ethUsdPair, SELL, 1.eth, 0.5.price, matcherFee, feeAsset = feeAsset)
       val bobOrderId = bobOrder.id()
       dex1.api.place(bobOrder)
 

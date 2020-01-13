@@ -4,7 +4,7 @@
 //import java.nio.charset.StandardCharsets
 //
 //import com.typesafe.config.{Config, ConfigFactory}
-//import com.wavesplatform.account.KeyPair
+//import com.wavesplatform.dex.domain.account.KeyPair
 //import com.wavesplatform.common.state.ByteStr
 //import com.wavesplatform.dex.settings.AssetType._
 //import com.wavesplatform.dex.settings.FeeMode._
@@ -12,8 +12,8 @@
 //import com.wavesplatform.it.api.SyncHttpApi._
 //import com.wavesplatform.it.api.SyncMatcherHttpApi._
 //import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
-//import com.wavesplatform.transaction.Asset
-//import com.wavesplatform.transaction.Asset.IssuedAsset
+//import com.wavesplatform.dex.domain.asset.Asset
+//import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 //import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 //
 //class V3OrderPercentFeeFeeReceivingTestSuite extends OrderPercentFeePriceTestSuite(3.toByte)

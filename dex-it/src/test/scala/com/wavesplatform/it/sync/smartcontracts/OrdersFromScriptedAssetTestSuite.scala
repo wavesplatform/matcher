@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities
@@ -10,7 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 /**
@@ -120,7 +120,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(counter)
 
     info("update a script")
-    val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, DenyBigAmountScript)
+    val setAssetScript = mkSetAssetScript(matcher, allowAsset2, DenyBigAmountScript)
     broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
@@ -147,7 +147,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(counter)
 
     info("update a script")
-    val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, DenyBigAmountScript)
+    val setAssetScriptTx = mkSetAssetScript(matcher, allowAsset3, DenyBigAmountScript)
     broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")

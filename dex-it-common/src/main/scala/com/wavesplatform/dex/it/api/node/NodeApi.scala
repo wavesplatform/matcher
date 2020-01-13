@@ -9,18 +9,17 @@ import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
 import com.typesafe.config.Config
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ConnectReq
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
 import com.wavesplatform.dex.it.json._
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.it.waves.Implicits.toByteStr
+import com.wavesplatform.wavesj.Transaction
 import play.api.libs.json.JsResultException
 
 import scala.concurrent.duration.DurationInt
@@ -48,7 +47,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForHeightArise(): F[Unit]
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
   def waitForTransaction(id: ByteStr): F[Unit]
-  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.id.value)
+  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.getId)
   def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit]
 }
 
@@ -84,7 +83,11 @@ object NodeApi {
       override def tryConfig: F[Either[ErrorResponse, Config]] = tryParse(sttp.get(uri"$apiUri/blocks/height").response(asConfig))
 
       override def tryConnect(toNode: InetSocketAddress): F[Either[ErrorResponse, Unit]] = tryUnit {
-        sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey)
+        val json = s"""{
+                     |  "host": "${toNode.getHostName}",
+                     |  "port": ${toNode.getPort}
+                     |}""".stripMargin
+        sttp.post(uri"$apiUri/peers/connect").body(json).header("X-API-Key", apiKey)
       }
 
       override def tryConnectedPeers: F[Either[ErrorResponse, ConnectedPeersResponse]] = tryParseJson(sttp.get(uri"$apiUri/peers/connected"))

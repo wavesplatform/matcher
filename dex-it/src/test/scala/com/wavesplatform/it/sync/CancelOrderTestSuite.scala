@@ -4,14 +4,14 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.TimerOps.TimerOpsImplicits
 import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 

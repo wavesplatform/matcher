@@ -5,8 +5,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
@@ -48,7 +48,7 @@ class RatesTestSuite extends MatcherSuiteBase {
     dex1.start()
   }
 
-  private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, matcherFeeAssetId = btcAsset)
+  private def newOrder: Order = mkOrder(alice, wctUsdPair, BUY, amount, price, matcherFee = 300000, feeAsset = btcAsset)
 
   "Rates can be handled via REST" in {
     // default rates

@@ -2,15 +2,20 @@ package com.wavesplatform.dex.it.config
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.KeyPair
+import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.it.config.GenesisConfig.generatorConfig
-import com.wavesplatform.wallet.Wallet
 
 import scala.collection.JavaConverters._
 
-object PredefinedAccounts extends PredefinedAccounts
+object PredefinedAccounts extends PredefinedAccounts {
+  def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = KeyPair(crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed)))
+}
 
 trait PredefinedAccounts {
+
+  import PredefinedAccounts._
 
   private val accounts: Map[String, KeyPair] = {
 
@@ -24,7 +29,7 @@ trait PredefinedAccounts {
         val prefix   = s"$distributionsKey.$accountName"
         val seedText = generatorConfig.getString(s"$prefix.seed-text")
         val nonce    = generatorConfig.getInt(s"$prefix.nonce")
-        accountName -> Wallet.generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
+        accountName -> generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
       }
       .toMap
   }

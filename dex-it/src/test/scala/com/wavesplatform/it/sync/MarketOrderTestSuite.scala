@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.AcceptedOrderType
@@ -12,8 +12,8 @@ import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest
@@ -438,9 +438,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val account = createAccountWithBalance { transfer -> usd }
 
-      placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, matcherFeeAssetId = btc, version = 3) }
+      placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3) }
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, matcherFeeAssetId = btc)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWith(
         3147270,
         s"0.003 ${BtcId.toString}"
       )

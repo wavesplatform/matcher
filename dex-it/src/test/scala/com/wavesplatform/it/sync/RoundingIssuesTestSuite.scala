@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, OrderType}
 
 class RoundingIssuesTestSuite extends MatcherSuiteBase {

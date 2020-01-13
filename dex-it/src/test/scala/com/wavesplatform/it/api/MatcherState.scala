@@ -1,10 +1,9 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.it.api.responses.dex.{MarketStatusResponse, OrderBookHistoryItem, OrderBookResponse, OrderStatusResponse}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 case class MatcherState(offset: QueueEventWithMeta.Offset,
                         snapshots: Map[AssetPair, QueueEventWithMeta.Offset],

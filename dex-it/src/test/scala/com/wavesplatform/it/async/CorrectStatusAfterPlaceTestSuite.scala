@@ -3,14 +3,16 @@ package com.wavesplatform.it.async
 import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.it._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order.Id
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.waves.Implicits._
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.wavesj.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -60,7 +62,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
       mkMassTransfer(
         bob,
         Waves,
-        traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, 100.waves))(collection.breakOut)
+        traders.map(x => new Transfer(x.toAddress, 100.waves))(collection.breakOut)
       )
 
     wavesNode1.start()
@@ -68,9 +70,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(issueAssetTxs: _*)
 
     val transferAssetsTxs = issueAssetTxs.map { issueTx =>
-      mkMassTransfer(issuer,
-                     IssuedAsset(issueTx.id.value),
-                     traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, sendAmount))(collection.breakOut))
+      mkMassTransfer(issuer, IssuedAsset(issueTx.getId), traders.map(x => new Transfer(x.toAddress, sendAmount))(collection.breakOut))
     }
 
     broadcastAndAwait(transferAssetsTxs: _*)

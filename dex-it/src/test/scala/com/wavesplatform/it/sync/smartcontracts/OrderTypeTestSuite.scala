@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
@@ -129,6 +129,6 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText)))
-  private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScript(alice, Some(scriptText)))
+  private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScript(alice, None, fee = setScriptFee + smartFee))
 }

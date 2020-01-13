@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -250,7 +250,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           broadcastAndAwait(newFeeAssetTx)
           dex1.api.upsertRate(newFeeAsset, 2)
 
-          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, matcherFeeAssetId = newFeeAsset)
+          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, feeAsset = newFeeAsset)
 
           dex1.api.place(bobOrder)
           dex1.api.reservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)

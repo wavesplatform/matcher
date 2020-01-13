@@ -7,9 +7,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.Asset
 
-class OrderFeeBaseTestSuite  extends MatcherSuiteBase{
+class OrderFeeBaseTestSuite extends MatcherSuiteBase {
 
-  val percentFee           = 14
+  val percentFee = 14
 
   val price                = 1.2.usd
   val fullyAmountWaves     = 15.waves
@@ -30,12 +30,10 @@ class OrderFeeBaseTestSuite  extends MatcherSuiteBase{
 
     balances.foreach {
       case (balance, asset) => {
-        if (asset != None)
-          assert(
-            wavesNode1.api.balance(alice, asset) >= balance,
-            s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
-          )
-
+        assert(
+          wavesNode1.api.balance(alice, asset) >= balance,
+          s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
+        )
         broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
       }
     }

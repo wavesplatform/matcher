@@ -90,6 +90,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+
+      dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get
+
       dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
 
       val orderBook = dex1.api.orderBook(wavesUsdPair)

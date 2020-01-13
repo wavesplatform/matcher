@@ -11,10 +11,10 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
-import com.wavesplatform.dex.it.config.Implicits.ConfigOps
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
+import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import com.wavesplatform.utils.ScorexLogging
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl

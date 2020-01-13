@@ -180,7 +180,7 @@ class OrderPercentFeePriceTestSuite extends MatcherSuiteBase {
             tooLowFee,
             version = version,
             matcherFeeAssetId = IssuedAsset(UsdId)
-          )) should failWith(9441542, // FeeNotEnough
+          )) should failWith(9441542,
                              s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
     }
 
@@ -196,7 +196,7 @@ class OrderPercentFeePriceTestSuite extends MatcherSuiteBase {
             tooLowFee,
             version = version,
             matcherFeeAssetId = IssuedAsset(UsdId)
-          )) should failWith(9441542, // FeeNotEnough
+          )) should failWith(9441542,
                              s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
     }
   }

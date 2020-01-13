@@ -5,22 +5,23 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.AcceptedOrderType
-import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest
 
 class MarketOrderTestSuite extends MatcherSuiteBase {
-  val fixedFee   = 0.003.waves
-  val percentFee = 14
+
+  val fixedFee: Long  = 0.003.waves
+  val percentFee: Int = 14
 
   implicit class DoubleOps(value: Double) {
     val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)

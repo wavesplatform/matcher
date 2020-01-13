@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.wavesj.Transaction
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.json.deser.TransactionDeserializer
-import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction}
+import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -43,7 +43,7 @@ package object json {
     Writes(x => JsString(x.toString))
   )
 
-  implicit val exchangeTxReads: Reads[JExchangeTransaction] = transactionFormat.map(_.asInstanceOf[JExchangeTransaction])
+  implicit val exchangeTxReads: Reads[ExchangeTransaction] = transactionFormat.map(_.asInstanceOf[ExchangeTransaction])
 
   implicit val orderWrites: Writes[Order] = Writes(_.json())
 

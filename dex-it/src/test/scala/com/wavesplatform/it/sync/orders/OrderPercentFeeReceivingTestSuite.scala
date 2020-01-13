@@ -5,7 +5,7 @@
 //
 //import com.typesafe.config.{Config, ConfigFactory}
 //import com.wavesplatform.dex.domain.account.KeyPair
-//import com.wavesplatform.common.state.ByteStr
+//import com.wavesplatform.dex.domain.bytes.ByteStr
 //import com.wavesplatform.dex.settings.AssetType._
 //import com.wavesplatform.dex.settings.FeeMode._
 //import com.wavesplatform.it.MatcherSuiteBase

@@ -2,15 +2,12 @@ package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 class OrderFixedFeeTestSuite extends MatcherSuiteBase {
   private val minMatcherFee = 200000L
@@ -23,7 +20,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
                     quantity = 9999999999999L,
                     decimals = 0,
                     fee = smartIssueFee,
-                    script = Some(ExprScript(Terms.TRUE).explicitGet()))
+                    script = "true")
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

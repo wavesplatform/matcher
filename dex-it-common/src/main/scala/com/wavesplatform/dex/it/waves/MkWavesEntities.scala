@@ -7,6 +7,8 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -148,14 +150,14 @@ trait MkWavesEntities {
     Transactions.makeSetAssetScriptTransaction(assetOwner, AddressScheme.current.chainId, asset, script, fee, timestamp)
   }
 
-  def mkExchange(buyOrderOwner: KeyPair,
-                 sellOrderOwner: KeyPair,
-                 pair: AssetPair,
-                 amount: Long,
-                 price: Long,
-                 matcherFee: Long = matcherFee,
-                 timestamp: Long = System.currentTimeMillis,
-                 matcher: KeyPair): JExchangeTransaction = {
+  def mkExchangeSymmetric(buyOrderOwner: KeyPair,
+                          sellOrderOwner: KeyPair,
+                          pair: AssetPair,
+                          amount: Long,
+                          price: Long,
+                          matcherFee: Long = matcherFee,
+                          timestamp: Long = System.currentTimeMillis,
+                          matcher: KeyPair): JExchangeTransaction = {
 
     val ttl = timestamp + (30.days - 1.seconds).toMillis
 
@@ -186,6 +188,51 @@ trait MkWavesEntities {
       )
 
     Transactions.makeExchangeTx(matcher, buyOrder, sellOrder, amount, price, buyOrder.getMatcherFee, sellOrder.getMatcherFee, matcherFee, timestamp)
+  }
+
+  def mkExchange(matcher: KeyPair,
+                 buyOrderSender: KeyPair,
+                 sellOrderSender: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long = matcherFee,
+                 sellMatcherFee: Long = matcherFee,
+                 fee: Long = matcherFee,
+                 timestamp: Long = System.currentTimeMillis): JExchangeTransaction = {
+
+    val buyOrderJ  = toOrderJ(buyOrderSender, buyOrder)
+    val sellOrderJ = toOrderJ(sellOrderSender, sellOrder)
+
+    Transactions.makeExchangeTx(matcher, buyOrderJ, sellOrderJ, amount, price, buyOrder.matcherFee, sellOrder.matcherFee, matcherFee, timestamp)
+  }
+
+  def mkDomainExchange(buyOrderOwner: KeyPair,
+                       sellOrderOwner: KeyPair,
+                       pair: AssetPair,
+                       amount: Long,
+                       price: Long,
+                       matcherFee: Long = matcherFee,
+                       ts: Long = System.currentTimeMillis(),
+                       matcher: KeyPair): ExchangeTransaction = {
+
+    val buyOrder  = mkOrder(buyOrderOwner, pair, OrderType.BUY, amount, price, matcherFee, matcher = matcher)
+    val sellOrder = mkOrder(sellOrderOwner, pair, OrderType.SELL, amount, price, matcherFee, matcher = matcher)
+
+    ExchangeTransactionV2
+      .create(
+        matcher = matcher,
+        buyOrder = buyOrder,
+        sellOrder = sellOrder,
+        amount = amount,
+        price = price,
+        buyMatcherFee = buyOrder.matcherFee,
+        sellMatcherFee = sellOrder.matcherFee,
+        fee = matcherFee,
+        timestamp = ts
+      )
+      .explicitGet()
   }
 }
 

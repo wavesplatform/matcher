@@ -1,14 +1,15 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
-import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV2}
+import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.concurrent.duration._
 
@@ -24,8 +25,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
-  private val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
+  private val IssueResults(issueAliceAssetTx, aliceAssetId, aliceAsset) = mkIssueExtended(alice, "AliceCoin", someAssetAmount, 0)
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
@@ -43,8 +43,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                  |   let id = t.id == base58''
                  |   let assetPair1Amount = isDefined(t.assetPair.amountAsset)
                  |   let assetPair1Price = if (isDefined(t.assetPair.priceAsset)) then extract(t.assetPair.priceAsset) == base58'$UsdId' else false
-                 |   let assetPair2Amount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'${issueAliceAssetTx
-                   .id()}' else false
+                 |   let assetPair2Amount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'$aliceAssetId' else false
                  |   let assetPair2Price = isDefined(t.assetPair.priceAsset)
                  |   (!assetPair1Amount && assetPair1Price) || (assetPair2Amount && !assetPair2Price)
                  | case s : SetScriptTransaction => true
@@ -205,8 +204,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.fee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.fee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }
@@ -252,8 +251,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.fee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.fee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }
@@ -318,12 +317,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
           val r1           = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
           r1 shouldBe 'left
-          r1.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+          r1.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
           val r2           = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
           r2 shouldBe 'left
-          r2.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+          r2.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
 
           dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
           dex1.api.reservedBalance(bob) shouldBe empty

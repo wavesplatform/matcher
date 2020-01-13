@@ -4,19 +4,19 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.it.docker.base.BaseContainer
-import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 

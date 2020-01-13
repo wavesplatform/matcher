@@ -1,9 +1,10 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.it.api.MatcherCommand
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalacheck.Gen
 
 import scala.concurrent.ExecutionContext.Implicits.global

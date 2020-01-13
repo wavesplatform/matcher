@@ -2,11 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.it.MatcherSuiteBase
 
 class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
@@ -35,11 +37,8 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
   "Order History REST API methods should have limit for orders in response" in {
     val now = System.currentTimeMillis()
 
-    val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-    val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
-
-    val issueBobAssetTx = mkIssue(bob, "BobCoin", someAssetAmount, 0)
-    val bobAsset        = IssuedAsset(issueBobAssetTx.id())
+    val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, "AliceCoin", someAssetAmount, 0)
+    val IssueResults(issueBobAssetTx, _, bobAsset)     = mkIssueExtended(bob, "BobCoin", someAssetAmount, 0)
 
     broadcastAndAwait(issueAliceAssetTx, issueBobAssetTx)
 

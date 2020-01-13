@@ -2,13 +2,12 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
+import com.wavesplatform.it.MatcherSuiteBase
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 

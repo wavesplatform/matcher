@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.Transfer
@@ -24,6 +23,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private val IssueResults(issueAsset1Tx, issuedAsset1Id, issuedAsset1) =
     mkIssueExtended(issuer, "asset1", Long.MaxValue, decimals = 0, timestamp = now)
+
   private val IssueResults(issueAsset2Tx, issuedAsset2Id, issuedAsset2) =
     mkIssueExtended(issuer, "asset2", Long.MaxValue, decimals = 0, timestamp = now + 1)
 

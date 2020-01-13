@@ -8,6 +8,7 @@ import com.wavesplatform.dex.it.config.genesis.{Block, GenesisSettings, GenesisT
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -58,6 +59,8 @@ object GenesisConfigGenerator {
   }
 
   def generate(genesisGeneratorConfig: Config): Config = {
+
+    implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 
     val generatorSettings = genesisGeneratorConfig.as[Settings]("genesis-generator")
 

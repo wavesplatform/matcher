@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.CanExtract
-import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction}
+import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 
 object DexApiOps {
   // TODO replace by a macros
@@ -43,8 +43,8 @@ object DexApiOps {
     def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
 
-    def transactionsByOrder(order: Order): F[List[JExchangeTransaction]] = transactionsByOrder(order.id())
-    def transactionsByOrder(id: Order.Id): F[List[JExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
+    def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
+    def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))
 
     def orderHistory(owner: KeyPair,
                      activeOnly: Option[Boolean] = None,

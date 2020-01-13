@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.base
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType
 
 class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
 
@@ -34,7 +34,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
 
     markup("Wait for a transaction")
-    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.id()
+    val exchangeTxId = dex1.api.waitForTransactionsByOrder(aliceOrder, 1).head.getId
 
     markup("Connect the miner node to the network")
     wavesNode1.connectToNetwork()

@@ -5,13 +5,13 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 
 class V1OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(1.toByte)
 class V2OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(2.toByte)

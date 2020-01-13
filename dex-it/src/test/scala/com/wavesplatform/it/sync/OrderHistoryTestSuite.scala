@@ -2,13 +2,12 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.it.api.responses.dex._
-import com.wavesplatform.dex.domain.model.Normalization
-import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.OrderType._
+import com.wavesplatform.dex.it.api.responses.dex._
+import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.math.BigDecimal.RoundingMode.CEILING

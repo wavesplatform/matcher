@@ -2,14 +2,14 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.it.api.responses.dex.MatcherError
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
-import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
+import com.wavesplatform.dex.domain.order.OrderType.BUY
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
+import com.wavesplatform.it.MatcherSuiteBase
 
 class RatesTestSuite extends MatcherSuiteBase {
 

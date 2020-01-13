@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
 class OrderRestrictionsTestSuite extends MatcherSuiteBase {
 

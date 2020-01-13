@@ -1,18 +1,18 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
+  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.getId)
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
@@ -124,7 +124,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1.api.tryBroadcast(txs.head)
         r shouldBe 'left
-        r.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+        r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
       }
     }
   }

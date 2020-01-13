@@ -2,14 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
 class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
@@ -132,7 +131,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     parseString(s"""
                    |waves.dex {
                    |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                   |  blacklisted-assets = [${toStr(assets.map(AssetPair.assetIdStr))}]
+                   |  blacklisted-assets = [${toStr(assets.map(_.toString))}]
                    |  blacklisted-names = [${toStr(names)}]
                    |  blacklisted-addresses = [${toStr(addresses.map(_.toAddress.toString))}]
                    |  allowed-asset-pairs = [${toStr(allowedAssetPairs)}]

@@ -1,13 +1,11 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
 
@@ -20,28 +18,21 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
        """.stripMargin
     )
 
-  private val trueScript  = Some(ExprScript(Terms.TRUE).explicitGet())
-  private val falseScript = Some(ExprScript(Terms.FALSE).explicitGet())
+  private val trueScript  = "true"
+  private val falseScript = "false"
   private val amount      = 1L
   private val price       = 100000000L
 
-  private val asset0Tx = mkIssue(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
-  private val asset0   = IssuedAsset(asset0Tx.id())
+  private val IssueResults(asset0Tx, _, asset0)     = mkIssueExtended(alice, "Asset0", defaultAssetQuantity, 0, smartIssueFee)
+  private val IssueResults(asset1Tx, _, asset1)     = mkIssueExtended(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val IssueResults(asset2Tx, _, asset2)     = mkIssueExtended(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
+  private val IssueResults(feeAssetTx, _, feeAsset) = mkIssueExtended(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, trueScript)
 
-  private val asset1Tx = mkIssue(alice, "SmartAsset1", defaultAssetQuantity, 0, smartIssueFee, trueScript)
-  private val asset1   = IssuedAsset(asset1Tx.id())
+  private val IssueResults(assetWith2DecTx, assetWith2DecId, assetWith2Dec) =
+    mkIssueExtended(bob, "SmartAsset3", defaultAssetQuantity, 2, smartIssueFee, trueScript)
 
-  private val asset2Tx = mkIssue(bob, "SmartAsset2", defaultAssetQuantity, 0, smartIssueFee, trueScript)
-  private val asset2   = IssuedAsset(asset2Tx.id())
-
-  private val assetWith2DecTx = mkIssue(bob, "SmartAsset3", defaultAssetQuantity, 2, smartIssueFee, trueScript)
-  private val assetWith2Dec   = IssuedAsset(assetWith2DecTx.id())
-
-  private val feeAssetTx = mkIssue(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, trueScript)
-  private val feeAsset   = IssuedAsset(feeAssetTx.id())
-
-  private val falseFeeAssetTx = mkIssue(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, falseScript)
-  private val falseFeeAsset   = IssuedAsset(falseFeeAssetTx.id())
+  private val IssueResults(falseFeeAssetTx, falseFeeAssetId, falseFeeAsset) =
+    mkIssueExtended(bob, "FeeSmartAsset", defaultAssetQuantity, 8, smartIssueFee, falseScript)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -172,7 +163,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
         dex1.api.tryPlace(mkOrder(bob, asset2WithDecWavesPair, SELL, 10000L, 300.waves * 1000000L, 4, feeAsset = assetWith2Dec)) should failWith(
           9441542, // FeeNotEnough
-          s"Required 0.05 ${assetWith2DecTx.id()} as fee for this order, but given 0.04 ${assetWith2DecTx.id()}"
+          s"Required 0.05 $assetWith2DecId as fee for this order, but given 0.04 $assetWith2DecId"
         )
 
         wavesNode1.api.balance(bob, Waves) shouldBe bobWavesBalance
@@ -217,6 +208,6 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
     dex1.api.tryPlace(mkOrder(bob, oneSmartPair, SELL, amount, price, 550, version = 3, feeAsset = falseFeeAsset)) should failWith(
       11536130, // AssetScriptDeniedOrder
-      s"The asset's script of ${falseFeeAssetTx.id()} rejected the order")
+      s"The asset's script of $falseFeeAssetId rejected the order")
   }
 }

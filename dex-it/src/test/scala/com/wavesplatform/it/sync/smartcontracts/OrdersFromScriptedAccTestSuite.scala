@@ -1,12 +1,13 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.feature.BlockchainFeatures
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
@@ -26,7 +27,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   )
 
   private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
+  private val aliceAsset     = IssuedAsset(aliceAssetTx.getId)
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
   private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScript(bob, Some(codeText), fee = setScriptFee + smartFee))

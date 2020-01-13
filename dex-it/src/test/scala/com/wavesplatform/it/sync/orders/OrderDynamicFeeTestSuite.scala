@@ -2,10 +2,10 @@ package com.wavesplatform.it.sync.orders
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 // TODO refactor balances retrieving
 class OrderDynamicFeeTestSuite extends MatcherSuiteBase {

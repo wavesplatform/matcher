@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
 

@@ -2,11 +2,11 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
-import com.wavesplatform.transaction.assets.exchange.OrderType._
+import com.wavesplatform.dex.domain.order.OrderType._
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt

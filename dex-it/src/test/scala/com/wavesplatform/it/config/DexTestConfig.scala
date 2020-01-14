@@ -43,61 +43,21 @@ object DexTestConfig {
       mkIssueExtended(amountAssetIssuer, Random.nextString(4), someAssetAmount, amountAssetDecimals, issueFee)
     }
 
-    //    val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
-//      .selfSigned(
-//        sender = amountAssetIssuer,
-//        name = Random.nextString(4).getBytes(),
-//        description = Random.nextString(10).getBytes(),
-//        quantity = someAssetAmount,
-//        decimals = amountAssetDecimals,
-//        reissuable = false,
-//        fee = issueFee,
-//        timestamp = System.currentTimeMillis()
-//      )
-//      .explicitGet()
-
     val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) = {
       mkIssueExtended(priceAssetIssuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
     }
-
-    //    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
-//      .selfSigned(
-//        sender = priceAssetIssuer,
-//        name = Random.nextString(4).getBytes(),
-//        description = Random.nextString(10).getBytes(),
-//        quantity = someAssetAmount,
-//        decimals = priceAssetDecimals,
-//        reissuable = false,
-//        fee = issueFee,
-//        timestamp = System.currentTimeMillis()
-//      )
-//      .explicitGet()
 
     if (MatcherActor.compare(Some(priceAssetId.arr), Some(amountAssetId.arr)) < 0)
       (issueAmountAssetTx, issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
     else issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
+  @scala.annotation.tailrec
   def assetPairIssuePriceAsset(issuer: KeyPair, amountAsset: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
-//    val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) =
     val issuePriceAssetTx = mkIssue(issuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
     val priceAssetId      = toByteStr(issuePriceAssetTx.getId)
     val priceAsset        = IssuedAsset(priceAssetId)
-
-    //    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
-//      .selfSigned(
-//        sender = issuer,
-//        name = Random.nextString(4).getBytes(),
-//        description = Random.nextString(10).getBytes(),
-//        quantity = someAssetAmount,
-//        decimals = priceAssetDecimals,
-//        reissuable = false,
-//        fee = issueFee,
-//        timestamp = System.currentTimeMillis()
-//      )
-//      .right
-//      .get
 
     if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0) (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
     else assetPairIssuePriceAsset(issuer, amountAsset, priceAssetDecimals)

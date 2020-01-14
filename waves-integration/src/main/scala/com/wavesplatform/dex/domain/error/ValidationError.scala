@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.domain.error
 
-import com.wavesplatform.dex.domain.crypto.Signed
 import com.wavesplatform.dex.domain.order.Order
 
 import scala.util.Either
@@ -20,13 +19,5 @@ object ValidationError {
 
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(ex.getMessage)
-  }
-
-  case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
-    override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
-  }
-
-  trait HasScriptType extends ValidationError {
-    def isAssetScript: Boolean
   }
 }

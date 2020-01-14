@@ -55,7 +55,7 @@ case class OrderV1(@ApiModelProperty(
                    )
                    proofs: Proofs)
     extends Order
-    with Signed {
+    with Authorized {
 
   @ApiModelProperty(required = true, dataType = "long", example = "1")
   override def version: Byte = 1
@@ -72,8 +72,8 @@ case class OrderV1(@ApiModelProperty(
       Longs.toByteArray(matcherFee)
   )
 
-  @ApiModelProperty(hidden = true)
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey))
+//  @ApiModelProperty(hidden = true)
+//  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey))
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature)

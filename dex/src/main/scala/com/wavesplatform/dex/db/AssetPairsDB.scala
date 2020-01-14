@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.asset.AssetPair
 import org.iq80.leveldb.DB
 

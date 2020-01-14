@@ -5,10 +5,10 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
-import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._

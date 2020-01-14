@@ -12,8 +12,6 @@ class RW(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB
     batch.put(key.keyBytes, bytes)
   }
 
-//  def update[V](key: Key[V])(f: V => V): Unit = put(key, f(get(key))) // TODO REMOVE
-
   /** Because of how leveldb batches work, you can increment a specific value only once! */
   def inc(key: Key[Int]): Int = {
     val newValue = get(key) + 1
@@ -21,8 +19,5 @@ class RW(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB
     newValue
   }
 
-  def delete(key: Array[Byte], statsKey: String): Unit = batch.delete(key)
   def delete[V](key: Key[V]): Unit                     = batch.delete(key.keyBytes)
-
-//  def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = put(key, get(key).filterNot(_ == heightToRemove))  // TODO REMOVE
 }

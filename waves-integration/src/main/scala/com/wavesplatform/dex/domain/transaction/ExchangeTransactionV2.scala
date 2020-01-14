@@ -90,8 +90,7 @@ object ExchangeTransactionV2 extends ExchangeTransactionParser[ExchangeTransacti
 
     if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
     if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
-    if (parsedVersion != 2)
-      throw new IllegalArgumentException(s"Expected version of transaction 2, but got '$parsedVersion'")
+    if (parsedVersion != 2) throw new IllegalArgumentException(s"Expected version of transaction 2, but got '$parsedVersion'")
 
     3
   }

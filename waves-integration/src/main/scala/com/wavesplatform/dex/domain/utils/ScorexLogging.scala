@@ -2,7 +2,6 @@ package com.wavesplatform.dex.domain.utils
 
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.Observable
 import org.slf4j.{Logger, LoggerFactory}
 
 case class LoggerFacade(logger: Logger) {

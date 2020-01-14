@@ -9,9 +9,8 @@ import cats.syntax.functor._
 import com.softwaremill.sttp.{DeserializationError, Response}
 import play.api.libs.json._
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.control.NonFatal
-import scala.concurrent.duration._
 
 case class RepeatRequestOptions(delayBetweenRequests: FiniteDuration, maxAttempts: Int) {
   def decreaseAttempts: RepeatRequestOptions = copy(maxAttempts = maxAttempts - 1)

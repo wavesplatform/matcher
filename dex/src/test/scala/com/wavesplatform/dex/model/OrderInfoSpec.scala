@@ -1,9 +1,8 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.NoShrink
-import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

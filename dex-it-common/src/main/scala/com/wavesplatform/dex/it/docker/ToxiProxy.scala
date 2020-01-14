@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.docker
 import com.wavesplatform.dex.it.docker.base.BaseContainer
 import org.testcontainers.containers.ToxiproxyContainer
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
+
 import scala.collection.JavaConverters._
 
 class ToxiProxy {

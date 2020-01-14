@@ -2,13 +2,12 @@ package com.wavesplatform.dex.db
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.MatcherKeys
-import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.effect.{FutureResult, liftValueAsync}
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import org.iq80.leveldb.DB
 
 trait AssetsStorage {

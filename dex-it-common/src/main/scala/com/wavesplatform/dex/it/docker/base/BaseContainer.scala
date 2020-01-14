@@ -17,11 +17,11 @@ import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
 import com.github.dockerjava.core.command.ExecStartResultCallback
 import com.google.common.primitives.Ints.toByteArray
 import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.docker.base.BaseContainer.{getIp, getNumber}
 import com.wavesplatform.dex.it.docker.base.info.{BaseContainerInfo, WavesNodeContainerInfo}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import monix.eval.Coeval
 import mouse.any._
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream

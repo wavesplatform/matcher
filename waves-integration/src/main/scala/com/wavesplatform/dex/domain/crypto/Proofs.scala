@@ -1,21 +1,17 @@
 package com.wavesplatform.dex.domain.crypto
 
-import com.google.common.primitives.Bytes
-import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.bytes.codec.Base58
-import com.wavesplatform.dex.domain.error.ValidationError
-import com.wavesplatform.dex.domain.bytes.deser
-import com.wavesplatform.dex.domain.error.ValidationError.GenericError
-import com.wavesplatform.dex.domain.utils.base58Length
-import monix.eval.Coeval
 import cats.syntax.either._
+import com.google.common.primitives.Bytes
+import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
+import com.wavesplatform.dex.domain.error.ValidationError
+import com.wavesplatform.dex.domain.error.ValidationError.GenericError
+import monix.eval.Coeval
 
 import scala.util.Try
 
 case class Proofs(proofs: List[ByteStr]) {
 
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Bytes.concat(Array(Proofs.Version), deser.serializeArrays(proofs.map(_.arr))))
-  val base58: Coeval[Seq[String]] = Coeval.evalOnce(proofs.map(p => Base58.encode(p.arr)))
 
   def toSignature: ByteStr = proofs.headOption.getOrElse(ByteStr.empty)
 
@@ -24,10 +20,9 @@ case class Proofs(proofs: List[ByteStr]) {
 
 object Proofs {
 
-  val Version            = 1: Byte
-  val MaxProofs          = 8
-  val MaxProofSize       = 64
-  val MaxProofStringSize = base58Length(MaxProofSize)
+  val Version: Byte           = 1: Byte
+  val MaxProofs: Int          = 8
+  val MaxProofSize: Int       = 64
 
   lazy val empty = new Proofs(Nil)
 
@@ -49,13 +44,6 @@ object Proofs {
     }
 
   def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] = validate(proofs).map(_ => Proofs(proofs.toList))
-
-//  def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
-//    for {
-//      _    <- Either.cond(ab.headOption contains 1, (), GenericError(s"Proofs version must be 1, actual:${ab.headOption}"))
-//      arrs <- Try(deser parseArrays ab.tail).toEither.leftMap { GenericError(_.toString) }
-//      r    <- createWithBytes(arrs.map(ByteStr.apply), ab)
-//    } yield r
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, (Proofs, Int)] =
     for {

@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.model.Events.OrderExecuted
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import org.scalatest.{FreeSpec, Matchers}
 
 class EventSpecification extends FreeSpec with Matchers with MatcherSpecBase {

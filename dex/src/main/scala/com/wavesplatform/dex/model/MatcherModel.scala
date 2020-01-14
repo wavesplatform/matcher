@@ -3,11 +3,11 @@ package com.wavesplatform.dex.model
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
-import com.wavesplatform.dex.domain.model.Price
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode

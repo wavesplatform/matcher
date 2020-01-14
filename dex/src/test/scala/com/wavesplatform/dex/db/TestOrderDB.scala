@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.db
 
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
 class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
 

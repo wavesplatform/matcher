@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

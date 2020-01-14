@@ -54,22 +54,6 @@ object ByteStr {
   implicit def fromByteArray(arr: Array[Byte]): ByteStr = new ByteStr(arr)
   implicit def toByteArray(bs: ByteStr): Array[Byte]    = bs.arr
 
-  def fromBytes(bytes: Byte*): ByteStr = ByteStr(bytes.toArray)
-
-  def fromLong(longValue: Long): ByteStr = {
-    val buf = new Array[Byte](8)
-    var b   = longValue
-
-    for (i <- (buf.length - 1) to 0 by -1) {
-      buf(i) = b.toByte
-      b = b >> 8
-    }
-
-    ByteStr(buf)
-  }
-
-  def fill(size: Int)(b: Int): ByteStr = ByteStr(Array.fill(size)(b.toByte))
-
   def decodeBase58(s: String): Try[ByteStr] = Base58.tryDecodeWithLimit(s).map(ByteStr(_))
   def decodeBase64(s: String): Try[ByteStr] = Base64.tryDecode(s).map(ByteStr(_))
 

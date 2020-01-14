@@ -27,14 +27,4 @@ object GRPCErrors {
     metadata.put(ErrorCodeKey, api.id)
     code.withDescription(api.message).asException(metadata)
   }
-
-  def toStatusException(exc: Throwable): StatusException = {
-    val status = exc match {
-      case _: IllegalArgumentException => Status.INVALID_ARGUMENT
-      case _: NoSuchElementException   => Status.NOT_FOUND
-      case _: IllegalStateException    => Status.FAILED_PRECONDITION
-      case _                           => Status.fromThrowable(exc)
-    }
-    new StatusException(status.withCause(exc).withDescription(exc.getMessage))
-  }
 }

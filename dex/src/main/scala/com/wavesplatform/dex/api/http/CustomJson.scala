@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.{JsonMappingException, JsonSerializer, Obj
 import play.api.libs.json._
 
 object NumberAsStringSerializer extends JsonSerializer[JsValue] {
+
   private val fieldNamesToTranslate = Set(
     "amount",
     "available",
@@ -72,11 +73,6 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
 object CustomJson {
 
   val jsonWithNumbersAsStrings: MediaType.WithFixedCharset = `application/json`.withParams(Map("large-significand-format" -> "string"))
-
-  def acceptsNumbersAsStrings(mr: MediaRange): Boolean = mr match {
-    case MediaRange.One(`jsonWithNumbersAsStrings`, _) => true
-    case _                                             => false
-  }
 
   private lazy val mapper = (new ObjectMapper)
     .registerModule(new SimpleModule("WavesJson").addSerializer(classOf[JsValue], NumberAsStringSerializer))

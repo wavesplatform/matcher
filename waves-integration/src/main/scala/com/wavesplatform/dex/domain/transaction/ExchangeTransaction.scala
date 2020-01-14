@@ -3,7 +3,7 @@ package com.wavesplatform.dex.domain.transaction
 import cats.syntax.either._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -36,8 +36,6 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
 
   def assetFee: (Asset, Long) = (Waves, fee)
   def chainByte: Option[Byte] = None
-
-  def checkedAssets(): Seq[IssuedAsset] = buyOrder.assetPair.assets.toSeq collect { case a: IssuedAsset => a }
 
   protected def proofField: Seq[(String, JsValue)] = Seq("proofs" -> JsArray { this.proofs.proofs.map(p => JsString(p.base58)) })
 

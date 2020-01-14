@@ -4,11 +4,11 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.feature.BlockchainFeature
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
-import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
 import play.api.libs.json.{JsObject, Json}
 

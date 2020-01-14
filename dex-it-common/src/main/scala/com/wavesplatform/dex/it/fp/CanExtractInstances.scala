@@ -2,8 +2,8 @@ package com.wavesplatform.dex.it.fp
 
 import cats.{Id, MonadError}
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 trait CanExtractInstances extends CanExtractInstances1
 

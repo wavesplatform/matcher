@@ -3,20 +3,16 @@ package com.wavesplatform.dex.domain.validation
 //noinspection ScalaStyle
 case class Validation(status: Boolean, labels: Set[String] = Set.empty) {
 
-  def hasError(error: String): Boolean = !status && labels.contains(error)
-
   def messages(): String = labels.mkString(", ")
 
   def &&(r: => Validation): Validation =
-    if (!this.status) {
-      this
-    } else {
+    if (!this.status) this
+    else {
       if (!r.status) r
       else Validation(true)
     }
 
   def :|(l: String): Validation = if (!this.status) copy(labels = labels + l) else this
-  def |:(l: String): Validation = if (!this.status) copy(labels = labels.map(l + " " + _)) else this
 
   def toEither: Either[String, Unit] = if (status) Right(()) else Left(messages())
 }
@@ -24,7 +20,6 @@ case class Validation(status: Boolean, labels: Set[String] = Set.empty) {
 //noinspection ScalaStyle
 class ExtendedBoolean(b: => Boolean) {
   def :|(l: String): Validation = Validation(b) :| l
-  def |:(l: String): Validation = l |: Validation(b)
 }
 
 case object Validation {
@@ -36,9 +31,4 @@ case object Validation {
     case Left(err) => Validation(status = false, Set(err))
     case Right(_)  => Validation(status = true)
   }
-
-  val success: Validation = Validation(status = true)
-  val failure: Validation = Validation(status = false)
-
-  def failure(l: String): Validation = Validation(status = false, Set(l))
 }

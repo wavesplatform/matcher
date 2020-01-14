@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.db.{RateDB, WithDB}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, WordSpecLike}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

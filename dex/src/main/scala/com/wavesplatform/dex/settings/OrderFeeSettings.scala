@@ -4,8 +4,8 @@ import cats.data.Validated.Valid
 import cats.instances.string._
 import cats.syntax.apply._
 import cats.syntax.foldable._
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{Waves, _}
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.FeeMode.FeeMode
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator

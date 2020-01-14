@@ -66,7 +66,7 @@ trait MkWavesEntities {
         expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
         version = 3,
-        matcherFeeAssetId = feeAsset
+        feeAsset = feeAsset
       )
 
   def mkTransfer(sender: KeyPair,

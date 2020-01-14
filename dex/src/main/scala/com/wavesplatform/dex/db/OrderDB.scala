@@ -1,15 +1,15 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.db.leveldb.DBExt
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 trait OrderDB {

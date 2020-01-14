@@ -15,12 +15,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
 
   private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, "AliceCoin", quantity = 9999999999999L, decimals = 0)
   private val IssueResults(issueAliceScriptedAssetTx, _, aliceScriptedAsset) =
-    mkIssueExtended(alice,
-                    "AliceSmartAsset",
-                    quantity = 9999999999999L,
-                    decimals = 0,
-                    fee = smartIssueFee,
-                    script = "true")
+    mkIssueExtended(alice, "AliceSmartAsset", quantity = 9999999999999L, decimals = 0, fee = smartIssueFee, script = "true")
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -31,7 +26,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
     "when has some asset as fixed fee in config and orders placed" - {
       "should accept orders if orders' matcherFeeAsset equal to specified in config" - {
         List(
-          "regular asset" -> aliceAsset,
+          "regular asset"  -> aliceAsset,
           "scripted asset" -> aliceScriptedAsset
         ).foreach {
           case (title, asset) =>

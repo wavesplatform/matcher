@@ -3,8 +3,8 @@ package com.wavesplatform.dex.smart
 import cats.Id
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError.produce
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms

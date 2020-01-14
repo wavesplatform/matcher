@@ -136,20 +136,18 @@ trait Order extends ByteAndJsonSerializable with Proven {
   def jsonStr: String = Json.stringify(json())
 
   @ApiModelProperty(hidden = true)
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case o: Order =>
-        senderPublicKey == o.senderPublicKey &&
-          matcherPublicKey == o.matcherPublicKey &&
-          assetPair == o.assetPair &&
-          orderType == o.orderType &&
-          price == o.price &&
-          amount == o.amount &&
-          expiration == o.expiration &&
-          matcherFee == o.matcherFee &&
-          (signature sameElements o.signature)
-      case _ => false
-    }
+  override def equals(obj: Any): Boolean = obj match {
+    case o: Order =>
+      senderPublicKey == o.senderPublicKey &&
+        matcherPublicKey == o.matcherPublicKey &&
+        assetPair == o.assetPair &&
+        orderType == o.orderType &&
+        price == o.price &&
+        amount == o.amount &&
+        expiration == o.expiration &&
+        matcherFee == o.matcherFee &&
+        (signature sameElements o.signature)
+    case _ => false
   }
 
   @ApiModelProperty(hidden = true)
@@ -204,10 +202,9 @@ object Order extends EntityParser[Order] {
           expiration: Long,
           matcherFee: Long,
           version: Byte = 1,
-          matcherFeeAssetId: Asset = Waves): Order = {
+          feeAsset: Asset = Waves): Order = {
     val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
+      case 3 => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
       case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     }
     sign(unsigned, sender)
@@ -222,10 +219,9 @@ object Order extends EntityParser[Order] {
            expiration: Long,
            matcherFee: Long,
            version: Byte = 1,
-           matcherFeeAssetId: Asset = Waves): Order = {
+           feeAsset: Asset = Waves): Order = {
     val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
+      case 3 => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
       case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     }
     sign(unsigned, sender)
@@ -255,8 +251,8 @@ object Order extends EntityParser[Order] {
             expiration: Long,
             matcherFee: Long,
             version: Byte,
-            matcherFeeAssetId: Asset): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
+            feeAsset: Asset): Order = {
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, feeAsset)
     sign(unsigned, sender)
   }
 

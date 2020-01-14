@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.account.PrivateKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.crypto.{Proofs, Signed}
+import com.wavesplatform.dex.domain.crypto.{Authorized, Proofs}
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.OrderV1
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
@@ -25,7 +25,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  timestamp: Long,
                                  signature: ByteStr)
     extends ExchangeTransaction
-    with Signed {
+    with Authorized {
 
   override def version: Byte = 1
 
@@ -50,9 +50,9 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
+//  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
 
-  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
+//  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {

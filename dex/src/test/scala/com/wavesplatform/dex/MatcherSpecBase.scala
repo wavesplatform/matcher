@@ -105,7 +105,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
       expiration = ntpNow + (1000 * 60 * 60 * 24),
       matcherFee = matcherFee,
       version = version,
-      matcherFeeAssetId = matcherFeeAsset
+      feeAsset = matcherFeeAsset
     )
   }
 

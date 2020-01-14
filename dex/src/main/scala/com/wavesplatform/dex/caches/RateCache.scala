@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap
 import com.wavesplatform.dex.db.RateDB
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
 import org.iq80.leveldb.DB
 import play.api.libs.json.{JsObject, Json}
 

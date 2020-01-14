@@ -20,25 +20,7 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
 
 trait ApiMarshallers {
 
-//  implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
-//    fromStatusCodeAndValue[StatusCode, JsValue].compose(ae => (ae.code, ae.json))
-//
-//  implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
-//    ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
-//
   implicit lazy val ExchangeTransactionJsonWrites: Writes[ExchangeTransaction] = Writes(_.json())
-//
-//  implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
-//
-//  implicit def tracedResultMarshaller[A](implicit writes: Writes[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
-//    fromStatusCodeAndValue[StatusCode, JsValue]
-//      .compose(
-//        ae =>
-//          (
-//            ae.resultE.fold(_.code, _ => StatusCodes.OK),
-//            ae.resultE.fold(_.json, writes.writes)
-//          )
-//      )
 
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller

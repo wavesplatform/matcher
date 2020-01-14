@@ -10,6 +10,7 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.Matcher.StoreEvent
+import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, PlayJsonException}
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -31,7 +32,6 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex._
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon

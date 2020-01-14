@@ -3,11 +3,10 @@ package com.wavesplatform.dex.api
 import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FreeSpec, Matchers}

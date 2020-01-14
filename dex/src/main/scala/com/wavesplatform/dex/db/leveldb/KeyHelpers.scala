@@ -6,9 +6,6 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 
 object KeyHelpers {
 
-  def h(prefix: Short, height: Int): Array[Byte] =
-    ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
-
   def hBytes(prefix: Short, height: Int, bytes: Array[Byte]): Array[Byte] =
     ByteBuffer.allocate(6 + bytes.length).putShort(prefix).putInt(height).put(bytes).array()
 

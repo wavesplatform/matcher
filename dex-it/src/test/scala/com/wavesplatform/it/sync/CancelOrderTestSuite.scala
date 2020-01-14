@@ -5,15 +5,15 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.TimerOps.TimerOpsImplicits
-import com.wavesplatform.dex.util.FutureOps.Implicits
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.time.GlobalTimer
+import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
+import com.wavesplatform.dex.util.FutureOps.Implicits
+import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.Transfer
 
 import scala.concurrent.duration.DurationInt

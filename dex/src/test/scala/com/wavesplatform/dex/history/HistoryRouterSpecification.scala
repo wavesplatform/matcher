@@ -8,10 +8,10 @@ import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
 import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}

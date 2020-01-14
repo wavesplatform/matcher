@@ -8,10 +8,10 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.Matchers
 

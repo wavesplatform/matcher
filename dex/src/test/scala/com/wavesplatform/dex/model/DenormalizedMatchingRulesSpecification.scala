@@ -1,8 +1,7 @@
 package com.wavesplatform.dex.model
 
 import cats.data.NonEmptyList
-import com.wavesplatform.dex.NoShrink
-import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}

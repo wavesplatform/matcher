@@ -4,10 +4,10 @@ import java.time.{Instant, LocalDateTime, ZoneOffset}
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord, Record}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.model.OrderStatus.Filled
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import com.wavesplatform.dex.settings.{OrderHistorySettings, PostgresConnection}

@@ -4,7 +4,6 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.AcceptedOrderType
 import play.api.libs.json.{Format, Json}
-import com.wavesplatform.dex.it.json._
 
 case class OrderBookHistoryItem(id: Order.Id,
                                 `type`: String,

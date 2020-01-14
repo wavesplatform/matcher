@@ -8,12 +8,11 @@ import cats.syntax.functor._
 import cats.syntax.show._
 import cats.{Show, Traverse}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
-import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.settings.formatValue
-import com.wavesplatform.dex.domain.feature.BlockchainFeature
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.feature.BlockchainFeature
+import com.wavesplatform.dex.settings.formatValue
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.ops.hlist.{Mapper, ToList}
 import shapeless.{HList, Id, Poly1, ProductArgs}

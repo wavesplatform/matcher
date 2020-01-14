@@ -13,6 +13,7 @@ package object utils {
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   implicit class EitherExt2[A, B](ei: Either[A, B]) {
+
     def explicitGet(): B = ei match {
       case Left(value)  => throw makeException(value)
       case Right(value) => value

@@ -30,8 +30,10 @@ object ToPbConversions {
                 buyMatcherFee = tx.buyMatcherFee,
                 sellMatcherFee = tx.sellMatcherFee,
                 orders = Seq(tx.buyOrder.toPB, tx.sellOrder.toPB)
-              ))
-          )),
+              )
+            )
+          )
+        ),
         proofs = tx.proofs.proofs.map(_.toPB)
       )
   }

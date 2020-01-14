@@ -40,7 +40,8 @@ object ExtensionPackaging extends AutoPlugin {
         val art = (Compile / packageBin / artifact).value
         jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
       },
-      classpathOrdering ++= excludeProvidedArtifacts((Runtime / dependencyClasspath).value, findProvidedArtifacts.value),
+      Compile / providedArtifacts := findProvidedArtifacts.value,
+      classpathOrdering ++= excludeProvidedArtifacts((Runtime / dependencyClasspath).value, (Compile / providedArtifacts).value),
       Universal / mappings ++= classpathOrdering.value ++ {
         val baseConfigName = s"${name.value}-${network.value}.conf"
         val localFile      = (Compile / baseDirectory).value / baseConfigName

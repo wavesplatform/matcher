@@ -93,7 +93,12 @@ inConfig(Universal)(
       .map { file =>
         file -> s"doc/${file.getName}"
       }
-      .toSeq,
+      .toSeq :+ {
+      // Dependent modules are ignored by ExtensionPackaging plugin
+      val wavesGrpcJar = (LocalProject("waves-grpc") / Compile / packageBin).value
+      val wavesGrpcOrg = (LocalProject("waves-grpc") / organization).value
+      wavesGrpcJar -> s"lib/$wavesGrpcOrg.${wavesGrpcJar.getName}"
+    },
     topLevelDirectory := None
   )
 )

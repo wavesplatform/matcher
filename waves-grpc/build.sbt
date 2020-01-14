@@ -6,7 +6,7 @@ inConfig(Compile)(
   Seq(
     PB.deleteTargetDirectory := false,
     PB.protoSources in Compile += PB.externalIncludePath.value,
-    PB.targets += scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value,
+    PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     // Google's descriptor.proto contains a deprecated field:
     //  optional bool java_generate_equals_and_hash = 20 [deprecated=true];
     // When scalac compiles a generated class, it warns about a deprecated field.

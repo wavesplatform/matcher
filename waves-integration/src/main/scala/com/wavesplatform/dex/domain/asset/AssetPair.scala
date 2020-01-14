@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{Format, JsObject, Json}
 
 import scala.annotation.meta.field
 import scala.util.{Success, Try}
@@ -77,4 +77,6 @@ object AssetPair {
     }
     res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
   }
+
+  implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 }

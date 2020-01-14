@@ -46,7 +46,7 @@ package object json {
 
   implicit val orderWrites: Writes[Order] = Writes(_.json())
 
-  implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
+  implicit val assetPairFormat: Format[AssetPair] = AssetPair.assetPairFormat
 
   implicit val assetRatesReads: Reads[Map[Asset, Double]] = Reads { json =>
     json.validate[Map[String, Double]].map { assetRates =>

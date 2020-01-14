@@ -15,10 +15,10 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
-import com.wavesplatform.dex.it.json._
+import com.wavesplatform.dex.it.json.transactionFormat
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.dex.it.waves.Implicits.toByteStr
+import com.wavesplatform.dex.it.waves.Implicits.toVanilla
 import com.wavesplatform.wavesj.Transaction
 import play.api.libs.json.JsResultException
 

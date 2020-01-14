@@ -30,11 +30,13 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   private val aliceAsset     = IssuedAsset(aliceAssetTx.getId)
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
-  private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScript(bob, Some(codeText), fee = setScriptFee + smartFee))
+  // TODO
+  private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScript(bob, ??? /*Some(codeText)*/, fee = setScriptFee + smartFee))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(aliceAssetTx, mkSetAccountScript(bob, Some("true")))
+    // TODO
+    broadcastAndAwait(aliceAssetTx, mkSetAccountScript(bob, ??? /*Some("true")*/))
   }
 
   "issue asset and run test" - {

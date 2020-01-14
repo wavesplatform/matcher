@@ -36,7 +36,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val ordersPerAccount = 200
 
       val accounts = (1 to totalAccounts).map(i => KeyPair(ByteStr(s"account-test-$i".getBytes(StandardCharsets.UTF_8)))).toList
-      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => new Transfer(account, 1000.waves))))
+      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => new Transfer(account.toAddress, 1000.waves))))
 
       def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Unit] = {
         val futures = (1 to numOrders).map { i =>
@@ -152,7 +152,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val oneOrderAmount = 10000
       val orderPrice     = 3000000000000L
 
-      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(new Transfer(_, issueFee)).toList))
+      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(x => new Transfer(x.toAddress, issueFee)).toList))
 
       val accountsAndAssets = accounts.zipWithIndex.map {
         case (account, i) => account -> mkIssue(account, s"WowSoMuchCoin-$i", quantity = oneOrderAmount, decimals = 2)

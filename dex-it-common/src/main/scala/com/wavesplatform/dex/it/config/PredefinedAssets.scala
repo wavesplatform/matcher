@@ -14,22 +14,22 @@ trait PredefinedAssets {
 
   val usdAssetName: String         = "USD-X"
   val IssueUsdTx: IssueTransaction = mkIssue(alice, usdAssetName, defaultAssetQuantity, 2)
-  val UsdId: ByteStr               = toByteStr(IssueUsdTx.getId)
+  val UsdId: ByteStr               = toVanilla(IssueUsdTx.getId)
   val usd: IssuedAsset             = IssuedAsset(UsdId)
 
   val wctAssetName: String         = "WCT-X"
   val IssueWctTx: IssueTransaction = mkIssue(bob, wctAssetName, defaultAssetQuantity, 2)
-  val WctId: ByteStr               = toByteStr(IssueWctTx.getId)
+  val WctId: ByteStr               = toVanilla(IssueWctTx.getId)
   val wct: IssuedAsset             = IssuedAsset(WctId)
 
   val ethAssetName: String         = "ETH-X"
   val IssueEthTx: IssueTransaction = mkIssue(alice, ethAssetName, defaultAssetQuantity, 8)
-  val EthId: ByteStr               = toByteStr(IssueEthTx.getId)
+  val EthId: ByteStr               = toVanilla(IssueEthTx.getId)
   val eth: IssuedAsset             = IssuedAsset(EthId)
 
   val btcAssetName: String         = "BTC-X"
   val IssueBtcTx: IssueTransaction = mkIssue(bob, btcAssetName, defaultAssetQuantity, 8)
-  val BtcId: ByteStr               = toByteStr(IssueBtcTx.getId)
+  val BtcId: ByteStr               = toVanilla(IssueBtcTx.getId)
   val btc: IssuedAsset             = IssuedAsset(BtcId)
 
   val wctUsdPair: AssetPair   = AssetPair(wct, usd)

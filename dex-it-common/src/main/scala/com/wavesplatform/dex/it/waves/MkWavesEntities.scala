@@ -13,16 +13,15 @@ import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
 import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.waves.WavesFeeConstants._
-import com.wavesplatform.wavesj.matcher.{Order => JOrder}
 import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction, _}
-import com.wavesplatform.wavesj.{Transactions, Transfer, AssetPair => JAssetPair}
+import com.wavesplatform.wavesj.{Transactions, Transfer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration, DurationInt}
 
 trait MkWavesEntities {
 
-  private val emptyAttachments, emptyScript: java.lang.String = null
+  private val emptyAttachments: java.lang.String = null
 
   private def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
@@ -104,7 +103,7 @@ trait MkWavesEntities {
               quantity: Long,
               decimals: Int = 8,
               fee: Long = issueFee,
-              script: String = emptyScript,
+              script: Option[ByteStr] = None,
               reissuable: Boolean = false,
               timestamp: Long = System.currentTimeMillis): IssueTransaction = {
     Transactions.makeIssueTx(issuer,
@@ -114,7 +113,7 @@ trait MkWavesEntities {
                              quantity,
                              decimals.toByte,
                              reissuable,
-                             script,
+                             script.map(_.base64).orNull,
                              fee,
                              timestamp)
   }
@@ -124,22 +123,22 @@ trait MkWavesEntities {
                       quantity: Long,
                       decimals: Int = 8,
                       fee: Long = issueFee,
-                      script: String = emptyScript,
+                      script: Option[ByteStr] = None,
                       reissuable: Boolean = false,
                       timestamp: Long = System.currentTimeMillis): IssueResults = {
 
     val tx          = mkIssue(issuer, name, quantity, decimals, fee, script, reissuable, timestamp)
-    val assetId     = toByteStr(tx.getId)
+    val assetId     = toVanilla(tx.getId)
     val issuedAsset = IssuedAsset(assetId)
 
     IssueResults(tx, assetId, issuedAsset)
   }
 
   def mkSetAccountScript(accountOwner: KeyPair,
-                         script: Option[String],
+                         script: Option[ByteStr],
                          fee: Long = setScriptFee,
                          timestamp: Long = System.currentTimeMillis): SetScriptTransaction = {
-    Transactions.makeScriptTx(accountOwner, script.getOrElse(emptyScript), AddressScheme.current.chainId, fee, timestamp)
+    Transactions.makeScriptTx(accountOwner, script.map(_.base64).orNull, AddressScheme.current.chainId, fee, timestamp)
   }
 
   def mkSetAssetScript(assetOwner: KeyPair,
@@ -150,63 +149,15 @@ trait MkWavesEntities {
     Transactions.makeSetAssetScriptTransaction(assetOwner, AddressScheme.current.chainId, asset, script, fee, timestamp)
   }
 
-  def mkExchangeSymmetric(buyOrderOwner: KeyPair,
-                          sellOrderOwner: KeyPair,
-                          pair: AssetPair,
-                          amount: Long,
-                          price: Long,
-                          matcherFee: Long = matcherFee,
-                          timestamp: Long = System.currentTimeMillis,
-                          matcher: KeyPair): JExchangeTransaction = {
-
-    val ttl = timestamp + (30.days - 1.seconds).toMillis
-
-    val buyOrder =
-      Transactions.makeOrder(
-        buyOrderOwner,
-        matcher.toAddress,
-        JOrder.Type.BUY,
-        new JAssetPair(pair.amountAsset, pair.priceAsset),
-        price,
-        amount,
-        ttl,
-        matcherFee,
-        System.currentTimeMillis
-      )
-
-    val sellOrder =
-      Transactions.makeOrder(
-        sellOrderOwner,
-        matcher.toAddress,
-        JOrder.Type.SELL,
-        new JAssetPair(pair.amountAsset, pair.priceAsset),
-        price,
-        amount,
-        ttl,
-        matcherFee,
-        System.currentTimeMillis
-      )
-
-    Transactions.makeExchangeTx(matcher, buyOrder, sellOrder, amount, price, buyOrder.getMatcherFee, sellOrder.getMatcherFee, matcherFee, timestamp)
-  }
-
-  def mkExchange(matcher: KeyPair,
-                 buyOrderSender: KeyPair,
-                 sellOrderSender: KeyPair,
-                 buyOrder: Order,
-                 sellOrder: Order,
+  def mkExchange(buyOrderOwner: KeyPair,
+                 sellOrderOwner: KeyPair,
+                 pair: AssetPair,
                  amount: Long,
                  price: Long,
-                 buyMatcherFee: Long = matcherFee,
-                 sellMatcherFee: Long = matcherFee,
-                 fee: Long = matcherFee,
-                 timestamp: Long = System.currentTimeMillis): JExchangeTransaction = {
-
-    val buyOrderJ  = toOrderJ(buyOrderSender, buyOrder)
-    val sellOrderJ = toOrderJ(sellOrderSender, sellOrder)
-
-    Transactions.makeExchangeTx(matcher, buyOrderJ, sellOrderJ, amount, price, buyOrder.matcherFee, sellOrder.matcherFee, matcherFee, timestamp)
-  }
+                 matcherFee: Long = matcherFee,
+                 timestamp: Long = System.currentTimeMillis,
+                 matcher: KeyPair): JExchangeTransaction =
+    toWavesJ(mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, matcher = matcher))
 
   def mkDomainExchange(buyOrderOwner: KeyPair,
                        sellOrderOwner: KeyPair,

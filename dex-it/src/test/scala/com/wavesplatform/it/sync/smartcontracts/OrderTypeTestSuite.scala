@@ -129,6 +129,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScript(alice, Some(scriptText)))
+  // TODO
+  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScript(alice, ??? /*Some(scriptText)*/))
   private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScript(alice, None, fee = setScriptFee + smartFee))
 }

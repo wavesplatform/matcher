@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.test.PredefinedScripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
@@ -18,8 +19,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
        """.stripMargin
     )
 
-  private val trueScript  = "true"
-  private val falseScript = "false"
+  private val trueScript  = Option(PredefinedScripts.alwaysTrue)
+  private val falseScript = Option(PredefinedScripts.alwaysFalse)
   private val amount      = 1L
   private val price       = 100000000L
 
@@ -43,7 +44,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset1, 0.009.waves),
       mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
     )
-    broadcastAndAwait(mkSetAccountScript(alice, Some("true")))
+    broadcastAndAwait(mkSetAccountScript(alice, trueScript))
 
     dex1.start()
   }
@@ -84,7 +85,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     "with one Smart Account, two Smart Assets and scripted Matcher" - {
       "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
         "and total fee should be divided proportionally with partial filling" in {
-          broadcastAndAwait(mkSetAccountScript(matcher, Some("true")))
+          broadcastAndAwait(mkSetAccountScript(matcher, trueScript))
 
           dex1.restart() // matcher caches knowledge about it's script during start
 

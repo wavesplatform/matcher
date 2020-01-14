@@ -171,10 +171,11 @@ object OrdersFromScriptedAssetTestSuite {
 
   import MkWavesEntities.mkIssue
   import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
-  import com.wavesplatform.dex.it.waves.Implicits.toByteStr
+  import com.wavesplatform.dex.it.waves.Implicits.toVanilla
   import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
-  private def mkAllow(id: Int): IssueTransaction = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, "true")
+  // TODO
+  private def mkAllow(id: Int): IssueTransaction = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, ??? /*"true"*/ )
 
   private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
   private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.getId)
@@ -188,7 +189,8 @@ object OrdersFromScriptedAssetTestSuite {
   private val issueAllowAsset3Tx = mkAllow(2)
   private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.getId)
 
-  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, "false")
+  // TODO
+  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, ??? /*"false"*/ )
   private val denyAsset        = IssuedAsset(issueDenyAssetTx.getId)
 
   private val DenyBigAmountScript: String =

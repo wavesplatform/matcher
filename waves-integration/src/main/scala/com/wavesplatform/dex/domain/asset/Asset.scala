@@ -8,7 +8,7 @@ import play.api.libs.json._
 
 import scala.util.Success
 
-sealed trait Asset { override def toString: String = super.toString }
+sealed trait Asset
 
 object Asset {
 

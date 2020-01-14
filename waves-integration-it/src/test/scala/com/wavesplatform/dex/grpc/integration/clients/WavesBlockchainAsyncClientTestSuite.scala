@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.{DEXClient, IntegrationSuiteBase}
+import com.wavesplatform.dex.it.test.PredefinedScripts
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
@@ -43,6 +44,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     override def onComplete(): Unit                                 = Unit
     override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges ++= elem; Continue }
   }
+
+  private val trueScript = Option(PredefinedScripts.alwaysTrue)
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
@@ -195,7 +198,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     }
 
     "has a script" in {
-      val issueTx = mkIssue(bob, "SmartCoin", defaultAssetQuantity, 8, smartIssueFee, "true")
+      val issueTx = mkIssue(bob, "SmartCoin", defaultAssetQuantity, 8, smartIssueFee, trueScript)
 
       withClue("issue scripted asset") {
         broadcastAndAwait(issueTx)
@@ -204,7 +207,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       }
 
       withClue("run script") {
-        val pair       = AssetPair.createAssetPair(toByteStr(issueTx.getId).toString, "WAVES").get
+        val pair       = AssetPair.createAssetPair(toVanilla(issueTx.getId).toString, "WAVES").get
         val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcherFee = 1.waves, matcher = matcher)
 
         wait(client.runScript(IssuedAsset(issueTx.getId), exchangeTx)) shouldBe RunScriptResult.Allowed
@@ -225,7 +228,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       }
 
       withClue("set script") {
-        val setScriptTx = mkSetAccountScript(receiver, script = Some("true"))
+        val setScriptTx = mkSetAccountScript(receiver, trueScript)
         broadcastAndAwait(setScriptTx)
 
         wait(client.hasScript(receiver)) shouldBe true
@@ -253,7 +256,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
     "the order was in a forged ExchangeTransaction" in {
       val pair       = AssetPair.createAssetPair(UsdId.toString, "WAVES").get
-      val exchangeTx = mkExchangeSymmetric(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
+      val exchangeTx = mkExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
       broadcastAndAwait(exchangeTx)
 

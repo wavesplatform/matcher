@@ -26,7 +26,7 @@ object MatcherKeys {
   def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
     "matcher-order",
     bytes(1, orderId.arr),
-    xs => Order.parseBytes(xs).get,
+    xs => Order.fromBytes(xs.head, xs.tail),
     o => o.version +: o.bytes()
   )
 

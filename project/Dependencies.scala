@@ -215,7 +215,8 @@ object Dependencies {
       supertagged,
       monixReactive,
       betterMonadicFor,
-      mouse
+      mouse,
+      grpcNetty
     ) ++ testKit
 
     lazy val wavesIntegrationIt: Seq[ModuleID] = integrationTestKit

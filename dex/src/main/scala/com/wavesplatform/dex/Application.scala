@@ -119,7 +119,7 @@ object Application {
     sys.addShutdownHook { SystemInformationReporter.report(config) }
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
-      log.info(s"${s"Waves v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
+      log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
       new Application(settings).run()
     }
   }

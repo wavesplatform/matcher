@@ -5,7 +5,6 @@
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="INFO"/>
 
-<!--    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>-->
     <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
 
     <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
@@ -22,8 +21,10 @@
 
     <logger name="io.grpc.netty" level="WARN"/>
 
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <target>System.out</target>
+    <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
+        <file>${logback.brief.fullPath}</file>
+        <append>true</append>
+        <immediateFlush>false</immediateFlush>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>TRACE</level>
         </filter>
@@ -33,6 +34,6 @@
     </appender>
 
     <root level="TRACE">
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="BRIEF"/>
     </root>
 </configuration>

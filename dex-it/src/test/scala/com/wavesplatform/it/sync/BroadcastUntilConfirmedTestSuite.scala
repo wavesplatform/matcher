@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.docker.base
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.OrderType
 
@@ -16,7 +16,7 @@ class BroadcastUntilConfirmedTestSuite extends MatcherSuiteBase {
                       |}""".stripMargin)
 
   // Validator node
-  protected lazy val wavesNode2: base.WavesNodeContainer = {
+  protected lazy val wavesNode2: WavesNodeContainer = {
     createWavesNode("waves-2", suiteInitialConfig = ConfigFactory.parseString("waves.miner.enable = no") withFallback wavesNodeInitialSuiteConfig)
   }
 

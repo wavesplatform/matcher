@@ -22,7 +22,10 @@ lazy val versionSourceTask = Def.task {
 
   val (major, minor, patch) = version.value match {
     case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case x                            => throw new IllegalStateException(s"Can't parse version: $x")
+    case x =>
+      // SBT downloads only the latest commit, so "version" doesn't know, which tag is the nearest
+      if (Option(System.getenv("TRAVIS")).fold(false)(_.toBoolean)) (0, 0, 0)
+      else throw new IllegalStateException(s"dex: can't parse version by git tag: $x")
   }
 
   IO.write(

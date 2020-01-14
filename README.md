@@ -232,11 +232,9 @@ To run:
     waves.dex {
       root-directory = "/full/path/to/base/dex/directory"
       # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
-   
-      grpc.integration.waves-node-grpc {
-        host = "127.0.0.1" # Or IP of Waves-DEX gRPC server
-        port = 6887
-      }
+
+      # host:port of DEX extension gRPC server
+      waves-blockchain-client.grpc.target = "127.0.0.1:6887"
     }
     ```
 

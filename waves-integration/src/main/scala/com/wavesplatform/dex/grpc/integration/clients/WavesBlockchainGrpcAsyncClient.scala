@@ -1,11 +1,14 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
+import java.util.concurrent.TimeUnit
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
 import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
@@ -17,6 +20,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.grpc.stub.StreamObserver
+import io.netty.channel.EventLoopGroup
 import monix.execution.Scheduler
 import monix.execution.atomic.AtomicBoolean
 import monix.reactive.Observable
@@ -24,7 +28,12 @@ import monix.reactive.subjects.ConcurrentSubject
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixScheduler: Scheduler, grpcExecutionContext: ExecutionContext)
+/**
+  * @param eventLoopGroup Here, because this class takes ownership
+  * @param monixScheduler Is not an implicit, because it is ExecutionContext too
+  */
+class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: ManagedChannel, monixScheduler: Scheduler)(
+    implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient[Future]
     with ScorexLogging {
 
@@ -136,5 +145,11 @@ class WavesBlockchainGrpcAsyncClient(channel: ManagedChannel)(implicit monixSche
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {
     blockchainService.forgedOrder { ForgedOrderRequest(orderId.toPB) }.map(_.isForged)
+  }
+
+  override def close(): Future[Unit] = {
+    channel.shutdownNow()
+    // See NettyChannelBuilder.eventLoopGroup
+    eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
 }

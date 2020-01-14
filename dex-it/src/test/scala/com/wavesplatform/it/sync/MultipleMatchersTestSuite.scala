@@ -5,7 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.docker.base
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
@@ -30,7 +30,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       |}""".stripMargin
     )
 
-  protected lazy val dex2: base.DexContainer = createDex("dex-2")
+  protected lazy val dex2: DexContainer = createDex("dex-2")
 
   private val placesNumber  = 200
   private val cancelsNumber = placesNumber / 10

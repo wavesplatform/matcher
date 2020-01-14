@@ -3,11 +3,17 @@
 
 trap 'kill -TERM $PID' TERM INT
 
-echo Config file: ${WAVES_NODE_CONFIGPATH}
-echo Options: ${WAVES_OPTS}
+echo "Starting process..." >> ${WAVES_NODE_DETAILED_LOG_PATH}
+echo Config file: ${WAVES_NODE_CONFIGPATH} >> ${WAVES_NODE_DETAILED_LOG_PATH}
+echo Options: ${WAVES_OPTS} >> ${WAVES_NODE_DETAILED_LOG_PATH}
+
 java ${WAVES_OPTS} -cp "/opt/waves/lib/*" com.wavesplatform.Application ${WAVES_NODE_CONFIGPATH} &
+
 PID=$!
+echo "PID: ${PID}" >> ${WAVES_NODE_DETAILED_LOG_PATH}
 wait ${PID}
+
 trap - TERM INT
 wait ${PID}
 EXIT_STATUS=$?
+echo "Exit status: ${EXIT_STATUS}" >> ${WAVES_NODE_DETAILED_LOG_PATH}

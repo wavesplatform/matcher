@@ -13,7 +13,7 @@ inTask(docker)(
     exposedPorts := Set(6887),
     additionalFiles ++= Seq(
       (LocalProject("waves-integration") / Universal / stage).value,
-      (Test / resourceDirectory).value / "logback.xml",
+      (Test / resourceDirectory).value / "nodes" / "logback-container.xml",
       (Test / sourceDirectory).value / "container" / "start-waves.sh"
     )
   )

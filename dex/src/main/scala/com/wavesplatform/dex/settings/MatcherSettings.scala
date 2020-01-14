@@ -7,6 +7,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
+import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
@@ -16,7 +17,6 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.AssetPair._
@@ -29,7 +29,7 @@ import scala.util.matching.Regex
 
 case class MatcherSettings(addressSchemeCharacter: Char,
                            accountStorage: AccountStorage.Settings,
-                           wavesNodeGrpc: GRPCSettings,
+                           wavesBlockchainClient: WavesBlockchainClientSettings,
                            ntpServer: String,
                            restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
@@ -59,8 +59,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings],
-                           defaultGrpcCachesExpiration: FiniteDuration) {
+                           orderHistory: Option[OrderHistorySettings]) {
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -97,10 +96,10 @@ object MatcherSettings {
         .headOption
         .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
 
-    val accountStorage  = accountStorageSettingsReader.read(config, "account-storage")
-    val wavesNodeGrpc   = config.as[GRPCSettings]("grpc.integration.waves-node-grpc")
-    val ntpServer       = config.as[String]("ntp-server")
-    val restApiSettings = config.as[RestAPISettings]("rest-api")
+    val accountStorage        = accountStorageSettingsReader.read(config, "account-storage")
+    val wavesBlockchainClient = config.as[WavesBlockchainClientSettings]("waves-blockchain-client")
+    val ntpServer             = config.as[String]("ntp-server")
+    val restApiSettings       = config.as[RestAPISettings]("rest-api")
 
     val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
@@ -146,12 +145,11 @@ object MatcherSettings {
     val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
     val postgresConnection          = config.as[PostgresConnection]("postgres")
     val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
-    val defaultGrpcCachesExpiration = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
 
     MatcherSettings(
       addressSchemeCharacter,
       accountStorage,
-      wavesNodeGrpc,
+      wavesBlockchainClient,
       ntpServer,
       restApiSettings,
       exchangeTxBaseFee,
@@ -180,8 +178,7 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory,
-      defaultGrpcCachesExpiration
+      orderHistory
     )
   }
 }

@@ -30,8 +30,9 @@ object ItTestPlugin extends AutoPlugin {
            * f - select the file reporter with output directory
            * F - show full stack traces
            * W - without color
+           * D - show all durations
            */
-          val args        = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
+          val args        = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution in Test := true,

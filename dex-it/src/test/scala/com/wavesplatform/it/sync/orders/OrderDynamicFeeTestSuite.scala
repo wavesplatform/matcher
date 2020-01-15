@@ -772,7 +772,8 @@ class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
       check()
 
       dex1.restartWithNewSuiteConfig(
-        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed").withFallback(dexInitialSuiteConfig))
+        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed").withFallback(dexInitialSuiteConfig)
+      )
 
       withClue("fee asset isn't part of asset pair") {
         broadcastAndAwait(mkTransfer(bob, alice, 100000000, btc))

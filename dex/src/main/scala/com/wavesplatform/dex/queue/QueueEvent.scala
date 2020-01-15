@@ -41,10 +41,10 @@ object QueueEvent {
   }
 
   def fromBytes(xs: Array[Byte]): QueueEvent = xs.head match {
-    case 1 => Placed(LimitOrder(Order.parseBytes(xs.tail).get))
+    case 1 => Placed(LimitOrder(Order.fromBytes(xs(1), xs.slice(2, Int.MaxValue))))
     case 2 => Canceled(AssetPair.fromBytes(xs.tail), ByteStr(xs.takeRight(DigestSize)))
     case 3 => OrderBookDeleted(AssetPair.fromBytes(xs.tail))
-    case 4 => val afs = Longs.fromByteArray(xs.slice(1, 9)); PlacedMarket(MarketOrder(Order.parseBytes(xs.drop(8)).get, afs))
+    case 4 => val afs = Longs.fromByteArray(xs.slice(1, 9)); PlacedMarket(MarketOrder(Order.fromBytes(xs(9), xs.slice(10, Int.MaxValue)), afs))
     case x => throw new IllegalArgumentException(s"Unknown event type: $x")
   }
 }

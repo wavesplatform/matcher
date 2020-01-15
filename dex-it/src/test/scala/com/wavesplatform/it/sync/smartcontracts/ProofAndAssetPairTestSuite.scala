@@ -260,7 +260,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract on AssetPairs/true/all fields/one proof" - {
         for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
-          log.debug(s"contract: $sc")
           val aliceOrd1 =
             mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
@@ -342,7 +341,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     "negative scenarios of order placement" - {
       "set contact and then place order" - {
         for ((sc, i) <- Seq(sc2, sc7, sc8).zip(Seq(2, 7, 8))) s"$i" in {
-          log.debug(s"contract: $sc")
           setAliceScript(sc)
 
           dex1.api
@@ -371,8 +369,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract" - {
         for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) s"$i" in {
-          log.debug(s"contract $contract")
-
           val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
 
@@ -395,12 +391,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
           val r1           = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
           r1 shouldBe 'left
-          r1.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+          r1.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
           val r2           = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
           r2 shouldBe 'left
-          r2.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+          r2.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
           dex1.api.reservedBalance(bob) shouldBe empty

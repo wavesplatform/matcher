@@ -19,15 +19,15 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val aliceSellAmount = 500
   private val exTxFee         = matcherFee
 
-  private val aliceAssetName                                            = "Alice-X"
-  private val IssueResults(issueAliceAssetTx, aliceAssetId, aliceAsset) = mkIssueExtended(alice, aliceAssetName, 1000, 0)
-  private val aliceWavesPair                                            = AssetPair(aliceAsset, Waves)
+  private val aliceAssetName                                 = "Alice-X"
+  private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, aliceAssetName, 1000, 0)
+  private val aliceWavesPair                                 = AssetPair(aliceAsset, Waves)
 
-  private val IssueResults(issueBob1Asset1Tx, bobAsset1Id, bobAsset1) = mkIssueExtended(bob, "Bob-1-X", someAssetAmount, 5)
-  private val bob1WavesPair                                           = AssetPair(bobAsset1, Waves)
+  private val IssueResults(issueBob1Asset1Tx, _, bobAsset1) = mkIssueExtended(bob, "Bob-1-X", someAssetAmount, 5)
+  private val bob1WavesPair                                 = AssetPair(bobAsset1, Waves)
 
-  private val IssueResults(issueBob2Asset2Tx, bobAsset2Id, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
-  private val bob2WavesPair                                           = AssetPair(bobAsset2, Waves)
+  private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
+  private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 

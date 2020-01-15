@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.test.PredefinedScripts
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -16,7 +16,7 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
 
   private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, "AliceCoin", quantity = 9999999999999L, decimals = 0)
   private val IssueResults(issueAliceScriptedAssetTx, _, aliceScriptedAsset) =
-    mkIssueExtended(alice, "AliceSmartAsset", quantity = 9999999999999L, decimals = 0, fee = smartIssueFee, script = Some(PredefinedScripts.alwaysTrue))
+    mkIssueExtended(alice, "AliceSmartAsset", quantity = 9999999999999L, decimals = 0, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

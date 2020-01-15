@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
-import com.wavesplatform.dex.it.test.PredefinedScripts
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
@@ -39,10 +39,10 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
   val deviationFee    = 40
 
   val IssueResults(scriptAssetTx, _, scriptAsset) =
-    mkIssueExtended(alice, "asset1", defaultAssetQuantity, fee = smartIssueFee, script = Some(PredefinedScripts.alwaysTrue))
+    mkIssueExtended(alice, "asset1", defaultAssetQuantity, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
 
   val IssueResults(anotherScriptAssetTx, _, anotherScriptAsset) =
-    mkIssueExtended(alice, "asset2", defaultAssetQuantity, fee = smartIssueFee, script = Some(PredefinedScripts.alwaysTrue))
+    mkIssueExtended(alice, "asset2", defaultAssetQuantity, fee = smartIssueFee, script = Some(Scripts.alwaysTrue))
 
   val scriptAssetsPair: AssetPair = createAssetPair(scriptAsset, anotherScriptAsset)
 

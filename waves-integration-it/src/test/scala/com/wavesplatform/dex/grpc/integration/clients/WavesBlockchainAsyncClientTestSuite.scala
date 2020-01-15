@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.{DEXClient, IntegrationSuiteBase}
-import com.wavesplatform.dex.it.test.PredefinedScripts
+import com.wavesplatform.dex.it.test.Scripts
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
@@ -45,7 +45,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges ++= elem; Continue }
   }
 
-  private val trueScript = Option(PredefinedScripts.alwaysTrue)
+  private val trueScript = Option(Scripts.alwaysTrue)
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not

@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.feature.BlockchainFeatures
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.IssueTransaction
@@ -174,8 +175,8 @@ object OrdersFromScriptedAssetTestSuite {
   import com.wavesplatform.dex.it.waves.Implicits.toVanilla
   import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
-  // TODO
-  private def mkAllow(id: Int): IssueTransaction = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, ??? /*"true"*/ )
+  private def mkAllow(id: Int): IssueTransaction =
+    mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
 
   private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
   private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.getId)
@@ -189,16 +190,20 @@ object OrdersFromScriptedAssetTestSuite {
   private val issueAllowAsset3Tx = mkAllow(2)
   private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.getId)
 
-  // TODO
-  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, ??? /*"false"*/ )
+  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
   private val denyAsset        = IssuedAsset(issueDenyAssetTx.getId)
 
-  private val DenyBigAmountScript: String =
-    s"""{-# STDLIB_VERSION 2 #-}
-       |match tx {
-       | case tx: ExchangeTransaction => tx.sellOrder.amount <= 100000
-       | case other => true
-       |}""".stripMargin
+  /*
+  {-# STDLIB_VERSION 2 #-}
+  match tx {
+   case tx: ExchangeTransaction => tx.sellOrder.amount <= 100000
+   case other => true
+  }
+   */
+  private val DenyBigAmountScript = Scripts.fromBase64(
+    "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAE0V4Y2hhbmdlVHJhbnNhY3Rpb24EAAAAAnR4BQAAAAckbWF0Y2gwCQA" +
+      "AZwAAAAIAAAAAAAABhqAICAUAAAACdHgAAAAJc2VsbE9yZGVyAAAABmFtb3VudAQAAAAFb3RoZXIFAAAAByRtYXRjaDAGTQhceA=="
+  )
 
   private val activationHeight = 5
 }

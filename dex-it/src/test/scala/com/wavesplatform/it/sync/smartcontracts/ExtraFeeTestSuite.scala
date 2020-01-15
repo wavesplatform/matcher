@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.smartcontracts
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.test.PredefinedScripts
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig._
@@ -19,8 +19,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
        """.stripMargin
     )
 
-  private val trueScript  = Option(PredefinedScripts.alwaysTrue)
-  private val falseScript = Option(PredefinedScripts.alwaysFalse)
+  private val trueScript  = Option(Scripts.alwaysTrue)
+  private val falseScript = Option(Scripts.alwaysFalse)
   private val amount      = 1L
   private val price       = 100000000L
 

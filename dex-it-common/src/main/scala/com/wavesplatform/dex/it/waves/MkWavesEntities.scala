@@ -134,6 +134,12 @@ trait MkWavesEntities {
     IssueResults(tx, assetId, issuedAsset)
   }
 
+  def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr): SetScriptTransaction =
+    mkSetAccountScript(accountOwner, script)
+
+  def mkResetAccountScript(accountOwner: KeyPair, fee: Long = setScriptFee, timestamp: Long = System.currentTimeMillis): SetScriptTransaction =
+    mkSetAccountScript(accountOwner, None, fee, timestamp)
+
   def mkSetAccountScript(accountOwner: KeyPair,
                          script: Option[ByteStr],
                          fee: Long = setScriptFee,
@@ -143,10 +149,10 @@ trait MkWavesEntities {
 
   def mkSetAssetScript(assetOwner: KeyPair,
                        asset: IssuedAsset,
-                       script: String,
+                       script: ByteStr,
                        fee: Long = setAssetScriptFee,
                        timestamp: Long = System.currentTimeMillis): SetAssetScriptTransaction = {
-    Transactions.makeSetAssetScriptTransaction(assetOwner, AddressScheme.current.chainId, asset, script, fee, timestamp)
+    Transactions.makeSetAssetScriptTransaction(assetOwner, AddressScheme.current.chainId, asset, script.base64, fee, timestamp)
   }
 
   def mkExchange(buyOrderOwner: KeyPair,

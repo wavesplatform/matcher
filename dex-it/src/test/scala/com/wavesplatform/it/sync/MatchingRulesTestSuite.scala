@@ -323,7 +323,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
                 assetBalance(bob, pair.amountAsset) shouldBe bobAmountBalance + amount - matcherFee
                 assetBalance(alice, pair.priceAsset) shouldBe alicePriceBalance + 25000L
                 assetBalance(bob, pair.priceAsset) shouldBe bobPriceBalance - 25000L
-              case _ => ???
+              case x => throw new RuntimeException(s"Impossible case: $x")
             }
 
             dex1.api.cancel(alice, partiallyFilledOrderId)

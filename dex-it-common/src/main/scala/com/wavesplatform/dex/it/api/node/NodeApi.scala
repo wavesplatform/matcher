@@ -20,7 +20,7 @@ import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import com.wavesplatform.dex.it.waves.Implicits.toVanilla
 import com.wavesplatform.wavesj.Transaction
-import play.api.libs.json.JsResultException
+import play.api.libs.json.{Format, JsResultException, Json}
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
@@ -83,11 +83,7 @@ object NodeApi {
       override def tryConfig: F[Either[ErrorResponse, Config]] = tryParse(sttp.get(uri"$apiUri/blocks/height").response(asConfig))
 
       override def tryConnect(toNode: InetSocketAddress): F[Either[ErrorResponse, Unit]] = tryUnit {
-        val json = s"""{
-                     |  "host": "${toNode.getHostName}",
-                     |  "port": ${toNode.getPort}
-                     |}""".stripMargin
-        sttp.post(uri"$apiUri/peers/connect").body(json).header("X-API-Key", apiKey)
+        sttp.post(uri"$apiUri/peers/connect").body(ConnectReq(toNode.getHostName, toNode.getPort)).header("X-API-Key", apiKey)
       }
 
       override def tryConnectedPeers: F[Either[ErrorResponse, ConnectedPeersResponse]] = tryParseJson(sttp.get(uri"$apiUri/peers/connected"))
@@ -135,4 +131,10 @@ object NodeApi {
         repeatUntil(request, RepeatRequestOptions(1.second, 60))(_ == true).map(_ => ())
       }
     }
+
+  private case class ConnectReq(host: String, port: Int)
+  private object ConnectReq {
+    implicit val connectFormat: Format[ConnectReq] = Json.format
+  }
+
 }

@@ -113,7 +113,7 @@ object GenesisConfigGenerator {
          |  address-scheme-character = "${generatorSettings.chainId.toChar}"
          |  genesis {
          |    timestamp: ${settings.timestamp}
-         |    signature: null
+         |    signature: ${genesisBlock.signerData.signature}
          |    initial-balance: ${settings.initialBalance}
          |    initial-base-target: ${settings.initialBaseTarget}
          |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms

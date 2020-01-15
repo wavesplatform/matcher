@@ -135,7 +135,7 @@ trait MkWavesEntities {
   }
 
   def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr): SetScriptTransaction =
-    mkSetAccountScript(accountOwner, script)
+    mkSetAccountScript(accountOwner, Some(script))
 
   def mkResetAccountScript(accountOwner: KeyPair, fee: Long = setScriptFee, timestamp: Long = System.currentTimeMillis): SetScriptTransaction =
     mkSetAccountScript(accountOwner, None, fee, timestamp)

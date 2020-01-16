@@ -5,10 +5,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
-import com.wavesplatform.it.MatcherSuiteBase
 
 // TODO refactor balances retrieving
-class OrderDynamicFeeTestSuite extends MatcherSuiteBase {
+class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
   private val baseFee = 300000
 

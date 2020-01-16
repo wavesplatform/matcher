@@ -3,31 +3,30 @@ package com.wavesplatform.it.sync
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.docker.base.info.WavesNodeContainerInfo
-import com.wavesplatform.dex.it.docker.{ToxiProxy, base}
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
-class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
+class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  val toxiproxy: ToxiProxy  = new ToxiProxy().start()
-  val proxy: ContainerProxy = toxiproxy.container.getProxy(WavesNodeContainerInfo.netAlias, WavesNodeContainerInfo.dexGrpcExtensionPort)
+  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  grpc.integration {
          |    waves-node-grpc {
-         |      host = ${toxiproxy.name}
-         |      port = ${toxiproxy.getInnerProxyPort(proxy)}
+         |      host = $toxiProxyHostName
+         |      port = ${getInnerToxiProxyPort(wavesNodeProxy)}
          |    }
          |  }
          |}""".stripMargin)
   }
 
-  lazy val wavesNode2: base.WavesNodeContainer = createWavesNode("waves-2")
+  lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -47,13 +46,13 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
 
     markup(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
-    proxy.setConnectionCut(true)
+    wavesNodeProxy.setConnectionCut(true)
 
     broadcastAndAwait(alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode1.api, 0, defaultAssetQuantity)
 
     markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
-    proxy.setConnectionCut(false)
+    wavesNodeProxy.setConnectionCut(false)
 
     dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
 
@@ -85,7 +84,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
     markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
-    wavesNode1.stopAndSaveLogs()
+    wavesNode1.stopWithoutRemove()
 
     broadcastAndAwait(wavesNode2.api, alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
@@ -105,7 +104,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase {
     wavesNode1.api.waitForTransaction(alice2BobTransferTx)
 
     markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
-    wavesNode2.stopAndSaveLogs()
+    wavesNode2.stopWithoutRemove()
     forgetContainer(wavesNode2)
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)

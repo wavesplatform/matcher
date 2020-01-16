@@ -8,16 +8,18 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._
 
-class MatcherSettingsSpecification extends BaseSettingsSpecification with Matchers {
+class MatcherSettingsSpecification extends BaseSettingsSpecification with Matchers with DiffMatcherWithImplicits {
 
   "MatcherSettings" should "read values" in {
 
@@ -32,6 +34,22 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       cors = false,
       apiKeyDifferentHost = false
     )
+    settings.wavesBlockchainClient should matchTo(
+      WavesBlockchainClientSettings(
+        grpc = GrpcClientSettings(
+          target = "127.1.2.9:6333",
+          maxHedgedAttempts = 9,
+          maxRetryAttempts = 13,
+          keepAliveWithoutCalls = false,
+          keepAliveTime = 8.seconds,
+          keepAliveTimeout = 11.seconds,
+          idleTimeout = 20.seconds,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(
+            connectTimeout = 99.seconds
+          )
+        ),
+        defaultCachesExpiration = 101.millis
+      ))
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
     settings.snapshotsInterval should be(999)

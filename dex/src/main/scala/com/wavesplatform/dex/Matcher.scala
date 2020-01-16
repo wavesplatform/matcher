@@ -5,12 +5,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
 import akka.pattern.{ask, gracefulStop}
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import akka.util.Timeout
 import cats.data.EitherT
-import cats.instances.future.catsStdInstancesForFuture
+import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
@@ -25,7 +25,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
-import com.wavesplatform.dex.grpc.integration.DEXClient
+import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -38,17 +38,27 @@ import com.wavesplatform.dex.util.{ErrorStartingMatcher, forceStopApplication}
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
-class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implicit val actorSystem: ActorSystem, val materializer: ActorMaterializer)
-    extends ScorexLogging {
+// TODO Remove start, merge with Application
+class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
-  import gRPCExtensionClient.{grpcExecutionContext, wavesBlockchainAsyncClient}
+
+  private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  private val monixScheduler                              = monix.execution.Scheduler.Implicits.global
+  private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val time = new NTP(settings.ntpServer)
+  private val wavesBlockchainAsyncClient = WavesBlockchainClientBuilder.async(
+    settings.wavesBlockchainClient,
+    monixScheduler,
+    grpcExecutionContext
+  )
+
+  private implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(actorSystem))
 
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")
@@ -61,9 +71,9 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   private lazy val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
-  private val pairBuilder = new AssetPairBuilder(settings,
-                                                 getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_),
-                                                 settings.blacklistedAssets)(grpcExecutionContext)
+  private val pairBuilder = {
+    new AssetPairBuilder(settings, getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_), settings.blacklistedAssets)
+  }
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
 
@@ -114,7 +124,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-    )(grpcExecutionContext)
+    )
   }
 
   private val matcherQueue: MatcherQueue = settings.eventsQueue.tpe match {
@@ -149,7 +159,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     }
 
     /** Needs additional asynchronous access to the blockchain */
-    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription)(implicit efc: ErrorFormatterContext): FutureResult[Order] = {
+    def asyncValidation(orderAssetsDescriptions: Asset => BriefAssetDescription): FutureResult[Order] =
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
@@ -160,8 +170,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         orderAssetsDescriptions,
         rateCache,
         hasMatcherAccountScript
-      )(o)(grpcExecutionContext, efc)
-    }
+      )(o)
 
     for {
       _ <- liftAsync { syncValidation(assetsCache.unsafeGetDecimals) }
@@ -193,13 +202,15 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
         apiKeyHash,
         rateCache,
-        Future
-          .sequence {
-            settings.allowedOrderVersions.map(version =>
-              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
-          }
-          .map { _.collect { case Right(version) => version } }
-      )(actorSystem),
+        validatedAllowedOrderVersions = () => {
+          Future
+            .sequence {
+              settings.allowedOrderVersions.map(version =>
+                OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
+            }
+            .map { _.collect { case Right(version) => version } }
+        }
+      ),
       MatcherApiRouteV1(
         pairBuilder,
         orderBooksSnapshotCache,
@@ -245,7 +256,6 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
               xs =>
                 if (xs.isEmpty) Future.successful(Unit)
                 else {
-
                   val eventAssets = xs.flatMap(_.event.assets)
                   val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
 
@@ -274,7 +284,7 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
         orderBooks,
         (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, assetsCache.unsafeGetDecimals),
         assetsCache.get(_)
-      )(grpcExecutionContext),
+      ),
       MatcherActor.name
     )
 
@@ -311,40 +321,61 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
   @volatile var matcherServerBinding: ServerBinding = _
 
-  def shutdown(): Future[Unit] = Future {
-    log.info("Shutting down matcher")
+  def shutdown(): Future[Unit] = {
     setStatus(Status.Stopping)
+    val r = for {
+      _ <- {
+        log.info("Shutting down HTTP server...")
+        Option(matcherServerBinding).fold[Future[HttpTerminated]](Future.successful(HttpServerTerminated))(_.terminate(1.second))
+      }
+      _ <- {
+        log.info("Shutting down gRPC client...")
+        wavesBlockchainAsyncClient.close()
+      }
+      _ <- {
+        log.info("Shutting down queue...")
+        Future(blocking(matcherQueue.close(5.seconds)))
+      }
+      _ <- {
+        log.info("Shutting down caches...")
+        Future.successful(orderBooksSnapshotCache.close())
+      }
+      _ <- {
+        log.info("Shutting down actors...")
+        gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown)
+      }
+      _ <- {
+        log.info("Shutting down materializer...")
+        Future.successful(materializer.shutdown())
+      }
+      _ <- {
+        log.debug("Shutting down DB...")
+        Future(blocking(db.close()))
+      }
+    } yield ()
 
-    Await.result(matcherServerBinding.unbind(), 10.seconds)
-
-    val stopMatcherTimeout = 5.minutes
-    matcherQueue.close(stopMatcherTimeout)
-
-    orderBooksSnapshotCache.close()
-    Await.result(gracefulStop(matcherActor, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
-    materializer.shutdown()
-    log.debug("Matcher's actor system has been shut down")
-    db.close()
-    log.info("Matcher shutdown successful")
+    r.andThen {
+      case Success(_) => log.info("Matcher stopped")
+      case Failure(e) => log.error("Failed to stop matcher", e)
+    }
   }
 
   def start(): Unit = {
-    def loadAllKnownAssets(): Future[Unit] = {
-      val assetsToLoad = assetPairsDB.all().flatMap(_.assets) ++ settings.mentionedAssets
-
-      Future
-        .traverse(assetsToLoad) { asset =>
-          getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
-        }
-        .map { xs =>
-          val notFoundAssets = xs.collect { case (id, Left(_)) => id }
-          if (notFoundAssets.isEmpty) Unit
-          else {
-            log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
-            forceStopApplication(ErrorStartingMatcher)
+    def loadAllKnownAssets(): Future[Unit] =
+      Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
+        Future
+          .traverse(assetsToLoad) { asset =>
+            getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
           }
-        }
-    }
+          .map { xs =>
+            val notFoundAssets = xs.collect { case (id, Left(_)) => id }
+            if (notFoundAssets.isEmpty) ()
+            else {
+              log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
+              forceStopApplication(ErrorStartingMatcher)
+            }
+          }
+      }
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
@@ -366,37 +397,50 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
 
     val startGuard = for {
       apiKeyHash <- checkApiKeyHash()
-      _ <- {
+      (_, http) <- {
         log.info("Loading known assets ...")
         loadAllKnownAssets()
-      }
-      hasMatcherScript <- {
+      } zip {
         log.info("Checking matcher's account script ...")
-        wavesBlockchainAsyncClient.hasScript(matcherKeyPair)
+        wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
+      } zip {
+        Future(blocking {
+          log.info(s"Initializing HTTP ...")
+          Http() // May take 3+ seconds
+        })
       }
-      serverBinding <- {
-        hasMatcherAccountScript = hasMatcherScript
+
+      _ <- {
+        log.info("Preparing HTTP service ...")
+        // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
-        Http().bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
-      }
-      _ = {
+        http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
+      } map { serverBinding =>
         matcherServerBinding = serverBinding
         log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
       }
-      _ <- {
-        log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout)
-      }
+
       deadline = settings.startEventsProcessingTimeout.fromNow
-      lastOffsetQueue <- {
+      (_, lastOffsetQueue) <- {
+        log.info("Waiting all snapshots are restored ...")
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
+          log.info("All snapshots are restored")
+        }
+      } zip {
         log.info("Getting last queue offset ...")
         getLastOffset(deadline)
       }
-      _ = log.info(s"Last queue offset is $lastOffsetQueue")
-      _ <- waitOffsetReached(lastOffsetQueue, deadline)
-      _ = log.info("Last offset has been reached, notify addresses")
-    } yield addressActors ! AddressDirectory.StartSchedules
+
+      _ <- {
+        log.info(s"Last queue offset is $lastOffsetQueue")
+        waitOffsetReached(lastOffsetQueue, deadline)
+      }
+    } yield {
+      log.info("Last offset has been reached, notify addresses")
+      addressActors ! AddressDirectory.StartSchedules
+    }
 
     startGuard.onComplete {
       case Success(_) => setStatus(Status.Working)
@@ -411,7 +455,8 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     log.info(s"Status now is $newStatus")
   }
 
-  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] = Future.firstCompletedOf[Unit](List(snapshotsRestore.future, timeout(wait)))
+  private def waitSnapshotsRestored(wait: FiniteDuration): Future[Unit] =
+    Future.firstCompletedOf(List(snapshotsRestore.future, timeout(wait, "wait snapshots restored")))
 
   private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
     case e: TimeoutException =>
@@ -438,10 +483,10 @@ class Matcher(settings: MatcherSettings, gRPCExtensionClient: DEXClient)(implici
     p.future
   }
 
-  private def timeout(after: FiniteDuration): Future[Nothing] = {
+  private def timeout(after: FiniteDuration, label: String): Future[Nothing] = {
     val failure = Promise[Nothing]()
     actorSystem.scheduler.scheduleOnce(after) {
-      failure.failure(new TimeoutException(s"$after is out"))
+      failure.failure(new TimeoutException(s"$after is out: $label"))
     }
     failure.future
   }

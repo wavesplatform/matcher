@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
@@ -25,6 +26,8 @@ import scala.concurrent.Future
 import scala.util.Random
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
+
+  private implicit val mat: ActorMaterializer = ActorMaterializer()
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
@@ -328,8 +331,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       matcherAccountFee = 300000L,
       apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }
-    )(system).route
+      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) }
+    ).route
 
     f(route)
   }

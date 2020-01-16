@@ -60,7 +60,7 @@ object GenesisConfigGenerator {
 
   def generate(genesisGeneratorConfig: Config): Config = {
 
-    implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+    implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // TODO
 
     val generatorSettings = genesisGeneratorConfig.as[Settings]("genesis-generator")
 

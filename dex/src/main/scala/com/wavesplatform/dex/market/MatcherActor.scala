@@ -18,14 +18,12 @@ import com.wavesplatform.dex.{WatchDistributedCompletionActor, error}
 import play.api.libs.json._
 import scorex.utils._
 
-import scala.concurrent.ExecutionContext
-
 class MatcherActor(settings: MatcherSettings,
                    assetPairsDB: AssetPairsDB,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: Asset => Option[BriefAssetDescription])(implicit ec: ExecutionContext)
+                   assetDescription: Asset => Option[BriefAssetDescription])
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -265,7 +263,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: Asset => Option[BriefAssetDescription])(implicit ec: ExecutionContext): Props = {
+            assetDescription: Asset => Option[BriefAssetDescription]): Props = {
     Props(
       new MatcherActor(
         matcherSettings,

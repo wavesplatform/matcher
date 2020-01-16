@@ -9,6 +9,7 @@ import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.domain.asset.AssetPair._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
@@ -27,7 +28,7 @@ import scala.util.matching.Regex
 
 case class MatcherSettings(addressSchemeCharacter: Char,
                            accountStorage: AccountStorage.Settings,
-                           wavesNodeGrpc: GRPCSettings,
+                           wavesBlockchainClient: WavesBlockchainClientSettings,
                            ntpServer: String,
                            restApi: RestAPISettings,
                            exchangeTxBaseFee: Long,
@@ -57,8 +58,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings],
-                           defaultGrpcCachesExpiration: FiniteDuration) {
+                           orderHistory: Option[OrderHistorySettings]) {
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -95,10 +95,10 @@ object MatcherSettings {
         .headOption
         .getOrElse(throw new IllegalArgumentException("waves.dex.address-scheme-character is mandatory!"))
 
-    val accountStorage  = accountStorageSettingsReader.read(config, "account-storage")
-    val wavesNodeGrpc   = config.as[GRPCSettings]("grpc.integration.waves-node-grpc")
-    val ntpServer       = config.as[String]("ntp-server")
-    val restApiSettings = config.as[RestAPISettings]("rest-api")
+    val accountStorage        = accountStorageSettingsReader.read(config, "account-storage")
+    val wavesBlockchainClient = config.as[WavesBlockchainClientSettings]("waves-blockchain-client")
+    val ntpServer             = config.as[String]("ntp-server")
+    val restApiSettings       = config.as[RestAPISettings]("rest-api")
 
     val exchangeTxBaseFee = config.getValidatedByPredicate[Long]("exchange-tx-base-fee")(
       predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
@@ -128,28 +128,27 @@ object MatcherSettings {
         }
         .toSet
 
-    val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
-    val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
-    val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache  = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-    val eventsQueue                 = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout      = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                    = config.as[OrderFeeSettings]("order-fee")
-    val deviation                   = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions           = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules               = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly               = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs           = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions        = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection          = config.as[PostgresConnection]("postgres")
-    val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
-    val defaultGrpcCachesExpiration = config.as[FiniteDuration]("grpc.integration.caches.default-expiration")
+    val blacklistedNames           = config.as[List[String]]("blacklisted-names").map(_.r)
+    val maxOrdersPerRequest        = config.as[Int]("rest-order-limit")
+    val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout     = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                   = config.as[OrderFeeSettings]("order-fee")
+    val deviation                  = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions          = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules              = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly              = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs          = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions       = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed    = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection         = config.as[PostgresConnection]("postgres")
+    val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
       addressSchemeCharacter,
       accountStorage,
-      wavesNodeGrpc,
+      wavesBlockchainClient,
       ntpServer,
       restApiSettings,
       exchangeTxBaseFee,
@@ -178,8 +177,7 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory,
-      defaultGrpcCachesExpiration
+      orderHistory
     )
   }
 }

@@ -5,76 +5,73 @@ import java.security.Security
 import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http.ServerBinding
-import akka.stream.ActorMaterializer
+import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
 import com.wavesplatform.dex.actors.RootActorSystem
-import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.grpc.integration.DEXClient
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.SystemInformationReporter
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext}
+import scala.util.{Failure, Success}
 
 class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
   app =>
 
-  import monix.execution.Scheduler.Implicits.{global => scheduler}
+  private implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
 
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()
+  private val shutdownInProgress = new AtomicBoolean(false)
+  private val matcher: Matcher   = new Matcher(settings)
+  matcher.start()
 
-  private val grpcExecutionContext = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
-
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
-
-  private var matcher: Matcher = _
-
-  def run(): Unit = {
-
-    val gRPCExtensionClient =
-      new DEXClient(
-        s"${settings.wavesNodeGrpc.host}:${settings.wavesNodeGrpc.port}",
-        settings.defaultGrpcCachesExpiration
-      )(scheduler, grpcExecutionContext)
-
-    matcher = new Matcher(settings, gRPCExtensionClient)
-    matcher.start()
-
-    // on unexpected shutdown
-    sys.addShutdownHook {
-      Await.ready(Kamon.stopAllReporters(), 20.seconds)
-    }
+  // on unexpected shutdown
+  sys.addShutdownHook {
+    shutdown()
   }
-
-  private val shutdownInProgress             = new AtomicBoolean(false)
-  @volatile var serverBinding: ServerBinding = _
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-      Await.ready(matcher.shutdown(), 5.minutes) // @TODO settings
+      log.info("Shutting down initiated")
 
-      spendableBalanceChanged.onComplete()
+      log.info("Shutting down reporters...")
+      val kamonShutdown = Kamon.stopAllReporters().andThen {
+        case Success(_) => log.info("Reporters stopped")
+        case Failure(e) => log.error("Failed to stop reporters", e)
+      }
 
-      log.info("Shutdown complete")
+      val task = matcher
+        .shutdown()
+        .zip(kamonShutdown)
+        .andThen {
+          case Success(_) => log.info("Shutdown complete")
+          case Failure(e) => log.error("Can't stop DEX correctly", e)
+        }
+
+      Await.ready(task, Duration.Inf)
+      val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+      loggerContext.stop()
     }
 }
 
 object Application {
 
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): (Config, MatcherSettings) = {
-
     import com.wavesplatform.dex.settings.loadConfig
+    import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
-    val config   = loadConfig(external map ConfigFactory.parseFile)
+    import scala.collection.JavaConverters._
+
+    val config           = loadConfig(external map ConfigFactory.parseFile)
+    val scalaContextPath = "scala.concurrent.context"
+    config.getConfig(scalaContextPath).toProperties.asScala.foreach { case (k, v) => System.setProperty(s"$scalaContextPath.$k", v) }
+
     val settings = config.as[MatcherSettings]("waves.dex")(MatcherSettings.valueReader)
 
     // Initialize global var with actual address scheme
@@ -120,7 +117,7 @@ object Application {
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
       log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
-      new Application(settings).run()
+      new Application(settings)
     }
   }
 }

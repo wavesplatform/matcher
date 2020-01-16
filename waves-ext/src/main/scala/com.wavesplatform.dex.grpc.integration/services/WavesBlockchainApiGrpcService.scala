@@ -136,7 +136,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
       val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
       val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
-      responseObserver.onNext(BalanceChangesResponse(pbBatch))
+      if (pbBatch.nonEmpty) responseObserver.onNext(BalanceChangesResponse(pbBatch))
     }
   }
 

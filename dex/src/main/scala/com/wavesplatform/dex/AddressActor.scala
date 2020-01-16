@@ -324,9 +324,9 @@ class AddressActor(owner: Address,
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
     // Now a user can have 100 active transaction maximum - easy to traverse.
-    activeOrders.values.toSeq
+    activeOrders.values.toVector
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
-      .view
+      .iterator
       .filter(_.isLimit)
       .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {

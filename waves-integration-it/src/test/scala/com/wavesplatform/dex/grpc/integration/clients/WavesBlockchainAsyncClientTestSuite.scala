@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -11,14 +13,15 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.grpc.integration.{DEXClient, IntegrationSuiteBase}
+import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
+import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesBlockchainClientBuilder}
 import com.wavesplatform.dex.it.test.Scripts
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
 import org.scalatest.Assertion
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
@@ -29,8 +32,33 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     override def reportFailure(cause: Throwable): Unit = throw cause
   }
 
+  private val grpcExecutor = Executors.newSingleThreadExecutor {
+    new ThreadFactoryBuilder()
+      .setDaemon(true)
+      .setNameFormat("grpc-%d")
+      .build()
+  }
+
   private implicit val monixScheduler = Scheduler(runNow)
-  private lazy val client             = new DEXClient(wavesNode1.grpcApiTarget, 100.milliseconds).wavesBlockchainAsyncClient
+  private lazy val client = WavesBlockchainClientBuilder.async(
+    WavesBlockchainClientSettings(
+      grpc = GrpcClientSettings(
+        target = wavesNode1.grpcApiTarget,
+        maxHedgedAttempts = 5,
+        maxRetryAttempts = 5,
+        keepAliveWithoutCalls = true,
+        keepAliveTime = 2.seconds,
+        keepAliveTimeout = 5.seconds,
+        idleTimeout = 1.minute,
+        channelOptions = GrpcClientSettings.ChannelOptionsSettings(
+          connectTimeout = 5.seconds
+        )
+      ),
+      defaultCachesExpiration = 100.milliseconds
+    ),
+    monixScheduler,
+    ExecutionContext.fromExecutor(grpcExecutor)
+  )
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -266,6 +294,12 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   // TODO check that the functions returns new data after the state is changed?
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    Await.ready(client.close(), Duration.Inf)
+    grpcExecutor.shutdown()
+  }
 
   private def wait[T](f: => Future[T]): T = Await.result(f, 10.seconds)
 

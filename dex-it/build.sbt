@@ -13,7 +13,7 @@ inTask(docker)(
     imageNames := Seq(ImageName("com.wavesplatform/dex-it:latest")),
     exposedPorts += 6886,
     additionalFiles ++= Seq(
-      (Test / resourceDirectory).value / "logback-container.xml"
+      (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml"
     )
   )
 )

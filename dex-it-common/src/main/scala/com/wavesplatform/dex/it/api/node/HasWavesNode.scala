@@ -4,9 +4,7 @@ import cats.Functor
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.config.GenesisConfig
-import com.wavesplatform.dex.it.docker.base
-import com.wavesplatform.dex.it.docker.base.info.WavesNodeContainerInfo
-import com.wavesplatform.dex.it.docker.base.{BaseContainer, WavesNodeContainer}
+import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 
@@ -22,9 +20,8 @@ trait HasWavesNode { self: BaseContainersKit =>
 
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig,
-                                suiteInitialConfig: Config = wavesNodeInitialSuiteConfig): base.WavesNodeContainer = {
-    WavesNodeContainer(name, BaseContainer.create(WavesNodeContainerInfo)(name, runConfig, suiteInitialConfig)) unsafeTap addKnownContainer
-  }
+                                suiteInitialConfig: Config = wavesNodeInitialSuiteConfig): WavesNodeContainer =
+    WavesNodeContainer(name, networkName, network, getIp(name), wavesNodeRunConfig, wavesNodeInitialSuiteConfig, localLogsDir) unsafeTap addKnownContainer
 
-  lazy val wavesNode1: base.WavesNodeContainer = createWavesNode("waves-1")
+  lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
 }

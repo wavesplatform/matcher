@@ -6,7 +6,6 @@ import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.api.AlreadyProcessed
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -242,7 +241,7 @@ class OrderBookActorSpecification
       (1 to 10).foreach { i =>
         actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
       }
-      all(receiveN(10)) shouldBe AlreadyProcessed
+      tp.expectNoMessage(100.millis)
     }
 
     "respond on SaveSnapshotCommand" in obcTest { (pair, actor, tp) =>

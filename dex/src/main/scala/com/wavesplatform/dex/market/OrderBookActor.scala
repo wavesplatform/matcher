@@ -92,7 +92,7 @@ class OrderBookActor(owner: ActorRef,
     case request: QueueEventWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
-        case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
+        case Some(lastProcessed) if request.offset <= lastProcessed => // Already processed
         case _ =>
           lastProcessedOffset = Some(request.offset)
           request.event match {

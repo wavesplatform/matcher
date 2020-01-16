@@ -8,11 +8,10 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.it.MatcherSuiteBase
 
-class OrderFixedFeeTestSuite extends MatcherSuiteBase {
+class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
   private val minMatcherFee = 200000L
-  private val price         = 100000000L
+  private val priceFixed    = 100000000L
 
   private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, "AliceCoin", quantity = 9999999999999L, decimals = 0)
   private val IssueResults(issueAliceScriptedAssetTx, _, aliceScriptedAsset) =
@@ -44,18 +43,18 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
               val bobAssetBalanceBefore = wavesNode1.api.balance(bob, asset)
               val bobWavesBalanceBefore = wavesNode1.api.balance(bob, Waves)
 
-              val aliceOrder = mkOrder(alice, pair, OrderType.BUY, orderAmount, price, matcherFee = minMatcherFee, feeAsset = asset)
+              val aliceOrder = mkOrder(alice, pair, OrderType.BUY, orderAmount, priceFixed, matcherFee = minMatcherFee, feeAsset = asset)
               placeAndAwaitAtDex(aliceOrder)
 
               val reservedBalance1 = dex1.api.reservedBalance(alice)
-              reservedBalance1(Waves) shouldBe orderAmount * price / 100000000
+              reservedBalance1(Waves) shouldBe orderAmount * priceFixed / 100000000
               reservedBalance1(asset) shouldBe minMatcherFee - orderAmount
 
               val tradableBalance1 = dex1.api.tradableBalance(alice, pair)
-              tradableBalance1(Waves) shouldBe aliceWavesBalanceBefore - (orderAmount * price / 100000000)
+              tradableBalance1(Waves) shouldBe aliceWavesBalanceBefore - (orderAmount * priceFixed / 100000000)
               tradableBalance1(asset) shouldBe aliceAssetBalanceBefore - (minMatcherFee - orderAmount)
 
-              val bobOrder = mkOrder(bob, pair, OrderType.SELL, orderAmount, price, matcherFee = minMatcherFee, feeAsset = asset)
+              val bobOrder = mkOrder(bob, pair, OrderType.SELL, orderAmount, priceFixed, matcherFee = minMatcherFee, feeAsset = asset)
               dex1.api.place(bobOrder)
 
               dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
@@ -64,10 +63,10 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
               waitForOrderAtNode(aliceOrder)
 
               wavesNode1.api.balance(alice, asset) shouldBe aliceAssetBalanceBefore - minMatcherFee + orderAmount
-              wavesNode1.api.balance(alice, Waves) shouldBe aliceWavesBalanceBefore - (orderAmount * price / 100000000)
+              wavesNode1.api.balance(alice, Waves) shouldBe aliceWavesBalanceBefore - (orderAmount * priceFixed / 100000000)
 
               wavesNode1.api.balance(bob, asset) shouldBe bobAssetBalanceBefore - minMatcherFee - orderAmount
-              wavesNode1.api.balance(bob, Waves) shouldBe bobWavesBalanceBefore + (orderAmount * price / 100000000)
+              wavesNode1.api.balance(bob, Waves) shouldBe bobWavesBalanceBefore + (orderAmount * priceFixed / 100000000)
             }
         }
       }
@@ -77,13 +76,13 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
         broadcastAndAwait(mkTransfer(bob, alice, wavesNode1.api.balance(bob, aliceAsset), aliceAsset))
 
         val pair = AssetPair(aliceAsset, Waves)
-        placeAndAwaitAtDex(mkOrder(bob, pair, OrderType.BUY, amount = minMatcherFee, price, matcherFee = minMatcherFee, feeAsset = aliceAsset))
+        placeAndAwaitAtDex(mkOrder(bob, pair, OrderType.BUY, amount = minMatcherFee, priceFixed, matcherFee = minMatcherFee, feeAsset = aliceAsset))
       }
 
       "should reject orders if orders' matcherFeeAsset not equal to specified in config" in {
         val pair = AssetPair(aliceAsset, Waves)
-        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, 1, price)) shouldBe 'left
-        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, 1, price)) shouldBe 'left
+        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, 1, priceFixed)) shouldBe 'left
+        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, 1, priceFixed)) shouldBe 'left
       }
 
       "should reject orders if orders' matcherFee less than specified minFee in config" in {
@@ -91,12 +90,12 @@ class OrderFixedFeeTestSuite extends MatcherSuiteBase {
         val pair                   = AssetPair(aliceAsset, Waves)
         val insufficientMatcherFee = minMatcherFee - 1
 
-        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, amount, price, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
+        dex1.api.tryPlace(mkOrder(alice, pair, OrderType.BUY, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
           9441542, // FeeNotEnough
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )
 
-        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, amount, price, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
+        dex1.api.tryPlace(mkOrder(bob, pair, OrderType.SELL, amount, priceFixed, matcherFee = insufficientMatcherFee, feeAsset = aliceAsset)) should failWith(
           9441542, // FeeNotEnough
           s"Required $minMatcherFee ${aliceAsset.toString}"
         )

@@ -18,9 +18,8 @@ import monix.reactive.{Observable, Observer}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration)(
-    implicit monixScheduler: Scheduler,
-    grpcExecutionContext: ExecutionContext)
+class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration, monixScheduler: Scheduler)(
+    implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient[Future]
     with ScorexLogging {
 
@@ -38,7 +37,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
         def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
         def onError(ex: Throwable): Unit                       = ()
       }
-    }
+    }(monixScheduler)
     underlying.spendableBalanceChanges
   }
 
@@ -52,4 +51,5 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]                           = underlying.wereForged(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean]                                    = underlying.broadcastTx(tx)
   override def forgedOrder(orderId: ByteStr): Future[Boolean]                                           = underlying.forgedOrder(orderId)
+  override def close(): Future[Unit]                                                                    = underlying.close()
 }

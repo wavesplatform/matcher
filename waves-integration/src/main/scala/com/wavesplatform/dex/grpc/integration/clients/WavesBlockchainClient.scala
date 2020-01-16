@@ -34,4 +34,6 @@ trait WavesBlockchainClient[F[_]] {
   def broadcastTx(tx: ExchangeTransaction): F[Boolean]
 
   def forgedOrder(orderId: ByteStr): F[Boolean]
+
+  def close(): F[Unit]
 }

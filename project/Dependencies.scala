@@ -29,7 +29,7 @@ object Dependencies {
     val janino  = "3.1.0"
 
     val silencer           = "1.4.1"
-    val kamonCore          = "1.1.5"
+    val kamonCore          = "1.1.6"
     val kamonInfluxDb      = "1.0.3"
     val kamonSystemMetrics = "1.0.1"
 

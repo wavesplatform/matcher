@@ -91,23 +91,29 @@ object Dependencies {
   private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
   private val slf4j                = "org.slf4j" % "slf4j-api" % Version.slf4j
+  private val julToSlf4j           = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore            = kamonModule("core", Version.kamonCore)
   private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
-  private val wavesJ               = "com.wavesplatform" % "wavesj" % Version.wavesJ
-  private val toxiProxy            = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
-  private val googleGuava          = "com.google.guava" % "guava" % Version.googleGuava
-  private val kafka                = "org.apache.kafka" % "kafka-clients" % Version.kafka
-  private val grpcNetty            = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
-  private val swagger              = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
-  private val playJson             = "com.typesafe.play" %% "play-json" % Version.playJson
-  private val scorexCrypto         = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
-  private val grpcScalaPb          = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
-  private val monixReactive        = monixModule("reactive")
-  private val supertagged          = "org.rudogma" %% "supertagged" % Version.supertagged
-  private val levelDb              = "org.iq80.leveldb" % "leveldb" % Version.levelDb
-  private val influxDb             = "org.influxdb" % "influxdb-java" % Version.influxDb
-  private val commonsNet           = "commons-net" % "commons-net" % Version.commonsNet
+  private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
+    // Conflicts with specified gRPC. This is the problem for waves-integration-it.
+    // Also, wavesj doesn't use gRPC, so it is safe.
+    ExclusionRule(organization = "io.grpc"),
+    ExclusionRule("com.wavesplatform", "protobuf-schemas")
+  )
+  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
+  private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
+  private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
+  private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
+  private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
+  private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
+  private val scorexCrypto  = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
+  private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  private val monixReactive = monixModule("reactive")
+  private val supertagged   = "org.rudogma" %% "supertagged" % Version.supertagged
+  private val levelDb       = "org.iq80.leveldb" % "leveldb" % Version.levelDb
+  private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
+  private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
@@ -167,7 +173,7 @@ object Dependencies {
       akkaActor,
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
-      wavesProtobufSchemas,
+      julToSlf4j,
       logback,
       kindProjector,
       catsTaglessMacros,
@@ -201,11 +207,15 @@ object Dependencies {
 
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx)
 
-    lazy val wavesExt: Seq[ModuleID] = Seq(grpcNetty)
+    lazy val wavesExt: Seq[ModuleID] = Seq(
+      julToSlf4j,
+      grpcNetty
+    )
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
 
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
+      julToSlf4j,
       logback,
       swagger,
       playJson,
@@ -219,6 +229,8 @@ object Dependencies {
       grpcNetty
     ) ++ testKit
 
-    lazy val wavesIntegrationIt: Seq[ModuleID] = integrationTestKit
+    lazy val wavesIntegrationIt: Seq[ModuleID] = Seq(
+      julToSlf4j
+    ) ++ integrationTestKit
   }
 }

@@ -39,7 +39,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
       .build()
   }
 
-  private implicit val monixScheduler = Scheduler(runNow)
+  private implicit val monixScheduler: Scheduler = Scheduler(runNow)
   private lazy val client = WavesBlockchainClientBuilder.async(
     WavesBlockchainClientSettings(
       grpc = GrpcClientSettings(

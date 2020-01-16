@@ -74,7 +74,8 @@ object DexContainer extends ScorexLogging {
         (s"$name.conf", getRawContentFromResource(s"dex-servers/$name.conf"), false),
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),
-        ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false)
+        ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false),
+        ("jul.properties", getRawContentFromResource("dex-servers/jul.properties"), false)
       ).map {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString
@@ -92,6 +93,7 @@ object DexContainer extends ScorexLogging {
     "WAVES_DEX_OPTS" ->
       List(
         "-J-Xmx1024M",
+        s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
         "-Dlogback.stdout.enabled=false",
         "-Dlogback.file.enabled=false",
         s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",

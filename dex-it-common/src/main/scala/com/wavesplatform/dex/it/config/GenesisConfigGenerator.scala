@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.genesis._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import net.ceedubs.ficus.readers.NameMapper
+import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -36,6 +36,11 @@ object GenesisConfigGenerator {
     val chainId: Byte = networkType.head.toByte
   }
 
+  object Settings {
+    implicit val chosenCase: NameMapper                = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+    implicit val settingsReader: ValueReader[Settings] = arbitraryTypeValueReader[Settings]
+  }
+
   case class FullAddressInfo(seedText: SeedText,
                              seed: ByteStr,
                              accountSeed: ByteStr,
@@ -60,9 +65,7 @@ object GenesisConfigGenerator {
 
   def generate(genesisGeneratorConfig: Config): Config = {
 
-    implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // TODO
-
-    val generatorSettings = genesisGeneratorConfig.as[Settings]("genesis-generator")
+    val generatorSettings = Settings.settingsReader.read(genesisGeneratorConfig, "genesis-generator")
 
     AddressScheme.current = new AddressScheme { override val chainId: Byte = generatorSettings.chainId }
 

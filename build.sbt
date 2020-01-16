@@ -1,17 +1,16 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
-import WavesExtensionDockerKeys.buildNodeContainer
+import WavesExtensionDockerKeys.wavesNodeVersion
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "v1.1.6"
+def rawNodeVersion: String = "1.1.6"
+def nodeVersionTag: String = s"v$rawNodeVersion"
 
 lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
-
-lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
 
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
@@ -42,6 +41,9 @@ lazy val `waves-ext` = project.dependsOn(
 lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
 
 lazy val `waves-integration-it` = project
+    .settings(
+      docker / wavesNodeVersion := rawNodeVersion
+    )
   .dependsOn(
     `waves-integration`,
     `dex-it-common`
@@ -114,8 +116,7 @@ inScope(Global)(
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
     network := NodeNetwork(sys.props.get("network")),
-    nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value,
+    nodeVersion := rawNodeVersion,
     // To speedup the compilation
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
@@ -130,10 +131,7 @@ git.uncommittedSignifier := Some("DIRTY")
 enablePlugins(ReleasePlugin)
 
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
-  node,
-  `node-it`
-)
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(node)
 
 Compile / cleanAll := {
   val xs = allProjects

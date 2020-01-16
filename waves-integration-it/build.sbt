@@ -6,7 +6,6 @@ description := "Integration tests of the Waves blockchain client"
 
 libraryDependencies ++= Dependencies.Module.wavesIntegrationIt
 
-docker := docker.dependsOn(buildNodeContainer).value
 inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/waves-integration-it:latest")),

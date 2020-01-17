@@ -82,7 +82,7 @@ trait MkWavesEntities {
                 ttl: Duration = 30.days - 1.seconds,
                 version: Byte = orderVersion,
                 matcher: PublicKey = matcher)(implicit assetDecimalsMap: Map[Asset, Int]): Order = {
-    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap(pair.amountAsset), assetDecimalsMap(pair.priceAsset))
+    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap.getOrElse(pair.amountAsset, 8), assetDecimalsMap.getOrElse(pair.priceAsset, 8))
     mkOrder(owner, pair, orderType, amount, normalizedPrice, matcherFee, feeAsset, ts, ttl, version, matcher)
   }
 

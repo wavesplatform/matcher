@@ -194,9 +194,10 @@ object OrderValidator extends ScorexLogging {
 
       /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
       lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
-        case DynamicSettings(baseFee) =>
+        case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
+          val correctedBaseFee = if (zeroMakerDoubleTaker) 2 * baseFee else baseFee
           for {
-            minFee          <- liftValueAsync { minFee(baseFee, hasMatcherAccountScript, assetPair, assetDescriptions(_).hasScript) }
+            minFee          <- liftValueAsync { minFee(correctedBaseFee, hasMatcherAccountScript, assetPair, assetDescriptions(_).hasScript) }
             minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDescriptions(feeAsset).decimals, rateCache) }
             _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
           } yield order
@@ -268,7 +269,13 @@ object OrderValidator extends ScorexLogging {
                                              rateCache: RateCache): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee)    => lift { fixedMinFee }
     case percentSettings: PercentSettings => lift { getMinValidFeeForPercentFeeSettings(order, percentSettings, order.price) }
-    case DynamicSettings(baseFee)         => convertFeeByAssetRate(baseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
+    case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
+      convertFeeByAssetRate(
+        feeInWaves = if (zeroMakerDoubleTaker) 2 * baseFee else baseFee,
+        asset = order.feeAsset,
+        assetDecimals = assetDecimals(order.feeAsset),
+        rateCache = rateCache
+      )
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {

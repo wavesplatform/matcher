@@ -23,5 +23,7 @@ package object model {
 
     def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): BigDecimal =
       BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)
+
+    def denormalizeWavesAmount(value: Amount): BigDecimal = denormalizeAmountAndFee(value, 8)
   }
 }

@@ -80,8 +80,9 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.processConsumedTimeout shouldBe 663.seconds
 
     settings.orderFee match {
-      case DynamicSettings(baseFee) =>
+      case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
         baseFee shouldBe 300000
+        zeroMakerDoubleTaker shouldBe true
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000

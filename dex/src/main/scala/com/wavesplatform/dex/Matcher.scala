@@ -33,6 +33,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import mouse.any.anySyntaxMouse
@@ -119,7 +120,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      settings,
+      settings.zeroMakerFee,
       time,
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),

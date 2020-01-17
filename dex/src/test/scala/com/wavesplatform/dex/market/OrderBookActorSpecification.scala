@@ -82,6 +82,7 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
+        false,
         ntpTime,
         matchingRules,
         _ => (),

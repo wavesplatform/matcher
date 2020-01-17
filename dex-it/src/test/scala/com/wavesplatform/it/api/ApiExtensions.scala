@@ -22,8 +22,9 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtNode(order: Order,
                                     dexApi: DexApi[Id] = dex1.api,
-                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api): Seq[ExchangeTransaction] = {
-    dex1.api.place(order)
+                                    wavesNodeApi: NodeApi[Id] = wavesNode1.api,
+                                    isMarketOrder: Boolean = false): Seq[ExchangeTransaction] = {
+    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 

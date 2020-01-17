@@ -67,11 +67,13 @@ case class MatcherSettings(addressSchemeCharacter: Char,
       matchingRules.keySet.flatMap(_.assets) ++
       allowedAssetPairs.flatMap(_.assets) ++ {
       orderFee match {
-        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
+        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAsset)
         case _                                 => Set.empty
       }
     }
   }
+
+  def zeroMakerFee: Boolean = orderFee match { case DynamicSettings(_, zeroMakerFee) => zeroMakerFee; case _ => false }
 }
 
 case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)

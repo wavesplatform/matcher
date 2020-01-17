@@ -23,10 +23,11 @@ object OrderFeeSettings {
     def getJson(matcherAccountFee: Long, ratesJson: JsObject): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
-          case DynamicSettings(baseFee) =>
+          case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
             "dynamic" -> Json.obj(
-              "baseFee" -> (baseFee + matcherAccountFee),
-              "rates"   -> ratesJson
+              "baseFee"              -> (baseFee + matcherAccountFee),
+              "zeroMakerDoubleTaker" -> zeroMakerDoubleTaker,
+              "rates"                -> ratesJson
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
@@ -43,9 +44,9 @@ object OrderFeeSettings {
     }
   }
 
-  case class DynamicSettings(baseFee: Long)                        extends OrderFeeSettings
-  case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
-  case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
+  final case class DynamicSettings(baseFee: Long, zeroMakerDoubleTaker: Boolean) extends OrderFeeSettings
+  final case class FixedSettings(defaultAsset: Asset, minFee: Long)              extends OrderFeeSettings
+  final case class PercentSettings(assetType: AssetType, minFee: Double)         extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
@@ -53,10 +54,11 @@ object OrderFeeSettings {
     def getPrefixByMode(mode: FeeMode): String = s"$path.$mode"
 
     def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
-      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(FeeMode.DYNAMIC)}.base-fee")(
-        predicate = fee => 0 < fee,
-        errorMsg = s"required 0 < base fee"
-      ) map DynamicSettings
+      val prefix = getPrefixByMode(FeeMode.DYNAMIC)
+      (
+        cfgValidator.validateByPredicate[Long](s"$prefix.base-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base fee"),
+        cfgValidator.validateWithDefault[Boolean](s"$prefix.zero-maker-double-taker", false)
+      ) mapN DynamicSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {

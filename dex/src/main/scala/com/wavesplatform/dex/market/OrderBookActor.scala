@@ -15,7 +15,7 @@ import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
@@ -31,6 +31,7 @@ class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
+                     zeroMakerFee: Boolean,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -69,10 +70,12 @@ class OrderBookActor(owner: ActorRef,
       lastSavedSnapshotOffset = result.map(_._1)
       lastProcessedOffset = lastSavedSnapshotOffset
 
-      log.debug(lastSavedSnapshotOffset match {
-        case None    => "Recovery completed"
-        case Some(x) => s"Recovery completed at $x: $orderBook"
-      })
+      log.debug(
+        lastSavedSnapshotOffset match {
+          case None    => "Recovery completed"
+          case Some(x) => s"Recovery completed at $x: $orderBook"
+        }
+      )
 
       lastProcessedOffset foreach actualizeRules
 
@@ -150,7 +153,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, actualRule.tickSize))
+    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, zeroMakerFee, actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -184,7 +187,7 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
-            settings: MatcherSettings,
+            zeroMakerFee: Boolean,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
@@ -197,6 +200,7 @@ object OrderBookActor {
         assetPair,
         updateSnapshot,
         updateMarketStatus,
+        zeroMakerFee,
         time,
         matchingRules,
         updateCurrentMatchingRules,

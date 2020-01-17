@@ -424,7 +424,7 @@ class MatcherActorSpecification
             assetPair,
             _ => {},
             _ => {},
-            matcherSettings,
+            zeroMakerFee = false,
             ntpTime,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},

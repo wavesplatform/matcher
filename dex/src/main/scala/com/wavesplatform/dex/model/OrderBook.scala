@@ -52,10 +52,10 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(ao: AcceptedOrder, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+  def add(ao: AcceptedOrder, ts: Long, zeroMakerFee: Boolean = false, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
     val (events, lt) = ao.order.orderType match {
-      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, normalizedTickSize)
-      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, normalizedTickSize)
+      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, zeroMakerFee)
+      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, zeroMakerFee)
     }
 
     lastTrade = lt
@@ -240,7 +240,8 @@ object OrderBook {
                       submittedSide: Side,
                       counterSide: Side,
                       lastTrade: Option[LastTrade],
-                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) = {
+                      tickSize: Long,
+                      zeroMakerFee: Boolean): (Seq[Event], Option[LastTrade]) = {
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, isSystemCancel = false, eventTs) +: prevEvents, lastTrade)
     else {
       counterSide.best match {
@@ -248,7 +249,7 @@ object OrderBook {
           submitted.fold { submittedLimitOrder =>
             // place limit order into appropriate level according to the tick size
             val correctedLevelPriceOfSubmittedOrder =
-              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, normalizedTickSize)
+              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, tickSize)
 
             submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submittedLimitOrder)
             (OrderAdded(submittedLimitOrder, eventTs) +: prevEvents, lastTrade)
@@ -262,18 +263,21 @@ object OrderBook {
           else if (!counter.order.isValid(eventTs)) {
 
             counterSide.removeBest()
-            doMatch(eventTs,
-                    canMatch,
-                    submitted,
-                    OrderCanceled(counter, isSystemCancel = false, eventTs) +: prevEvents,
-                    submittedSide,
-                    counterSide,
-                    lastTrade,
-                    normalizedTickSize)
+            doMatch(
+              eventTs,
+              canMatch,
+              submitted,
+              OrderCanceled(counter, isSystemCancel = false, eventTs) +: prevEvents,
+              submittedSide,
+              counterSide,
+              lastTrade,
+              tickSize,
+              zeroMakerFee
+            )
 
           } else {
 
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs)
+            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, zeroMakerFee)
             val newEvents          = orderExecutedEvent +: prevEvents
             val lt                 = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
@@ -291,18 +295,18 @@ object OrderBook {
 
               submitted match {
                 case _: LimitOrder =>
-                  val sloRemaining = orderExecutedEvent.submittedRemaining
-                  if (sloRemaining.isValid) doMatch(eventTs, canMatch, sloRemaining, newEvents, submittedSide, counterSide, lt, normalizedTickSize)
+                  val remaining = orderExecutedEvent.submittedRemaining
+                  if (remaining.isValid) doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, zeroMakerFee)
                   else (newEvents, lt)
 
                 case submittedMarketOrder: MarketOrder =>
-                  val smoRemaining      = orderExecutedEvent.submittedMarketRemaining(submittedMarketOrder)
-                  val isSubmittedFilled = !smoRemaining.isValid
-                  val canSpendMore      = smoRemaining.availableForSpending > 0
+                  val remaining         = orderExecutedEvent.submittedMarketRemaining(submittedMarketOrder)
+                  val isSubmittedFilled = !remaining.isValid
+                  val canSpendMore      = remaining.availableForSpending > 0
 
                   (isSubmittedFilled, canSpendMore) match {
-                    case (false, true)  => doMatch(eventTs, canMatch, smoRemaining, newEvents, submittedSide, counterSide, lt, normalizedTickSize)
-                    case (false, false) => (OrderCanceled(smoRemaining, isSystemCancel = true, eventTs) +: newEvents, lt)
+                    case (false, true)  => doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, zeroMakerFee)
+                    case (false, false) => (OrderCanceled(remaining, isSystemCancel = true, eventTs) +: newEvents, lt)
                     case (true, _)      => (newEvents, lt)
                   }
               }
@@ -312,7 +316,7 @@ object OrderBook {
     }
   }
 
-  private def formatSide(side: Side) =
+  private def formatSide(side: Side): String =
     side
       .map { case (price, level) => s""""$price":${level.map(formatLo).mkString("[", ",", "]")}""" }
       .mkString("{", ",", "}")

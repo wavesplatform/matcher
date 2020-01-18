@@ -209,7 +209,9 @@ object Dependencies {
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
       julToSlf4j,
-      grpcNetty
+      grpcNetty,
+      // java.lang.NoClassDefFoundError: scalapb/grpc/AbstractService
+      grpcScalaPb
     )
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)

@@ -23,13 +23,9 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
           new Dockerfile {
             from(baseImage.value)
             // see https://github.com/wavesplatform/Waves/blob/master/docker/Dockerfile
-            user("root")
-            runRaw("mkdir -p /opt/waves")
-            add(additionalFiles.value, "/opt/waves/") //, chown = "143:143")
-            runRaw("chown -R waves:waves /opt/waves && chmod +x /opt/waves/start-waves.sh")
+            user("root:root")
+            add(additionalFiles.value, "/opt/waves/")
             expose(exposedPorts.value.toSeq: _*)
-
-            user("waves")
             entryPoint("/opt/waves/start-waves.sh")
           }
         },

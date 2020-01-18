@@ -9,7 +9,7 @@ echo Options: ${WAVES_OPTS} >> ${WAVES_NODE_DETAILED_LOG_PATH}
 
 find /opt/waves -type f >> ${WAVES_NODE_DETAILED_LOG_PATH}
 
-java ${WAVES_OPTS} -cp "/usr/share/waves/lib/*:/opt/waves/lib*" com.wavesplatform.Application ${WAVES_NODE_CONFIGPATH} &>> ${WAVES_NODE_DETAILED_LOG_PATH} &
+java ${WAVES_OPTS} -cp "/usr/share/waves/lib/*:/opt/waves/lib/*" com.wavesplatform.Application ${WAVES_NODE_CONFIGPATH} &>> ${WAVES_NODE_DETAILED_LOG_PATH} &
 
 PID=$!
 echo "PID: ${PID}" >> ${WAVES_NODE_DETAILED_LOG_PATH}

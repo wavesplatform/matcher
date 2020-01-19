@@ -45,47 +45,21 @@ lazy val versionSourceTask = Def.task {
 
 inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
 
-// TODO is it really needed?
-val aopMerge: MergeStrategy = new MergeStrategy {
-
-  import scala.xml._
-  import scala.xml.dtd._
-
-  override val name = "aopMerge"
-
-  override def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
-    val dt                         = DocType("aspectj", PublicID("-//AspectJ//DTD//EN", "http://www.eclipse.org/aspectj/dtd/aspectj.dtd"), Nil)
-    val file                       = MergeStrategy.createMergeTarget(tempDir, path)
-    val xmls: Seq[Elem]            = files.map(XML.loadFile)
-    val aspectsChildren: Seq[Node] = xmls.flatMap(_ \\ "aspectj" \ "aspects" \ "_")
-    val weaverChildren: Seq[Node]  = xmls.flatMap(_ \\ "aspectj" \ "weaver" \ "_")
-    val options: String            = xmls.map(x => (x \\ "aspectj" \ "weaver" \ "@options").text).mkString(" ").trim
-    val weaverAttr                 = if (options.isEmpty) Null else new UnprefixedAttribute("options", options, Null)
-    val aspects                    = new Elem(null, "aspects", Null, TopScope, false, aspectsChildren: _*)
-    val weaver                     = new Elem(null, "weaver", weaverAttr, TopScope, false, weaverChildren: _*)
-    val aspectj                    = new Elem(null, "aspectj", Null, TopScope, false, aspects, weaver)
-    XML.save(file.toString, aspectj, "UTF-8", xmlDecl = false, dt)
-    IO.append(file, IO.Newline.getBytes(IO.defaultCharset))
-    Right(Seq(file -> path))
-  }
-}
-
-inTask(assembly)(
-  Seq(
-    test := {},
-    assemblyJarName := s"waves-all-${version.value}.jar",
-    assemblyMergeStrategy := {
-      case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
-      case PathList("META-INF", "aop.xml")                      => aopMerge
-      case PathList("logback.xml")                              => MergeStrategy.first
-      case other                                                => (assemblyMergeStrategy in assembly).value(other)
-    },
-    mainClass := Some("com.wavesplatform.dex.grpc.integration.Main")
-  )
-)
-
 // Packaging
 executableScriptName := "waves-dex-extension"
+
+// Add waves-grpc's JAR, dependency modules are ignored by ExtensionPackaging plugin
+classpathOrdering += ExtensionPackaging.linkedProjectJar(
+  jar = (LocalProject("waves-grpc") / Compile / packageBin).value,
+  art = (LocalProject("waves-grpc") / Compile / packageBin / artifact).value,
+  moduleId = (LocalProject("waves-grpc") / projectID).value
+)
+
+// Exclude waves-all*.jar
+Runtime / dependencyClasspath := {
+  val exclude = (Compile / unmanagedJars).value.toSet
+  (Runtime / dependencyClasspath).value.filterNot(exclude.contains)
+}
 
 // ZIP archive
 inConfig(Universal)(
@@ -96,12 +70,7 @@ inConfig(Universal)(
       .map { file =>
         file -> s"doc/${file.getName}"
       }
-      .toSeq :+ {
-      // Dependent modules are ignored by ExtensionPackaging plugin
-      val wavesGrpcJar = (LocalProject("waves-grpc") / Compile / packageBin).value
-      val wavesGrpcOrg = (LocalProject("waves-grpc") / organization).value
-      wavesGrpcJar -> s"lib/$wavesGrpcOrg.${wavesGrpcJar.getName}"
-    },
+      .toSeq,
     topLevelDirectory := None
   )
 )

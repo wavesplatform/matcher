@@ -24,7 +24,7 @@
     <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
         <file>${logback.brief.fullPath}</file>
         <append>true</append>
-        <immediateFlush>false</immediateFlush>
+        <immediateFlush>false</immediateFlush> <!-- TODO use hook instead -->
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>TRACE</level>
         </filter>

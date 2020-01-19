@@ -8,9 +8,6 @@ import sbt.internal.inc.ReflectUtilities
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 def rawNodeVersion: String = "1.1.6"
-def nodeVersionTag: String = s"v$rawNodeVersion"
-
-lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
 
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
@@ -33,17 +30,14 @@ lazy val `dex-it` = project.dependsOn(
 
 lazy val `waves-grpc` = project
 
-lazy val `waves-ext` = project.dependsOn(
-  `waves-grpc`,
-  node % "compile;test->test;runtime->provided"
-)
+lazy val `waves-ext` = project.dependsOn(`waves-grpc`)
 
 lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
 
 lazy val `waves-integration-it` = project
-    .settings(
-      docker / wavesNodeVersion := rawNodeVersion
-    )
+  .settings(
+    docker / wavesNodeVersion := rawNodeVersion
+  )
   .dependsOn(
     `waves-integration`,
     `dex-it-common`
@@ -131,7 +125,7 @@ git.uncommittedSignifier := Some("DIRTY")
 enablePlugins(ReleasePlugin)
 
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(node)
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)
 
 Compile / cleanAll := {
   val xs = allProjects

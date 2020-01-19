@@ -163,7 +163,8 @@ object Dependencies {
       scalaTest % Test,
       googleGuava,
       slf4j,
-      grpcNetty
+      grpcNetty,
+      "io.netty" % "netty-codec-http2" % "4.1.33.Final"
     )
   )
 
@@ -210,7 +211,6 @@ object Dependencies {
     lazy val wavesExt: Seq[ModuleID] = Seq(
       julToSlf4j,
       grpcNetty,
-      // java.lang.NoClassDefFoundError: scalapb/grpc/AbstractService
       grpcScalaPb
     )
 

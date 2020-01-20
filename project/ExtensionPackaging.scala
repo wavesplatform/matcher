@@ -1,7 +1,8 @@
 import java.io.BufferedInputStream
 import java.nio.file.Files
 
-import CommonSettings.autoImport.{network, nodeVersion}
+import CommonSettings.autoImport.network
+import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging.autoImport.maintainerScriptsAppend
@@ -24,7 +25,7 @@ object ExtensionPackaging extends AutoPlugin {
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging
+  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging && WavesNodeArtifactsPlugin
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
@@ -44,7 +45,7 @@ object ExtensionPackaging extends AutoPlugin {
       ),
       classpathOrdering ++= {
         val jar = """(.+)[-_]([\d\.]+.*)\.jar""".r
-        val inDeb = filesInDeb((Compile / unmanagedBase).value / "waves_1.1.7_all.deb")
+        val inDeb = filesInDeb((Compile / unmanagedBase).value / s"waves_${wavesNodeVersion.value}_all.deb")
           .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share/waves/lib"))
           .map(_.split('/').last)
           .map {
@@ -65,7 +66,7 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := s"waves${network.value.packageSuffix}",
-      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${nodeVersion.value})"),
+      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${wavesNodeVersion.value})"),
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,

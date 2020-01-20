@@ -1,9 +1,9 @@
 description := "Node integration extension for the Waves DEX"
 
+import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
-import sbtassembly.MergeStrategy
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging, GitVersioning)
+enablePlugins(RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.wavesExt
@@ -11,7 +11,7 @@ libraryDependencies ++= Dependencies.Module.wavesExt
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "Node integration extension for the Waves DEX",
-  packageDescription := s"${packageSummary.value}. Compatible with ${nodeVersion.value} node version"
+  packageDescription := s"${packageSummary.value}. Compatible with ${wavesNodeVersion.value} node version"
 )
 
 packageSettings
@@ -43,7 +43,10 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
-inConfig(Compile)(Seq(sourceGenerators += versionSourceTask))
+inConfig(Compile)(Seq(
+  sourceGenerators += versionSourceTask,
+  compile := (Compile / compile).dependsOn(downloadWavesNodeArtifacts).value
+))
 
 // Packaging
 executableScriptName := "waves-dex-extension"

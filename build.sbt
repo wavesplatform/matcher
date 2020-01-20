@@ -1,13 +1,10 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
-import WavesExtensionDockerKeys.wavesNodeVersion
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
-
-def rawNodeVersion: String = "1.1.6"
 
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
@@ -34,14 +31,10 @@ lazy val `waves-ext` = project.dependsOn(`waves-grpc`)
 
 lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
 
-lazy val `waves-integration-it` = project
-  .settings(
-    docker / wavesNodeVersion := rawNodeVersion
-  )
-  .dependsOn(
-    `waves-integration`,
-    `dex-it-common`
-  )
+lazy val `waves-integration-it` = project.dependsOn(
+  `waves-integration`,
+  `dex-it-common`
+)
 
 lazy val it = project
   .settings(
@@ -110,7 +103,6 @@ inScope(Global)(
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
     network := NodeNetwork(sys.props.get("network")),
-    nodeVersion := rawNodeVersion,
     // To speedup the compilation
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false,

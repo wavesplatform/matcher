@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, Pu
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -67,6 +68,22 @@ trait MkWavesEntities {
         version = 3,
         feeAsset = feeAsset
       )
+
+  /** Creates order with denormalized price */
+  def mkOrderDP(owner: KeyPair,
+                pair: AssetPair,
+                orderType: OrderType,
+                amount: Long,
+                price: Double,
+                matcherFee: Long = matcherFee,
+                feeAsset: Asset = Waves,
+                ts: Long = System.currentTimeMillis,
+                ttl: Duration = 30.days - 1.seconds,
+                version: Byte = orderVersion,
+                matcher: PublicKey = matcher)(implicit assetDecimalsMap: Map[Asset, Int]): Order = {
+    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap(pair.amountAsset), assetDecimalsMap(pair.priceAsset))
+    mkOrder(owner, pair, orderType, amount, normalizedPrice, matcherFee, feeAsset, ts, ttl, version, matcher)
+  }
 
   def mkTransfer(sender: KeyPair,
                  recipient: Address,

@@ -8,7 +8,6 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
@@ -22,11 +21,6 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
   val fixedFee: Long  = 0.003.waves
   val percentFee: Int = 14
-
-  implicit class DoubleOps(value: Double) {
-    val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long        = Normalization.normalizePrice(value, 8, 2)
-  }
 
   def tooLowPrice(orderType: String, price: String): String = {
     s"Price of the $orderType market order ($price) is too low for its full execution with the current market state"

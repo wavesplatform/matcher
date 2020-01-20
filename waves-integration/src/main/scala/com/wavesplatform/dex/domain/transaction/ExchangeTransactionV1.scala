@@ -50,9 +50,6 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
-//  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
-
-//  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransactionV1] {
@@ -103,8 +100,8 @@ object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransacti
 
   override def statefulParse: Stateful[ExchangeTransactionV1] = {
     for {
-      _              <- read[Int] // legacy buy order length
-      _              <- read[Int] // legacy sell order length
+      _              <- read[Int]
+      _              <- read[Int]
       buyOrder       <- OrderV1.statefulParse
       sellOrder      <- OrderV1.statefulParse
       price          <- read[Long]

@@ -1,4 +1,5 @@
 import java.io.File
+import java.nio.file.Paths
 
 import gigahorse.Request
 import sbt.Keys.{streams, unmanagedBase}
@@ -12,12 +13,14 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
 
+// Probably, JAR artifact should be downloaded through custom resolver
 object WavesNodeArtifactsPlugin extends AutoPlugin {
 
   object autoImport extends WavesNodeArtifactsKeys
   import autoImport._
 
   override def projectSettings: Seq[Def.Setting[_]] = Seq(
+    wavesArtifactsCacheDir := Paths.get(System.getProperty("user.home"), ".cache", "dex").toFile,
     cleanupWavesNodeArtifacts := {
       val version = wavesNodeVersion.value
       val filesToRemove = IO.listFiles(unmanagedBase.value).filter { x =>
@@ -29,27 +32,44 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
       filesToRemove
     },
     downloadWavesNodeArtifacts := {
-      val version = wavesNodeVersion.value
-      val destDir = unmanagedBase.value
-      val log     = streams.value.log
+      val version   = wavesNodeVersion.value
+      val targetDir = unmanagedBase.value
+      val log       = streams.value.log
 
-      val artifactsToDownload = artifactNames(version).filterNot(x => (destDir / x).isFile)
-      if (artifactsToDownload.isEmpty) {
-        log.info("Waves Node artifacts have been downloaded")
-        List.empty
-      } else {
-        log.info("Opening releases page...")
-        val r = Http.http.run(Request("https://api.github.com/repos/wavesplatform/Waves/releases")).map { releasesContent =>
-          log.info(s"Looking for Waves Node $version...")
-          getFilesToDownload(releasesContent.bodyAsString, version, _ => artifactsToDownload).map { rawUrl =>
-            val url        = new URL(rawUrl)
-            val targetFile = destDir / url.getPath.split('/').last
-            log.info(s"Downloading $url to $targetFile")
-            Using.urlInputStream(url)(IO.transfer(_, targetFile))
-            targetFile
-          }
+      val unmanagedJarsToDownload = artifactNames(version).filterNot(x => (targetDir / x).isFile)
+      if (unmanagedJarsToDownload.isEmpty) log.info("Waves Node artifacts have been downloaded")
+      else {
+        val cacheDir = wavesArtifactsCacheDir.value
+        cacheDir.mkdirs()
+
+        val (cachedArtifacts, artifactsToDownload) = unmanagedJarsToDownload.partition(x => (cacheDir / x).isFile)
+        cachedArtifacts.foreach { x =>
+          IO.copyFile(cacheDir / x, targetDir / x)
         }
-        Await.result(r, 10.minutes)
+
+        if (artifactsToDownload.isEmpty) log.info("Waves Node artifacts have been cached")
+        else {
+          log.info("Opening releases page...")
+          val r = Http.http.run(Request("https://api.github.com/repos/wavesplatform/Waves/releases")).map {
+            releasesContent =>
+              log.info(s"Looking for Waves Node $version...")
+              getFilesToDownload(releasesContent.bodyAsString, version, _ => artifactsToDownload).map { rawUrl =>
+                val url        = new URL(rawUrl)
+                val fileName   = url.getPath.split('/').last
+                val cachedFile = cacheDir / fileName
+                val targetFile = targetDir / fileName
+
+                log.info(s"Downloading $url to $cachedFile...")
+                Using.urlInputStream(url)(IO.transfer(_, cachedFile))
+
+                log.info(s"Copying $cachedFile to $targetFile")
+                IO.copyFile(cachedFile, targetFile)
+
+                targetFile
+              }
+          }
+          Await.ready(r, 10.minutes)
+        }
       }
     },
     downloadWavesNodeArtifacts := downloadWavesNodeArtifacts.dependsOn(cleanupWavesNodeArtifacts).value
@@ -92,7 +112,9 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
 }
 
 trait WavesNodeArtifactsKeys {
+  // Useful for CI
+  val wavesArtifactsCacheDir     = settingKey[File]("Where cached artifacts are stored")
   val wavesNodeVersion           = settingKey[String]("Waves Node version without 'v'")
   val cleanupWavesNodeArtifacts  = taskKey[Seq[File]]("Removes stale artifacts")
-  val downloadWavesNodeArtifacts = taskKey[Seq[File]]("Downloads Waves Node artifacts to unmanagedBase")
+  val downloadWavesNodeArtifacts = taskKey[Unit]("Downloads Waves Node artifacts to unmanagedBase")
 }

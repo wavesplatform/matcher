@@ -17,6 +17,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
+
     ConfigFactory.parseString(s"""waves.dex {
                                  |  price-assets = [ "$UsdId", "WAVES" ]
                                  |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"

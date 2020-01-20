@@ -11,6 +11,4 @@ trait ItMatchers {
   def failWith(errorCode: Int, containsParams: MatcherError.Params): Matcher[Either[MatcherError, Any]] = {
     new FailWith(errorCode, None, containsParams)
   }
-
-  def failWith(e: Throwable): Matcher[Either[MatcherError, Any]] = new FailWith(100500)
 }

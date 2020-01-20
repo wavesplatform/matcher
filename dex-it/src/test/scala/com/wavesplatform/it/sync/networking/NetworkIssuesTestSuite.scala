@@ -1,9 +1,7 @@
 package com.wavesplatform.it.sync.networking
 
-import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.api.HasToxiProxy
-import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests

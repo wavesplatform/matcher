@@ -4,8 +4,6 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
-
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
 
@@ -61,7 +59,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.9",
+    scalaVersion := "2.12.10",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),

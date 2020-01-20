@@ -9,8 +9,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
-
-@NetworkTests
 class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)

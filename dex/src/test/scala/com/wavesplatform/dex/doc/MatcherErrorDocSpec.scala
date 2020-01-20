@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.doc
 
-import org.scalatest.{FreeSpec, Matchers}
 import com.wavesplatform.dex.util.getSimpleName
+import org.scalatest.{FreeSpec, Matchers}
 
 class MatcherErrorDocSpec extends FreeSpec with Matchers {
   "MatcherErrorDoc" - {

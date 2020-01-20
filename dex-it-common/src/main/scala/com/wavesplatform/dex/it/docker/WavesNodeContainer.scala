@@ -8,6 +8,7 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.cache.CachedData
@@ -15,7 +16,6 @@ import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import com.wavesplatform.utils.ScorexLogging
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl
 
@@ -91,7 +91,8 @@ object WavesNodeContainer extends ScorexLogging {
         (s"$name.conf", getRawContentFromResource(s"nodes/$name.conf"), false),
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),
-        ("/logback-container.xml", getRawContentFromResource("nodes/logback-container.xml"), false)
+        ("logback-container.xml", getRawContentFromResource("nodes/logback-container.xml"), false),
+        ("jul.properties", getRawContentFromResource("nodes/jul.properties"), false)
       ).foreach {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString
@@ -108,6 +109,7 @@ object WavesNodeContainer extends ScorexLogging {
     "WAVES_NODE_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
     "WAVES_OPTS" -> List(
       "-Xmx1024M",
+      s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
       s"-Dlogback.configurationFile=$baseContainerPath/logback-container.xml",
       s"-Dlogback.brief.fullPath=$containerLogsPath/container-$containerName.log",
       s"-Dwaves.network.declared-address=$ip:6883"

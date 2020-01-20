@@ -4,18 +4,18 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 
@@ -188,7 +188,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, 2)
   }
 
-  def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)
+  def stringify(asset: Asset): String = asset.toString
 
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
@@ -207,8 +207,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
-    def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, matcherFeeAssetId = btc)
-    val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
+    def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, feeAsset = btc)
+    val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, feeAsset = eth)
 
     dex1.api.place(buyOrder)
 
@@ -275,8 +275,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
   }
 
   "Order history should correctly save events with Waves as amount and fee" in {
-    val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, matcherFeeAssetId = Waves)
-    val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, matcherFeeAssetId = usd)
+    val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, feeAsset = Waves)
+    val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, feeAsset = usd)
 
     dex1.api.place(buyOrder)
     dex1.api.place(sellOrder)
@@ -317,8 +317,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 small counter and 1 big submitted" in {
 
-    val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, matcherFeeAssetId = eth)
-    val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, matcherFeeAssetId = btc)
+    val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, feeAsset = eth)
+    val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, feeAsset = btc)
 
     dex1.api.place(smallBuyOrder)
     dex1.api.place(bigSellOrder)
@@ -372,7 +372,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     dex1.api.cancelAll(bob)
     dex1.api.cancelAll(alice)
 
-    def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
+    def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, feeAsset = eth)
 
     withClue("place buy market order into empty order book") {
 

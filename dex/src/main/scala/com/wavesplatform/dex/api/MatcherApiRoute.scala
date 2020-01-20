@@ -10,31 +10,29 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.{ApiRoute, jsonPost}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.api.http.AuthRoute
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, PlayJsonException}
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.http.PlayJsonException
-import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon
@@ -81,7 +79,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
 
-  private def invalidJsonResponse(fields: List[String] = Nil) = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
+  private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
@@ -92,7 +90,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
       .result()
 
-  val gRPCExceptionsHandler: ExceptionHandler = ExceptionHandler {
+  private val gRPCExceptionsHandler: ExceptionHandler = ExceptionHandler {
     case ex: WavesNodeConnectionLostException =>
       log.error("Waves Node connection lost", ex)
       complete { WavesNodeUnavailable(error.WavesNodeConnectionBroken) }
@@ -253,7 +251,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             complete(
               if (asset == Waves) RateError(error.WavesImmutableRate)
               else {
-                val assetStr = AssetPair.assetIdStr(asset)
+                val assetStr = asset.toString
                 rateCache.upsertRate(asset, rate) match {
                   case None     => StatusCodes.Created -> wrapMessage(s"The rate $rate for the asset $assetStr added")
                   case Some(pv) => StatusCodes.OK      -> wrapMessage(s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
@@ -277,7 +275,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       complete(
         if (asset == Waves) RateError(error.WavesImmutableRate)
         else {
-          val assetStr = AssetPair.assetIdStr(asset)
+          val assetStr = asset.toString
           rateCache.deleteRate(asset) match {
             case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
             case Some(pv) => StatusCodes.OK -> wrapMessage(s"The rate for the asset $assetStr deleted, old value = $pv")
@@ -501,9 +499,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
-    jsonPost[CancelOrderRequest] { req =>
-      req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
-    }
+    post {
+      entity(as[CancelOrderRequest]) { req =>
+        complete {
+          req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
+        }
+      }
+    } ~ get(complete(StatusCodes.MethodNotAllowed))
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
@@ -520,7 +522,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             "timestamp" -> oi.timestamp,
             "filled"    -> oi.status.filledAmount,
             "filledFee" -> oi.status.filledFee,
-            "feeAsset"  -> oi.matcherFeeAssetId,
+            "feeAsset"  -> oi.feeAsset,
             "status"    -> oi.status.name,
             "assetPair" -> oi.assetPair.json
           )
@@ -777,5 +779,5 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
 object MatcherApiRoute {
   private def stringifyAssetIds(balances: Map[Asset, Long]): Map[String, Long] =
-    balances.map { case (aid, v) => AssetPair.assetIdStr(aid) -> v }
+    balances.map { case (aid, v) => aid.toString -> v }
 }

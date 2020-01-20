@@ -7,7 +7,7 @@ echo "Starting process..." >> ${WAVES_NODE_DETAILED_LOG_PATH}
 echo Config file: ${WAVES_NODE_CONFIGPATH} >> ${WAVES_NODE_DETAILED_LOG_PATH}
 echo Options: ${WAVES_OPTS} >> ${WAVES_NODE_DETAILED_LOG_PATH}
 
-java ${WAVES_OPTS} -cp "/opt/waves/lib/*" com.wavesplatform.Application ${WAVES_NODE_CONFIGPATH} &
+java ${WAVES_OPTS} -cp "/usr/share/waves/lib/*:/opt/waves/lib/*" com.wavesplatform.Application ${WAVES_NODE_CONFIGPATH} &>> ${WAVES_NODE_DETAILED_LOG_PATH} &
 
 PID=$!
 echo "PID: ${PID}" >> ${WAVES_NODE_DETAILED_LOG_PATH}

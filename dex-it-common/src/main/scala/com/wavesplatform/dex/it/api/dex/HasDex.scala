@@ -48,9 +48,11 @@ trait HasDex { self: BaseContainersKit =>
         "group.id"           -> s"create-$name",
         "key.deserializer"   -> "org.apache.kafka.common.serialization.StringDeserializer",
         "value.deserializer" -> "org.apache.kafka.common.serialization.StringDeserializer"
-      ).asJava)
+      ).asJava
+    )
 
     val adminClient = AdminClient.create(properties)
+
     try {
       val newTopic = new NewTopic(name, 1, 1.toShort)
       adminClient.createTopics(java.util.Collections.singletonList(newTopic))

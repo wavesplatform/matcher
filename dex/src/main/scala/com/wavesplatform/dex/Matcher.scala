@@ -12,14 +12,17 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
-import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.{ApiRoute, CompositeHttpService => _}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.database._
-import com.wavesplatform.dex.api.http.CompositeHttpService
+import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, RateCache}
 import com.wavesplatform.dex.db._
+import com.wavesplatform.dex.db.leveldb._
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
@@ -31,11 +34,7 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
-import com.wavesplatform.extensions.Extension
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
+import com.wavesplatform.dex.util.{ErrorStartingMatcher, forceStopApplication}
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -44,7 +43,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 // TODO Remove start, merge with Application
-class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends Extension with ScorexLogging {
+class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) extends ScorexLogging {
 
   import com.wavesplatform.dex.Matcher._
 
@@ -248,7 +247,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         assetPairsDB, {
           case Left(msg) =>
             log.error(s"Can't start MatcherActor: $msg")
-            forceStopApplication(ErrorStartingMatcher)
+            util.forceStopApplication(ErrorStartingMatcher)
 
           case Right((self, processedOffset)) =>
             snapshotsRestore.trySuccess(())
@@ -322,7 +321,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   @volatile var matcherServerBinding: ServerBinding = _
 
-  override def shutdown(): Future[Unit] = {
+  def shutdown(): Future[Unit] = {
     setStatus(Status.Stopping)
     val r = for {
       _ <- {
@@ -361,7 +360,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     }
   }
 
-  override def start(): Unit = {
+  def start(): Unit = {
     def loadAllKnownAssets(): Future[Unit] =
       Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
         Future

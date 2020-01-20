@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, RW}
-import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.db.leveldb.{DBExt, RW}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.model.Events._
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {

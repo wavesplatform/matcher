@@ -2,10 +2,10 @@ package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.market.OrderBookSnapshotStoreActor._
 import com.wavesplatform.dex.model.OrderBook.Snapshot
 import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDB) extends Actor {
   override def receive: Receive = {

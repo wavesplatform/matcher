@@ -3,18 +3,17 @@ package com.wavesplatform.dex.api
 import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.model._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.{NTPTime, TransactionGenBase}
+import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime with TableDrivenPropertyChecks {
+class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with NTPTime with TableDrivenPropertyChecks {
 
   private val defaultAssetPair                            = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
   private def getAssetDecimals(asset: Asset): Option[Int] = Some(8)

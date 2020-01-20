@@ -1,14 +1,13 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.order.Order.PriceConstant
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 
@@ -324,7 +323,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
                 assetBalance(bob, pair.amountAsset) shouldBe bobAmountBalance + amount - matcherFee
                 assetBalance(alice, pair.priceAsset) shouldBe alicePriceBalance + 25000L
                 assetBalance(bob, pair.priceAsset) shouldBe bobPriceBalance - 25000L
-              case _ => ???
+              case x => throw new RuntimeException(s"Impossible case: $x")
             }
 
             dex1.api.cancel(alice, partiallyFilledOrderId)

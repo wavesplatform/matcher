@@ -7,10 +7,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import ch.qos.logback.classic.LoggerContext
 import com.typesafe.config._
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.dex.actors.RootActorSystem
+import com.wavesplatform.dex.domain.account.AddressScheme
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, SystemInformationReporter}
+import com.wavesplatform.dex.util.SystemInformationReporter
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
@@ -62,8 +63,9 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
 object Application {
 
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): (Config, MatcherSettings) = {
+    import com.wavesplatform.dex.settings.loadConfig
     import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-    import com.wavesplatform.settings._
+
     import scala.collection.JavaConverters._
 
     val config           = loadConfig(external map ConfigFactory.parseFile)
@@ -107,8 +109,6 @@ object Application {
 
   private[this] def startDEX(configFile: Option[String]): Unit = {
 
-    import com.wavesplatform.settings.Constants
-
     val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }
     val log                = LoggerFacade(LoggerFactory getLogger getClass)
 
@@ -116,7 +116,7 @@ object Application {
     sys.addShutdownHook { SystemInformationReporter.report(config) }
 
     RootActorSystem.start("wavesplatform", config) { implicit actorSystem =>
-      log.info(s"${Constants.AgentName} Blockchain Id: ${settings.addressSchemeCharacter}")
+      log.info(s"${s"DEX v${Version.VersionString}"} Blockchain Id: ${settings.addressSchemeCharacter}")
       new Application(settings)
     }
   }

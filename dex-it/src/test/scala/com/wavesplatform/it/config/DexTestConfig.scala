@@ -1,14 +1,14 @@
 package com.wavesplatform.it.config
 
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.AssetPairBuilder
-import com.wavesplatform.dex.it.waves.WavesFeeConstants._
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.it.waves.Implicits.toVanilla
+import com.wavesplatform.dex.it.waves.MkWavesEntities._
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.dex.waves.WavesFeeConstants._
+import com.wavesplatform.wavesj.transactions.IssueTransaction
 
 import scala.util.Random
 
@@ -17,7 +17,7 @@ object DexTestConfig {
   val orderLimit = 10
 
   def createAssetPair(asset1: String, asset2: String): AssetPair = {
-    val (a1, a2) = (AssetPair.extractAssetId(asset1).get, AssetPair.extractAssetId(asset2).get)
+    val (a1, a2) = (AssetPair.extractAsset(asset1).get, AssetPair.extractAsset(asset2).get)
     if (AssetPairBuilder.assetIdOrdering.compare(a1.compatId, a2.compatId) > 0)
       AssetPair(a1, a2)
     else
@@ -33,69 +33,33 @@ object DexTestConfig {
     issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
   }
 
+  @scala.annotation.tailrec
   def issueAssetPair(amountAssetIssuer: KeyPair,
                      priceAssetIssuer: KeyPair,
                      amountAssetDecimals: Byte,
                      priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
-    val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
-      .selfSigned(
-        sender = amountAssetIssuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
-        quantity = someAssetAmount,
-        decimals = amountAssetDecimals,
-        reissuable = false,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
 
-    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
-      .selfSigned(
-        sender = priceAssetIssuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
-        quantity = someAssetAmount,
-        decimals = priceAssetDecimals,
-        reissuable = false,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
+    val IssueResults(issueAmountAssetTx, amountAssetId, amountAsset) = {
+      mkIssueExtended(amountAssetIssuer, Random.nextString(4), someAssetAmount, amountAssetDecimals, issueFee)
+    }
 
-    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(issueAmountAssetTx.id().arr)) < 0) {
-      (issueAmountAssetTx,
-       issuePriceAssetTx,
-       AssetPair(
-         amountAsset = IssuedAsset(issueAmountAssetTx.id()),
-         priceAsset = IssuedAsset(issuePriceAssetTx.id())
-       ))
-    } else
-      issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
+    val IssueResults(issuePriceAssetTx, priceAssetId, priceAsset) = {
+      mkIssueExtended(priceAssetIssuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
+    }
+
+    if (MatcherActor.compare(Some(priceAssetId.arr), Some(amountAssetId.arr)) < 0)
+      (issueAmountAssetTx, issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
+    else issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: KeyPair, amountAssetId: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
-    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
-      .selfSigned(
-        sender = issuer,
-        name = Random.nextString(4).getBytes(),
-        description = Random.nextString(10).getBytes(),
-        quantity = someAssetAmount,
-        decimals = priceAssetDecimals,
-        reissuable = false,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
+  @scala.annotation.tailrec
+  def assetPairIssuePriceAsset(issuer: KeyPair, amountAsset: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
-    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), amountAssetId.compatId.map(_.arr)) < 0) {
-      (issuePriceAssetTx,
-       AssetPair(
-         amountAsset = amountAssetId,
-         priceAsset = IssuedAsset(issuePriceAssetTx.id())
-       ))
-    } else
-      assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)
+    val issuePriceAssetTx = mkIssue(issuer, Random.nextString(4), someAssetAmount, priceAssetDecimals, issueFee)
+    val priceAssetId      = toVanilla(issuePriceAssetTx.getId)
+    val priceAsset        = IssuedAsset(priceAssetId)
+
+    if (MatcherActor.compare(Some(priceAssetId.arr), amountAsset.compatId.map(_.arr)) < 0) (issuePriceAssetTx, AssetPair(amountAsset, priceAsset))
+    else assetPairIssuePriceAsset(issuer, amountAsset, priceAssetDecimals)
   }
 }

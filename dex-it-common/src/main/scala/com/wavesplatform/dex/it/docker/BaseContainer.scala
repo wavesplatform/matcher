@@ -10,10 +10,10 @@ import com.github.dockerjava.api.exception.NotFoundException
 import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
 import com.github.dockerjava.core.command.ExecStartResultCallback
 import com.typesafe.config.Config
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import com.wavesplatform.utils.ScorexLogging
 import org.testcontainers.images.builder.Transferable
 
 import scala.collection.JavaConverters._

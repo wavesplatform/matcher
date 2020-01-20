@@ -3,10 +3,9 @@ package com.wavesplatform.dex.caches
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.data.NonEmptyList
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.Try
 import scala.util.control.NonFatal

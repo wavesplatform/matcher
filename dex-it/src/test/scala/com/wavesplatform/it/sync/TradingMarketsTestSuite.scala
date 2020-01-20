@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.domain.order.OrderType.BUY
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 
 class TradingMarketsTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, 1000000000L)

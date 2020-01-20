@@ -7,12 +7,11 @@ import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import akka.http.scaladsl.server.{Route, RouteResult}
+import akka.http.scaladsl.server.{Directive0, Route, RouteResult}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.Application
-import com.wavesplatform.api.http.ApiRoute
+import com.wavesplatform.dex.Application
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.RestAPISettings
-import com.wavesplatform.utils.ScorexLogging
 
 class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)(implicit system: ActorSystem)
     extends ScorexLogging {
@@ -38,7 +37,7 @@ class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], setti
   private val corsAllowedHeaders = (if (settings.apiKeyDifferentHost) List("api_key", "X-API-Key") else List.empty[String]) ++
     Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
 
-  private def corsAllowAll = if (settings.cors) respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
+  private def corsAllowAll: Directive0 = if (settings.cors) respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 
   private def extendRoute(base: Route): Route =
     if (settings.cors) { ctx =>

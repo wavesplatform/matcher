@@ -2,7 +2,6 @@ package com.wavesplatform.dex.settings
 
 import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.settings.loadConfig
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.FlatSpec
 

@@ -2,12 +2,12 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {

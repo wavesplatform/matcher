@@ -1,13 +1,15 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.dex.db.OrderDB
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.OrderType._
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex._
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange._
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
@@ -17,21 +19,15 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val aliceSellAmount = 500
   private val exTxFee         = matcherFee
 
-  private val aliceAssetName    = "Alice-X"
-  private val issueAliceAssetTx = mkIssue(alice, aliceAssetName, 1000, 0)
-  private val aliceAssetId      = issueAliceAssetTx.id()
-  private val aliceAsset        = IssuedAsset(aliceAssetId)
-  private val aliceWavesPair    = AssetPair(aliceAsset, Waves)
+  private val aliceAssetName                                 = "Alice-X"
+  private val IssueResults(issueAliceAssetTx, _, aliceAsset) = mkIssueExtended(alice, aliceAssetName, 1000, 0)
+  private val aliceWavesPair                                 = AssetPair(aliceAsset, Waves)
 
-  private val issueBob1Asset1Tx = mkIssue(bob, "Bob-1-X", someAssetAmount, 5)
-  private val bobAsset1Id       = issueBob1Asset1Tx.id()
-  private val bobAsset1         = IssuedAsset(bobAsset1Id)
-  private val bob1WavesPair     = AssetPair(bobAsset1, Waves)
+  private val IssueResults(issueBob1Asset1Tx, _, bobAsset1) = mkIssueExtended(bob, "Bob-1-X", someAssetAmount, 5)
+  private val bob1WavesPair                                 = AssetPair(bobAsset1, Waves)
 
-  private val issueBob2Asset2Tx = mkIssue(bob, "Bob-2-X", someAssetAmount, 0)
-  private val bobAsset2Id       = issueBob2Asset2Tx.id()
-  private val bobAsset2         = IssuedAsset(bobAsset2Id)
-  private val bob2WavesPair     = AssetPair(bobAsset2, Waves)
+  private val IssueResults(issueBob2Asset2Tx, _, bobAsset2) = mkIssueExtended(bob, "Bob-2-X", someAssetAmount, 0)
+  private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
@@ -75,7 +71,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val markets = orderBooks.markets.head
 
         markets.amountAssetName shouldBe aliceAssetName
-        markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(issueAliceAssetTx.decimals))
+        markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(issueAliceAssetTx.getDecimals))
 
         markets.priceAssetName shouldBe "WAVES"
         markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(8))
@@ -234,7 +230,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       "request order book for blacklisted pair" in {
         dex1.api.tryOrderBook(AssetPair(ForbiddenAsset, Waves)) should failWith(
           11534345,
-          MatcherError.Params(assetId = Some(AssetPair.assetIdStr(ForbiddenAsset)))) // AssetNotFound
+          MatcherError.Params(assetId = Some(ForbiddenAsset.toString))) // AssetNotFound
       }
 
       "should consider UTX pool when checking the balance" in {

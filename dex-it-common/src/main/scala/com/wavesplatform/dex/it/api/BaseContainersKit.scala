@@ -13,9 +13,9 @@ import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.BaseContainer
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
-import com.wavesplatform.utils.ScorexLogging
 import mouse.any._
 import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.testcontainers.containers.Network
@@ -39,7 +39,7 @@ trait BaseContainersKit extends ScorexLogging {
     }
     .build()
 
-  protected def getIp(name: String): String = getIp(getNumber(name))
+  protected def getIp(name: String): String         = getIp(getNumber(name))
   protected def getIp(containerNumber: Int): String = InetAddress.getByAddress(toByteArray(containerNumber & 0xF | networkSeed)).getHostAddress
   protected def getNumber(name: String): Int = {
     val raw =

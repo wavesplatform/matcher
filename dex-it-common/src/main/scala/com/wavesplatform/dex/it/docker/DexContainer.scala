@@ -8,6 +8,7 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.try_._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
@@ -15,7 +16,6 @@ import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
-import com.wavesplatform.utils.ScorexLogging
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.Network.NetworkImpl
 
@@ -74,7 +74,8 @@ object DexContainer extends ScorexLogging {
         (s"$name.conf", getRawContentFromResource(s"dex-servers/$name.conf"), false),
         ("run.conf", runConfig.rendered, true),
         ("suite.conf", suiteInitialConfig.rendered, true),
-        ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false)
+        ("/doc/logback-container.xml", getRawContentFromResource("dex-servers/logback-container.xml"), false),
+        ("jul.properties", getRawContentFromResource("dex-servers/jul.properties"), false)
       ).map {
         case (fileName, content, logContent) =>
           val containerPath = Paths.get(baseContainerPath, fileName).toString
@@ -92,6 +93,7 @@ object DexContainer extends ScorexLogging {
     "WAVES_DEX_OPTS" ->
       List(
         "-J-Xmx1024M",
+        s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",
         "-Dlogback.stdout.enabled=false",
         "-Dlogback.file.enabled=false",
         s"-Dlogback.configurationFile=$baseContainerPath/doc/logback.xml",

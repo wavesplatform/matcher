@@ -4,11 +4,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
-import com.wavesplatform.database.{DBExt, Key}
 import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.db.leveldb.{DBExt, Key}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBook.Snapshot
 import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.iq80.leveldb.DB
 
 trait OrderBookSnapshotDB {

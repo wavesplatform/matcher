@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.{WavesBlockchainCachingClient, WavesBlockchainClient, WavesBlockchainGrpcAsyncClient}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
-import com.wavesplatform.utils.ScorexLogging
 import io.grpc.internal.DnsNameResolverProvider
 import io.netty.channel.nio.NioEventLoopGroup
 import monix.execution.Scheduler

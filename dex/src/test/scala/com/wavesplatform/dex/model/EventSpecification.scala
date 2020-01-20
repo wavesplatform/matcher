@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalatest.{FreeSpec, Matchers}
 
-class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
+class EventSpecification extends FreeSpec with Matchers with MatcherSpecBase {
   "Proper rounding scenario 1" in {
     val pair      = AssetPair(Waves, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))

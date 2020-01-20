@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode.PERCENT
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 
 class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
 
@@ -44,7 +44,7 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
                 price,
                 matcherFee = minimalFee,
                 version = version,
-                matcherFeeAssetId = IssuedAsset(UsdId)))
+                feeAsset = IssuedAsset(UsdId)))
 
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe 0L
@@ -70,7 +70,7 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
                 price,
                 matcherFee = minimalFee,
                 version = version,
-                matcherFeeAssetId = IssuedAsset(UsdId)))
+                feeAsset = IssuedAsset(UsdId)))
 
       wavesNode1.api.balance(accountBuyer, Waves) shouldBe partiallyAmountWaves + (minimalFeeWaves - partiallyFeeWaves)
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe fullyAmountUsd - partiallyAmountUsd
@@ -99,7 +99,7 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
                 price,
                 matcherFee = tooHighFee,
                 version = version,
-                matcherFeeAssetId = IssuedAsset(UsdId)))
+                feeAsset = IssuedAsset(UsdId)))
 
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe 0L
@@ -138,7 +138,7 @@ class OrderPercentFeeReceivingTestSuite extends OrderFeeBaseTestSuite {
             price,
             tooLowFee,
             version = version,
-            matcherFeeAssetId = IssuedAsset(UsdId)
+            feeAsset = IssuedAsset(UsdId)
           )) should failWith(9441542, // FeeNotEnough
                              s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
     }

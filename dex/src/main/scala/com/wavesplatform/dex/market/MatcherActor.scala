@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.api.OrderBookUnavailable
 import com.wavesplatform.dex.db.AssetPairsDB
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
@@ -12,10 +15,6 @@ import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.{ActorNameParser, WorkingStash}
 import com.wavesplatform.dex.{WatchDistributedCompletionActor, error}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 import scorex.utils._
 
@@ -55,7 +54,7 @@ class MatcherActor(settings: MatcherSettings,
 
   private def getAssetName(asset: Asset, desc: Option[BriefAssetDescription]): String =
     asset match {
-      case Waves => AssetPair.WavesName
+      case Waves => Asset.WavesName
       case _     => desc.fold("Unknown")(_.name)
     }
 

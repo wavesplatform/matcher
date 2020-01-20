@@ -1,18 +1,18 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.error.ValidationError
+import com.wavesplatform.dex.domain.error.ValidationError.ActivationError
+import com.wavesplatform.dex.domain.order.{Order, OrderV1}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.assets.exchange._
 
 import scala.concurrent.ExecutionContext
 
@@ -99,8 +99,6 @@ object ExchangeTransactionCreator {
     *
     *   1. Calculate matcher fee that CLIENT PAYS TO MATCHER for the order placement and covering matcher expenses (OrderValidator blockchainAware, base fee depends on order fee settings)
     *   2. Calculate transaction fee that MATCHER PAYS TO THE MINERS for issuing Exchange transaction (ExchangeTransactionCreator, base fee = matcherSettings.exchangeTxBaseFee)
-    *
-    * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
   def minFee(baseFee: Long, hasMatcherAccountScript: Boolean, assetPair: AssetPair, hasAssetScript: IssuedAsset => Boolean): Long = {
 
@@ -112,5 +110,5 @@ object ExchangeTransactionCreator {
       assetFee(assetPair.priceAsset)
   }
 
-  def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) FeeValidation.ScriptExtraFee else 0L
+  def getAdditionalFeeForScript(hasScript: Boolean): Long = if (hasScript) OrderValidator.ScriptExtraFee else 0L
 }

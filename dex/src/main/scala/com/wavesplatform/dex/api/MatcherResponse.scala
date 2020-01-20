@@ -3,12 +3,12 @@ package com.wavesplatform.dex.api
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._
 
 sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherResponseContent) {

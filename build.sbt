@@ -1,60 +1,39 @@
 import CommonSettings.autoImport.network
 import ReleasePlugin.autoImport._
-import WavesExtensionDockerKeys.buildNodeContainer
 import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-def nodeVersionTag: String = "v1.1.6"
-
-lazy val node = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node")
-
-lazy val `node-it` = ProjectRef(uri(s"git://github.com/wavesplatform/Waves.git#$nodeVersionTag"), "node-it")
-
-lazy val `dex-common` = project
-
 // Used in unit and integration tests
-lazy val `dex-test-common` = project.dependsOn(
-  node % "compile;runtime->provided"
-)
+lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
 
 lazy val dex = project.dependsOn(
   `waves-integration`,
-  `dex-common`,
-  `dex-test-common` % "test->compile",
-  node % "compile;test->test;runtime->provided"
+  `dex-test-common` % "test->compile"
 )
 
 lazy val `dex-it-common` = project.dependsOn(
   dex % "compile;runtime->provided",
-  node % "compile;runtime->provided",
   `dex-test-common`
 )
 
 lazy val `dex-it` = project.dependsOn(
   dex % "compile;test->test",
   `waves-integration-it`,
-  `dex-it-common`,
-  `dex-common`
+  `dex-it-common`
 )
 
-lazy val `waves-integration` = project.dependsOn(
-  `dex-common`,
-  node % "compile;test->test;runtime->provided"
-)
+lazy val `waves-grpc` = project
 
-lazy val `waves-integration-it` = project
-  .dependsOn(
-    `waves-integration`,
-    `dex-it-common`
-  )
+lazy val `waves-ext` = project.dependsOn(`waves-grpc`)
 
-lazy val `dex-generator` = project.dependsOn(
-  dex,
-  `node-it` % "compile->test", // Without this IDEA doesn't find classes
-  `dex-it`  % "compile->test"
+lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
+
+lazy val `waves-integration-it` = project.dependsOn(
+  `waves-integration`,
+  `dex-it-common`
 )
 
 lazy val it = project
@@ -77,8 +56,7 @@ lazy val root = (project in file("."))
   .settings(name := "dex-root")
   .aggregate(
     dex,
-    `dex-it`,
-    `dex-generator`
+    `dex-it`
   )
 
 inScope(Global)(
@@ -125,8 +103,6 @@ inScope(Global)(
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
     network := NodeNetwork(sys.props.get("network")),
-    nodeVersion := (node / version).value,
-    buildNodeContainer := (`node-it` / Docker / docker).value,
     // To speedup the compilation
     Compile / doc / sources := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
@@ -141,10 +117,7 @@ git.uncommittedSignifier := Some("DIRTY")
 enablePlugins(ReleasePlugin)
 
 // https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference) ++ List(
-  node,
-  `node-it`
-)
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList.map(x => x: ProjectReference)
 
 Compile / cleanAll := {
   val xs = allProjects
@@ -160,7 +133,6 @@ checkPRRaw := {
   } finally {
     (dex / Test / test).value
     (`waves-integration` / Test / test).value
-    (`dex-generator` / Test / compile).value
   }
 }
 

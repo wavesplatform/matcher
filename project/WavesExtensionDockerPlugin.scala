@@ -1,10 +1,11 @@
 import java.io.File
 
 import sbt.plugins.JvmPlugin
-import sbt.{AutoPlugin, Def, PluginTrigger, Plugins, inTask, taskKey}
+import sbt.{AutoPlugin, Def, PluginTrigger, Plugins, inTask, taskKey, settingKey}
 import sbtdocker.DockerPlugin
 import sbtdocker.DockerPlugin.autoImport._
 
+// TODO move to waves-integration-it
 object WavesExtensionDockerPlugin extends AutoPlugin {
 
   import WavesExtensionDockerKeys._
@@ -17,24 +18,24 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
       Seq(
         additionalFiles := Seq.empty,
         exposedPorts := Set.empty,
-        baseImage := "com.wavesplatform/node-it:latest",
+        baseImage := s"wavesplatform/wavesnode:${wavesNodeVersion.value}",
         dockerfile := {
           new Dockerfile {
             from(baseImage.value)
+            // see https://github.com/wavesplatform/Waves/blob/master/docker/Dockerfile
+            user("root:root")
             add(additionalFiles.value, "/opt/waves/")
             expose(exposedPorts.value.toSeq: _*)
-            runShell("chmod", "+x", "/opt/waves/start-waves.sh")
+            entryPoint("/opt/waves/start-waves.sh")
           }
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
-      )) ++ Seq(
-      docker := docker.dependsOn(buildNodeContainer).value
-    )
+      ))
 }
 
 object WavesExtensionDockerKeys {
-  val additionalFiles    = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
-  val exposedPorts       = taskKey[Set[Int]]("Exposed ports")
-  val buildNodeContainer = taskKey[Unit]("Builds a NODE container")
-  val baseImage          = taskKey[String]("A base image for this container")
+  val additionalFiles  = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
+  val exposedPorts     = taskKey[Set[Int]]("Exposed ports")
+  val baseImage        = taskKey[String]("A base image for this container")
+  val wavesNodeVersion = settingKey[String]("A version of Waves Node")
 }

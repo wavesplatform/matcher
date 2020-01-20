@@ -5,10 +5,13 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
-import com.wavesplatform.NTPTime
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
@@ -17,10 +20,7 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecu
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderOps._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.dex.time.NTPTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -31,7 +31,7 @@ class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")
     with NTPTime
     with ImplicitSender
-    with MatcherTestData
+    with MatcherSpecBase
     with PathMockFactory
     with Eventually {
 
@@ -540,7 +540,7 @@ class OrderBookActorSpecification
               val buyOrder = buy(wctWavesPair, amount = moAmount, price = 100, matcherFee = smallFee, version = 3)
               val marketSellOrder =
                 MarketOrder(
-                  buyOrder.updateType(OrderType.SELL).updateMatcherFeeAssetId(feeAsset),
+                  buyOrder.updateType(OrderType.SELL).updateFeeAsset(feeAsset),
                   availableForSpending = availableForSpending
                 )
               buyOrder -> marketSellOrder
@@ -548,7 +548,7 @@ class OrderBookActorSpecification
               val sellOrder = sell(wctWavesPair, amount = moAmount, price = 90, matcherFee = smallFee, version = 3)
               val marketBuyOrder =
                 MarketOrder(
-                  sellOrder.updateType(OrderType.BUY).updateMatcherFeeAssetId(feeAsset),
+                  sellOrder.updateType(OrderType.BUY).updateFeeAsset(feeAsset),
                   availableForSpending = availableForSpending
                 )
               sellOrder -> marketBuyOrder

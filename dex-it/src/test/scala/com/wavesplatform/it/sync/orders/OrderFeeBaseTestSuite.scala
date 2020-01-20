@@ -2,10 +2,10 @@ package com.wavesplatform.it.sync.orders
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
 
 class OrderFeeBaseTestSuite extends MatcherSuiteBase {
 

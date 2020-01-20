@@ -31,10 +31,10 @@
     </root>
 
     <!-- Networking -->
-    <logger name="io.netty" level="DEBUG" additivity="false">
+    <logger name="io.netty" level="INFO" additivity="false">
         <appender-ref ref="DETAILED"/>
     </logger>
-    <logger name="io.grpc.netty" level="TRACE" additivity="false">
+    <logger name="io.grpc.netty" level="INFO" additivity="false">
         <appender-ref ref="DETAILED"/>
     </logger>
     <logger name="akka.http" level="TRACE" additivity="false">

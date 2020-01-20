@@ -1,15 +1,15 @@
 package com.wavesplatform.dex.error
 
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.feature.BlockchainFeature
+import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
-import com.wavesplatform.features.BlockchainFeature
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}
 
 sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) extends Product with Serializable {
@@ -99,7 +99,7 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      if (AssetPair.assetIdStr(given) == "WAVES")
+      if (given.toString == "WAVES")
         e"""Required one of the following fee asset: ${'required  -> required}. But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
       else e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
@@ -173,7 +173,7 @@ object BalanceNotEnough {
     input
       .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
       .toList
-      .sortBy(x => AssetPair.assetIdStr(x.asset))
+      .sortBy(x => x.asset.toString)
 }
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
@@ -311,7 +311,7 @@ case class DeviantOrderMatcherFee(orderType: OrderType, matcherFee: Amount, devi
     )
 object DeviantOrderMatcherFee {
   def apply(ord: Order, deviationSettings: DeviationsSettings)(implicit efc: ErrorFormatterContext): DeviantOrderMatcherFee =
-    DeviantOrderMatcherFee(ord.orderType, Amount(ord.matcherFeeAssetId, ord.matcherFee), deviationSettings)
+    DeviantOrderMatcherFee(ord.orderType, Amount(ord.feeAsset, ord.matcherFee), deviationSettings)
 }
 
 case class AssetPairSameAssets(theAsset: Asset)

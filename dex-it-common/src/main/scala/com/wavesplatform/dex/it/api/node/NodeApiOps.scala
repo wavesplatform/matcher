@@ -5,13 +5,13 @@ import java.net.InetSocketAddress
 import cats.Functor
 import cats.syntax.functor._
 import com.typesafe.config.Config
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.responses.node.{ActivationStatusResponse, AssetBalanceResponse, ConnectedPeersResponse, WavesBalanceResponse}
 import com.wavesplatform.dex.it.fp.CanExtract
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.wavesj.Transaction
 
 object NodeApiOps {
 
@@ -36,11 +36,11 @@ object NodeApiOps {
     def transactionInfo(id: ByteStr): F[Option[Transaction]] = self.tryTransactionInfo(id).map {
       case Right(r) => Some(r)
       case Left(e) =>
-        if (e.error == ApiError.TransactionDoesNotExist.id) None
+        if (e.error == 311) None // node's ApiError.TransactionDoesNotExist.id
         else throw new RuntimeException(s"Unexpected error: $e")
     }
 
     def activationStatus: F[ActivationStatusResponse] = explicitGet(self.tryActivationStatus)
-    def config: F[Config] = explicitGet(self.tryConfig)
+    def config: F[Config]                             = explicitGet(self.tryConfig)
   }
 }

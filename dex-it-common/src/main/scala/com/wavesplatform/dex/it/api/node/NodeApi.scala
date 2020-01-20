@@ -9,19 +9,18 @@ import cats.tagless.{Derive, FunctorK}
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
 import com.typesafe.config.Config
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ConnectReq
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}
-import com.wavesplatform.dex.it.json._
+import com.wavesplatform.dex.it.json.transactionFormat
 import com.wavesplatform.dex.it.sttp.ResponseParsers.asConfig
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import play.api.libs.json.JsResultException
+import com.wavesplatform.dex.it.waves.Implicits.toVanilla
+import com.wavesplatform.wavesj.Transaction
+import play.api.libs.json.{Format, JsResultException, Json}
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
@@ -48,7 +47,7 @@ trait NodeApi[F[_]] extends HasWaitReady[F] {
   def waitForHeightArise(): F[Unit]
   def waitForConnectedPeer(toNode: InetSocketAddress): F[Unit]
   def waitForTransaction(id: ByteStr): F[Unit]
-  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.id.value)
+  def waitForTransaction(tx: Transaction): F[Unit] = waitForTransaction(tx.getId)
   def waitForActivationStatus(f: ActivationStatusResponse => Boolean): F[Unit]
 }
 
@@ -69,7 +68,7 @@ object NodeApi {
         tryParseJson(sttp.get(uri"$apiUri/addresses/balance/$address"))
 
       override def tryAssetBalance(address: Address, asset: IssuedAsset): F[Either[ErrorResponse, AssetBalanceResponse]] =
-        tryParseJson(sttp.get(uri"$apiUri/assets/balance/$address/${AssetPair.assetIdStr(asset)}"))
+        tryParseJson(sttp.get(uri"$apiUri/assets/balance/$address/${asset.toString}"))
 
       override def tryBroadcast(tx: Transaction): F[Either[ErrorResponse, Unit]] = tryUnit(sttp.post(uri"$apiUri/transactions/broadcast").body(tx))
 
@@ -133,4 +132,10 @@ object NodeApi {
         repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
     }
+
+  private case class ConnectReq(host: String, port: Int)
+  private object ConnectReq {
+    implicit val connectFormat: Format[ConnectReq] = Json.format
+  }
+
 }

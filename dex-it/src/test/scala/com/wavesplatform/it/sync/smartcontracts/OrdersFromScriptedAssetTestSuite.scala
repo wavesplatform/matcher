@@ -1,17 +1,16 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.feature.BlockchainFeatures
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.wavesj.transactions.IssueTransaction
 
 /**
   * Rules:
@@ -91,14 +90,15 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee))
 
     info("place a submitted order")
-    placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee), OrderStatus.Filled)
+    placeAndAwaitAtDex(mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = smartTradeFee),
+                       OrderStatus.Filled)
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
     val allowAsset100 = mkAllow(100)
     broadcastAndAwait(allowAsset100)
 
-    val pair = AssetPair(IssuedAsset(allowAsset100.id()), allowAsset)
+    val pair = AssetPair(IssuedAsset(allowAsset100.getId), allowAsset)
 
     info("place a counter order")
     val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, matcherFee = twoSmartTradeFee)
@@ -120,7 +120,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(counter)
 
     info("update a script")
-    val setAssetScript = mkSetAssetScriptText(matcher, allowAsset2, DenyBigAmountScript)
+    val setAssetScript = mkSetAssetScript(matcher, allowAsset2, DenyBigAmountScript)
     broadcastAndAwait(setAssetScript)
 
     info("a counter order wasn't rejected")
@@ -137,7 +137,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe 'left
-    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
+    r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -147,7 +147,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(counter)
 
     info("update a script")
-    val setAssetScriptTx = mkSetAssetScriptText(matcher, allowAsset3, DenyBigAmountScript)
+    val setAssetScriptTx = mkSetAssetScript(matcher, allowAsset3, DenyBigAmountScript)
     broadcastAndAwait(setAssetScriptTx)
 
     info("a counter order wasn't rejected")
@@ -164,7 +164,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe 'left
-    r.left.get.error shouldBe TransactionNotAllowedByAssetScript.Id
+    r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 }
 
@@ -172,31 +172,38 @@ object OrdersFromScriptedAssetTestSuite {
 
   import MkWavesEntities.mkIssue
   import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
-  import com.wavesplatform.dex.it.waves.WavesFeeConstants.smartIssueFee
+  import com.wavesplatform.dex.it.waves.Implicits.toVanilla
+  import com.wavesplatform.dex.waves.WavesFeeConstants.smartIssueFee
 
-  private def mkAllow(id: Int) = mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.TRUE).explicitGet()))
+  private def mkAllow(id: Int): IssueTransaction =
+    mkIssue(matcher, s"AllowAsset-$id", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysTrue))
 
   private val issueUnscriptedAssetTx = mkIssue(matcher, "UnscriptedAsset", Int.MaxValue / 3, 0)
-  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.id())
+  private val unscriptedAsset        = IssuedAsset(issueUnscriptedAssetTx.getId)
 
   private val issueAllowAssetTx = mkAllow(0)
-  private val allowAsset        = IssuedAsset(issueAllowAssetTx.id())
+  private val allowAsset        = IssuedAsset(issueAllowAssetTx.getId)
 
   private val issueAllowAsset2Tx = mkAllow(1)
-  private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.id())
+  private val allowAsset2        = IssuedAsset(issueAllowAsset2Tx.getId)
 
   private val issueAllowAsset3Tx = mkAllow(2)
-  private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.id())
+  private val allowAsset3        = IssuedAsset(issueAllowAsset3Tx.getId)
 
-  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(ExprScript(Terms.FALSE).explicitGet()))
-  private val denyAsset        = IssuedAsset(issueDenyAssetTx.id())
+  private val issueDenyAssetTx = mkIssue(matcher, "DenyAsset", Int.MaxValue / 3, 0, smartIssueFee, Some(Scripts.alwaysFalse))
+  private val denyAsset        = IssuedAsset(issueDenyAssetTx.getId)
 
-  private val DenyBigAmountScript: String =
-    s"""{-# STDLIB_VERSION 2 #-}
-       |match tx {
-       | case tx: ExchangeTransaction => tx.sellOrder.amount <= 100000
-       | case other => true
-       |}""".stripMargin
+  /*
+  {-# STDLIB_VERSION 2 #-}
+  match tx {
+   case tx: ExchangeTransaction => tx.sellOrder.amount <= 100000
+   case other => true
+  }
+   */
+  private val DenyBigAmountScript = Scripts.fromBase64(
+    "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAE0V4Y2hhbmdlVHJhbnNhY3Rpb24EAAAAAnR4BQAAAAckbWF0Y2gwCQA" +
+      "AZwAAAAIAAAAAAAABhqAICAUAAAACdHgAAAAJc2VsbE9yZGVyAAAABmFtb3VudAQAAAAFb3RoZXIFAAAAByRtYXRjaDAGTQhceA=="
+  )
 
   private val activationHeight = 5
 }

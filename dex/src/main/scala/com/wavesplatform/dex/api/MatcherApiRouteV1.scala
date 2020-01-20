@@ -4,14 +4,13 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import com.wavesplatform.api.http.ApiRoute
-import com.wavesplatform.dex.api.http.AuthRoute
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.MatcherModel
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.ScorexLogging
 import io.swagger.annotations._
 import javax.ws.rs.Path
 

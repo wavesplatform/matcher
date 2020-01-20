@@ -1,18 +1,19 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
   private val issueAliceAssetTx = mkIssue(alice, "AliceCoinOrders", someAssetAmount, decimals = 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
+  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.getId)
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
@@ -24,35 +25,17 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   }
 
   "Order types verification with SmartContracts" - {
-    val sco1 = s"""
-                 |{-# STDLIB_VERSION 2 #-}
-                 |match tx {
-                 | case o : Order =>
-                 |   o.orderType == Buy
-                 | case s : SetScriptTransaction => true
-                 | case other => throw()
-                 | }
-                 |""".stripMargin
-
-    val sco2 = s"""
-              |{-# STDLIB_VERSION 2 #-}
-              |match tx {
-              | case o : Order =>
-              |    o.orderType == Sell
-              |  case s : SetScriptTransaction => true
-              |  case _ => throw()
-              | }
-      """.stripMargin
-
-    val sco3 = s"""
-                 |{-# STDLIB_VERSION 2 #-}
-                 |match tx {
-                 |  case o : Order =>
-                 |        o.orderType == Buy || o.orderType == Sell
-                 |  case s : SetScriptTransaction => true
-                 |  case _ => throw()
-                 | }
-      """.stripMargin
+    /*
+    {-# STDLIB_VERSION 2 #-}
+    match tx {
+      case o : Order => o.orderType == Buy
+      case s : SetScriptTransaction => true
+      case other => throw()
+    }
+     */
+    val sco1 = "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAAAAAAAII" +
+      "BQAAAAFvAAAACW9yZGVyVHlwZQUAAAADQnV5AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJ" +
+      "G1hdGNoMAYEAAAABW90aGVyBQAAAAckbWF0Y2gwCQEAAAAFdGhyb3cAAAAADXx9DQ=="
 
     "scenarios of order placement" - {
       "set contracts with only BUY type and then place order" in {
@@ -71,7 +54,19 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       }
 
       "set contracts with only SELL type and then place order" in {
-        setAliceScriptText(sco2)
+        /*
+        {-# STDLIB_VERSION 2 #-}
+        match tx {
+          case o : Order => o.orderType == Sell
+          case s : SetScriptTransaction => true
+          case _ => throw()
+        }
+         */
+        setAliceScriptText(
+          "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAAAAAAAII" +
+            "BQAAAAFvAAAACW9yZGVyVHlwZQUAAAAEU2VsbAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAB" +
+            "yRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAYWVPjA=="
+        )
 
         dex1.api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
           3147522, // AccountScriptDeniedOrder
@@ -86,7 +81,19 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
       }
 
       "set contracts with both SELL/BUY types and then place order" in {
-        setAliceScriptText(sco3)
+        /*
+        {-# STDLIB_VERSION 2 #-}
+        match tx {
+          case o : Order => o.orderType == Buy || o.orderType == Sell
+          case s : SetScriptTransaction => true
+          case _ => throw()
+        }
+         */
+        setAliceScriptText(
+          "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwAwkAAAAAAAACCAUAAAABb" +
+            "wAAAAlvcmRlclR5cGUFAAAAA0J1eQYJAAAAAAAAAggFAAAAAW8AAAAJb3JkZXJUeXBlBQAAAARTZWxsAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAA" +
+            "ABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV0aHJvdwAAAAAeB1+u"
+        )
 
         val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
         placeAndAwaitAtDex(aliceOrd1)
@@ -124,11 +131,12 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1.api.tryBroadcast(txs.head)
         r shouldBe 'left
-        r.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+        r.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
       }
     }
   }
 
-  private def setAliceScriptText(scriptText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText)))
-  private def resetAliceAccountScript(): Unit              = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScriptText(binaryCodeInBase64: String): Unit =
+    broadcastAndAwait(mkSetAccountScript(alice, Scripts.fromBase64(binaryCodeInBase64)))
+  private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkResetAccountScript(alice, fee = setScriptFee + smartFee))
 }

@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.api
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
-import com.wavesplatform.crypto
+import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -41,7 +41,7 @@ object CancelOrderRequest {
     pk => JsString(Base58.encode(pk))
   )
 
-  protected implicit val byteStrWrites: Format[ByteStr] = com.wavesplatform.utils.byteStrWrites
+  protected implicit val byteStrWrites: Format[ByteStr] = com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 
   implicit val format: OFormat[CancelOrderRequest] = Json.format
 }

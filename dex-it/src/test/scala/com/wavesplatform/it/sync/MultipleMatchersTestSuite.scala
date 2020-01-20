@@ -2,7 +2,9 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -11,7 +13,6 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 import com.wavesplatform.it.tags.DexItKafkaRequired
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
@@ -49,8 +50,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
     broadcastAndAwait(IssueEthTx, IssueWctTx)
     broadcastAndAwait(
-      mkTransfer(alice, bob, IssueEthTx.quantity / 2, eth),
-      mkTransfer(bob, alice, IssueWctTx.quantity / 2, wct)
+      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth),
+      mkTransfer(bob, alice, IssueWctTx.getQuantity / 2, wct)
     )
 
     dex1.start()

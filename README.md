@@ -132,8 +132,8 @@ See instructions in their [documentation](https://docs.wavesplatform.com/en/wave
 ### 6.2. DEX extension installation and configuration 
 
 Artifacts of DEX extension have names like:
-* `waves-dex-integration{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
-* `waves-dex-integration-{version}.zip` for ZIP artifact;
+* `waves-dex-extension{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
+* `waves-dex-extension-{version}.zip` for ZIP artifact;
 
 #### a. 📦 Installation through DEB
 
@@ -185,7 +185,7 @@ waves.dex {
 
 ### 6.3. DEX server installation and configuration
 
-Artifacts of DEX extension have names like `dex{version}.{deb|zip}`.
+Artifacts of DEX extension have names like `waves-dex{version}.{deb|zip}`.
 
 #### a. 📦 Installation through DEB
 
@@ -341,6 +341,9 @@ Note, the shown settings contain a placeholder for your raw password, insert a r
    1. Copy a command from the IntelliJ IDEA's "Run" tab
    2. Remove `javaagent` option
    3. Paste this into a terminal and run
+
+5. IDE can't find Waves Node's classes in `waves-ext`. Download required artifacts manually: `sbt waves-ext/downloadWavesNodeArtifacts` and 
+   then reload SBT configuration in IDE.
 
 ## 10. Production recommendations
 

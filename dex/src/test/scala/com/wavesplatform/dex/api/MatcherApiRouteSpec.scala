@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api
 
-import java.nio.charset.StandardCharsets
-
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -10,38 +8,35 @@ import akka.stream.ActorMaterializer
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.{WithDB, crypto}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsString, JsValue}
 
 import scala.concurrent.Future
+import scala.util.Random
 
-class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData with PathMockFactory with Eventually with WithDB {
+class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
   private implicit val mat: ActorMaterializer = ActorMaterializer()
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
-  private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
-  private val smartAssetId   = smartAssetTx.id()
-  private val smartAsset     = IssuedAsset(smartAssetId)
-
-  private val asset = IssuedAsset(smartAssetTx.id())
+  private val smartAsset     = arbitraryAssetGen.sample.get
+  private val smartAssetId   = smartAsset.id
 
   private val smartAssetDesc = BriefAssetDescription(
-    name = new String(smartAssetTx.name, StandardCharsets.UTF_8),
-    decimals = smartAssetTx.decimals,
+    name = "smart asset",
+    decimals = Random.nextInt(9),
     hasScript = false
   )
 
@@ -307,7 +302,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       assetPairBuilder = new AssetPairBuilder(
         settings,
         x => {
-          if (x == asset)
+          if (x == smartAsset)
             liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
           else liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
         },
@@ -324,7 +319,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
-        x => if (x == asset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
+        x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
         _ => None
       ),
       matcherSettings = settings,

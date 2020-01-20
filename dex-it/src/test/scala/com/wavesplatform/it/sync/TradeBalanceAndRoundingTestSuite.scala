@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{AssetDecimalsInfo, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -66,7 +66,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
-      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.decimals))
+      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.getDecimals))
     }
 
     "check usd and waves balance after fill" in {
@@ -228,10 +228,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val markets     = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
-    markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(IssueWctTx.decimals))
+    markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(IssueWctTx.getDecimals))
 
     markets.priceAssetName shouldBe usdAssetName
-    markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.decimals))
+    markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.getDecimals))
   }
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {
@@ -251,7 +251,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       dex1.api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270) // BalanceNotEnough
 
-      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.id()))
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
     }
   }
 

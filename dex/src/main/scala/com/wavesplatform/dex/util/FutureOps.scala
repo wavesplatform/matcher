@@ -11,7 +11,7 @@ object FutureOps {
         case (r, x) =>
           for {
             xs <- r
-            b <- f(x)
+            b  <- f(x)
           } yield xs.enqueue(b)
       }
     }

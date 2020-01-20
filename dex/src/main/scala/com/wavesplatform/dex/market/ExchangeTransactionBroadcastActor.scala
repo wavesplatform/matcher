@@ -3,13 +3,13 @@ package com.wavesplatform.dex.market
 import akka.actor.{Actor, Props}
 import cats.instances.future.catsStdInstancesForFuture
 import cats.syntax.functor._
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.ExchangeTransactionBroadcastActor._
 import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.ExchangeTransactionBroadcastSettings
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -33,7 +33,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
   private def watching(toCheck: Vector[ExchangeTransaction], toNextCheck: Vector[ExchangeTransaction]): Receive = {
     case CheckAndSend =>
-      val nowMs    = time.getTimestamp()
+      val nowMs    = time.getTimestamp
       val expireMs = nowMs - settings.maxPendingTime.toMillis
 
       confirmed { toCheck.map(_.id()) }

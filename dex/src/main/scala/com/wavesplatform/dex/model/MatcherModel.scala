@@ -2,44 +2,19 @@ package com.wavesplatform.dex.model
 
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
-import com.wavesplatform.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.model.Price
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
-import com.wavesplatform.dex.model.MatcherModel.Price
-import com.wavesplatform.state.Portfolio
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
 
-  type Price  = Long
-  type Amount = Long
-
-  def getCost(amount: Long, price: Long): Long = (BigDecimal(price) * amount / Order.PriceConstant).toLong
-
-  /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
-  object Normalization {
-
-    def normalizeAmountAndFee(value: BigDecimal, assetDecimals: Int): Amount =
-      (value * BigDecimal(10).pow(assetDecimals)).toLong
-
-    def normalizePrice(value: BigDecimal, amountAssetDecimals: Int, priceAssetDecimals: Int): Price =
-      (value * BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)).toLong
-  }
-
-  /** Converts amounts, prices and fees from normalized values (longs) to denormalized ones (decimal numbers) */
-  object Denormalization {
-
-    def denormalizeAmountAndFee(value: Amount, assetDecimals: Int): BigDecimal =
-      BigDecimal(value) / BigDecimal(10).pow(assetDecimals)
-
-    def denormalizePrice(value: Price, amountAssetDecimals: Int, priceAssetDecimals: Int): BigDecimal =
-      BigDecimal(value) / BigDecimal(10).pow(8 + priceAssetDecimals - amountAssetDecimals)
-  }
-
+  def getCost(amount: Long, price: Long): Long                              = (BigDecimal(price) * amount / Order.PriceConstant).toLong
   def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
 
   sealed trait DecimalsFormat
@@ -70,7 +45,7 @@ sealed trait AcceptedOrder {
 
   def spentAsset: Asset = order.getSpendAssetId
   def rcvAsset: Asset   = order.getReceiveAssetId
-  val feeAsset: Asset   = order.matcherFeeAssetId
+  val feeAsset: Asset   = order.feeAsset
 
   def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
@@ -370,13 +345,4 @@ object Events {
   case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
 
   case class ExchangeTransactionCreated(tx: ExchangeTransaction)
-
-  case class BalanceChanged(changes: Map[Address, BalanceChanged.Changes]) {
-    def isEmpty: Boolean = changes.isEmpty
-  }
-
-  object BalanceChanged {
-    val empty: BalanceChanged = BalanceChanged(Map.empty)
-    case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[Asset]])
-  }
 }

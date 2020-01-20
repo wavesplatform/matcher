@@ -4,8 +4,12 @@ import java.util.concurrent.TimeUnit
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
@@ -14,10 +18,6 @@ import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
 import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
 import com.wavesplatform.dex.grpc.integration.services._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.grpc.stub.StreamObserver
 import io.netty.channel.EventLoopGroup
@@ -117,7 +117,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     blockchainService.hasAssetScript { AssetIdRequest(assetId = asset.toPB) }.map(_.has)
   }
 
-  override def runScript(asset: Asset.IssuedAsset, input: exchange.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
+  override def runScript(asset: Asset.IssuedAsset, input: transaction.ExchangeTransaction): Future[RunScriptResult] = handlingErrors {
     blockchainService
       .runAssetScript { RunAssetScriptRequest(assetId = asset.toPB, transaction = Some(input.toPB)) }
       .map(parse)
@@ -140,7 +140,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
         .map { _.transactionsStatutes.map(txStatus => txStatus.id.toVanilla -> txStatus.status.isConfirmed).toMap }
     } recover { case _ => txIds.map(_ -> false).toMap }
 
-  override def broadcastTx(tx: exchange.ExchangeTransaction): Future[Boolean] =
+  override def broadcastTx(tx: transaction.ExchangeTransaction): Future[Boolean] =
     handlingErrors { blockchainService.broadcast { BroadcastRequest(transaction = Some(tx.toPB)) }.map(_.isValid) } recover { case _ => false }
 
   override def forgedOrder(orderId: ByteStr): Future[Boolean] = handlingErrors {

@@ -2,15 +2,25 @@ package com.wavesplatform.dex.util
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object Codecs {
-  def len(assetId: Asset): Int = assetId.fold(1)(1 + _.id.arr.length)
 
   implicit class ByteBufferExt(val b: ByteBuffer) extends AnyVal {
+
+    def getBytes: Array[Byte] = {
+      val len = b.getInt
+      if (b.limit() < len || len < 0) {
+        throw new Exception(s"Invalid array size ($len)")
+      }
+      val bytes = new Array[Byte](len)
+      b.get(bytes)
+      bytes
+    }
+
     def putAssetId(assetId: Asset): ByteBuffer = assetId match {
       case Waves => b.put(0.toByte)
       case IssuedAsset(aid) =>

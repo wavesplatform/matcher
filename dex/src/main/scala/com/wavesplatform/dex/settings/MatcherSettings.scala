@@ -7,6 +7,8 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
+import com.wavesplatform.dex.domain.asset.AssetPair._
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
@@ -17,9 +19,6 @@ import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -83,7 +82,7 @@ object MatcherSettings {
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
   private def unsafeParseAsset(x: String): Asset = {
-    AssetPair.extractAssetId(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
+    AssetPair.extractAsset(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
   }
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
@@ -129,22 +128,22 @@ object MatcherSettings {
         }
         .toSet
 
-    val blacklistedNames            = config.as[List[String]]("blacklisted-names").map(_.r)
-    val maxOrdersPerRequest         = config.as[Int]("rest-order-limit")
-    val blacklistedAddresses        = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache  = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
-    val eventsQueue                 = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout      = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                    = config.as[OrderFeeSettings]("order-fee")
-    val deviation                   = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions           = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules               = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly               = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs           = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions        = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed     = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection          = config.as[PostgresConnection]("postgres")
-    val orderHistory                = config.as[Option[OrderHistorySettings]]("order-history")
+    val blacklistedNames           = config.as[List[String]]("blacklisted-names").map(_.r)
+    val maxOrdersPerRequest        = config.as[Int]("rest-order-limit")
+    val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout     = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                   = config.as[OrderFeeSettings]("order-fee")
+    val deviation                  = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions          = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules              = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly              = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs          = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions       = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed    = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection         = config.as[PostgresConnection]("postgres")
+    val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
 
     MatcherSettings(
       addressSchemeCharacter,

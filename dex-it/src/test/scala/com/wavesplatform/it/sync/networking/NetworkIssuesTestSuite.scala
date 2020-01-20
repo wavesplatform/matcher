@@ -36,7 +36,7 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
     clearOrderBook
   }
 
-  "DEXClient should works correctly despite of latency: " in {
+  "DEXClient should works correctly despite of latency: " - {
 
     "high latency (from node to dex)" in {
       wavesNodeProxy.toxics().latency("latency", ToxicDirection.DOWNSTREAM, 4500)
@@ -58,7 +58,7 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
     }
   }
 
-  "DEXClient should works correctly despite of slow network: " in {
+  "DEXClient should works correctly despite of slow network: " - {
 
     "16 kbps from node to dex" in {
       wavesNodeProxy.toxics().bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)

@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.networking
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
@@ -7,23 +7,20 @@ import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.tags.NetworkTests
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
+@NetworkTests
 class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {
-         |  price-assets = [ "$UsdId", "WAVES" ]
-         |  grpc.integration {
-         |    waves-node-grpc {
-         |      host = $toxiProxyHostName
-         |      port = ${getInnerToxiProxyPort(wavesNodeProxy)}
-         |    }
-         |  }
-         |}""".stripMargin)
+                                 |  price-assets = [ "$UsdId", "WAVES" ]
+                                 |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+                                 |}""".stripMargin)
   }
 
   lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")

@@ -19,5 +19,5 @@ class RW(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB
     newValue
   }
 
-  def delete[V](key: Key[V]): Unit                     = batch.delete(key.keyBytes)
+  def delete[V](key: Key[V]): Unit = batch.delete(key.keyBytes)
 }

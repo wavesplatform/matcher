@@ -22,7 +22,6 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterator: DBIterator                                 = db.iterator(readOptions)
   def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
-//  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)  // TODO REMOVE
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

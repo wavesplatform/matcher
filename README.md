@@ -342,6 +342,9 @@ Note, the shown settings contain a placeholder for your raw password, insert a r
    2. Remove `javaagent` option
    3. Paste this into a terminal and run
 
+5. IDE can't find Waves Node's classes in `waves-ext`. Download required artifacts manually: `sbt waves-ext/downloadWavesNodeArtifacts` and 
+   then reload SBT configuration in IDE.
+
 ## 10. Production recommendations
 
 ### Kafka's queue

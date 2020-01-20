@@ -156,6 +156,7 @@ object DexApi {
         sttp
           .post(uri"$apiUri/orderbook")
           .readTimeout(3.minutes) // TODO find way to decrease timeout!
+
           .followRedirects(false) // TODO move ?
           .body(order)
       }

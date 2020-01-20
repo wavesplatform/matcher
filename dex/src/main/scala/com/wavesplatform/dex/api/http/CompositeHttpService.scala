@@ -8,7 +8,6 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Directive0, Route, RouteResult}
-import akka.stream.ActorMaterializer
 import com.wavesplatform.dex.Application
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.RestAPISettings
@@ -16,7 +15,7 @@ import com.wavesplatform.dex.settings.RestAPISettings
 class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)(implicit system: ActorSystem)
     extends ScorexLogging {
 
-  private val swaggerService    = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, s"${settings.address}:${settings.port}")
+  private val swaggerService    = new SwaggerDocService(system, apiTypes, s"${settings.address}:${settings.port}")
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
   private val swaggerRoute: Route = swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~

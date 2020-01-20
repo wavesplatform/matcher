@@ -25,7 +25,10 @@ lazy val `dex-it` = project.dependsOn(
 
 lazy val `waves-grpc` = project
 
-lazy val `waves-ext` = project.dependsOn(`waves-grpc`)
+lazy val `waves-ext` = project.dependsOn(
+  `waves-grpc`,
+  `dex-test-common` % "test->compile"
+)
 
 lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
 
@@ -130,6 +133,7 @@ checkPRRaw := {
     (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
+    (`waves-ext` / Test / test).value
     (`waves-integration` / Test / test).value
   }
 }

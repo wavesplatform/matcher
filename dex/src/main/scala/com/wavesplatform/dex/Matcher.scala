@@ -7,7 +7,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
 import akka.pattern.{ask, gracefulStop}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
@@ -58,7 +58,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     grpcExecutionContext
   )
 
-  private implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(actorSystem))
+  private implicit val materializer: Materializer = Materializer.matFromSystem(actorSystem)
 
   private val matcherKeyPair = AccountStorage.load(settings.accountStorage).map(_.keyPair).explicitGet().unsafeTap { x =>
     log.info(s"The DEX's public key: ${Base58.encode(x.publicKey.arr)}, account address: ${x.publicKey.toAddress.stringRepr}")

@@ -2,11 +2,13 @@ package com.wavesplatform.dex.grpc.integration.protobuf
 
 import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.{FreeSpecLike, Matchers}
-import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => PropertyChecks}
+import com.wavesplatform.dex.{NoShrink, TransactionGen}
+import com.wavesplatform.dex.gen.orderGen
+import org.scalatest.freespec.AnyFreeSpecLike
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.prop.TableDrivenPropertyChecks
 
-class ConversionsSuite extends FreeSpecLike with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class ConversionsSuite extends AnyFreeSpecLike with TableDrivenPropertyChecks with Matchers with TransactionGen with NoShrink {
   "order" in forAll(orderGen) { order =>
     order.toPB.toVanilla shouldBe order
   }

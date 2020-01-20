@@ -9,13 +9,15 @@ import com.wavesplatform.dex.it.test.InformativeTestStart
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
-import org.scalatest._
 import org.scalatest.concurrent.Eventually
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.duration.DurationInt
 
 trait IntegrationSuiteBase
-    extends FreeSpec
+    extends AnyFreeSpec
     with Matchers
     with BeforeAndAfterAll
     with BeforeAndAfterEach

@@ -54,7 +54,7 @@ object Dependencies {
     val googleGuava = "28.2-jre"
     val kafka       = "2.4.0"
 
-    val swagger = "2.0.4"
+    val swagger = "1.1.1"
 
     val scorexCrypto = "2.1.7"
 
@@ -210,7 +210,7 @@ object Dependencies {
       wavesJ
     ) ++ testContainers
 
-    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx)
+    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck)
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
       julToSlf4j,

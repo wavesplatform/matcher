@@ -435,7 +435,7 @@ case object UnexpectedError
       e"An unexpected error occurred"
     )
 
-case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> Waves} cannot be changed")
+case object WavesImmutableRate extends MatcherError(rate, commonEntity, immutable, e"The rate for ${'assetId -> (Waves: Asset)} cannot be changed")
 
 case object NonPositiveAssetRate extends MatcherError(rate, commonEntity, outOfBound, e"Asset rate should be positive")
 

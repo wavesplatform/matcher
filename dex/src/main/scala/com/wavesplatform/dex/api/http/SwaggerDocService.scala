@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.api.http
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.dex.Version
 import io.swagger.models.{Scheme, Swagger}
 
-class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiClasses: Set[Class[_]], override val host: String)
+// TODO materializer?
+class SwaggerDocService(val actorSystem: ActorSystem, val apiClasses: Set[Class[_]], override val host: String)
     extends SwaggerHttpService {
 
   override val info: Info = Info(

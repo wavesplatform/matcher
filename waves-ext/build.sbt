@@ -45,7 +45,7 @@ lazy val versionSourceTask = Def.task {
 
 inConfig(Compile)(Seq(
   sourceGenerators += versionSourceTask,
-  compile := (Compile / compile).dependsOn(downloadWavesNodeArtifacts).value
+  unmanagedJars := (Compile / unmanagedJars).dependsOn(downloadWavesNodeArtifacts).value
 ))
 
 // Packaging

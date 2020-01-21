@@ -34,7 +34,7 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.time.NTP
-import com.wavesplatform.dex.util.{ErrorStartingMatcher, forceStopApplication}
+import com.wavesplatform.dex.util._
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -247,7 +247,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         assetPairsDB, {
           case Left(msg) =>
             log.error(s"Can't start MatcherActor: $msg")
-            util.forceStopApplication(ErrorStartingMatcher)
+            forceStopApplication(RecoveryError)
 
           case Right((self, processedOffset)) =>
             snapshotsRestore.trySuccess(())
@@ -275,7 +275,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
                   } andThen {
                     case Failure(ex) =>
                       log.error("Error while event processing occurred: ", ex)
-                      forceStopApplication(ErrorStartingMatcher)
+                      forceStopApplication(EventProcessingError)
                     case _ =>
                   }
               }
@@ -361,6 +361,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   }
 
   def start(): Unit = {
+
     def loadAllKnownAssets(): Future[Unit] =
       Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
         Future
@@ -372,7 +373,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             if (notFoundAssets.isEmpty) ()
             else {
               log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
-              forceStopApplication(ErrorStartingMatcher)
+              forceStopApplication(UnsynchronizedNodeError)
             }
           }
       }
@@ -383,7 +384,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
       CreateExchangeTransactionActor.name
     )
+
     actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+
     actorSystem.actorOf(
       ExchangeTransactionBroadcastActor
         .props(
@@ -404,10 +407,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         log.info("Checking matcher's account script ...")
         wavesBlockchainAsyncClient.hasScript(matcherKeyPair).map(hasMatcherAccountScript = _)
       } zip {
-        Future(blocking {
-          log.info(s"Initializing HTTP ...")
-          Http() // May take 3+ seconds
-        })
+        Future(
+          blocking {
+            log.info(s"Initializing HTTP ...")
+            Http() // May take 3+ seconds
+          }
+        )
       }
 
       _ <- {
@@ -425,9 +430,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       deadline = settings.startEventsProcessingTimeout.fromNow
       (_, lastOffsetQueue) <- {
         log.info("Waiting all snapshots are restored ...")
-        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map { _ =>
-          log.info("All snapshots are restored")
-        }
+        waitSnapshotsRestored(settings.snapshotsLoadingTimeout).map(_ => log.info("All snapshots are restored"))
       } zip {
         log.info("Getting last queue offset ...")
         getLastOffset(deadline)
@@ -446,7 +449,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       case Success(_) => setStatus(Status.Working)
       case Failure(e) =>
         log.error(s"Can't start matcher: ${e.getMessage}", e)
-        forceStopApplication(ErrorStartingMatcher)
+        forceStopApplication(StartingMatcherError)
     }
   }
 

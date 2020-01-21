@@ -83,7 +83,7 @@ inScope(Global)(
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
+    dependencyOverrides ++= Dependencies.globalEnforcedVersions.value,
     cancelable := true,
     logBuffered := false,
     coverageExcludedPackages := ".*",

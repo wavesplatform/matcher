@@ -6,8 +6,8 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
-import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
-import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus

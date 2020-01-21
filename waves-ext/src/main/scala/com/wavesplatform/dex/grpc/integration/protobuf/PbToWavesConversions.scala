@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.{Asset, Proofs}
 
-object ToVanillaConversions {
+object PbToWavesConversions {
 
   implicit class PbSignedExchangeTransactionOps(val self: SignedExchangeTransaction) extends AnyVal {
     def toVanilla: Either[ValidationError, exchange.ExchangeTransaction] =

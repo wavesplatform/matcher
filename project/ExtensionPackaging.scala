@@ -54,7 +54,9 @@ object ExtensionPackaging extends AutoPlugin {
           }
           .toMap
 
-        excludeProvidedArtifacts((Runtime / dependencyClasspath).value, inDeb)
+        val (r, conflicts) = excludeProvidedArtifacts((Runtime / dependencyClasspath).value, inDeb)
+        streams.value.log.warn(s"Found conflicts (name: deb != ours):\n${conflicts.map { case (name, (deb, ours)) => s"$name: $deb != $ours" }.mkString("\n")}")
+        r.toSeq
       },
       Universal / mappings ++= classpathOrdering.value ++ {
         val baseConfigName = s"${name.value}-${network.value}.conf"
@@ -141,24 +143,25 @@ object ExtensionPackaging extends AutoPlugin {
     filename.getOrElse(dep.data.getName)
   }
 
-  private def excludeProvidedArtifacts(runtimeClasspath: Classpath, exclusions: Map[String, String]): Seq[(File, String)] = {
-    (for {
-      r <- runtimeClasspath
-      if r.data.isFile
-      moduleID = r.get(Keys.moduleID.key)
-      exclude = moduleID match {
-        case None => false
-        case Some(artifact) =>
-          val name = s"${artifact.organization}.${artifact.name}"
-          exclusions.get(name) match {
-            case None => false
-            case Some(debRevision) =>
-              if (debRevision == artifact.revision) true
-              else throw new RuntimeException(s"Found a version conflict of '$name'! DEB revision: $debRevision, in classpath: ${artifact.revision}")
-          }
-      }
-      if !exclude
-    } yield r.data -> ("lib/" + getJarFullFilename(r))).distinct
+  private def excludeProvidedArtifacts(runtimeClasspath: Classpath,
+                                       exclusions: Map[String, String]): (Map[File, String], Map[String, (String, String)]) = {
+    val initJarMapping = Map.empty[File, String]
+    val initConflicts  = Map.empty[String, (String, String)]
+    runtimeClasspath.foldLeft((initJarMapping, initConflicts)) {
+      case (r @ (jarMapping, conflicts), x) if x.data.isFile =>
+        x.get(Keys.moduleID.key) match {
+          case None => r
+          case Some(artifact) =>
+            val name = s"${artifact.organization}.${artifact.name}"
+            exclusions.get(name) match {
+              case None => (jarMapping.updated(x.data, "lib/" + getJarFullFilename(x)), conflicts)
+              case Some(debRevision) =>
+                if (debRevision == artifact.revision) r
+                else (jarMapping, conflicts.updated(name, (debRevision, artifact.revision)))
+            }
+        }
+      case (r, _) => r
+    }
   }
 
   private def filesInDeb(file: File): List[String] = {

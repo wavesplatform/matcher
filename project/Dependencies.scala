@@ -8,10 +8,11 @@ object Dependencies {
     val akka     = "2.6.1"
     val akkaHttp = "10.1.11"
 
-    val scalaTest  = "3.1.0"
-    val scalaCheck = "1.14.3"
-    val scalaMock  = "4.4.0"
-    val diffx      = "0.3.16"
+    val scalaTest          = "3.1.0"
+    val scalaCheck         = "1.14.3"
+    val scalaTestPlusCheck = "3.1.0.1"
+    val scalaMock          = "4.4.0"
+    val diffx              = "0.3.16"
 
     val cats              = "2.0.0"
     val catsTaglessMacros = "0.11"
@@ -28,9 +29,8 @@ object Dependencies {
     val slf4j   = "1.7.30"
     val janino  = "3.1.0"
 
-    val silencer           = "1.4.4"
+    val silencer = "1.4.4"
 
-    // TODO
     val kamonCore          = "1.1.6"
     val kamonInfluxDb      = "1.0.3"
     val kamonSystemMetrics = "1.0.1"
@@ -80,12 +80,11 @@ object Dependencies {
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
+  private val scalaTestPlusCheck   = "org.scalatestplus" %% "scalacheck-1-14" % Version.scalaTestPlusCheck
   private val scalaMock            = "org.scalamock" %% "scalamock" % Version.scalaMock
   private val diffx                = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore             = catsModule("core")
   private val catsTaglessMacros    = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
-
-  // TODO
   private val kindProjector        = compilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
   private val betterMonadicFor     = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
   private val mouse                = "org.typelevel" %% "mouse" % Version.mouse
@@ -139,12 +138,13 @@ object Dependencies {
     akkaModule("akka-http-testkit", Version.akkaHttp),
     scalaTest,
     scalaCheck,
+    scalaTestPlusCheck,
     scalaMock
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
 
-  val enforcedVersions = Def.setting(
+  val globalEnforcedVersions = Def.setting(
     Seq(
       akkaActor,
       akkaHttp,
@@ -210,7 +210,7 @@ object Dependencies {
       wavesJ
     ) ++ testContainers
 
-    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck)
+    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck)
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
       julToSlf4j,
@@ -218,7 +218,7 @@ object Dependencies {
       grpcScalaPb
     )
 
-    lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
+    lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
       julToSlf4j,

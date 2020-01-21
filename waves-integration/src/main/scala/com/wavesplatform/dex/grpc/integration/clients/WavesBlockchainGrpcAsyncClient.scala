@@ -14,8 +14,8 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.Spen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
-import com.wavesplatform.dex.grpc.integration.protobuf.ToPbConversions._
-import com.wavesplatform.dex.grpc.integration.protobuf.ToVanillaConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.DexToPbConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.PbToDexConversions._
 import com.wavesplatform.dex.grpc.integration.services.RunScriptResponse.Result
 import com.wavesplatform.dex.grpc.integration.services._
 import io.grpc.ManagedChannel

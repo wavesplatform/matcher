@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.utils._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
 
-object ToVanillaConversions {
+object PbToDexConversions {
 
   implicit class PbByteStringOps(val self: PbByteString) extends AnyVal {
     def toVanilla: VByteStr        = VByteStr(self.toByteArray)

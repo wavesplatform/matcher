@@ -3,9 +3,9 @@ package com.wavesplatform.dex.smart
 import cats.Id
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.Log
@@ -13,12 +13,12 @@ import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType, OrderV1}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.{FreeSpecLike, Matchers}
+import org.scalatest.freespec.AnyFreeSpecLike
+import org.scalatest.matchers.should.Matchers
 
 import scala.util.Try
 
-class MatcherScriptRunnerSpecification extends FreeSpecLike with Matchers with TransactionGen with NoShrink {
+class MatcherScriptRunnerSpecification extends AnyFreeSpecLike with Matchers {
 
   private val sampleOrder = OrderV1(
     sender = KeyPair("test".getBytes()),

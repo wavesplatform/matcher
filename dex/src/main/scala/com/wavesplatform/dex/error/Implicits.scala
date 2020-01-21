@@ -76,7 +76,7 @@ object Implicits {
   implicit val priceWrites = decimalWrites.contramap[Price](_.volume)
 
   implicit def listWrites[T: Writes]: Writes[List[T]] = Writes.iterableWrites2[T, List[T]]
-  implicit def setWrites[T: Writes]: Writes[Set[T]]   = listWrites[T].contramap[Set[T]](_.toList)
+  implicit def setWrites[T: Writes]: Writes[Set[T]]   = Writes.iterableWrites2[T, Set[T]]
 
   implicit class ErrorInterpolator(sc: StringContext) {
 

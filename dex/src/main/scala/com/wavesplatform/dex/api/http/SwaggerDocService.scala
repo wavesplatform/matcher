@@ -6,7 +6,6 @@ import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.dex.Version
 import io.swagger.models.{Scheme, Swagger}
 
-// TODO materializer?
 class SwaggerDocService(val actorSystem: ActorSystem, val apiClasses: Set[Class[_]], override val host: String)
     extends SwaggerHttpService {
 

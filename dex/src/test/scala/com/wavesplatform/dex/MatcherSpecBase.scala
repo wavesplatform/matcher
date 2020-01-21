@@ -439,25 +439,4 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
 
     Order.sign(correctedOrder, sender)
   }
-
-  val exchangeTransactionGen: Gen[ExchangeTransaction] = for {
-    sender1                 <- accountGen
-    sender2                 <- accountGen
-    assetPair               <- assetPairGen
-    buyerAnotherAsset       <- arbitraryAssetGen
-    sellerAnotherAsset      <- arbitraryAssetGen
-    buyerMatcherFeeAssetId  <- Gen.oneOf(assetPair.amountAsset, assetPair.priceAsset, buyerAnotherAsset, None)
-    sellerMatcherFeeAssetId <- Gen.oneOf(assetPair.amountAsset, assetPair.priceAsset, sellerAnotherAsset, None)
-    r <- Gen.oneOf(
-      exchangeV1GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset),
-      exchangeV2GeneratorP(
-        buyer = sender1,
-        seller = sender2,
-        amountAssetId = assetPair.amountAsset,
-        priceAssetId = assetPair.priceAsset,
-        buyMatcherFeeAssetId = buyerMatcherFeeAssetId,
-        sellMatcherFeeAssetId = sellerMatcherFeeAssetId
-      )
-    )
-  } yield r
 }

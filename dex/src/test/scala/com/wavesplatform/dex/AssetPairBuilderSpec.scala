@@ -11,14 +11,15 @@ import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
-class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
+class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
 
   import AssetPairBuilderSpec._
 

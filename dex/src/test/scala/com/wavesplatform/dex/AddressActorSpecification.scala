@@ -18,13 +18,15 @@ import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.time.NTPTime
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.Future
 
 class AddressActorSpecification
     extends TestKit(ActorSystem("AddressActorSpecification"))
-    with WordSpecLike
+    with AnyWordSpecLike
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender

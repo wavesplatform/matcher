@@ -23,8 +23,8 @@ import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.dex.{MatcherSpecBase, _}
 import monix.reactive.subjects.Subject
-import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
+import org.scalatest.propspec.AnyPropSpecLike
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Future}
@@ -76,7 +76,7 @@ import scala.math.BigDecimal.RoundingMode.CEILING
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
 class ReservedBalanceSpecification
-    extends PropSpecLike
+    extends AnyPropSpecLike
     with MatcherSpecLike
     with WithDB
     with MatcherSpecBase

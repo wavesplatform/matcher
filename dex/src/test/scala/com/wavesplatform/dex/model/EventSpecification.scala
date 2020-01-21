@@ -5,9 +5,10 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 
-class EventSpecification extends FreeSpec with Matchers with MatcherSpecBase {
+class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase {
   "Proper rounding scenario 1" in {
     val pair      = AssetPair(Waves, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))

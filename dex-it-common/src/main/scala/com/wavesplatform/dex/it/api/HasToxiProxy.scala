@@ -11,6 +11,7 @@ trait HasToxiProxy { self: BaseContainersKit =>
   private val container: ToxiproxyContainer = new ToxiproxyContainer()
     .withNetwork(network)
     .withNetworkAliases(toxiProxyHostName)
+    .withExposedPorts(8666)
     .withCreateContainerCmdModifier { cmd =>
       cmd withName toxiProxyHostName
       cmd withIpv4Address getIp(13)

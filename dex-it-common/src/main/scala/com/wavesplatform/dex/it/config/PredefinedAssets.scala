@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.config
 
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.it.config.PredefinedAccounts._
 import com.wavesplatform.dex.it.waves.Implicits._
@@ -42,4 +42,6 @@ trait PredefinedAssets {
 
   val ForbiddenAssetId: ByteStr   = ByteStr.decodeBase58("FdbnAsset").get
   val ForbiddenAsset: IssuedAsset = IssuedAsset(ForbiddenAssetId)
+
+  implicit val assetDecimalsMap: Map[Asset, Int] = Map(Waves -> 8, usd -> 2, wct -> 2, eth -> 8, btc -> 8)
 }

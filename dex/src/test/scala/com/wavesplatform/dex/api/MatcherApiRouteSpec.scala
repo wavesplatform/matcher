@@ -4,7 +4,6 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
-import akka.stream.Materializer
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
@@ -26,8 +25,6 @@ import scala.concurrent.Future
 import scala.util.Random
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
-
-  private implicit val mat: Materializer = Materializer.matFromSystem
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))

@@ -1,13 +1,14 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.OrderInfoSpec.OrderExt
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OrderInfoSpec extends FreeSpec with Matchers with MatcherSpecBase with PropertyChecks with NoShrink {
+class OrderInfoSpec extends AnyFreeSpec with Matchers with MatcherSpecBase with PropertyChecks with NoShrink {
   private def finalizedOrderInfoGen(o: Order, orderInfoVersion: Byte): Gen[OrderInfo[OrderStatus.Final]] =
     for {
       filledAmount <- Gen.choose(0, o.amount)

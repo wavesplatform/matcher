@@ -13,6 +13,8 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecu
 import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalatest._
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.propspec.AnyPropSpecLike
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -20,7 +22,7 @@ import scala.reflect.ClassTag
 
 class OrderHistoryBalanceSpecification
     extends TestKit(ActorSystem())
-    with PropSpecLike
+    with AnyPropSpecLike
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterEach

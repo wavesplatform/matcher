@@ -4,6 +4,10 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
+// Scalafix
+scalafixDependencies in ThisBuild += "org.scalatest" %% "autofix" % "3.1.0.0"
+addCompilerPlugin(scalafixSemanticdb)
+
 // Used in unit and integration tests
 lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
 
@@ -79,7 +83,8 @@ inScope(Global)(
       "-Xlint",
       "-Ypartial-unification",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Yrangepos" // required for scalafix
     ),
     crossPaths := false,
     scalafmtOnCompile := false,

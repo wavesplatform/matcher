@@ -417,7 +417,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
       _ <- {
         log.info("Preparing HTTP service ...")
-        // Lazily initializes matcherActor, so it must be after loadAllKnownAssets
+        // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
 
         log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")

@@ -192,7 +192,8 @@ object Dependencies {
       kamonModule("influxdb", Version.kamonInfluxDb),
       kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
-      commonsNet
+      commonsNet,
+      "org.webjars" % "swagger-ui" % "3.24.3"
     ) ++ testKit ++ quill ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit

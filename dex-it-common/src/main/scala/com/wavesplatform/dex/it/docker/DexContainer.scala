@@ -30,9 +30,10 @@ final case class DexContainer private (override val internalIp: String, underlyi
     extends BaseContainer(DexContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
+  def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
 
-  override def api: DexApi[Id]          = fp.sync { DexApi[Try](apiKey, cachedRestApiAddress.get()) }
-  override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, cachedRestApiAddress.get())
+  override def api: DexApi[Id]          = fp.sync { DexApi[Try](apiKey, restApiAddress) }
+  override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
 }
 
 object DexContainer extends ScorexLogging {

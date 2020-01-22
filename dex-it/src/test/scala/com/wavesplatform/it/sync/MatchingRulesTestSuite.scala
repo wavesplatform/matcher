@@ -7,7 +7,9 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.config.DexTestConfig.createAssetPair
 
 class MatchingRulesTestSuite extends MatcherSuiteBase {
 
@@ -65,10 +67,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
        """.stripMargin
     )
 
+  private val IssueResults(asset0Tx, _, twoDecimalAsset)     = mkIssueExtended(alice, "twoDecimalAsset", defaultAssetQuantity, 2, smartIssueFee)
+
   override protected def beforeAll(): Unit = {
     // A custom initialization to guarantee that assets are in the blockchain
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx)
+    broadcastAndAwait(IssueUsdTx, IssueWctTx, IssueBtcTx, asset0Tx)
     dex1.start()
   }
 
@@ -86,9 +90,17 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
 
   val (amount, price) = (1000L, PriceConstant)
 
+  "Tick size should have max 8 decimals" in {
+    val twoDecimalWavesPair = createAssetPair(twoDecimalAsset, Waves)
+    placeAndAwaitAtDex( mkOrder(bob, twoDecimalWavesPair, BUY, amount, price, matcherFee))
+    dex1.api.tradingPairInfo(twoDecimalWavesPair).get.matchingRules.tickSize shouldBe "0.00000001"
+    dex1.api.cancelAll(bob)
+  }
+
   // offset is 0, after test - 6
   "Tick size isn't set" in {
     dex1.api.allOrderBooks.markets.size shouldBe 0
+
     Seq(wctUsdPair -> "0.00000001", wavesBtcPair -> "0.00000001", wavesUsdPair -> "0.01").foreach {
       case (pair, defaultTs) =>
         dex1.api.orderBookInfo(pair).matchingRules.tickSize shouldBe defaultTs

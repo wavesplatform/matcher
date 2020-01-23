@@ -21,40 +21,34 @@ trait WavesEntitiesGen {
     1  -> Gen.const(Waves)
   )
 
-  val orderSideGen: Gen[OrderType]      = Gen.oneOf(OrderType.BUY, OrderType.SELL)
-  val orderSenderGen: Gen[KeyPair]      = bytes32gen.map(xs => KeyPair(ByteStr(xs)))
-  val orderMatcherGen: Gen[PublicKey]   = orderSenderGen.map(x => x)
-  val orderAssetPairGen: Gen[AssetPair] = Gen.zip(assetGen, assetGen).map(Function.tupled(AssetPair.apply))
-  val orderAmountGen: Gen[Long]         = Gen.choose(1, 1000L)
-  val orderPriceGen: Gen[Long]          = Gen.choose(1, 1000L).map(_ * Order.PriceConstant)
-  val orderTimestampGen: Gen[Long]      = Gen.choose(1, Long.MaxValue - Order.MaxLiveTime)
-  val orderTtlGen: Gen[Long]            = Gen.choose(1, Order.MaxLiveTime)
-  val orderFeeGen: Gen[Long]            = Gen.choose(1, Order.MaxAmount)
-  val orderFeeAssetGen: Gen[Asset]      = assetGen
-  val orderVersionGen: Gen[Byte]        = Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
+  val keyPairGen: Gen[KeyPair]     = bytes32gen.map(xs => KeyPair(ByteStr(xs)))
+  val publicKeyGen: Gen[PublicKey] = keyPairGen.map(x => x)
+  val assetPairGen: Gen[AssetPair] = Gen.zip(assetGen, assetGen).map(Function.tupled(AssetPair.apply))
+  val timestampGen: Gen[Long]      = Gen.choose(1, Long.MaxValue - Order.MaxLiveTime)
+
+  val orderSideGen: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
+  val orderAmountGen: Gen[Long]    = Gen.choose(1, 1000L)
+  val orderPriceGen: Gen[Long]     = Gen.choose(1, 1000L).map(_ * Order.PriceConstant)
+  val orderTtlGen: Gen[Long]       = Gen.choose(1, Order.MaxLiveTime)
+  val orderFeeGen: Gen[Long]       = Gen.choose(1, Order.MaxAmount)
 
   def orderAndSenderGen(sideGen: Gen[OrderType] = orderSideGen,
-                        senderGen: Gen[KeyPair] = orderSenderGen,
-                        matcherGen: Gen[PublicKey] = orderMatcherGen,
-                        assetPairGen: Gen[AssetPair] = orderAssetPairGen,
-                        amountGen: Gen[Long] = orderAmountGen,
+                        matcherGen: Gen[PublicKey] = publicKeyGen,
+                        assetPairGen: Gen[AssetPair] = assetPairGen,
                         priceGen: Gen[Long] = orderPriceGen,
-                        timestampGen: Gen[Long] = orderTimestampGen,
-                        ttlGen: Gen[Long] = orderTtlGen,
-                        feeGen: Gen[Long] = orderFeeGen,
-                        feeAssetGen: Gen[Asset] = orderFeeAssetGen,
-                        versionGen: Gen[Byte] = orderVersionGen): Gen[(Order, KeyPair)] =
+                        timestampGen: Gen[Long] = timestampGen,
+                        versionGen: Gen[Byte] = Gen.oneOf(1: Byte, 2: Byte, 3: Byte)): Gen[(Order, KeyPair)] =
     for {
       tpe       <- sideGen
-      sender    <- senderGen
+      sender    <- keyPairGen
       matcher   <- matcherGen
       assetPair <- assetPairGen
-      amount    <- amountGen
+      amount    <- orderAmountGen
       price     <- priceGen
       timestamp <- timestampGen
-      ttl       <- ttlGen
-      fee       <- feeGen
-      feeAsset  <- feeAssetGen
+      ttl       <- orderTtlGen
+      fee       <- orderFeeGen
+      feeAsset  <- assetGen
       version   <- versionGen
     } yield {
       val expiration = timestamp + ttl
@@ -64,18 +58,10 @@ trait WavesEntitiesGen {
       (order, sender)
     }
 
-  val exchangeTransactionVersionGen: Gen[Byte]    = Gen.oneOf(1: Byte, 2: Byte)
-  val exchangeTransactionFeeGen: Gen[Long]        = orderFeeGen
-  val exchangeTransactionMatcherGen: Gen[KeyPair] = orderSenderGen
-  val exchangeTransactionTimestampGen: Gen[Long]  = orderTimestampGen
-
-  def exchangeTransactionGen(versionGen: Gen[Byte] = exchangeTransactionVersionGen,
-                             matcherGen: Gen[KeyPair] = exchangeTransactionMatcherGen,
-                             feeGen: Gen[Long] = exchangeTransactionFeeGen,
-                             timestampGen: Gen[Long] = exchangeTransactionTimestampGen): Gen[ExchangeTransaction] = {
+  val exchangeTransactionGen: Gen[ExchangeTransaction] = {
     for {
-      version <- versionGen
-      matcher <- matcherGen
+      version <- Gen.oneOf(1: Byte, 2: Byte)
+      matcher <- keyPairGen
       matcherPublicKeyGen = Gen.const[PublicKey](matcher)
       timestamp <- timestampGen
       orderTimestampGen = Gen.choose(1, 1000L).map(_ + timestamp)
@@ -90,12 +76,14 @@ trait WavesEntitiesGen {
         val priceGen     = Gen.choose(1, buyOrder.price)
         val assetPairGen = Gen.const(buyOrder.assetPair)
         if (version == 1)
-          orderAndSenderGen(sideGen = sideGen,
-                            matcherGen = matcherPublicKeyGen,
-                            assetPairGen = assetPairGen,
-                            priceGen = priceGen,
-                            versionGen = Gen.const(1: Byte),
-                            timestampGen = orderTimestampGen)
+          orderAndSenderGen(
+            sideGen = sideGen,
+            matcherGen = matcherPublicKeyGen,
+            assetPairGen = assetPairGen,
+            priceGen = priceGen,
+            versionGen = Gen.const(1: Byte),
+            timestampGen = orderTimestampGen
+          )
         else
           orderAndSenderGen(sideGen = sideGen,
                             matcherGen = matcherPublicKeyGen,
@@ -103,7 +91,7 @@ trait WavesEntitiesGen {
                             priceGen = priceGen,
                             timestampGen = orderTimestampGen)
       }
-      fee       <- feeGen
+      fee <- orderFeeGen
     } yield {
       val amount = math.min(buyOrder.amount, sellOrder.amount)
       val price  = buyOrder.price

@@ -14,7 +14,7 @@ class ConversionsSuite extends AnyFreeSpecLike with ScalaCheckDrivenPropertyChec
     order.toPB.toVanilla shouldBe order
   }
 
-  "exchangeTx" in forAll(exchangeTransactionGen()) { tx =>
+  "exchangeTx" in forAll(exchangeTransactionGen) { tx =>
     tx.toPB.toVanilla.right.get shouldBe tx
   }
 }

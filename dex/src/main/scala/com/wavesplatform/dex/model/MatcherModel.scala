@@ -307,6 +307,11 @@ object Events {
 
   sealed trait Event
 
+  /**
+    *  In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`
+    * @param maxSubmittedFee limited by base-taker-fee
+    * @param maxCounterFee limited by base-maker-fee
+    */
   case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, maxSubmittedFee: Long, maxCounterFee: Long) extends Event {
 
     lazy val executedAmount: Long             = AcceptedOrder.executedAmount(submitted, counter)

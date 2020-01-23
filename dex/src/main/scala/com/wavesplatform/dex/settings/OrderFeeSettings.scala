@@ -23,13 +23,7 @@ object OrderFeeSettings {
     def getJson(matcherAccountFee: Long, ratesJson: JsObject): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
-          case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
-            "dynamic" -> Json.obj(
-              "baseFee"              -> (baseFee + matcherAccountFee),
-              "zeroMakerDoubleTaker" -> zeroMakerDoubleTaker,
-              "rates"                -> ratesJson
-            )
-          case ds: DynamicSettings1 =>
+          case ds: DynamicSettings =>
             "dynamic" -> Json.obj(
               "baseFee" -> (ds.maxBaseFee + matcherAccountFee),
               "rates"   -> ratesJson
@@ -49,33 +43,28 @@ object OrderFeeSettings {
     }
   }
 
-  final case class DynamicSettings1(baseFeeMaker: Long, baseFeeTaker: Long) extends OrderFeeSettings {
-    val maxBaseFee: Long = math.max(baseFeeMaker, baseFeeTaker)
+  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long) extends OrderFeeSettings {
+    val maxBaseFee: Long = math.max(baseMakerFee, baseTakerFee)
   }
 
-  final case class DynamicSettings(baseFee: Long, zeroMakerDoubleTaker: Boolean) extends OrderFeeSettings
-  final case class FixedSettings(defaultAsset: Asset, minFee: Long)              extends OrderFeeSettings
-  final case class PercentSettings(assetType: AssetType, minFee: Double)         extends OrderFeeSettings
+  object DynamicSettings {
+    def symmetric(baseFee: Long): DynamicSettings = DynamicSettings(baseFee, baseFee)
+  }
+
+  final case class FixedSettings(defaultAsset: Asset, minFee: Long)      extends OrderFeeSettings
+  final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     def getPrefixByMode(mode: FeeMode): String = s"$path.$mode"
 
-    def validateDynamicSettings1: ErrorsListOr[DynamicSettings1] = {
-      val prefix = getPrefixByMode(FeeMode.DYNAMIC1)
-      (
-        cfgValidator.validateByPredicate[Long](s"$prefix.base-fee-maker")(predicate = fee => 0 < fee, errorMsg = s"required 0 < maker base fee"),
-        cfgValidator.validateByPredicate[Long](s"$prefix.base-fee-taker")(predicate = fee => 0 < fee, errorMsg = s"required 0 < taker base fee"),
-      ) mapN DynamicSettings1
-    }
-
     def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
       val prefix = getPrefixByMode(FeeMode.DYNAMIC)
       (
-        cfgValidator.validateByPredicate[Long](s"$prefix.base-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base fee"),
-        cfgValidator.validateWithDefault[Boolean](s"$prefix.zero-maker-double-taker", false)
-      ) mapN DynamicSettings
+        cfgValidator.validateByPredicate[Long](s"$prefix.base-maker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base maker fee"),
+        cfgValidator.validateByPredicate[Long](s"$prefix.base-taker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base taker fee"),
+      ) mapN DynamicSettings.apply
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {
@@ -101,10 +90,9 @@ object OrderFeeSettings {
     }
 
     def getSettingsByMode(mode: FeeMode): ErrorsListOr[OrderFeeSettings] = mode match {
-      case FeeMode.DYNAMIC  => validateDynamicSettings
-      case FeeMode.DYNAMIC1 => validateDynamicSettings1
-      case FeeMode.FIXED    => validateFixedSettings
-      case FeeMode.PERCENT  => validatePercentSettings
+      case FeeMode.DYNAMIC => validateDynamicSettings
+      case FeeMode.FIXED   => validateFixedSettings
+      case FeeMode.PERCENT => validatePercentSettings
     }
 
     cfgValidator.validate[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
@@ -126,8 +114,7 @@ object AssetType extends Enumeration {
 object FeeMode extends Enumeration {
   type FeeMode = Value
 
-  val DYNAMIC  = Value("dynamic")
-  val DYNAMIC1 = Value("dynamic1")
-  val FIXED    = Value("fixed")
-  val PERCENT  = Value("percent")
+  val DYNAMIC = Value("dynamic")
+  val FIXED   = Value("fixed")
+  val PERCENT = Value("percent")
 }

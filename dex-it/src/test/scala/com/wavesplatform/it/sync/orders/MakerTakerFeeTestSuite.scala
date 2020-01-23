@@ -19,10 +19,10 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
        |waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-fee {
-       |    mode = dynamic1
-       |    dynamic1 {
-       |      base-fee-maker = 100000
-       |      base-fee-taker = 500000
+       |    mode = dynamic
+       |    dynamic {
+       |      base-maker-fee = 100000
+       |      base-taker-fee = 500000
        |    }
        |  }
        |}
@@ -31,16 +31,12 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
+
     broadcastAndAwait(IssueUsdTx, IssueEthTx)
     broadcastAndAwait(mkTransfer(alice, bob, 100.eth, eth))
+
     dex1.start()
     dex1.api.upsertRate(eth, 0.00567593)
-  }
-
-  override protected def afterEach(): Unit = {
-    super.afterEach()
-    dex1.api.cancelAll(maker)
-    dex1.api.cancelAll(taker)
   }
 
   "DEX with non-default DynamicSettings " - {
@@ -58,20 +54,26 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
     }
 
     "should charge different fees for makers (SELL) and takers (BUY)" in {
+      // format: off
       forAll(
         Table(
-          ("M amount", "M fee", "M fee asset", "T amount", "T fee", "T fee asset", "M expected balance change", "T expected balance change", "is T market"),
-          (1.waves, 0.005, Waves, 1.waves, 0.005, Waves, -1.001.waves, 0.995.waves, false), // symmetric
-          (2.waves, 0.005, Waves, 10.waves, 0.005, Waves, -2.001.waves, 1.999.waves, false), // little maker - big taker
-          (10.waves, 0.005, Waves, 2.waves, 0.005, Waves, -2.0002.waves, 1.995.waves, false), // big maker - little taker
-          (1.waves, 0.005, Waves, 1.waves, 0.005, Waves, -1.001.waves, 0.995.waves, true), // symmetric
-          (2.waves, 0.005, Waves, 10.waves, 0.005, Waves, -2.001.waves, 1.999.waves, true), // little maker - big taker
-          (10.waves, 0.005, Waves, 2.waves, 0.005, Waves, -2.0002.waves, 1.995.waves, true), // big maker - little taker
+          ("M amt", "M fee", "M fee asset", "T amt", "T fee", "T fee asset", "M expected balance change", "T expected balance change", "is T market"),
+          (1.waves,  0.005, Waves, 1.waves,  0.005, Waves, -1.001.waves,  0.995.waves, false), // symmetric
+          (2.waves,  0.005, Waves, 10.waves, 0.005, Waves, -2.001.waves,  1.999.waves, false), // little maker - big taker
+          (10.waves, 0.005, Waves, 2.waves,  0.005, Waves, -2.0002.waves, 1.995.waves, false), //    big maker - little taker
+          (1.waves,  0.005, Waves, 1.waves,  0.005, Waves, -1.001.waves,  0.995.waves, true),  // symmetric, MARKET taker
+          (2.waves,  0.005, Waves, 10.waves, 0.005, Waves, -2.001.waves,  1.999.waves, true),  // little maker - big MARKET taker
+          (10.waves, 0.005, Waves, 2.waves,  0.005, Waves, -2.0002.waves, 1.995.waves, true),  //    big maker - little MARKET taker
           /** fee in ETH, 0.001.waves = 0.00000568.eth, 0.005.waves = 0.00002838.eth */
-          (1.waves, 0.00002838, eth, 1.waves, 0.00002838, eth, -0.00000568.eth, -0.00002838.eth, false), // symmetric, 0.001.waves = 0.00000568.eth, 0.005.waves = 0.00002838.eth,
+          (1.waves,  0.00002838, eth, 1.waves,  0.00002838, eth, -0.00000568.eth, -0.00002838.eth, false), // symmetric
+          (2.waves,  0.00002838, eth, 10.waves, 0.00002838, eth, -0.00000568.eth, -0.00000567.eth, false), // little maker - big taker
+          (10.waves, 0.00002838, eth, 2.waves,  0.00002838, eth, -0.00000113.eth, -0.00002838.eth, false), //    big maker - little taker
+          (1.waves,  0.00002838, eth, 1.waves,  0.00002838, eth, -0.00000568.eth, -0.00002838.eth, true),  // symmetric, MARKET taker
+          (2.waves,  0.00002838, eth, 10.waves, 0.00002838, eth, -0.00000568.eth, -0.00000567.eth, true),  // little maker - big MARKET taker
+          (10.waves, 0.00002838, eth, 2.waves,  0.00002838, eth, -0.00000113.eth, -0.00002838.eth, true)   //    big maker - little MARKET taker
         )
       ) { (mAmt: Long, mFee: Double, mFeeAsset: Asset, tAmt: Long, tFee: Double, tFeeAsset: Asset, mExpectedBalanceChange: Long, tExpectedBalanceChange: Long, isTMarket: Boolean) =>
-
+        // format: on
         val normalizedMakerFee = normalizeAmountAndFee(mFee, assetDecimalsMap(mFeeAsset))
         val normalizedTakerFee = normalizeAmountAndFee(tFee, assetDecimalsMap(tFeeAsset))
 

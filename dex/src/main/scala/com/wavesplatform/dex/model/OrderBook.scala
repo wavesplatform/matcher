@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings1, OrderFeeSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

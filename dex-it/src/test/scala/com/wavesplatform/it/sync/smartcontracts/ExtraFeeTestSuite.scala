@@ -14,7 +14,10 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     ConfigFactory.parseString(
       s"""waves.dex.order-fee {
        |  mode = dynamic
-       |  dynamic.base-fee = $tradeFee
+       |  dynamic {
+       |    base-maker-fee = $tradeFee
+       |    base-taker-fee = $tradeFee
+       |  }
        |}
        """.stripMargin
     )

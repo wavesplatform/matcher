@@ -17,8 +17,8 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        |order-fee {
        |  mode = percent
        |  dynamic {
-       |    base-fee = 300000
-       |    zero-maker-double-taker = true
+       |    base-maker-fee = 200000
+       |    base-maker-fee = 700000
        |  }
        |  fixed {
        |    asset = WAVES

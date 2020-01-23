@@ -33,7 +33,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, DynamicSettings1, OrderFeeSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import mouse.any.anySyntaxMouse
@@ -531,17 +531,16 @@ object Matcher extends ScorexLogging {
       }
   }
 
-  def getMakerTakerFee(orderFeeSettings: OrderFeeSettings, assetsCache: AssetsStorage, rateCache: RateCache)(submitted: AcceptedOrder,
-                                                                                                             counter: LimitOrder): (Long, Long) =
-    orderFeeSettings match {
-      case DynamicSettings1(baseFeeMaker, baseFeeTaker) =>
-        import OrderValidator.convertFeeByAssetRate
-        (
-          for {
-            maxCounterFee   <- convertFeeByAssetRate(baseFeeMaker, counter.feeAsset, assetsCache.unsafeGet(counter.feeAsset).decimals, rateCache)
-            maxSubmittedFee <- convertFeeByAssetRate(baseFeeTaker, submitted.feeAsset, assetsCache.unsafeGet(submitted.feeAsset).decimals, rateCache)
-          } yield maxCounterFee -> maxSubmittedFee
-        ).explicitGet()
-      case _ => counter.matcherFee -> submitted.matcherFee
-    }
+  /** Calculates maker and taker fees. For DynamicSettings corrects values by rate of each fee asset */
+  def getMakerTakerFee(ofs: OrderFeeSettings, as: AssetsStorage, rc: RateCache)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = ofs match {
+    case DynamicSettings(baseFeeMaker, baseFeeTaker) =>
+      import OrderValidator.convertFeeByAssetRate
+      (
+        for {
+          makerFee <- convertFeeByAssetRate(baseFeeMaker, c.feeAsset, as.unsafeGet(c.feeAsset).decimals, rc)
+          takerFee <- convertFeeByAssetRate(baseFeeTaker, s.feeAsset, as.unsafeGet(s.feeAsset).decimals, rc)
+        } yield makerFee -> takerFee
+      ).explicitGet()
+    case _ => c.matcherFee -> s.matcherFee
+  }
 }

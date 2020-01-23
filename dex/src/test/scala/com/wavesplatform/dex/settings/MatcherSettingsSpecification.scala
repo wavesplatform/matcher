@@ -80,9 +80,9 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.processConsumedTimeout shouldBe 663.seconds
 
     settings.orderFee match {
-      case DynamicSettings(baseFee, zeroMakerDoubleTaker) =>
-        baseFee shouldBe 300000
-        zeroMakerDoubleTaker shouldBe true
+      case DynamicSettings(baseMakerFee, baseTakerFee) =>
+        baseMakerFee shouldBe 200000
+        baseTakerFee shouldBe 700000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000
@@ -157,7 +157,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
          |order-fee {
          |  mode = $invalidModeName
          |  dynamic {
-         |    base-fee = 300000
+         |    base-maker-fee = 300000
+         |    base-taker-fee = 300000
          |  }
          |  fixed {
          |    asset = WAVES
@@ -175,7 +176,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
          |order-fee {
          |  mode = percent
          |  dynamic {
-         |    base-fee = 300000
+         |    base-maker-fee = 300000
+         |    base-taker-fee = 300000
          |  }
          |  fixed {
          |    asset = WAVES
@@ -193,7 +195,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
          |order-fee {
          |  mode = fixed
          |  dynamic {
-         |    base-fee = 300000
+         |    base-maker-fee = 300000
+         |    base-taker-fee = 300000
          |  }
          |  fixed {
          |    asset = ;;;;
@@ -211,7 +214,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
          |order-fee {
          |  mode = dynamic
          |  dynamic {
-         |    base-fee = -350000
+         |    base-maker-fee = -350000
+         |    base-taker-fee = 350000
          |  }
          |  fixed {
          |    asset = ;;;;
@@ -246,7 +250,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
           "Invalid setting order-fee.fixed.min-fee value: -300000 (required 0 < fee)")
 
     settingsInvalidFeeInDynamicMode shouldBe Left(
-      s"Invalid setting order-fee.dynamic.base-fee value: -350000 (required 0 < base fee)"
+      s"Invalid setting order-fee.dynamic.base-maker-fee value: -350000 (required 0 < base maker fee)"
     )
   }
 

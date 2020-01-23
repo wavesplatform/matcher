@@ -568,7 +568,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             "filledFee" -> oi.status.filledFee,
             "feeAsset"  -> oi.feeAsset,
             "status"    -> oi.status.name,
-            "assetPair" -> oi.assetPair.json
+            "assetPair" -> Json.toJsObject(oi.assetPair)
           )
       }
     }

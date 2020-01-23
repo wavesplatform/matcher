@@ -120,7 +120,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
       "sender"           -> senderPublicKey.stringRepr,
       "senderPublicKey"  -> Base58.encode(senderPublicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-      "assetPair"        -> assetPair.json,
+      "assetPair"        -> Json.toJsObject(assetPair),
       "orderType"        -> orderType.toString,
       "amount"           -> amount,
       "price"            -> price,

@@ -11,19 +11,6 @@ import play.api.libs.json._
 import scala.util.{Failure, Success}
 
 package object json {
-  implicit val assetFormat: Format[Asset] = Format(
-    fjs = Reads {
-      case JsNull | JsString("") => JsSuccess(Waves)
-      case JsString(s) =>
-        AssetPair.extractAssetId(s) match {
-          case Failure(_)       => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
-          case Success(assetId) => JsSuccess(assetId)
-        }
-      case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
-    },
-    tjs = Writes(_.maybeBase58Repr.fold[JsValue](JsNull)(JsString))
-  )
-
   implicit val assetRatesFormat: Format[Map[Asset, Double]]  = assetMapFormat[Double]
   implicit val assetBalancesFormat: Format[Map[Asset, Long]] = assetMapFormat[Long]
 
@@ -65,24 +52,6 @@ package object json {
     )
   }
 
-  implicit val byteStrFormat: Format[ByteStr] = Format(
-    fjs = Reads {
-      case JsString(str) =>
-        ByteStr.decodeBase58(str) match {
-          case Success(x) => JsSuccess(x)
-          case Failure(e) => JsError(e.getMessage)
-        }
-
-      case _ => JsError("Can't read ByteStr")
-    },
-    tjs = Writes(x => JsString(x.toString))
-  )
-
-  implicit val assetPairFormat: Format[AssetPair] = (
-    (JsPath \ "amountAsset").formatWithDefault[Asset](Waves)(assetFormat) and
-      (JsPath \ "priceAsset").formatWithDefault[Asset](Waves)(assetFormat)
-  )(AssetPair.apply, Function.unlift(AssetPair.unapply))
-
   implicit val transactionFormat: Format[Transaction] = Format[Transaction](
     json => TransactionFactory.fromSignedRequest(json).fold(e => JsError(s"Can't parse as transaction: $e, json: $json"), JsSuccess(_)),
     _.json()
@@ -97,9 +66,4 @@ package object json {
   implicit val proofsReads: Reads[Proofs] = Reads.seq[ByteStr].map(Proofs(_))
 
   implicit val orderReads: Reads[Order] = OrderJson.orderReads
-
-  implicit val orderTypeReads: Reads[OrderType] = Reads {
-    case JsString(x) => JsSuccess(OrderType(x))
-    case x           => JsError(s"Can't parse '$x' as OrderType")
-  }
 }

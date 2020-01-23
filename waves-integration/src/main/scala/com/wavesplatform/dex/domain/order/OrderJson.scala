@@ -129,9 +129,6 @@ object OrderJson {
     r(AssetPair(_, _))
   }
 
-  implicit val orderTypeReads: Reads[OrderType] =
-    JsPath.read[String].map(OrderType.apply)
-
   private val orderV1V2Reads: Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and

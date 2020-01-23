@@ -46,19 +46,10 @@ object Implicits {
   implicit def listShow[T: Show]: Show[List[T]] = traverseShow[List, T]
   implicit def setShow[T: Show]: Show[Set[T]]   = listShow[T].contramap[Set[T]](_.toList)
 
-  implicit val byteWrites    = Writes.ByteWrites
-  implicit val intWrites     = Writes.IntWrites
-  implicit val longWrites    = Writes.LongWrites
-  implicit val stringWrites  = Writes.StringWrites
-  implicit val booleanWrites = Writes.BooleanWrites
+  implicit val stringWrites = Writes.StringWrites
 
   implicit val doubleWrites            = stringWrites.contramap[Double](d => formatValue(d))
   implicit val decimalWrites           = stringWrites.contramap[BigDecimal](formatValue)
-  implicit val byteStrWrites           = stringWrites.contramap[ByteStr](_.toString)
-  implicit val assetWrites             = stringWrites.contramap[Asset](_.toString)
-  implicit val assetPairWrites         = Writes[AssetPair](_.json)
-  implicit val publicKeyWrites         = stringWrites.contramap[PublicKey](_.toString)
-  implicit val addressWrites           = stringWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = stringWrites.contramap[BlockchainFeature](_.description)
 
   implicit val amountWrites = Writes[Amount] { amount: Amount =>

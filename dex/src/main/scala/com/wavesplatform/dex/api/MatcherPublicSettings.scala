@@ -1,9 +1,8 @@
 package com.wavesplatform.dex.api
 
 import com.wavesplatform.dex.api.MatcherPublicSettings.OrderFeePublicSettings
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.common.json._
-import com.wavesplatform.transaction.Asset
 import play.api.libs.json._
 
 case class MatcherPublicSettings(priceAssets: Seq[Asset], orderFee: OrderFeePublicSettings, orderVersions: Seq[Byte])

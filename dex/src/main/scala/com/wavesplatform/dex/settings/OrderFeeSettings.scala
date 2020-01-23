@@ -10,10 +10,6 @@ import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.FeeMode.FeeMode
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorsListOr
-import com.wavesplatform.settings.Constants
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{Waves, _}
-import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader

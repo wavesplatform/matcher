@@ -6,7 +6,8 @@ import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{Format, JsObject, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, OFormat}
 
 import scala.annotation.meta.field
 import scala.util.{Success, Try}
@@ -35,11 +36,6 @@ case class AssetPair(@(ApiModelProperty @field)(
 
   def isValid: Validation = (amountAsset != priceAsset) :| "Invalid AssetPair"
   def bytes: Array[Byte]  = amountAsset.byteRepr ++ priceAsset.byteRepr
-
-  def json: JsObject = Json.obj(
-    "amountAsset" -> amountAsset.maybeBase58Repr,
-    "priceAsset"  -> priceAsset.maybeBase58Repr
-  )
 
   def reverse: AssetPair = AssetPair(priceAsset, amountAsset)
 
@@ -78,5 +74,7 @@ object AssetPair {
     res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
   }
 
-  implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
+  implicit val assetPairFormat: OFormat[AssetPair] = (
+    (JsPath \ "amountAsset").formatWithDefault[Asset](Waves) and (JsPath \ "priceAsset").formatWithDefault[Asset](Waves)
+  )(AssetPair.apply, Function.unlift(AssetPair.unapply))
 }

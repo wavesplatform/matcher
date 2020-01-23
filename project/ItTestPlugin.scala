@@ -30,8 +30,9 @@ object ItTestPlugin extends AutoPlugin {
            * f - select the file reporter with output directory
            * F - show full stack traces
            * W - without color
+           * D - show all durations
            */
-          val args        = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
+          val args = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution in Test := true,
@@ -41,10 +42,11 @@ object ItTestPlugin extends AutoPlugin {
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266
-          val javaHomeValue     = javaHome.value
-          val logDirectoryValue = logDirectory.value
-          val envVarsValue      = envVars.value
-          val javaOptionsValue  = javaOptions.value
+          val javaHomeValue          = javaHome.value
+          val logDirectoryValue      = logDirectory.value
+          val envVarsValue           = envVars.value
+          val javaOptionsValue       = javaOptions.value
+          val resourceDirectoryValue = resourceDirectory.value
 
           for {
             group <- testGrouping.value
@@ -60,6 +62,8 @@ object ItTestPlugin extends AutoPlugin {
                   bootJars = Vector.empty[java.io.File],
                   workingDirectory = Option(baseDirectory.value),
                   runJVMOptions = Vector(
+                    s"-Djava.util.logging.config.file=${resourceDirectoryValue / "jul.properties"}",
+                    s"-Dlogback.configurationFile=${resourceDirectoryValue / "logback-test.xml"}",
                     "-Dwaves.it.logging.appender=FILE",
                     s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
                   ) ++ javaOptionsValue,

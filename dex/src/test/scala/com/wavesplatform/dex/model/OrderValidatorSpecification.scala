@@ -1,52 +1,55 @@
 package com.wavesplatform.dex.model
 
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.feature.BlockchainFeatures
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
+import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1, OrderV2}
+import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.time.TestTime
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderOps._
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{Asset, Proofs}
-import com.wavesplatform.utils.randomBytes
-import com.wavesplatform.{NoShrink, WithDB}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrderValidatorSpecification
-    extends WordSpec
+    extends AnyWordSpec
     with WithDB
     with Matchers
-    with MatcherTestData
+    with MatcherSpecBase
     with BeforeAndAfterAll
     with PathMockFactory
     with PropertyChecks
     with NoShrink {
 
-  private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(btc -> 10 * Constants.UnitsInWave))
+  private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(btc -> 10.btc))
 
   private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDescription.decimals
 
@@ -70,7 +73,7 @@ class OrderValidatorSpecification
       }
 
       "v1 order from a scripted account" in forAll(accountGen) { scripted =>
-        portfolioTest(defaultPortfolio) { (ov, bc) =>
+        blockchainTest() { (ov, bc) =>
           assignScript(bc, scripted.toAddress, RunScriptResult.Allowed)
           activate(bc, _ => false)
           awaitResult { ov(newBuyOrder(scripted)) } should produce("AccountFeatureUnsupported")
@@ -78,7 +81,7 @@ class OrderValidatorSpecification
       }
 
       "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
-        portfolioTest(defaultPortfolio) { (ov, bc) =>
+        blockchainTest() { (ov, bc) =>
           assignScript(bc, scripted.toAddress, RunScriptResult.Allowed)
           activate(bc, _ => false)
           awaitResult { ov(newBuyOrder(scripted)) } should produce("AccountFeatureUnsupported")
@@ -86,7 +89,7 @@ class OrderValidatorSpecification
       }
 
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
-        portfolioTest(defaultPortfolio) { (ov, bc) =>
+        blockchainTest() { (ov, bc) =>
           assignScript(bc, scripted.toAddress, RunScriptResult.Denied)
           activate(bc, _ == BlockchainFeatures.SmartAccountTrading.id)
           awaitResult { ov(newBuyOrder(scripted, version = 2)) } should produce("AccountScriptDeniedOrder")
@@ -96,7 +99,7 @@ class OrderValidatorSpecification
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
         val tt       = new TestTime
         val unsigned = newBuyOrder
-        val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
+        val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp + offset).updateSender(pk), pk)
 
         OrderValidator.timeAware(tt)(signed) should produce("WrongExpiration")
       }
@@ -111,7 +114,7 @@ class OrderValidatorSpecification
         OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson) should produce("amount should be > 0")
       }
 
-      "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
+      "order signature is invalid" in blockchainTest() { (ov, bc) =>
         val pk = KeyPair(randomBytes())
 
         assignNoScript(bc, pk.toAddress)
@@ -132,11 +135,10 @@ class OrderValidatorSpecification
         ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
       }
 
-      "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
+      "order price has invalid non-zero trailing decimals" in forAll(assetGen(1), accountGen, Gen.choose(1, 7)) {
         case (amountAsset, sender, amountDecimals) =>
-          portfolioTest(
-            p = Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty),
-            assetDescriptions = getDefaultAssetDescriptions(amountAsset, BriefAssetDescription("AssetName", amountDecimals, hasScript = false))
+          blockchainTest(
+            assetDescriptions = getDefaultAssetDescriptions(amountAsset -> BriefAssetDescription("AssetName", amountDecimals, hasScript = false))
           ) { (ov, bc) =>
             assignNoScript(bc, sender.toAddress)
             assignNoScript(bc, MatcherAccount.toAddress)
@@ -149,9 +151,9 @@ class OrderValidatorSpecification
               ov(
                 buy(
                   AssetPair(amountAsset, Waves),
-                  10 * Constants.UnitsInWave,
+                  10.waves,
                   price,
-                  matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+                  matcherFee = Some(0.003.waves),
                   sender = Some(sender)
                 )
               )
@@ -161,7 +163,7 @@ class OrderValidatorSpecification
 
       "matcherFeeAssetId is blacklisted" in {
         val preconditions = for {
-          matcherFeeAsset <- arbitraryAssetIdGen map (asset => IssuedAsset(asset.compatId.get))
+          matcherFeeAsset <- arbitraryAssetGen map (asset => IssuedAsset(asset.compatId.get))
           (_, order)      <- orderV3WithPredefinedFeeAssetGenerator(Some(matcherFeeAsset))
         } yield order -> matcherFeeAsset
 
@@ -188,7 +190,7 @@ class OrderValidatorSpecification
         val preconditions =
           for {
             order            <- orderV3Generator
-            fixedFeeAsset    <- arbitraryAssetIdGen
+            fixedFeeAsset    <- arbitraryAssetGen
             fixedFeeSettings <- fixedSettingsGenerator(fixedFeeAsset)
           } yield (order, fixedFeeSettings)
 
@@ -205,7 +207,6 @@ class OrderValidatorSpecification
 
       "matcherFeeAssetId specified as WAVES Base58 string" in {
 
-        import com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads
         import play.api.libs.json.Json
 
         val order = Json.fromJson[Order](createOrder(AssetPair(btc, usd), SELL, 100, 3.0).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")).get
@@ -699,7 +700,7 @@ class OrderValidatorSpecification
           def setFeeAssetScriptAndValidate(matcherFeeAssetScript: Option[RunScriptResult]): Result[Order] =
             awaitResult { validateByBlockchain(orderFeeSettings)(None, None, matcherFeeAssetScript, None)(order) }
 
-          if (order.matcherFeeAssetId != Waves) {
+          if (order.feeAsset != Waves) {
             setFeeAssetScriptAndValidate(Some(RunScriptResult.ScriptError("Some error"))) should produce("AssetScriptReturnedError")
             setFeeAssetScriptAndValidate(Some(RunScriptResult.Denied)) should produce("AssetScriptDeniedOrder")
             setFeeAssetScriptAndValidate(None) shouldBe 'right
@@ -713,7 +714,7 @@ class OrderValidatorSpecification
 
 // @TODO run this to runScript
 //
-//    "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
+//    "meaningful error for undefined functions in matcher" in blockchainTest() { (ov, bc) =>
 //      activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
 //
 //      val pk     = KeyPair(randomBytes())
@@ -727,11 +728,11 @@ class OrderValidatorSpecification
 //      val asset1 = mkAssetId("asset1")
 //      val asset2 = mkAssetId("asset2")
 //      val pair   = AssetPair(asset1, asset2)
-//      val portfolio = Portfolio(10 * Constants.UnitsInWave,
+//      val portfolio = Portfolio(10.waves,
 //                                LeaseBalance.empty,
 //                                Map(
-//                                  asset1 -> 10 * Constants.UnitsInWave,
-//                                  asset2 -> 10 * Constants.UnitsInWave
+//                                  asset1 -> 10.waves,
+//                                  asset2 -> 10.waves
 //                                ))
 //
 //      val permitScript = ExprScript(Terms.TRUE).explicitGet()
@@ -759,7 +760,7 @@ class OrderValidatorSpecification
 //      }
 //
 //      def test(f: (Order => OrderValidator.Result[Order], WavesBlockchainClient, Order) => Any): Unit = (1 to 2).foreach { version =>
-//        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
+//        s"v$version" in blockchainTest(portfolio) { (ov, bc) =>
 //          val features = Seq(BlockchainFeatures.SmartAssets) ++ {
 //            if (version == 1) Seq.empty else Seq(BlockchainFeatures.SmartAccountTrading)
 //          }
@@ -773,10 +774,10 @@ class OrderValidatorSpecification
 //          val pk = KeyPair(randomBytes())
 //          val o = buy(
 //            pair = pair,
-//            amount = 100 * Constants.UnitsInWave,
+//            amount = 100.waves,
 //            price = 0.0022,
 //            sender = Some(pk),
-//            matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+//            matcherFee = Some(0.003.waves),
 //            ts = Some(System.currentTimeMillis()),
 //            version = version.toByte
 //          )
@@ -787,7 +788,7 @@ class OrderValidatorSpecification
 //    }
 
     "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
-      portfolioTest(defaultPortfolio) { (ov, bc) =>
+      blockchainTest() { (ov, bc) =>
         activate(bc, _ => false)
         assignScript(bc, account.toAddress, RunScriptResult.Allowed)
 
@@ -798,7 +799,7 @@ class OrderValidatorSpecification
 // @TODO run this to runScript
 //
 //    "deny blockchain functions in account script" in forAll(accountGen) { account =>
-//      portfolioTest(defaultPortfolio) { (ov, bc) =>
+//      blockchainTest() { (ov, bc) =>
 //        activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
 //        (bc.height _).when().returns(0).anyNumberOfTimes()
 //
@@ -815,9 +816,8 @@ class OrderValidatorSpecification
 //    }
   }
 
-  private def portfolioTest(p: Portfolio,
-                            assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
-                            hasMatcherAccountScript: Boolean = false)(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
+  private def blockchainTest(assetDescriptions: Asset => BriefAssetDescription = getDefaultAssetDescriptions,
+                             hasMatcherAccountScript: Boolean = false)(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
 
     val bc = stub[AsyncBlockchain]
     val tc = exchangeTransactionCreator(bc, hasMatcherAccountScript, assetDescriptions(_).hasScript)
@@ -842,12 +842,12 @@ class OrderValidatorSpecification
         senderPublicKey = pk,
         matcherPublicKey = MatcherAccount,
         assetPair = pairWavesBtc,
-        amount = 100 * Constants.UnitsInWave,
+        amount = 100.waves,
         price = (0.0022 * Order.PriceConstant).toLong,
         timestamp = System.currentTimeMillis(),
         expiration = System.currentTimeMillis() + 60 * 60 * 1000L,
-        matcherFee = (0.003 * Constants.UnitsInWave).toLong,
-        orderType = BUY,
+        matcherFee = 0.003.waves,
+        orderType = OrderType.BUY,
         proofs = proofs
       )
 
@@ -860,15 +860,15 @@ class OrderValidatorSpecification
   private def mkAssetDescription(decimals: Int): BriefAssetDescription = BriefAssetDescription(name = "name", decimals = decimals, hasScript = false)
 
   private def newBuyOrder: Order =
-    buy(pair = pairWavesBtc, amount = 100 * Constants.UnitsInWave, price = 0.0022, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))
+    buy(pair = pairWavesBtc, amount = 100.waves, price = 0.0022, matcherFee = Some(0.003.waves))
 
   private def newBuyOrder(pk: KeyPair, ts: Long = System.currentTimeMillis, version: Byte = 1) =
     buy(
       pair = pairWavesBtc,
-      amount = 100 * Constants.UnitsInWave,
+      amount = 100.waves,
       price = 0.0022,
       sender = Some(pk),
-      matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+      matcherFee = Some(0.003.waves),
       ts = Some(ts),
       version = version
     )
@@ -973,7 +973,7 @@ class OrderValidatorSpecification
     prepareAssets(
       (order.assetPair.amountAsset, amountAssetScript, assetDescriptions(order.assetPair.amountAsset).decimals),
       (order.assetPair.priceAsset, priceAssetScript, assetDescriptions(order.assetPair.priceAsset).decimals),
-      (order.matcherFeeAssetId, matcherFeeAssetScript, assetDescriptions(order.matcherFeeAssetId).decimals)
+      (order.feeAsset, matcherFeeAssetScript, assetDescriptions(order.feeAsset).decimals)
     )
 
     assignScript(blockchain, MatcherAccount.toAddress, matcherAccountScript)
@@ -984,7 +984,7 @@ class OrderValidatorSpecification
     val assetsDescriptions = {
       Set(order.assetPair.amountAsset -> amountAssetScript,
           order.assetPair.priceAsset  -> priceAssetScript,
-          order.matcherFeeAssetId     -> matcherFeeAssetScript).foldLeft(defaultAssetDescriptionsMap) {
+          order.feeAsset     -> matcherFeeAssetScript).foldLeft(defaultAssetDescriptionsMap) {
         case (descMap, (asset, maybeScript)) => descMap.updated(asset, descMap(asset).copy(hasScript = maybeScript.nonEmpty))
       }
     }

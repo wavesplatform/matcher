@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.dex.MatcherTestData
-import com.wavesplatform.dex.db.RateDB
-import com.wavesplatform.{NoShrink, WithDB}
+import com.wavesplatform.dex.db.{RateDB, WithDB}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RateDBSpec extends WordSpecLike with Matchers with WithDB with MatcherTestData with PropertyChecks with NoShrink {
+class RateDBSpec extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private def test(f: RateDB => Unit): Unit = f { RateDB(db) }
 
@@ -18,7 +18,7 @@ class RateDBSpec extends WordSpecLike with Matchers with WithDB with MatcherTest
           .listOfN(
             100,
             for {
-              asset     <- arbitraryAssetIdGen
+              asset     <- arbitraryAssetGen
               rateValue <- Gen.choose(1, 100).map(_.toDouble / 100)
             } yield asset -> rateValue
           )
@@ -33,7 +33,7 @@ class RateDBSpec extends WordSpecLike with Matchers with WithDB with MatcherTest
     }
 
     "update rate if it already exists" in test { rdb =>
-      forAll(arbitraryAssetIdGen) { asset =>
+      forAll(arbitraryAssetGen) { asset =>
         rdb.upsertRate(asset, 1)
         rdb.getAllRates shouldBe Map(asset -> 1)
 

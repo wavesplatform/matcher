@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- And additional file. The base configuration is dex/src/package/doc/logback.xml -->
+<included>
+    <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
+        <file>${logback.brief.fullPath}</file>
+        <append>true</append>
+        <immediateFlush>false</immediateFlush>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.common.pattern}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="DETAILED" class="ch.qos.logback.core.FileAppender">
+        <file>${logback.detailed.fullPath}</file>
+        <append>true</append>
+        <immediateFlush>false</immediateFlush>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.common.pattern}</pattern>
+        </encoder>
+    </appender>
+
+    <root>
+        <appender-ref ref="BRIEF"/>
+        <appender-ref ref="DETAILED"/>
+    </root>
+
+    <!-- Networking -->
+    <logger name="io.netty" level="INFO" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+    <logger name="io.grpc.netty" level="INFO" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+    <logger name="akka.http" level="TRACE" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+
+    <!-- Queue -->
+    <logger name="org.apache.kafka" level="DEBUG" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+    <logger name="org.apache.kafka.clients.producer.KafkaProducer" level="TRACE" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+    <logger name="org.apache.kafka.common.metrics.Metrics" level="INFO"/>
+    <logger name="org.apache.kafka.common.network.Selector" level="DEBUG" additivity="false">
+        <appender-ref ref="BRIEF"/>
+        <appender-ref ref="DETAILED"/>
+    </logger>
+</included>

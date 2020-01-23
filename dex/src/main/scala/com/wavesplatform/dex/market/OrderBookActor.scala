@@ -6,9 +6,13 @@ import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import com.wavesplatform.dex.api._
 import com.wavesplatform.dex.common.json._
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
@@ -16,9 +20,6 @@ import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
-import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory
@@ -93,7 +94,7 @@ class OrderBookActor(owner: ActorRef,
     case request: QueueEventWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
-        case Some(lastProcessed) if request.offset <= lastProcessed => sender() ! AlreadyProcessed
+        case Some(lastProcessed) if request.offset <= lastProcessed => // Already processed
         case _ =>
           lastProcessedOffset = Some(request.offset)
           request.event match {

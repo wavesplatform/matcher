@@ -1,25 +1,30 @@
 package com.wavesplatform.dex.model
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.dex.model.MatcherModel.Denormalization
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2, OrderType}
-import com.wavesplatform.transaction.{Asset, Proofs}
-import com.wavesplatform.{NoShrink, crypto}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ExchangeTransactionCreatorSpecification
-    extends WordSpec
+    extends AnyWordSpec
     with Matchers
-    with MatcherTestData
+    with MatcherSpecBase
     with BeforeAndAfterAll
     with PathMockFactory
     with PropertyChecks
@@ -72,7 +77,6 @@ class ExchangeTransactionCreatorSpecification
     }
 
     "create valid exchange transaction when orders are matched partially" in {
-      import com.wavesplatform.transaction.assets.exchange.OrderOps._
 
       val preconditions = for { ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator } yield {
         val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)

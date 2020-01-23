@@ -1,20 +1,23 @@
 package com.wavesplatform.dex.grpc.integration
 
+import com.wavesplatform.dex.asset.DoubleOps
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.node.{HasWavesNode, NodeApiExtensions}
-import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.test.InformativeTestStart
-import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
+import com.wavesplatform.dex.waves.WavesFeeConstants
 import org.scalatest.concurrent.Eventually
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.duration.DurationInt
 
 trait IntegrationSuiteBase
-    extends FreeSpec
+    extends AnyFreeSpec
     with Matchers
     with BeforeAndAfterAll
     with BeforeAndAfterEach
@@ -29,6 +32,7 @@ trait IntegrationSuiteBase
     with DoubleOps
     with DiffMatcherWithImplicits
     with InformativeTestStart
+    with ToWavesJConversions
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()

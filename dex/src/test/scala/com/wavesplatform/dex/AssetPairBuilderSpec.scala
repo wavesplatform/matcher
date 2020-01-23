@@ -1,25 +1,26 @@
 package com.wavesplatform.dex
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderValidator.Result
-import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
-class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
+class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
+
   import AssetPairBuilderSpec._
 
   private def b(v: String) = ByteStr.decodeBase58(v).get

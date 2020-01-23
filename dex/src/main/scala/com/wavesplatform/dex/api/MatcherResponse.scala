@@ -3,12 +3,12 @@ package com.wavesplatform.dex.api
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.utils.byteStrWrites
 import play.api.libs.json._
 
 sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherResponseContent) {
@@ -72,10 +72,9 @@ object SimpleResponse {
   def apply(code: StatusCode, message: String): SimpleResponse = new SimpleResponse(code, Json.obj("message" -> message))
 }
 
-case object AlreadyProcessed               extends MatcherResponse(C.Accepted, Json.obj("message" -> "This event has been already processed"))
-case class OrderAccepted(order: Order)     extends MatcherResponse(C.OK, Json.obj("message"       -> order.json()))
-case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
-case class OrderDeleted(orderId: ByteStr)  extends MatcherResponse(C.OK, Json.obj("orderId"       -> orderId))
+case class OrderAccepted(order: Order)     extends MatcherResponse(C.OK, Json.obj("message" -> order.json()))
+case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
+case class OrderDeleted(orderId: ByteStr)  extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
 
 case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
     extends MatcherResponse(C.OK, MatcherResponseContent.Multiple(orders.values.toList))

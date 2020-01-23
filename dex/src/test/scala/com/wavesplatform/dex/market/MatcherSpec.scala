@@ -3,11 +3,13 @@ package com.wavesplatform.dex.market
 import akka.actor.ActorSystem
 import akka.testkit.TestKitBase
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
+import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.settings.loadConfig
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
-abstract class MatcherSpec(_actorSystemName: String) extends WordSpecLike with MatcherSpecLike {
+abstract class MatcherSpec(_actorSystemName: String) extends AnyWordSpecLike with MatcherSpecLike {
   protected def actorSystemName: String = _actorSystemName
 }
 

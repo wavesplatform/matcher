@@ -8,13 +8,16 @@ import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.functor.toFunctorOps
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
@@ -24,9 +27,6 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecu
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
@@ -245,7 +245,7 @@ class AddressActor(owner: Address,
               val validationResult = {
                 for {
                   hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
-                  tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.matcherFeeAssetId))
+                  tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
                 } yield {
                   val ao = command.toAcceptedOrder(tradableBalance)
                   accountStateValidator(ao, tradableBalance, hasOrderInBlockchain) match {
@@ -324,9 +324,9 @@ class AddressActor(owner: Address,
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
     // Now a user can have 100 active transaction maximum - easy to traverse.
-    activeOrders.values.toSeq
+    activeOrders.values.toVector
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
-      .view
+      .iterator
       .filter(_.isLimit)
       .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {

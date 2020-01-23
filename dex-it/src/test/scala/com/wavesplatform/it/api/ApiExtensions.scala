@@ -1,12 +1,14 @@
 package com.wavesplatform.it.api
 
 import cats.Id
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.{MatcherSuiteBase, api}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
 
 import scala.collection.immutable.TreeMap
@@ -37,7 +39,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
     dex1.api.waitForTransactionsByOrder(orderId, 1).unsafeTap {
-      _.foreach(tx => wavesNodeApi.waitForTransaction(tx.id()))
+      _.foreach(tx => wavesNodeApi.waitForTransaction(tx.getId))
     }
 
   protected def matcherState(assetPairs: Seq[AssetPair],

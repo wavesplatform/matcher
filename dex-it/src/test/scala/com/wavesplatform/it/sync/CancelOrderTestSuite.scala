@@ -4,16 +4,17 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.TimerOps.TimerOpsImplicits
+import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.wavesj.Transfer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
@@ -35,7 +36,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val ordersPerAccount = 200
 
       val accounts = (1 to totalAccounts).map(i => KeyPair(ByteStr(s"account-test-$i".getBytes(StandardCharsets.UTF_8)))).toList
-      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => ParsedTransfer(account, 1000.waves))))
+      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => new Transfer(account.toAddress, 1000.waves))))
 
       def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Unit] = {
         val futures = (1 to numOrders).map { i =>
@@ -90,6 +91,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
       dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
 
       val orderBook = dex1.api.orderBook(wavesUsdPair)
@@ -151,7 +153,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val oneOrderAmount = 10000
       val orderPrice     = 3000000000000L
 
-      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(ParsedTransfer(_, issueFee)).toList))
+      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(x => new Transfer(x.toAddress, issueFee)).toList))
 
       val accountsAndAssets = accounts.zipWithIndex.map {
         case (account, i) => account -> mkIssue(account, s"WowSoMuchCoin-$i", quantity = oneOrderAmount, decimals = 2)
@@ -160,7 +162,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val sells = accountsAndAssets.map {
         case (account, asset) =>
-          val assetPair = AssetPair(IssuedAsset(asset.id()), Waves)
+          val assetPair = AssetPair(IssuedAsset(asset.getId), Waves)
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
       }
 
@@ -172,7 +174,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         i          <- 1 to 10
       } yield
         mkOrder(alice,
-                AssetPair(IssuedAsset(asset.id()), Waves),
+                AssetPair(IssuedAsset(asset.getId), Waves),
                 OrderType.BUY,
                 amount = oneOrderAmount / 10,
                 price = orderPrice,

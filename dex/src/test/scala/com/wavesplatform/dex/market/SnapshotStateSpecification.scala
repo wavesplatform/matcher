@@ -1,14 +1,15 @@
 package com.wavesplatform.dex.market
 
-import com.wavesplatform.NoShrink
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.propspec.AnyPropSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => DrivenPropertyChecks}
 
-class SnapshotStateSpecification extends PropSpecLike with DrivenPropertyChecks with Matchers with NoShrink {
+class SnapshotStateSpecification extends AnyPropSpecLike with DrivenPropertyChecks with Matchers with NoShrink {
   property("nextSnapshotOffset generates greater offsets than old and last processed") {
     val assetPair = AssetPair(
       IssuedAsset(ByteStr("asset1".getBytes())),

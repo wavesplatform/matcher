@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, Props}
-import com.wavesplatform.account.Address
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.CreateExchangeTransactionActor.OrderExecutedObserved
 import com.wavesplatform.dex.model.Events.{ExchangeTransactionCreated, OrderExecuted}
 import com.wavesplatform.dex.model.ExchangeTransactionCreator.CreateTransaction
-import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.Json
 
 import scala.collection.mutable
@@ -16,6 +16,7 @@ import scala.collection.mutable
   * If both orders have the same owner, an ExchangeTransaction is created immediately.
   */
 class CreateExchangeTransactionActor(createTransaction: CreateTransaction) extends Actor with ScorexLogging {
+
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
 
   override def preStart(): Unit = context.system.eventStream.subscribe(self, classOf[OrderExecutedObserved])

@@ -4,15 +4,17 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
-import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.{Address, KeyPair}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.{AddressActor, MatcherTestData}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalatest._
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.propspec.AnyPropSpecLike
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -20,9 +22,9 @@ import scala.reflect.ClassTag
 
 class OrderHistoryBalanceSpecification
     extends TestKit(ActorSystem())
-    with PropSpecLike
+    with AnyPropSpecLike
     with Matchers
-    with MatcherTestData
+    with MatcherSpecBase
     with BeforeAndAfterEach
     with NTPTime {
 

@@ -1,18 +1,14 @@
 package com.wavesplatform.dex.it.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.crypto
-import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.settings.{GenesisSettings, _}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.it.config.genesis._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -40,6 +36,11 @@ object GenesisConfigGenerator {
     val chainId: Byte = networkType.head.toByte
   }
 
+  object Settings {
+    implicit val chosenCase: NameMapper                = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+    implicit val settingsReader: ValueReader[Settings] = arbitraryTypeValueReader[Settings]
+  }
+
   case class FullAddressInfo(seedText: SeedText,
                              seed: ByteStr,
                              accountSeed: ByteStr,
@@ -50,7 +51,7 @@ object GenesisConfigGenerator {
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
 
     val seedBytes = item.seedText.getBytes("UTF-8")
-    val acc       = Wallet.generateNewAccount(seedBytes, item.nonce)
+    val acc       = PredefinedAccounts.generateNewAccount(seedBytes, item.nonce)
 
     FullAddressInfo(
       seedText = item.seedText,
@@ -64,7 +65,7 @@ object GenesisConfigGenerator {
 
   def generate(genesisGeneratorConfig: Config): Config = {
 
-    val generatorSettings = genesisGeneratorConfig.as[Settings]("genesis-generator")
+    val generatorSettings = Settings.settingsReader.read(genesisGeneratorConfig, "genesis-generator")
 
     AddressScheme.current = new AddressScheme { override val chainId: Byte = generatorSettings.chainId }
 
@@ -82,7 +83,7 @@ object GenesisConfigGenerator {
 
     val genesisBlock = {
 
-      val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
+      val reference     = ByteStr(Array.fill(crypto.SignatureLength)(-1: Byte))
       val genesisSigner = KeyPair(ByteStr.empty)
 
       Block
@@ -92,9 +93,7 @@ object GenesisConfigGenerator {
           reference = reference,
           consensusData = NxtLikeConsensusBlockData(generatorSettings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
           transactionData = genesisTxs,
-          signer = genesisSigner,
-          featureVotes = Set.empty,
-          rewardVote = 100L
+          signer = genesisSigner
         )
         .explicitGet()
     }
@@ -117,7 +116,7 @@ object GenesisConfigGenerator {
          |  address-scheme-character = "${generatorSettings.chainId.toChar}"
          |  genesis {
          |    timestamp: ${settings.timestamp}
-         |    signature: "${settings.signature.get}"
+         |    signature: ${genesisBlock.signerData.signature}
          |    initial-balance: ${settings.initialBalance}
          |    initial-base-target: ${settings.initialBaseTarget}
          |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms

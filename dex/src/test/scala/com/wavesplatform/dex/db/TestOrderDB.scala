@@ -1,10 +1,12 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
+
   private var knownOrders   = Map.empty[Order.Id, Order]
   private var orderInfo     = Map.empty[Order.Id, OrderInfo[OrderStatus.Final]]
   private var idsForPair    = Map.empty[(Address, AssetPair), Seq[Order.Id]].withDefaultValue(Seq.empty)

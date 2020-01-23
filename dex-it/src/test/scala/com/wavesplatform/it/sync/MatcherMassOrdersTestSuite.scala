@@ -1,11 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -27,7 +28,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     val assets = List(IssueUsdTx, IssueEthTx)
     broadcastAndAwait(assets: _*)
     assets
-      .map(tx => mkTransfer(alice, bob, tx.quantity / 2, IssuedAsset(tx.id())))
+      .map(tx => mkTransfer(alice, bob, tx.getQuantity / 2, IssuedAsset(tx.getId)))
       .foreach(wavesNode1.api.broadcast)
 
     dex1.start()

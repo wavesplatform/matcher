@@ -10,6 +10,7 @@ import javax.crypto.{Cipher, SecretKeyFactory}
 import scala.util.control.NonFatal
 
 object Enigma {
+
   private[this] val KeySalt           = "0495c728-1614-41f6-8ac3-966c22b4a62d".getBytes(StandardCharsets.UTF_8)
   private[this] val AES               = "AES"
   private[this] val Algorithm         = AES + "/ECB/PKCS5Padding"

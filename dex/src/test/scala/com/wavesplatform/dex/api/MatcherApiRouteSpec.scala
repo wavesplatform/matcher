@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api
 
-import java.nio.charset.StandardCharsets
-
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -15,8 +13,13 @@ import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.AddressActor.Reply.Balance
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.common.json._
+import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
@@ -30,27 +33,26 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{WithDB, crypto}
+import com.wavesplatform.dex.settings.MatcherSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json._
 
 import scala.concurrent.Future
+import scala.util.Random
 
-class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData with PathMockFactory with Eventually with WithDB {
+class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
   private val apiKey       = "apiKey"
   private val apiKeyHeader = RawHeader("X-API-KEY", apiKey)
 
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
-  private val smartAssetTx   = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
-  private val smartAssetId   = smartAssetTx.id()
-  private val smartAsset     = IssuedAsset(smartAssetId)
-
-  private val asset = IssuedAsset(smartAssetTx.id())
+  private val smartAsset     = arbitraryAssetGen.sample.get
+  private val smartAssetId   = smartAsset.id
 
   private val smartAssetDesc = BriefAssetDescription(
-    name = new String(smartAssetTx.name, StandardCharsets.UTF_8),
-    decimals = smartAssetTx.decimals,
+    name = "smart asset",
+    decimals = Random.nextInt(9),
     hasScript = false
   )
 
@@ -627,7 +629,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(
         settings, {
-          case `asset` =>
+          case `smartAsset` =>
             liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
           case x if x == order.assetPair.amountAsset =>
             liftValueAsync[BriefAssetDescription](BriefAssetDescription("AmountAsset", 8, hasScript = false))
@@ -657,7 +659,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
         ntpTime,
-        x => if (x == asset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
+        x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
         x => if (x == smartWavesPair) Some(smartWavesAggregatedSnapshot) else None
       ),
       matcherSettings = settings,
@@ -669,8 +671,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherTestData wit
       matcherAccountFee = 300000L,
       apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = Future.successful { Set(1, 2, 3) }
-    )(system).route
+      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) }
+    ).route
 
     f(route)
   }

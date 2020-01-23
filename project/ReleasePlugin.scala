@@ -40,8 +40,8 @@ object ReleasePlugin extends AutoPlugin {
             Def.task {
               // Don't forget to update "artifactExtensions" if there is a new artifact
               val artifacts = Seq(
-                (LocalProject("waves-integration") / Universal / packageBin).value,
-                (LocalProject("waves-integration") / Debian / packageBin).value,
+                (LocalProject("waves-ext") / Universal / packageBin).value,
+                (LocalProject("waves-ext") / Debian / packageBin).value,
                 (LocalProject("dex") / Universal / packageBin).value,
                 (LocalProject("dex") / Debian / packageBin).value
               )

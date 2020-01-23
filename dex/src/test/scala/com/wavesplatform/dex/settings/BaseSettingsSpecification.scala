@@ -2,13 +2,12 @@ package com.wavesplatform.dex.settings
 
 import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.settings.loadConfig
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.FlatSpec
+import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.util.Try
 
-class BaseSettingsSpecification extends FlatSpec {
+class BaseSettingsSpecification extends AnyFlatSpec {
 
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)
@@ -75,6 +74,21 @@ class BaseSettingsSpecification extends FlatSpec {
          |      api-key-hash = foobarhash
          |      cors = no
          |      api-key-different-host = no
+         |    }
+         |    waves-blockchain-client {
+         |      grpc {
+         |        target = "127.1.2.9:6333"
+         |        max-hedged-attempts = 9
+         |        max-retry-attempts = 13
+         |        keep-alive-without-calls = false
+         |        keep-alive-time = 8s
+         |        keep-alive-timeout = 11s
+         |        idle-timeout = 20s
+         |        channel-options {
+         |          connect-timeout = 99s
+         |        }
+         |      }
+         |      default-caches-expiration = 101ms
          |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s

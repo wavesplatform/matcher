@@ -1,9 +1,9 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.assets.exchange.OrderType
 
 class OrderV3TestSuite extends MatcherSuiteBase {
 

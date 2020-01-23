@@ -3,11 +3,9 @@ package com.wavesplatform.dex.api.http
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directive0
-import com.wavesplatform.api.http.ApiRoute
-import com.wavesplatform.crypto
 import com.wavesplatform.dex.api.{MatcherResponse, SimpleErrorResponse}
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid}
-import com.wavesplatform.http.{`X-Api-Key`, api_key}
 
 trait AuthRoute { this: ApiRoute =>
 

@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.settings
 
 import com.typesafe.config.Config
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.assets.exchange.AssetPair
-import org.scalatest.Matchers
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.test.matchers.ProduceError.produce
+import org.scalatest.matchers.should.Matchers
 
 class OrderRestrictionSpecification extends BaseSettingsSpecification with Matchers {
 

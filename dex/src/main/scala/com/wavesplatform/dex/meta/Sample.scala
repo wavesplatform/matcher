@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.meta
 
-import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeature
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderV3}
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.feature.BlockchainFeature
+import com.wavesplatform.dex.domain.order.{Order, OrderV3}
 import shapeless._
 
 import scala.reflect.ClassTag

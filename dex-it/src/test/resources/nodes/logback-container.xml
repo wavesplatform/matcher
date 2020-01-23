@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="default.pattern" value="%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n"/>
+
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.swagger" level="INFO"/>
+
+    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
+
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
+
+    <logger name="org.apache.kafka" level="INFO"/>
+    <logger name="org.apache.kafka.common.network.Selector"
+            level="DEBUG"/> <!-- https://issues.apache.org/jira/browse/KAFKA-5133 -->
+
+    <logger name="org.aspectj" level="INFO"/>
+    <logger name="org.asynchttpclient" level="INFO"/>
+
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <logger name="io.grpc.netty" level="WARN"/>
+
+    <appender name="BRIEF" class="ch.qos.logback.core.FileAppender">
+        <file>${logback.brief.fullPath}</file>
+        <append>true</append>
+        <immediateFlush>false</immediateFlush>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>${logback.pattern:-${default.pattern}}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="TRACE">
+        <appender-ref ref="BRIEF"/>
+    </root>
+</configuration>

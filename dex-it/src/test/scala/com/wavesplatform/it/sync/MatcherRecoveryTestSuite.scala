@@ -1,9 +1,9 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
-import com.wavesplatform.transaction.assets.exchange.Order
 import org.scalacheck.Gen
 
 import scala.util.Random

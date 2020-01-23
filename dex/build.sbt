@@ -1,14 +1,14 @@
 import java.nio.charset.StandardCharsets
 
+import Dependencies.Version
 import DexDockerKeys._
 import com.typesafe.sbt.SbtNativePackager.Universal
-import CommonSettings.autoImport.network
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
-enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, RunApplicationSettings, GitVersioning)
+enablePlugins(RewriteSwaggerConfigPlugin, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
-libraryDependencies ++= Dependencies.dex ++ Dependencies.silencer
+libraryDependencies ++= Dependencies.Module.dex
 
 val packageSettings = Seq(
   maintainer := "wavesplatform.com",
@@ -24,7 +24,10 @@ lazy val versionSourceTask = Def.task {
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
   val (major, minor, patch) = version.value match {
     case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case x                            => throw new IllegalStateException(s"Can't parse version: $x")
+    case x                            =>
+      // SBT downloads only the latest commit, so "version" doesn't know, which tag is the nearest
+      if (Option(System.getenv("TRAVIS")).fold(false)(_.toBoolean)) (0, 0, 0)
+      else throw new IllegalStateException(s"dex: can't parse version by git tag: $x")
   }
 
   IO.write(
@@ -41,14 +44,30 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
+lazy val swaggerUiVersionSourceTask = Def.task {
+  val versionFile = sourceManaged.value / "com" / "wavesplatform" / "dex" / "api" / "http" / "SwaggerUiVersion.scala"
+  IO.write(
+    versionFile,
+    s"""package com.wavesplatform.dex.api.http
+       |
+       |object SwaggerUiVersion {
+       |  val VersionString = "${Version.swaggerUi}"
+       |}
+       |""".stripMargin,
+    charset = StandardCharsets.UTF_8
+  )
+  Seq(versionFile)
+}
+
 inConfig(Compile)(
   Seq(
-    sourceGenerators += versionSourceTask,
+    sourceGenerators ++= List(versionSourceTask.taskValue, swaggerUiVersionSourceTask.taskValue),
     discoveredMainClasses := Seq(
       "com.wavesplatform.dex.Application",
       "com.wavesplatform.dex.WavesDexCli"
     ),
-    mainClass := discoveredMainClasses.value.headOption
+    mainClass := discoveredMainClasses.value.headOption,
+    run / fork := true
   ))
 
 // Docker

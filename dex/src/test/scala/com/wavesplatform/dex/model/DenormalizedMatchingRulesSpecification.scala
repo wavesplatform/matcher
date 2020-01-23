@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.model
 
 import cats.data.NonEmptyList
-import com.wavesplatform.NoShrink
-import com.wavesplatform.dex.MatcherTestData
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.propspec.AnyPropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class DenormalizedMatchingRulesSpecification extends PropSpec with PropertyChecks with Matchers with MatcherTestData with NoShrink {
+class DenormalizedMatchingRulesSpecification extends AnyPropSpec with PropertyChecks with Matchers with MatcherSpecBase with NoShrink {
   property("skipOutdated: rules.head.startOffset <= currentOffset < rules(1).startOffset") {
     val g = for {
       currOffset <- currOffsetGen

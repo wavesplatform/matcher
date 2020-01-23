@@ -1,9 +1,0 @@
-package com.wavesplatform.dex
-
-import scala.math.BigDecimal.RoundingMode.CEILING
-
-case class AssetPairDecimals(amountDecimals: Byte, priceDecimals: Byte) {
-  def amount(a: Double): Long         = { BigDecimal(a) * Math.pow(10, amountDecimals) }.toLong
-  def price(p: Double): Long          = { BigDecimal(p) * Math.pow(10, 8 + priceDecimals - amountDecimals) }.toLong
-  def minAmountFor(price: Long): Long = { BigDecimal(Math.pow(10, amountDecimals)) / BigDecimal(price) }.setScale(0, CEILING).toLong
-}

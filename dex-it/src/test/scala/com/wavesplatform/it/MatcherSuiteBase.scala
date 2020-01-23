@@ -1,24 +1,27 @@
 package com.wavesplatform.it
 
 import cats.instances.FutureInstances
+import com.wavesplatform.dex.asset.DoubleOps
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
-import com.wavesplatform.dex.it.assets.DoubleOps
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.test.InformativeTestStart
-import com.wavesplatform.dex.it.waves.{MkWavesEntities, WavesFeeConstants}
+import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
+import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
-import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
 import org.scalatest.concurrent.Eventually
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, CancelAfterFailure}
 
 import scala.concurrent.duration.DurationInt
 
-abstract class MatcherSuiteBase
-    extends FreeSpec
+trait MatcherSuiteBase
+    extends AnyFreeSpec
     with Matchers
     with CancelAfterFailure
     with BeforeAndAfterAll
@@ -37,6 +40,7 @@ abstract class MatcherSuiteBase
     with DiffMatcherWithImplicits
     with InformativeTestStart
     with FutureInstances
+    with ToWavesJConversions
     with ScorexLogging {
 
   GenesisConfig.setupAddressScheme()

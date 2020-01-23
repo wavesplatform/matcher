@@ -2,10 +2,12 @@ package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.wavesplatform.NTPTime
 import com.wavesplatform.dex.WatchDistributedCompletionActorSpecification._
+import com.wavesplatform.dex.time.NTPTime
 import org.scalacheck.Gen
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => DrivenPropertyChecks}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -13,7 +15,7 @@ import scala.util.Random
 
 class WatchDistributedCompletionActorSpecification
     extends TestKit(ActorSystem("WatchDistributedCompletionActorSpecification"))
-    with WordSpecLike
+    with AnyWordSpecLike
     with DrivenPropertyChecks
     with Matchers
     with BeforeAndAfterAll

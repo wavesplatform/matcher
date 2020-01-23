@@ -4,16 +4,17 @@ import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.wavesplatform.dex.AddressActor.Command.CancelOrder
 import com.wavesplatform.dex.actors.TimedOut
 import com.wavesplatform.dex.api.MatcherResponse
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.{api, error}
-import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.exchange.Order.Id
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
 class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef, timeout: FiniteDuration)
     extends Actor
     with ScorexLogging {
+
   import BatchOrderCancelActor._
   import context.dispatcher
 

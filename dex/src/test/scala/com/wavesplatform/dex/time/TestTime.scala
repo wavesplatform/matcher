@@ -3,6 +3,7 @@ package com.wavesplatform.dex.time
 import scala.concurrent.duration.FiniteDuration
 
 class TestTime(var t: Long = System.currentTimeMillis()) extends Time {
+
   def setTime(tt: Long): this.type = {
     t = tt
     this

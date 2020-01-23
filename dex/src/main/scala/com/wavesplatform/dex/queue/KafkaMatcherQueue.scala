@@ -7,10 +7,10 @@ import java.util.concurrent.{Executors, TimeoutException}
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.config.Config
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.KafkaMatcherQueue.{KafkaProducer, Settings, eventDeserializer}
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.settings.toConfigOps
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{Cancelable, ExecutionModel, Scheduler}
 import monix.reactive.Observable
@@ -26,10 +26,12 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
   private val producerExecutionContext =
-    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
+    ExecutionContext.fromExecutor(
+      Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("queue-kafka-producer-%d").build()))
 
   private implicit val consumerExecutionContext =
-    ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("kafka-%d").build()))
+    ExecutionContext.fromExecutor(
+      Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("queue-kafka-consumer-%d").build()))
 
   private val duringShutdown = new AtomicBoolean(false)
 

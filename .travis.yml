@@ -21,6 +21,8 @@ cache:
     - $HOME/.cache/coursier
     - $HOME/.ivy2/cache
     - $HOME/.sbt
+    # See WavesNodeArtifactsPlugin.wavesArtifactsCacheDir
+    - $HOME/.cache/dex
 before_cache:
   # Cleanup the cached directories to avoid unnecessary cache updates
   - find $HOME/.sbt -name "*.lock" | xargs rm

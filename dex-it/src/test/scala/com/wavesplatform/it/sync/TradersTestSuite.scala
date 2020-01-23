@@ -1,13 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Price
+import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.dex.model.MatcherModel.Price
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderType.SELL
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class TradersTestSuite extends MatcherSuiteBase {
 
@@ -45,7 +46,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       val trickyBobWavesPairWB58 = AssetPair(
         amountAsset = wct,
-        priceAsset = IssuedAsset { ByteStr.decodeBase58(AssetPair.WavesName).get }
+        priceAsset = IssuedAsset { ByteStr.decodeBase58(Asset.WavesName).get }
       )
 
       trickyBobWavesPairWB58.key shouldBe AssetPair(wct, Waves).key
@@ -54,7 +55,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       dex1.api.tryPlace(trickyBobOrderWB58) should failWith(9440512) // OrderInvalidSignature
 
       val trickyBobWavesPairWS = AssetPair(
-        amountAsset = IssuedAsset { ByteStr(AssetPair.WavesName.getBytes) },
+        amountAsset = IssuedAsset { ByteStr(Asset.WavesName.getBytes) },
         priceAsset = wct
       )
 
@@ -95,7 +96,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           for (orderV <- orderVersions) {
             val orderAmount              = 4000
-            val transferAmount           = IssueWctTx.quantity - orderAmount
+            val transferAmount           = IssueWctTx.getQuantity - orderAmount
             val oldestOrder, newestOrder = bobPlacesSellWctOrder(orderAmount, orderV)
 
             // Transfer all coins except required for one order
@@ -142,7 +143,7 @@ class TradersTestSuite extends MatcherSuiteBase {
               wavesNode1.api.waitForTransaction(lease)
               dex1.api.cancelAll(bob)
               dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-              broadcastAndAwait(mkLeaseCancel(bob, lease.id.value))
+              broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
             }
           }
         }
@@ -198,7 +199,7 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1.api.waitForTransaction(lease)
             dex1.api.cancelAll(bob)
             dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
-            broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
+            broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
           }
         }
 
@@ -218,7 +219,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           withClue("Cleanup") {
             wavesNode1.api.waitForTransaction(lease)
-            broadcastAndAwait(mkLeaseCancel(bob, lease.id()))
+            broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
           }
         }
 
@@ -245,12 +246,12 @@ class TradersTestSuite extends MatcherSuiteBase {
           val bobAssetQuantity = 10000
 
           val newFeeAssetTx = mkIssue(bob, "FeeCoin", bobAssetQuantity, 2, issueFee)
-          val newFeeAsset   = IssuedAsset(newFeeAssetTx.id())
+          val newFeeAsset   = IssuedAsset(newFeeAssetTx.getId)
 
           broadcastAndAwait(newFeeAssetTx)
           dex1.api.upsertRate(newFeeAsset, 2)
 
-          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, matcherFeeAssetId = newFeeAsset)
+          val bobOrder = mkOrder(bob, wctUsdPair, SELL, 400L, 2 * 100000000L, matcherFee = 1, feeAsset = newFeeAsset)
 
           dex1.api.place(bobOrder)
           dex1.api.reservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)

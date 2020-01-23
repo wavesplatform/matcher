@@ -2,7 +2,7 @@ package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, Terminated}
 import com.wavesplatform.dex.actors.TimedOut
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 

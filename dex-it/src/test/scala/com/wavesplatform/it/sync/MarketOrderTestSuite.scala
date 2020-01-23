@@ -4,28 +4,23 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.AcceptedOrderType
-import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest
 
 class MarketOrderTestSuite extends MatcherSuiteBase {
-  val fixedFee   = 0.003.waves
-  val percentFee = 14
 
-  implicit class DoubleOps(value: Double) {
-    val waves, eth: Long = Normalization.normalizeAmountAndFee(value, 8)
-    val usd: Long        = Normalization.normalizePrice(value, 8, 2)
-  }
+  val fixedFee: Long  = 0.003.waves
+  val percentFee: Int = 14
 
   def tooLowPrice(orderType: String, price: String): String = {
     s"Price of the $orderType market order ($price) is too low for its full execution with the current market state"
@@ -95,7 +90,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
           assert(
             wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
-            s"Alice doesn't have enough balance in ${AssetPair.assetIdStr(issuedAsset)} to make a transfer"
+            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
           )
         }
         broadcastAndAwait { mkTransfer(alice, account, balance, asset, fixedFee) }
@@ -438,9 +433,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       val account = createAccountWithBalance { transfer -> usd }
 
-      placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, matcherFeeAssetId = btc, version = 3) }
+      placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3) }
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, matcherFeeAssetId = btc)) should failWith(
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWith(
         3147270,
         s"0.003 ${BtcId.toString}"
       )

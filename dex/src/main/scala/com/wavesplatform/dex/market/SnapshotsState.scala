@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.market
 
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.SortedSet
 

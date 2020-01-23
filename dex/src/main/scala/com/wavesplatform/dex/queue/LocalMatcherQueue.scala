@@ -3,21 +3,29 @@ package com.wavesplatform.dex.queue
 import java.util.concurrent.Executors
 import java.util.{Timer, TimerTask}
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.dex.LocalQueueStore
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.queue.LocalMatcherQueue._
 import com.wavesplatform.dex.queue.MatcherQueue.{IgnoreProducer, Producer}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.util.control.NonFatal
 
-class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(implicit ec: ExecutionContext)
-    extends MatcherQueue
-    with ScorexLogging {
+class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time) extends MatcherQueue with ScorexLogging {
 
   @volatile private var lastUnreadOffset: QueueEventWithMeta.Offset = -1L
+
+  private val executor = Executors.newSingleThreadExecutor {
+    new ThreadFactoryBuilder()
+      .setDaemon(true)
+      .setNameFormat("queue-local-consumer-%d")
+      .build()
+  }
+
+  private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private val timer = new Timer("local-dex-queue", true)
   private val producer: Producer = {
@@ -75,13 +83,20 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
 object LocalMatcherQueue {
   case class Settings(enableStoring: Boolean, pollingInterval: FiniteDuration, maxElementsPerPoll: Int, cleanBeforeConsume: Boolean)
 
-  private class LocalProducer(store: LocalQueueStore, time: Time)(implicit ec: ExecutionContext) extends Producer {
-    private val thread = Executors.newSingleThreadExecutor()
+  private class LocalProducer(store: LocalQueueStore, time: Time) extends Producer {
+    private val executor = Executors.newSingleThreadExecutor {
+      new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("queue-local-producer-%d")
+        .build()
+    }
+
+    private implicit val executionContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
     override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = {
       val p = Promise[QueueEventWithMeta]
       // Need to guarantee the order
-      thread.submit(new Runnable {
+      executor.submit(new Runnable {
         override def run(): Unit = {
           val ts     = time.correctedTime()
           val offset = store.enqueue(event, time.correctedTime())
@@ -91,6 +106,6 @@ object LocalMatcherQueue {
       p.future.map(Some(_))
     }
 
-    override def close(timeout: FiniteDuration): Unit = thread.shutdown()
+    override def close(timeout: FiniteDuration): Unit = executor.shutdown()
   }
 }

@@ -1,34 +1,202 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.crypto.Proofs
+import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV2}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.test.Scripts
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
 
 import scala.concurrent.duration._
 
 class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
-  val sc1 = s"""true"""
-  val sc2 =
-    s"""
-       |match tx {
-       | case s : SetScriptTransaction => true
-       | case _ => false
-       |}""".stripMargin
-
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
-  private val issueAliceAssetTx = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset        = IssuedAsset(issueAliceAssetTx.id())
+  private val IssueResults(issueAliceAssetTx, aliceAssetId, aliceAsset) = mkIssueExtended(alice, "AliceCoin", someAssetAmount, 0)
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(aliceAsset, Waves)
+
+  private val sc1 = Scripts.alwaysTrue
+
+  /*
+  match tx {
+   case s : SetScriptTransaction => true
+   case _ => false
+  }
+   */
+  private val sc2 = Scripts.fromBase64(
+    "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBAAAAAFzBQAAAAckbWF0Y2gwBgfLRT2k"
+  )
+
+  /*
+    let usdId = base64'e3VzZElkfQ==' # {usdId}
+    let aliceAssetId =  base64'e2FsaWNlQXNzZXRJZH0='
+    match tx {
+      case t : Order =>
+        let id = t.id == base58''
+        let assetPair1Amount = isDefined(t.assetPair.amountAsset)
+        let assetPair1Price = t.assetPair.priceAsset == usdId
+        let assetPair2Amount = t.assetPair.amountAsset == aliceAssetId
+        let assetPair2Price = isDefined(t.assetPair.priceAsset)
+        (!assetPair1Amount && assetPair1Price) || (assetPair2Amount && !assetPair2Price)
+      case s : SetScriptTransaction => true
+      case other => throw()
+    }
+   */
+  private val sc3 = Scripts.renderScriptTemplate(
+    "AgQAAAAFdXNkSWQBAAAAB3t1c2RJZH0EAAAADGFsaWNlQXNzZXRJZAEAAAAOe2FsaWNlQXNzZXRJZH0EAAAAByRtYXRja" +
+      "DAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAAC" +
+      "aWQBAAAAAAQAAAAQYXNzZXRQYWlyMUFtb3VudAkBAAAACWlzRGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQ" +
+      "EAAAAD2Fzc2V0UGFpcjFQcmljZQkAAAAAAAACCAgFAAAAAXQAAAAJYXNzZXRQYWlyAAAACnByaWNlQXNzZXQFAAAABXVzZElkBAAAABBhc3NldF" +
+      "BhaXIyQW1vdW50CQAAAAAAAAIICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQFAAAADGFsaWNlQXNzZXRJZAQAAAAPYXNzZXRQY" +
+      "WlyMlByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AAAACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwMJAQAAAAEhAAAAAQUAAAAQYXNz" +
+      "ZXRQYWlyMUFtb3VudAUAAAAPYXNzZXRQYWlyMVByaWNlBwYDBQAAABBhc3NldFBhaXIyQW1vdW50CQEAAAABIQAAAAEFAAAAD2Fzc2V0UGFpcjJ" +
+      "QcmljZQcDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAFFNldFNjcmlwdFRyYW5zYWN0aW9uBAAAAAFzBQAAAAckbWF0Y2gwBgQAAAAFb3RoZXIFAA" +
+      "AAByRtYXRjaDAJAQAAAAV0aHJvdwAAAABoNJIT",
+    "{usdId}"        -> UsdId,
+    "{aliceAssetId}" -> aliceAssetId
+  )
+
+  /*
+  let alicePublicKey = base64'e2FsaWNlUHVibGljS2V5fQ=='
+  let matcherPublicKey = base64'e21hdGNoZXJQdWJsaWNLZXl9'
+  match tx {
+    case t : Order =>
+      let id = t.id == base58''
+      let senderPublicKey = t.senderPublicKey == alicePublicKey
+      let isMatcherPublicKey = t.matcherPublicKey == matcherPublicKey
+      let timestamp = t.timestamp > 0
+      let price = t.price > 0
+      let amount = t.amount > 0
+      let expiration = t.expiration > 0
+      let matcherFee = t.matcherFee > 0
+      let bodyBytes = t.bodyBytes == base64''
+      !id && senderPublicKey && isMatcherPublicKey && timestamp && price && amount && expiration && matcherFee &&
+      expiration && matcherFee && !bodyBytes
+    case s : SetScriptTransaction => true
+    case _ => throw()
+  }
+   */
+  private val sc4 = Scripts.renderScriptTemplate(
+    "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAAEG1hdGNoZXJQdWJsaWNLZXkBAAAAEnttY" +
+      "XRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gw" +
+      "BAAAAAJpZAkAAAAAAAACCAUAAAABdAAAAAJpZAEAAAAABAAAAA9zZW5kZXJQdWJsaWNLZXkJAAAAAAAAAggFAAAAAXQAAAAPc2VuZGVyUHVibGl" +
+      "jS2V5BQAAAA5hbGljZVB1YmxpY0tleQQAAAASaXNNYXRjaGVyUHVibGljS2V5CQAAAAAAAAIIBQAAAAF0AAAAEG1hdGNoZXJQdWJsaWNLZXkFAA" +
+      "AAEG1hdGNoZXJQdWJsaWNLZXkEAAAACXRpbWVzdGFtcAkAAGYAAAACCAUAAAABdAAAAAl0aW1lc3RhbXAAAAAAAAAAAAAEAAAABXByaWNlCQAAZ" +
+      "gAAAAIIBQAAAAF0AAAABXByaWNlAAAAAAAAAAAABAAAAAZhbW91bnQJAABmAAAAAggFAAAAAXQAAAAGYW1vdW50AAAAAAAAAAAABAAAAApleHBp" +
+      "cmF0aW9uCQAAZgAAAAIIBQAAAAF0AAAACmV4cGlyYXRpb24AAAAAAAAAAAAEAAAACm1hdGNoZXJGZWUJAABmAAAAAggFAAAAAXQAAAAKbWF0Y2h" +
+      "lckZlZQAAAAAAAAAAAAQAAAAJYm9keUJ5dGVzCQAAAAAAAAIIBQAAAAF0AAAACWJvZHlCeXRlcwEAAAAAAwMDAwMDAwMDAwkBAAAAASEAAAABBQ" +
+      "AAAAJpZAUAAAAPc2VuZGVyUHVibGljS2V5BwUAAAASaXNNYXRjaGVyUHVibGljS2V5BwUAAAAJdGltZXN0YW1wBwUAAAAFcHJpY2UHBQAAAAZhb" +
+      "W91bnQHBQAAAApleHBpcmF0aW9uBwUAAAAKbWF0Y2hlckZlZQcFAAAACmV4cGlyYXRpb24HBQAAAAptYXRjaGVyRmVlBwkBAAAAASEAAAABBQAA" +
+      "AAlib2R5Qnl0ZXMHAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAAV" +
+      "0aHJvdwAAAAAIj5yk",
+    "{alicePublicKey}"   -> alice.publicKey,
+    "{matcherPublicKey}" -> matcher.publicKey
+  )
+
+  /*
+  let alicePublicKey = base64'e2FsaWNlUHVibGljS2V5fQ=='
+  match tx {
+    case t : Order => sigVerify(t.bodyBytes, t.proofs[0], alicePublicKey)
+    case s : SetScriptTransaction => true
+    case _ => throw()
+  }
+   */
+  private val sc5 = Scripts.renderScriptTemplate(
+    "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAAByRtYXRjaDAFAAAAAnR4AwkAAAEAAAACB" +
+      "QAAAAckbWF0Y2gwAgAAAAVPcmRlcgQAAAABdAUAAAAHJG1hdGNoMAkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQA" +
+      "AAAGcHJvb2ZzAAAAAAAAAAAABQAAAA5hbGljZVB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24" +
+      "EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAnM6WrQ==",
+    "{alicePublicKey}" -> alice.publicKey
+  )
+
+  /*
+  let alicePublicKey = base64'e2FsaWNlUHVibGljS2V5fQ=='
+  let bobPublicKey = base64'e2JvYlB1YmxpY0tleX0='
+  let matcherPublicKey = base64'e21hdGNoZXJQdWJsaWNLZXl9'
+  match tx {
+    case t : Order =>
+      let alice = if (sigVerify(t.bodyBytes, t.proofs[0], alicePublicKey)) then 1 else 0
+      let bob = if (sigVerify(t.bodyBytes, t.proofs[1], bobPublicKey)) then 1 else 0
+      let matcher = if (sigVerify(t.bodyBytes, t.proofs[2], matcherPublicKey)) then 1 else 0
+      alice + bob + matcher >= 2
+    case s : SetScriptTransaction => true
+    case _ => throw()
+  }
+   */
+  private val sc6 = Scripts.renderScriptTemplate(
+    "AgQAAAAOYWxpY2VQdWJsaWNLZXkBAAAAEHthbGljZVB1YmxpY0tleX0EAAAADGJvYlB1YmxpY0tleQEAAAAOe2JvYlB1Y" +
+      "mxpY0tleX0EAAAAEG1hdGNoZXJQdWJsaWNLZXkBAAAAEnttYXRjaGVyUHVibGljS2V5fQQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAA" +
+      "ByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gwBAAAAAVhbGljZQMJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAI" +
+      "IBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAOYWxpY2VQdWJsaWNLZXkAAAAAAAAAAAEAAAAAAAAAAAAEAAAAA2JvYgMJAAH0AAAAAwgFAA" +
+      "AAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAAAAF0AAAABnByb29mcwAAAAAAAAAAAQUAAAAMYm9iUHVibGljS2V5AAAAAAAAAAABAAAAAAAAA" +
+      "AAABAAAAAdtYXRjaGVyAwkAAfQAAAADCAUAAAABdAAAAAlib2R5Qnl0ZXMJAAGRAAAAAggFAAAAAXQAAAAGcHJvb2ZzAAAAAAAAAAACBQAAABBt" +
+      "YXRjaGVyUHVibGljS2V5AAAAAAAAAAABAAAAAAAAAAAACQAAZwAAAAIJAABkAAAAAgkAAGQAAAACBQAAAAVhbGljZQUAAAADYm9iBQAAAAdtYXR" +
+      "jaGVyAAAAAAAAAAACAwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAABRTZXRTY3JpcHRUcmFuc2FjdGlvbgQAAAABcwUAAAAHJG1hdGNoMAYJAQAAAA" +
+      "V0aHJvdwAAAABu4D+b",
+    "{alicePublicKey}"   -> alice.publicKey,
+    "{bobPublicKey}"     -> bob.publicKey,
+    "{matcherPublicKey}" -> matcher.publicKey
+  )
+
+  /*
+  let wctId = base64'e3djdElkfQ=='
+  match tx {
+    case t : Order =>
+      let id = t.id == base58''
+      let assetPairAmount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == wctId else false
+      let assetPairPrice = isDefined(t.assetPair.priceAsset)
+      (assetPairAmount && !assetPairPrice)
+    case s : SetScriptTransaction => true
+    case other => throw()
+  }
+   */
+  private val sc7 = Scripts.renderScriptTemplate(
+    "AgQAAAAFd2N0SWQBAAAAB3t3Y3RJZH0EAAAAByRtYXRjaDAFAAAAAnR4AwkAAAEAAAACBQAAAAckbWF0Y2gwAgAAAAVPc" +
+      "mRlcgQAAAABdAUAAAAHJG1hdGNoMAQAAAACaWQJAAAAAAAAAggFAAAAAXQAAAACaWQBAAAAAAQAAAAPYXNzZXRQYWlyQW1vdW50AwkBAAAACWlz" +
+      "RGVmaW5lZAAAAAEICAUAAAABdAAAAAlhc3NldFBhaXIAAAALYW1vdW50QXNzZXQJAAAAAAAAAgkBAAAAB2V4dHJhY3QAAAABCAgFAAAAAXQAAAA" +
+      "JYXNzZXRQYWlyAAAAC2Ftb3VudEFzc2V0BQAAAAV3Y3RJZAcEAAAADmFzc2V0UGFpclByaWNlCQEAAAAJaXNEZWZpbmVkAAAAAQgIBQAAAAF0AA" +
+      "AACWFzc2V0UGFpcgAAAApwcmljZUFzc2V0AwUAAAAPYXNzZXRQYWlyQW1vdW50CQEAAAABIQAAAAEFAAAADmFzc2V0UGFpclByaWNlBwMJAAABA" +
+      "AAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGBAAAAAVvdGhlcgUAAAAHJG1hdGNoMAkB" +
+      "AAAABXRocm93AAAAAPKBXCk=",
+    "{wctId}" -> WctId
+  )
+
+  /*
+  let matcherPublicKey = base64'e21hdGNoZXJQdWJsaWNLZXl9'
+  match tx {
+    case t : Order => sigVerify(t.bodyBytes,t.proofs[0], matcherPublicKey) # here was alice
+    case s : SetScriptTransaction => true
+    case _ => throw()
+  }
+   */
+  private val sc8 = Scripts.renderScriptTemplate(
+    "AgQAAAAQbWF0Y2hlclB1YmxpY0tleQEAAAASe21hdGNoZXJQdWJsaWNLZXl9BAAAAAckbWF0Y2gwBQAAAAJ0eAMJAAABA" +
+      "AAAAgUAAAAHJG1hdGNoMAIAAAAFT3JkZXIEAAAAAXQFAAAAByRtYXRjaDAJAAH0AAAAAwgFAAAAAXQAAAAJYm9keUJ5dGVzCQABkQAAAAIIBQAA" +
+      "AAF0AAAABnByb29mcwAAAAAAAAAAAAUAAAAQbWF0Y2hlclB1YmxpY0tleQMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnN" +
+      "hY3Rpb24EAAAAAXMFAAAAByRtYXRjaDAGCQEAAAAFdGhyb3cAAAAAWX4f/Q==",
+    "{matcherPublicKey}" -> matcher.publicKey
+  )
+
+  /*
+  match tx {
+    case t : Order => height < 0
+    case s : SetScriptTransaction => true
+    case _ => throw()
+  }
+   */
+  private val sc9 = Scripts.fromBase64(
+    "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAABU9yZGVyBAAAAAF0BQAAAAckbWF0Y2gwCQAAZgAAAAIA" +
+      "AAAAAAAAAAAFAAAABmhlaWdodAMJAAABAAAAAgUAAAAHJG1hdGNoMAIAAAAUU2V0U2NyaXB0VHJhbnNhY3Rpb24EAAAAAXMFAAAAByRtYXRjaDA" +
+      "GCQEAAAAFdGhyb3cAAAAAnVjIGw=="
+  )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -37,97 +205,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   }
 
   "Proofs and AssetPairs verification with SmartContracts" - {
-    val sc3 = s"""
-                 |match tx {
-                 | case t : Order =>
-                 |   let id = t.id == base58''
-                 |   let assetPair1Amount = isDefined(t.assetPair.amountAsset)
-                 |   let assetPair1Price = if (isDefined(t.assetPair.priceAsset)) then extract(t.assetPair.priceAsset) == base58'$UsdId' else false
-                 |   let assetPair2Amount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'${issueAliceAssetTx
-                   .id()}' else false
-                 |   let assetPair2Price = isDefined(t.assetPair.priceAsset)
-                 |   (!assetPair1Amount && assetPair1Price) || (assetPair2Amount && !assetPair2Price)
-                 | case s : SetScriptTransaction => true
-                 | case other => throw()
-                 | }
-                 |""".stripMargin
-
-    val sc4 = s"""
-              |match tx {
-              | case t : Order =>
-              |    let id = t.id == base58''
-              |    #let sender = t.sender == (base58'${ByteStr(alice.publicKey)}')
-              |    let senderPublicKey = t.senderPublicKey == base58'${ByteStr(alice.publicKey)}'
-              |    let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(matcher.publicKey)}'
-              |    let timestamp = t.timestamp > 0
-              |    let price = t.price > 0
-              |    let amount = t.amount > 0
-              |    let expiration = t.expiration > 0
-              |    let matcherFee = t.matcherFee > 0
-              |    let bodyBytes = t.bodyBytes == base64''
-              |    !id && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee &&
-              |    expiration && matcherFee && !bodyBytes
-              |  case s : SetScriptTransaction => true
-              |  case _ => throw()
-              | }
-      """.stripMargin
-
-    val sc5 = s"""
-                 |match tx {
-                 |  case t : Order =>
-                 |        let pk1 = base58'${ByteStr(alice.publicKey)}'
-                 |   sigVerify(t.bodyBytes,t.proofs[0],pk1)
-                 |  case s : SetScriptTransaction => true
-                 |  case _ => throw()
-                 | }
-      """.stripMargin
-
-    val sc6 = s"""
-                 |match tx {
-                 |  case t : Order =>
-                 |        let pk1 = base58'${ByteStr(alice.publicKey)}'
-                 |        let pk2 = base58'${ByteStr(bob.publicKey)}'
-                 |        let pk3 = base58'${ByteStr(matcher.publicKey)}'
-                 |
-                 |        let alice = if (sigVerify(t.bodyBytes,t.proofs[0],pk1)) then 1 else 0
-                 |        let bob = if (sigVerify(t.bodyBytes,t.proofs[1],pk2)) then 1 else 0
-                 |        let matcher = if (sigVerify(t.bodyBytes,t.proofs[2],pk3)) then 1 else 0
-                 |        alice + bob + matcher >=2
-                 |  case s : SetScriptTransaction => true
-                 |  case _ => throw()
-                 | }
-      """.stripMargin
-
-    val sc7 = s"""
-                 |match tx {
-                 | case t : Order =>
-                 |   let id = t.id == base58''
-                 |   let assetPairAmount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'$WctId' else false
-                 |   let assetPairPrice = isDefined(t.assetPair.priceAsset)
-                 |   (assetPairAmount && !assetPairPrice)
-                 | case s : SetScriptTransaction => true
-                 | case other => throw()
-                 | }
-                 |""".stripMargin
-
-    val sc8 = s"""
-                 |match tx {
-                 |  case t : Order =>
-                 |   let pk1 = base58'${ByteStr(matcher.publicKey)}' # here was alice
-                 |   sigVerify(t.bodyBytes,t.proofs[0],pk1)
-                 |  case s : SetScriptTransaction => true
-                 |  case _ => throw()
-                 | }
-      """.stripMargin
-
-    val sc9 = s"""
-                 |match tx {
-                 |  case t : Order => height < 0
-                 |  case s : SetScriptTransaction => true
-                 |  case _ => throw()
-                 | }
-      """.stripMargin
-
     "positive scenarios of order placement" - {
       "set contracts with AssetPairs/all tx fields/true/one proof and then place order" - {
         for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
@@ -183,7 +260,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract on AssetPairs/true/all fields/one proof" - {
         for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
-          log.debug(s"contract: $sc")
           val aliceOrd1 =
             mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, matcherFee = smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
@@ -205,15 +281,15 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.fee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.fee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }
       }
 
       "place order and then set contract with many proofs" in {
-        setAliceScript("true")
+        setAliceScript(Scripts.alwaysTrue)
         broadcastAndAwait(mkTransfer(alice, bob, 1000, aliceAsset, 0.005.waves))
 
         for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {
@@ -252,8 +328,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           dex1.api.waitForOrderStatus(bobOrd1, OrderStatus.Filled)
           dex1.api.waitForOrderStatus(bobOrd2, OrderStatus.Filled)
 
-          waitForOrderAtNode(bobOrd1).head.fee shouldBe 300000
-          waitForOrderAtNode(bobOrd2).head.fee shouldBe 300000
+          waitForOrderAtNode(bobOrd1).head.getFee shouldBe 300000
+          waitForOrderAtNode(bobOrd2).head.getFee shouldBe 300000
 
           dex1.api.reservedBalance(bob) shouldBe empty
         }
@@ -265,7 +341,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     "negative scenarios of order placement" - {
       "set contact and then place order" - {
         for ((sc, i) <- Seq(sc2, sc7, sc8).zip(Seq(2, 7, 8))) s"$i" in {
-          log.debug(s"contract: $sc")
           setAliceScript(sc)
 
           dex1.api
@@ -294,8 +369,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract" - {
         for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) s"$i" in {
-          log.debug(s"contract $contract")
-
           val aliceOrd1 = mkOrder(alice, predefAssetPair, OrderType.BUY, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)
           placeAndAwaitAtDex(aliceOrd1)
 
@@ -318,12 +391,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
           val r1           = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
           r1 shouldBe 'left
-          r1.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+          r1.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
           val r2           = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
           r2 shouldBe 'left
-          r2.left.get.error shouldBe TransactionNotAllowedByAccountScript.Id
+          r2.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
           dex1.api.reservedBalance(bob) shouldBe empty
@@ -334,7 +407,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def setAliceScript(scriptText: String): Unit =
-    broadcastAndAwait(mkSetAccountScriptText(alice, Some(scriptText), fee = setScriptFee + smartFee))
-  private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkSetAccountScriptText(alice, None, fee = setScriptFee + smartFee))
+  private def setAliceScript(binaryCode: ByteStr): Unit =
+    broadcastAndAwait(mkSetAccountScript(alice, Some(binaryCode), fee = setScriptFee + smartFee))
+  private def resetAliceAccountScript(): Unit = broadcastAndAwait(mkResetAccountScript(alice, fee = setScriptFee + smartFee))
 }

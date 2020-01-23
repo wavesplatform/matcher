@@ -7,31 +7,30 @@ import cats.instances.map.catsKernelStdCommutativeMonoidForMap
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.semigroup.catsSyntaxSemigroup
-import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto.Verifier
+import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.model.Normalization._
+import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.dex.model.MatcherModel.Normalization
-import com.wavesplatform.dex.model.MatcherModel.Normalization._
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.OrderOps._
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 
 import scala.Either.cond
@@ -49,7 +48,8 @@ object OrderValidator extends ScorexLogging {
   val MinExpiration: Long  = 60 * 1000L
   val MaxActiveOrders: Int = 200
 
-  val exchangeTransactionCreationFee: Long = FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
+  val exchangeTransactionCreationFee: Long = 30000L
+  val ScriptExtraFee                       = 400000L
 
   private[dex] def multiplyAmountByDouble(a: Long, d: Double): Long = (BigDecimal(a) * d).setScale(0, RoundingMode.HALF_UP).toLong
   private[dex] def multiplyPriceByDouble(p: Long, d: Double): Long  = (BigDecimal(p) * d).setScale(0, RoundingMode.HALF_UP).toLong
@@ -176,7 +176,7 @@ object OrderValidator extends ScorexLogging {
       val assetPair   = order.assetPair
       val amountAsset = assetPair.amountAsset
       val priceAsset  = assetPair.priceAsset
-      val feeAsset    = order.matcherFeeAssetId
+      val feeAsset    = order.feeAsset
 
       lazy val exchangeTx: Result[ExchangeTransaction] = {
         val fakeOrder: Order  = order.updateType(order.orderType.opposite)
@@ -268,18 +268,18 @@ object OrderValidator extends ScorexLogging {
                                              rateCache: RateCache): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee)    => lift { fixedMinFee }
     case percentSettings: PercentSettings => lift { getMinValidFeeForPercentFeeSettings(order, percentSettings, order.price) }
-    case DynamicSettings(baseFee)         => convertFeeByAssetRate(baseFee, order.matcherFeeAssetId, assetDecimals(order.matcherFeeAssetId), rateCache)
+    case DynamicSettings(baseFee)         => convertFeeByAssetRate(baseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
     val requiredFeeAssets = getValidFeeAssetForSettings(order, orderFeeSettings, rateCache)
-    cond(requiredFeeAssets contains order.matcherFeeAssetId, order, error.UnexpectedFeeAsset(requiredFeeAssets, order.matcherFeeAssetId))
+    cond(requiredFeeAssets contains order.feeAsset, order, error.UnexpectedFeeAsset(requiredFeeAssets, order.feeAsset))
   }
 
   private def validateFee(order: Order, orderFeeSettings: OrderFeeSettings, assetDecimals: Asset => Int, rateCache: RateCache)(
       implicit efc: ErrorFormatterContext): Result[Order] = {
     getMinValidFeeForSettings(order, orderFeeSettings, assetDecimals, rateCache) flatMap { requiredFee =>
-      cond(order.matcherFee >= requiredFee, order, error.FeeNotEnough(requiredFee, order.matcherFee, order.matcherFeeAssetId))
+      cond(order.matcherFee >= requiredFee, order, error.FeeNotEnough(requiredFee, order.matcherFee, order.feeAsset))
     }
   }
 
@@ -297,7 +297,7 @@ object OrderValidator extends ScorexLogging {
         .ensure(error.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
         .ensure(error.OrderVersionDenied(order.version, matcherSettings.allowedOrderVersions))(o => matcherSettings.allowedOrderVersions(o.version))
-      _ <- validateBlacklistedAsset(order.matcherFeeAssetId, error.FeeAssetBlacklisted)
+      _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted)
       _ <- validateFeeAsset(order, matcherSettings.orderFee, rateCache)
       _ <- validateFee(order, matcherSettings.orderFee, assetDecimals, rateCache)
     } yield order

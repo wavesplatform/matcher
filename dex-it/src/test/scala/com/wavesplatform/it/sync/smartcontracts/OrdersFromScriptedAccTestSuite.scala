@@ -1,12 +1,14 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.feature.BlockchainFeatures
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
@@ -26,14 +28,15 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   )
 
   private val aliceAssetTx   = mkIssue(alice, "AliceCoin", someAssetAmount, 0)
-  private val aliceAsset     = IssuedAsset(aliceAssetTx.id())
+  private val aliceAsset     = IssuedAsset(aliceAssetTx.getId)
   private val aliceWavesPair = AssetPair(aliceAsset, Waves)
 
-  private def updateBobScript(codeText: String): Unit = broadcastAndAwait(mkSetAccountScriptText(bob, Some(codeText), fee = setScriptFee + smartFee))
+  private def updateBobScript(binaryCodeInBase64: String): Unit =
+    broadcastAndAwait(mkSetAccountScript(bob, Some(Scripts.fromBase64(binaryCodeInBase64)), fee = setScriptFee + smartFee))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    broadcastAndAwait(aliceAssetTx, mkSetAccountScriptText(bob, Some("true")))
+    broadcastAndAwait(aliceAssetTx, mkSetAccountScript(bob, Scripts.alwaysTrue))
   }
 
   "issue asset and run test" - {
@@ -55,7 +58,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
         x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
       })
-      updateBobScript("true && (height > 0)")
+      // true && (height > 0)
+      updateBobScript("AgMGCQAAZgAAAAIFAAAABmhlaWdodAAAAAAAAAAAAAeEODpj")
       Thread.sleep(3000) // TODO Sometimes fail without this awaiting, probably issue in the cache
       dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
         3147521, // AccountScriptException
@@ -64,44 +68,44 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "scripted account can trade once SmartAccountTrading is activated" in {
-      updateBobScript(
-        """let x = (let x = 2
-          |3)
-          |x == 3""".stripMargin
-      )
+      // let x = 3; x == 3
+      updateBobScript("AgQAAAABeAAAAAAAAAAAAwkAAAAAAAACBQAAAAF4AAAAAAAAAAADT0BZng==")
       dex1.api
         .place(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2))
         .status shouldBe "OrderAccepted"
     }
 
     "scripted dApp account can trade" in {
-      updateBobScript(
-        """{-# STDLIB_VERSION 3       #-}
-          |{-# CONTENT_TYPE   DAPP    #-}
-          |{-# SCRIPT_TYPE    ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func call() = WriteSet([])
-          |""".stripMargin
-      )
+      /*
+      {-# STDLIB_VERSION 3       #-}
+      {-# CONTENT_TYPE   DAPP    #-}
+      {-# SCRIPT_TYPE    ACCOUNT #-}
+
+      @Callable(i)
+      func call() = WriteSet([])
+       */
+      updateBobScript("AAIDAAAAAAAAAAQIARIAAAAAAAAAAAEAAAABaQEAAAAEY2FsbAAAAAAJAQAAAAhXcml0ZVNldAAAAAEFAAAAA25pbAAAAABTiKBL")
 
       val bobOrder = mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)
       dex1.api.place(bobOrder).status shouldBe "OrderAccepted"
     }
 
     "scripted dApp account" - {
+      /*
+      {-# STDLIB_VERSION 3       #-}
+      {-# CONTENT_TYPE   DAPP    #-}
+      {-# SCRIPT_TYPE    ACCOUNT #-}
+
+      @Verifier(tx)
+      func verify() =
+        match tx {
+          case o: Order => o.amount > 1000
+          case _        => true
+        }
+       */
       "prepare" in updateBobScript(
-        """{-# STDLIB_VERSION 3       #-}
-          |{-# CONTENT_TYPE   DAPP    #-}
-          |{-# SCRIPT_TYPE    ACCOUNT #-}
-          |
-          |@Verifier(tx)
-          |func verify() =
-          |  match tx {
-          |    case o: Order => o.amount > 1000
-          |    case _        => true
-          |  }
-          |""".stripMargin
+        "AAIDAAAAAAAAAAIIAQAAAAAAAAAAAAAAAQAAAAJ0eAEAAAAGdmVyaWZ5AAAAAAQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAABy" +
+          "RtYXRjaDACAAAABU9yZGVyBAAAAAFvBQAAAAckbWF0Y2gwCQAAZgAAAAIIBQAAAAFvAAAABmFtb3VudAAAAAAAAAAD6AboNesg"
       )
 
       "accept correct order" in {

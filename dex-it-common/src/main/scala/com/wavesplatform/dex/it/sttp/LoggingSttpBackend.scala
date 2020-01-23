@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.sttp
 
 import com.softwaremill.sttp.{MonadError, Request, Response, SttpBackend}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 class LoggingSttpBackend[R[_], S](delegate: SttpBackend[R, S]) extends SttpBackend[R, S] with ScorexLogging {
 

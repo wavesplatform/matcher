@@ -2,24 +2,26 @@ package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.dex.MatcherTestData
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.{Normalization, Price}
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
-import com.wavesplatform.dex.model.MatcherModel.{Normalization, Price}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
-import com.wavesplatform.settings.Constants
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.OrderType._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.{NTPTime, NoShrink}
+import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with MatcherTestData with NTPTime with NoShrink {
+class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with MatcherSpecBase with NTPTime with NoShrink {
+
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
   "place buy orders with different prices" in {
@@ -287,7 +289,7 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
   }
 
   "partially execute order with zero fee remaining part" in {
-    val ord1 = sell(pair, 1500 * Constants.UnitsInWave, 0.0006999)
+    val ord1 = sell(pair, 1500.waves, 0.0006999)
     val ord2 = sell(pair, 3075248828L, 0.00067634)
     val ord3 = buy(pair, 3075363900L, 0.00073697)
 
@@ -308,9 +310,9 @@ class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with Matc
 
   "partially execute order with price > 1 and zero fee remaining part " in {
     val pair = AssetPair(IssuedAsset(ByteStr("BTC".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
-    val ord1 = sell(pair, (0.1 * Constants.UnitsInWave).toLong, 1850)
-    val ord2 = sell(pair, (0.01 * Constants.UnitsInWave).toLong, 1840)
-    val ord3 = buy(pair, (0.0100001 * Constants.UnitsInWave).toLong, 2000)
+    val ord1 = sell(pair, 0.1.waves, 1850)
+    val ord2 = sell(pair, 0.01.waves, 1840)
+    val ord3 = buy(pair, 0.0100001.waves, 2000)
 
     val ob = OrderBook.empty
 

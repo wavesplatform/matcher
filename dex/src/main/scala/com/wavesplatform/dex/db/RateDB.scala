@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.DBExt
 import com.wavesplatform.dex.MatcherKeys
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.dex.db.leveldb.DBExt
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import org.iq80.leveldb.DB
 
 import scala.collection.mutable.ListBuffer

@@ -1,6 +1,9 @@
-import CommonSettings.autoImport.{network, nodeVersion}
+import java.io.BufferedInputStream
+import java.nio.file.Files
+
+import CommonSettings.autoImport.network
+import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
-import com.typesafe.sbt.packager.Compat._
 import com.typesafe.sbt.packager.Keys.{debianPackageDependencies, maintainerScripts, packageName}
 import com.typesafe.sbt.packager.archetypes.JavaAppPackaging.autoImport.maintainerScriptsAppend
 import com.typesafe.sbt.packager.debian.DebianPlugin.Names.Postinst
@@ -10,6 +13,7 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 import com.typesafe.sbt.packager.linux.LinuxPlugin.autoImport.{defaultLinuxInstallLocation, linuxPackageMappings}
 import com.typesafe.sbt.packager.linux.LinuxPlugin.{Users, mapGenericMappingsToLinux}
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
+import org.apache.commons.compress.archivers.{ArchiveEntry, ArchiveStreamFactory}
 import sbt.Keys._
 import sbt._
 
@@ -21,7 +25,7 @@ object ExtensionPackaging extends AutoPlugin {
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging
+  override def requires: Plugins = CommonSettings && UniversalDeployPlugin && JDebPackaging && WavesNodeArtifactsPlugin
 
   override def projectSettings: Seq[Def.Setting[_]] =
     Seq(
@@ -34,13 +38,26 @@ object ExtensionPackaging extends AutoPlugin {
       // Note: This is sometimes on the classpath via dependencyClasspath in Runtime.
       // We need to figure out why sometimes the Attributed[File] is correctly configured
       // and sometimes not.
-      classpathOrdering += {
-        val jar = (Compile / packageBin).value
-        val id  = projectID.value
-        val art = (Compile / packageBin / artifact).value
-        jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
+      classpathOrdering += linkedProjectJar(
+        jar = (Compile / packageBin).value,
+        art = (Compile / packageBin / artifact).value,
+        moduleId = projectID.value
+      ),
+      classpathOrdering ++= {
+        val jar = """(.+)[-_]([\d\.]+.*)\.jar""".r
+        val inDeb = filesInDeb((Compile / unmanagedBase).value / s"waves_${wavesNodeVersion.value}_all.deb")
+          .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share/waves/lib"))
+          .map(_.split('/').last)
+          .map {
+            case jar(name, rev) => name -> rev
+            case x              => throw new RuntimeException(s"Can't parse JAR name: $x")
+          }
+          .toMap
+
+        val (r, conflicts) = excludeProvidedArtifacts((Runtime / dependencyClasspath).value, inDeb)
+        streams.value.log.warn(s"Found conflicts (name: deb != ours):\n${conflicts.map { case (name, (deb, ours)) => s"$name: $deb != $ours" }.mkString("\n")}")
+        r.toSeq
       },
-      classpathOrdering ++= excludeProvidedArtifacts((Runtime / dependencyClasspath).value, findProvidedArtifacts.value),
       Universal / mappings ++= classpathOrdering.value ++ {
         val baseConfigName = s"${name.value}-${network.value}.conf"
         val localFile      = (Compile / baseDirectory).value / baseConfigName
@@ -51,7 +68,7 @@ object ExtensionPackaging extends AutoPlugin {
       },
       classpath := makeRelativeClasspathNames(classpathOrdering.value),
       nodePackageName := s"waves${network.value.packageSuffix}",
-      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${nodeVersion.value})"),
+      debianPackageDependencies := Seq(s"${nodePackageName.value} (= ${wavesNodeVersion.value})"),
       // To write files to Waves NODE directory
       linuxPackageMappings := getUniversalFolderMappings(
         nodePackageName.value,
@@ -71,9 +88,6 @@ object ExtensionPackaging extends AutoPlugin {
     normalizedName := s"${packageName.value}"
   )
 
-  // 1.0.1 -> 1.0.999
-  private def mostSupportedVersion(leastSupportedVersion: String): String = leastSupportedVersion.replaceFirst("\\.[^.]+$", ".999")
-
   // A copy of com.typesafe.sbt.packager.linux.LinuxPlugin.getUniversalFolderMappings
   private def getUniversalFolderMappings(pkg: String, installLocation: String, mappings: Seq[(File, String)]): Seq[LinuxPackageMapping] = {
     def isWindowsFile(f: (File, String)): Boolean = f._2 endsWith ".bat"
@@ -92,6 +106,17 @@ object ExtensionPackaging extends AutoPlugin {
       if (name startsWith "lib/") name drop 4
       else "../" + name
     }
+
+  def linkedProjectJar(jar: File, art: Artifact, moduleId: ModuleID): (File, String) = {
+    val jarName = ExtensionPackaging.makeJarName(
+      org = moduleId.organization,
+      name = moduleId.name,
+      revision = moduleId.revision,
+      artifactName = art.name,
+      artifactClassifier = art.classifier
+    )
+    jar -> s"lib/$jarName"
+  }
 
   /**
     * Constructs a jar name from components...(ModuleID/Artifact)
@@ -118,54 +143,42 @@ object ExtensionPackaging extends AutoPlugin {
     filename.getOrElse(dep.data.getName)
   }
 
-  // Here we grab the dependencies...
-  private def dependencyProjectRefs(build: BuildDependencies, thisProject: ProjectRef): Seq[ProjectRef] =
-    build.classpathTransitive.getOrElse(thisProject, Nil)
+  private def excludeProvidedArtifacts(runtimeClasspath: Classpath,
+                                       exclusions: Map[String, String]): (Map[File, String], Map[String, (String, String)]) = {
+    val initJarMapping = Map.empty[File, String]
+    val initConflicts  = Map.empty[String, (String, String)]
+    runtimeClasspath.foldLeft((initJarMapping, initConflicts)) {
+      case (r @ (jarMapping, conflicts), x) if x.data.isFile =>
+        x.get(Keys.moduleID.key) match {
+          case None => r
+          case Some(artifact) =>
+            val name = s"${artifact.organization}.${artifact.name}"
+            exclusions.get(name) match {
+              case None => (jarMapping.updated(x.data, "lib/" + getJarFullFilename(x)), conflicts)
+              case Some(debRevision) =>
+                if (debRevision == artifact.revision) r
+                else (jarMapping, conflicts.updated(name, (debRevision, artifact.revision)))
+            }
+        }
+      case (r, _) => r
+    }
+  }
 
-  private def isRuntimeArtifact(dep: Attributed[File]): Boolean =
-    dep.get(sbt.Keys.artifact.key).map(a => a.`type` == "jar" || a.`type` == "bundle").getOrElse {
-      val name = dep.data.getName
-      !(name.endsWith(".jar") || name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar"))
+  private def filesInDeb(file: File): List[String] = {
+    val fs      = new BufferedInputStream(Files.newInputStream(file.toPath))
+    val factory = new ArchiveStreamFactory()
+
+    def entries: Iterator[ArchiveEntry] = {
+      val ais = factory.createArchiveInputStream(fs)
+      Iterator.continually(ais.getNextEntry).takeWhile(_ != null).filter(ais.canReadEntryData)
     }
 
-  private def findProvidedArtifacts: Def.Initialize[Task[Classpath]] =
-    Def
-      .task {
-        val stateTask = state.taskValue
-        val refs      = dependencyProjectRefs(buildDependencies.value, thisProjectRef.value)
-
-        val providedClasspath = refs.map { ref =>
-          stateTask.flatMap { state =>
-            val extracted = Project.extract(state)
-            extracted.get(Runtime / dependencyClasspath in ref)
-          }
-        }
-
-        val allProvidedClasspath: Task[Classpath] =
-          providedClasspath
-            .fold[Task[Classpath]](task(Nil)) { (prev, next) =>
-              for {
-                p <- prev
-                n <- next
-              } yield p ++ n.filter(isRuntimeArtifact)
-            }
-            .map(_.distinct)
-
-        allProvidedClasspath
+    try entries
+      .flatMap { x =>
+        if (x.getName == "data.tar") entries else Iterator(x)
       }
-      .flatMap(identity)
-
-  private def excludeProvidedArtifacts(runtimeClasspath: Classpath, exclusions: Classpath): Seq[(File, String)] = {
-    val excludedArtifacts = (for {
-      a <- exclusions
-      moduleID = a.get(Keys.moduleID.key)
-    } yield (moduleID.map(_.organization), moduleID.map(_.name))).toSet
-
-    (for {
-      r <- runtimeClasspath
-      if r.data.isFile
-      moduleID = r.get(Keys.moduleID.key)
-      if !excludedArtifacts((moduleID.map(_.organization), moduleID.map(_.name)))
-    } yield r.data -> ("lib/" + getJarFullFilename(r))).distinct
+      .map(_.getName)
+      .toList
+    finally fs.close()
   }
 }

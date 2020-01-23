@@ -1,9 +1,10 @@
 package com.wavesplatform.dex.doc
 
-import org.scalatest.{FreeSpec, Matchers}
 import com.wavesplatform.dex.util.getSimpleName
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 
-class MatcherErrorDocSpec extends FreeSpec with Matchers {
+class MatcherErrorDocSpec extends AnyFreeSpec with Matchers {
   "MatcherErrorDoc" - {
     "should not contain two equal error codes" in {
       val samples = MatcherErrorDoc.errorSamples.run.sortBy(_.code)

@@ -3,7 +3,7 @@ package com.wavesplatform.dex.settings.utils
 import java.util.Properties
 
 import cats.data.Validated
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.dex.settings.utils.ConfigSettingsValidator.ErrorListOrOps
 import mouse.any._
 import net.ceedubs.ficus.readers.ValueReader
@@ -12,7 +12,7 @@ object ConfigOps {
 
   final implicit class ConfigOps(config: Config) {
 
-    val cfgValidator = ConfigSettingsValidator(config)
+    val cfgValidator: ConfigSettingsValidator = ConfigSettingsValidator(config)
 
     def getValidatedSet[T: ValueReader](path: String): Set[T] = {
       cfgValidator.validateList[T](path).map(_.toSet) getValueOrThrowErrors
@@ -31,5 +31,18 @@ object ConfigOps {
         properties.setProperty(entry.getKey, config getString entry.getKey)
       }
     }
+
+    def rendered: String =
+      config
+        .resolve()
+        .root()
+        .render(
+          ConfigRenderOptions
+            .concise()
+            .setOriginComments(false)
+            .setComments(false)
+            .setFormatted(true)
+            .setJson(false)
+        )
   }
 }

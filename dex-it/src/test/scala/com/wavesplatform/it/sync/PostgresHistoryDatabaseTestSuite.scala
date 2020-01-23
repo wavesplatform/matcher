@@ -4,19 +4,16 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.dex.it.docker.base.BaseContainer
-import com.wavesplatform.dex.model.MatcherModel.Normalization
 import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import io.getquill.{PostgresJdbcContext, SnakeCase}
 import net.ceedubs.ficus.Ficus._
 
@@ -61,11 +58,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
       username = customUser,
       password = customPassword
     ).configure { p =>
-      p.withNetwork(BaseContainer.network)
+      p.withNetwork(network)
       p.withNetworkAliases(postgresContainerName)
       p.withCreateContainerCmdModifier { cmd =>
         cmd withName postgresContainerName
-        cmd withIpv4Address BaseContainer.getIp(11)
+        cmd withIpv4Address getIp(11)
       }
     }
 
@@ -182,22 +179,13 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         EventBriefInfo(r.orderId, r.eventType, r.filled.toDouble, r.totalFilled.toDouble, r.feeFilled.toDouble, r.feeTotalFilled.toDouble, r.status)
       }
 
-  implicit class DoubleOps(value: Double) {
-    val wct, usd: Long      = Normalization.normalizeAmountAndFee(value, 2)
-    val eth, btc: Long      = Normalization.normalizeAmountAndFee(value, 8)
-    val wctUsdPrice: Long   = Normalization.normalizePrice(value, 2, 2)
-    val wavesUsdPrice: Long = Normalization.normalizePrice(value, 8, 2)
-  }
-
-  def stringify(asset: Asset): String = AssetPair.assetIdStr(asset)
-
   "Order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
       .foreach { i =>
-        dex1.api.place(mkOrder(alice, wctUsdPair, BUY, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
-        dex1.api.place(mkOrder(bob, wctUsdPair, SELL, 1.wct, 0.35.wctUsdPrice, 0.003.waves, ttl = 1.day + i.seconds))
+        dex1.api.place(mkOrderDP(alice, wctUsdPair, BUY, 1.wct, 0.35, 0.003.waves, ttl = 1.day + i.seconds))
+        dex1.api.place(mkOrderDP(bob, wctUsdPair, SELL, 1.wct, 0.35, 0.003.waves, ttl = 1.day + i.seconds))
       }
 
     eventually {
@@ -208,8 +196,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 big counter and 2 small submitted" in {
 
-    def sellOrder: Order = mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.35.wctUsdPrice, matcherFee = 0.00000030.btc, matcherFeeAssetId = btc)
-    val buyOrder         = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
+    def sellOrder: Order = mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.35, matcherFee = 0.00000030.btc, feeAsset = btc)
+    val buyOrder         = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
 
     dex1.api.place(buyOrder)
 
@@ -236,9 +224,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                            limitOrderType,
                            bob.publicKey.toString,
                            sellSide,
-                           stringify(wct),
-                           stringify(usd),
-                           stringify(btc),
+                           wct.toString,
+                           usd.toString,
+                           btc.toString,
                            100,
                            0.35,
                            0.00000030)
@@ -256,9 +244,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                          limitOrderType,
                          alice.publicKey.toString,
                          buySide,
-                         stringify(wct),
-                         stringify(usd),
-                         stringify(eth),
+                         wct.toString,
+                         usd.toString,
+                         eth.toString,
                          300,
                          0.35,
                          0.00001703)
@@ -276,8 +264,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
   }
 
   "Order history should correctly save events with Waves as amount and fee" in {
-    val buyOrder  = mkOrder(alice, wavesUsdPair, BUY, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.00370300.waves, matcherFeeAssetId = Waves)
-    val sellOrder = mkOrder(bob, wavesUsdPair, SELL, 300.waves, 0.35.wavesUsdPrice, matcherFee = 0.30.usd, matcherFeeAssetId = usd)
+    val buyOrder  = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
+    val sellOrder = mkOrderDP(bob, wavesUsdPair, SELL, 300.waves, 0.35, matcherFee = 0.30.usd, feeAsset = usd)
 
     dex1.api.place(buyOrder)
     dex1.api.place(sellOrder)
@@ -288,7 +276,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     eventually {
       withClue("checking info for counter order\n") {
         getOrderInfoById(buyOrder.id()).get should matchTo(
-          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", stringify(usd), "WAVES", 300, 0.35, 0.00370300)
+          OrderBriefInfo(buyOrder.idStr(), limitOrderType, alice.publicKey.toString, buySide, "WAVES", usd.toString, "WAVES", 300, 0.35, 0.00370300)
         )
         getEventsInfoByOrderId(buyOrder.id()) should matchTo(
           List(EventBriefInfo(buyOrder.idStr(), eventTrade, 300, 300, 0.00370300, 0.00370300, statusFilled))
@@ -297,16 +285,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       withClue("checking info for submitted order\n") {
         getOrderInfoById(sellOrder.id()).get should matchTo(
-          OrderBriefInfo(sellOrder.idStr(),
-                         limitOrderType,
-                         bob.publicKey.toString,
-                         sellSide,
-                         "WAVES",
-                         stringify(usd),
-                         stringify(usd),
-                         300,
-                         0.35,
-                         0.30)
+          OrderBriefInfo(sellOrder.idStr(), limitOrderType, bob.publicKey.toString, sellSide, "WAVES", usd.toString, usd.toString, 300, 0.35, 0.30)
         )
 
         getEventsInfoByOrderId(sellOrder.id()) should matchTo(
@@ -318,8 +297,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
   "Order history should correctly save events: 1 small counter and 1 big submitted" in {
 
-    val smallBuyOrder = mkOrder(alice, wctUsdPair, BUY, 300.wct, 0.35.wctUsdPrice, 0.00001703.eth, matcherFeeAssetId = eth)
-    val bigSellOrder  = mkOrder(bob, wctUsdPair, SELL, 900.wct, 0.35.wctUsdPrice, 0.00000030.btc, matcherFeeAssetId = btc)
+    val smallBuyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, 0.00001703.eth, feeAsset = eth)
+    val bigSellOrder  = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00000030.btc, feeAsset = btc)
 
     dex1.api.place(smallBuyOrder)
     dex1.api.place(bigSellOrder)
@@ -334,9 +313,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                          limitOrderType,
                          alice.publicKey.toString,
                          buySide,
-                         stringify(wct),
-                         stringify(usd),
-                         stringify(eth),
+                         wct.toString,
+                         usd.toString,
+                         eth.toString,
                          300,
                          0.35,
                          0.00001703)
@@ -353,9 +332,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                          limitOrderType,
                          bob.publicKey.toString,
                          sellSide,
-                         stringify(wct),
-                         stringify(usd),
-                         stringify(btc),
+                         wct.toString,
+                         usd.toString,
+                         btc.toString,
                          900,
                          0.35,
                          0.00000030)
@@ -373,14 +352,16 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     dex1.api.cancelAll(bob)
     dex1.api.cancelAll(alice)
 
-    def bigBuyOrder: Order = mkOrder(alice, wctUsdPair, BUY, 500.wct, 0.35.wctUsdPrice, matcherFee = 0.00001703.eth, matcherFeeAssetId = eth)
+    def bigBuyOrder: Order = mkOrderDP(alice, wctUsdPair, BUY, 500.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
 
     withClue("place buy market order into empty order book") {
 
       val unmatchableMarketBuyOrder = bigBuyOrder
+
       dex1.api.placeMarket(unmatchableMarketBuyOrder)
       dex1.api.waitForOrder(unmatchableMarketBuyOrder)(
-        _ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct)))
+        _ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct))
+      )
 
       eventually {
         getOrderInfoById(unmatchableMarketBuyOrder.id()).get should matchTo(
@@ -388,9 +369,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                          marketOrderType,
                          alice.publicKey.toString,
                          buySide,
-                         stringify(wct),
-                         stringify(usd),
-                         stringify(eth),
+                         wct.toString,
+                         usd.toString,
+                         eth.toString,
                          500,
                          0.35,
                          0.00001703)
@@ -407,9 +388,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
       val ts = System.currentTimeMillis()
 
       val orders = Seq(
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.33.wctUsdPrice, 0.003.waves, ts = ts),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 100),
-        mkOrder(bob, wctUsdPair, SELL, 100.wct, 0.34.wctUsdPrice, 0.003.waves, ts = ts + 200)
+        mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.33, 0.003.waves, ts = ts),
+        mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.34, 0.003.waves, ts = ts + 100),
+        mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.34, 0.003.waves, ts = ts + 200)
       )
 
       orders.foreach { order =>
@@ -427,9 +408,9 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
                          marketOrderType,
                          alice.publicKey.toString,
                          buySide,
-                         stringify(wct),
-                         stringify(usd),
-                         stringify(eth),
+                         wct.toString,
+                         usd.toString,
+                         eth.toString,
                          500,
                          0.35,
                          0.00001703)

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.fp
 
 import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.TimerOps.TimerOpsImplicits
+import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

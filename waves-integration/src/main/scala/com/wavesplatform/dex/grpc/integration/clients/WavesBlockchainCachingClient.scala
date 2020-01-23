@@ -2,14 +2,15 @@ package com.wavesplatform.dex.grpc.integration.clients
 
 import java.time.Duration
 
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.grpc.integration.caches.{AssetDescriptionsCache, BalancesCache, FeaturesCache}
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.{Observable, Observer}
@@ -17,9 +18,8 @@ import monix.reactive.{Observable, Observer}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration)(
-    implicit monixScheduler: Scheduler,
-    grpcExecutionContext: ExecutionContext)
+class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], defaultCacheExpiration: FiniteDuration, monixScheduler: Scheduler)(
+    implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainClient[Future]
     with ScorexLogging {
 
@@ -37,7 +37,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
         def onComplete(): Unit                                 = log.info("Balance changes stream completed!")
         def onError(ex: Throwable): Unit                       = ()
       }
-    }
+    }(monixScheduler)
     underlying.spendableBalanceChanges
   }
 
@@ -51,4 +51,5 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]                           = underlying.wereForged(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean]                                    = underlying.broadcastTx(tx)
   override def forgedOrder(orderId: ByteStr): Future[Boolean]                                           = underlying.forgedOrder(orderId)
+  override def close(): Future[Unit]                                                                    = underlying.close()
 }

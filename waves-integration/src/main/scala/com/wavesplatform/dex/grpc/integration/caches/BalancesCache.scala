@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
-import com.wavesplatform.account.Address
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.dex.domain.account.Address
+import com.wavesplatform.dex.domain.asset.Asset
 
 import scala.concurrent.{ExecutionContext, Future}
 

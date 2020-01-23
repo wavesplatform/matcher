@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.dex.domain.account.AddressScheme
 
 object GenesisConfig {
 

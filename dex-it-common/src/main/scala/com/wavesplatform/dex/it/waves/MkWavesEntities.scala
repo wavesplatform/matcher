@@ -1,34 +1,34 @@
 package com.wavesplatform.dex.it.waves
 
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.PredefinedAccounts.matcher
+import com.wavesplatform.dex.it.waves.Implicits._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.it.waves.WavesFeeConstants._
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV2, LeaseTransaction, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction, TransferTransactionV2}
+import com.wavesplatform.dex.waves.WavesFeeConstants._
+import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction, _}
+import com.wavesplatform.wavesj.{Transactions, Transfer}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration, DurationInt}
 
+// TODO Rename
 trait MkWavesEntities {
 
-  def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
+  private val emptyAttachments: java.lang.String = null
+
+  private def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
   /**
-    * @param matcherFeeAssetId If specified IssuedAsset, the version will be automatically set to 3
+    * @param feeAsset If specified IssuedAsset, the version will be automatically set to 3
     * TODO make ttl random by default to solve issue of creating multiple orders in a loop
     */
   def mkOrder(owner: KeyPair,
@@ -37,12 +37,12 @@ trait MkWavesEntities {
               amount: Long,
               price: Long,
               matcherFee: Long = matcherFee,
-              matcherFeeAssetId: Asset = Waves,
-              ts: Long = System.currentTimeMillis(),
+              feeAsset: Asset = Waves,
+              ts: Long = System.currentTimeMillis,
               ttl: Duration = 30.days - 1.seconds,
               version: Byte = orderVersion,
               matcher: PublicKey = matcher): Order =
-    if (matcherFeeAssetId == Waves)
+    if (feeAsset == Waves)
       Order(
         sender = owner,
         matcher = matcher,
@@ -67,8 +67,24 @@ trait MkWavesEntities {
         expiration = ts + ttl.toMillis,
         matcherFee = matcherFee,
         version = 3,
-        matcherFeeAssetId = matcherFeeAssetId
+        feeAsset = feeAsset
       )
+
+  /** Creates order with denormalized price */
+  def mkOrderDP(owner: KeyPair,
+                pair: AssetPair,
+                orderType: OrderType,
+                amount: Long,
+                price: Double,
+                matcherFee: Long = matcherFee,
+                feeAsset: Asset = Waves,
+                ts: Long = System.currentTimeMillis,
+                ttl: Duration = 30.days - 1.seconds,
+                version: Byte = orderVersion,
+                matcher: PublicKey = matcher)(implicit assetDecimalsMap: Map[Asset, Int]): Order = {
+    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap(pair.amountAsset), assetDecimalsMap(pair.priceAsset))
+    mkOrder(owner, pair, orderType, amount, normalizedPrice, matcherFee, feeAsset, ts, ttl, version, matcher)
+  }
 
   def mkTransfer(sender: KeyPair,
                  recipient: Address,
@@ -76,146 +92,85 @@ trait MkWavesEntities {
                  asset: Asset,
                  feeAmount: Long = minFee,
                  feeAsset: Asset = Waves,
-                 timestamp: Long = System.currentTimeMillis()): TransferTransaction =
-    TransferTransactionV2
-      .selfSigned(
-        assetId = asset,
-        sender = sender,
-        recipient = recipient,
-        amount = amount,
-        timestamp = timestamp,
-        feeAssetId = feeAsset,
-        feeAmount = feeAmount,
-        attachment = Array.emptyByteArray
-      )
-      .explicitGet()
+                 timestamp: Long = System.currentTimeMillis): TransferTransaction = {
+    Transactions.makeTransferTx(sender, recipient, amount, asset, feeAmount, feeAsset, emptyAttachments, timestamp)
+  }
 
   def mkMassTransfer(sender: KeyPair,
                      asset: Asset,
-                     transfers: List[ParsedTransfer],
+                     transfers: List[Transfer],
                      fee: Long = massTransferDefaultFee,
-                     ts: Long = System.currentTimeMillis()): MassTransferTransaction =
-    MassTransferTransaction
-      .selfSigned(
-        sender = sender,
-        assetId = asset,
-        transfers = transfers,
-        timestamp = ts,
-        feeAmount = fee,
-        attachment = Array.emptyByteArray
-      )
-      .explicitGet()
+                     timestamps: Long = System.currentTimeMillis): MassTransferTransaction = {
+    Transactions.makeMassTransferTx(sender, asset, transfers.asJava, fee, emptyAttachments, timestamps)
+  }
 
   def mkLease(sender: KeyPair,
               recipient: Address,
               amount: Long,
               fee: Long = leasingFee,
-              timestamp: Long = System.currentTimeMillis()): LeaseTransaction =
-    LeaseTransactionV2
-      .selfSigned(
-        sender = sender,
-        amount = amount,
-        fee = fee,
-        timestamp = timestamp,
-        recipient = recipient
-      )
-      .explicitGet()
+              timestamp: Long = System.currentTimeMillis): LeaseTransaction = {
+    Transactions.makeLeaseTx(sender, recipient, amount, fee, timestamp)
+  }
 
-  def mkLeaseCancel(sender: KeyPair, leaseId: ByteStr, fee: Long = leasingFee, timestamp: Long = System.currentTimeMillis()): LeaseCancelTransaction =
-    LeaseCancelTransactionV2
-      .selfSigned(
-        chainId = AddressScheme.current.chainId,
-        sender = sender,
-        leaseId = leaseId,
-        fee = fee,
-        timestamp = timestamp
-      )
-      .explicitGet()
+  def mkLeaseCancel(sender: KeyPair, leaseId: ByteStr, fee: Long = leasingFee, timestamp: Long = System.currentTimeMillis): LeaseCancelTransaction = {
+    Transactions.makeLeaseCancelTx(sender, AddressScheme.current.chainId, leaseId.base58, fee, timestamp)
+  }
 
   def mkIssue(issuer: KeyPair,
               name: String,
               quantity: Long,
               decimals: Int = 8,
               fee: Long = issueFee,
-              script: Option[Script] = None,
+              script: Option[ByteStr] = None,
               reissuable: Boolean = false,
-              timestamp: Long = System.currentTimeMillis()): IssueTransaction =
-    IssueTransactionV2
-      .selfSigned(
-        chainId = AddressScheme.current.chainId,
-        sender = issuer,
-        name = name.getBytes(),
-        description = s"$name asset".getBytes(StandardCharsets.UTF_8),
-        quantity = quantity,
-        decimals = decimals.toByte,
-        reissuable = false,
-        script = script,
-        fee = fee,
-        timestamp = timestamp
-      )
-      .explicitGet()
+              timestamp: Long = System.currentTimeMillis): IssueTransaction = {
+    Transactions.makeIssueTx(issuer,
+                             AddressScheme.current.chainId,
+                             name,
+                             s"$name asset",
+                             quantity,
+                             decimals.toByte,
+                             reissuable,
+                             script.map(_.base64).orNull,
+                             fee,
+                             timestamp)
+  }
 
   def mkIssueExtended(issuer: KeyPair,
                       name: String,
                       quantity: Long,
                       decimals: Int = 8,
                       fee: Long = issueFee,
-                      script: Option[Script] = None,
+                      script: Option[ByteStr] = None,
                       reissuable: Boolean = false,
-                      timestamp: Long = System.currentTimeMillis()): IssueResults = {
+                      timestamp: Long = System.currentTimeMillis): IssueResults = {
+
     val tx          = mkIssue(issuer, name, quantity, decimals, fee, script, reissuable, timestamp)
-    val assetId     = tx.id()
+    val assetId     = toVanilla(tx.getId)
     val issuedAsset = IssuedAsset(assetId)
+
     IssueResults(tx, assetId, issuedAsset)
   }
 
+  def mkSetAccountScript(accountOwner: KeyPair, script: ByteStr): SetScriptTransaction =
+    mkSetAccountScript(accountOwner, Some(script))
+
+  def mkResetAccountScript(accountOwner: KeyPair, fee: Long = setScriptFee, timestamp: Long = System.currentTimeMillis): SetScriptTransaction =
+    mkSetAccountScript(accountOwner, None, fee, timestamp)
+
   def mkSetAccountScript(accountOwner: KeyPair,
-                         script: Option[Script],
+                         script: Option[ByteStr],
                          fee: Long = setScriptFee,
-                         ts: Long = System.currentTimeMillis()): SetScriptTransaction =
-    SetScriptTransaction
-      .selfSigned(
-        sender = accountOwner,
-        script = script,
-        fee = fee,
-        timestamp = ts
-      )
-      .explicitGet()
-
-  def mkSetAccountScriptText(accountOwner: KeyPair,
-                             scriptText: Option[String],
-                             fee: Long = setScriptFee,
-                             ts: Long = System.currentTimeMillis()): SetScriptTransaction = {
-    val script = scriptText.map { x =>
-      ScriptCompiler.compile(x.stripMargin, ScriptEstimatorV2).explicitGet()._1
-    }
-
-    mkSetAccountScript(accountOwner, script, fee, ts)
+                         timestamp: Long = System.currentTimeMillis): SetScriptTransaction = {
+    Transactions.makeScriptTx(accountOwner, script.map(_.base64).orNull, AddressScheme.current.chainId, fee, timestamp)
   }
 
   def mkSetAssetScript(assetOwner: KeyPair,
                        asset: IssuedAsset,
-                       script: Option[Script],
+                       script: ByteStr,
                        fee: Long = setAssetScriptFee,
-                       ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction =
-    SetAssetScriptTransaction
-      .selfSigned(
-        chainId = AddressScheme.current.chainId,
-        sender = assetOwner,
-        asset = asset,
-        script = script,
-        fee = fee,
-        timestamp = ts
-      )
-      .explicitGet()
-
-  def mkSetAssetScriptText(assetOwner: KeyPair,
-                           asset: IssuedAsset,
-                           scriptText: String,
-                           fee: Long = setAssetScriptFee,
-                           ts: Long = System.currentTimeMillis()): SetAssetScriptTransaction = {
-    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    mkSetAssetScript(assetOwner, asset, Some(script), fee, ts)
+                       timestamp: Long = System.currentTimeMillis): SetAssetScriptTransaction = {
+    Transactions.makeSetAssetScriptTransaction(assetOwner, AddressScheme.current.chainId, asset, script.base64, fee, timestamp)
   }
 
   def mkExchange(buyOrderOwner: KeyPair,
@@ -224,10 +179,22 @@ trait MkWavesEntities {
                  amount: Long,
                  price: Long,
                  matcherFee: Long = matcherFee,
-                 ts: Long = System.currentTimeMillis(),
-                 matcher: KeyPair): ExchangeTransaction = {
+                 timestamp: Long = System.currentTimeMillis,
+                 matcher: KeyPair): JExchangeTransaction =
+    toWavesJ(mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, matcher = matcher))
+
+  def mkDomainExchange(buyOrderOwner: KeyPair,
+                       sellOrderOwner: KeyPair,
+                       pair: AssetPair,
+                       amount: Long,
+                       price: Long,
+                       matcherFee: Long = matcherFee,
+                       ts: Long = System.currentTimeMillis(),
+                       matcher: KeyPair): ExchangeTransaction = {
+
     val buyOrder  = mkOrder(buyOrderOwner, pair, OrderType.BUY, amount, price, matcherFee, matcher = matcher)
     val sellOrder = mkOrder(sellOrderOwner, pair, OrderType.SELL, amount, price, matcherFee, matcher = matcher)
+
     ExchangeTransactionV2
       .create(
         matcher = matcher,

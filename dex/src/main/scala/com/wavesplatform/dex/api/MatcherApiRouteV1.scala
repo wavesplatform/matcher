@@ -57,7 +57,12 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
-  @ApiOperation(value = "Get Order Book for a given Asset Pair", notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")
+  @ApiOperation(
+    value = "Get Order Book for a given Asset Pair",
+    notes = "Get Order Book for a given Asset Pair",
+    httpMethod = "GET",
+    response = classOf[Any]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),

@@ -1,5 +1,6 @@
 import java.nio.charset.StandardCharsets
 
+import Dependencies.Version
 import DexDockerKeys._
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
@@ -43,9 +44,24 @@ lazy val versionSourceTask = Def.task {
   Seq(versionFile)
 }
 
+lazy val swaggerUiVersionSourceTask = Def.task {
+  val versionFile = sourceManaged.value / "com" / "wavesplatform" / "dex" / "api" / "http" / "SwaggerUiVersion.scala"
+  IO.write(
+    versionFile,
+    s"""package com.wavesplatform.dex.api.http
+       |
+       |object SwaggerUiVersion {
+       |  val VersionString = "${Version.swaggerUi}"
+       |}
+       |""".stripMargin,
+    charset = StandardCharsets.UTF_8
+  )
+  Seq(versionFile)
+}
+
 inConfig(Compile)(
   Seq(
-    sourceGenerators += versionSourceTask,
+    sourceGenerators ++= List(versionSourceTask.taskValue, swaggerUiVersionSourceTask.taskValue),
     discoveredMainClasses := Seq(
       "com.wavesplatform.dex.Application",
       "com.wavesplatform.dex.WavesDexCli"

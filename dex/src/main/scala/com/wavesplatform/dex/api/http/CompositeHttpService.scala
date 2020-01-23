@@ -18,7 +18,8 @@ class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], setti
   private val swaggerRoute: Route = swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
     pathPrefix("api-docs") {
-      pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("META-INF/resources/webjars/swagger-ui/3.24.3", Application.getClass.getClassLoader)
+      pathEndOrSingleSlash(redirectToSwagger) ~
+        getFromResourceDirectory(s"META-INF/resources/webjars/swagger-ui/${SwaggerUiVersion.VersionString}", Application.getClass.getClassLoader)
     }
 
   val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)

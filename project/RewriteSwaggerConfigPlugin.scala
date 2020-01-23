@@ -2,6 +2,7 @@ import java.io.{BufferedInputStream, ByteArrayOutputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
+import Dependencies.Version
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.io.IOUtils
 import sbt.Keys._
@@ -14,19 +15,19 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
     inConfig(Compile)(
       Seq(
         resourceGenerators += Def.task {
-          val file = resourceManaged.value / "META-INF" / "resources" / "webjars" / "swagger-ui" / "3.24.3" / "index.html"
-          val log  = streams.value.log
+          val jarName       = s"swagger-ui-${Version.swaggerUi}.jar"
+          val indexHtmlPath = s"META-INF/resources/webjars/swagger-ui/${Version.swaggerUi}/index.html"
+          val outputFile    = resourceManaged.value / indexHtmlPath
 
           val html = (Compile / dependencyClasspath).value
-            .find(_.data.getName == "swagger-ui-3.24.3.jar")
-            .flatMap(jar => fileContentFromJar(jar.data, "META-INF/resources/webjars/swagger-ui/3.24.3/index.html"))
+            .find(_.data.getName == jarName)
+            .flatMap(jar => fileContentFromJar(jar.data, indexHtmlPath))
             .map { new String(_, StandardCharsets.UTF_8) }
 
-          val resource = "swagger-ui-3.24.3.jar:META-INF/resources/webjars/swagger-ui/3.24.3/index.html"
+          val resource = s"$jarName:$indexHtmlPath"
           html match {
             case None => throw new RuntimeException(s"Can't find $resource")
             case Some(html) =>
-              log.info(s"Found $resource")
               val doc = org.jsoup.parser.Parser.parse(html, "127.0.0.1")
               import scala.collection.JavaConverters._
               doc
@@ -35,12 +36,14 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                 .asScala
                 .find { el =>
                   el.tagName() == "script" && el.html().contains("SwaggerUIBundle")
-                }
-                .foreach { el =>
+                } match {
+                case None => throw new RuntimeException("Can't patch script in index.html")
+                case Some(el) =>
                   val update =
                     """
 const ui = SwaggerUIBundle({
   url: "/api-docs/swagger.json",
+  dom_id: '#swagger-ui',
   presets: [
     SwaggerUIBundle.presets.apis,
     SwaggerUIStandalonePreset
@@ -54,13 +57,13 @@ const ui = SwaggerUIBundle({
 window.ui = ui;"""
                   // Careful! ^ will be inserted as one-liner
                   el.text(update)
-                }
+              }
 
-              Files.createDirectories(file.getParentFile.toPath)
-              IO.write(file, doc.outerHtml())
+              Files.createDirectories(outputFile.getParentFile.toPath)
+              IO.write(outputFile, doc.outerHtml())
           }
 
-          Seq(file)
+          Seq(outputFile)
         }.taskValue
       ))
 

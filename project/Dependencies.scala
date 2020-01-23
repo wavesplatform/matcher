@@ -54,7 +54,8 @@ object Dependencies {
     val googleGuava = "28.2-jre"
     val kafka       = "2.4.0"
 
-    val swagger = "1.1.1"
+    val swagger   = "1.1.1"
+    val swaggerUi = "3.24.3"
 
     val scorexCrypto = "2.1.7"
 
@@ -109,6 +110,7 @@ object Dependencies {
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
   private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
+  private val swaggerUi     = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto  = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
@@ -193,7 +195,7 @@ object Dependencies {
       kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
       commonsNet,
-      "org.webjars" % "swagger-ui" % "3.24.3"
+      swaggerUi
     ) ++ testKit ++ quill ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit

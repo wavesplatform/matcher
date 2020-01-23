@@ -385,7 +385,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.transaction.assets.exchange.Order"
+        dataType = "com.wavesplatform.dex.domain.order.Order"
       )
     )
   )
@@ -407,7 +407,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.transaction.assets.exchange.Order"
+        dataType = "com.wavesplatform.dex.domain.order.Order"
       )
     )
   )

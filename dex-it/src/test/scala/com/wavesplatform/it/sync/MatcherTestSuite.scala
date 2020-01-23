@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.softwaremill.sttp._
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -34,6 +35,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
+  }
+
+  "Swagger page is available" in {
+    val addr = dex1.restApiAddress
+    tryHttpBackend.send(sttp.response(asString).get(uri"http://${addr.getHostName}:${addr.getPort}/api-docs/index.html")) shouldBe 'success
   }
 
   "Check cross ordering between Alice and Bob" - {

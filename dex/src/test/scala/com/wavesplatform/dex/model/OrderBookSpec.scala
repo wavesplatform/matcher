@@ -14,12 +14,13 @@ import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec extends FreeSpec with PropertyChecks with Matchers with MatcherSpecBase with NTPTime with NoShrink {
+class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with MatcherSpecBase with NTPTime with NoShrink {
 
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 

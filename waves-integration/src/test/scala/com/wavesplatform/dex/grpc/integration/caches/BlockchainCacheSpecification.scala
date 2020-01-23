@@ -4,12 +4,13 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import mouse.any.anySyntaxMouse
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, Future}
 
-class BlockchainCacheSpecification extends WordSpecLike with Matchers {
+class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
 
   private class BlockchainCacheTest(loader: String => Future[String], expiration: Option[Duration], invalidationPredicate: String => Boolean)
       extends BlockchainCache[String, String](loader, expiration, invalidationPredicate)

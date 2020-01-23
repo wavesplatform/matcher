@@ -20,6 +20,7 @@ import com.wavesplatform.wavesj.{Transactions, Transfer}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration, DurationInt}
 
+// TODO Rename
 trait MkWavesEntities {
 
   private val emptyAttachments: java.lang.String = null

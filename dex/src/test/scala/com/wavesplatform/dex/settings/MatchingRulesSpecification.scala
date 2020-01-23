@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 
 class MatchingRulesSpecification extends BaseSettingsSpecification with Matchers {
 

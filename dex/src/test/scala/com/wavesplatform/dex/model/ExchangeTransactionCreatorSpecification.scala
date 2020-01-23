@@ -14,13 +14,15 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ExchangeTransactionCreatorSpecification
-    extends WordSpec
+    extends AnyWordSpec
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterAll

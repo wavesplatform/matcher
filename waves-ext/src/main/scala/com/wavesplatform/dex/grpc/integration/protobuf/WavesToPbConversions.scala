@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.{exchange => ve}
 import com.wavesplatform.{account => va}
 
-object ToPbConversions {
+object WavesToPbConversions {
 
   implicit class VanillaExchangeTransactionOps(tx: ve.ExchangeTransaction) {
     def toPB: SignedExchangeTransaction =

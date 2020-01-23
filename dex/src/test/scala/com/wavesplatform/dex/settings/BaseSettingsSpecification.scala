@@ -3,11 +3,11 @@ package com.wavesplatform.dex.settings
 import cats.syntax.either._
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.Ficus._
-import org.scalatest.FlatSpec
+import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.util.Try
 
-class BaseSettingsSpecification extends FlatSpec {
+class BaseSettingsSpecification extends AnyFlatSpec {
 
   def getSettingByConfig(conf: Config): Either[String, MatcherSettings] =
     Try(conf.as[MatcherSettings]("waves.dex")).toEither.leftMap(_.getMessage)

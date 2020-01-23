@@ -11,7 +11,7 @@ import com.wavesplatform.protobuf.order.{AssetPair => PbAssetPair, Order => PbOr
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData => PbExchangeTransactionData}
 import com.wavesplatform.protobuf.{Amount => PbAmount}
 
-object ToPbConversions {
+object DexToPbConversions {
 
   implicit class VanillaExchangeTransactionOps(tx: VExchangeTransaction) {
     def toPB: SignedExchangeTransaction = {

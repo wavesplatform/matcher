@@ -8,12 +8,13 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.time.NTPTime
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with NTPTime with TableDrivenPropertyChecks {
+class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPTime with TableDrivenPropertyChecks {
 
   private val defaultAssetPair                            = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
   private def getAssetDecimals(asset: Asset): Option[Int] = Some(8)

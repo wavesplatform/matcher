@@ -5,30 +5,32 @@ object Dependencies {
 
   object Version {
 
-    val akka     = "2.5.20"
-    val akkaHttp = "10.1.8"
+    val akka     = "2.6.1"
+    val akkaHttp = "10.1.11"
 
-    val scalaTest  = "3.0.6"
-    val scalaCheck = "1.14.0"
-    val scalaMock  = "3.6.0"
-    val diffx      = "0.3.12"
+    val scalaTest          = "3.1.0"
+    val scalaCheck         = "1.14.3"
+    val scalaTestPlusCheck = "3.1.0.1"
+    val scalaMock          = "4.4.0"
+    val diffx              = "0.3.16"
 
     val cats              = "2.0.0"
-    val catsTaglessMacros = "0.9"
-    val kindProjector     = "0.9.6"
+    val catsTaglessMacros = "0.11"
+    val kindProjector     = "0.9.10"
     val betterMonadicFor  = "0.3.1"
-    val mouse             = "0.22"
+    val mouse             = "0.24"
     val shapeless         = "2.3.3"
 
-    val typesafeConfig = "1.3.3"
+    val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
-    val ficus          = "1.4.2"
+    val ficus          = "1.4.7"
 
     val logback = "1.2.3"
-    val slf4j   = "1.7.25"
+    val slf4j   = "1.7.30"
     val janino  = "3.1.0"
 
-    val silencer           = "1.4.1"
+    val silencer = "1.4.4"
+
     val kamonCore          = "1.1.6"
     val kamonInfluxDb      = "1.0.3"
     val kamonSystemMetrics = "1.0.1"
@@ -36,32 +38,33 @@ object Dependencies {
     val wavesProtobufSchemas = "1.0.0"
     val wavesJ               = "0.16.0"
 
-    val postgresql = "9.4.1208"
-    val quillJdbc  = "3.1.0"
+    val postgresql = "42.2.9"
+    val quillJdbc  = "3.5.0"
 
     val sttp = "1.7.2"
 
-    val testContainers         = "0.34.1"
-    val testContainersPostgres = "1.12.3"
+    val testContainers         = "0.34.3"
+    val testContainersPostgres = "1.12.4"
 
-    val toxiProxy = "1.12.3"
+    val toxiProxy = "1.12.4"
 
-    val jackson  = "2.9.8"
-    val playJson = "2.7.1"
+    val jackson  = "2.10.0"
+    val playJson = "2.8.1"
 
-    val googleGuava = "27.0.1-jre"
-    val kafka       = "2.3.1"
+    val googleGuava = "28.2-jre"
+    val kafka       = "2.4.0"
 
-    val swagger = "1.1.0"
+    val swagger   = "1.1.1"
+    val swaggerUi = "3.24.3"
 
-    val scorexCrypto = "2.0.4"
+    val scorexCrypto = "2.1.7"
 
     val monix = "3.0.0"
 
     val supertagged = "1.4"
 
     val levelDb  = "0.12"
-    val influxDb = "2.14"
+    val influxDb = "2.17"
 
     val commonsNet = "3.6"
   }
@@ -78,7 +81,8 @@ object Dependencies {
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
-  private val scalaMock            = "org.scalamock" %% "scalamock-scalatest-support" % Version.scalaMock
+  private val scalaTestPlusCheck   = "org.scalatestplus" %% "scalacheck-1-14" % Version.scalaTestPlusCheck
+  private val scalaMock            = "org.scalamock" %% "scalamock" % Version.scalaMock
   private val diffx                = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore             = catsModule("core")
   private val catsTaglessMacros    = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
@@ -106,6 +110,7 @@ object Dependencies {
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
   private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
+  private val swaggerUi     = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
   private val scorexCrypto  = "org.scorexfoundation" %% "scrypto" % Version.scorexCrypto
   private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
@@ -116,8 +121,8 @@ object Dependencies {
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
 
   private val silencer: Seq[ModuleID] = Seq(
-    compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer),
-    "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided
+    compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
+    "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided cross CrossVersion.full
   )
 
   private val quill: Seq[ModuleID] = Seq(
@@ -135,12 +140,13 @@ object Dependencies {
     akkaModule("akka-http-testkit", Version.akkaHttp),
     scalaTest,
     scalaCheck,
+    scalaTestPlusCheck,
     scalaMock
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
 
-  val enforcedVersions = Def.setting(
+  val globalEnforcedVersions = Def.setting(
     Seq(
       akkaActor,
       akkaHttp,
@@ -188,7 +194,8 @@ object Dependencies {
       kamonModule("influxdb", Version.kamonInfluxDb),
       kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
-      commonsNet
+      commonsNet,
+      swaggerUi
     ) ++ testKit ++ quill ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
@@ -206,7 +213,7 @@ object Dependencies {
       wavesJ
     ) ++ testContainers
 
-    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx)
+    lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck)
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
       julToSlf4j,
@@ -214,7 +221,7 @@ object Dependencies {
       grpcScalaPb
     )
 
-    lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb)
+    lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer
 
     lazy val wavesIntegration: Seq[ModuleID] = Seq(
       julToSlf4j,

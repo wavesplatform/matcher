@@ -4,37 +4,56 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+// Scalafix
+scalafixDependencies in ThisBuild += "org.scalatest" %% "autofix" % "3.1.0.0"
+addCompilerPlugin(scalafixSemanticdb)
+
+lazy val commonOwaspSettings = Seq(
+  dependencyCheckAssemblyAnalyzerEnabled := Some(false)
+)
 
 // Used in unit and integration tests
-lazy val `dex-test-common` = project.dependsOn(`waves-integration`)
+lazy val `dex-test-common` = project.settings(commonOwaspSettings).dependsOn(`waves-integration`)
 
-lazy val dex = project.dependsOn(
-  `waves-integration`,
-  `dex-test-common` % "test->compile"
-)
+lazy val dex = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    `waves-integration`,
+    `dex-test-common` % "test->compile"
+  )
 
-lazy val `dex-it-common` = project.dependsOn(
-  dex % "compile;runtime->provided",
-  `dex-test-common`
-)
+lazy val `dex-it-common` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    dex % "compile;runtime->provided",
+    `dex-test-common`
+  )
 
-lazy val `dex-it` = project.dependsOn(
-  dex % "compile;test->test",
-  `waves-integration-it`,
-  `dex-it-common`
-)
+lazy val `dex-it` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    dex % "compile;test->test",
+    `waves-integration-it`,
+    `dex-it-common`
+  )
 
-lazy val `waves-grpc` = project
+lazy val `waves-grpc` = project.settings(commonOwaspSettings)
 
-lazy val `waves-ext` = project.dependsOn(`waves-grpc`)
+lazy val `waves-ext` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    `waves-grpc`,
+    `dex-test-common` % "test->compile"
+  )
 
-lazy val `waves-integration` = project.dependsOn(`waves-grpc`)
+lazy val `waves-integration` = project.settings(commonOwaspSettings).dependsOn(`waves-grpc`)
 
-lazy val `waves-integration-it` = project.dependsOn(
-  `waves-integration`,
-  `dex-it-common`
-)
+lazy val `waves-integration-it` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    `waves-integration`,
+    `dex-it-common`
+  )
 
 lazy val it = project
   .settings(
@@ -54,14 +73,21 @@ lazy val it = project
 
 lazy val root = (project in file("."))
   .settings(name := "dex-root")
+  .settings(commonOwaspSettings)
   .aggregate(
+    `dex-test-common`,
     dex,
-    `dex-it`
+    `dex-it-common`,
+    `dex-it`,
+    `waves-grpc`,
+    `waves-ext`,
+    `waves-integration`,
+    `waves-integration-it`
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.9",
+    scalaVersion := "2.12.10",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -78,11 +104,12 @@ inScope(Global)(
       "-Xlint",
       "-Ypartial-unification",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Yrangepos" // required for scalafix
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
+    dependencyOverrides ++= Dependencies.globalEnforcedVersions.value,
     cancelable := true,
     logBuffered := false,
     coverageExcludedPackages := ".*",
@@ -105,7 +132,7 @@ inScope(Global)(
     network := NodeNetwork(sys.props.get("network")),
     // To speedup the compilation
     Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false,
+    Compile / packageDoc / publishArtifact := false
   )
 )
 
@@ -132,6 +159,7 @@ checkPRRaw := {
     (root / Compile / cleanAll).value
   } finally {
     (dex / Test / test).value
+    (`waves-ext` / Test / test).value
     (`waves-integration` / Test / test).value
   }
 }

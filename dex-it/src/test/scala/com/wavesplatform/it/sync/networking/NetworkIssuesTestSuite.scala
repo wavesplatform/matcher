@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.networking
 
-import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy
@@ -9,7 +8,6 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
-
 
 @NetworkTests
 class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
@@ -33,28 +31,28 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
   override protected def afterEach(): Unit = {
     wavesNodeProxy.toxics().getAll.forEach(_.remove())
-    clearOrderBook
+    clearOrderBook()
   }
 
   "DEXClient should works correctly despite of latency: " - {
 
     "high latency (from node to dex)" in {
       wavesNodeProxy.toxics().latency("latency", ToxicDirection.DOWNSTREAM, 4500)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
 
     "high latency (from dex to node)" in {
       wavesNodeProxy.toxics().latency("latency", ToxicDirection.UPSTREAM, 4500)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
 
     "high latency (both directions)" in {
       wavesNodeProxy.toxics().latency("latencyD", ToxicDirection.DOWNSTREAM, 4500)
       wavesNodeProxy.toxics().latency("latencyU", ToxicDirection.UPSTREAM, 4500)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
   }
 
@@ -62,21 +60,21 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
     "16 kbps from node to dex" in {
       wavesNodeProxy.toxics().bandwidth("bandwidth", ToxicDirection.DOWNSTREAM, 16)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
 
     "16 kbps from dex to node" in {
       wavesNodeProxy.toxics().bandwidth("bandwidth", ToxicDirection.UPSTREAM, 16)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
 
     "16 kbps in both directions" in {
       wavesNodeProxy.toxics().bandwidth("bandwidthD", ToxicDirection.DOWNSTREAM, 16)
       wavesNodeProxy.toxics().bandwidth("bandwidthU", ToxicDirection.UPSTREAM, 16)
-      makeAndMatchOrders
-      matchingShouldBeSuccess
+      makeAndMatchOrders()
+      matchingShouldBeSuccess()
     }
   }
 

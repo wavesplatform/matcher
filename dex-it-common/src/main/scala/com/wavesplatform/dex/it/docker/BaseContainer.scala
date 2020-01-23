@@ -145,11 +145,6 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     start()
   }
 
-  override def stop(): Unit = {
-    stopWithoutRemove() // Graceful shutdown to save logs and correctly close ports
-    super.stop()
-  }
-
   def restartWithNewSuiteConfig(newSuiteConfig: Config): Unit = {
     replaceSuiteConfig(newSuiteConfig)
     restart()

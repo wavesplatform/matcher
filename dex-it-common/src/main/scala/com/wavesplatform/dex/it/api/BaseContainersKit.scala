@@ -95,6 +95,6 @@ trait BaseContainersKit extends ScorexLogging {
     log.debug("Stopping containers")
     futureHttpBackend.close()
     tryHttpBackend.close()
-    knownContainers.asScala.foreach(_.close()) // Graceful shutdown
+    knownContainers.asScala.foreach(_.stopWithoutRemove()) // Graceful shutdown to save logs
   }
 }

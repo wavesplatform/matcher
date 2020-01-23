@@ -41,8 +41,6 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                     """
 const ui = SwaggerUIBundle({
   url: "/api-docs/swagger.json",
-  dom_id: '#swagger-ui',
-  deepLinking: true,
   presets: [
     SwaggerUIBundle.presets.apis,
     SwaggerUIStandalonePreset
@@ -50,7 +48,8 @@ const ui = SwaggerUIBundle({
   plugins: [
     SwaggerUIBundle.plugins.DownloadUrl
   ],
-  layout: "StandaloneLayout"
+  layout: "StandaloneLayout",
+  operationsSorter: "alpha"
 });
 window.ui = ui;"""
                   // Careful! ^ will be inserted as one-liner

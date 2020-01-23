@@ -1,20 +1,17 @@
 package com.wavesplatform.dex.model
 
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -49,7 +46,7 @@ class ExchangeTransactionCreatorSpecification
       val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
 
       val tc = getExchangeTransactionCreator()
-      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
+      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
 
       tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV1]
     }
@@ -60,7 +57,7 @@ class ExchangeTransactionCreatorSpecification
       val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = 2)
 
       val tc = getExchangeTransactionCreator()
-      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis)
+      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
 
       tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
     }
@@ -73,7 +70,7 @@ class ExchangeTransactionCreatorSpecification
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
-          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
+          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis, buyOrder.matcherFee, sellOrder.matcherFee)
           val tx = tc.createTransaction(oe).explicitGet()
 
           tx.buyMatcherFee shouldBe buyOrder.matcherFee
@@ -94,7 +91,7 @@ class ExchangeTransactionCreatorSpecification
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
-          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
+          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis, buyOrder.matcherFee, sellOrder.matcherFee)
           val tx = tc.createTransaction(oe)
 
           tx shouldBe 'right
@@ -135,7 +132,7 @@ class ExchangeTransactionCreatorSpecification
             .zipWithIndex
             .foldLeft[AcceptedOrder](submittedOrder) {
               case (submitted, ((counter, expectedMatcherFee), i)) =>
-                val oe            = OrderExecuted(submitted, counter, System.currentTimeMillis)
+                val oe            = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
                 val tx            = tc.createTransaction(oe).explicitGet()
                 val counterAmount = Denormalization.denormalizeAmountAndFee(counter.order.amount, 8)
 
@@ -179,48 +176,6 @@ class ExchangeTransactionCreatorSpecification
           test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(1, 0)
           test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(1, 4)
           test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
-        }
-      }
-    }
-
-    "charge zero fee from maker and doubled fee from taker" in {
-
-      val ms = matcherSettings.copy(orderFee = DynamicSettings(0.003.waves, zeroMakerDoubleTaker = true))
-      val tc = getExchangeTransactionCreator(matcherSettings = ms)
-
-      def limit(amount: Long, orderType: OrderType, fee: Long = 0.006.waves, feeAsset: Asset = Waves): LimitOrder =
-        LimitOrder(createOrder(wavesUsdPair, orderType, amount, 3.00, fee, feeAsset = Waves))
-
-      def market(amount: Long, orderType: OrderType, fee: Long = 0.006.waves, feeAsset: Asset = Waves): MarketOrder =
-        MarketOrder(createOrder(wavesUsdPair, orderType, amount, 3.00, fee, feeAsset = Waves), _ => Long.MaxValue)
-
-      def createTx(s: AcceptedOrder, c: LimitOrder): Either[ValidationError, ExchangeTransaction] =
-        tc.createTransaction(OrderExecuted(s, c, System.currentTimeMillis, zeroMakerFee = true))
-
-      // format: off
-      forAll(
-        Table(
-          ("maker amount", "taker amount", "is taker market", "taker fee"),
-          /** Limit orders */
-          (1.waves,  1.waves,  false, 0.006.waves),      // symmetric
-          (10.waves, 1.waves,  false, 0.006.waves),      //    big maker - little taker
-          (1.waves,  10.waves, false, 0.006.waves / 10), // little maker -    big taker
-          /** Market orders */
-          (1.waves,  1.waves,  true, 0.006.waves),      // symmetric
-          (10.waves, 1.waves,  true, 0.006.waves),      //    big maker - little taker
-          (1.waves,  10.waves, true, 0.006.waves / 10)  // little maker -    big taker
-        )
-        // format: on
-      ) { (makerAmount: Long, takerAmount: Long, isTakerMarket: Boolean, takerFee: Long) =>
-        val maker = limit(makerAmount, SELL)
-        val taker = if (isTakerMarket) market(takerAmount, BUY) else limit(takerAmount, BUY)
-        val tx    = createTx(taker, maker)
-
-        tx shouldBe 'right
-
-        withClue(s"maker: $maker, taker: $taker; taker fee = $takerFee\n") {
-          tx.explicitGet().sellMatcherFee shouldBe 0L
-          tx.explicitGet().buyMatcherFee shouldBe takerFee
         }
       }
     }

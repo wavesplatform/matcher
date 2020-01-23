@@ -19,6 +19,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings1
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.NTPTime
 import org.scalamock.scalatest.PathMockFactory
@@ -82,11 +83,11 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        false,
         ntpTime,
         matchingRules,
         _ => (),
-        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact)
+        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
+        snapshot => OrderBook(snapshot, (t, m) => m.matcherFee -> t.matcherFee)
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
@@ -99,7 +100,7 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBook.empty.snapshot))
+      obsdb.update(p, 50, Some(OrderBook.Snapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
@@ -107,7 +108,7 @@ class OrderBookActorSpecification
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
         val ord = buy(p, 10 * Order.PriceConstant, 100)
-        val ob  = OrderBook.empty
+        val ob  = OrderBook.empty((t, m) => m.matcherFee -> t.matcherFee)
         ob.add(LimitOrder(ord), ord.timestamp)
         obsdb.update(p, 50, Some(ob.snapshot))
       }

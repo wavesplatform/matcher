@@ -54,7 +54,7 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
       forward(lo.order.sender, e)
       historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 
-    case e @ Events.OrderExecuted(submitted, counter, timestamp, _) =>
+    case e @ Events.OrderExecuted(submitted, counter, timestamp, _, _) =>
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
 

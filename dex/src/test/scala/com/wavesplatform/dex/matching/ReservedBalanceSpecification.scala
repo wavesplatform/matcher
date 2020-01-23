@@ -139,7 +139,7 @@ class ReservedBalanceSpecification
     addressDir ! OrderAdded(LimitOrder(counter), ntpTime.getTimestamp())
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, submitted.matcherFee, counter.matcherFee)
     addressDir ! exec
     exec
   }
@@ -518,7 +518,7 @@ class ReservedBalanceSpecification
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
-    val executionEvent = OrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp)
+    val executionEvent = OrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp, marketOrder.matcherFee, limitOrder.matcherFee)
 
     addressDirWithOrderBookCache ! OrderAdded(limitOrder, ntpTime.getTimestamp())
     addressDirWithOrderBookCache ! executionEvent

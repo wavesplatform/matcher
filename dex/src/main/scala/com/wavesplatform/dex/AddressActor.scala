@@ -182,7 +182,7 @@ class AddressActor(owner: Address,
         command.client ! api.OrderAccepted(order)
       }
 
-    case e @ OrderExecuted(submitted, counter, _, _) =>
+    case e @ OrderExecuted(submitted, counter, _, _, _) =>
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount=${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
       handleOrderExecuted(e.counterRemaining)

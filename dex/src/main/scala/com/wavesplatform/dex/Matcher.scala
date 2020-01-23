@@ -33,7 +33,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, DynamicSettings1, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import mouse.any.anySyntaxMouse
@@ -120,11 +120,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       assetPair,
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
-      settings.zeroMakerFee,
       time,
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
+      snapshot => OrderBook(snapshot, getMakerTakerFee(settings.orderFee, assetsCache, rateCache))
     )
   }
 
@@ -530,4 +530,18 @@ object Matcher extends ScorexLogging {
           }
       }
   }
+
+  def getMakerTakerFee(orderFeeSettings: OrderFeeSettings, assetsCache: AssetsStorage, rateCache: RateCache)(submitted: AcceptedOrder,
+                                                                                                             counter: LimitOrder): (Long, Long) =
+    orderFeeSettings match {
+      case DynamicSettings1(baseFeeMaker, baseFeeTaker) =>
+        import OrderValidator.convertFeeByAssetRate
+        (
+          for {
+            maxCounterFee   <- convertFeeByAssetRate(baseFeeMaker, counter.feeAsset, assetsCache.unsafeGet(counter.feeAsset).decimals, rateCache)
+            maxSubmittedFee <- convertFeeByAssetRate(baseFeeTaker, submitted.feeAsset, assetsCache.unsafeGet(submitted.feeAsset).decimals, rateCache)
+          } yield maxCounterFee -> maxSubmittedFee
+        ).explicitGet()
+      case _ => counter.matcherFee -> submitted.matcherFee
+    }
 }

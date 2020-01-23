@@ -24,7 +24,7 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, DynamicSettings1, FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.time.TestTime
@@ -694,44 +694,42 @@ class OrderValidatorSpecification
         }
       }
 
-      "matcherFee is not enough (zero-maker-double-tacker = true requires double fee)" in {
+      "matcherFee is not enough (dynamic settings, different fee for maker and taker)" in {
 
         val rateCache = RateCache.inMem unsafeTap { _.upsertRate(btc, 0.00011167) }
 
         def orderWithFee(fee: Long, feeAsset: Asset = Waves): Order =
           createOrder(wavesUsdPair, BUY, 1.waves, 3.0, matcherFee = fee, feeAsset = feeAsset)
 
-        def validateByFee(doubleTaker: Boolean)(order: Order): Result[Order] =
-          validateByMatcherSettings(DynamicSettings(0.003.waves, doubleTaker), rateCache = rateCache)(order)
+        def validateByFee(makerFee: Long, takerFee: Long)(order: Order): Result[Order] =
+          validateByMatcherSettings(DynamicSettings1(makerFee, takerFee), rateCache = rateCache)(order)
 
-        def validateByFeeWithMatcherScript(doubleTaker: Boolean)(order: Order): Result[Order] =
+        def validateByFeeWithScript(makerFee: Long, takerFee: Long)(order: Order): Result[Order] =
           awaitResult {
-            validateByBlockchain(DynamicSettings(0.003.waves, doubleTaker))(
+            validateByBlockchain(DynamicSettings1(makerFee, takerFee))(
               matcherAccountScript = Some(RunScriptResult.Allowed),
               rateCache = rateCache
             )(order)
           }
 
-        validateByFee(doubleTaker = false) { orderWithFee(0.003.waves) } shouldBe 'right
-        validateByFee(doubleTaker = true) { orderWithFee(0.006.waves) } shouldBe 'right
-        validateByFee(doubleTaker = true) { orderWithFee(0.00599999.waves) } should produce("FeeNotEnough")
+        validateByFee(0.003.waves, 0.003.waves) { orderWithFee(0.003.waves) } shouldBe 'right
+        validateByFee(0.001.waves, 0.005.waves) { orderWithFee(0.005.waves) } shouldBe 'right
+        validateByFee(0.001.waves, 0.005.waves) { orderWithFee(0.00499999.waves) } should produce("FeeNotEnough")
 
-        withClue("0.003.waves = 0.00000034.btc with BTC rate = 0.00011167\n") {
-          validateByFee(doubleTaker = false) { orderWithFee(0.00000034.btc, btc) } shouldBe 'right
-          validateByFee(doubleTaker = true) { orderWithFee(0.00000068.btc, btc) } shouldBe 'right
-          validateByFee(doubleTaker = true) { orderWithFee(0.00000067.btc, btc) } should produce("FeeNotEnough")
+        withClue("BTC rate = 0.00011167; 0.003.waves = 0.00000034.btc, 0.005.waves = 0.00000056.btc\n") {
+          validateByFee(0.003.waves, 0.003.waves) { orderWithFee(0.00000034.btc, btc) } shouldBe 'right
+          validateByFee(0.001.waves, 0.005.waves) { orderWithFee(0.00000056.btc, btc) } shouldBe 'right
+          validateByFee(0.001.waves, 0.005.waves) { orderWithFee(0.00000055.btc, btc) } should produce("FeeNotEnough")
         }
 
-        val extraWavesFee = 0.004.waves
+        validateByFeeWithScript(0.003.waves, 0.003.waves) { orderWithFee(0.003.waves + smartFee) } shouldBe 'right
+        validateByFeeWithScript(0.001.waves, 0.005.waves) { orderWithFee(0.005.waves + smartFee) } shouldBe 'right
+        validateByFeeWithScript(0.001.waves, 0.005.waves) { orderWithFee(0.00499999.waves + smartFee) } should produce("FeeNotEnough")
 
-        validateByFeeWithMatcherScript(doubleTaker = false) { orderWithFee(0.003.waves + extraWavesFee) } shouldBe 'right
-        validateByFeeWithMatcherScript(doubleTaker = true) { orderWithFee(0.006.waves + extraWavesFee) } shouldBe 'right
-        validateByFeeWithMatcherScript(doubleTaker = true) { orderWithFee(0.00599999.waves + extraWavesFee) } should produce("FeeNotEnough")
-
-        withClue("0.004.waves = 0.00000045.btc with BTC rate = 0.00011167, 2 * 0.003.waves + 0.004.waves = 0.00000112.btc\n") {
-          validateByFeeWithMatcherScript(doubleTaker = false) { orderWithFee(0.00000079.btc, btc) } shouldBe 'right
-          validateByFeeWithMatcherScript(doubleTaker = true) { orderWithFee(0.00000112.btc, btc) } shouldBe 'right
-          validateByFeeWithMatcherScript(doubleTaker = true) { orderWithFee(0.00000111.btc, btc) } should produce("FeeNotEnough")
+        withClue("BTC rate = 0.00011167; 0.007.waves = 0.00000079.btc, 0.009.waves = 0.00000101.btc\n") {
+          validateByFeeWithScript(0.003.waves, 0.003.waves) { orderWithFee(0.00000079.btc, btc) } shouldBe 'right
+          validateByFeeWithScript(0.001.waves, 0.005.waves) { orderWithFee(0.00000101.btc, btc) } shouldBe 'right
+          validateByFeeWithScript(0.001.waves, 0.005.waves) { orderWithFee(0.00000100.btc, btc) } should produce("FeeNotEnough")
         }
       }
     }

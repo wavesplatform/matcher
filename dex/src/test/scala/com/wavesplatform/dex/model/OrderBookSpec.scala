@@ -2,25 +2,42 @@ package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
+import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.AssetsStorage
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
-import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings1, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTPTime
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
+import mouse.any._
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with MatcherSpecBase with NTPTime with NoShrink {
+class OrderBookSpec
+    extends AnyFreeSpec
+    with PropertyChecks
+    with Matchers
+    with MatcherSpecBase
+    with NTPTime
+    with NoShrink
+    with TableDrivenPropertyChecks {
+
+  private def createEmptyOrderBook(
+      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long) = (t, m) => m.matcherFee -> t.matcherFee): OrderBook =
+    OrderBook.empty(getMakerTakerFee)
 
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
@@ -29,7 +46,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord2 = LimitOrder(buy(pair, 170484969L, 34120))
     val ord3 = LimitOrder(buy(pair, 44521418496L, 34000))
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
     ob.add(ord1, ntpNow)
     ob.add(ord2, ntpNow)
     ob.add(ord3, ntpNow)
@@ -40,7 +57,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
   "place several buy orders at the same price" in {}
 
   "place orders with different tick sizes" in {
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     val normalizedTickSizes =
       Array(1L, 7L, 8L, 100L, 211L, 320L, 100000L, 124337L, 250250L, toNormalized(10L), 651983183L, toNormalized(100L))
@@ -65,7 +82,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
   }
 
   "place buy and sell orders with prices different from each other less than tick size in one level" in {
-    val ob                 = OrderBook.empty
+    val ob                 = createEmptyOrderBook()
     val tickSize: Long     = 100L
     val normalizedTickSize = toNormalized(tickSize)
 
@@ -133,7 +150,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
   }
 
   "place matchable orders with and without tick size" in {
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     val amt                = 54521418493L
     val normalizedTickSize = toNormalized(8)
@@ -146,7 +163,9 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
 
     withClue("matchable orders should be matched without tick size:\n") {
       ob.add(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
-      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime))
+      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(
+        OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
+      )
 
       ob.getAsks shouldBe empty
       ob.getBids shouldBe empty
@@ -168,7 +187,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
 
   "old counter orders should be matched with the new ones (with new activated tick-size)" in {
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     def normalizedTickSize(tickSize: Double): Price = Normalization.normalizePrice(tickSize, 8, 2)
 
@@ -181,7 +200,9 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
 
       ob.add(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
-      ob.add(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(OrderExecuted(submitted, counter, submittedTs))
+      ob.add(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(
+        OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+      )
 
       ob.getAsks shouldBe empty
       ob.getBids shouldBe empty
@@ -200,7 +221,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     "with same level" - {
       "TickSize.Enabled" in {
         val normalizedTickSize = toNormalized(100L)
-        val ob                 = OrderBook.empty
+        val ob                 = createEmptyOrderBook()
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
         ob.add(sellOrder, ntpNow, tickSize = normalizedTickSize)
@@ -211,7 +232,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
       }
 
       "MatchingRules.Default.normalizedTickSize" in {
-        val ob = OrderBook.empty
+        val ob = createEmptyOrderBook()
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
         ob.add(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
@@ -223,7 +244,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     }
 
     "with different levels" in {
-      val ob = OrderBook.empty
+      val ob = createEmptyOrderBook()
 
       val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
       ob.add(sellOrder, ntpNow, tickSize = toNormalized(100L))
@@ -240,7 +261,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
     val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
     ob.add(LimitOrder(ord1), ntpNow)
     ob.add(LimitOrder(ord2), ntpNow)
 
@@ -258,7 +279,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord3 = sell(pair, 10 * Order.PriceConstant, 110)
     val ord4 = buy(pair, 22 * Order.PriceConstant, 115)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
     ob.add(LimitOrder(ord1), ntpNow)
     ob.add(LimitOrder(ord2), ntpNow)
     ob.add(LimitOrder(ord3), ntpNow)
@@ -279,7 +300,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord2 = sell(pair, 100000000, 0.0004)
     val ord3 = buy(pair, 100000001, 0.00045)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     ob.add(LimitOrder(ord1), ntpNow)
     ob.add(LimitOrder(ord2), ntpNow)
@@ -293,7 +314,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord2 = sell(pair, 3075248828L, 0.00067634)
     val ord3 = buy(pair, 3075363900L, 0.00073697)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     ob.add(LimitOrder(ord1), ntpNow)
     ob.add(LimitOrder(ord2), ntpNow)
@@ -314,7 +335,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val ord2 = sell(pair, 0.01.waves, 1840)
     val ord3 = buy(pair, 0.0100001.waves, 2000)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
 
     ob.add(LimitOrder(ord1), ntpNow)
     ob.add(LimitOrder(ord2), ntpNow)
@@ -330,7 +351,7 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     val b = rawBuy(p, 700000L, 280)
     val s = rawSell(p, 30000000000L, 280)
 
-    val ob = OrderBook.empty
+    val ob = createEmptyOrderBook()
     ob.add(LimitOrder(s), ntpNow)
     ob.add(LimitOrder(b), ntpNow)
 
@@ -381,6 +402,85 @@ class OrderBookSpec extends AnyFreeSpec with PropertyChecks with Matchers with M
     restored.asks shouldBe x.asks
     restored.bids shouldBe x.bids
     restored.lastTrade shouldBe x.lastTrade
+  }
+
+  "create OrderExecuted events with different executed fee for maker and taker" in {
+
+    val assetsCache: AssetsStorage = AssetsStorage.inMem unsafeTap { _.put(eth, BriefAssetDescription("ETH", 8, hasScript = false)) }
+    val rateCache: RateCache       = RateCache.inMem unsafeTap { _.upsertRate(eth, 0.00567593) }
+
+    def limit(amount: Long, orderType: OrderType, fee: Long, feeAsset: Asset = Waves): LimitOrder =
+      LimitOrder(createOrder(wavesUsdPair, orderType, amount, 3.00, fee, feeAsset = feeAsset))
+
+    def market(amount: Long, orderType: OrderType, fee: Long, feeAsset: Asset): MarketOrder =
+      MarketOrder(createOrder(wavesUsdPair, orderType, amount, 3.00, fee, feeAsset = feeAsset), _ => Long.MaxValue)
+
+    forAll(
+      Table(
+        ("M amount", "T amount", "is T market", "fee settings", "M order fee", "T order fee", "T fee asset", "M executed fee", "T executed fee"),
+        /** symmetric */
+        (1.waves, 1.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.003.waves), // like in old good times
+        (1.waves, 1.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
+        (1.waves, 1.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.009.waves), // orders have excess fee = 0.010.waves
+        /** small maker - big taker */
+        (2.waves, 10.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.0006.waves), // like in old good times
+        (2.waves, 10.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.0018.waves), // orders have sufficient fee = 0.009.waves
+        (2.waves, 10.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.0018.waves), // orders have excess fee = 0.010.waves
+        /** big maker - small taker */
+        (10.waves, 2.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.0006.waves, 0.003.waves), // like in old good times
+        (10.waves, 2.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.0002.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
+        (10.waves, 2.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.0002.waves, 0.009.waves), // orders have excess fee = 0.010.waves
+        /** symmetric, taker is market */
+        (1.waves, 1.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.003.waves), // like in old good times
+        (1.waves, 1.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
+        (1.waves, 1.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.009.waves), // orders have excess fee = 0.010.waves
+        /** small maker - big market taker */
+        (2.waves, 10.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.0006.waves), // like in old good times
+        (2.waves, 10.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.0018.waves), // orders have sufficient fee = 0.009.waves
+        (2.waves, 10.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.0018.waves), // orders have excess fee = 0.010.waves
+        /** big maker - small market taker */
+        (10.waves, 2.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.0006.waves, 0.003.waves), // like in old good times
+        (10.waves, 2.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.0002.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
+        (10.waves, 2.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.0002.waves, 0.009.waves), // orders have excess fee = 0.010.waves
+        /** symmetric, taker fee in ETH */
+        (1.waves, 1.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00001703.eth), // like in old good times
+        (1.waves, 1.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (1.waves, 1.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
+        /** small maker - big taker, taker fee in ETH */
+        (2.waves, 10.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
+        (2.waves, 10.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (2.waves, 10.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00001021.waves), // orders have excess fee = 0.010.waves = 0.00005676.eth
+        /** big maker - small taker, taker fee in ETH */
+        (10.waves, 2.waves, false, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
+        (10.waves, 2.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (10.waves, 2.waves, false, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.0002.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
+        /** symmetric, taker is market, taker fee in ETH */
+        (1.waves, 1.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00001703.eth), // like in old good times
+        (1.waves, 1.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (1.waves, 1.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
+        /** small maker - big market taker, taker fee in ETH */
+        (2.waves, 10.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
+        (2.waves, 10.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (2.waves, 10.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00001021.waves), // orders have excess fee = 0.010.waves = 0.00005676.eth
+        /** big maker - small market taker, taker fee in ETH */
+        (10.waves, 2.waves, true, DynamicSettings1(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
+        (10.waves, 2.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves
+        (10.waves, 2.waves, true, DynamicSettings1(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.0002.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
+      )
+    ) { (mAmt: Long, tAmt: Long, isTMarket: Boolean, ofs: OrderFeeSettings, orderMFee: Long, orderTFee: Double, tFeeAsset: Asset, eMFee: Long, eTFee: Long) =>
+//      val ob    = createEmptyOrderBook(Matcher.getMakerTakerFee(ofs, assetsCache, rateCache))
+      val ob    = createEmptyOrderBook(Matcher.getMakerTakerFee(ofs, assetsCache, rateCache))
+      val normalizedOrderTFee = Normalization.normalizeAmountAndFee(orderTFee, 8)
+
+      val maker = limit(mAmt, SELL, orderMFee)
+      val taker = if (isTMarket) market(tAmt, BUY, normalizedOrderTFee, tFeeAsset) else limit(tAmt, BUY, normalizedOrderTFee, tFeeAsset)
+      val evt   = { ob.add(maker, System.currentTimeMillis); ob.add(taker, System.currentTimeMillis) }.head
+
+      evt shouldBe a[OrderExecuted]
+      val oe = evt.asInstanceOf[OrderExecuted]
+      oe.counterExecutedFee shouldBe eMFee
+      oe.submittedExecutedFee shouldBe eTFee
+    }
   }
 
   private val sellLevelGen: Gen[Vector[SellLimitOrder]] =

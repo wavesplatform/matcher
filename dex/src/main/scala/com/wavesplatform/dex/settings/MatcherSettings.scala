@@ -72,8 +72,6 @@ case class MatcherSettings(addressSchemeCharacter: Char,
       }
     }
   }
-
-  def zeroMakerFee: Boolean = orderFee match { case DynamicSettings(_, zeroMakerFee) => zeroMakerFee; case _ => false }
 }
 
 case class RestAPISettings(address: String, port: Int, apiKeyHash: String, cors: Boolean, apiKeyDifferentHost: Boolean)

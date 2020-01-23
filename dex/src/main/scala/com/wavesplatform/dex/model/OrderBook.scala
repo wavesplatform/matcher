@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings1, OrderFeeSettings}
 import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -20,7 +21,8 @@ import scala.util.Try
 
 class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
                          private[OrderBook] val asks: OrderBook.Side,
-                         private[OrderBook] var lastTrade: Option[LastTrade]) {
+                         private[OrderBook] var lastTrade: Option[LastTrade],
+                         private[OrderBook] val getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)) {
   import OrderBook._
 
   private[model] def getBids: OrderBook.Side = bids
@@ -52,10 +54,10 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(ao: AcceptedOrder, ts: Long, zeroMakerFee: Boolean = false, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+  def add(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
     val (events, lt) = ao.order.orderType match {
-      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, zeroMakerFee)
-      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, zeroMakerFee)
+      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, getMakerTakerFee)
+      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, getMakerTakerFee)
     }
 
     lastTrade = lt
@@ -128,6 +130,7 @@ object OrderBook {
 
   case class LastTrade(price: Long, amount: Long, side: OrderType)
   object LastTrade {
+
     implicit val orderTypeFormat: Format[OrderType] = Format(
       {
         case JsNumber(x) => Try(OrderType(x.toIntExact)).fold(e => JsError(s"Can't deserialize $x as OrderType: ${e.getMessage}"), JsSuccess(_))
@@ -135,6 +138,7 @@ object OrderBook {
       },
       x => JsNumber(x.bytes.head.toInt)
     )
+
     implicit val format: Format[LastTrade] = Json.format[LastTrade]
 
     def serialize(dest: mutable.ArrayBuilder[Byte], x: LastTrade): Unit = {
@@ -148,6 +152,9 @@ object OrderBook {
 
   case class Snapshot(bids: SideSnapshot, asks: SideSnapshot, lastTrade: Option[LastTrade])
   object Snapshot {
+
+    val empty: Snapshot = Snapshot(bids = Map.empty, asks = Map.empty, None)
+
     def serialize(dest: mutable.ArrayBuilder[Byte], x: Snapshot): Unit = {
       SideSnapshot.serialize(dest, x.bids)
       SideSnapshot.serialize(dest, x.asks)
@@ -241,7 +248,7 @@ object OrderBook {
                       counterSide: Side,
                       lastTrade: Option[LastTrade],
                       tickSize: Long,
-                      zeroMakerFee: Boolean): (Seq[Event], Option[LastTrade]) = {
+                      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): (Seq[Event], Option[LastTrade]) = {
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, isSystemCancel = false, eventTs) +: prevEvents, lastTrade)
     else {
       counterSide.best match {
@@ -272,14 +279,15 @@ object OrderBook {
               counterSide,
               lastTrade,
               tickSize,
-              zeroMakerFee
+              getMakerTakerFee
             )
 
           } else {
 
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, zeroMakerFee)
-            val newEvents          = orderExecutedEvent +: prevEvents
-            val lt                 = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
+            val (maxCounterFee, maxSubmittedFee) = getMakerTakerFee(submitted, counter)
+            val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
+            val newEvents                        = orderExecutedEvent +: prevEvents
+            val lt                               = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
             if (orderExecutedEvent.counterRemaining.isValid) { // counter is not filled
 
@@ -296,7 +304,7 @@ object OrderBook {
               submitted match {
                 case _: LimitOrder =>
                   val remaining = orderExecutedEvent.submittedRemaining
-                  if (remaining.isValid) doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, zeroMakerFee)
+                  if (remaining.isValid) doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, getMakerTakerFee)
                   else (newEvents, lt)
 
                 case submittedMarketOrder: MarketOrder =>
@@ -305,7 +313,7 @@ object OrderBook {
                   val canSpendMore      = remaining.availableForSpending > 0
 
                   (isSubmittedFilled, canSpendMore) match {
-                    case (false, true)  => doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, zeroMakerFee)
+                    case (false, true)  => doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, getMakerTakerFee)
                     case (false, false) => (OrderCanceled(remaining, isSystemCancel = true, eventTs) +: newEvents, lt)
                     case (true, _)      => (newEvents, lt)
                   }
@@ -346,15 +354,6 @@ object OrderBook {
       (__ \ "order").format[Order])(limitOrder, (lo: LimitOrder) => (lo.amount, lo.fee, lo.order))
   )
 
-  /*
-  // Replace by:
-  private implicit val limitOrderFormat: Format[LimitOrder] = (
-    (JsPath \ "amount").format[Long] and
-      (JsPath \ "fee").format[Long] and
-      (JsPath \ "order").format[Order]
-  )(limitOrder, lo => (lo.amount, lo.fee, lo.order))
-   */
-
   implicit val priceMapFormat: Format[SideSnapshot] =
     implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
       _.map { case (k, v) => k.toLong   -> v },
@@ -363,7 +362,9 @@ object OrderBook {
 
   implicit val snapshotFormat: Format[OrderBook.Snapshot] = Json.format
 
-  def empty: OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
+  def empty(getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): OrderBook = {
+    new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None, getMakerTakerFee)
+  }
 
   private def transformSide(side: SideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     val bidMap = mutable.TreeMap.empty[Price, Level](ordering)
@@ -379,8 +380,9 @@ object OrderBook {
     bidMap
   }
 
-  def apply(snapshot: Snapshot): OrderBook =
+  def apply(snapshot: Snapshot, getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): OrderBook =
     new OrderBook(transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
                   transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
-                  snapshot.lastTrade)
+                  snapshot.lastTrade,
+                  getMakerTakerFee)
 }

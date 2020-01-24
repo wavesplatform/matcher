@@ -26,7 +26,7 @@ import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.json._
-import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{AssetInfo, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
@@ -85,6 +85,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   )
 
   private val (order, senderPrivateKey) = orderGenerator.sample.get
+
+  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
+  private val priceAssetDesc  = BriefAssetDescription("PriceAsset", 8, hasScript = false)
 
   private val settings = MatcherSettings.valueReader
     .read(ConfigFactory.load(), "waves.dex")
@@ -205,7 +208,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   // getOrderBook
-  // TODO DEX-552
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
     "returns an order book" in test(
       { route =>
@@ -321,6 +323,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // reservedBalance
   routePath("/balance/reserved/{publicKey}") - {
 
     val publicKey = matcherKeyPair.publicKey
@@ -366,6 +369,103 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/${order.id()}")) ~> route ~> check {
           responseAs[JsObject] should matchTo(Json.obj("status" -> "Accepted"))
+        }
+      }
+    )
+  }
+
+  // cancel
+  routePath("/orderbook/{amountAsset}/{priceAsset}/cancel") - {
+    "single cancel - returns that an order was canceled" in test(
+      { route =>
+        val unsignedRequest = CancelOrderRequest(senderPrivateKey.publicKey, Some(order.id()), timestamp = None, signature = Array.emptyByteArray)
+        val signedRequest   = unsignedRequest.copy(signature = crypto.sign(senderPrivateKey, unsignedRequest.toSign))
+
+        Post(routePath(s"/orderbook/${order.assetPair.amountAssetStr}/${order.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+          (responseAs[JsObject] - "success") should matchTo(
+            Json.obj(
+              "orderId" -> order.id(),
+              "status"  -> "OrderCanceled"
+            ))
+        }
+      }
+    )
+
+    "massive cancel - returns canceled orders" in test(
+      { route =>
+        val unsignedRequest = CancelOrderRequest(
+          sender = senderPrivateKey.publicKey,
+          orderId = None,
+          timestamp = Some(System.currentTimeMillis()),
+          signature = Array.emptyByteArray
+        )
+        val signedRequest = unsignedRequest.copy(signature = crypto.sign(senderPrivateKey, unsignedRequest.toSign))
+
+        Post(routePath(s"/orderbook/${order.assetPair.amountAssetStr}/${order.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+          (responseAs[JsObject] - "success") should matchTo(Json.obj(
+            "message" -> Json.arr( // LOL!
+              Json.arr(Json.obj( // LOL!
+                                "orderId" -> order.id(),
+                                "success" -> true,
+                                "status"  -> "OrderCanceled"))),
+            "status" -> "BatchCancelCompleted"
+          ))
+        }
+      }
+    )
+  }
+
+  // cancelAll
+  routePath("/orderbook/cancel") - {
+    "returns canceled orders" in test(
+      { route =>
+        val unsignedRequest = CancelOrderRequest(
+          sender = senderPrivateKey.publicKey,
+          orderId = None,
+          timestamp = Some(System.currentTimeMillis()),
+          signature = Array.emptyByteArray
+        )
+        val signedRequest = unsignedRequest.copy(signature = crypto.sign(senderPrivateKey, unsignedRequest.toSign))
+
+        Post(routePath("/orderbook/cancel"), signedRequest) ~> route ~> check {
+          (responseAs[JsObject] - "success") should matchTo(Json.obj(
+            "message" -> Json.arr( // LOL!
+              Json.arr(Json.obj( // LOL!
+                                "orderId" -> order.id(),
+                                "success" -> true,
+                                "status"  -> "OrderCanceled"))),
+            "status" -> "BatchCancelCompleted"
+          ))
+        }
+      }
+    )
+  }
+
+  // orderBooks
+  routePath("/orderbook") - {
+    "returns all order books" in test(
+      { route =>
+        Get(routePath("/orderbook")) ~> route ~> check {
+          val r = responseAs[JsObject]
+          (r \ "matcherPublicKey").as[String] should matchTo(matcherKeyPair.publicKey.base58)
+
+          val markets = (r \ "markets").as[JsArray]
+          markets.value.size shouldBe 1
+          (markets.head.as[JsObject] - "created") should matchTo(Json.obj(
+            "amountAssetName" -> amountAssetDesc.name,
+            "amountAsset"     -> order.assetPair.amountAssetStr,
+            "amountAssetInfo" -> Json.obj(
+              "decimals" -> amountAssetDesc.decimals
+            ),
+            "priceAssetName" -> priceAssetDesc.name,
+            "priceAsset"     -> order.assetPair.priceAssetStr,
+            "priceAssetInfo" -> Json.obj(
+              "decimals" -> priceAssetDesc.decimals
+            ),
+            "matchingRules" -> Json.obj(
+              "tickSize" -> "0.1"
+            )
+          ))
         }
       }
     )
@@ -589,18 +689,34 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
-      msg match {
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) =>
-          sender ! AddressActor.Reply.Balance(Map(Waves -> 350L))
-        case AddressDirectory.Envelope(_, PlaceOrder(x, _)) => sender ! OrderAccepted(x)
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrdersStatuses(assetPair, _)) =>
-          sender ! AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetOrderStatus(orderId)) =>
-          sender ! { if (orderId == order.id()) OrderStatus.Accepted else Status.Failure(new RuntimeException(s"Unknown order $orderId")) }
-        case AddressDirectory.Envelope(_, GetTradableBalance(xs)) => sender ! Balance(xs.map(_ -> 100L).toMap)
-        case x                                                    => sender ! Status.Failure(new RuntimeException(s"Unknown command: $x"))
+      val response = msg match {
+        case AddressDirectory.Envelope(_, msg) =>
+          msg match {
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
+            case PlaceOrder(x, _)                      => OrderAccepted(x)
+
+            case AddressActor.Query.GetOrdersStatuses(_, _) =>
+              AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
+
+            case AddressActor.Query.GetOrderStatus(orderId) =>
+              if (orderId == order.id()) OrderStatus.Accepted
+              else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
+
+            case AddressActor.Command.CancelOrder(orderId) =>
+              if (orderId == order.id()) api.OrderCanceled(orderId)
+              else api.OrderCancelRejected(error.OrderNotFound(orderId))
+
+            case AddressActor.Command.CancelAllOrders(pair, _) if pair.forall(_ == order.assetPair) =>
+              api.BatchCancelCompleted(Map(order.id() -> api.OrderCanceled(order.id())))
+
+            case GetTradableBalance(xs) => Balance(xs.map(_ -> 100L).toMap)
+            case x                      => Status.Failure(new RuntimeException(s"Unknown command: $x"))
+          }
+
+        case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
       }
 
+      sender ! response
       TestActor.KeepRunning
     }
 
@@ -614,6 +730,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               smartWavesPair                    -> Some(120L),
               AssetPair(smartAsset, priceAsset) -> None,
             ))
+
+        case GetMarkets =>
+          sender ! List(
+            MarketData(
+              pair = order.assetPair,
+              amountAssetName = amountAssetDesc.name,
+              priceAssetName = priceAssetDesc.name,
+              created = System.currentTimeMillis(),
+              amountAssetInfo = Some(AssetInfo(amountAssetDesc.decimals)),
+              priceAssetInfo = Some(AssetInfo(priceAssetDesc.decimals))
+            )
+          )
         case _ =>
       }
 
@@ -625,13 +753,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(
         settings, {
-          case `smartAsset` =>
-            liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
-          case x if x == order.assetPair.amountAsset =>
-            liftValueAsync[BriefAssetDescription](BriefAssetDescription("AmountAsset", 8, hasScript = false))
-          case x if x == order.assetPair.priceAsset =>
-            liftValueAsync[BriefAssetDescription](BriefAssetDescription("PriceAsset", 8, hasScript = false))
-          case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+          case `smartAsset`                          => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+          case x if x == order.assetPair.amountAsset => liftValueAsync[BriefAssetDescription](amountAssetDesc)
+          case x if x == order.assetPair.priceAsset  => liftValueAsync[BriefAssetDescription](priceAssetDesc)
+          case x                                     => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
         },
         Set.empty
       ),

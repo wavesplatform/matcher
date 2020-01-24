@@ -315,7 +315,7 @@ object MatcherActor {
                         priceAssetName: String,
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
-                        priceAssetinfo: Option[AssetInfo])
+                        priceAssetInfo: Option[AssetInfo])
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

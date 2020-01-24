@@ -26,7 +26,14 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -439,7 +446,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                   "amountAssetInfo" -> m.amountAssetInfo,
                   "priceAsset"      -> m.pair.priceAssetStr,
                   "priceAssetName"  -> m.priceAssetName,
-                  "priceAssetInfo"  -> m.priceAssetinfo,
+                  "priceAssetInfo"  -> m.priceAssetInfo,
                   "created"         -> m.created
                 )
                 .deepMerge(orderBookInfoJson(m.pair))

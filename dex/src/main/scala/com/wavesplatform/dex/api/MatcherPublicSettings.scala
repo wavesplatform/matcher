@@ -2,12 +2,15 @@ package com.wavesplatform.dex.api
 
 import com.wavesplatform.dex.api.MatcherPublicSettings.OrderFeePublicSettings
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.json
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import play.api.libs.json._
 
 case class MatcherPublicSettings(priceAssets: Seq[Asset], orderFee: OrderFeePublicSettings, orderVersions: Seq[Byte])
 
 object MatcherPublicSettings {
+  private implicit val assetDoubleMapFormat: Format[Map[Asset, Double]] = json.assetDoubleMapFormat // IntelliJ IDEA issue
+
   sealed trait OrderFeePublicSettings extends Product with Serializable
   object OrderFeePublicSettings {
     case class Dynamic(baseFee: Long, rates: Map[Asset, Double]) extends OrderFeePublicSettings

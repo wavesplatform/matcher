@@ -7,33 +7,30 @@ import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.AddressActor.Reply.Balance
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.common.json._
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.order.OrderJson._
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.effect._
+import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.json._
 import com.wavesplatform.dex.market.MatcherActor.{GetSnapshotOffsets, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
-import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.{WithDB, crypto}
-import com.wavesplatform.dex.settings.MatcherSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json._
@@ -65,8 +62,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     maxPrice = 2000.0,
   )
 
-  private val priceAssetTx = issueGen.sample.get
-  private val priceAssetId = priceAssetTx.id()
+  private val priceAssetId = issuedAssetIdGen.map(ByteStr(_)).sample.get
   private val priceAsset   = IssuedAsset(priceAssetId)
 
   private val smartWavesPair = AssetPair(smartAsset, Waves)

@@ -15,6 +15,10 @@ object Asset {
 
   val WavesName = "WAVES"
 
+  // TODO Refactor:
+  //  1. toString is a method used only for debugging purposes.
+  //     Also for better readability it should contain a class like IssuedAsset(stringHere)
+  //  2. Used something else for any logic. E.g. trait Representation[T], where T <: String
   final case class IssuedAsset(id: ByteStr) extends Asset { override def toString: String = id.base58 }
   final case object Waves                   extends Asset { override def toString: String = WavesName }
 
@@ -39,9 +43,9 @@ object Asset {
     AssetPair.extractAsset(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
-  def fromString(maybeStr: Option[String]): Asset = {
-    maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
-  }
+  def fromString(x: String): Option[Asset] =
+    if (x == WavesName) Some(Waves)
+    else ByteStr.decodeBase58(x).fold(_ => None, xs => Some(IssuedAsset(xs)))
 
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
     maybeBStr.fold[Asset](Waves)(IssuedAsset)

@@ -50,7 +50,15 @@ object Implicits {
 
   implicit val doubleWrites            = stringWrites.contramap[Double](d => formatValue(d))
   implicit val decimalWrites           = stringWrites.contramap[BigDecimal](formatValue)
+  implicit val addressWrites           = stringWrites.contramap[Address](_.stringRepr)
   implicit val blockchainFeatureWrites = stringWrites.contramap[BlockchainFeature](_.description)
+
+  // Writes is invariant
+  implicit val wavesWrites       = Asset.assetFormat.contramap[Waves.type](x => x)
+  implicit val issuedAssetWrites = Asset.assetFormat.contramap[IssuedAsset](x => x)
+
+  // Tagged types can't catch this
+  implicit val publicKeyWrites = ByteStr.byteStrFormat.contramap[PublicKey](x => x)
 
   implicit val amountWrites = Writes[Amount] { amount: Amount =>
     Json.obj("volume" -> Json.toJson(amount.volume), "assetId" -> Json.toJson(amount.asset))

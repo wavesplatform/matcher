@@ -471,6 +471,47 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // orderBookDelete
+  routePath("/orderbook/{amountAsset}/{priceAsset}") - {
+    "returns an empty snapshot" in test(
+      { route =>
+        Delete(routePath(s"/orderbook/${order.assetPair.amountAssetStr}/${order.assetPair.priceAssetStr}"))
+          .withHeaders(apiKeyHeader) ~> route ~> check {
+          // TODO
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getTransactionsByOrder
+  routePath("/transactions/{orderId}") - {
+    "returns known transactions with this order" in test(
+      { route =>
+        Get(routePath(s"/transactions/${order.idStr()}")) ~> route ~> check {
+          // TODO
+          responseAs[JsArray] shouldBe Json.arr()
+        }
+      }
+    )
+  }
+
+  // forceCancelOrder
+  routePath("/orders/cancel/[orderId]") - {
+    "single cancel with API key" in test(
+      { route =>
+        Post(routePath(s"/orders/cancel/${order.id()}")).withHeaders(apiKeyHeader) ~> route ~> check {
+          (responseAs[JsObject] - "success") should matchTo(
+            Json.obj(
+              "orderId" -> order.id(),
+              "status"  -> "OrderCanceled"
+            ))
+        }
+      },
+      apiKey
+    )
+  }
+
   routePath("/settings/rates/{assetId}") - {
     val rateCache = RateCache.inMem
 

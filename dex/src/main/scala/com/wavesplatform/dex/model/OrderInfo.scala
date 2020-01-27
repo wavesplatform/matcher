@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 
-trait OrderInfo[+S <: OrderStatus] {
+sealed trait OrderInfo[+S <: OrderStatus] {
   def version: Byte
   def side: OrderType
   def amount: Long

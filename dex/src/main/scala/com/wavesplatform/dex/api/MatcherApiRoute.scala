@@ -21,6 +21,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
@@ -559,25 +560,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     } ~ get(complete(StatusCodes.MethodNotAllowed))
   }
 
+  private val tupledOrderBookHistoryItem: ((Id, OrderInfo[OrderStatus])) => ApiOrderBookHistoryItem =
+    Function.tupled(ApiOrderBookHistoryItem.fromOrderInfo)
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
     askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { reply =>
-      StatusCodes.OK -> reply.xs.map {
-        case (id, oi) =>
-          Json.obj(
-            "id"        -> id.toString,
-            "type"      -> oi.side.toString,
-            "orderType" -> oi.orderType,
-            "amount"    -> oi.amount,
-            "fee"       -> oi.matcherFee,
-            "price"     -> oi.price,
-            "timestamp" -> oi.timestamp,
-            "filled"    -> oi.status.filledAmount,
-            "filledFee" -> oi.status.filledFee,
-            "feeAsset"  -> oi.feeAsset,
-            "status"    -> oi.status.name,
-            "assetPair" -> Json.toJsObject(oi.assetPair)
-          )
-      }
+      StatusCodes.OK -> reply.xs.map(tupledOrderBookHistoryItem)
     }
   }
 

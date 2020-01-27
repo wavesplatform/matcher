@@ -222,11 +222,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
-        import MatcherPublicSettings.OrderFeePublicSettings._
+        import ApiMatcherPublicSettings.OrderFeePublicSettings._
         SimpleResponse(
           code = StatusCodes.OK,
           js = Json.toJsObject(
-            MatcherPublicSettings(
+            ApiMatcherPublicSettings(
               priceAssets = matcherSettings.priceAssets,
               orderFee = matcherSettings.orderFee match {
                 case OrderFeeSettings.DynamicSettings(baseFee)              => Dynamic(baseFee + matcherAccountFee, rateCache.getAllRates)
@@ -247,7 +247,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     httpMethod = "GET",
     response = classOf[Map[String, Double]]
   )
-  def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> rateCache.getJson) }
+  def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> ApiRates(rateCache.getAllRates)) }
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(
@@ -375,9 +375,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def orderBookInfoJson(pair: AssetPair): JsObject = Json.toJsObject(
-    OrderBookInfo(
+    ApiOrderBookInfo(
       restrictions = matcherSettings.orderRestrictions.get(pair),
-      matchingRules = OrderBookInfo.MatchingRuleSettings(tickSize = getActualTickSize(pair).toDouble)
+      matchingRules = ApiOrderBookInfo.MatchingRuleSettings(tickSize = getActualTickSize(pair).toDouble)
     )
   )
 
@@ -770,8 +770,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
         DBUtils.order(db, orderId) match {
-          case Some(order) => askMapAddressActor[OrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId))(_.json)
-          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status).json)
+          case Some(order) => askMapAddressActor[OrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId))(x => x)
+          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status))
         }
       }
     }
@@ -867,13 +867,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        val js = Json.obj(
-          x.offsets.collect {
-            case (assetPair, Some(offset)) => assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
-          }.toSeq: _*
-        )
-
-        StatusCodes.OK -> js
+        StatusCodes.OK -> ApiSnapshotOffsets(x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset })
       }
     }
   }

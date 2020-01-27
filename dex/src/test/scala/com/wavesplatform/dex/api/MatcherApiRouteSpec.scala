@@ -16,7 +16,7 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -25,7 +25,6 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.json._
 import com.wavesplatform.dex.market.MatcherActor.{AssetInfo, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.LastTrade
@@ -109,10 +108,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   routePath("/orderbook/{amountAsset}/{priceAsset}/info") - {
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
-        responseAs[JsValue].as[OrderBookInfo] should matchTo(
-          OrderBookInfo(
+        responseAs[JsValue].as[ApiOrderBookInfo] should matchTo(
+          ApiOrderBookInfo(
             restrictions = Some(orderRestrictions),
-            matchingRules = OrderBookInfo.MatchingRuleSettings(0.1)
+            matchingRules = ApiOrderBookInfo.MatchingRuleSettings(0.1)
           ))
       }
     }
@@ -122,9 +121,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   routePath("/matcher/settings") - {
     "returns matcher's settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
-        responseAs[JsValue].as[MatcherPublicSettings] should matchTo(MatcherPublicSettings(
+        responseAs[JsValue].as[ApiMatcherPublicSettings] should matchTo(ApiMatcherPublicSettings(
           priceAssets = List(order.assetPair.priceAsset, priceAsset, Waves),
-          orderFee = MatcherPublicSettings.OrderFeePublicSettings.Dynamic(
+          orderFee = ApiMatcherPublicSettings.OrderFeePublicSettings.Dynamic(
             baseFee = 600000,
             rates = Map(Waves -> 1.0)
           ),
@@ -138,7 +137,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   routePath("/settings/rates") - {
     "returns available rates for fee" in test { route =>
       Get(routePath("/settings/rates")) ~> route ~> check {
-        responseAs[JsValue].as[Map[Asset, Double]] should matchTo(Map[Asset, Double](Waves -> 1.0))
+        responseAs[JsValue].as[ApiRates] should matchTo(ApiRates(Map(Waves -> 1.0)))
       }
     }
   }
@@ -184,11 +183,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns a dictionary with order books offsets" in test(
       { route =>
         Get(routePath("/debug/allSnapshotOffsets")).withHeaders(apiKeyHeader) ~> route ~> check {
-          responseAs[JsValue].as[Map[String, Long]] should matchTo(
-            Map[String, Long](
-              s"WAVES-$priceAssetId" -> 100,
-              s"$smartAssetId-WAVES" -> 120
-            ))
+          responseAs[JsValue].as[ApiSnapshotOffsets] should matchTo(
+            ApiSnapshotOffsets(
+              Map(
+                AssetPair(Waves, priceAsset) -> 100,
+                AssetPair(smartAsset, Waves) -> 120
+              )))
         }
       },
       apiKey
@@ -212,11 +212,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book" in test(
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
-          val r = responseAs[JsValue]
-          (r \ "timestamp").as[Long] should be > 0L
-          (r \ "pair").as[AssetPair] should matchTo(smartWavesPair)
-          (r \ "bids").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.bids)
-          (r \ "asks").as[List[LevelAgg]] should matchTo(smartWavesAggregatedSnapshot.asks)
+          responseAs[JsValue].as[OrderBookResult].copy(timestamp = 0L) should matchTo(
+            OrderBookResult(
+              timestamp = 0L,
+              pair = smartWavesPair,
+              bids = smartWavesAggregatedSnapshot.bids,
+              asks = smartWavesAggregatedSnapshot.asks
+            ))
         }
       }
     )
@@ -257,7 +259,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   // getAssetPairAndPublicKeyOrderHistory
   routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
-    "returns an order history filtered  by asset pair" in test(
+    "returns an order history filtered by asset pair" in test(
       { route =>
         val now       = System.currentTimeMillis()
         val signature = crypto.sign(senderPrivateKey, order.senderPublicKey ++ Longs.toByteArray(now))
@@ -266,10 +268,23 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             RawHeader("Timestamp", s"$now"),
             RawHeader("Signature", s"$signature")
           ) ~> route ~> check {
-          // TODO
-          val r = responseAs[JsArray]
-          r.value.size shouldBe 1
-          (r.value.head \ "id").as[String] shouldBe order.idStr()
+          responseAs[JsArray].as[List[ApiOrderBookHistoryItem]] should matchTo(
+            List(
+              ApiOrderBookHistoryItem(
+                id = order.id(),
+                `type` = order.orderType,
+                orderType = AcceptedOrderType.Limit,
+                amount = order.amount,
+                filled = 0L,
+                price = order.price,
+                fee = order.matcherFee,
+                filledFee = 0L,
+                feeAsset = Waves,
+                timestamp = order.timestamp,
+                status = "Accepted",
+                assetPair = order.assetPair
+              )
+            ))
         }
       }
     )

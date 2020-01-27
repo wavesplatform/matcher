@@ -6,7 +6,6 @@ import com.wavesplatform.dex.db.RateDB
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import org.iq80.leveldb.DB
-import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
@@ -23,16 +22,11 @@ trait RateCache {
   /** Deletes asset rate, returns previous rate value if there was one */
   def deleteRate(asset: Asset): Option[Double]
 
-  def getJson: JsObject = RateCache.getJson(getAllRates)
 }
 
 object RateCache {
 
   private val WavesRate = Option(1d)
-
-  def getJson(ratesMap: Map[Asset, Double]): JsObject = Json.obj(
-    ratesMap.map { case (asset, rate) => asset.toString -> Json.toJsFieldJsValueWrapper(rate) }.toSeq: _*
-  )
 
   def apply(db: DB): RateCache = new RateCache {
 

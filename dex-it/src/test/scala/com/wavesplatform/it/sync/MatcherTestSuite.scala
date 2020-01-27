@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
+import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -61,7 +62,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "orderType should be limit for a limit order" in {
-        def validateHistory(label: String, orders: Seq[OrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+        def validateHistory(label: String, orders: Seq[ApiOrderBookHistoryItem]): Unit = withClue(s"$label: ") {
           orders should have size 1
           orders.head.orderType shouldBe AcceptedOrderType.Limit
         }

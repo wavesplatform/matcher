@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.api.dex
 import cats.Functor
 import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
+import com.wavesplatform.dex.api.{ApiOrderBookInfo, ApiRates, ApiOrderBookHistoryItem}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
@@ -48,16 +49,16 @@ object DexApiOps {
 
     def orderHistory(owner: KeyPair,
                      activeOnly: Option[Boolean] = None,
-                     timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
+                     timestamp: Long = System.currentTimeMillis()): F[List[ApiOrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistory(owner, activeOnly, timestamp))
 
-    def orderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] =
+    def orderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[List[ApiOrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly))
 
     def orderHistoryByPair(owner: KeyPair,
                            assetPair: AssetPair,
                            activeOnly: Option[Boolean] = None,
-                           timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
+                           timestamp: Long = System.currentTimeMillis()): F[List[ApiOrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistoryByPair(owner, assetPair, activeOnly, timestamp))
 
     def allOrderBooks: F[MarketDataInfo] = explicitGet(self.tryAllOrderBooks)
@@ -69,12 +70,12 @@ object DexApiOps {
     def orderBook(assetPair: AssetPair): F[OrderBookResponse]             = explicitGet(self.tryOrderBook(assetPair))
     def orderBook(assetPair: AssetPair, depth: Int): F[OrderBookResponse] = explicitGet(self.tryOrderBook(assetPair, depth))
 
-    def orderBookInfo(assetPair: AssetPair): F[OrderBookInfo]          = explicitGet(self.tryOrderBookInfo(assetPair))
+    def orderBookInfo(assetPair: AssetPair): F[ApiOrderBookInfo]       = explicitGet(self.tryOrderBookInfo(assetPair))
     def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse] = explicitGet(self.tryOrderBookStatus(assetPair))
 
     def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = explicitGet(self.tryUpsertRate(asset, rate))
     def deleteRate(asset: Asset): F[RatesResponse]                             = explicitGet(self.tryDeleteRate(asset))
-    def rates: F[Map[Asset, Double]]                                           = explicitGet(self.tryRates)
+    def rates: F[ApiRates]                                                     = explicitGet(self.tryRates)
 
     def currentOffset: F[Long]                      = explicitGet(self.tryCurrentOffset)
     def lastOffset: F[Long]                         = explicitGet(self.tryLastOffset)

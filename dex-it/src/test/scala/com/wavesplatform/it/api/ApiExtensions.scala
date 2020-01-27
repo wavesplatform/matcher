@@ -1,12 +1,13 @@
 package com.wavesplatform.it.api
 
 import cats.Id
+import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
@@ -66,7 +67,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
             case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
           }
 
-          account -> (TreeMap.empty[AssetPair, Seq[OrderBookHistoryItem]] ++ assetPairHistory)
+          account -> (TreeMap.empty[AssetPair, Seq[ApiOrderBookHistoryItem]] ++ assetPairHistory)
       }
 
     clean {

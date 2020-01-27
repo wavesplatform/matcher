@@ -19,8 +19,8 @@ object JsonSerializer {
   mapper.registerModule(DefaultScalaModule)
   mapper.registerModule(coreTypeSerializers)
 
-  def serialize(value: Any): String                             = mapper.writeValueAsString(value)
-  def deserialize[T](value: String)(implicit m: Manifest[T]): T = mapper.readValue(value)
+  def serialize(value: Any): String              = mapper.writeValueAsString(value)
+  def deserialize[T: Manifest](value: String): T = mapper.readValue(value)
 
   private class AssetPairDeserializer extends StdDeserializer[AssetPair](classOf[AssetPair]) {
 

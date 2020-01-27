@@ -8,7 +8,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
-import play.api.libs.json.{Format, JsObject, JsValue, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -254,7 +255,6 @@ case class SellMarketOrder(amount: Long, fee: Long, order: Order, availableForSp
 
 sealed trait OrderStatus {
   def name: String
-  def json: JsValue
 
   def filledAmount: Long
   def filledFee: Long
@@ -265,37 +265,53 @@ object OrderStatus {
   sealed trait Final extends OrderStatus
 
   case object Accepted extends OrderStatus {
-
-    val name           = "Accepted"
-    def json: JsObject = Json.obj("status" -> name)
+    val name = "Accepted"
 
     override def filledAmount: Long = 0
     override def filledFee: Long    = 0
   }
 
   case object NotFound extends Final {
-
-    val name           = "NotFound"
-    def json: JsObject = Json.obj("status" -> name, "message" -> "The limit order is not found")
+    val name = "NotFound"
 
     override def filledAmount: Long = 0
     override def filledFee: Long    = 0
   }
 
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
-    val name           = "PartiallyFilled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = "PartiallyFilled"
   }
 
   case class Filled(filledAmount: Long, filledFee: Long) extends Final {
-    val name           = "Filled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = "Filled"
   }
 
   case class Cancelled(filledAmount: Long, filledFee: Long) extends Final {
-    val name           = "Cancelled"
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = "Cancelled"
   }
+
+  implicit val orderStatusFormat: Format[OrderStatus] = (
+    (JsPath \ "status").format[String] and
+      (JsPath \ "filledAmount").formatNullable[Long] and
+      (JsPath \ "filledFee").formatNullable[Long] and
+      (JsPath \ "message").formatNullable[String] // TODO Should be removed
+  ).apply[OrderStatus](
+    f1 = Function.untupled[String, Option[Long], Option[Long], Option[String], OrderStatus] {
+      case ("Accepted", _, _, _)                                       => Accepted
+      case ("NotFound", _, _, _)                                       => NotFound
+      case ("PartiallyFilled", Some(filledAmount), Some(filledFee), _) => PartiallyFilled(filledAmount, filledFee)
+      case ("Filled", Some(filledAmount), Some(filledFee), _)          => Filled(filledAmount, filledFee)
+      case ("Cancelled", Some(filledAmount), Some(filledFee), _)       => Cancelled(filledAmount, filledFee)
+      case _                                                           => NotFound // Careful, now it is used only in tests
+    },
+    f2 = {
+      case Accepted                                 => ("Accepted", None, None, None)
+      case NotFound                                 => ("NotFound", None, None, Some("The limit order is not found"))
+      case PartiallyFilled(filledAmount, filledFee) => ("PartiallyFilled", Some(filledAmount), Some(filledFee), None)
+      case Filled(filledAmount, filledFee)          => ("Filled", Some(filledAmount), Some(filledFee), None)
+      case Cancelled(filledAmount, filledFee)       => ("Cancelled", Some(filledAmount), Some(filledFee), None)
+    }: OrderStatus => (String, Option[Long], Option[Long], Option[String])
+  )
 
   def finalStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {
     val filledAmount     = ao.order.amount - ao.amount

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -264,7 +265,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
   }
 
-  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[OrderBookHistoryItem]] = List(
+  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[ApiOrderBookHistoryItem]] = List(
     dex1.api.orderHistory(account, activeOnly),
     dex1.api.orderHistoryByPair(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)

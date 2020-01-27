@@ -4,9 +4,9 @@ import com.wavesplatform.dex.json.stringAsDoubleFormat
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import play.api.libs.json.{Format, Json, OFormat}
 
-case class OrderBookInfo(restrictions: Option[OrderRestrictionsSettings], matchingRules: OrderBookInfo.MatchingRuleSettings)
-object OrderBookInfo {
-  implicit val orderBookInfoFormat: OFormat[OrderBookInfo] = Json.format[OrderBookInfo]
+case class ApiOrderBookInfo(restrictions: Option[OrderRestrictionsSettings], matchingRules: ApiOrderBookInfo.MatchingRuleSettings)
+object ApiOrderBookInfo {
+  implicit val orderBookInfoFormat: OFormat[ApiOrderBookInfo] = Json.format[ApiOrderBookInfo]
 
   case class MatchingRuleSettings(tickSize: Double)
   object MatchingRuleSettings {

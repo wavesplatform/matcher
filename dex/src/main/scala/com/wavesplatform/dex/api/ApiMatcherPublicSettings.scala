@@ -1,14 +1,14 @@
 package com.wavesplatform.dex.api
 
-import com.wavesplatform.dex.api.MatcherPublicSettings.OrderFeePublicSettings
+import com.wavesplatform.dex.api.ApiMatcherPublicSettings.OrderFeePublicSettings
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.json
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import play.api.libs.json._
 
-case class MatcherPublicSettings(priceAssets: Seq[Asset], orderFee: OrderFeePublicSettings, orderVersions: Seq[Byte])
+case class ApiMatcherPublicSettings(priceAssets: Seq[Asset], orderFee: OrderFeePublicSettings, orderVersions: Seq[Byte])
 
-object MatcherPublicSettings {
+object ApiMatcherPublicSettings {
   private implicit val assetDoubleMapFormat: Format[Map[Asset, Double]] = json.assetDoubleMapFormat // IntelliJ IDEA issue
 
   sealed trait OrderFeePublicSettings extends Product with Serializable
@@ -43,5 +43,5 @@ object MatcherPublicSettings {
     private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
   }
 
-  implicit val matcherPublicSettingsFormat: OFormat[MatcherPublicSettings] = Json.format[MatcherPublicSettings]
+  implicit val matcherPublicSettingsFormat: OFormat[ApiMatcherPublicSettings] = Json.format[ApiMatcherPublicSettings]
 }

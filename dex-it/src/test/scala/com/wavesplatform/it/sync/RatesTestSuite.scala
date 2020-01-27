@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiRates
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -26,7 +27,7 @@ class RatesTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
-  val defaultRateMap: Map[Asset, Double] = Map(Waves -> 1d)
+  val defaultRateMap: ApiRates = ApiRates(Map(Waves -> 1d))
 
   val wctRate        = 0.2
   val wctRateUpdated = 0.5
@@ -135,5 +136,9 @@ class RatesTestSuite extends MatcherSuiteBase {
       9441542, // FeeNotEnough
       s"Required 0.0033 $btcStr as fee for this order, but given 0.003 $btcStr"
     )
+  }
+
+  implicit final class ApiRatesOps(val self: ApiRates) {
+    def +(update: (Asset, Double)): ApiRates = ApiRates(xs = self.xs + update)
   }
 }

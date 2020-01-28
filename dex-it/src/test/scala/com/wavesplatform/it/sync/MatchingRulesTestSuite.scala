@@ -67,7 +67,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
        """.stripMargin
     )
 
-  private val IssueResults(asset0Tx, _, twoDecimalAsset)     = mkIssueExtended(alice, "twoDecimalAsset", defaultAssetQuantity, 2, smartIssueFee)
+  private val IssueResults(asset0Tx, _, twoDecimalAsset) = mkIssueExtended(alice, "twoDecimalAsset", defaultAssetQuantity, 2, smartIssueFee)
 
   override protected def beforeAll(): Unit = {
     // A custom initialization to guarantee that assets are in the blockchain
@@ -89,13 +89,6 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   }
 
   val (amount, price) = (1000L, PriceConstant)
-
-  "Tick size should have max 8 decimals" in {
-    val twoDecimalWavesPair = createAssetPair(twoDecimalAsset, Waves)
-    placeAndAwaitAtDex( mkOrder(bob, twoDecimalWavesPair, BUY, amount, price, matcherFee))
-    dex1.api.tradingPairInfo(twoDecimalWavesPair).get.matchingRules.tickSize shouldBe "0.00000001"
-    dex1.api.cancelAll(bob)
-  }
 
   // offset is 0, after test - 6
   "Tick size isn't set" in {
@@ -341,5 +334,12 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
             dex1.api.cancel(alice, partiallyFilledOrderId)
           }
       }
+  }
+
+  "Tick size should have max 8 decimals" in {
+    val twoDecimalWavesPair = createAssetPair(twoDecimalAsset, Waves)
+    placeAndAwaitAtDex(mkOrder(bob, twoDecimalWavesPair, BUY, amount, price, matcherFee))
+    dex1.api.tradingPairInfo(twoDecimalWavesPair).get.matchingRules.tickSize shouldBe "0.00000001"
+    dex1.api.cancelAll(bob)
   }
 }

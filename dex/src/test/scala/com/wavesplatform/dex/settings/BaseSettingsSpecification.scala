@@ -15,18 +15,20 @@ class BaseSettingsSpecification extends AnyFlatSpec {
   val correctOrderFeeStr: String =
     s"""
        |order-fee {
-       |  mode = percent
-       |  dynamic {
-       |    base-maker-fee = 200000
-       |    base-maker-fee = 700000
-       |  }
-       |  fixed {
-       |    asset = WAVES
-       |    min-fee = 300000
-       |  }
-       |  percent {
-       |    asset-type = amount
-       |    min-fee = 0.1
+       |  0: {
+       |    mode = percent
+       |    dynamic {
+       |      base-maker-fee = 200000
+       |      base-maker-fee = 700000
+       |    }
+       |    fixed {
+       |      asset = WAVES
+       |      min-fee = 300000
+       |    }
+       |    percent {
+       |      asset-type = amount
+       |      min-fee = 0.1
+       |    }
        |  }
        |}
        """.stripMargin

@@ -2,22 +2,18 @@ package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.AssetsStorage
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
-import mouse.any._
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -406,9 +402,6 @@ class OrderBookSpec
 
   "create OrderExecuted events with different executed fee for maker and taker" in {
 
-    val assetsCache: AssetsStorage = AssetsStorage.inMem unsafeTap { _.put(eth, BriefAssetDescription("ETH", 8, hasScript = false)) }
-    val rateCache: RateCache       = RateCache.inMem unsafeTap { _.upsertRate(eth, 0.00567593) }
-
     def limit(amount: Long, orderType: OrderType, fee: Long, feeAsset: Asset = Waves): LimitOrder =
       LimitOrder(createOrder(wavesUsdPair, orderType, amount, 3.00, fee, feeAsset = feeAsset))
 
@@ -421,56 +414,44 @@ class OrderBookSpec
         /** symmetric */
         (1.waves, 1.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.003.waves), // like in old good times
         (1.waves, 1.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
-        (1.waves, 1.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.009.waves), // orders have excess fee = 0.010.waves
         /** small maker - big taker */
         (2.waves, 10.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.0006.waves), // like in old good times
         (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.0018.waves), // orders have sufficient fee = 0.009.waves
-        (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.0018.waves), // orders have excess fee = 0.010.waves
         /** big maker - small taker */
         (10.waves, 2.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.0006.waves, 0.003.waves), // like in old good times
         (10.waves, 2.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.0002.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
-        (10.waves, 2.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.0002.waves, 0.009.waves), // orders have excess fee = 0.010.waves
         /** symmetric, taker is market */
         (1.waves, 1.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.003.waves), // like in old good times
         (1.waves, 1.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
-        (1.waves, 1.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.009.waves), // orders have excess fee = 0.010.waves
         /** small maker - big market taker */
         (2.waves, 10.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.003.waves, 0.0006.waves), // like in old good times
         (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.001.waves, 0.0018.waves), // orders have sufficient fee = 0.009.waves
-        (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.001.waves, 0.0018.waves), // orders have excess fee = 0.010.waves
         /** big maker - small market taker */
         (10.waves, 2.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.003, Waves, 0.0006.waves, 0.003.waves), // like in old good times
         (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.009, Waves, 0.0002.waves, 0.009.waves), // orders have sufficient fee = 0.009.waves
-        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.010, Waves, 0.0002.waves, 0.009.waves), // orders have excess fee = 0.010.waves
         /** symmetric, taker fee in ETH */
         (1.waves, 1.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00001703.eth), // like in old good times
         (1.waves, 1.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
-        (1.waves, 1.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
         /** small maker - big taker, taker fee in ETH */
         (2.waves, 10.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
         (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth),   // orders have sufficient fee = 0.009.waves = 0.00005109.eth
-        (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00001021.waves), // orders have excess fee = 0.010.waves = 0.00005676.eth
         /** big maker - small taker, taker fee in ETH */
         (10.waves, 2.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
         (10.waves, 2.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
-        (10.waves, 2.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.0002.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
         /** symmetric, taker is market, taker fee in ETH */
         (1.waves, 1.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00001703.eth), // like in old good times
         (1.waves, 1.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
-        (1.waves, 1.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00005109.eth), // orders have excess fee = 0.010.waves = 0.00005676.eth
         /** small maker - big market taker, taker fee in ETH */
         (2.waves, 10.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
         (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth),   // orders have sufficient fee = 0.009.waves = 0.00005109.eth
-        (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.001.waves, 0.00001021.waves), // orders have excess fee = 0.010.waves = 0.00005676.eth
         /** big maker - small market taker, taker fee in ETH */
         (10.waves, 2.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
-        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves
-        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.010.waves, 0.00005676, eth, 0.0002.waves, 0.00005109.eth) // orders have excess fee = 0.010.waves = 0.00005676.eth
+        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
       )
       // format: off
     ) { (mAmt: Long, tAmt: Long, isTMarket: Boolean, ofs: OrderFeeSettings, orderMFee: Long, orderTFee: Double, tFeeAsset: Asset, eMFee: Long, eTFee: Long) =>
       // format: on
-      val ob                  = createEmptyOrderBook(Matcher.getMakerTakerFee(ofs, assetsCache, rateCache))
+      val ob                  = createEmptyOrderBook(Matcher.getMakerTakerFee(ofs))
       val normalizedOrderTFee = Normalization.normalizeAmountAndFee(orderTFee, 8)
 
       val maker = limit(mAmt, SELL, orderMFee)

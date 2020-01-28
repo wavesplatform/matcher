@@ -289,7 +289,8 @@ object OrderValidator extends ScorexLogging {
                            blacklistedAddresses: Set[Address],
                            matcherSettings: MatcherSettings,
                            assetDecimals: Asset => Int,
-                           rateCache: RateCache)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
+                           rateCache: RateCache,
+                           getActualOrderFeeSettings: => OrderFeeSettings)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       asset.fold { success }(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), Unit, e(issuedAsset)))
@@ -300,8 +301,8 @@ object OrderValidator extends ScorexLogging {
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
         .ensure(error.OrderVersionDenied(order.version, matcherSettings.allowedOrderVersions))(o => matcherSettings.allowedOrderVersions(o.version))
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted)
-      _ <- validateFeeAsset(order, matcherSettings.orderFee, rateCache)
-      _ <- validateFee(order, matcherSettings.orderFee, assetDecimals, rateCache)
+      _ <- validateFeeAsset(order, getActualOrderFeeSettings, rateCache)
+      _ <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield order
   }
 

@@ -11,13 +11,12 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
+import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest._
-import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -33,10 +32,11 @@ class ExchangeTransactionCreatorSpecification
     with NoShrink
     with TableDrivenPropertyChecks {
 
-  private def getExchangeTransactionCreator(hasMatcherScript: Boolean = false,
-                                            hasAssetScripts: Asset => Boolean = _ => false,
-                                            matcherSettings: MatcherSettings = matcherSettings): ExchangeTransactionCreator = {
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings, hasMatcherScript, hasAssetScripts)
+  private def getExchangeTransactionCreator(
+      hasMatcherScript: Boolean = false,
+      hasAssetScripts: Asset => Boolean = _ => false,
+      orderFeeSettings: OrderFeeSettings = DynamicSettings.symmetric(matcherFee)): ExchangeTransactionCreator = {
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, orderFeeSettings, hasMatcherScript, hasAssetScripts)
   }
 
   "ExchangeTransactionCreator" should {
@@ -178,6 +178,23 @@ class ExchangeTransactionCreatorSpecification
           test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
         }
       }
+    }
+
+    "create transactions with correct buy/sell matcher fees when order fee settings changes" in {
+
+      val maker = LimitOrder(createOrder(wavesUsdPair, SELL, 10.waves, 3.00, 0.003.waves)) // was placed when order-fee was DynamicSettings(0.003.waves, 0.003.waves)
+      val taker = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.00, 0.005.waves))
+
+      val ofs      = DynamicSettings(0.001.waves, 0.005.waves)
+      val tc       = getExchangeTransactionCreator(orderFeeSettings = ofs)
+      val (mf, tf) = Matcher.getMakerTakerFee(ofs)(taker, maker)
+      val oe       = OrderExecuted(taker, maker, System.currentTimeMillis(), tf, mf)
+
+      val tx = tc.createTransaction(oe)
+
+      tx shouldBe 'right
+      tx.explicitGet().sellMatcherFee shouldBe 0.0006.waves
+      tx.explicitGet().buyMatcherFee shouldBe 0.005.waves
     }
   }
 }

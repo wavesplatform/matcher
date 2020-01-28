@@ -170,7 +170,7 @@ class OrderValidatorSpecification
 
         forAll(preconditions) {
           case (order, matcherFeeAssetId) =>
-            validateByMatcherSettings(matcherSettings.orderFee, Set(matcherFeeAssetId))(order) should produce("FeeAssetBlacklisted")
+            validateByMatcherSettings(DynamicSettings.symmetric(matcherFee), Set(matcherFeeAssetId))(order) should produce("FeeAssetBlacklisted")
         }
       }
 
@@ -247,7 +247,8 @@ class OrderValidatorSpecification
       }
 
       "matcherFee is not enough (dynamic mode)" in {
-        val validateByDynamicSettings: Order => Result[Order] = validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
+        val validateByDynamicSettings: Order => Result[Order] =
+          validateByMatcherSettings(DynamicSettings.symmetric(0.003.waves), rateCache = rateCache)
 
         /**
           * asset rate = price of 1 Waves in that asset;
@@ -272,9 +273,9 @@ class OrderValidatorSpecification
                                     matcherScript: Option[RunScriptResult] = None): Order => Result[Order] = { order =>
           awaitResult {
             validateByBlockchain { DynamicSettings.symmetric(0.003.waves) }(priceAssetScript = priceAssetScript,
-                                                                         matcherAccountScript = matcherScript,
-                                                                         matcherFeeAssetScript = priceAssetScript,
-                                                                         rateCache = rateCache)(order)
+                                                                            matcherAccountScript = matcherScript,
+                                                                            matcherFeeAssetScript = priceAssetScript,
+                                                                            rateCache = rateCache)(order)
           }
         }
 
@@ -926,7 +927,7 @@ class OrderValidatorSpecification
         tc.createTransaction,
         MatcherAccount,
         ntpTime,
-        matcherSettings.orderFee,
+        DynamicSettings.symmetric(matcherFee),
         matcherSettings.orderRestrictions,
         assetDescriptions,
         rateCache,
@@ -939,7 +940,11 @@ class OrderValidatorSpecification
   private def exchangeTransactionCreator(blockchain: AsyncBlockchain,
                                          hasMatcherAccountScript: Boolean = false,
                                          hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) = {
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings, hasMatcherAccountScript, hasAssetScript)
+    new ExchangeTransactionCreator(MatcherAccount,
+                                   matcherSettings.exchangeTxBaseFee,
+                                   DynamicSettings.symmetric(matcherFee),
+                                   hasMatcherAccountScript,
+                                   hasAssetScript)
   }
 
   private def asa[A](
@@ -961,7 +966,7 @@ class OrderValidatorSpecification
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache)
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache, DynamicSettings.symmetric(matcherFee))
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
@@ -974,12 +979,12 @@ class OrderValidatorSpecification
       .matcherSettingsAware(
         MatcherAccount,
         Set.empty,
-        matcherSettings.copy(orderFee = orderFeeSettings,
-                             allowedAssetPairs = allowedAssetPairs,
+        matcherSettings.copy(allowedAssetPairs = allowedAssetPairs,
                              allowedOrderVersions = allowedOrderVersions,
                              blacklistedAssets = blacklistedAssets),
         assetDecimals,
-        rateCache
+        rateCache,
+        orderFeeSettings
       )(order)
   }
 

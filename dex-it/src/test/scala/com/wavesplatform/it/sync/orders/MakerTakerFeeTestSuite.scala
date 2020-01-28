@@ -18,11 +18,11 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
     s"""
        |waves.dex {
        |  price-assets = [ "$UsdId", "WAVES" ]
-       |  order-fee {
+       |  order-fee.0 {
        |    mode = dynamic
        |    dynamic {
-       |      base-maker-fee = 100000
-       |      base-taker-fee = 500000
+       |      base-maker-fee = ${0.001.waves}
+       |      base-taker-fee = ${0.005.waves}
        |    }
        |  }
        |}
@@ -39,7 +39,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
     dex1.api.upsertRate(eth, 0.00567593)
   }
 
-  "DEX with non-default DynamicSettings " - {
+  "DEX with static non-default DynamicSettings" - {
 
     "should reject orders with insufficient fee" in {
       dex1.api.tryPlace(mkOrderDP(maker, wavesUsdPair, SELL, 1.waves, 3.00, 0.00499999.waves)) should failWith(
@@ -112,6 +112,94 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
           wavesNode1.api.balance(taker, tFeeAsset) shouldBe takerInitialFeeAssetBalance + tExpectedBalanceChange
         }
       }
+    }
+  }
+
+  "DEX should correctly charge different fees when settings changes" in {
+
+    val offsetInitial = dex1.api.currentOffset
+    val offset0       = offsetInitial + 1
+    val offset1       = offset0 + 1
+    val offset2       = offset1 + 1
+    val offset3       = offset2 + 1
+
+    dex1.restartWithNewSuiteConfig(
+      ConfigFactory.parseString(
+        s"""
+           |waves.dex {
+           |  price-assets = [ "$UsdId", "WAVES" ]
+           |  order-fee {
+           |    0: {
+           |      mode = dynamic
+           |      dynamic {
+           |        base-maker-fee = ${0.003.waves}
+           |        base-taker-fee = ${0.003.waves}
+           |      }
+           |    }
+           |    $offset0: {
+           |      mode = dynamic
+           |      dynamic {
+           |        base-maker-fee = ${0.003.waves}
+           |        base-taker-fee = ${0.003.waves}
+           |      }
+           |    }
+           |    $offset1: {
+           |      mode = dynamic
+           |      dynamic {
+           |        base-maker-fee = ${0.001.waves}
+           |        base-taker-fee = ${0.005.waves}
+           |      }
+           |    }
+           |    $offset3: {
+           |      mode = dynamic
+           |      dynamic {
+           |        base-maker-fee = ${0.002.waves}
+           |        base-taker-fee = ${0.004.waves}
+           |      }
+           |    }
+           |  }
+           |}
+       """.stripMargin
+      )
+    )
+
+    withClue("maker - DynamicSettings(0.003.waves, 0.003.waves), taker - DynamicSettings(0.001.waves, 0.005.waves), fee in Waves") {
+
+      val makerOrder = mkOrderDP(maker, wavesUsdPair, SELL, 10.waves, 3.00, 0.003.waves)
+      val takerOrder = mkOrderDP(taker, wavesUsdPair, BUY, 10.waves, 3.00, 0.005.waves)
+
+      dex1.api.currentOffset shouldBe offsetInitial
+
+      placeAndAwaitAtDex(makerOrder)
+      dex1.api.currentOffset shouldBe offset0
+
+      val tx = placeAndAwaitAtNode(takerOrder).head
+      dex1.api.currentOffset shouldBe offset1
+
+      tx.getSellMatcherFee shouldBe 0.0006.waves
+      tx.getBuyMatcherFee shouldBe 0.005.waves
+
+      dex1.api.cancelAll(maker)
+      dex1.api.cancelAll(taker)
+    }
+
+    withClue("maker - DynamicSettings(0.001.waves, 0.005.waves), taker (market, 25% filled) - DynamicSettings(0.002.waves, 0.004.waves), fee in ETH") {
+
+      dex1.api.currentOffset shouldBe offset1
+
+      val makerOrder = mkOrderDP(maker, wavesUsdPair, SELL, 10.waves, 3.00, 0.00002838.eth, eth) // 0.005.waves = 0.00002838.eth
+      val takerOrder = mkOrderDP(taker, wavesUsdPair, BUY, 40.waves, 3.00, 0.00002271.eth, eth)  // 0.004.waves = 0.00002271.eth
+
+      placeAndAwaitAtDex(makerOrder)
+      dex1.api.currentOffset shouldBe offset2
+
+      val tx = placeAndAwaitAtNode(takerOrder, isMarketOrder = true).head
+
+      tx.getSellMatcherFee shouldBe 0.00001419.eth
+      tx.getBuyMatcherFee shouldBe 0.00000567.eth
+
+      dex1.api.cancelAll(maker)
+      dex1.api.cancelAll(taker)
     }
   }
 }

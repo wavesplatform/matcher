@@ -106,7 +106,7 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
   private def configWithOrderFeeFixed(matcherFeeAsset: Asset): Config = {
     parseString(s"""waves.dex {
                    | allowed-order-versions = [1, 2, 3]
-                   |  order-fee {
+                   |  order-fee.0 {
                    |    mode = fixed
                    |    fixed {
                    |      asset = ${matcherFeeAsset.toString}

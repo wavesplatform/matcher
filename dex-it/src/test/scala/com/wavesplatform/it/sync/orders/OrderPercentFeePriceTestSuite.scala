@@ -14,7 +14,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
                                                                                       |waves.dex {
                                                                                       |  allowed-order-versions = [1, 2, 3]
                                                                                       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                                                                                      |  order-fee {
+                                                                                      |  order-fee.0 {
                                                                                       |    mode = $PERCENT
                                                                                       |    $PERCENT {
                                                                                       |      asset-type = $assetType

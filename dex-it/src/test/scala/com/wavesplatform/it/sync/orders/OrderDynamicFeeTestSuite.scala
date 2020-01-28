@@ -16,7 +16,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
        |waves.dex {
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
        |  allowed-order-versions = [1, 2, 3]
-       |  order-fee {
+       |  order-fee.0 {
        |    mode = dynamic
        |    dynamic {
        |      base-maker-fee = $baseFee
@@ -793,14 +793,14 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       broadcastAndAwait { mkTransfer(alice, bob, defaultAssetQuantity / 2, eth, 0.005.waves) }
 
-      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.mode = percent"))
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.0.mode = percent"))
       check()
 
-      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.mode = fixed").withFallback(dexInitialSuiteConfig))
+      dex1.restartWithNewSuiteConfig(ConfigFactory.parseString("waves.dex.order-fee.0.mode = fixed").withFallback(dexInitialSuiteConfig))
       check()
 
       dex1.restartWithNewSuiteConfig(
-        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = fixed").withFallback(dexInitialSuiteConfig)
+        ConfigFactory.parseString(s"waves.dex.order-fee.0.fixed.asset = $BtcId\nwaves.dex.order-fee.0.mode = fixed").withFallback(dexInitialSuiteConfig)
       )
 
       withClue("fee asset isn't part of asset pair") {

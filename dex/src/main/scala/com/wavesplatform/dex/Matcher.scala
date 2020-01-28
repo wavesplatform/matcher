@@ -14,7 +14,7 @@ import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
-import com.wavesplatform.dex.caches.{MatchingRulesCache, RateCache}
+import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -83,7 +83,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private lazy val assetsCache = AssetsStorage.cache { AssetsStorage.levelDB(db) }
 
   private lazy val transactionCreator = {
-    new ExchangeTransactionCreator(matcherKeyPair, settings, hasMatcherAccountScript, assetsCache.unsafeGetHasScript)
+    new ExchangeTransactionCreator(
+      matcherKeyPair,
+      settings.exchangeTxBaseFee,
+      orderFeeSettingsCache.getCurrentFeeSettings,
+      hasMatcherAccountScript,
+      assetsCache.unsafeGetHasScript
+    )
   }
 
   private implicit val errorContext: ErrorFormatterContext = {
@@ -91,9 +97,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     case asset: IssuedAsset => assetsCache.unsafeGetDecimals(asset)
   }
 
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val matchingRulesCache = new MatchingRulesCache(settings)
-  private val rateCache          = RateCache(db)
+  private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+  private val matchingRulesCache    = new MatchingRulesCache(settings)
+  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee, lastProcessedOffset)
+  private val rateCache             = RateCache(db)
 
   private val orderBooksSnapshotCache =
     new OrderBookSnapshotHttpCache(
@@ -124,7 +131,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      snapshot => OrderBook(snapshot, getMakerTakerFee(settings.orderFee, assetsCache, rateCache))
+      snapshot => OrderBook(snapshot, getMakerTakerFee(orderFeeSettingsCache.getCurrentFeeSettings))
     )
   }
 
@@ -144,6 +151,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     import OrderValidator._
 
+    def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getFeeSettingsForNextOrder
+
     /** Does not need additional access to the blockchain via gRPC */
     def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
 
@@ -152,9 +161,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         .tickSize
 
       for {
-        _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache)(o)
+        _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
         _ <- timeAware(time)(o)
-        _ <- marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair))(o)
+        _ <- marketAware(actualOrderFeeSettings, settings.deviation, getMarketStatus(o.assetPair))(o)
         _ <- tickSizeAware(actualTickSize)(o)
       } yield o
     }
@@ -166,7 +175,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         transactionCreator.createTransaction,
         matcherPublicKey.toAddress,
         time,
-        settings.orderFee,
+        actualOrderFeeSettings,
         settings.orderRestrictions,
         orderAssetsDescriptions,
         rateCache,
@@ -210,7 +219,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
                 OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
             }
             .map { _.collect { case Right(version) => version } }
-        }
+        },
+        () => orderFeeSettingsCache.getFeeSettingsForNextOrder
       ),
       MatcherApiRouteV1(
         pairBuilder,
@@ -498,6 +508,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
 object Matcher extends ScorexLogging {
 
+  import OrderValidator.multiplyFeeByDouble
+
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   sealed trait Status
@@ -531,16 +543,8 @@ object Matcher extends ScorexLogging {
       }
   }
 
-  /** Calculates maker and taker fees. For DynamicSettings corrects values by rate of each fee asset */
-  def getMakerTakerFee(ofs: OrderFeeSettings, as: AssetsStorage, rc: RateCache)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = ofs match {
-    case DynamicSettings(baseFeeMaker, baseFeeTaker) =>
-      import OrderValidator.convertFeeByAssetRate
-      (
-        for {
-          makerFee <- convertFeeByAssetRate(baseFeeMaker, c.feeAsset, as.unsafeGet(c.feeAsset).decimals, rc)
-          takerFee <- convertFeeByAssetRate(baseFeeTaker, s.feeAsset, as.unsafeGet(s.feeAsset).decimals, rc)
-        } yield makerFee -> takerFee
-      ).explicitGet()
-    case _ => c.matcherFee -> s.matcherFee
+  def getMakerTakerFee(ofs: => OrderFeeSettings)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = ofs match {
+    case ds: DynamicSettings => multiplyFeeByDouble(c.matcherFee, ds.makerRatio) -> multiplyFeeByDouble(s.matcherFee, ds.takerRatio)
+    case _                   => c.matcherFee                                     -> s.matcherFee
   }
 }

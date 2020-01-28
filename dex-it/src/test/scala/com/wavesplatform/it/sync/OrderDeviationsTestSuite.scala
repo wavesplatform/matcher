@@ -57,7 +57,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
        |    loss = $deviationLoss
        |    fee = $deviationFee
        |  }
-       |  order-fee {
+       |  order-fee.0 {
        |    mode = "percent"
        |    percent {
        |      asset-type = "price"

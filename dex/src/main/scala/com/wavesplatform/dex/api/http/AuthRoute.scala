@@ -11,7 +11,7 @@ trait AuthRoute { this: ApiRoute =>
 
   protected val apiKeyHash: Option[Array[Byte]]
 
-  def withAuth(implicit trm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
+  def withAuth(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
     apiKeyHash.fold[Directive0] { complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided)) } { hashFromSettings =>
       optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
         case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server
 import akka.http.scaladsl.server._
@@ -27,14 +27,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -77,12 +70,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     with AuthRoute
     with ScorexLogging {
 
-  import MatcherApiRoute._
   import PathMatchers._
 
-  private implicit val executionContext: ExecutionContext         = mat.executionContext
-  private implicit val timeout: Timeout                           = matcherSettings.actorResponseTimeout
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
+  private implicit val executionContext: ExecutionContext = mat.executionContext
+  private implicit val timeout: Timeout                   = matcherSettings.actorResponseTimeout
+
+  private type LogicResponseHandler = PartialFunction[Any, ToResponseMarshallable]
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
@@ -123,12 +116,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
-
-  private def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case Matcher.Status.Working  => pass
-    case Matcher.Status.Starting => complete(DuringStart)
-    case Matcher.Status.Stopping => complete(DuringShutdown)
-  }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
     case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
@@ -176,8 +163,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           complete(
             placeTimer.measureFuture {
               orderValidator(order).value flatMap {
-                case Right(o) => placeTimer.measureFuture { askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) }
-                case Left(e)  => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+                case Right(o) =>
+                  placeTimer.measureFuture {
+                    askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                      case x: error.MatcherError               => if (x == error.CanNotPersistEvent) api.WavesNodeUnavailable(x) else api.OrderRejected(x)
+                      case AddressActor.Event.OrderAccepted(x) => api.OrderAccepted(x) //StatusCodes.OK -> ApiSuccessfulPlace(x)
+                    }
+                  }
+                case Left(e) => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
               }
             }
           )
@@ -194,23 +187,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           case _             => complete(InvalidSignature)
         }
     }
-
-  @inline private def askAddressActor(sender: Address, msg: AddressActor.Command): Future[ToResponseMarshallable] = {
-    askMapAddressActor[MatcherResponse](sender, msg)(x => x)
-  }
-
-  @inline
-  private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
-      f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
-    (addressActor ? AddressDirectory.Envelope(sender, msg))
-      .mapTo[A]
-      .map(f)
-      .recover {
-        case e: AskTimeoutException =>
-          log.error(s"Error processing $msg", e)
-          TimedOut
-      }
-  }
 
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET", response = classOf[String])
@@ -461,9 +437,20 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
     complete(
       (timestamp, orderId) match {
-        case (Some(ts), None)  => askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts))
-        case (None, Some(oid)) => askAddressActor(sender, AddressActor.Command.CancelOrder(oid))
-        case _                 => OrderCancelRejected(error.CancelRequestIsIncomplete)
+        case (Some(ts), None) =>
+          askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts)) {
+            case AddressActor.Event.BatchCancelCompleted(xs) =>
+              api.BatchCancelCompleted(xs.map {
+                case (id, Right(_)) => id -> api.OrderCanceled(id)
+                case (id, Left(e))  => id -> api.OrderCancelRejected(e)
+              })
+          }
+        case (None, Some(oid)) =>
+          askAddressActor(sender, AddressActor.Command.CancelOrder(oid)) {
+            case x: error.MatcherError               => if (x == error.CanNotPersistEvent) api.WavesNodeUnavailable(x) else api.OrderCancelRejected(x)
+            case AddressActor.Event.OrderCanceled(x) => api.OrderCanceled(x)
+          }
+        case _ => OrderCancelRejected(error.CancelRequestIsIncomplete)
       }
     )
 
@@ -563,7 +550,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val tupledOrderBookHistoryItem: ((Id, OrderInfo[OrderStatus])) => ApiOrderBookHistoryItem =
     Function.tupled(ApiOrderBookHistoryItem.fromOrderInfo)
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { reply =>
+    askMapAddressActor[AddressActor.Reply.GetOrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { reply =>
       StatusCodes.OK -> reply.xs.map(tupledOrderBookHistoryItem)
     }
   }
@@ -704,8 +691,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { r =>
-          stringifyAssetIds(r.balance)
+        askMapAddressActor[AddressActor.Reply.GetBalance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { r =>
+          ApiBalance(r.balance)
         }
       }
     }
@@ -732,8 +719,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
-          stringifyAssetIds(r.balance)
+        askMapAddressActor[AddressActor.Reply.GetBalance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
+          ApiBalance(r.balance)
         }
       }
     }
@@ -757,8 +744,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
         DBUtils.order(db, orderId) match {
-          case Some(order) => askMapAddressActor[OrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId))(x => x)
-          case None        => Future.successful(DBUtils.orderInfo(db, orderId).fold[OrderStatus](OrderStatus.NotFound)(_.status))
+          case Some(order) =>
+            askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
+              ApiOrderStatus.from(r.x)
+            }
+
+          case None =>
+            Future.successful(DBUtils.orderInfo(db, orderId).fold(ApiOrderStatus.from(OrderStatus.NotFound))(x => ApiOrderStatus.from(x.status)))
         }
       }
     }
@@ -869,12 +861,37 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def saveSnapshots: Route = (path("debug" / "saveSnapshots") & post & withAuth) {
     complete {
       matcher ! ForceSaveSnapshots
-      SimpleResponse(StatusCodes.OK, "Saving started")
+      StatusCodes.OK -> ApiMessage("Saving started")
     }
   }
-}
 
-object MatcherApiRoute {
-  private def stringifyAssetIds(balances: Map[Asset, Long]): Map[String, Long] =
-    balances.map { case (aid, v) => aid.toString -> v }
+  @inline
+  private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
+      f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
+    (addressActor ? AddressDirectory.Envelope(sender, msg))
+      .mapTo[A]
+      .map(f)
+      .recover {
+        case e: AskTimeoutException =>
+          log.error(s"Error processing $msg", e)
+          TimedOut
+      }
+  }
+
+  private val handleUnknownResponse: LogicResponseHandler = {
+    case x =>
+      log.error(s"Can't handle $x")
+      api.InternalError
+  }
+
+  @inline
+  private def askAddressActor(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] = {
+    (addressActor ? AddressDirectory.Envelope(sender, msg))
+      .map(handleResponse.orElse(handleUnknownResponse))
+      .recover {
+        case e: AskTimeoutException =>
+          log.error(s"Error processing $msg", e)
+          TimedOut
+      }
+  }
 }

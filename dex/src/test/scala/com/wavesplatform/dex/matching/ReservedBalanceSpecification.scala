@@ -6,7 +6,6 @@ import akka.testkit.TestProbe
 import akka.util.Timeout
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressDirectory.Envelope
-import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -128,7 +127,7 @@ class ReservedBalanceSpecification
     Await
       .result(
         (addressDirectory ? AddressDirectory
-          .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
+          .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.GetBalance].map(_.balance),
         Duration.Inf
       )
       .getOrElse(assetId, 0L)
@@ -695,7 +694,7 @@ class ReservedBalanceSpecification
         // since order will be rejected because of the BalanceNotEnough error. Its ok since in these tests we check
         // tricky cases of balance reservation, when afs is not enough to cover market value and fee
 
-        tp.expectMsgAnyClassOf(300.millisecond, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
+        tp.expectMsgAnyClassOf(300.millisecond, classOf[QueueEvent.PlacedMarket], classOf[error.BalanceNotEnough])
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 

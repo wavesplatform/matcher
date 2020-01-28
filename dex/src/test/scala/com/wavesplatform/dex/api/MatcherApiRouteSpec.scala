@@ -9,7 +9,7 @@ import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
 import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
-import com.wavesplatform.dex.AddressActor.Reply.Balance
+import com.wavesplatform.dex.AddressActor.Reply.GetBalance
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
@@ -200,7 +200,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns that all is fine" in test(
       { route =>
         Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
-          (responseAs[JsValue] \ "message").as[String] shouldBe "Saving started"
+          responseAs[JsValue].as[ApiMessage] should matchTo(ApiMessage("Saving started"))
         }
       },
       apiKey
@@ -237,9 +237,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   // placeLimitOrder
   routePath("/orderbook") - {
-    "returns a placed order" in test(
+    "returns a placed limit order" in test(
       { route =>
         Post(routePath("/orderbook"), Json.toJson(order)) ~> route ~> check {
+          println(responseAs[String])
           (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
         }
       }
@@ -248,7 +249,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   // placeMarketOrder
   routePath("/orderbook/market") - {
-    "returns a placed order" in test(
+    "returns a placed market order" in test(
       { route =>
         Post(routePath("/orderbook/market"), Json.toJson(order)) ~> route ~> check {
           (responseAs[JsValue] \ "message").as[Order] should matchTo(order)
@@ -256,6 +257,21 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       }
     )
   }
+
+  private val historyItem: ApiOrderBookHistoryItem = ApiOrderBookHistoryItem(
+    id = order.id(),
+    `type` = order.orderType,
+    orderType = AcceptedOrderType.Limit,
+    amount = order.amount,
+    filled = 0L,
+    price = order.price,
+    fee = order.matcherFee,
+    filledFee = 0L,
+    feeAsset = order.feeAsset,
+    timestamp = order.timestamp,
+    status = OrderStatus.Accepted.name,
+    assetPair = order.assetPair
+  )
 
   // getAssetPairAndPublicKeyOrderHistory
   routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
@@ -268,23 +284,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             RawHeader("Timestamp", s"$now"),
             RawHeader("Signature", s"$signature")
           ) ~> route ~> check {
-          responseAs[JsArray].as[List[ApiOrderBookHistoryItem]] should matchTo(
-            List(
-              ApiOrderBookHistoryItem(
-                id = order.id(),
-                `type` = order.orderType,
-                orderType = AcceptedOrderType.Limit,
-                amount = order.amount,
-                filled = 0L,
-                price = order.price,
-                fee = order.matcherFee,
-                filledFee = 0L,
-                feeAsset = Waves,
-                timestamp = order.timestamp,
-                status = "Accepted",
-                assetPair = order.assetPair
-              )
-            ))
+          responseAs[JsArray].as[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       }
     )
@@ -301,9 +301,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             RawHeader("Timestamp", s"$now"),
             RawHeader("Signature", s"$signature")
           ) ~> route ~> check {
-          val r = responseAs[JsArray]
-          r.value.size shouldBe 1
-          (r.value.head \ "id").as[String] shouldBe order.idStr()
+          responseAs[JsArray].as[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       }
     )
@@ -314,9 +312,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order history by api key" in test(
       { route =>
         Get(routePath(s"/orders/${order.senderPublicKey.toAddress}")).withHeaders(apiKeyHeader) ~> route ~> check {
-          val r = responseAs[JsArray]
-          r.value.size shouldBe 1
-          (r.value.head \ "id").as[String] shouldBe order.idStr()
+          responseAs[JsArray].as[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
         }
       },
       apiKey
@@ -328,11 +324,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns a tradable balance" in test(
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${order.senderPublicKey.toAddress}")) ~> route ~> check {
-          responseAs[JsObject].as[Map[String, Long]] should matchTo(
-            Map(
-              smartAssetId.toString -> 100L,
-              "WAVES"               -> 100L
-            ))
+          responseAs[JsObject].as[ApiBalance] should matchTo(
+            ApiBalance(
+              Map(
+                smartAsset -> 100L,
+                Waves      -> 100L
+              )))
         }
       }
     )
@@ -355,7 +352,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       f = { route =>
         mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
           status shouldBe StatusCodes.OK
-          responseAs[JsObject].as[Map[String, Long]] shouldBe Map("WAVES" -> 350L)
+          responseAs[JsObject].as[ApiBalance] should matchTo(ApiBalance(Map(Waves -> 350L)))
         }
       },
       apiKey = apiKey
@@ -383,12 +380,13 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order status" in test(
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/${order.id()}")) ~> route ~> check {
-          responseAs[JsObject] should matchTo(Json.obj("status" -> "Accepted"))
+          responseAs[ApiOrderStatus] should matchTo(ApiOrderStatus("Accepted"))
         }
       }
     )
   }
 
+  // TODO
   // cancel
   routePath("/orderbook/{amountAsset}/{priceAsset}/cancel") - {
     "single cancel - returns that an order was canceled" in test(
@@ -406,6 +404,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       }
     )
 
+    // TODO
     "massive cancel - returns canceled orders" in test(
       { route =>
         val unsignedRequest = CancelOrderRequest(
@@ -419,7 +418,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Post(routePath(s"/orderbook/${order.assetPair.amountAssetStr}/${order.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
           (responseAs[JsObject] - "success") should matchTo(Json.obj(
             "message" -> Json.arr( // LOL!
-              Json.arr(Json.obj( // LOL!
+              Json.arr(Json.obj(
                                 "orderId" -> order.id(),
                                 "success" -> true,
                                 "status"  -> "OrderCanceled"))),
@@ -430,6 +429,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // TODO
   // cancelAll
   routePath("/orderbook/cancel") - {
     "returns canceled orders" in test(
@@ -456,6 +456,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // TODO
   // orderBooks
   routePath("/orderbook") - {
     "returns all order books" in test(
@@ -511,6 +512,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // TODO
   // forceCancelOrder
   routePath("/orders/cancel/[orderId]") - {
     "single cancel with API key" in test(
@@ -527,6 +529,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // TODO
   routePath("/settings/rates/{assetId}") - {
     val rateCache = RateCache.inMem
 
@@ -748,24 +751,24 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       val response = msg match {
         case AddressDirectory.Envelope(_, msg) =>
           msg match {
-            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
-            case PlaceOrder(x, _)                      => OrderAccepted(x)
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.GetBalance(Map(Waves -> 350L))
+            case PlaceOrder(x, _)                      => AddressActor.Event.OrderAccepted(x)
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.OrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
+              AddressActor.Reply.GetOrdersStatuses(List(order.id() -> OrderInfo.v3(LimitOrder(order), OrderStatus.Accepted)))
 
             case AddressActor.Query.GetOrderStatus(orderId) =>
-              if (orderId == order.id()) OrderStatus.Accepted
+              if (orderId == order.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
               else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
 
             case AddressActor.Command.CancelOrder(orderId) =>
-              if (orderId == order.id()) api.OrderCanceled(orderId)
+              if (orderId == order.id()) AddressActor.Event.OrderCanceled(orderId)
               else api.OrderCancelRejected(error.OrderNotFound(orderId))
 
             case AddressActor.Command.CancelAllOrders(pair, _) if pair.forall(_ == order.assetPair) =>
-              api.BatchCancelCompleted(Map(order.id() -> api.OrderCanceled(order.id())))
+              AddressActor.Event.BatchCancelCompleted(Map(order.id() -> Right(AddressActor.Event.OrderCanceled(order.id()))))
 
-            case GetTradableBalance(xs) => Balance(xs.map(_ -> 100L).toMap)
+            case GetTradableBalance(xs) => GetBalance(xs.map(_ -> 100L).toMap)
             case x                      => Status.Failure(new RuntimeException(s"Unknown command: $x"))
           }
 

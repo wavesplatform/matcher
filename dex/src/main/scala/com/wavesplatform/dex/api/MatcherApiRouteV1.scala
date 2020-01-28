@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.api
 
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.http.scaladsl.server.{Directive0, Directive1, Route}
+import akka.http.scaladsl.server.{Directive1, Route}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -27,18 +27,10 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
 
   import PathMatchers._
 
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
-
   override lazy val route: Route = pathPrefix("api" / "v1") {
     matcherStatusBarrier {
       getOrderBook
     }
-  }
-
-  private def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case Matcher.Status.Working  => pass
-    case Matcher.Status.Starting => complete(DuringStart)
-    case Matcher.Status.Stopping => complete(DuringShutdown)
   }
 
   private def withAssetPair(p: AssetPair,

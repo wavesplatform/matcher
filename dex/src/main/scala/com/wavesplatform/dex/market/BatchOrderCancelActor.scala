@@ -2,16 +2,16 @@ package com.wavesplatform.dex.market
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.wavesplatform.dex.AddressActor.Command.CancelOrder
+import com.wavesplatform.dex.AddressActor.Event
 import com.wavesplatform.dex.actors.TimedOut
-import com.wavesplatform.dex.api.MatcherResponse
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.{api, error}
+import com.wavesplatform.dex.error
+import com.wavesplatform.dex.market.BatchOrderCancelActor.CancelResponse.OrderCancelResult
 
 import scala.concurrent.duration.FiniteDuration
 
-class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef, timeout: FiniteDuration)
+class BatchOrderCancelActor private (orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef, timeout: FiniteDuration)
     extends Actor
     with ScorexLogging {
 
@@ -22,22 +22,22 @@ class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: Act
 
   override def receive: Receive = state(orderIds, Map.empty, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
-  private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, api.MatcherResponse], timer: Cancellable): Receive = {
+  private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, OrderCancelResult], timer: Cancellable): Receive = {
     case CancelResponse(id, x) =>
       val updatedRestOrderIds = restOrderIds - id
       val updatedResponse     = response.updated(id, x)
 
-      if (updatedRestOrderIds.isEmpty) stop(api.BatchCancelCompleted(response), timer)
+      if (updatedRestOrderIds.isEmpty) stop(Event.BatchCancelCompleted(response), timer)
       else context.become(state(restOrderIds - id, updatedResponse, timer))
 
     // case Terminated(ref) => // Can't terminate before processorActor, because processorActor is a parent
 
     case TimedOut =>
       log.error(s"CancelOrder is timed out for orders: ${restOrderIds.mkString(", ")}")
-      stop(api.BatchCancelCompleted(response), timer)
+      stop(Event.BatchCancelCompleted(response), timer)
   }
 
-  private def stop(response: api.BatchCancelCompleted, timer: Cancellable): Unit = {
+  private def stop(response: Event.BatchCancelCompleted, timer: Cancellable): Unit = {
     timer.cancel()
     clientActor ! response
     context.stop(self)
@@ -51,14 +51,15 @@ object BatchOrderCancelActor {
   }
 
   object CancelResponse {
-    def unapply(arg: Any): Option[(Id, MatcherResponse)] = helper.lift(arg)
+    type OrderCancelResult =  Either[error.MatcherError, Event.OrderCanceled]
 
-    private val helper: PartialFunction[Any, (Order.Id, api.MatcherResponse)] = {
-      case x @ api.OrderCanceled(id)                                => (id, x)
-      case x @ api.OrderCancelRejected(error.OrderNotFound(id))     => (id, x)
-      case x @ api.OrderCancelRejected(error.OrderCanceled(id))     => (id, x)
-      case x @ api.OrderCancelRejected(error.OrderFull(id))         => (id, x)
-      case x @ api.OrderCancelRejected(error.MarketOrderCancel(id)) => (id, x)
+    def unapply(arg: Any): Option[(Order.Id,OrderCancelResult)] = helper.lift(arg)
+    private val helper: PartialFunction[Any, (Order.Id,OrderCancelResult)] = {
+      case x @ Event.OrderCanceled(id)     => (id, Right(x))
+      case x @ error.OrderNotFound(id)     => (id, Left(x))
+      case x @ error.OrderCanceled(id)     => (id, Left(x))
+      case x @ error.OrderFull(id)         => (id, Left(x))
+      case x @ error.MarketOrderCancel(id) => (id, Left(x))
     }
   }
 }

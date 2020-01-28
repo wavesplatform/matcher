@@ -1,14 +1,10 @@
 package com.wavesplatform.dex.api
 
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.json.assetMapFormat
+import com.wavesplatform.dex.json._
 import play.api.libs.json.Format
 
 case class ApiRates(xs: Map[Asset, Double]) extends AnyVal
 object ApiRates {
-  private val baseFormat = assetMapFormat[Double]
-  implicit val rateSettingsFormat: Format[ApiRates] = Format(
-    baseFormat.map(apply),
-    baseFormat.contramap(_.xs)
-  )
+  implicit val rateSettingsFormat: Format[ApiRates] = assetMapFormat[Double].coerce(apply, _.xs)
 }

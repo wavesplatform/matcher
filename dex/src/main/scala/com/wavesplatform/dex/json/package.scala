@@ -51,4 +51,8 @@ package object json {
       tjs = Writes.map[V].contramap(_.map { case (k, v) => stringifyKey(k) -> v })
     )
   }
+
+  implicit final class FormatOps[A](val self: Format[A]) extends AnyVal {
+    def coerce[B](to: A => B, from: B => A): Format[B] = Format(self.map(to), self.contramap(from))
+  }
 }

@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
 import akka.util.ByteString
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error
@@ -72,9 +71,9 @@ object SimpleResponse {
   def apply(code: StatusCode, message: String): SimpleResponse = new SimpleResponse(code, Json.obj("message" -> message))
 }
 
-case class OrderAccepted(order: Order)     extends MatcherResponse(C.OK, Json.obj("message" -> order.json()))
-case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
-case class OrderDeleted(orderId: ByteStr)  extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
+case class OrderAccepted(order: Order)      extends MatcherResponse(C.OK, Json.obj("message" -> order.json()))
+case class OrderCanceled(orderId: Order.Id) extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
+case class OrderDeleted(orderId: Order.Id)  extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))
 
 case class BatchCancelCompleted(orders: Map[Order.Id, MatcherResponse])
     extends MatcherResponse(C.OK, MatcherResponseContent.Multiple(orders.values.toList))

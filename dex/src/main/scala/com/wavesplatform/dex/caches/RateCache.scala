@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import org.iq80.leveldb.DB
 import play.api.libs.json.{JsObject, Json}
-import mouse.any._
 
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
@@ -38,7 +37,7 @@ object RateCache {
   def apply(db: DB): RateCache = new RateCache {
 
     private val rateDB  = RateDB(db)
-    private val rateMap = new ConcurrentHashMap[IssuedAsset, Double] unsafeTap (_.putAll(rateDB.getAllRates.asJava))
+    private val rateMap = new ConcurrentHashMap[IssuedAsset, Double](rateDB.getAllRates.asJava)
 
     def upsertRate(asset: Asset, value: Double): Option[Double] =
       asset.fold { WavesRate } { issuedAsset =>

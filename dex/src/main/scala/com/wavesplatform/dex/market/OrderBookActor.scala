@@ -35,7 +35,7 @@ class OrderBookActor(owner: ActorRef,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-                     createOrderBook: OrderBook.Snapshot => OrderBook)(implicit ec: ExecutionContext)
+                     getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -48,7 +48,7 @@ class OrderBookActor(owner: ActorRef,
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
-  private var orderBook   = createOrderBook(OrderBook.Snapshot.empty)
+  private var orderBook   = OrderBook.empty()
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
@@ -65,7 +65,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def recovering: Receive = {
     case OrderBookSnapshotStoreActor.Response.GetSnapshot(result) =>
-      result.foreach { case (_, snapshot) => orderBook = createOrderBook(snapshot) }
+      result.foreach { case (_, snapshot) => orderBook = OrderBook(snapshot) }
 
       lastSavedSnapshotOffset = result.map(_._1)
       lastProcessedOffset = lastSavedSnapshotOffset
@@ -153,7 +153,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, actualRule.tickSize))
+    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -191,7 +191,7 @@ object OrderBookActor {
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-            createOrderBook: OrderBook.Snapshot => OrderBook)(implicit ec: ExecutionContext): Props =
+            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -204,7 +204,7 @@ object OrderBookActor {
         matchingRules,
         updateCurrentMatchingRules,
         normalizeMatchingRule,
-        createOrderBook
+        getMakerTakerFeeByOffset
       )
     )
 

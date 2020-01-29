@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
@@ -31,9 +31,10 @@ class OrderBookSpec
     with NoShrink
     with TableDrivenPropertyChecks {
 
-  private def createEmptyOrderBook(
-      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long) = (t, m) => m.matcherFee -> t.matcherFee): OrderBook =
-    OrderBook.empty(getMakerTakerFee)
+  implicit class OrderBookOps(ob: OrderBook) {
+    def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] =
+      ob.add(ao, ts, (t, m) => m.matcherFee -> t.matcherFee, tickSize)
+  }
 
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
 
@@ -42,10 +43,10 @@ class OrderBookSpec
     val ord2 = LimitOrder(buy(pair, 170484969L, 34120))
     val ord3 = LimitOrder(buy(pair, 44521418496L, 34000))
 
-    val ob = createEmptyOrderBook()
-    ob.add(ord1, ntpNow)
-    ob.add(ord2, ntpNow)
-    ob.add(ord3, ntpNow)
+    val ob = OrderBook.empty()
+    ob.append(ord1, ntpNow)
+    ob.append(ord2, ntpNow)
+    ob.append(ord3, ntpNow)
 
     ob.allOrders.toSeq.map(_._2) shouldEqual Seq(ord2, ord1, ord3)
   }
@@ -53,17 +54,17 @@ class OrderBookSpec
   "place several buy orders at the same price" in {}
 
   "place orders with different tick sizes" in {
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
     val normalizedTickSizes =
       Array(1L, 7L, 8L, 100L, 211L, 320L, 100000L, 124337L, 250250L, toNormalized(10L), 651983183L, toNormalized(100L))
     val prices = Gen.choose(1, 100000L)
     for (tickSize <- normalizedTickSizes) {
       forAll(prices) { price =>
-        ob.add(LimitOrder(buy(pair, 1583290045643L, price)), ntpNow, tickSize = tickSize)
+        ob.append(LimitOrder(buy(pair, 1583290045643L, price)), ntpNow, tickSize = tickSize)
       }
       forAll(prices) { price =>
-        ob.add(LimitOrder(sell(pair, 984651354686L, price)), ntpNow, tickSize = tickSize)
+        ob.append(LimitOrder(sell(pair, 984651354686L, price)), ntpNow, tickSize = tickSize)
       }
       for ((level, orders) <- ob.getBids; order <- orders) {
         order.price - level should be < tickSize
@@ -78,7 +79,7 @@ class OrderBookSpec
   }
 
   "place buy and sell orders with prices different from each other less than tick size in one level" in {
-    val ob                 = createEmptyOrderBook()
+    val ob                 = OrderBook.empty()
     val tickSize: Long     = 100L
     val normalizedTickSize = toNormalized(tickSize)
 
@@ -97,20 +98,20 @@ class OrderBookSpec
     val sellOrd5 = LimitOrder(sell(pair, 54521418494L, 44357))
     val sellOrd6 = LimitOrder(sell(pair, 54521418493L, 44389))
 
-    ob.add(buyOrd1, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrd2, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrd3, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrd4, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrd5, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrd6, ntpNow, tickSize = normalizedTickSize)
-    ob.add(buyOrdZero, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd1, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd2, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd3, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd4, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd5, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrd6, ntpNow, tickSize = normalizedTickSize)
+    ob.append(buyOrdZero, ntpNow, tickSize = normalizedTickSize)
 
-    ob.add(sellOrd1, ntpNow, tickSize = normalizedTickSize)
-    ob.add(sellOrd2, ntpNow, tickSize = normalizedTickSize)
-    ob.add(sellOrd3, ntpNow, tickSize = normalizedTickSize)
-    ob.add(sellOrd4, ntpNow, tickSize = normalizedTickSize)
-    ob.add(sellOrd5, ntpNow, tickSize = normalizedTickSize)
-    ob.add(sellOrd6, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd1, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd2, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd3, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd4, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd5, ntpNow, tickSize = normalizedTickSize)
+    ob.append(sellOrd6, ntpNow, tickSize = normalizedTickSize)
 
     ob.getBids.keySet shouldBe SortedSet[Long](0, 34300, 34200, 34100).map(toNormalized)
     ob.getAsks.keySet shouldBe SortedSet[Long](44100, 44200, 44300, 44400).map(toNormalized)
@@ -136,7 +137,7 @@ class OrderBookSpec
     ob.cancelAll(ntpNow)
     val sellTickSizeOrder = sell(pair, 54521418493L, 40)
 
-    ob.add(LimitOrder(sellTickSizeOrder), ntpNow, tickSize = normalizedTickSize)
+    ob.append(LimitOrder(sellTickSizeOrder), ntpNow, tickSize = normalizedTickSize)
 
     ob.getAsks shouldBe mutable.TreeMap[Price, Level](
       Seq(
@@ -146,7 +147,7 @@ class OrderBookSpec
   }
 
   "place matchable orders with and without tick size" in {
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
     val amt                = 54521418493L
     val normalizedTickSize = toNormalized(8)
@@ -158,8 +159,8 @@ class OrderBookSpec
     val submittedOrderTime = ntpNow
 
     withClue("matchable orders should be matched without tick size:\n") {
-      ob.add(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
-      ob.add(submittedBuyOrder, submittedOrderTime) shouldBe Seq(
+      ob.append(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
+      ob.append(submittedBuyOrder, submittedOrderTime) shouldBe Seq(
         OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
       )
 
@@ -168,8 +169,8 @@ class OrderBookSpec
     }
 
     withClue("matchable orders should not be matched with tick size:\n") {
-      ob.add(counterSellOrder, ntpNow, tickSize = normalizedTickSize)
-      ob.add(submittedBuyOrder, ntpNow, tickSize = normalizedTickSize)
+      ob.append(counterSellOrder, ntpNow, tickSize = normalizedTickSize)
+      ob.append(submittedBuyOrder, ntpNow, tickSize = normalizedTickSize)
 
       ob.getAsks shouldBe mutable.TreeMap[Price, Level](
         Seq(16 -> Vector(counterSellOrder)).map { case (price, orders) => toNormalized(price) -> orders }: _*
@@ -183,7 +184,7 @@ class OrderBookSpec
 
   "old counter orders should be matched with the new ones (with new activated tick-size)" in {
 
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
     def normalizedTickSize(tickSize: Double): Price = Normalization.normalizePrice(tickSize, 8, 2)
 
@@ -195,8 +196,8 @@ class OrderBookSpec
 
     withClue("Counter SELL order (price = 3.15, tick size disabled) and submitted BUY order (price = 3.15, tick size = 0.1) should be matched:\n") {
 
-      ob.add(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
-      ob.add(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(
+      ob.append(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
+      ob.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(
         OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
       )
 
@@ -217,22 +218,22 @@ class OrderBookSpec
     "with same level" - {
       "TickSize.Enabled" in {
         val normalizedTickSize = toNormalized(100L)
-        val ob                 = createEmptyOrderBook()
+        val ob                 = OrderBook.empty()
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
-        ob.add(sellOrder, ntpNow, tickSize = normalizedTickSize)
-        ob.add(sellOrder, ntpNow, tickSize = normalizedTickSize)
+        ob.append(sellOrder, ntpNow, tickSize = normalizedTickSize)
+        ob.append(sellOrder, ntpNow, tickSize = normalizedTickSize)
 
         ob.getAsks.size shouldBe 1
         ob.getAsks.head._2.toList shouldBe List(sellOrder, sellOrder)
       }
 
       "MatchingRules.Default.normalizedTickSize" in {
-        val ob = createEmptyOrderBook()
+        val ob = OrderBook.empty()
 
         val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
-        ob.add(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
-        ob.add(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
+        ob.append(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
+        ob.append(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
 
         ob.getAsks.size shouldBe 1
         ob.getAsks.head._2.toList shouldBe List(sellOrder, sellOrder)
@@ -240,11 +241,11 @@ class OrderBookSpec
     }
 
     "with different levels" in {
-      val ob = createEmptyOrderBook()
+      val ob = OrderBook.empty()
 
       val sellOrder = LimitOrder(sell(pair, 54521418493L, 44389))
-      ob.add(sellOrder, ntpNow, tickSize = toNormalized(100L))
-      ob.add(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
+      ob.append(sellOrder, ntpNow, tickSize = toNormalized(100L))
+      ob.append(sellOrder, ntpNow, tickSize = MatchingRule.DefaultRule.tickSize)
 
       ob.getAsks.size shouldBe 2
 
@@ -257,14 +258,14 @@ class OrderBookSpec
     val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
     val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
-    val ob = createEmptyOrderBook()
-    ob.add(LimitOrder(ord1), ntpNow)
-    ob.add(LimitOrder(ord2), ntpNow)
+    val ob = OrderBook.empty()
+    ob.append(LimitOrder(ord1), ntpNow)
+    ob.append(LimitOrder(ord2), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
 
     val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
-    ob.add(LimitOrder(ord3), ntpNow)
+    ob.append(LimitOrder(ord3), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
@@ -275,11 +276,11 @@ class OrderBookSpec
     val ord3 = sell(pair, 10 * Order.PriceConstant, 110)
     val ord4 = buy(pair, 22 * Order.PriceConstant, 115)
 
-    val ob = createEmptyOrderBook()
-    ob.add(LimitOrder(ord1), ntpNow)
-    ob.add(LimitOrder(ord2), ntpNow)
-    ob.add(LimitOrder(ord3), ntpNow)
-    ob.add(LimitOrder(ord4), ntpNow)
+    val ob = OrderBook.empty()
+    ob.append(LimitOrder(ord1), ntpNow)
+    ob.append(LimitOrder(ord2), ntpNow)
+    ob.append(LimitOrder(ord3), ntpNow)
+    ob.append(LimitOrder(ord4), ntpNow)
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
@@ -296,11 +297,11 @@ class OrderBookSpec
     val ord2 = sell(pair, 100000000, 0.0004)
     val ord3 = buy(pair, 100000001, 0.00045)
 
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
-    ob.add(LimitOrder(ord1), ntpNow)
-    ob.add(LimitOrder(ord2), ntpNow)
-    ob.add(LimitOrder(ord3), ntpNow)
+    ob.append(LimitOrder(ord1), ntpNow)
+    ob.append(LimitOrder(ord2), ntpNow)
+    ob.append(LimitOrder(ord3), ntpNow)
 
     ob.allOrders.map(_._2) shouldEqual Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))
   }
@@ -310,11 +311,11 @@ class OrderBookSpec
     val ord2 = sell(pair, 3075248828L, 0.00067634)
     val ord3 = buy(pair, 3075363900L, 0.00073697)
 
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
-    ob.add(LimitOrder(ord1), ntpNow)
-    ob.add(LimitOrder(ord2), ntpNow)
-    ob.add(LimitOrder(ord3), ntpNow)
+    ob.append(LimitOrder(ord1), ntpNow)
+    ob.append(LimitOrder(ord2), ntpNow)
+    ob.append(LimitOrder(ord3), ntpNow)
 
     val corrected1 = Order.correctAmount(ord2.amount, ord2.price)
     val leftovers1 = ord3.amount - corrected1
@@ -331,11 +332,11 @@ class OrderBookSpec
     val ord2 = sell(pair, 0.01.waves, 1840)
     val ord3 = buy(pair, 0.0100001.waves, 2000)
 
-    val ob = createEmptyOrderBook()
+    val ob = OrderBook.empty()
 
-    ob.add(LimitOrder(ord1), ntpNow)
-    ob.add(LimitOrder(ord2), ntpNow)
-    ob.add(LimitOrder(ord3), ntpNow)
+    ob.append(LimitOrder(ord1), ntpNow)
+    ob.append(LimitOrder(ord2), ntpNow)
+    ob.append(LimitOrder(ord3), ntpNow)
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee    = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
@@ -347,9 +348,9 @@ class OrderBookSpec
     val b = rawBuy(p, 700000L, 280)
     val s = rawSell(p, 30000000000L, 280)
 
-    val ob = createEmptyOrderBook()
-    ob.add(LimitOrder(s), ntpNow)
-    ob.add(LimitOrder(b), ntpNow)
+    val ob = OrderBook.empty()
+    ob.append(LimitOrder(s), ntpNow)
+    ob.append(LimitOrder(b), ntpNow)
 
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
@@ -434,7 +435,7 @@ class OrderBookSpec
         (1.waves, 1.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
         /** small maker - big taker, taker fee in ETH */
         (2.waves, 10.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
-        (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth),   // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (2.waves, 10.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
         /** big maker - small taker, taker fee in ETH */
         (10.waves, 2.waves, false, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
         (10.waves, 2.waves, false, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
@@ -443,20 +444,21 @@ class OrderBookSpec
         (1.waves, 1.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
         /** small maker - big market taker, taker fee in ETH */
         (2.waves, 10.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.003.waves, 0.00000340.eth), // like in old good times
-        (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth),   // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (2.waves, 10.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.001.waves, 0.00001021.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
         /** big maker - small market taker, taker fee in ETH */
         (10.waves, 2.waves, true, DynamicSettings(0.003.waves, 0.003.waves), 0.003.waves, 0.00001703, eth, 0.0006.waves, 0.00001703.eth), // like in old good times
-        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth), // orders have sufficient fee = 0.009.waves = 0.00005109.eth
+        (10.waves, 2.waves, true, DynamicSettings(0.001.waves, 0.009.waves), 0.009.waves, 0.00005109, eth, 0.0002.waves, 0.00005109.eth) // orders have sufficient fee = 0.009.waves = 0.00005109.eth
       )
       // format: off
     ) { (mAmt: Long, tAmt: Long, isTMarket: Boolean, ofs: OrderFeeSettings, orderMFee: Long, orderTFee: Double, tFeeAsset: Asset, eMFee: Long, eTFee: Long) =>
       // format: on
-      val ob                  = createEmptyOrderBook(Matcher.getMakerTakerFee(ofs))
+      val ob                  = OrderBook.empty()
       val normalizedOrderTFee = Normalization.normalizeAmountAndFee(orderTFee, 8)
 
       val maker = limit(mAmt, SELL, orderMFee)
       val taker = if (isTMarket) market(tAmt, BUY, normalizedOrderTFee, tFeeAsset) else limit(tAmt, BUY, normalizedOrderTFee, tFeeAsset)
-      val evt   = { ob.add(maker, System.currentTimeMillis); ob.add(taker, System.currentTimeMillis) }.head
+      val gmtf  = Matcher.getMakerTakerFee(ofs)(_, _)
+      val evt   = { ob.add(maker, System.currentTimeMillis, gmtf); ob.add(taker, System.currentTimeMillis, gmtf) }.head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]

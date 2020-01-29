@@ -428,7 +428,7 @@ class MatcherActorSpecification
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
             _ => MatchingRule.DefaultRule,
-            snapshot => OrderBook(snapshot, (t, m) => m.matcherFee -> t.matcherFee)
+            _ => (t, m) => m.matcherFee -> t.matcherFee
         ),
         assetDescription
       )

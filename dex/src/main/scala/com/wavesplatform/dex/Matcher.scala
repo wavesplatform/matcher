@@ -131,7 +131,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      snapshot => OrderBook(snapshot, getMakerTakerFee(orderFeeSettingsCache getSettingsForOffset lastProcessedOffset))
+      getMakerTakerFeeByOffset(orderFeeSettingsCache)
     )
   }
 
@@ -541,6 +541,10 @@ object Matcher extends ScorexLogging {
               }
           }
       }
+  }
+
+  private def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache)(offset: Long)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = {
+    getMakerTakerFee(ofsc getSettingsForOffset offset)(s, c)
   }
 
   def getMakerTakerFee(ofs: => OrderFeeSettings)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = ofs match {

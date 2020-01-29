@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -21,8 +20,7 @@ import scala.util.Try
 
 class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
                          private[OrderBook] val asks: OrderBook.Side,
-                         private[OrderBook] var lastTrade: Option[LastTrade],
-                         private[OrderBook] val getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)) {
+                         private[OrderBook] var lastTrade: Option[LastTrade]) {
   import OrderBook._
 
   private[model] def getBids: OrderBook.Side = bids
@@ -54,7 +52,11 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+  def add(ao: AcceptedOrder,
+          ts: Long,
+          getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
+          tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+
     val (events, lt) = ao.order.orderType match {
       case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, getMakerTakerFee)
       case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, getMakerTakerFee)
@@ -362,9 +364,7 @@ object OrderBook {
 
   implicit val snapshotFormat: Format[OrderBook.Snapshot] = Json.format
 
-  def empty(getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): OrderBook = {
-    new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None, getMakerTakerFee)
-  }
+  def empty(): OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
 
   private def transformSide(side: SideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     val bidMap = mutable.TreeMap.empty[Price, Level](ordering)
@@ -380,9 +380,8 @@ object OrderBook {
     bidMap
   }
 
-  def apply(snapshot: Snapshot, getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): OrderBook =
+  def apply(snapshot: Snapshot): OrderBook =
     new OrderBook(transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
                   transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
-                  snapshot.lastTrade,
-                  getMakerTakerFee)
+                  snapshot.lastTrade)
 }

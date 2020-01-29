@@ -129,7 +129,7 @@ class MakerTakerFeeTestSuite extends MatcherSuiteBase with TableDrivenPropertyCh
            |waves.dex {
            |  price-assets = [ "$UsdId", "WAVES" ]
            |  order-fee {
-           |    0: {
+           |    -1: {
            |      mode = dynamic
            |      dynamic {
            |        base-maker-fee = ${0.003.waves}

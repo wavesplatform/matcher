@@ -10,7 +10,7 @@ import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OWrites}
 
 sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) extends Product with Serializable {
   def this(obj: Entity, part: Entity, klass: Class, message: MatcherErrorMessage) = this(
@@ -22,18 +22,16 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
 }
 
 object MatcherError {
-  implicit final class Ops(val self: MatcherError) extends AnyVal {
-    def toJson = {
-      val obj           = self.message
-      val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
-      Json
-        .obj(
-          "error"    -> self.code,
-          "message"  -> obj.text,
-          "template" -> obj.template
-        )
-        .deepMerge(wrappedParams)
-    }
+  implicit val matcherErrorWrites: OWrites[MatcherError] = OWrites { x =>
+    val obj           = x.message
+    val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
+    Json
+      .obj(
+        "error"    -> x.code,
+        "message"  -> obj.text,
+        "template" -> obj.template
+      )
+      .deepMerge(wrappedParams)
   }
 }
 

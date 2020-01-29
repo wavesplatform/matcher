@@ -32,9 +32,7 @@ class ApiSuccessfulPlaceSpec extends AnyFreeSpec with Matchers with DiffMatcherW
     "expiration" : 1582677054923,
     "matcherFee" : 5273291907571414,
     "signature" : "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj",
-    "proofs" : [
-      "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj"
-    ]
+    "proofs" : [ "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj" ]
   },
   "success" : true,
   "status" : "OrderAccepted"

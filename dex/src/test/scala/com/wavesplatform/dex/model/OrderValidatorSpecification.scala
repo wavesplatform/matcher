@@ -35,6 +35,7 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -111,7 +112,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson) should produce("amount should be > 0")
+        OrderValidator.timeAware(ntpTime)(signed).left.map(Json.toJsObject(_)) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in blockchainTest() { (ov, bc) =>

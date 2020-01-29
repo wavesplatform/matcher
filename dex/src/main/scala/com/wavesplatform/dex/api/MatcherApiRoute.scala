@@ -27,7 +27,14 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -158,7 +165,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def placeOrder(endpoint: PathMatcher[Unit], isMarket: Boolean): Route = path(endpoint) {
     (pathEndOrSingleSlash & entity(as[Order])) { order =>
-      withAssetPair(order.assetPair, formatError = e => OrderRejected(e)) { pair =>
+      withAssetPair(order.assetPair, formatError = e => StatusCodes.BadRequest -> ApiError.from(e, "OrderRejected")) { pair =>
         unavailableOrderBookBarrier(pair) {
           complete(
             placeTimer.measureFuture {
@@ -166,11 +173,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                 case Right(o) =>
                   placeTimer.measureFuture {
                     askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
-                      case x: error.MatcherError               => if (x == error.CanNotPersistEvent) api.WavesNodeUnavailable(x) else api.OrderRejected(x)
-                      case AddressActor.Event.OrderAccepted(x) => api.OrderAccepted(x) //StatusCodes.OK -> ApiSuccessfulPlace(x)
+                      case AddressActor.Event.OrderAccepted(x) => StatusCodes.OK -> ApiSuccessfulPlace(x)
+                      case x: error.MatcherError =>
+                        if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> ApiError.from(x, "WavesNodeUnavailable")
+                        else StatusCodes.BadRequest                                       -> ApiError.from(x, "OrderRejected")
                     }
                   }
-                case Left(e) => Future.successful[ToResponseMarshallable] { OrderRejected(e) }
+                case Left(e) => Future.successful[ToResponseMarshallable] { StatusCodes.BadRequest -> ApiError.from(e, "OrderRejected") }
               }
             }
           )

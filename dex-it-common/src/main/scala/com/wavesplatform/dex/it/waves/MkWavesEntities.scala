@@ -70,7 +70,10 @@ trait MkWavesEntities {
         feeAsset = feeAsset
       )
 
-  /** Creates order with denormalized price */
+  /**
+    * Creates order with denormalized price.
+    * For not predefined assets it is required to enrich `PredefinedAssets.assetsDecimalsMap` (use overriding), otherwise 8 decimals will be picked
+    */
   def mkOrderDP(owner: KeyPair,
                 pair: AssetPair,
                 orderType: OrderType,
@@ -82,7 +85,7 @@ trait MkWavesEntities {
                 ttl: Duration = 30.days - 1.seconds,
                 version: Byte = orderVersion,
                 matcher: PublicKey = matcher)(implicit assetDecimalsMap: Map[Asset, Int]): Order = {
-    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap.getOrElse(pair.amountAsset, 8), assetDecimalsMap.getOrElse(pair.priceAsset, 8))
+    val normalizedPrice = Normalization.normalizePrice(price, assetDecimalsMap(pair.amountAsset), assetDecimalsMap(pair.priceAsset))
     mkOrder(owner, pair, orderType, amount, normalizedPrice, matcherFee, feeAsset, ts, ttl, version, matcher)
   }
 

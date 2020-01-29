@@ -15,7 +15,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
   val correctOrderFeeStr: String =
     s"""
        |order-fee {
-       |  0: {
+       |  -1: {
        |    mode = percent
        |    dynamic {
        |      base-maker-fee = 200000

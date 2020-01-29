@@ -80,7 +80,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
     settings.processConsumedTimeout shouldBe 663.seconds
-    settings.orderFee should matchTo(Map[Long, OrderFeeSettings](0L -> PercentSettings(AssetType.AMOUNT, 0.1)))
+    settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
     settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
@@ -145,7 +145,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     def invalidMode(invalidModeName: String = "invalid"): String =
       s"""
          |order-fee {
-         |  0: {
+         |  -1: {
          |    mode = $invalidModeName
          |    dynamic {
          |      base-maker-fee = 300000
@@ -166,7 +166,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val invalidAssetTypeAndPercent =
       s"""
          |order-fee {
-         |  0: {
+         |  -1: {
          |    mode = percent
          |    dynamic {
          |      base-maker-fee = 300000
@@ -187,7 +187,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val invalidAssetAndFee =
       s"""
          |order-fee {
-         |  0: {
+         |  -1: {
          |    mode = fixed
          |    dynamic {
          |      base-maker-fee = 300000
@@ -208,7 +208,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val invalidFeeInDynamicMode =
       s"""
          |order-fee {
-         |  0: {
+         |  -1: {
          |    mode = dynamic
          |    dynamic {
          |      base-maker-fee = -350000
@@ -233,22 +233,22 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     val settingsInvalidAssetAndFee      = getSettingByConfig(configStr(invalidAssetAndFee))
     val settingsInvalidFeeInDynamicMode = getSettingByConfig(configStr(invalidFeeInDynamicMode))
 
-    settingsInvalidMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.0.mode value: invalid")
+    settingsInvalidMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.-1.mode value: invalid")
 
-    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.0.mode value: waves")
+    settingsDeprecatedNameMode shouldBe Left("Invalid setting order-fee value: Invalid setting order-fee.-1.mode value: waves")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
-        "Invalid setting order-fee value: Invalid setting order-fee.0.percent.asset-type value: test, " +
-          "Invalid setting order-fee.0.percent.min-fee value: 121.2 (required 0 < percent <= 100)")
+        "Invalid setting order-fee value: Invalid setting order-fee.-1.percent.asset-type value: test, " +
+          "Invalid setting order-fee.-1.percent.min-fee value: 121.2 (required 0 < percent <= 100)")
 
     settingsInvalidAssetAndFee shouldBe
       Left(
-        "Invalid setting order-fee value: Invalid setting order-fee.0.fixed.asset value: ;;;;, " +
-          "Invalid setting order-fee.0.fixed.min-fee value: -300000 (required 0 < fee)")
+        "Invalid setting order-fee value: Invalid setting order-fee.-1.fixed.asset value: ;;;;, " +
+          "Invalid setting order-fee.-1.fixed.min-fee value: -300000 (required 0 < fee)")
 
     settingsInvalidFeeInDynamicMode shouldBe Left(
-      s"Invalid setting order-fee value: Invalid setting order-fee.0.dynamic.base-maker-fee value: -350000 (required 0 < base maker fee)"
+      s"Invalid setting order-fee value: Invalid setting order-fee.-1.dynamic.base-maker-fee value: -350000 (required 0 < base maker fee)"
     )
   }
 

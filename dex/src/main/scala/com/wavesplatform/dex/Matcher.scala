@@ -86,7 +86,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     new ExchangeTransactionCreator(
       matcherKeyPair,
       settings.exchangeTxBaseFee,
-      orderFeeSettingsCache.getCurrentFeeSettings,
+      orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset),
       hasMatcherAccountScript,
       assetsCache.unsafeGetHasScript
     )
@@ -99,7 +99,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val matchingRulesCache    = new MatchingRulesCache(settings)
-  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee, lastProcessedOffset)
+  private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
   private val rateCache             = RateCache(db)
 
   private val orderBooksSnapshotCache =
@@ -131,7 +131,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      snapshot => OrderBook(snapshot, getMakerTakerFee(orderFeeSettingsCache.getCurrentFeeSettings))
+      snapshot => OrderBook(snapshot, getMakerTakerFee(orderFeeSettingsCache getSettingsForOffset lastProcessedOffset))
     )
   }
 
@@ -151,7 +151,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     import OrderValidator._
 
-    def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getFeeSettingsForNextOrder
+    def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
 
     /** Does not need additional access to the blockchain via gRPC */
     def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
@@ -220,7 +220,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             }
             .map { _.collect { case Right(version) => version } }
         },
-        () => orderFeeSettingsCache.getFeeSettingsForNextOrder
+        () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
       ),
       MatcherApiRouteV1(
         pairBuilder,

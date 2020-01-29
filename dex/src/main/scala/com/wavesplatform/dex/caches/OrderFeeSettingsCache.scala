@@ -4,19 +4,18 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
 
 import scala.collection.immutable.TreeMap
 
-class OrderFeeSettingsCache(orderFeeSettingsMap: Map[Long, OrderFeeSettings], currentOffset: => Long) {
+class OrderFeeSettingsCache(orderFeeSettingsMap: Map[Long, OrderFeeSettings]) {
 
   private val allOrderFeeSettings = {
-    if (!orderFeeSettingsMap.contains(0)) throw new IllegalArgumentException("Order fee settings should contain value for 0 offset!")
+    if (orderFeeSettingsMap.isEmpty) throw new IllegalArgumentException("Order fee settings should contain at least 1 value!")
     TreeMap.empty[Long, OrderFeeSettings] ++ orderFeeSettingsMap
   }
 
-  private def getClosestActualSettings(offset: Long): OrderFeeSettings = {
-    allOrderFeeSettings.toSeq.reverse
-      .collectFirst { case (startOffset, settings) if startOffset <= offset => settings }
-      .getOrElse(allOrderFeeSettings.head._2)
+  def getSettingsForOffset(offset: Long): OrderFeeSettings = {
+    allOrderFeeSettings
+      .takeWhile { case (o, _) => o <= offset }
+      .lastOption
+      .map(_._2)
+      .getOrElse(throw new IllegalStateException(s"Order fee settings are not set for offset $offset"))
   }
-
-  def getCurrentFeeSettings: OrderFeeSettings      = getClosestActualSettings(currentOffset)
-  def getFeeSettingsForNextOrder: OrderFeeSettings = getClosestActualSettings(currentOffset + 1)
 }

@@ -30,7 +30,7 @@ object ConfigSettingsValidator {
     }
 
     def validateOffset(key: String): Validated[String, Long] = {
-      Validated.fromTry(Try(key.toLong)).leftMap(_ => s"Can't parse offset '$key'").ensure("Offset should be >= 0")(_ >= 0)
+      Validated.fromTry(Try(key.toLong)).leftMap(_ => s"Can't parse offset '$key'").ensure("Offset should be >= -1")(_ >= -1)
     }
   }
 }

@@ -74,6 +74,16 @@ object WavesDexCli {
               .text("Where to save the documentation")
               .required()
               .action((x, s) => s.copy(outputDirectory = x))
+          ),
+        cmd(Command.CreateApiKey.name)
+          .action((_, s) => s.copy(command = Some(Command.CreateApiKey)))
+          .text("Creates a hashed version of api key and prints settings for DEX server to change it")
+          .children(
+            opt[String]("api-key")
+              .abbr("ak")
+              .text("Raw API key, which will be passed to REST API in the X-Api-Key header")
+              .required()
+              .action((x, s) => s.copy(apiKey = x))
           )
       )
     }
@@ -154,6 +164,15 @@ object WavesDexCli {
               } finally {
                 errors.close()
               }
+
+            case Command.CreateApiKey =>
+              val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
+              println(
+                s"""Your API Key: $hashedApiKey
+                   |Don't forget to update your settings:
+                   |
+                   |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
+                   |""".stripMargin)
           }
           println("Done")
       }
@@ -176,6 +195,10 @@ object WavesDexCli {
     case object CreateDocumentation extends Command {
       override def name: String = "create-documentation"
     }
+
+    case object CreateApiKey extends Command {
+      override def name: String = "create-api-key"
+    }
   }
 
   private sealed trait SeedFormat
@@ -183,7 +206,7 @@ object WavesDexCli {
     case object RawString extends SeedFormat
     case object Base64    extends SeedFormat
 
-    implicit val weekDaysRead: scopt.Read[SeedFormat] = scopt.Read.reads {
+    implicit val seedFormatRead: scopt.Read[SeedFormat] = scopt.Read.reads {
       case "raw-string" => RawString
       case "base64"     => Base64
       case x            => throw new IllegalArgumentException(s"Expected 'raw-string' or 'base64', but got '$x'")
@@ -195,7 +218,8 @@ object WavesDexCli {
                           seedFormat: SeedFormat = SeedFormat.RawString,
                           accountNonce: Option[Int] = None,
                           command: Option[Command] = None,
-                          outputDirectory: File = defaultFile)
+                          outputDirectory: File = defaultFile,
+                          apiKey: String = "")
 
   @scala.annotation.tailrec
   private def readSeedFromFromStdIn(prompt: String, format: SeedFormat): ByteStr = {

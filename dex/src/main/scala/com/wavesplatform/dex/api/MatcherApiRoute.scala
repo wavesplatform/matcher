@@ -456,10 +456,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           }
         case (None, Some(oid)) =>
           askAddressActor(sender, AddressActor.Command.CancelOrder(oid)) {
-            case x: error.MatcherError               => if (x == error.CanNotPersistEvent) api.WavesNodeUnavailable(x) else api.OrderCancelRejected(x)
-            case AddressActor.Event.OrderCanceled(x) => api.OrderCanceled(x)
+            case AddressActor.Event.OrderCanceled(x) => StatusCodes.OK -> ApiSuccessfulCancel(x)
+            case x: error.MatcherError =>
+              if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> ApiError.from(x, "WavesNodeUnavailable")
+              else StatusCodes.BadRequest                                       -> ApiError.from(x, "OrderCancelRejected")
           }
-        case _ => OrderCancelRejected(error.CancelRequestIsIncomplete)
+        case _ => StatusCodes.BadRequest -> ApiError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected")
       }
     )
 

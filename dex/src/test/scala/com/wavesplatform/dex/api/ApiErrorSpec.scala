@@ -24,9 +24,7 @@ class ApiErrorSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
     error = 3148040,
     message = "The order 979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU has already been placed",
     template = "The order {{id}} has already been placed",
-    params = Some(Json.obj(
-      "id" -> "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"
-    )),
+    params = Json.obj("id" -> "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"),
     status = "OrderRejected"
   )
 

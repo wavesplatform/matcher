@@ -14,6 +14,14 @@ case class ApiError(
 object ApiError {
   implicit val apiRejectedPlaceFormat: Format[ApiError] = Json.format
 
+  def apply(error: Int, message: String, template: String, params: JsObject, status: String): ApiError = new ApiError(
+    error = error,
+    message = message,
+    template = template,
+    params = Some(params),
+    status = status
+  )
+
   def from(x: MatcherError, status: String): ApiError = ApiError(
     error = x.code,
     message = x.message.text,

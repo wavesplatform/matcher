@@ -35,7 +35,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
        |waves.dex {
        |  price-assets = [ "$UsdId", "WAVES", "$EthId", "$BtcId", "$WctId" ]
        |  allowed-order-versions = [1, 2, 3]
-       |  order-fee {
+       |  order-fee.-1 {
        |    mode = $PERCENT
        |    $DYNAMIC {
        |      base-fee = 300000
@@ -166,7 +166,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     "fixed fee mode" - {
 
       "processing market order (SELL)" in {
-        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.mode = $FIXED").withFallback(dexInitialSuiteConfig))
+        dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = $FIXED").withFallback(dexInitialSuiteConfig))
 
         testFilledMarketOrder(SELL, FIXED)
       }
@@ -424,7 +424,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
       dex1.restartWithNewSuiteConfig(
-        ConfigFactory.parseString(s"waves.dex.order-fee.fixed.asset = $BtcId\nwaves.dex.order-fee.mode = $FIXED").withFallback(dexInitialSuiteConfig)
+        ConfigFactory.parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = $FIXED").withFallback(dexInitialSuiteConfig)
       )
 
       val amount   = 10.waves

@@ -52,10 +52,14 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     canceledOrders
   }
 
-  def add(ao: AcceptedOrder, ts: Long, normalizedTickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+  def add(ao: AcceptedOrder,
+          ts: Long,
+          getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
+          tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
+
     val (events, lt) = ao.order.orderType match {
-      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, normalizedTickSize)
-      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, normalizedTickSize)
+      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, getMakerTakerFee)
+      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, getMakerTakerFee)
     }
 
     lastTrade = lt
@@ -128,6 +132,7 @@ object OrderBook {
 
   case class LastTrade(price: Long, amount: Long, side: OrderType)
   object LastTrade {
+
     implicit val orderTypeFormat: Format[OrderType] = Format(
       {
         case JsNumber(x) => Try(OrderType(x.toIntExact)).fold(e => JsError(s"Can't deserialize $x as OrderType: ${e.getMessage}"), JsSuccess(_))
@@ -135,6 +140,7 @@ object OrderBook {
       },
       x => JsNumber(x.bytes.head.toInt)
     )
+
     implicit val format: Format[LastTrade] = Json.format[LastTrade]
 
     def serialize(dest: mutable.ArrayBuilder[Byte], x: LastTrade): Unit = {
@@ -148,6 +154,9 @@ object OrderBook {
 
   case class Snapshot(bids: SideSnapshot, asks: SideSnapshot, lastTrade: Option[LastTrade])
   object Snapshot {
+
+    val empty: Snapshot = Snapshot(bids = Map.empty, asks = Map.empty, None)
+
     def serialize(dest: mutable.ArrayBuilder[Byte], x: Snapshot): Unit = {
       SideSnapshot.serialize(dest, x.bids)
       SideSnapshot.serialize(dest, x.asks)
@@ -240,7 +249,8 @@ object OrderBook {
                       submittedSide: Side,
                       counterSide: Side,
                       lastTrade: Option[LastTrade],
-                      normalizedTickSize: Long): (Seq[Event], Option[LastTrade]) = {
+                      tickSize: Long,
+                      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): (Seq[Event], Option[LastTrade]) = {
     if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, isSystemCancel = false, eventTs) +: prevEvents, lastTrade)
     else {
       counterSide.best match {
@@ -248,7 +258,7 @@ object OrderBook {
           submitted.fold { submittedLimitOrder =>
             // place limit order into appropriate level according to the tick size
             val correctedLevelPriceOfSubmittedOrder =
-              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, normalizedTickSize)
+              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, tickSize)
 
             submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submittedLimitOrder)
             (OrderAdded(submittedLimitOrder, eventTs) +: prevEvents, lastTrade)
@@ -262,20 +272,24 @@ object OrderBook {
           else if (!counter.order.isValid(eventTs)) {
 
             counterSide.removeBest()
-            doMatch(eventTs,
-                    canMatch,
-                    submitted,
-                    OrderCanceled(counter, isSystemCancel = false, eventTs) +: prevEvents,
-                    submittedSide,
-                    counterSide,
-                    lastTrade,
-                    normalizedTickSize)
+            doMatch(
+              eventTs,
+              canMatch,
+              submitted,
+              OrderCanceled(counter, isSystemCancel = false, eventTs) +: prevEvents,
+              submittedSide,
+              counterSide,
+              lastTrade,
+              tickSize,
+              getMakerTakerFee
+            )
 
           } else {
 
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs)
-            val newEvents          = orderExecutedEvent +: prevEvents
-            val lt                 = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
+            val (maxCounterFee, maxSubmittedFee) = getMakerTakerFee(submitted, counter)
+            val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
+            val newEvents                        = orderExecutedEvent +: prevEvents
+            val lt                               = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
             if (orderExecutedEvent.counterRemaining.isValid) { // counter is not filled
 
@@ -291,18 +305,18 @@ object OrderBook {
 
               submitted match {
                 case _: LimitOrder =>
-                  val sloRemaining = orderExecutedEvent.submittedRemaining
-                  if (sloRemaining.isValid) doMatch(eventTs, canMatch, sloRemaining, newEvents, submittedSide, counterSide, lt, normalizedTickSize)
+                  val remaining = orderExecutedEvent.submittedRemaining
+                  if (remaining.isValid) doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, getMakerTakerFee)
                   else (newEvents, lt)
 
                 case submittedMarketOrder: MarketOrder =>
-                  val smoRemaining      = orderExecutedEvent.submittedMarketRemaining(submittedMarketOrder)
-                  val isSubmittedFilled = !smoRemaining.isValid
-                  val canSpendMore      = smoRemaining.availableForSpending > 0
+                  val remaining         = orderExecutedEvent.submittedMarketRemaining(submittedMarketOrder)
+                  val isSubmittedFilled = !remaining.isValid
+                  val canSpendMore      = remaining.availableForSpending > 0
 
                   (isSubmittedFilled, canSpendMore) match {
-                    case (false, true)  => doMatch(eventTs, canMatch, smoRemaining, newEvents, submittedSide, counterSide, lt, normalizedTickSize)
-                    case (false, false) => (OrderCanceled(smoRemaining, isSystemCancel = true, eventTs) +: newEvents, lt)
+                    case (false, true)  => doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, lt, tickSize, getMakerTakerFee)
+                    case (false, false) => (OrderCanceled(remaining, isSystemCancel = true, eventTs) +: newEvents, lt)
                     case (true, _)      => (newEvents, lt)
                   }
               }
@@ -312,7 +326,7 @@ object OrderBook {
     }
   }
 
-  private def formatSide(side: Side) =
+  private def formatSide(side: Side): String =
     side
       .map { case (price, level) => s""""$price":${level.map(formatLo).mkString("[", ",", "]")}""" }
       .mkString("{", ",", "}")
@@ -342,15 +356,6 @@ object OrderBook {
       (__ \ "order").format[Order])(limitOrder, (lo: LimitOrder) => (lo.amount, lo.fee, lo.order))
   )
 
-  /*
-  // Replace by:
-  private implicit val limitOrderFormat: Format[LimitOrder] = (
-    (JsPath \ "amount").format[Long] and
-      (JsPath \ "fee").format[Long] and
-      (JsPath \ "order").format[Order]
-  )(limitOrder, lo => (lo.amount, lo.fee, lo.order))
-   */
-
   implicit val priceMapFormat: Format[SideSnapshot] =
     implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
       _.map { case (k, v) => k.toLong   -> v },
@@ -359,7 +364,7 @@ object OrderBook {
 
   implicit val snapshotFormat: Format[OrderBook.Snapshot] = Json.format
 
-  def empty: OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
+  def empty(): OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
 
   private def transformSide(side: SideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     val bidMap = mutable.TreeMap.empty[Price, Level](ordering)

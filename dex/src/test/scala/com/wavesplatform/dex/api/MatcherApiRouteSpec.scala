@@ -17,6 +17,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsString, JsValue}
@@ -328,7 +329,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       matcherAccountFee = 300000L,
       apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) }
+      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
+      () => DynamicSettings.symmetric(matcherFee)
     ).route
 
     f(route)

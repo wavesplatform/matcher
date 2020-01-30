@@ -43,7 +43,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
     ConfigFactory.parseString(
       s"""waves.dex {
          |  allowed-order-versions = [1, 2, 3]
-         |  order-fee {
+         |  order-fee.-1 {
          |    mode = $PERCENT
          |    $PERCENT {
          |      asset-type = $assetType

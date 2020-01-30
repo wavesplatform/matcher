@@ -38,6 +38,12 @@ object AssetsStorage {
     def get(asset: IssuedAsset): Option[BriefAssetDescription]       = db.readOnly(_.get(MatcherKeys.asset(asset)))
   }
 
+  def inMem: AssetsStorage = new AssetsStorage {
+    private val assetsCache                                        = new ConcurrentHashMap[Asset, BriefAssetDescription]
+    def put(asset: IssuedAsset, item: BriefAssetDescription): Unit = assetsCache.putIfAbsent(asset, item)
+    def get(asset: IssuedAsset): Option[BriefAssetDescription]     = Option(assetsCache get asset)
+  }
+
   final implicit class Ops(val self: AssetsStorage) extends AnyVal {
 
     def get(asset: Asset): Option[BriefAssetDescription] = asset.fold(BriefAssetDescription.someWavesDescription)(self.get)

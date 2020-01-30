@@ -10,14 +10,15 @@ import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTr
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
+import com.wavesplatform.dex.settings.AssetType
 import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 
 import scala.concurrent.ExecutionContext
 
 class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
-                                 matcherSettings: MatcherSettings,
+                                 exchangeTxBaseFee: Long,
+                                 currentOrderFeeSettings: => OrderFeeSettings,
                                  hasMatcherAccountScript: Boolean,
                                  hasAssetScript: IssuedAsset => Boolean)(implicit ec: ExecutionContext) {
 
@@ -48,7 +49,7 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
         buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
       }
 
-      matcherSettings.orderFee match {
+      currentOrderFeeSettings match {
         case PercentSettings(assetType, _) =>
           val (buyAmountExecuted, sellAmountExecuted) = getActualBuySellAmounts(assetType, executedAmount, price, executedAmount, price)
           val (buyAmountTotal, sellAmountTotal)       = getActualBuySellAmounts(assetType, buy.amount, buy.price, sell.amount, sell.price)
@@ -72,7 +73,7 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
     val (buyFee, sellFee) = calculateMatcherFee
 
     // matcher always pays fee to the miners in Waves
-    val txFee = minFee(matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
+    val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
 
     if (buy.version >= 2 || sell.version >= 2) {
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)

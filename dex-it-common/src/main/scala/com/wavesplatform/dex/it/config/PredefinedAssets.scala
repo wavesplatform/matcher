@@ -43,5 +43,5 @@ trait PredefinedAssets {
   val ForbiddenAssetId: ByteStr   = ByteStr.decodeBase58("FdbnAsset").get
   val ForbiddenAsset: IssuedAsset = IssuedAsset(ForbiddenAssetId)
 
-  implicit val assetDecimalsMap: Map[Asset, Int] = Map(Waves -> 8, usd -> 2, wct -> 2, eth -> 8, btc -> 8)
+  implicit val assetDecimalsMap: Map[Asset, Int] = Map[Asset, Int](Waves -> 8, usd -> 2, wct -> 2, eth -> 8, btc -> 8).withDefaultValue(8)
 }

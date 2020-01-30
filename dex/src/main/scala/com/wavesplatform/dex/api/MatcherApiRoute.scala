@@ -31,6 +31,7 @@ import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, formatValue}
 import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
@@ -64,7 +65,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: () => Future[Set[Byte]])(implicit mat: Materializer)
+                           validatedAllowedOrderVersions: () => Future[Set[Byte]],
+                           getActualOrderFeeSettings: () => OrderFeeSettings)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -219,7 +221,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           StatusCodes.OK,
           Json.obj(
             "priceAssets"   -> matcherSettings.priceAssets,
-            "orderFee"      -> matcherSettings.orderFee.getJson(matcherAccountFee, rateCache.getJson).value,
+            "orderFee"      -> getActualOrderFeeSettings().getJson(matcherAccountFee, rateCache.getJson).value,
             "orderVersions" -> allowedOrderVersions.toSeq.sorted
           )
         )

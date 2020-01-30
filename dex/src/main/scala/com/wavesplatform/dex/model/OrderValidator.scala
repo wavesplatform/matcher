@@ -180,7 +180,7 @@ object OrderValidator extends ScorexLogging {
 
       lazy val exchangeTx: Result[ExchangeTransaction] = {
         val fakeOrder: Order  = order.updateType(order.orderType.opposite)
-        val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime())
+        val oe: OrderExecuted = OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime(), fakeOrder.matcherFee, order.matcherFee)
         transactionCreator(oe) leftMap (txValidationError => error.CanNotCreateExchangeTransaction(txValidationError.toString))
       }
 
@@ -194,9 +194,9 @@ object OrderValidator extends ScorexLogging {
 
       /** Checks whether order fee is enough to cover matcher's expenses for the Exchange transaction issue */
       lazy val validateOrderFeeByTransactionRequirements: FutureResult[Order] = orderFeeSettings match {
-        case DynamicSettings(baseFee) =>
+        case ds: DynamicSettings =>
           for {
-            minFee          <- liftValueAsync { minFee(baseFee, hasMatcherAccountScript, assetPair, assetDescriptions(_).hasScript) }
+            minFee          <- liftValueAsync { minFee(ds.maxBaseFee, hasMatcherAccountScript, assetPair, assetDescriptions(_).hasScript) }
             minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDescriptions(feeAsset).decimals, rateCache) }
             _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
           } yield order
@@ -217,7 +217,7 @@ object OrderValidator extends ScorexLogging {
 
   private[dex] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
     orderFeeSettings match {
-      case _: DynamicSettings               => rateCache.getAllRates.keySet
+      case _: DynamicSettings              => rateCache.getAllRates.keySet
       case FixedSettings(defaultAssetId, _) => Set(defaultAssetId)
       case PercentSettings(assetType, _) =>
         Set(
@@ -231,13 +231,15 @@ object OrderValidator extends ScorexLogging {
     }
 
   /** Converts fee in waves to fee in the specified asset, taking into account correction by the asset decimals */
-  private def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, assetDecimals: Int, rateCache: RateCache): Result[Long] = {
-    rateCache.getRate(asset) map { assetRate =>
-      multiplyFeeByDouble(
-        feeInWaves,
-        MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals)
-      )
-    } toRight error.RateNotFound(asset)
+  private[dex] def convertFeeByAssetRate(feeInWaves: Long, asset: Asset, assetDecimals: Int, rateCache: RateCache): Result[Long] = {
+    asset.fold { lift(feeInWaves) } { issuedAsset =>
+      rateCache.getRate(issuedAsset) map { assetRate =>
+        multiplyFeeByDouble(
+          feeInWaves,
+          MatcherModel.correctRateByAssetDecimals(assetRate, assetDecimals)
+        )
+      } toRight error.RateNotFound(asset)
+    }
   }
 
   private[dex] def getMinValidFeeForPercentFeeSettings(order: Order, percentSettings: PercentSettings, matchPrice: Long): Long = {
@@ -266,9 +268,9 @@ object OrderValidator extends ScorexLogging {
                                              orderFeeSettings: OrderFeeSettings,
                                              assetDecimals: Asset => Int,
                                              rateCache: RateCache): Result[Long] = orderFeeSettings match {
-    case FixedSettings(_, fixedMinFee)    => lift { fixedMinFee }
-    case percentSettings: PercentSettings => lift { getMinValidFeeForPercentFeeSettings(order, percentSettings, order.price) }
-    case DynamicSettings(baseFee)         => convertFeeByAssetRate(baseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
+    case FixedSettings(_, fixedMinFee) => lift { fixedMinFee }
+    case ps: PercentSettings           => lift { getMinValidFeeForPercentFeeSettings(order, ps, order.price) }
+    case ds: DynamicSettings          => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
@@ -287,7 +289,8 @@ object OrderValidator extends ScorexLogging {
                            blacklistedAddresses: Set[Address],
                            matcherSettings: MatcherSettings,
                            assetDecimals: Asset => Int,
-                           rateCache: RateCache)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
+                           rateCache: RateCache,
+                           getActualOrderFeeSettings: => OrderFeeSettings)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       asset.fold { success }(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), Unit, e(issuedAsset)))
@@ -298,8 +301,8 @@ object OrderValidator extends ScorexLogging {
         .ensure(error.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
         .ensure(error.OrderVersionDenied(order.version, matcherSettings.allowedOrderVersions))(o => matcherSettings.allowedOrderVersions(o.version))
       _ <- validateBlacklistedAsset(order.feeAsset, error.FeeAssetBlacklisted)
-      _ <- validateFeeAsset(order, matcherSettings.orderFee, rateCache)
-      _ <- validateFee(order, matcherSettings.orderFee, assetDecimals, rateCache)
+      _ <- validateFeeAsset(order, getActualOrderFeeSettings, rateCache)
+      _ <- validateFee(order, getActualOrderFeeSettings, assetDecimals, rateCache)
     } yield order
   }
 

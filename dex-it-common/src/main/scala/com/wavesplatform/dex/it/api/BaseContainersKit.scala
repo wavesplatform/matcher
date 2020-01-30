@@ -21,7 +21,6 @@ import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.Network.NetworkImpl
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}
 
@@ -95,6 +94,6 @@ trait BaseContainersKit extends ScorexLogging {
     log.debug("Stopping containers")
     futureHttpBackend.close()
     tryHttpBackend.close()
-    knownContainers.asScala.foreach(_.stopWithoutRemove()) // Graceful shutdown to save logs
+    knownContainers.forEach(_.stopWithoutRemove()) // Graceful shutdown to save logs
   }
 }

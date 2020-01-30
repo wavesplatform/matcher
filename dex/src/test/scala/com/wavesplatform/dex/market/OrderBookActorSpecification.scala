@@ -85,7 +85,8 @@ class OrderBookActorSpecification
         ntpTime,
         matchingRules,
         _ => (),
-        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact)
+        raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
+        _ => (t, m) => m.matcherFee -> t.matcherFee
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
@@ -98,7 +99,7 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBook.empty.snapshot))
+      obsdb.update(p, 50, Some(OrderBook.Snapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
@@ -106,8 +107,8 @@ class OrderBookActorSpecification
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
         val ord = buy(p, 10 * Order.PriceConstant, 100)
-        val ob  = OrderBook.empty
-        ob.add(LimitOrder(ord), ord.timestamp)
+        val ob  = OrderBook.empty()
+        ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
         obsdb.update(p, 50, Some(ob.snapshot))
       }
     ) { (pair, _, tp) =>

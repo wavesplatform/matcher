@@ -6,8 +6,8 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.dex.grpc.integration._
 import com.wavesplatform.dex.grpc.integration.protobuf.EitherVEExt
-import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.protobuf.PbToWavesConversions._
+import com.wavesplatform.dex.grpc.integration.protobuf.WavesToPbConversions._
 import com.wavesplatform.dex.grpc.integration.smart.MatcherScriptRunner
 import com.wavesplatform.extensions.{Context => ExtensionContext}
 import com.wavesplatform.features.BlockchainFeatureStatus
@@ -124,7 +124,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
     val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
     val assetId = request.assetId.toVanillaAsset
-    SpendableAssetBalanceResponse(context.blockchain.balance(addr, assetId))
+    SpendableAssetBalanceResponse(context.utx.spendableBalance(addr, assetId))
   }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {

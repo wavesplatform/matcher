@@ -13,7 +13,7 @@ import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
-import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, OrderBookSnapshotHttpCache}
+import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -228,13 +228,15 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         () => status.get(),
         apiKeyHash,
         settings
-      )
+      ),
+      MatcherWebSocketRoute()
     )
   }
 
   lazy val matcherApiTypes: Set[Class[_]] = Set(
     classOf[MatcherApiRoute],
-    classOf[MatcherApiRouteV1]
+    classOf[MatcherApiRouteV1],
+    classOf[MatcherWebSocketRoute]
   )
 
   private val snapshotsRestore = Promise[Unit]()

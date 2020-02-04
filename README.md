@@ -270,6 +270,8 @@ We have CLI tools accompanying to DEX server. Run `waves-dex-cli` to see a full 
 
 * Generating an account storage (required to run DEX server);
 * Generating an account seed by base seed, and printing useful information about it;
+* Generating an API key;
+* And so on.
 
 If you want to run CLI from SBT, use the following template:
 
@@ -294,6 +296,23 @@ here:
 
 After running this command you will see where your `account.dat` was saved and which settings do you have to add to the DEX server configuration.
 Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
+
+### 8.2. Generating API key
+
+Example:
+
+```bash
+./bin/waves-dex-cli com.wavesplatform.dex.WavesDexCli create-api-key --api-key "integration-test-rest-api"
+```
+
+An output:
+
+```
+Your API Key: 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
+Don't forget to update your settings:
+
+waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
+```
 
 ## 9. Known issues
 

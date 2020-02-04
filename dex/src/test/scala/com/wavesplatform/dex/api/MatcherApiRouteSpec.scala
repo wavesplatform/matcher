@@ -480,28 +480,60 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       )
     }
 
-    // TODO
-    // TODO error
-    "massive cancel - returns canceled orders" in test(
-      { route =>
-        val unsignedRequest = CancelOrderRequest(
-          sender = okOrderSenderPrivateKey.publicKey,
-          orderId = None,
-          timestamp = Some(System.currentTimeMillis()),
-          signature = Array.emptyByteArray
-        )
-        val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+    "massive cancel" - {
+      "returns canceled orders" in test(
+        { route =>
+          val unsignedRequest = CancelOrderRequest(
+            sender = okOrderSenderPrivateKey.publicKey,
+            orderId = None,
+            timestamp = Some(System.currentTimeMillis()),
+            signature = Array.emptyByteArray
+          )
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
 
-        Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
-          (responseAs[JsObject] - "success") should matchTo(
-            Json.obj(
-              "message" -> Json.arr( // LOL!
-                Json.arr(Json.obj("orderId" -> okOrder.id(), "success" -> true, "status" -> "OrderCanceled"))),
-              "status" -> "BatchCancelCompleted"
-            ))
+          Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[JsObject].as[ApiSuccessfulMassiveCancel] should matchTo(
+              ApiSuccessfulMassiveCancel(
+                List(
+                  Right(ApiSuccessfulCancel(orderId = okOrder.id())),
+                  Left(ApiError(
+                    error = 25601,
+                    message = "Can not persist event, please retry later or contact with the administrator",
+                    template = "Can not persist event, please retry later or contact with the administrator",
+                    status = "OrderCancelRejected"
+                  ))
+                )
+              ))
+          }
         }
-      }
-    )
+      )
+
+      "returns an error" in test(
+        { route =>
+          val unsignedRequest = CancelOrderRequest(
+            sender = okOrderSenderPrivateKey.publicKey,
+            orderId = None,
+            timestamp = Some(System.currentTimeMillis()),
+            signature = Array.emptyByteArray
+          )
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+
+          Post(routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.ServiceUnavailable
+            responseAs[JsObject].as[ApiError] should matchTo(ApiError(
+              error = 3145733,
+              message = s"The account ${badOrder.sender.toAddress} is blacklisted",
+              template = "The account {{address}} is blacklisted",
+              status = "BatchCancelRejected",
+              params = Json.obj(
+                "address" -> badOrder.sender.toAddress
+              )
+            ))
+          }
+        }
+      )
+    }
   }
 
   // TODO
@@ -853,8 +885,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               if (orderId == okOrder.id()) AddressActor.Event.OrderCanceled(orderId)
               else error.OrderNotFound(orderId)
 
-            case AddressActor.Command.CancelAllOrders(pair, _) if pair.forall(_ == okOrder.assetPair) =>
-              AddressActor.Event.BatchCancelCompleted(Map(okOrder.id() -> Right(AddressActor.Event.OrderCanceled(okOrder.id()))))
+            case x @ AddressActor.Command.CancelAllOrders(pair, _) =>
+              if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
+              else if (pair.forall(_ == okOrder.assetPair))
+                AddressActor.Event.BatchCancelCompleted(
+                  Map(
+                    okOrder.id()  -> Right(AddressActor.Event.OrderCanceled(okOrder.id())),
+                    badOrder.id() -> Left(error.CanNotPersistEvent)
+                  ))
+              else Status.Failure(new RuntimeException(s"Can't handle $x"))
 
             case GetTradableBalance(xs) => GetBalance(xs.map(_ -> 100L).toMap)
             case x                      => Status.Failure(new RuntimeException(s"Unknown command: $x"))

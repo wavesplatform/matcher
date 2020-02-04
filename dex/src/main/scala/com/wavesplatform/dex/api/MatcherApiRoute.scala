@@ -448,6 +448,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                 case (id, Right(_)) => id -> api.OrderCanceled(id)
                 case (id, Left(e))  => id -> api.OrderCancelRejected(e)
               })
+
+            case x: error.MatcherError => StatusCodes.ServiceUnavailable -> ApiError.from(x, "BatchCancelRejected")
           }
         case (None, Some(oid)) =>
           askAddressActor(sender, AddressActor.Command.CancelOrder(oid)) {

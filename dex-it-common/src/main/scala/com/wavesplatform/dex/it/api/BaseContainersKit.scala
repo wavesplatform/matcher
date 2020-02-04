@@ -11,7 +11,7 @@ import com.github.dockerjava.api.command.CreateNetworkCmd
 import com.github.dockerjava.api.model.Network.Ipam
 import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp.TryHttpURLConnectionBackend
+import com.softwaremill.sttp.{HttpURLConnectionBackend, TryHttpURLConnectionBackend}
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.BaseContainer

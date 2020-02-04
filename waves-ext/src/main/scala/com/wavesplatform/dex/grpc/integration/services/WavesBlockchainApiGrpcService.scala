@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.services
 
 import cats.syntax.either._
+import cats.syntax.monoid._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
@@ -15,7 +16,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
@@ -151,6 +152,21 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       case NonFatal(e) =>
         log.trace(error.formatStackTrace(e))
         Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
+    }
+  }
+
+  override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
+    import com.wavesplatform.state.Portfolio.monoid
+    Future {
+
+      val address              = request.address.toVanillaAddress
+      val pessimisticPortfolio = context.blockchain.portfolio(address) |+| context.utx.pessimisticPortfolio(address)
+
+      AllAssetsSpendableBalanceResponse(
+        (pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)).map {
+          case (a, b) => AllAssetsSpendableBalanceResponse.Record(a.toPB, b)
+        }.toSeq
+      )
     }
   }
 }

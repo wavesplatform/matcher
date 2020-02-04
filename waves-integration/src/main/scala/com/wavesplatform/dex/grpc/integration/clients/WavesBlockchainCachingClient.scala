@@ -14,6 +14,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.execution.Ack.Continue
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.{Observable, Observer}
+import mouse.any._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,7 +42,12 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
     underlying.spendableBalanceChanges
   }
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long]                           = balancesCache.get(address -> asset).map(_.toLong)
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = balancesCache.get(address -> asset).map(_.toLong)
+
+  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = {
+    underlying.allAssetsSpendableBalance(address) unsafeTap { _.foreach(bs => balancesCache.batchPut(Map(address -> bs))) }
+  }
+
   override def isFeatureActivated(id: Short): Future[Boolean]                                           = featuresCache.get(id) map Boolean2boolean
   override def assetDescription(asset: Asset.IssuedAsset): Future[Option[BriefAssetDescription]]        = assetDescriptionsCache.get(asset)
   override def hasScript(asset: Asset.IssuedAsset): Future[Boolean]                                     = underlying.hasScript(asset)

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <shutdownHook/>
+
     <property name="default.pattern" value="%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n"/>
 
     <logger name="io.netty" level="INFO"/>

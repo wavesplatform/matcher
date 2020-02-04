@@ -105,8 +105,9 @@ object WavesNodeContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String, ip: String): Map[String, String] = Map(
-    "WAVES_NODE_CONFIGPATH"        -> s"$baseContainerPath/$containerName.conf",
-    "WAVES_NODE_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.log",
+    "BRIEF_LOG_PATH"        -> s"$containerLogsPath/container-$containerName.log",
+    "DETAILED_LOG_PATH"     -> "/dev/null",
+    "WAVES_NODE_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_OPTS" -> List(
       "-Xmx1024M",
       s"-Djava.util.logging.config.file=$baseContainerPath/jul.properties",

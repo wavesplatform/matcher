@@ -31,6 +31,8 @@ service WavesBlockchainApi {
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
     rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
+
+    rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 }
 
 // Common requests
@@ -41,6 +43,10 @@ message TransactionsByIdRequest {
 
 message AssetIdRequest {
     bytes asset_id = 1;
+}
+
+message AddressRequest {
+    bytes address = 1;
 }
 
 // Common responses
@@ -144,6 +150,14 @@ message BalanceChangesResponse {
         int64 balance = 3;
     }
     repeated Record batch = 1;
+}
+
+message AllAssetsSpendableBalanceResponse {
+    message Record {
+        bytes asset_id = 1;
+        int64 balance = 2;
+    }
+    repeated Record balances = 1;
 }
 
 // Other entities

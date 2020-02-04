@@ -30,7 +30,7 @@ final case class DexContainer private (override val internalIp: String, underlyi
     extends BaseContainer(DexContainer.baseContainerPath, underlying) {
 
   override protected val cachedRestApiAddress: CachedData[InetSocketAddress] = CachedData(getExternalAddress(DexContainer.restApiPort))
-  def restApiAddress: InetSocketAddress = cachedRestApiAddress.get()
+  def restApiAddress: InetSocketAddress                                      = cachedRestApiAddress.get()
 
   override def api: DexApi[Id]          = fp.sync { DexApi[Try](apiKey, restApiAddress) }
   override def asyncApi: DexApi[Future] = DexApi[Future](apiKey, restApiAddress)
@@ -89,8 +89,9 @@ object DexContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String): Map[String, String] = Map(
-    "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log",
-    "WAVES_DEX_CONFIGPATH"        -> s"$baseContainerPath/$containerName.conf",
+    "BRIEF_LOG_PATH"       -> s"$containerLogsPath/container-$containerName.log",
+    "DETAILED_LOG_PATH"    -> s"$containerLogsPath/container-$containerName.detailed.log",
+    "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
     "WAVES_DEX_OPTS" ->
       List(
         "-J-Xmx1024M",

@@ -28,6 +28,10 @@ object ConfigSettingsValidator {
     def validateAssetPairKey(key: String): Validated[String, AssetPair] = {
       Validated.fromTry(AssetPair.fromString(key)) leftMap (_ => s"Can't parse asset pair '$key'")
     }
+
+    def validateOffset(key: String): Validated[String, Long] = {
+      Validated.fromTry(Try(key.toLong)).leftMap(_ => s"Can't parse offset '$key'").ensure("Offset should be >= -1")(_ >= -1)
+    }
   }
 }
 

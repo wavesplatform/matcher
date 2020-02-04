@@ -26,7 +26,7 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
   private val issuedAsset = IssuedAsset(Base58.decode("4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8"))
   private val matcherPublicSettings = ApiMatcherPublicSettings(
     priceAssets = Seq(Waves, issuedAsset),
-    orderFee = ApiMatcherPublicSettings.OrderFeePublicSettings.Fixed(
+    orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Fixed(
       assetId = issuedAsset,
       minFee = 300000
     ),

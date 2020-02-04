@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -48,8 +47,8 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   protected val usd: IssuedAsset = mkAssetId("WUSD")
   protected val eth: IssuedAsset = mkAssetId("WETH")
 
-  protected val pairWavesBtc: AssetPair = AssetPair(Waves, btc)
-  protected val pairWavesUsd: AssetPair = AssetPair(Waves, usd)
+  protected val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
+  protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
 
   protected val rateCache: RateCache    = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
   protected val smallFee: Option[Price] = Some(toNormalized(1))
@@ -91,7 +90,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
                             price: Double,
                             matcherFee: Long = matcherFee,
                             version: Byte = 3,
-                            matcherFeeAsset: Asset = Waves): Order = {
+                            feeAsset: Asset = Waves): Order = {
     Order(
       sender = senderKeyPair,
       matcher = MatcherAccount,
@@ -105,7 +104,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
       expiration = ntpNow + (1000 * 60 * 60 * 24),
       matcherFee = matcherFee,
       version = version,
-      feeAsset = matcherFeeAsset
+      feeAsset = feeAsset
     )
   }
 
@@ -134,28 +133,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   private val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
   private val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
 
-  private val config: Config = loadConfig(
-    ConfigFactory.parseString(
-      """waves {
-      |    directory: "/tmp/waves-test"
-      |    dex {
-      |      account: ""
-      |      bind-address: "127.0.0.1"
-      |      port: 6886
-      |      order-history-file: null
-      |      min-order-fee: 100000
-      |      snapshots-interval: 100000
-      |      max-open-orders: 1000
-      |      price-assets: ["BASE1", "BASE2", "BASE"]
-      |      blacklisted-assets: ["BLACKLST"]
-      |      blacklisted-names: ["[Ff]orbidden"]
-      |      allowed-order-versions = [1, 2, 3]
-      |    }
-      |}""".stripMargin
-    )
-  )
-
-  protected val matcherSettings: MatcherSettings = config.as[MatcherSettings]("waves.dex")
+  protected val matcherSettings: MatcherSettings = loadConfig(None).as[MatcherSettings]("waves.dex")
 
   protected def randomBytes(howMany: Int = 32): Array[Byte] = {
     val r = new Array[Byte](howMany)
@@ -377,7 +355,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
   protected def dynamicSettingsGenerator(lowerBaseFeeBound: Long = 1, upperBaseFeeBound: Long = 1000000L): Gen[DynamicSettings] =
-    for { baseFee <- Gen.choose(lowerBaseFeeBound, upperBaseFeeBound) } yield { DynamicSettings(baseFee) }
+    for { baseFee <- Gen.choose(lowerBaseFeeBound, upperBaseFeeBound) } yield { DynamicSettings(baseFee, baseFee) }
 
   private def orderFeeSettingsGenerator(defaultAssetForFixedSettings: Option[Asset] = None): Gen[OrderFeeSettings] = {
     for {
@@ -425,12 +403,12 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
           .updateFee {
             OrderValidator.getMinValidFeeForSettings(order, percentSettings, getDefaultAssetDescriptions(_).decimals, rateCache).explicitGet()
           }
-      case (_, DynamicSettings(baseFee)) =>
+      case (_, ds @ DynamicSettings(_, _)) =>
         order
           .updateFeeAsset(matcherFeeAssetForDynamicSettings getOrElse Waves)
           .updateFee(
-            rateForDynamicSettings.fold(baseFee) { rate =>
-              OrderValidator.multiplyFeeByDouble(baseFee, rate)
+            rateForDynamicSettings.fold(ds.maxBaseFee) { rate =>
+              OrderValidator.multiplyFeeByDouble(ds.maxBaseFee, rate)
             }
           )
       case _ => order

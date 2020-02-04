@@ -29,11 +29,8 @@ class MatchingRulesCache(matcherSettings: MatcherSettings) extends ScorexLogging
 
     val result =
       Try {
-        getMatchingRules(assetPair, assetDecimals).toList.reverse.collectFirst {
-          case mr @ DenormalizedMatchingRule(startOffset, _) if startOffset <= (currentOffset + 1) => mr
-        }
-      }.recover { case NonFatal(e) => log.error(s"Can't get a denormalized rule for a next order", e); None }
-        .getOrElse(None)
+        getMatchingRules(assetPair, assetDecimals).foldLeft(defaultRule) { case (acc, mr) => if (mr.startOffset <= (currentOffset + 1)) mr else acc }
+      }.recover { case NonFatal(e) => log.error(s"Can't get a denormalized rule for a next order", e); defaultRule }
         .getOrElse(defaultRule)
 
     result.copy(tickSize = result.tickSize max defaultRule.tickSize)

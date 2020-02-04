@@ -2,10 +2,21 @@ import java.nio.charset.StandardCharsets
 
 import Dependencies.Version
 import DexDockerKeys._
+import VersionSourcePlugin.V
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 
-enablePlugins(RewriteSwaggerConfigPlugin, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, DexDockerPlugin, GitVersioning)
+enablePlugins(RewriteSwaggerConfigPlugin,
+              JavaServerAppPackaging,
+              UniversalDeployPlugin,
+              JDebPackaging,
+              SystemdPlugin,
+              DexDockerPlugin,
+              GitVersioning,
+              VersionSourcePlugin)
+
+V.scalaPackage := "com.wavesplatform.dex"
+V.subProject := "dex"
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.dex
@@ -18,31 +29,6 @@ val packageSettings = Seq(
 
 packageSettings
 inScope(Global)(packageSettings)
-
-lazy val versionSourceTask = Def.task {
-  val versionFile      = sourceManaged.value / "com" / "wavesplatform" / "dex" / "Version.scala"
-  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val (major, minor, patch) = version.value match {
-    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case x                            =>
-      // SBT downloads only the latest commit, so "version" doesn't know, which tag is the nearest
-      if (Option(System.getenv("TRAVIS")).fold(false)(_.toBoolean)) (0, 0, 0)
-      else throw new IllegalStateException(s"dex: can't parse version by git tag: $x")
-  }
-
-  IO.write(
-    versionFile,
-    s"""package com.wavesplatform.dex
-       |
-       |object Version {
-       |  val VersionString = "${version.value}"
-       |  val VersionTuple = ($major, $minor, $patch)
-       |}
-       |""".stripMargin,
-    charset = StandardCharsets.UTF_8
-  )
-  Seq(versionFile)
-}
 
 lazy val swaggerUiVersionSourceTask = Def.task {
   val versionFile = sourceManaged.value / "com" / "wavesplatform" / "dex" / "api" / "http" / "SwaggerUiVersion.scala"
@@ -61,7 +47,7 @@ lazy val swaggerUiVersionSourceTask = Def.task {
 
 inConfig(Compile)(
   Seq(
-    sourceGenerators ++= List(versionSourceTask.taskValue, swaggerUiVersionSourceTask.taskValue),
+    sourceGenerators += swaggerUiVersionSourceTask.taskValue,
     discoveredMainClasses := Seq(
       "com.wavesplatform.dex.Application",
       "com.wavesplatform.dex.WavesDexCli"
@@ -71,7 +57,6 @@ inConfig(Compile)(
   ))
 
 // Docker
-
 inTask(docker)(
   Seq(
     additionalFiles ++= Seq(
@@ -83,7 +68,6 @@ inTask(docker)(
 )
 
 // Packaging
-
 executableScriptName := "waves-dex"
 
 // ZIP archive and mappings for all artifacts
@@ -129,4 +113,5 @@ inConfig(Debian)(
         |    /sbin/init --version | grep upstart >/dev/null 2>&1
         |}
         |""".stripMargin
-  ))
+  )
+)

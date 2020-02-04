@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, PlayJsonException, SwaggerDocService}
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, PlayJsonException, SwaggerDocService, HasStatusBarrier}
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -27,14 +27,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -72,9 +65,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherAccountFee: Long,
                            apiKeyHash: Option[Array[Byte]],
                            rateCache: RateCache,
-                           validatedAllowedOrderVersions: () => Future[Set[Byte]])(implicit mat: Materializer)
+                           validatedAllowedOrderVersions: () => Future[Set[Byte]],
+                           getActualOrderFeeSettings: () => OrderFeeSettings)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
+    with HasStatusBarrier
     with ScorexLogging {
 
   import PathMatchers._
@@ -208,17 +203,17 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
-        import ApiMatcherPublicSettings.OrderFeePublicSettings._
+
         SimpleResponse(
           code = StatusCodes.OK,
           js = Json.toJsObject(
             ApiMatcherPublicSettings(
               priceAssets = matcherSettings.priceAssets,
-              orderFee = matcherSettings.orderFee match {
-                case OrderFeeSettings.DynamicSettings(baseFee)              => Dynamic(baseFee + matcherAccountFee, rateCache.getAllRates)
-                case OrderFeeSettings.FixedSettings(defaultAssetId, minFee) => Fixed(defaultAssetId, minFee)
-                case OrderFeeSettings.PercentSettings(assetType, minFee)    => Percent(assetType, minFee)
-              },
+              orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.fromSettings(
+                settings = getActualOrderFeeSettings(),
+                matcherAccountFee = matcherAccountFee,
+                allRates = rateCache.getAllRates
+              ),
               orderVersions = allowedOrderVersions.toSeq.sorted
             ))
         )

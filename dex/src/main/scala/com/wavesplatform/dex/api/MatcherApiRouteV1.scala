@@ -4,7 +4,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
-import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, HasStatusBarrier}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
@@ -23,6 +23,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
+    with HasStatusBarrier
     with ScorexLogging {
 
   import PathMatchers._

@@ -70,7 +70,7 @@ object HistoryRouter {
       this.event match {
         case _: OrderAdded => Set.empty[EventRecord]
 
-        case e @ OrderExecuted(submitted, counter, timestamp) =>
+        case e @ OrderExecuted(submitted, counter, timestamp, _, _) =>
           val assetPair = submitted.order.assetPair
 
           Set(

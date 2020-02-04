@@ -910,6 +910,7 @@ private object OrderHistoryBalanceSpecification {
   }
 
   private implicit class OrderExecutedExt(val oe: OrderExecuted.type) extends AnyVal {
-    def apply(submitted: LimitOrder, counter: LimitOrder): OrderExecuted = OrderExecuted(submitted, counter, submitted.order.timestamp)
+    def apply(submitted: LimitOrder, counter: LimitOrder): OrderExecuted =
+      OrderExecuted(submitted, counter, submitted.order.timestamp, submitted.matcherFee, counter.matcherFee)
   }
 }

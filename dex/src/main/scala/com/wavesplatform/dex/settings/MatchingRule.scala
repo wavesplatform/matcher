@@ -41,8 +41,11 @@ case class DenormalizedMatchingRule(startOffset: Long, tickSize: BigDecimal) {
 
 object DenormalizedMatchingRule extends ScorexLogging {
 
+  val DefaultTickSize: BigDecimal = 0.00000001
+
   def getDefaultRule(assetPair: AssetPair, assetDecimals: Asset => Int): DenormalizedMatchingRule = {
-    MatchingRule.DefaultRule.denormalize(assetPair, assetDecimals)
+    val DenormalizedMatchingRule(startOffset, tickSize) = MatchingRule.DefaultRule.denormalize(assetPair, assetDecimals)
+    DenormalizedMatchingRule(startOffset, tickSize max DefaultTickSize)
   }
 
   @annotation.tailrec

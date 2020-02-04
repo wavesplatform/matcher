@@ -424,11 +424,11 @@ class MatcherActorSpecification
             assetPair,
             _ => {},
             _ => {},
-            matcherSettings,
             ntpTime,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
-            _ => MatchingRule.DefaultRule
+            _ => MatchingRule.DefaultRule,
+            _ => (t, m) => m.matcherFee -> t.matcherFee
         ),
         assetDescription
       )
@@ -440,7 +440,7 @@ class MatcherActorSpecification
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDB, obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
     pairs.map(_._1).foreach(apdb.add)
-    pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBook.empty.snapshot)) }
+    pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBook.Snapshot.empty)) }
   }
 
   private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}

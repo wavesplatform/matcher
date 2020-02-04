@@ -14,7 +14,7 @@ import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
-import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
+import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._
@@ -49,7 +49,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
-                           orderFee: OrderFeeSettings,
+                           orderFee: Map[Long, OrderFeeSettings],
                            deviation: DeviationsSettings,
                            orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
                            matchingRules: Map[AssetPair, NonEmptyList[DenormalizedMatchingRule]],
@@ -65,12 +65,11 @@ case class MatcherSettings(addressSchemeCharacter: Char,
       blacklistedAssets ++
       orderRestrictions.keySet.flatMap(_.assets) ++
       matchingRules.keySet.flatMap(_.assets) ++
-      allowedAssetPairs.flatMap(_.assets) ++ {
-      orderFee match {
-        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAssetId)
-        case _                                 => Set.empty
+      allowedAssetPairs.flatMap(_.assets) ++
+      orderFee.values.toSet[OrderFeeSettings].flatMap {
+        case x: OrderFeeSettings.FixedSettings => Set(x.defaultAsset)
+        case _                                 => Set.empty[Asset]
       }
-    }
   }
 }
 
@@ -87,7 +86,7 @@ object MatcherSettings {
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
 
-    import ConfigSettingsValidator.AdhocValidation.validateAssetPairKey
+    import ConfigSettingsValidator.AdhocValidation.{validateAssetPairKey, validateOffset}
 
     val addressSchemeCharacter =
       config
@@ -134,7 +133,7 @@ object MatcherSettings {
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
     val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
     val processConsumedTimeout     = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                   = config.as[OrderFeeSettings]("order-fee")
+    val orderFee                   = config.getValidatedMap[Long, OrderFeeSettings]("order-fee")(validateOffset)
     val deviation                  = config.as[DeviationsSettings]("max-price-deviations")
     val orderRestrictions          = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
     val matchingRules              = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)

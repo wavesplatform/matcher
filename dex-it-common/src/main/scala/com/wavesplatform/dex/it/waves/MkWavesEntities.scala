@@ -70,7 +70,10 @@ trait MkWavesEntities {
         feeAsset = feeAsset
       )
 
-  /** Creates order with denormalized price */
+  /**
+    * Creates order with denormalized price.
+    * For not predefined assets it is required to enrich `PredefinedAssets.assetsDecimalsMap` (use overriding), otherwise 8 decimals will be picked
+    */
   def mkOrderDP(owner: KeyPair,
                 pair: AssetPair,
                 orderType: OrderType,

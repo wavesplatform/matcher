@@ -1,13 +1,12 @@
-package com.wavesplatform.dex.model
+package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.db.{RateDB, WithDB}
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RateDBSpec extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
+class RateDBSpecification extends AnyWordSpecLike with Matchers with WithDB with MatcherSpecBase with PropertyChecks with NoShrink {
 
   private def test(f: RateDB => Unit): Unit = f { RateDB(db) }
 

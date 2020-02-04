@@ -15,7 +15,7 @@ import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatcherSettings, MatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
@@ -35,7 +35,8 @@ class OrderBookActor(owner: ActorRef,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)(implicit ec: ExecutionContext)
+                     normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
+                     getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext)
     extends Actor
     with WorkingStash
     with ScorexLogging {
@@ -48,7 +49,7 @@ class OrderBookActor(owner: ActorRef,
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
-  private var orderBook   = OrderBook.empty
+  private var orderBook   = OrderBook.empty()
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
@@ -70,10 +71,12 @@ class OrderBookActor(owner: ActorRef,
       lastSavedSnapshotOffset = result.map(_._1)
       lastProcessedOffset = lastSavedSnapshotOffset
 
-      log.debug(lastSavedSnapshotOffset match {
-        case None    => "Recovery completed"
-        case Some(x) => s"Recovery completed at $x: $orderBook"
-      })
+      log.debug(
+        lastSavedSnapshotOffset match {
+          case None    => "Recovery completed"
+          case Some(x) => s"Recovery completed at $x: $orderBook"
+        }
+      )
 
       lastProcessedOffset foreach actualizeRules
 
@@ -151,7 +154,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, actualRule.tickSize))
+    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -185,11 +188,11 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
-            settings: MatcherSettings,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
-            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule)(implicit ec: ExecutionContext): Props =
+            normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
+            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext): Props =
     Props(
       new OrderBookActor(
         parent,
@@ -202,6 +205,7 @@ object OrderBookActor {
         matchingRules,
         updateCurrentMatchingRules,
         normalizeMatchingRule,
+        getMakerTakerFeeByOffset
       )
     )
 

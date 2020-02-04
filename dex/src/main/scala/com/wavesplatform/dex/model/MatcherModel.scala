@@ -50,6 +50,8 @@ sealed trait AcceptedOrder {
   def rcvAsset: Asset   = order.getReceiveAssetId
   val feeAsset: Asset   = order.feeAsset
 
+  val matcherFee: Long = order.matcherFee
+
   def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
@@ -300,18 +302,23 @@ object Events {
 
   sealed trait Event
 
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long) extends Event {
+  /**
+    *  In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`
+    * @param maxSubmittedFee limited by base-taker-fee
+    * @param maxCounterFee limited by base-maker-fee
+    */
+  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, maxSubmittedFee: Long, maxCounterFee: Long) extends Event {
 
     lazy val executedAmount: Long             = AcceptedOrder.executedAmount(submitted, counter)
     lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, counter.price)
 
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
-    def counterExecutedFee: Long     = AcceptedOrder.partialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
+    def counterExecutedFee: Long     = AcceptedOrder.partialFee(maxCounterFee, counter.order.amount, executedAmount)
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
     def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
-    def submittedExecutedFee: Long     = AcceptedOrder.partialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
+    def submittedExecutedFee: Long     = AcceptedOrder.partialFee(maxSubmittedFee, submitted.order.amount, executedAmount)
     def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
 
     def submittedMarketRemaining(submittedMarketOrder: MarketOrder): MarketOrder = {

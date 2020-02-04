@@ -1,20 +1,17 @@
 package com.wavesplatform.dex.domain.order
 
-import cats.data.State
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
-import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.crypto.{KeyLength, Proofs}
+import com.wavesplatform.dex.domain.crypto.Proofs
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-
-import scala.util.Try
 
 case class OrderV3(senderPublicKey: PublicKey,
                    matcherPublicKey: PublicKey,
@@ -79,8 +76,6 @@ case class OrderV3(senderPublicKey: PublicKey,
 
 object OrderV3 extends EntityParser[OrderV3] {
 
-  private val AssetIdLength = 32
-
   def buy(sender: KeyPair,
           matcher: PublicKey,
           pair: AssetPair,
@@ -128,62 +123,6 @@ object OrderV3 extends EntityParser[OrderV3] {
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
-  }
-
-  def parseBytes1(bytes: Array[Byte]): Try[Order] = Try {
-
-    val longLength = 8
-
-    val readByte: State[Int, Byte] = State { from =>
-      (from + 1, bytes(from))
-    }
-
-    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
-      val end = from + size
-      (end, f(bytes.slice(from, end)))
-    }
-
-    def readEnd[T](f: Array[Byte] => T): State[Int, T] = State { from =>
-      (from, f(bytes.drop(from)))
-    }
-
-    def parse[T](f: (Array[Byte], Int, Int) => (T, Int), size: Int): State[Int, T] = State { from =>
-      val (res, off) = f(bytes, from, size)
-      (off, res)
-    }
-
-    val makeOrder = for {
-      version <- readByte
-      _ = if (version != 3) { throw new Exception(s"Incorrect order version: expect 3 but found $version") }
-      sender            <- read(PublicKey.apply, KeyLength)
-      matcher           <- read(PublicKey.apply, KeyLength)
-      amountAssetId     <- parse(deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-      priceAssetId      <- parse(deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-      orderType         <- readByte
-      price             <- read(Longs.fromByteArray, longLength)
-      amount            <- read(Longs.fromByteArray, longLength)
-      timestamp         <- read(Longs.fromByteArray, longLength)
-      expiration        <- read(Longs.fromByteArray, longLength)
-      matcherFee        <- read(Longs.fromByteArray, longLength)
-      matcherFeeAssetId <- parse(deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-      maybeProofs       <- readEnd(Proofs.fromBytes)
-    } yield {
-      OrderV3(
-        senderPublicKey = sender,
-        matcherPublicKey = matcher,
-        assetPair = AssetPair(amountAssetId, priceAssetId),
-        orderType = OrderType(orderType),
-        amount = amount,
-        price = price,
-        timestamp = timestamp,
-        expiration = expiration,
-        matcherFee = matcherFee,
-        feeAsset = matcherFeeAssetId,
-        proofs = maybeProofs.right.get._1
-      )
-    }
-
-    makeOrder.runA(0).value
   }
 
   override def statefulParse: Stateful[OrderV3] = {

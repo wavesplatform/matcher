@@ -30,6 +30,8 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json._
@@ -127,7 +129,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.OK
         responseAs[JsValue].as[ApiMatcherPublicSettings] should matchTo(ApiMatcherPublicSettings(
           priceAssets = List(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
-          orderFee = ApiMatcherPublicSettings.OrderFeePublicSettings.Dynamic(
+          orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Dynamic(
             baseFee = 600000,
             rates = Map(Waves -> 1.0)
           ),
@@ -939,7 +941,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       matcherAccountFee = 300000L,
       apiKeyHash = Some(crypto secureHash apiKey),
       rateCache = rateCache,
-      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) }
+      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
+      () => DynamicSettings.symmetric(matcherFee)
     ).route
 
     f(route)

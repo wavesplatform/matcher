@@ -72,9 +72,12 @@ class HistoryRouterSpecification
     )
   }
 
-  def orderAdded(submitted: LimitOrder): OrderAdded                               = OrderAdded(submitted, ntpTime.getTimestamp())
-  def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = OrderExecuted(submitted, counter, ntpTime.getTimestamp())
-  def orderCancelled(submitted: AcceptedOrder): OrderCanceled                     = OrderCanceled(submitted, isSystemCancel = false, ntpTime.getTimestamp())
+  def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, ntpTime.getTimestamp())
+  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, isSystemCancel = false, ntpTime.getTimestamp())
+
+  def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
+    OrderExecuted(submitted, counter, ntpTime.getTimestamp(), submitted.matcherFee, counter.matcherFee)
+  }
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used
   def denormalizeAmountAndFee(value: Long, asset: Asset): BigDecimal = Denormalization.denormalizeAmountAndFee(value, wavesDecimals)

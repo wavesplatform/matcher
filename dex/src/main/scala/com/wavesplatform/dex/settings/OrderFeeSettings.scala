@@ -15,12 +15,21 @@ import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{Reads, Writes}
 
+sealed trait OrderFeeSettings extends Product with Serializable
 object OrderFeeSettings {
 
-  sealed trait OrderFeeSettings
-  case class DynamicSettings(baseFee: Long)                        extends OrderFeeSettings
-  case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
-  case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
+  final case class DynamicSettings(baseMakerFee: Long, baseTakerFee: Long) extends OrderFeeSettings {
+    val maxBaseFee: Long   = math.max(baseMakerFee, baseTakerFee)
+    val makerRatio: Double = (BigDecimal(baseMakerFee) / maxBaseFee).toDouble
+    val takerRatio: Double = (BigDecimal(baseTakerFee) / maxBaseFee).toDouble
+  }
+
+  object DynamicSettings {
+    def symmetric(baseFee: Long): DynamicSettings = DynamicSettings(baseFee, baseFee)
+  }
+
+  final case class FixedSettings(defaultAsset: Asset, minFee: Long)      extends OrderFeeSettings
+  final case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     val cfgValidator = ConfigSettingsValidator(cfg)
@@ -28,10 +37,11 @@ object OrderFeeSettings {
     def getPrefixByMode(mode: FeeMode): String = s"$path.$mode"
 
     def validateDynamicSettings: ErrorsListOr[DynamicSettings] = {
-      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(FeeMode.DYNAMIC)}.base-fee")(
-        predicate = fee => 0 < fee,
-        errorMsg = s"required 0 < base fee"
-      ) map DynamicSettings
+      val prefix = getPrefixByMode(FeeMode.DYNAMIC)
+      (
+        cfgValidator.validateByPredicate[Long](s"$prefix.base-maker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base maker fee"),
+        cfgValidator.validateByPredicate[Long](s"$prefix.base-taker-fee")(predicate = fee => 0 < fee, errorMsg = s"required 0 < base taker fee"),
+      ) mapN DynamicSettings.apply
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {

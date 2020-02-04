@@ -12,9 +12,12 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
-      s"""waves.dex.order-fee {
+      s"""waves.dex.order-fee.-1 {
        |  mode = dynamic
-       |  dynamic.base-fee = $tradeFee
+       |  dynamic {
+       |    base-maker-fee = $tradeFee
+       |    base-taker-fee = $tradeFee
+       |  }
        |}
        """.stripMargin
     )

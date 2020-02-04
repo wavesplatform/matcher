@@ -3,7 +3,7 @@ description := "Node integration extension for the Waves DEX"
 import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
 
-enablePlugins(RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning)
+enablePlugins(WavesExtensionDockerPlugin, RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning)
 
 resolvers += "dnvriend" at "https://dl.bintray.com/dnvriend/maven"
 libraryDependencies ++= Dependencies.Module.wavesExt

@@ -6,7 +6,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
-class ApiSuccessfulMassiveCancelSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
+class ApiSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
   // Note, we removed "result" : null , because it effectively equal to a missing field
   private val json =
@@ -26,7 +26,7 @@ class ApiSuccessfulMassiveCancelSpec extends AnyFreeSpec with Matchers with Diff
   "status" : "BatchCancelCompleted"
 }"""
 
-  private val message = ApiSuccessfulMassiveCancel(
+  private val message = ApiSuccessfulBatchCancel(
     List(
       Right(ApiSuccessfulCancel(orderId = ByteStr.decodeBase58("8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK").get)),
       Left(
@@ -41,7 +41,7 @@ class ApiSuccessfulMassiveCancelSpec extends AnyFreeSpec with Matchers with Diff
 
   "backward JSON compatibility" - {
     "serialization" in {
-      Json.parse(json).as[ApiSuccessfulMassiveCancel] should matchTo(message)
+      Json.parse(json).as[ApiSuccessfulBatchCancel] should matchTo(message)
     }
 
     "deserialization" in {

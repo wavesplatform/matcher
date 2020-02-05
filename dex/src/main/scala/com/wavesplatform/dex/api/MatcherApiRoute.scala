@@ -27,7 +27,14 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -203,7 +210,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
-
         SimpleResponse(
           code = StatusCodes.OK,
           js = Json.toJsObject(
@@ -444,10 +450,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         case (Some(ts), None) =>
           askAddressActor(sender, AddressActor.Command.CancelAllOrders(assetPair, ts)) {
             case AddressActor.Event.BatchCancelCompleted(xs) =>
-              api.BatchCancelCompleted(xs.map {
-                case (id, Right(_)) => id -> api.OrderCanceled(id)
-                case (id, Left(e))  => id -> api.OrderCancelRejected(e)
-              })
+              ApiSuccessfulBatchCancel(xs.map {
+                case (id, Right(_)) => Right(ApiSuccessfulCancel(id))
+                case (_, Left(e))   => Left(ApiError.from(e, "OrderCancelRejected"))
+              }.toList)
 
             case x: error.MatcherError => StatusCodes.ServiceUnavailable -> ApiError.from(x, "BatchCancelRejected")
           }

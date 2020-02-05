@@ -4,14 +4,14 @@ import play.api.libs.json.{Format, JsError, Json, Reads, Writes}
 
 import scala.reflect.ClassTag
 
-case class ApiSuccessfulMassiveCancel(
+case class ApiSuccessfulBatchCancel(
     // TODO: In new API: should be a map id -> cancel result
     message: List[List[Either[ApiError, ApiSuccessfulCancel]]],
     success: Boolean = true,
     status: String = "BatchCancelCompleted"
 )
 
-object ApiSuccessfulMassiveCancel {
+object ApiSuccessfulBatchCancel {
   implicit def eitherFormat[L, R](implicit lFormat: Format[L], rFormat: Format[R], ctl: ClassTag[L], ctr: ClassTag[R]): Format[Either[L, R]] = Format(
     Reads { js =>
       js.validate[R]
@@ -27,7 +27,7 @@ object ApiSuccessfulMassiveCancel {
     }
   )
 
-  implicit val apiSuccessfulMassiveCancelFormat: Format[ApiSuccessfulMassiveCancel] = Json.format
+  implicit val apiSuccessfulMassiveCancelFormat: Format[ApiSuccessfulBatchCancel] = Json.format
 
-  def apply(message: List[Either[ApiError, ApiSuccessfulCancel]]): ApiSuccessfulMassiveCancel = ApiSuccessfulMassiveCancel(message = List(message))
+  def apply(message: List[Either[ApiError, ApiSuccessfulCancel]]): ApiSuccessfulBatchCancel = ApiSuccessfulBatchCancel(message = List(message))
 }

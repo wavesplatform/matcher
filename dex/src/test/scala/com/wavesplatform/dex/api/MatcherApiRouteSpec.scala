@@ -493,8 +493,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
           Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[JsObject].as[ApiSuccessfulMassiveCancel] should matchTo(
-              ApiSuccessfulMassiveCancel(
+            responseAs[JsObject].as[ApiSuccessfulBatchCancel] should matchTo(
+              ApiSuccessfulBatchCancel(
                 List(
                   Right(ApiSuccessfulCancel(orderId = okOrder.id())),
                   Left(ApiError(
@@ -536,7 +536,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // TODO
   // cancelAll
   routePath("/orderbook/cancel") - {
     "returns canceled orders" in test(
@@ -550,14 +549,19 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
 
         Post(routePath("/orderbook/cancel"), signedRequest) ~> route ~> check {
-          (responseAs[JsObject] - "success") should matchTo(Json.obj(
-            "message" -> Json.arr( // LOL!
-              Json.arr(Json.obj( // LOL!
-                                "orderId" -> okOrder.id(),
-                                "success" -> true,
-                                "status"  -> "OrderCanceled"))),
-            "status" -> "BatchCancelCompleted"
-          ))
+          status shouldEqual StatusCodes.OK
+          responseAs[JsObject].as[ApiSuccessfulBatchCancel] should matchTo(
+            ApiSuccessfulBatchCancel(
+              List(
+                Right(ApiSuccessfulCancel(orderId = okOrder.id())),
+                Left(ApiError(
+                  error = 25601,
+                  message = "Can not persist event, please retry later or contact with the administrator",
+                  template = "Can not persist event, please retry later or contact with the administrator",
+                  status = "OrderCancelRejected"
+                ))
+              )
+            ))
         }
       }
     )

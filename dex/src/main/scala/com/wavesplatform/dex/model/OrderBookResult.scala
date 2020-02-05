@@ -8,6 +8,7 @@ import com.wavesplatform.dex.api.JsonSerializer
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization
 
+// TODO: Break into ApiV0OrderBook and ApiV1OrderBook
 @JsonSerialize(using = classOf[OrderBookResult.Serializer])
 case class OrderBookResult(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg], assetPairDecimals: Option[(Int, Int)] = None)
 

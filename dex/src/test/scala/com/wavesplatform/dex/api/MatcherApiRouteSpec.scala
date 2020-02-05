@@ -573,6 +573,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns all order books" in test(
       { route =>
         Get(routePath("/orderbook")) ~> route ~> check {
+          println(responseAs[String])
           val r = responseAs[JsObject]
           (r \ "matcherPublicKey").as[String] should matchTo(matcherKeyPair.publicKey.base58)
 

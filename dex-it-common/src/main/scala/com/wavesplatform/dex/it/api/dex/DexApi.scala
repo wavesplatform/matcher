@@ -10,7 +10,7 @@ import com.google.common.primitives.Longs
 import com.softwaremill.sttp.Uri.QueryFragment
 import com.softwaremill.sttp.playJson._
 import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
-import com.wavesplatform.dex.api.{ApiOrderBookInfo, ApiRates, ApiSnapshotOffsets, CancelOrderRequest, ApiOrderBookHistoryItem}
+import com.wavesplatform.dex.api.{ApiV0OrderBook, ApiOrderBookHistoryItem, ApiOrderBookInfo, ApiRates, ApiSnapshotOffsets, CancelOrderRequest}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -63,8 +63,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]]
 
-  def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]]
-  def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, OrderBookResponse]]
+  def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiV0OrderBook]]
+  def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, ApiV0OrderBook]]
 
   def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, ApiOrderBookInfo]]
   def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]]
@@ -242,13 +242,13 @@ object DexApi {
 
       override def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]] = tryParseJson(sttp.get(uri"$apiUri/orderbook"))
 
-      override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, OrderBookResponse]] = tryParseJson {
+      override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiV0OrderBook]] = tryParseJson {
         sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
           .followRedirects(false)
       }
 
-      override def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, OrderBookResponse]] = tryParseJson {
+      override def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, ApiV0OrderBook]] = tryParseJson {
         sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
           .followRedirects(false)

@@ -4,7 +4,24 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.settings.formatValue
 import play.api.libs.json._
 
+import scala.reflect.ClassTag
+
 package object json {
+  implicit def eitherFormat[L, R](implicit lFormat: Format[L], rFormat: Format[R], ctl: ClassTag[L], ctr: ClassTag[R]): Format[Either[L, R]] = Format(
+    Reads { js =>
+      js.validate[R]
+        .map(Right[L, R])
+        .orElse {
+          js.validate[L].map(Left[L, R])
+        }
+        .orElse(JsError(s"Can't parse as Either[${ctl.runtimeClass.getName}, ${ctr.runtimeClass.getName}]"))
+    },
+    Writes {
+      case Right(x) => rFormat.writes(x)
+      case Left(x)  => lFormat.writes(x)
+    }
+  )
+
   // TODO create a function with f
   // create an implementation with formatValue
   val stringAsDoubleFormat: Format[Double] = Format(

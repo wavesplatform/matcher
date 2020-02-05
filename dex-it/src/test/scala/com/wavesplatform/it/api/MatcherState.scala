@@ -1,14 +1,14 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
+import com.wavesplatform.dex.api.{ApiV0OrderBook, ApiOrderBookHistoryItem}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.it.api.responses.dex.{MarketStatusResponse, OrderBookResponse, OrderStatusResponse}
+import com.wavesplatform.dex.it.api.responses.dex.{MarketStatusResponse, OrderStatusResponse}
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 
 case class MatcherState(offset: QueueEventWithMeta.Offset,
                         snapshots: Map[AssetPair, QueueEventWithMeta.Offset],
-                        orderBooks: Map[AssetPair, (OrderBookResponse, MarketStatusResponse)],
+                        orderBooks: Map[AssetPair, (ApiV0OrderBook, MarketStatusResponse)],
                         orderStatuses: Map[String, OrderStatusResponse],
                         reservedBalances: Map[KeyPair, Map[Asset, Long]],
                         orderHistory: Map[KeyPair, Map[AssetPair, Seq[ApiOrderBookHistoryItem]]]) {

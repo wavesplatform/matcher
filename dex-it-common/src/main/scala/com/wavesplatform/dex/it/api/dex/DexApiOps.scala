@@ -3,7 +3,7 @@ package com.wavesplatform.dex.it.api.dex
 import cats.Functor
 import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
-import com.wavesplatform.dex.api.{ApiOrderBookInfo, ApiRates, ApiOrderBookHistoryItem}
+import com.wavesplatform.dex.api.{ApiV0OrderBook, ApiOrderBookHistoryItem, ApiOrderBookInfo, ApiRates}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
@@ -67,8 +67,8 @@ object DexApiOps {
       _.markets.find(marketData => marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
     }
 
-    def orderBook(assetPair: AssetPair): F[OrderBookResponse]             = explicitGet(self.tryOrderBook(assetPair))
-    def orderBook(assetPair: AssetPair, depth: Int): F[OrderBookResponse] = explicitGet(self.tryOrderBook(assetPair, depth))
+    def orderBook(assetPair: AssetPair): F[ApiV0OrderBook]             = explicitGet(self.tryOrderBook(assetPair))
+    def orderBook(assetPair: AssetPair, depth: Int): F[ApiV0OrderBook] = explicitGet(self.tryOrderBook(assetPair, depth))
 
     def orderBookInfo(assetPair: AssetPair): F[ApiOrderBookInfo]       = explicitGet(self.tryOrderBookInfo(assetPair))
     def orderBookStatus(assetPair: AssetPair): F[MarketStatusResponse] = explicitGet(self.tryOrderBookStatus(assetPair))

@@ -4,7 +4,7 @@ import VersionSourcePlugin.V
 import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
 
-enablePlugins(RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning, VersionSourcePlugin)
+enablePlugins(WavesExtensionDockerPlugin, RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning, VersionSourcePlugin)
 
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"

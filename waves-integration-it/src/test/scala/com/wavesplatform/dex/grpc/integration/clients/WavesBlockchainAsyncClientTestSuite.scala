@@ -40,25 +40,25 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   private implicit val monixScheduler: Scheduler = Scheduler(runNow)
-  private lazy val client = WavesBlockchainClientBuilder.async(
-    WavesBlockchainClientSettings(
-      grpc = GrpcClientSettings(
-        target = wavesNode1.grpcApiTarget,
-        maxHedgedAttempts = 5,
-        maxRetryAttempts = 5,
-        keepAliveWithoutCalls = true,
-        keepAliveTime = 2.seconds,
-        keepAliveTimeout = 5.seconds,
-        idleTimeout = 1.minute,
-        channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-          connectTimeout = 5.seconds
-        )
+
+  private lazy val client =
+    WavesBlockchainClientBuilder.async(
+      WavesBlockchainClientSettings(
+        grpc = GrpcClientSettings(
+          target = wavesNode1.grpcApiTarget,
+          maxHedgedAttempts = 5,
+          maxRetryAttempts = 5,
+          keepAliveWithoutCalls = true,
+          keepAliveTime = 2.seconds,
+          keepAliveTimeout = 5.seconds,
+          idleTimeout = 1.minute,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+        ),
+        defaultCachesExpiration = 100.milliseconds
       ),
-      defaultCachesExpiration = 100.milliseconds
-    ),
-    monixScheduler,
-    ExecutionContext.fromExecutor(grpcExecutor)
-  )
+      monixScheduler,
+      ExecutionContext.fromExecutor(grpcExecutor)
+    )
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -77,9 +77,11 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
-    val actual = simplify(balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
-      case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
-    })
+    val actual = simplify(
+      balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
+        case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
+      }
+    )
     val expected = simplify(expectedBalanceChanges)
     actual should matchTo(expected)
   }
@@ -275,6 +277,27 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   "spendableBalance" in {
     wait(client.spendableBalance(bob, Waves)) shouldBe 494994799299998L
     wait(client.spendableBalance(bob, randomIssuedAsset)) shouldBe 0L
+  }
+
+  "allAssetsSpendableBalance" in {
+
+    val carol = mkKeyPair("carol")
+
+    broadcastAndAwait(
+      mkTransfer(bob, carol, 10.waves, Waves),
+      mkTransfer(alice, carol, 1.usd, usd),
+      mkTransfer(bob, carol, 1.btc, btc)
+    )
+
+    wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
+
+    wait(client allAssetsSpendableBalance carol) should matchTo(
+      Map[Asset, Long](
+        Waves -> (10.waves - 1.waves - minFee),
+        usd   -> 1.usd,
+        btc   -> 1.btc
+      )
+    )
   }
 
   "forgedOrder" - {

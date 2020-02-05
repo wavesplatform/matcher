@@ -105,6 +105,12 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
       .map(_.balance)
   }
 
+  override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = handlingErrors {
+    blockchainService
+      .allAssetsSpendableBalance { AddressRequest(address.toPB) }
+      .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
+  }
+
   override def isFeatureActivated(id: Short): Future[Boolean] = handlingErrors {
     blockchainService.isFeatureActivated { IsFeatureActivatedRequest(id) }.map(_.isActivated)
   }

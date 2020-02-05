@@ -78,8 +78,17 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     try {
       if (dockerClient.inspectContainerCmd(underlying.containerId).exec().getState.getRunning) {
 
-        val escaped   = text.replace('\'', '\"')
-        val execCmd   = dockerClient.execCreateCmd(underlying.containerId).withCmd("/bin/sh", "-c", s"/bin/echo '$escaped' >> /proc/1/fd/1")
+        val escaped = text.replace('\'', '\"')
+
+        val execCmd =
+          dockerClient
+            .execCreateCmd(underlying.containerId)
+            .withCmd(
+              "/bin/sh",
+              "-c",
+              s"""/bin/echo '$escaped' >> $$BRIEF_LOG_PATH; /bin/echo '$escaped' >> $$DETAILED_LOG_PATH"""
+            )
+
         val execCmdId = execCmd.exec().getId
 
         try dockerClient.execStartCmd(execCmdId).exec(new ExecStartResultCallback)

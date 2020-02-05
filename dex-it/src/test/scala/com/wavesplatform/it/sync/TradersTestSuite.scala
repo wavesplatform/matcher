@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
-import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
@@ -263,6 +263,29 @@ class TradersTestSuite extends MatcherSuiteBase {
           }
         }
       }
+    }
+
+    "DEX should consider pessimistic portfolio when obtains spendable balance" in {
+
+      dex1.api.cancelAll(alice)
+      dex1.api.cancelAll(bob)
+
+      wavesNode1.restartWithNewSuiteConfig(
+        ConfigFactory.parseString(
+          s"""waves.miner {
+             |  micro-block-interval = 11171ms            # 10 times more than usual one
+             |  minimal-block-generation-offset = 31871ms # 10 times more than usual one
+             |}""".stripMargin
+        )
+      )
+
+      dex1.restart() // after restart DEX doesn't have cached Bob's balance
+
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 100.waves, 3.00))
+
+      wavesNode1.api.broadcast { mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves) }
+
+      dex1.api.tryPlace { mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00) } should failWith(3147270) // BalanceNotEnough
     }
   }
 }

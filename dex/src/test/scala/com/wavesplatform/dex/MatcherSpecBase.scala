@@ -31,8 +31,8 @@ import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 
-import scala.concurrent.Await
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
@@ -78,6 +78,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   protected def wrapMarketOrder(mo: MarketOrder): QueueEventWithMeta  = wrapEvent(seqNr.incrementAndGet(), QueueEvent.PlacedMarket(mo))
 
   protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
+  protected def awaitResult[A](result: Future[A]): A               = Await.result(result, Duration.Inf)
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)

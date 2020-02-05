@@ -281,7 +281,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   "allAssetsSpendableBalance" in {
 
-    val carol = mkAddress("carol")
+    val carol = mkKeyPair("carol")
 
     broadcastAndAwait(
       mkTransfer(bob, carol, 10.waves, Waves),

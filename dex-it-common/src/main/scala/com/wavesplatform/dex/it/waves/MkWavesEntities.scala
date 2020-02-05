@@ -29,7 +29,7 @@ trait MkWavesEntities {
 
   private def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
 
-  def mkAddress(seed: String): KeyPair = KeyPair(crypto secureHash seed.getBytes(StandardCharsets.UTF_8))
+  def mkKeyPair(seed: String): KeyPair = KeyPair(crypto secureHash seed.getBytes(StandardCharsets.UTF_8))
 
   /**
     * @param feeAsset If specified IssuedAsset, the version will be automatically set to 3

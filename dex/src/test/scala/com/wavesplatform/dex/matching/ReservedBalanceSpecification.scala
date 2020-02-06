@@ -9,6 +9,7 @@ import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -107,6 +108,7 @@ class ReservedBalanceSpecification
             new AddressActor(
               address,
               _ => Future.successful(0L),
+              Future.successful(Map.empty[Asset, Long]),
               ntpTime,
               new TestOrderDB(100),
               _ => Future.successful(false),
@@ -492,6 +494,7 @@ class ReservedBalanceSpecification
               new AddressActor(
                 owner = address,
                 spendableBalance = spendableBalance,
+                Future.successful(Map.empty[Asset, Long]),
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
                 hasOrderInBlockchain = _ => Future.successful(false),

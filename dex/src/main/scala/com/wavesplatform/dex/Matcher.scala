@@ -229,7 +229,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute()
+      MatcherWebSocketRoute(addressActors)
     )
   }
 
@@ -317,6 +317,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
+                wavesBlockchainAsyncClient.allAssetsSpendableBalance(address),
                 time,
                 orderDB,
                 wavesBlockchainAsyncClient.forgedOrder,

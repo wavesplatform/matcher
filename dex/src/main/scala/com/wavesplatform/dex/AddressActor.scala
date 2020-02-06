@@ -11,6 +11,7 @@ import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
+import com.wavesplatform.dex.api.websockets.{Balances, WsBalance}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -37,6 +38,7 @@ import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
                    spendableBalance: Asset => Future[Long],
+                   allAssetsSpendableBalance: => Future[Map[Asset, Long]],
                    time: Time,
                    orderDB: OrderDB,
                    hasOrderInBlockchain: Order.Id => Future[Boolean],
@@ -54,9 +56,10 @@ class AddressActor(owner: Address,
   private var placementQueue  = Queue.empty[Order.Id]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
-  private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
-  private var openVolume   = Map.empty[Asset, Long]
-  private val expiration   = MutableMap.empty[ByteStr, Cancellable]
+  private val activeOrders           = MutableMap.empty[Order.Id, AcceptedOrder]
+  private var openVolume             = Map.empty[Asset, Long]
+  private val expiration             = MutableMap.empty[ByteStr, Cancellable]
+  private val webSocketSubscriptions = scala.collection.mutable.Set.empty[ActorRef]
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
@@ -228,6 +231,14 @@ class AddressActor(owner: Address,
       }
 
     case Status.Failure(e) => log.error(s"Got $e", e)
+
+    case AddWebSocketSubscription =>
+      allAssetsSpendableBalance.map { spendableBalances =>
+        val tradableBalances = spendableBalances |-| openVolume
+        WsBalance(tradableBalances.map { case (a, tb) => a -> Balances(tb, openVolume.getOrElse(a, 0)) })
+      } pipeTo sender
+
+      webSocketSubscriptions += sender
   }
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
@@ -465,6 +476,8 @@ object AddressActor {
     }
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
+
+  case object AddWebSocketSubscription extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)

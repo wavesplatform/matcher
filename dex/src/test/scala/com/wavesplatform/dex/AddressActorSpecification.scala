@@ -203,6 +203,7 @@ class AddressActorSpecification
           new AddressActor(
             address,
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
+            Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) },
             ntpTime,
             EmptyOrderDB,
             _ => Future.successful(false),

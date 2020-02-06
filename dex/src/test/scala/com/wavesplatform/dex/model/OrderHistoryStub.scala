@@ -29,6 +29,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
           new AddressActor(
             ao.order.sender,
             _ => Future.successful(0L),
+            Future.successful(Map.empty[Asset, Long]),
             time,
             new TestOrderDB(100),
             _ => Future.successful(false),

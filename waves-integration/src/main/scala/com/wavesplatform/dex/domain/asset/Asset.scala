@@ -40,7 +40,7 @@ object Asset {
     case _              => JsError("Expected base58-encoded assetId or null")
   }
   implicit val assetIdWrites: Writes[Asset] = Writes {
-    case Waves           => JsNull
+    case Waves           => JsString(WavesName)
     case IssuedAsset(id) => JsString(id.base58)
   }
 

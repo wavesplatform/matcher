@@ -54,7 +54,13 @@ const ui = SwaggerUIBundle({
   layout: "StandaloneLayout",
   operationsSorter: "alpha"
 });
-window.ui = ui;"""
+window.ui = ui;
+
+/* Select HTTPS if you are on HTTPS. "Тот, кто использовал Swagger UI, в цирке не смеется" */
+if ("https" === window.location.protocol.replace(":", "")) {
+  document.querySelector('option[value="https"]').selected = true;
+}
+"""
                   // Careful! ^ will be inserted as one-liner
                   el.text(update)
               }

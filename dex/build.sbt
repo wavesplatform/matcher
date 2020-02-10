@@ -90,6 +90,12 @@ executableScriptName := "waves-dex"
 inConfig(Universal)(
   Seq(
     packageName := s"waves-dex-${version.value}", // An archive file name
+    // Common JVM parameters
+    // -J prefix is required by a parser
+    javaOptions ++= Seq(
+      "-Xmx2g",
+      "-Xms128m",
+    ).map(x => s"-J$x"),
     mappings ++= sbt.IO
       .listFiles((Compile / packageSource).value / "doc")
       .map { file =>
@@ -99,9 +105,11 @@ inConfig(Universal)(
   ))
 
 // DEB package
-Linux / name := s"waves-dex" // A staging directory name
-Linux / normalizedName := (Linux / name).value // An archive file name
-Linux / packageName := (Linux / name).value    // In a control file
+inConfig(Linux)(Seq(
+  name := "waves-dex", // A staging directory name
+  normalizedName := name.value, // An archive file name
+  packageName := name.value // In a control file
+))
 
 inConfig(Debian)(
   Seq(

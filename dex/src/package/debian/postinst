@@ -2,11 +2,11 @@ ${{header}}
 ${{loader-functions}}
 ${{detect-loader}}
 
-config_dir=/etc/${{app_name}}
+install_dir=/usr/share/${{app_name}}
+
+config_dir=$install_dir/conf
 config_file=$config_dir/main.conf
 logback_file=$config_dir/logback.xml
-
-install_dir=/usr/share/${{app_name}}
 
 if [ "$1" = configure ]; then
     # make sure the user exists

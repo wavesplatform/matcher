@@ -13,7 +13,7 @@
     <property name="logback.file.enabled" value="${logback.file.enabled:-false}"/>
     <property name="logback.file.pattern" value="${logback.file.pattern:-${logback.common.pattern}}"/>
     <property name="logback.file.level" value="${logback.file.level:-DEBUG}"/>
-    <property name="logback.file.directory" value="${logback.file.directory:-${waves.directory}/log}"/>
+    <property name="logback.file.directory" value="${logback.file.directory:-${waves.dex.root-directory}/log}"/>
 
     <!-- JRE -->
     <logger name="sun.rmi" level="INFO"/>

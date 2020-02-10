@@ -41,25 +41,32 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                 case Some(el) =>
                   val update =
                     """
+const setHttps = (el, restAttempts) => {
+    if (restAttempts > 0 && !el.selected) {
+        el.selected = true;
+        setTimeout(setHttps.bind(window, el, restAttempts - 1), 50);
+    }
+};
+
 const ui = SwaggerUIBundle({
-  url: "/api-docs/swagger.json",
-  dom_id: '#swagger-ui',
-  presets: [
-    SwaggerUIBundle.presets.apis,
-    SwaggerUIStandalonePreset
-  ],
-  plugins: [
-    SwaggerUIBundle.plugins.DownloadUrl
-  ],
-  layout: "StandaloneLayout",
-  operationsSorter: "alpha"
+    url: "/api-docs/swagger.json",
+    dom_id: '#swagger-ui',
+    presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIStandalonePreset
+    ],
+    plugins: [
+        SwaggerUIBundle.plugins.DownloadUrl
+    ],
+    layout: "StandaloneLayout",
+    operationsSorter: "alpha",
+    onComplete: () => {
+        /* Select HTTPS if you are on HTTPS. "Тот, кто использовал Swagger UI, в цирке не смеется" */
+        if ("https" === window.location.protocol.replace(":", ""))
+            setHttps(document.querySelector('option[value="https"]'), 10);
+    }
 });
 window.ui = ui;
-
-/* Select HTTPS if you are on HTTPS. "Тот, кто использовал Swagger UI, в цирке не смеется" */
-if ("https" === window.location.protocol.replace(":", "")) {
-  document.querySelector('option[value="https"]').selected = true;
-}
 """
                   // Careful! ^ will be inserted as one-liner
                   el.text(update)

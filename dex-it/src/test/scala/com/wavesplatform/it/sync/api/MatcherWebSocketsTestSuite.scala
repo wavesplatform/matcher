@@ -17,7 +17,10 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase {
     implicit val system: ActorSystem        = ActorSystem()
     implicit val materializer: Materializer = Materializer.matFromSystem(system)
 
-    val sink: Sink[Message, Future[Done]] = Sink.foreach { case message: TextMessage.Strict => message.text should startWith("Now is") }
+    val sink: Sink[Message, Future[Done]] = Sink.foreach {
+      case message: TextMessage.Strict => message.text should startWith("Now is")
+      case e                           => log.error(s"Impossible: $e")
+    }
 
     // using Source.maybe materializes into a promise
     // which will allow us to complete the source later

@@ -58,9 +58,11 @@ inConfig(Universal)(
 )
 
 // DEB package
-Linux / name := s"waves-dex-extension${network.value.packageSuffix}" // A staging directory name
-Linux / normalizedName := (Linux / name).value // An archive file name
-Linux / packageName := (Linux / name).value    // In a control file
+inConfig(Linux)(Seq(
+  name := s"waves-dex-extension${network.value.packageSuffix}", // A staging directory name
+  normalizedName := name.value, // An archive file name
+  packageName := name.value // In a control file
+))
 
 Debian / debianPackageConflicts := Seq(
   "grpc-server",

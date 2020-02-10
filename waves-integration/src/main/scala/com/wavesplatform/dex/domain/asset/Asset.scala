@@ -35,12 +35,12 @@ object Asset {
   }
 
   implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => assetReads.reads(json)
+    case json: JsString => if (json.value == WavesName) JsSuccess(Waves) else assetReads.reads(json)
     case JsNull         => JsSuccess(Waves)
     case _              => JsError("Expected base58-encoded assetId or null")
   }
   implicit val assetIdWrites: Writes[Asset] = Writes {
-    case Waves           => JsNull
+    case Waves           => JsString(WavesName)
     case IssuedAsset(id) => JsString(id.base58)
   }
 

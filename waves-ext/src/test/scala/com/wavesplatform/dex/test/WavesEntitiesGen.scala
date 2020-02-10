@@ -23,8 +23,11 @@ trait WavesEntitiesGen {
 
   val keyPairGen: Gen[KeyPair]     = bytes32gen.map(xs => KeyPair(ByteStr(xs)))
   val publicKeyGen: Gen[PublicKey] = keyPairGen.map(x => x)
-  val assetPairGen: Gen[AssetPair] = Gen.zip(assetGen, assetGen).map(Function.tupled(AssetPair.apply))
-  val timestampGen: Gen[Long]      = Gen.choose(1, Long.MaxValue - Order.MaxLiveTime)
+  val assetPairGen: Gen[AssetPair] = Gen.zip(issuedAssetGen, assetGen).map {
+    case (asset1, Waves)  => AssetPair(asset1, Waves)
+    case (asset1, asset2) => if (asset1 == asset2) AssetPair(asset1, Waves) else AssetPair(asset1, asset2)
+  }
+  val timestampGen: Gen[Long] = Gen.choose(1, Long.MaxValue - Order.MaxLiveTime)
 
   val orderSideGen: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
   val orderAmountGen: Gen[Long]    = Gen.choose(1, 1000L)

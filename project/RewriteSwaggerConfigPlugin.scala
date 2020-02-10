@@ -41,10 +41,13 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                 case Some(el) =>
                   val update =
                     """
-const setHttps = (el, restAttempts) => {
-    if (restAttempts > 0 && !el.selected) {
-        el.selected = true;
-        setTimeout(setHttps.bind(window, el, restAttempts - 1), 50);
+const setHttps = function (el, restAttempts) {
+    if (restAttempts != 0) {
+        /* otherwise we get double "amp" */
+        if (!el.selected) {
+          el.selected = true;
+          setTimeout(setHttps.bind(window, el, restAttempts - 1), 50);
+        }
     }
 };
 
@@ -60,7 +63,7 @@ const ui = SwaggerUIBundle({
     ],
     layout: "StandaloneLayout",
     operationsSorter: "alpha",
-    onComplete: () => {
+    onComplete: function () {
         /* Select HTTPS if you are on HTTPS. "Тот, кто использовал Swagger UI, в цирке не смеется" */
         if ("https" === window.location.protocol.replace(":", ""))
             setHttps(document.querySelector('option[value="https"]'), 10);

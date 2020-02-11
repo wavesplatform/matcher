@@ -15,14 +15,28 @@ import scala.collection.mutable
 class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] val asks: Side, private[OrderBook] var lastTrade: Option[LastTrade]) {
   import OrderBook._
 
+  private val orderIds: mutable.Map[Order.Id, Price] = {
+    val xs = for {
+      (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
+      lo <- level
+    } yield lo.order.id() -> price
+
+    val r = mutable.Map.newBuilder[Order.Id, Price]
+    xs.foreach { x =>
+      r += x
+    }
+    r.result()
+  }
+
+  // Only for tests, do not use in production
   private[model] def getBids: Side = bids
   private[model] def getAsks: Side = asks
 
-  def bestBid: Option[LevelAgg]       = bids.aggregated.headOption
-  def bestAsk: Option[LevelAgg]       = asks.aggregated.headOption
+  def bestBid: Option[LevelAgg]       = bids.bestLevel
+  def bestAsk: Option[LevelAgg]       = asks.bestLevel
   def getLastTrade: Option[LastTrade] = lastTrade
 
-  def allOrders: Iterable[(Long, LimitOrder)] = {
+  def allOrders: Iterable[(Price, LimitOrder)] = {
     for {
       (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
       lo             <- level

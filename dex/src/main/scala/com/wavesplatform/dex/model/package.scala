@@ -39,5 +39,6 @@ package object model {
     }
 
     def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
+    def bestLevel: Option[LevelAgg] = aggregated.headOption
   }
 }

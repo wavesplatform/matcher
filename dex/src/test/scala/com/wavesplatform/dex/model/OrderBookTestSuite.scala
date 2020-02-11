@@ -21,7 +21,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.{SortedSet, mutable}
 
-class OrderBookSpec
+class OrderBookTestSuite
     extends AnyFreeSpec
     with PropertyChecks
     with Matchers

@@ -1,30 +1,22 @@
 package com.wavesplatform.dex.model
 
-import java.nio.ByteBuffer
-
-import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.OrderBook.LastTrade
 import com.wavesplatform.dex.settings.MatchingRule
-import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Try
 
-class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
-                         private[OrderBook] val asks: OrderBook.Side,
-                         private[OrderBook] var lastTrade: Option[LastTrade]) {
+class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] val asks: Side, private[OrderBook] var lastTrade: Option[LastTrade]) {
   import OrderBook._
 
-  private[model] def getBids: OrderBook.Side = bids
-  private[model] def getAsks: OrderBook.Side = asks
+  private[model] def getBids: Side = bids
+  private[model] def getAsks: Side = asks
 
   def bestBid: Option[LevelAgg]       = bids.aggregated.headOption
   def bestAsk: Option[LevelAgg]       = asks.aggregated.headOption
@@ -66,155 +58,13 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side,
     events.reverse
   }
 
-  def snapshot: Snapshot                     = Snapshot(bids.toMap, asks.toMap, lastTrade)
-  def aggregatedSnapshot: AggregatedSnapshot = AggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
+  def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids.toMap, asks.toMap, lastTrade)
+  def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 }
 
 object OrderBook {
-
-  type Level        = Vector[LimitOrder]
-  type Side         = mutable.TreeMap[Price, Level]
-  type SideSnapshot = Map[Price, Seq[LimitOrder]]
-
-  object SideSnapshot {
-
-    def serialize(dest: mutable.ArrayBuilder[Byte], snapshot: SideSnapshot): Unit = {
-      dest ++= Ints.toByteArray(snapshot.size)
-      snapshot.foreach {
-        case (price, xs) =>
-          dest ++= Longs.toByteArray(price)
-          dest ++= Ints.toByteArray(xs.size)
-          xs.foreach(serialize(dest, _))
-      }
-    }
-
-    def fromBytes(bb: ByteBuffer): SideSnapshot = {
-      val snapshotSize = bb.getInt
-      val r            = Map.newBuilder[Price, Seq[LimitOrder]]
-      (1 to snapshotSize).foreach { _ =>
-        val price       = bb.getLong
-        val levelSize   = bb.getInt
-        val limitOrders = (1 to levelSize).map(_ => loFromBytes(bb))
-        r += price -> limitOrders
-      }
-      r.result()
-    }
-
-    def serialize(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
-
-      dest ++= lo.order.orderType.bytes
-      dest ++= Longs.toByteArray(lo.amount)
-      dest ++= Longs.toByteArray(lo.fee)
-      dest += lo.order.version
-
-      val orderBytes = lo.order.bytes()
-
-      dest ++= Ints.toByteArray(orderBytes.length)
-      dest ++= orderBytes
-    }
-
-    def loFromBytes(bb: ByteBuffer): LimitOrder = {
-
-      val orderType = OrderType(bb.get)
-      val amount    = bb.getLong
-      val fee       = bb.getLong
-      val version   = bb.get
-      val order     = Order.fromBytes(version, bb.getBytes)
-
-      orderType match {
-        case OrderType.SELL => SellLimitOrder(amount, fee, order)
-        case OrderType.BUY  => BuyLimitOrder(amount, fee, order)
-      }
-    }
-  }
-
-  case class LastTrade(price: Long, amount: Long, side: OrderType)
-  object LastTrade {
-
-    implicit val orderTypeFormat: Format[OrderType] = Format(
-      {
-        case JsNumber(x) => Try(OrderType(x.toIntExact)).fold(e => JsError(s"Can't deserialize $x as OrderType: ${e.getMessage}"), JsSuccess(_))
-        case x           => JsError(s"Can't deserialize $x as OrderType")
-      },
-      x => JsNumber(x.bytes.head.toInt)
-    )
-
-    implicit val format: Format[LastTrade] = Json.format[LastTrade]
-
-    def serialize(dest: mutable.ArrayBuilder[Byte], x: LastTrade): Unit = {
-      dest ++= Longs.toByteArray(x.price)
-      dest ++= Longs.toByteArray(x.amount)
-      dest ++= x.side.bytes
-    }
-
-    def fromBytes(bb: ByteBuffer): LastTrade = LastTrade(bb.getLong, bb.getLong, OrderType(bb.get))
-  }
-
-  case class Snapshot(bids: SideSnapshot, asks: SideSnapshot, lastTrade: Option[LastTrade])
-  object Snapshot {
-
-    val empty: Snapshot = Snapshot(bids = Map.empty, asks = Map.empty, None)
-
-    def serialize(dest: mutable.ArrayBuilder[Byte], x: Snapshot): Unit = {
-      SideSnapshot.serialize(dest, x.bids)
-      SideSnapshot.serialize(dest, x.asks)
-      x.lastTrade match {
-        case None => dest += 0
-        case Some(lastTrade) =>
-          dest += 1
-          LastTrade.serialize(dest, lastTrade)
-      }
-    }
-
-    def fromBytes(bb: ByteBuffer): Snapshot =
-      Snapshot(
-        SideSnapshot.fromBytes(bb),
-        SideSnapshot.fromBytes(bb),
-        bb.get match {
-          case 0 => None
-          case 1 => Some(LastTrade.fromBytes(bb))
-          case x => throw new RuntimeException(s"Can't deserialize Option as $x")
-        }
-      )
-  }
-
-  case class AggregatedSnapshot(bids: Seq[LevelAgg] = Seq.empty, asks: Seq[LevelAgg] = Seq.empty) {
-    def getSideFor(acceptedOrder: AcceptedOrder): Seq[LevelAgg]        = if (acceptedOrder.isBuyOrder) bids else asks
-    def getCounterSideFor(acceptedOrder: AcceptedOrder): Seq[LevelAgg] = if (acceptedOrder.isBuyOrder) asks else bids
-  }
-
-  implicit class SideExt(val side: Side) extends AnyVal {
-
-    /** Returns the best limit order in this side and the price of its level */
-    def best: Option[(LimitOrder, Price)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(_ -> levelPrice) }
-
-    final def removeBest(): LimitOrder = side.headOption match {
-      case l if l.forall(_._2.isEmpty) => throw new IllegalArgumentException("Cannot remove the best element from an empty level")
-      case Some((price, level)) =>
-        if (level.length == 1) side -= price
-        else side += price -> level.tail
-        level.head
-    }
-
-    def replaceBest(newBest: LimitOrder): Side = {
-      require(side.nonEmpty, "Cannot replace the best level of an empty side")
-      val (price, level) = side.head
-      require(level.nonEmpty, "Cannot replace the best element of an empty level")
-      side += (price -> (newBest +: level.tail))
-    }
-
-    def remove(price: Price, orderId: ByteStr): LimitOrder = {
-      val (toRemove, toKeep) = side.getOrElse(price, Vector.empty).partition(_.order.id() == orderId)
-      require(toRemove.nonEmpty, s"Order $orderId not found at $price")
-      if (toKeep.isEmpty) side -= price else side += price -> toKeep
-
-      toRemove.head
-    }
-
-    def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
-  }
 
   /** Returns true if submitted buy order can be matched with counter sell order */
   private object canMatchBuy extends ((Long, Long) => Boolean) {
@@ -356,17 +206,17 @@ object OrderBook {
       (__ \ "order").format[Order])(limitOrder, (lo: LimitOrder) => (lo.amount, lo.fee, lo.order))
   )
 
-  implicit val priceMapFormat: Format[SideSnapshot] =
+  implicit val priceMapFormat: Format[OrderBookSideSnapshot] =
     implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
       _.map { case (k, v) => k.toLong   -> v },
       _.map { case (k, v) => k.toString -> v }
     )
 
-  implicit val snapshotFormat: Format[OrderBook.Snapshot] = Json.format
+  implicit val snapshotFormat: Format[OrderBookSnapshot] = Json.format
 
   def empty(): OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
 
-  private def transformSide(side: SideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
+  private def transformSide(side: OrderBookSideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     val bidMap = mutable.TreeMap.empty[Price, Level](ordering)
     for ((p, level) <- side) {
       val v = Vector.newBuilder[LimitOrder]
@@ -380,7 +230,7 @@ object OrderBook {
     bidMap
   }
 
-  def apply(snapshot: Snapshot): OrderBook =
+  def apply(snapshot: OrderBookSnapshot): OrderBook =
     new OrderBook(transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
                   transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
                   snapshot.lastTrade)

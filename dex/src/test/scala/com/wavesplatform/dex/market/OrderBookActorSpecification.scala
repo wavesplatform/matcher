@@ -15,7 +15,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
-import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.market.OrderBookActor.{Snapshot => _, _}
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
@@ -35,13 +35,13 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
+  private val obc = new ConcurrentHashMap[AssetPair, OrderBookAggregatedSnapshot]
   private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
 
-  private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
+  private def update(ap: AssetPair)(snapshot: OrderBookAggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => ()) { (pair, actor, probe) =>
@@ -99,7 +99,7 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBook.Snapshot.empty))
+      obsdb.update(p, 50, Some(OrderBookSnapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }

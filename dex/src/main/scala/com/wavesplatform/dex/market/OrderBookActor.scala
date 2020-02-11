@@ -12,7 +12,7 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBook
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
-import com.wavesplatform.dex.model.OrderBook.LastTrade
+import com.wavesplatform.dex.model.LastTrade
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
@@ -29,7 +29,7 @@ class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
                      snapshotStore: ActorRef,
                      assetPair: AssetPair,
-                     updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
+                     updateSnapshot: OrderBookAggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
@@ -102,7 +102,7 @@ class OrderBookActor(owner: ActorRef,
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
-              updateSnapshot(OrderBook.AggregatedSnapshot())
+              updateSnapshot(OrderBookAggregatedSnapshot.empty)
               processEvents(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
@@ -185,7 +185,7 @@ object OrderBookActor {
             addressActor: ActorRef,
             snapshotStore: ActorRef,
             assetPair: AssetPair,
-            updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
+            updateSnapshot: OrderBookAggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
@@ -232,7 +232,7 @@ object OrderBookActor {
     def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.getLastTrade, ob.bestBid, ob.bestAsk)
   }
 
-  case class Snapshot(eventNr: Option[Long], orderBook: OrderBook.Snapshot)
+  case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)
 
   // Internal messages
   case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])

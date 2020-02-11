@@ -21,7 +21,6 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
@@ -131,7 +130,7 @@ class OrderValidatorSpecification
       "order exists" in {
 
         val pk = KeyPair(randomBytes())
-        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true, _ => OrderBook.AggregatedSnapshot())(_)
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true, _ => OrderBookAggregatedSnapshot.empty)(_)
 
         ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
       }
@@ -625,7 +624,7 @@ class OrderValidatorSpecification
         val enoughBalance = Map[Asset, Long](Waves -> 1000.waves, btc -> 10.btc, eth -> 500.eth)
 
         val orderBook =
-          AggregatedSnapshot(
+          OrderBookAggregatedSnapshot(
             asks = Seq(
               LevelAgg(amount = 32.waves, price = 0.00011842.btc), // buy part of level, value = 11 * 0.00011842 = 0.00130262.btc, remain to execute =  11 - 11 =  0
               LevelAgg(amount = 23.waves, price = 0.00011825.btc), // buy whole level,   value = 23 * 0.00011825 = 0.00271975.btc, remain to execute =  34 - 23 = 11
@@ -952,9 +951,9 @@ class OrderValidatorSpecification
       orderStatus: ByteStr => Boolean = _ => false,
       o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBook.AggregatedSnapshot())(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
-  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: AggregatedSnapshot)(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = {
+  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = {
     order =>
       OrderValidator.accountStateAware(
         sender = order.sender.toAddress,

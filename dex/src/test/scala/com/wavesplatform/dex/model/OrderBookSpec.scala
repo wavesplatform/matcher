@@ -9,7 +9,6 @@ import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderExecuted}
-import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Snapshot}
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTPTime
@@ -372,16 +371,16 @@ class OrderBookSpec
 
   "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
-    SideSnapshot.serialize(dest, x)
+    OrderBookSideSnapshot.serialize(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    SideSnapshot.loFromBytes(bb) shouldBe x
+    OrderBookSideSnapshot.loFromBytes(bb) shouldBe x
   }
 
-  "SideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
+  "OrderBookSideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
-    SideSnapshot.serialize(dest, x)
+    OrderBookSideSnapshot.serialize(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    SideSnapshot.fromBytes(bb) shouldBe x
+    OrderBookSideSnapshot.fromBytes(bb) shouldBe x
   }
 
   "LastTrade serialization" in forAll(lastTradeGen) { x =>
@@ -391,11 +390,11 @@ class OrderBookSpec
     LastTrade.fromBytes(bb) shouldBe x
   }
 
-  "Snapshot serialization" in forAll(snapshotGen) { x =>
+  "OrderBookSnapshot serialization" in forAll(snapshotGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
-    Snapshot.serialize(dest, x)
+    OrderBookSnapshot.serialize(dest, x)
     val bb       = ByteBuffer.wrap(dest.result())
-    val restored = Snapshot.fromBytes(bb)
+    val restored = OrderBookSnapshot.fromBytes(bb)
     restored.asks shouldBe x.asks
     restored.bids shouldBe x.bids
     restored.lastTrade shouldBe x.lastTrade
@@ -470,7 +469,7 @@ class OrderBookSpec
   private val sellLevelGen: Gen[Vector[SellLimitOrder]] =
     Gen.containerOf[Vector, SellLimitOrder](sellLimitOrderGenerator)
 
-  private val asksGen: Gen[SideSnapshot] = for {
+  private val asksGen: Gen[OrderBookSideSnapshot] = for {
     n      <- Gen.choose(0, 10)
     levels <- Gen.containerOfN[Vector, Vector[SellLimitOrder]](n, sellLevelGen)
     prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
@@ -479,7 +478,7 @@ class OrderBookSpec
   private val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
     Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
 
-  private val bidsGen: Gen[SideSnapshot] = for {
+  private val bidsGen: Gen[OrderBookSideSnapshot] = for {
     n      <- Gen.choose(0, 10)
     levels <- Gen.containerOfN[Vector, Vector[BuyLimitOrder]](n, buyLevelGen)
     prices <- Gen.containerOfN[Vector, Long](n, Gen.choose(1, 1000L))
@@ -491,11 +490,11 @@ class OrderBookSpec
     orderType <- orderTypeGenerator
   } yield LastTrade(price, amount, orderType)
 
-  private val snapshotGen: Gen[Snapshot] = for {
+  private val snapshotGen: Gen[OrderBookSnapshot] = for {
     asks      <- asksGen
     bids      <- bidsGen
     lastTrade <- Gen.option(lastTradeGen)
-  } yield Snapshot(bids, asks, lastTrade)
+  } yield OrderBookSnapshot(bids, asks, lastTrade)
 
-  private val sideSnapshotSerGen: Gen[SideSnapshot] = Gen.oneOf(asksGen, bidsGen)
+  private val sideSnapshotSerGen: Gen[OrderBookSideSnapshot] = Gen.oneOf(asksGen, bidsGen)
 }

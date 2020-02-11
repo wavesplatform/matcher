@@ -59,7 +59,7 @@ class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPT
           getAssetDecimals,
           _ =>
             Some(
-              OrderBook.AggregatedSnapshot(
+              OrderBookAggregatedSnapshot(
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
               )

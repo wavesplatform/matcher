@@ -7,7 +7,7 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized, Normalized}
-import com.wavesplatform.dex.model.{OrderBook, OrderBookResult}
+import com.wavesplatform.dex.model.{OrderBookAggregatedSnapshot, OrderBookResult}
 import com.wavesplatform.dex.time.Time
 import kamon.Kamon
 
@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 class OrderBookSnapshotHttpCache(settings: Settings,
                                  time: Time,
                                  assetDecimals: Asset => Option[Int],
-                                 orderBookSnapshot: AssetPair => Option[OrderBook.AggregatedSnapshot])
+                                 orderBookSnapshot: AssetPair => Option[OrderBookAggregatedSnapshot])
     extends AutoCloseable {
   import OrderBookSnapshotHttpCache._
 
@@ -41,7 +41,7 @@ class OrderBookSnapshotHttpCache(settings: Settings,
               case _ => None
             }
 
-            val orderBook = orderBookSnapshot(key.pair) getOrElse { OrderBook.AggregatedSnapshot() }
+            val orderBook = orderBookSnapshot(key.pair) getOrElse { OrderBookAggregatedSnapshot.empty }
 
             val entity =
               OrderBookResult(

@@ -39,7 +39,7 @@ class AddressActor(owner: Address,
                    orderDB: OrderDB,
                    hasOrderInBlockchain: Order.Id => Future[Boolean],
                    store: StoreEvent,
-                   orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
+                   orderBookCache: AssetPair => OrderBookAggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)

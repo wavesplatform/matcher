@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBook}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.BeforeAndAfterAll
@@ -199,7 +199,7 @@ class AddressActorSpecification
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          _ => OrderBook.AggregatedSnapshot(),
+          _ => OrderBookAggregatedSnapshot.empty,
           false,
           spendableBalancesActor
         )

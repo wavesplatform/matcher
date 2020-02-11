@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
-import com.wavesplatform.dex.model.{OrderBook, OrderInfo}
+import com.wavesplatform.dex.model.{OrderInfo, OrderBookSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 
 import scala.collection.mutable
@@ -100,14 +100,14 @@ object MatcherKeys {
     Key.opt("matcher-ob-snapshot-offset", bytes(OrderBookSnapshotOffsetPrefix, pair.bytes), Longs.fromByteArray, Longs.toByteArray)
 
   val OrderBookSnapshotPrefix: Short = 25
-  def orderBookSnapshot(pair: AssetPair): Key[Option[OrderBook.Snapshot]] =
+  def orderBookSnapshot(pair: AssetPair): Key[Option[OrderBookSnapshot]] =
     Key.opt(
       "matcher-ob-snapshot",
       bytes(OrderBookSnapshotPrefix, pair.bytes),
-      xs => OrderBook.Snapshot.fromBytes(ByteBuffer.wrap(xs)),
+      xs => OrderBookSnapshot.fromBytes(ByteBuffer.wrap(xs)),
       x => {
         val r = new mutable.ArrayBuilder.ofByte
-        OrderBook.Snapshot.serialize(r, x)
+        OrderBookSnapshot.serialize(r, x)
         r.result()
       }
     )

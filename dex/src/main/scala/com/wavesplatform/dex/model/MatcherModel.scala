@@ -181,15 +181,9 @@ sealed trait LimitOrder extends AcceptedOrder {
 }
 
 object LimitOrder {
-
-  def apply(o: Order): LimitOrder = {
-
-    val pf = AcceptedOrder.partialFee(o.matcherFee, o.amount, o.amount)
-
-    o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(o.amount, pf, o)
-      case OrderType.SELL => SellLimitOrder(o.amount, pf, o)
-    }
+  def apply(o: Order): LimitOrder = o.orderType match {
+    case OrderType.BUY  => BuyLimitOrder(o.amount, o.matcherFee, o)
+    case OrderType.SELL => SellLimitOrder(o.amount, o.matcherFee, o)
   }
 }
 

@@ -66,26 +66,40 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
       ))
 
     val obBefore    = format(ob)
-    val coinsBefore = countCoins(ob) // |+| newOrder.requiredBalance
+    val coinsBefore = countCoins(ob) |+| newOrder.requiredBalance // do not change
     val events      = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
     val eventsDiff = Monoid.combineAll(events.map {
       case evt: Events.OrderExecuted =>
-        val submittedSpent   = Map(evt.submitted.spentAsset -> evt.submitted.order.getSpendAmount(evt.executedAmount, evt.counter.price).right.get)
-        val submittedReceive = Map(evt.submitted.rcvAsset   -> evt.submitted.order.getReceiveAmount(evt.executedAmount, evt.counter.price).right.get)
+        val price            = evt.counter.price
+        val submittedSpent   = Map(evt.submitted.spentAsset -> evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)
+        val submittedReceive = Map(evt.submitted.rcvAsset -> evt.submitted.order.getReceiveAmount(evt.executedAmount, price).right.get)
 
-        val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, evt.counter.price).right.get)
-        val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, evt.counter.price).right.get)
+        val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
+        val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
 
         submittedSpent should matchTo(counterReceive)
         counterSpent should matchTo(submittedReceive)
+
+        val compensaction = newOrder.partial(evt.executedAmount, evt.submittedExecutedFee).requiredBalance
+        println(s"""
+submittedReceive:
+${submittedReceive.mkString("\n")}
+
+counterReceive:
+${counterReceive.mkString("\n")}
+
+compensation:
+${compensaction.mkString("\n")}
+"""
+)
 
         Monoid.combineAll(
           Seq(
             Group.inverse(
               Monoid.combineAll(
                 Seq(
-                  newOrder.partial(evt.executedAmount, evt.submittedExecutedFee).requiredBalance
+                  compensaction
 //                  Map(newOrder.spentAsset -> newOrder.order.getSpendAmount(evt.executedAmount, newOrder.price).right.get),
 //                  Map(newOrder.feeAsset -> AcceptedOrder.partialFee(newOrder.order.matcherFee, newOrder.order.amount, evt.executedAmount)),
 
@@ -94,23 +108,24 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 //                  counterSpent,
 //                  Map(evt.counter.feeAsset -> evt.counterExecutedFee)
                 ))),
-//            submittedReceive, //Map(evt.submitted.rcvAsset -> evt.submitted.receiveAmount),
-//            counterReceive,
+            submittedReceive, //Map(evt.submitted.rcvAsset -> evt.submitted.receiveAmount),
+            counterReceive,
             // Matcher's fee
 //            Map(evt.submitted.feeAsset -> evt.submittedExecutedFee),
 //            Map(evt.counter.feeAsset   -> evt.counterExecutedFee)
           ))
 
       case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
-      case evt: Events.OrderAdded      => Group.inverse(
-        evt.order.requiredBalance
+      case evt: Events.OrderAdded =>
+        Group.inverse(
+          evt.order.requiredBalance
 //        Monoid.combineAll(
 //          Seq(
 //            Map(newOrder.spentAsset -> newOrder.order.getSpendAmount(evt.order.amount, newOrder.price).right.get),
 //            Map(newOrder.feeAsset -> AcceptedOrder.partialFee(newOrder.order.matcherFee, newOrder.order.amount, evt.order.amount))
 //          )
 //        )
-      ) // Map.empty[Asset, Long]
+        ) // Map.empty[Asset, Long]
     })
 
     // TODO find order in order book and compensate
@@ -135,6 +150,9 @@ ${format(ob)}
 
 Events:
 ${events.mkString("\n")}
+
+Events diff:
+${eventsDiff.mkString("\n")}
 
 Diff:
 ${diff.mkString("\n")}
@@ -207,6 +225,7 @@ ${formatSide(x.getAsks)}
 Bids:
 ${formatSide(x.getBids)}"""
 
-  private def format(x: LimitOrder): String = s"""LimitOrder(a=${x.amount}, f=${x.fee}, ${format(x.order)})"""
-  private def format(x: Order): String      = s"""Order(${x.idStr()}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
+  private def format(x: LimitOrder): String =
+    s"""LimitOrder(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, spt=${x.spentAmount})"""
+  private def format(x: Order): String = s"""Order(${x.idStr()}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
 }

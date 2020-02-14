@@ -53,71 +53,86 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
     limitOrderGen(orderGen(allPricesGen, x))
   }
 
-  "coins invariant" in forAll(
-    Gen.listOfN(3, askLimitOrderGen),
-    Gen.listOfN(3, bidLimitOrderGen),
-    limitOrderGen
-  ) { (askOrders, bidOrders, newOrder) =>
-    val ob = OrderBook(
-      OrderBookSnapshot(
-        bidOrders.groupBy(_.order.price),
-        askOrders.groupBy(_.order.price),
-        lastTrade = None
-      ))
+  private val invariantTestGen = for {
+    askOrders <- Gen.listOfN(3, askLimitOrderGen)
+    bidOrders <- Gen.listOfN(3, bidLimitOrderGen)
+    newOrder  <- limitOrderGen //limitOrderGen(orderGen(askOrders.map(_.order.price).toVector.min, OrderType.BUY)) // TODO limitOrderGen
+  } yield (askOrders, bidOrders, newOrder)
 
-    val obBefore    = format(ob)
-    val coinsBefore = countCoins(ob) |+| newOrder.requiredBalance // do not change
-    val events      = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+  "coins invariant" in forAll(invariantTestGen) {
+    case (askOrders, bidOrders, newOrder) =>
+      val ob = OrderBook(
+        OrderBookSnapshot(
+          bidOrders.groupBy(_.order.price),
+          askOrders.groupBy(_.order.price),
+          lastTrade = None
+        ))
 
-    val eventsDiff = Monoid.combineAll(events.map {
-      case evt: Events.OrderExecuted =>
-        val price            = evt.counter.price
-        val submittedSpent   = Map(evt.submitted.spentAsset -> evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)
-        val submittedReceive = Map(evt.submitted.rcvAsset -> evt.submitted.order.getReceiveAmount(evt.executedAmount, price).right.get)
+      val obBefore    = format(ob)
+      val coinsBefore = countCoins(ob) |+| newOrder.requiredBalance // do not change
+      val events      = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
-        val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
-        val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
+      val eventsDiff = Monoid.combineAll(events.map {
+        case evt: Events.OrderExecuted =>
+          // remaining
 
-        submittedSpent should matchTo(counterReceive)
-        counterSpent should matchTo(submittedReceive)
+          val price            = evt.counter.price
+          val submittedSpent   = Map(evt.submitted.spentAsset -> evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)
+          val submittedReceive = Map(evt.submitted.rcvAsset -> evt.submitted.order.getReceiveAmount(evt.executedAmount, price).right.get)
+          val submittedSpentFee =
+            Map(evt.submitted.feeAsset -> AcceptedOrder.partialFee(evt.submitted.order.matcherFee, evt.submitted.order.amount, evt.executedAmount))
 
-        println(s"""
+          val submittedCompensation = Map(
+            evt.submitted.spentAsset -> (
+              evt.submitted.order.getSpendAmount(evt.executedAmount, evt.submitted.order.price).right.get -
+                evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
+              ))
+
+          val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
+          val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
+          val counterSpentFee =
+            Map(evt.counter.feeAsset -> AcceptedOrder.partialFee(evt.counter.order.matcherFee, evt.counter.order.amount, evt.executedAmount))
+
+          submittedSpent should matchTo(counterReceive)
+          counterSpent should matchTo(submittedReceive)
+
+          println(s"""
 submittedReceive:
 ${submittedReceive.mkString("\n")}
 
 counterReceive:
 ${counterReceive.mkString("\n")}
 
-evt.submitted.spentAmount:
+evt.submitted.order.spentAmount:
 ${evt.submitted.spentAsset} -> ${evt.submitted.spentAmount}
 
-evt.submitted.order.getSpendAmount(evt.executedAmount, price):
-${evt.submitted.spentAsset} -> ${evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get}
+evt.submitted.spentAmount :
+${evt.submitted.spentAsset} -> ${evt.submitted.spentAmount}
 """)
 
-        Monoid.combineAll(
-          Seq(
-            Map(evt.submitted.spentAsset -> (evt.submitted.spentAmount - evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)) ,
-            submittedReceive,
-            Map(evt.submitted.feeAsset -> evt.submitted.requiredFee),
-            counterReceive,
-            Map(evt.counter.feeAsset -> evt.counter.requiredFee)
-          ))
+          Monoid.combineAll(
+            Seq(
+              submittedReceive,
+              submittedSpentFee,
+              submittedCompensation,
+              counterReceive,
+              counterSpentFee
+            ))
 
-      case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
-      case evt: Events.OrderAdded    =>
-        // Group.inverse(evt.order.requiredBalance)
-        Map.empty[Asset, Long] //
-    })
+        case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
+        case evt: Events.OrderAdded    =>
+          // Group.inverse(evt.order.requiredBalance)
+          Map.empty[Asset, Long] //
+      })
 
-    // TODO find order in order book and compensate
-    //val updatedOrder = ob.allOrders.map(_._2).find(_.order.id() == newOrder.order.id()).get
+      // TODO find order in order book and compensate
+      //val updatedOrder = ob.allOrders.map(_._2).find(_.order.id() == newOrder.order.id()).get
 
-    val coinsAfter = countCoins(ob) |+| eventsDiff // |+| (newOrder.requiredBalance |-| updatedOrder.requiredBalance)
+      val coinsAfter = countCoins(ob) |+| eventsDiff // |+| (newOrder.requiredBalance |-| updatedOrder.requiredBalance)
 
-    val diff = coinsAfter |-| coinsBefore
-    val clue =
-      s"""
+      val diff = coinsAfter |-| coinsBefore
+      val clue =
+        s"""
 Pair:
 $assetPair
 
@@ -140,9 +155,9 @@ Diff:
 ${diff.mkString("\n")}
 """
 
-    withClue(clue) {
-      coinsBefore should matchTo(coinsAfter)
-    }
+      withClue(clue) {
+        coinsBefore should matchTo(coinsAfter)
+      }
   }
 
   private def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
@@ -170,9 +185,9 @@ ${diff.mkString("\n")}
         // In both cases we get same condition (20 here to escape cases when sum > Long.MaxValue):
         // amount: 1 <= amount * price / PriceConstant <= Long.MaxValue / 20
         // TODO
-        //val maxValue = BigInt(Long.MaxValue / 20) * Order.PriceConstant / price
-        //Gen.chooseNum(minAmount(price), maxValue.min(Long.MaxValue / 20).toLong)
-        Gen.const(minAmount(price))
+        val maxValue = BigInt(Long.MaxValue / 20) * Order.PriceConstant / price
+        Gen.chooseNum(minAmount(price), 100) //maxValue.min(Long.MaxValue / 20).toLong)
+        //Gen.const(minAmount(price))
       }
       version <- if (feeAsset == Waves) Gen.choose[Byte](1, 3) else Gen.const(3: Byte)
     } yield

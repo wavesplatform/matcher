@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.db.TestOrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
@@ -9,8 +8,10 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.dex.time.Time
+import com.wavesplatform.dex.{AddressActor, SpendableBalancesActor}
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time) {
@@ -18,8 +19,9 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
     override def assetDecimals(asset: Asset): Int = 8
   }
 
-  private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
-  private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
+  private val refs                  = mutable.AnyRefMap.empty[Address, ActorRef]
+  private val orders                = mutable.AnyRefMap.empty[ByteStr, Address]
+  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]))))
 
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
@@ -29,13 +31,13 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
           new AddressActor(
             ao.order.sender,
             _ => Future.successful(0L),
-            Future.successful(Map.empty[Asset, Long]),
             time,
             new TestOrderDB(100),
             _ => Future.successful(false),
             e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
             _ => OrderBook.AggregatedSnapshot(),
-            true
+            true,
+            spendableBalanceActor
           )
         )
       )

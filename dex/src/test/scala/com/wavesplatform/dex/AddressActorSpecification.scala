@@ -30,12 +30,13 @@ class AddressActorSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
-    with NTPTime {
+    with NTPTime
+    with MatcherSpecBase {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
-  private val assetId    = ByteStr("asset".getBytes("utf-8"))
-  private val matcherFee = 30000L
+  private val assetId     = ByteStr("asset".getBytes("utf-8"))
+  override val matcherFee = 30000L
 
   private val sellTokenOrder1 = OrderV1(
     sender = privateKey("test"),
@@ -197,13 +198,21 @@ class AddressActorSpecification
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address          = addr("test")
 
+    def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
+      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) }
+    }
+
+    val spendableBalancesActor =
+      system.actorOf(
+        Props(new SpendableBalancesActor(allAssetsSpendableBalance)(scala.concurrent.ExecutionContext.Implicits.global))
+      )
+
     val addressActor =
       system.actorOf(
         Props(
           new AddressActor(
             address,
             x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
-            Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) },
             ntpTime,
             EmptyOrderDB,
             _ => Future.successful(false),
@@ -212,7 +221,8 @@ class AddressActorSpecification
               Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
             },
             _ => OrderBook.AggregatedSnapshot(),
-            false
+            false,
+            spendableBalancesActor
           )
         )
       )
@@ -221,15 +231,18 @@ class AddressActorSpecification
       eventsProbe,
       (updatedPortfolio, notify) => {
         val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
-        if (notify)
-          addressActor !
-            CancelNotEnoughCoinsOrders {
-              prevPortfolio
-                .changedAssetIds(updatedPortfolio)
-                .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
-                .toMap
-                .withDefaultValue(0)
-            }
+        if (notify) {
+
+          val spendableBalanceChanges: Map[Asset, Long] =
+            prevPortfolio
+              .changedAssetIds(updatedPortfolio)
+              .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
+              .toMap
+              .withDefaultValue(0)
+
+          addressActor ! CancelNotEnoughCoinsOrders(spendableBalanceChanges)
+          spendableBalancesActor ! SpendableBalancesActor.Command.UpdateDiff(Map(address -> spendableBalanceChanges))
+        }
       }
     )
 

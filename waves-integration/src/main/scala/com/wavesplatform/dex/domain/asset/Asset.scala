@@ -8,7 +8,7 @@ import play.api.libs.json._
 
 import scala.util.Success
 
-sealed trait Asset
+sealed trait Asset extends Product with Serializable
 
 object Asset {
 

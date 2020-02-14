@@ -305,6 +305,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     actorSystem.actorOf(HistoryRouter.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
+  private val spendableBalancesActor = actorSystem.actorOf(Props(new SpendableBalancesActor(wavesBlockchainAsyncClient.allAssetsSpendableBalance)))
+
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
@@ -317,17 +319,18 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
               new AddressActor(
                 address,
                 asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
-                wavesBlockchainAsyncClient.allAssetsSpendableBalance(address),
                 time,
                 orderDB,
                 wavesBlockchainAsyncClient.forgedOrder,
                 matcherQueue.storeEvent,
                 orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
                 startSchedules,
-                settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough
+                spendableBalancesActor,
+                settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough,
               )
           ),
-          historyRouter
+          historyRouter,
+          spendableBalancesActor
         )
       ),
       "addresses"

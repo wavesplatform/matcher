@@ -18,7 +18,8 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
                        settings: MatcherSettings,
                        orderDB: OrderDB,
                        addressActorProps: (Address, Boolean) => Props,
-                       historyRouter: Option[ActorRef])
+                       historyRouter: Option[ActorRef],
+                       spendableBalancesActor: ActorRef)
     extends Actor
     with ScorexLogging {
 
@@ -29,9 +30,10 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
   /** Sends balance changes to the AddressActors */
-  spendableBalanceChanges.foreach {
-    _.foreach {
-      case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances })
+  spendableBalanceChanges.foreach { spendableBalanceChanges =>
+    spendableBalancesActor ! SpendableBalancesActor.Command.UpdateDiff(spendableBalanceChanges)
+    spendableBalanceChanges.foreach {
+      case (address, assetBalances) => children.get(address) foreach { _ ! AddressActor.Command.CancelNotEnoughCoinsOrders(assetBalances) }
     }
   } { Scheduler(context.dispatcher) }
 

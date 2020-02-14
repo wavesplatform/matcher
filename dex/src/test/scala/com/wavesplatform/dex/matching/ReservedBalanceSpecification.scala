@@ -9,7 +9,6 @@ import com.wavesplatform.dex.AddressDirectory.Envelope
 import com.wavesplatform.dex.api.OrderRejected
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.PublicKey
-import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -97,6 +96,8 @@ class ReservedBalanceSpecification
   private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
   private var oh: OrderHistoryStub = new OrderHistoryStub(system, ntpTime)
 
+  private val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]))))
+
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectory(
@@ -108,16 +109,17 @@ class ReservedBalanceSpecification
             new AddressActor(
               address,
               _ => Future.successful(0L),
-              Future.successful(Map.empty[Asset, Long]),
               ntpTime,
               new TestOrderDB(100),
               _ => Future.successful(false),
               _ => Future.failed(new IllegalStateException("Should not be used in the test")),
               orderBookCache = _ => AggregatedSnapshot(),
-              enableSchedules
+              enableSchedules,
+              spendableBalancesActor
             )
         ),
-        None
+        None,
+        spendableBalancesActor
       )
     )
   )
@@ -483,6 +485,7 @@ class ReservedBalanceSpecification
   private def addressDirWithSpendableBalance(spendableBalance: Asset => Future[Long],
                                              orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot(),
                                              testProbe: TestProbe): ActorRef = {
+    val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]))))
     system.actorOf(
       Props(
         new AddressDirectory(
@@ -494,7 +497,6 @@ class ReservedBalanceSpecification
               new AddressActor(
                 owner = address,
                 spendableBalance = spendableBalance,
-                Future.successful(Map.empty[Asset, Long]),
                 time = ntpTime,
                 orderDB = new TestOrderDB(100),
                 hasOrderInBlockchain = _ => Future.successful(false),
@@ -503,10 +505,12 @@ class ReservedBalanceSpecification
                   Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
                 },
                 orderBookCache = orderBookCache,
-                enableSchedules
+                enableSchedules,
+                spendableBalancesActor
               )
           ),
-          None
+          None,
+          spendableBalancesActor
         )
       )
     )

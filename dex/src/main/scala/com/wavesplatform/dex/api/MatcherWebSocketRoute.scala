@@ -12,7 +12,7 @@ import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.PathMatchers.PublicKeyPM
 import com.wavesplatform.dex.api.http.ApiRoute
-import com.wavesplatform.dex.api.websockets.WsBalance
+import com.wavesplatform.dex.api.websockets.WsAddressState
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -36,15 +36,20 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef)(implicit mat: Mater
     val failureMatcher: PartialFunction[Any, Throwable]             = { case _ => throw new IllegalStateException("Stream processing error") }
 
     Source
-      .actorRef[WsBalance](
+      .actorRef[WsAddressState](
 //        completionMatcher = completionMatcher,
 //        failureMatcher = failureMatcher,
         bufferSize = 10,
         overflowStrategy = OverflowStrategy.fail
       )
-      .map(b => TextMessage.Strict(b.toString))
+      .map(
+        b =>
+          TextMessage.Strict(
+            b.balances.map { case (asset, balances) => s"$asset: reserved = ${balances.reserved}, tradable = ${balances.tradable}" }.mkString("; ")
+        )
+      )
       .mapMaterializedValue { sourceActor =>
-        addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWebSocketSubscription), sourceActor)
+        addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription), sourceActor)
       }
   }
 
@@ -61,16 +66,14 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef)(implicit mat: Mater
     Flow.fromSinkAndSource(sink, source)
   }
 
-  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {
-    parameters('Timestamp, 'Signature).tflatMap {
-      case (timestamp, signature) =>
-        Base58
-          .tryDecodeWithLimit(signature)
-          .map { crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey) } match {
-          case Success(true) => pass
-          case _             => complete(InvalidSignature)
-        }
-    }
+  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters('Timestamp, 'Signature).tflatMap {
+    case (timestamp, signature) =>
+      Base58
+        .tryDecodeWithLimit(signature)
+        .map { crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey) } match {
+        case Success(true) => pass
+        case _             => complete(InvalidSignature)
+      }
   }
 
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */

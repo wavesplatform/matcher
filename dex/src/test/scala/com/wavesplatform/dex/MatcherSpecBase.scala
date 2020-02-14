@@ -91,9 +91,10 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
                             price: Double,
                             matcherFee: Long = matcherFee,
                             version: Byte = 3,
-                            feeAsset: Asset = Waves): Order = {
+                            feeAsset: Asset = Waves,
+                            sender: KeyPair = senderKeyPair): Order = {
     Order(
-      sender = senderKeyPair,
+      sender = sender,
       matcher = MatcherAccount,
       pair = pair,
       orderType = orderType,

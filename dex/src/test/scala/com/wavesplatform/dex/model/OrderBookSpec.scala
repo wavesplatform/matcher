@@ -82,11 +82,12 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
           val submittedSpentFee =
             Map(evt.submitted.feeAsset -> AcceptedOrder.partialFee(evt.submitted.order.matcherFee, evt.submitted.order.amount, evt.executedAmount))
 
-          val submittedCompensation = Map(
-            evt.submitted.spentAsset -> (
+          val submittedCompensation =
+            if (evt.submitted.isSellOrder) Map.empty[Asset, Long]
+            else Map(evt.submitted.spentAsset -> {
               evt.submitted.order.getSpendAmount(evt.executedAmount, evt.submitted.order.price).right.get -
                 evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
-              ))
+            })
 
           val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
           val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
@@ -97,17 +98,26 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
           counterSpent should matchTo(submittedReceive)
 
           println(s"""
+submittedSpent:
+${submittedSpent.mkString("\n")}
+
 submittedReceive:
 ${submittedReceive.mkString("\n")}
+
+submittedSpentFee:
+${submittedSpentFee.mkString("\n")}
+
+submittedCompensation:
+${submittedCompensation.mkString("\n")}
+
+counterSpent:
+${counterSpent.mkString("\n")}
 
 counterReceive:
 ${counterReceive.mkString("\n")}
 
-evt.submitted.order.spentAmount:
-${evt.submitted.spentAsset} -> ${evt.submitted.spentAmount}
-
-evt.submitted.spentAmount :
-${evt.submitted.spentAsset} -> ${evt.submitted.spentAmount}
+counterSpentFee:
+${counterSpentFee.mkString("\n")}
 """)
 
           Monoid.combineAll(

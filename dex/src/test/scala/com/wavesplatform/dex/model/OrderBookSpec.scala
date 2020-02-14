@@ -89,15 +89,28 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
                 evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
             })
 
+          val lastExecutionSubmittedCompensation =
+            if (evt.submittedRemaining.isValid) Map.empty[Asset, Long]
+            else if (evt.counterRemaining.isValid) submittedSpent
+            else Map.empty[Asset, Long]
+
           val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
           val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
           val counterSpentFee =
             Map(evt.counter.feeAsset -> AcceptedOrder.partialFee(evt.counter.order.matcherFee, evt.counter.order.amount, evt.executedAmount))
 
+          val lastExecutionCounterCompensation =
+            if (evt.counterRemaining.isValid) Map.empty[Asset, Long]
+            else if (evt.submittedRemaining.isValid) counterSpent
+            else Map.empty[Asset, Long]
+
           submittedSpent should matchTo(counterReceive)
           counterSpent should matchTo(submittedReceive)
 
           println(s"""
+submitted (amount = ${evt.submitted.amount}):
+${evt.submitted}
+
 submittedSpent:
 ${submittedSpent.mkString("\n")}
 
@@ -110,6 +123,9 @@ ${submittedSpentFee.mkString("\n")}
 submittedCompensation:
 ${submittedCompensation.mkString("\n")}
 
+lastExecutionSubmittedCompensation:
+${lastExecutionSubmittedCompensation.mkString("\n")}
+
 counterSpent:
 ${counterSpent.mkString("\n")}
 
@@ -118,6 +134,9 @@ ${counterReceive.mkString("\n")}
 
 counterSpentFee:
 ${counterSpentFee.mkString("\n")}
+
+lastExecutionCounterCompensation:
+${lastExecutionCounterCompensation.mkString("\n")}
 """)
 
           Monoid.combineAll(
@@ -125,8 +144,10 @@ ${counterSpentFee.mkString("\n")}
               submittedReceive,
               submittedSpentFee,
               submittedCompensation,
+              lastExecutionSubmittedCompensation,
               counterReceive,
-              counterSpentFee
+              counterSpentFee,
+              lastExecutionCounterCompensation
             ))
 
         case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance

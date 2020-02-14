@@ -81,7 +81,6 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
         submittedSpent should matchTo(counterReceive)
         counterSpent should matchTo(submittedReceive)
 
-        val compensaction = newOrder.partial(evt.executedAmount, evt.submittedExecutedFee).requiredBalance
         println(s"""
 submittedReceive:
 ${submittedReceive.mkString("\n")}
@@ -89,43 +88,26 @@ ${submittedReceive.mkString("\n")}
 counterReceive:
 ${counterReceive.mkString("\n")}
 
-compensation:
-${compensaction.mkString("\n")}
-"""
-)
+evt.submitted.spentAmount:
+${evt.submitted.spentAsset} -> ${evt.submitted.spentAmount}
+
+evt.submitted.order.getSpendAmount(evt.executedAmount, price):
+${evt.submitted.spentAsset} -> ${evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get}
+""")
 
         Monoid.combineAll(
           Seq(
-            Group.inverse(
-              Monoid.combineAll(
-                Seq(
-                  compensaction
-//                  Map(newOrder.spentAsset -> newOrder.order.getSpendAmount(evt.executedAmount, newOrder.price).right.get),
-//                  Map(newOrder.feeAsset -> AcceptedOrder.partialFee(newOrder.order.matcherFee, newOrder.order.amount, evt.executedAmount)),
-
-//                  submittedSpent,
-//                  Map(evt.submitted.feeAsset -> evt.submittedExecutedFee),
-//                  counterSpent,
-//                  Map(evt.counter.feeAsset -> evt.counterExecutedFee)
-                ))),
-            submittedReceive, //Map(evt.submitted.rcvAsset -> evt.submitted.receiveAmount),
+            Map(evt.submitted.spentAsset -> (evt.submitted.spentAmount - evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)) ,
+            submittedReceive,
+            Map(evt.submitted.feeAsset -> evt.submitted.requiredFee),
             counterReceive,
-            // Matcher's fee
-//            Map(evt.submitted.feeAsset -> evt.submittedExecutedFee),
-//            Map(evt.counter.feeAsset   -> evt.counterExecutedFee)
+            Map(evt.counter.feeAsset -> evt.counter.requiredFee)
           ))
 
       case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
-      case evt: Events.OrderAdded =>
-        Group.inverse(
-          evt.order.requiredBalance
-//        Monoid.combineAll(
-//          Seq(
-//            Map(newOrder.spentAsset -> newOrder.order.getSpendAmount(evt.order.amount, newOrder.price).right.get),
-//            Map(newOrder.feeAsset -> AcceptedOrder.partialFee(newOrder.order.matcherFee, newOrder.order.amount, evt.order.amount))
-//          )
-//        )
-        ) // Map.empty[Asset, Long]
+      case evt: Events.OrderAdded    =>
+        // Group.inverse(evt.order.requiredBalance)
+        Map.empty[Asset, Long] //
     })
 
     // TODO find order in order book and compensate
@@ -219,10 +201,10 @@ ${diff.mkString("\n")}
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
 
   private def format(x: OrderBook): String = s"""
-Asks:
+Asks (rcv=${assetPair.priceAsset}, spt=${assetPair.amountAsset}):
 ${formatSide(x.getAsks)}
 
-Bids:
+Bids (rcv=${assetPair.amountAsset}, spt=${assetPair.priceAsset}):
 ${formatSide(x.getBids)}"""
 
   private def format(x: LimitOrder): String =

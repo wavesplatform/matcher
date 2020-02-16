@@ -19,6 +19,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers with ScalaCheckPropertyChecks with NoShrink {
 
+  implicit override val generatorDrivenConfig: PropertyCheckConfiguration = PropertyCheckConfiguration(minSuccessful = 1000)
+
   private val matcher = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))
   private val assetPair = AssetPair(
     amountAsset = IssuedAsset(ByteStr("amount-asset".getBytes(StandardCharsets.UTF_8))),
@@ -30,8 +32,10 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 
   private val assetGen = Gen.oneOf[Asset](assetPair.amountAsset, assetPair.priceAsset, thirdAsset)
 
-  private val clients     = (1 to 3).map(clientId => KeyPair(ByteStr(s"client-$clientId".getBytes(StandardCharsets.UTF_8))))
-  protected val clientGen = Gen.oneOf(clients)
+  private val clients   = (1 to 3).map(clientId => KeyPair(ByteStr(s"client-$clientId".getBytes(StandardCharsets.UTF_8))))
+  private val clientGen = Gen.oneOf(clients)
+
+  private val maxOrdersInOrderBook = 6
 
   // TODO migrate to long ranges in 2.13
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -46,112 +50,64 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 
   private val askLimitOrderGen: Gen[LimitOrder] = limitOrderGen(orderGen(askPricesGen, OrderType.SELL))
   private val bidLimitOrderGen: Gen[LimitOrder] = limitOrderGen(orderGen(bidPricesGen, OrderType.BUY))
-  private val limitOrderGen: Gen[LimitOrder] = orderTypeGenerator.flatMap { x =>
-    limitOrderGen(orderGen(allPricesGen, x))
+  private val newOrderGen: Gen[AcceptedOrder] = orderTypeGenerator.flatMap { x =>
+    Gen.oneOf(
+      limitOrderGen(orderGen(allPricesGen, x)),
+      marketOrderGen(orderGen(allPricesGen, x))
+    )
   }
 
   private val invariantTestGen = for {
-    askOrders <- Gen.listOfN(3, askLimitOrderGen)
-    bidOrders <- Gen.listOfN(3, bidLimitOrderGen)
-    newOrder  <- limitOrderGen //limitOrderGen(orderGen(askOrders.map(_.order.price).toVector.min, OrderType.BUY)) // TODO limitOrderGen
+    asksNumber <- Gen.choose(1, maxOrdersInOrderBook)
+    askOrders  <- Gen.listOfN(asksNumber, askLimitOrderGen)
+    bidOrders  <- Gen.listOfN(maxOrdersInOrderBook - asksNumber, bidLimitOrderGen)
+    newOrder   <- newOrderGen
   } yield (askOrders, bidOrders, newOrder)
 
   "coins invariant" in forAll(invariantTestGen) {
     case (askOrders, bidOrders, newOrder) =>
-      val ob = OrderBook(
-        OrderBookSnapshot(
-          bidOrders.groupBy(_.order.price),
-          askOrders.groupBy(_.order.price),
-          lastTrade = None
-        ))
+      val ob             = mkOrderBook(askOrders, bidOrders)
+      val obBefore       = format(ob)
+      val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
+      val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-      val obBefore    = format(ob)
-      val coinsBefore = countCoins(ob) |+| newOrder.requiredBalance // do not change
-      val events      = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+      val events = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
-      // TODO
-      val eventsDiff = Monoid.combineAll(events.map {
-        case evt: Events.OrderExecuted =>
-          // remaining
-
+      val balancesAfter = events.foldLeft(balancesBefore) {
+        case (r, evt: Events.OrderExecuted) =>
           val price            = evt.counter.price
           val submittedSpent   = Map(evt.submitted.spentAsset -> evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get)
           val submittedReceive = Map(evt.submitted.rcvAsset -> evt.submitted.order.getReceiveAmount(evt.executedAmount, price).right.get)
           val submittedSpentFee =
             Map(evt.submitted.feeAsset -> AcceptedOrder.partialFee(evt.submitted.order.matcherFee, evt.submitted.order.amount, evt.executedAmount))
 
-          val submittedCompensation =
-            if (evt.submitted.isSellOrder) Map.empty[Asset, Long]
-            else {
-              val scByOrigPrice     = evt.submitted.order.getSpendAmount(evt.executedAmount, evt.submitted.order.price).right.get
-              val scByExecutedPrice = evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
-              Map(evt.submitted.spentAsset -> (scByOrigPrice - scByExecutedPrice))
-            }
-
-          val submittedCompensation2 = newOrder.requiredBalance |-| (submittedSpent |+| submittedSpentFee |+| evt.submittedRemaining.requiredBalance)
-          //evt.submitted.requiredBalance |-| (evt.submittedRemaining.requiredBalance |+| submittedSpent |+| submittedSpentFee)
-
           val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
           val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
           val counterSpentFee =
             Map(evt.counter.feeAsset -> AcceptedOrder.partialFee(evt.counter.order.matcherFee, evt.counter.order.amount, evt.executedAmount))
 
-          val counterCompensation = evt.counter.requiredBalance |-| (evt.counterRemaining.requiredBalance |+| counterSpent |+| counterSpentFee)
-
           submittedSpent should matchTo(counterReceive)
           counterSpent should matchTo(submittedReceive)
 
-          println(s"""
-submitted (amount = ${evt.submitted.amount}):
-${evt.submitted}
+          r |+|
+            Monoid.combineAll(Seq(
+              Map(evt.submitted.order.senderPublicKey -> submittedReceive),
+              Map(evt.counter.order.senderPublicKey   -> counterReceive),
+              Map((matcher: PublicKey)                -> submittedSpentFee),
+              Map((matcher: PublicKey)                -> counterSpentFee)
+            )) |-|
+            Monoid.combineAll(
+              Seq(
+                Map(evt.submitted.order.senderPublicKey -> submittedSpent),
+                Map(evt.submitted.order.senderPublicKey -> submittedSpentFee),
+                Map(evt.counter.order.senderPublicKey   -> counterSpent),
+                Map(evt.counter.order.senderPublicKey   -> counterSpentFee),
+              ))
 
----
-submittedReceive:
-${submittedReceive.mkString("\n")}
+        case (r, _) => r
+      }
 
-submittedSpentFee:
-${submittedSpentFee.mkString("\n")}
-
-submittedCompensation:
-${submittedCompensation.mkString("\n")}
-
-submittedCompensation2:
-${submittedCompensation2.mkString("\n")}
-
-counterReceive:
-${counterReceive.mkString("\n")}
-
-counterSpentFee:
-${counterSpentFee.mkString("\n")}
-
-counterCompensation:
-${counterCompensation.mkString("\n")}
----
-""")
-
-          Monoid.combineAll(
-            Seq(
-              submittedReceive,
-              submittedSpentFee,
-              submittedCompensation,
-              counterReceive,
-              counterSpentFee,
-              counterCompensation
-            ))
-
-        case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
-        case evt: Events.OrderAdded    =>
-          // Group.inverse(evt.order.requiredBalance)
-          Map.empty[Asset, Long] //
-      })
-
-      // TODO find order in order book and compensate
-      //val updatedOrder = ob.allOrders.map(_._2).find(_.order.id() == newOrder.order.id()).get
-
-      val ordersBefore = (askOrders ++ bidOrders).map(x => x.order.id() -> x).toMap
-      val ordersAfter  = ob.allOrders.map(_._2).toList
-
-      val coinsAfter = countCoins(ob) |+| eventsDiff
+      val coinsAfter = Monoid.combineAll(balancesAfter.values)
 
       val diff = coinsAfter |-| coinsBefore
       val clue =
@@ -171,9 +127,6 @@ ${format(ob)}
 Events:
 ${events.mkString("\n")}
 
-Events diff:
-${eventsDiff.mkString("\n")}
-
 Diff:
 ${diff.mkString("\n")}
 """
@@ -186,12 +139,23 @@ ${diff.mkString("\n")}
   private def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
     for {
       order      <- orderGen
-      restAmount <- Gen.const(order.amount) // TODO Gen.choose(minAmount(order.price), order.amount)
+      restAmount <- Gen.choose(minAmount(order.price), order.amount)
     } yield {
       val restFee = AcceptedOrder.partialFee(order.matcherFee, order.amount, restAmount)
       order.orderType match {
         case OrderType.SELL => SellLimitOrder(restAmount, restFee, order)
         case OrderType.BUY  => BuyLimitOrder(restAmount, restFee, order)
+      }
+    }
+
+  private def marketOrderGen(orderGen: Gen[Order]): Gen[MarketOrder] =
+    for {
+      order <- orderGen
+      availableForSpending <- Gen.choose(minAmount(order.price), order.amount)
+    } yield {
+      order.orderType match {
+        case OrderType.SELL => SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending)
+        case OrderType.BUY  => BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending)
       }
     }
 
@@ -201,18 +165,17 @@ ${diff.mkString("\n")}
   private def orderGen(pricesGen: Gen[Long], side: OrderType): Gen[Order] =
     for {
       owner    <- clientGen
-      feeAsset <- Gen.const(thirdAsset) // TODO assetGen
+      feeAsset <- assetGen
       price    <- pricesGen
       amount <- {
         // The rule based on getReceiveAmount (for SELL orders) or getSpendAmount (for BUY orders)
         // In both cases we get same condition (20 here to escape cases when sum > Long.MaxValue):
         // amount: 1 <= amount * price / PriceConstant <= Long.MaxValue / 20
-        // TODO
         val maxValue = BigInt(Long.MaxValue / 20) * Order.PriceConstant / price
-        Gen.chooseNum(minAmount(price), 100) //maxValue.min(Long.MaxValue / 20).toLong)
-        //Gen.const(minAmount(price))
+        Gen.chooseNum(minAmount(price), maxValue.min(Long.MaxValue / 20).toLong)
       }
-      version <- if (feeAsset == Waves) Gen.choose[Byte](1, 3) else Gen.const(3: Byte)
+      matcherFee <- Gen.choose(0, 300000)
+      version    <- if (feeAsset == Waves) Gen.choose[Byte](1, 3) else Gen.const(3: Byte)
     } yield
       Order(
         sender = owner,
@@ -223,17 +186,27 @@ ${diff.mkString("\n")}
         price = price,
         timestamp = ts,
         expiration = expiration,
-        matcherFee = matcherFee, // TODO
+        matcherFee = matcherFee,
         version = version,
         feeAsset = feeAsset
       )
 
-  private def countCoins(ob: OrderBook): Map[Asset, Long] = Monoid.combineAll((ob.getAsks.values ++ ob.getBids.values).flatten.map(_.requiredBalance))
-  private def clientsPortfolio(ob: OrderBook): Map[PublicKey, Map[Asset, Long]] = {
-    ???
-  }
+  private def balancesBy(ob: OrderBook): Map[PublicKey, Map[Asset, Long]] =
+    ob.allOrders.foldLeft(Map.empty[PublicKey, Map[Asset, Long]]) {
+      case (r, (_, o)) => r |+| balancesBy(o)
+    }
+
+  private def balancesBy(o: AcceptedOrder): Map[PublicKey, Map[Asset, Long]] = Map(o.order.senderPublicKey -> o.requiredBalance)
 
   private def minAmount(price: Long): Long = math.max(1, Order.PriceConstant / price)
+
+  private def mkOrderBook(askOrders: List[LimitOrder], bidOrders: List[LimitOrder]): OrderBook =
+    OrderBook(
+      OrderBookSnapshot(
+        asks = askOrders.groupBy(_.order.price),
+        bids = bidOrders.groupBy(_.order.price),
+        lastTrade = None
+      ))
 
   private def formatSide(xs: Iterable[(Long, Level)]): String =
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
@@ -245,7 +218,14 @@ ${formatSide(x.getAsks)}
 Bids (rcv=${assetPair.amountAsset}, spt=${assetPair.priceAsset}):
 ${formatSide(x.getBids)}"""
 
-  private def format(x: LimitOrder): String =
-    s"""LimitOrder(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, requiredBalance={ ${x.requiredBalance.mkString(", ")} })"""
+  private def format(x: AcceptedOrder): String = {
+    val name = x match {
+      case _: LimitOrder  => "limit"
+      case _: MarketOrder => "market"
+    }
+
+    s"""$name(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, requiredBalance={ ${x.requiredBalance.mkString(", ")} })"""
+  }
+
   private def format(x: Order): String = s"""Order(${x.idStr()}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
 }

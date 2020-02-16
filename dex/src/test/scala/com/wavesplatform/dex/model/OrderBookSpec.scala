@@ -86,8 +86,13 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
           val counterSpentFee =
             Map(evt.counter.feeAsset -> AcceptedOrder.partialFee(evt.counter.order.matcherFee, evt.counter.order.amount, evt.executedAmount))
 
-          submittedSpent should matchTo(counterReceive)
-          counterSpent should matchTo(submittedReceive)
+          withClue(s"$evt: submitted.spent == counter.receive: ") {
+            submittedSpent should matchTo(counterReceive)
+          }
+
+          withClue(s"$evt: counter.spent == submitted.receive: ") {
+            counterSpent should matchTo(submittedReceive)
+          }
 
           r |+|
             Monoid.combineAll(Seq(
@@ -111,7 +116,7 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 
       val diff = coinsAfter |-| coinsBefore
       val clue =
-        s"""
+        s"""Coins invariant
 Pair:
 $assetPair
 
@@ -150,7 +155,7 @@ ${diff.mkString("\n")}
 
   private def marketOrderGen(orderGen: Gen[Order]): Gen[MarketOrder] =
     for {
-      order <- orderGen
+      order                <- orderGen
       availableForSpending <- Gen.choose(minAmount(order.price), order.amount)
     } yield {
       order.orderType match {

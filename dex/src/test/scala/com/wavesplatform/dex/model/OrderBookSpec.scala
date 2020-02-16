@@ -3,8 +3,8 @@ package com.wavesplatform.dex.model
 import java.nio.charset.StandardCharsets
 
 import cats.instances.long.catsKernelStdGroupForLong
+import cats.kernel.Monoid
 import cats.syntax.group._
-import cats.kernel.{Group, Monoid}
 import com.wavesplatform.dex.domain.account.{KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -13,12 +13,9 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
-import org.scalacheck.Gen.Choose
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import scala.collection.immutable.NumericRange
 
 class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers with ScalaCheckPropertyChecks with NoShrink {
 
@@ -72,6 +69,7 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
       val coinsBefore = countCoins(ob) |+| newOrder.requiredBalance // do not change
       val events      = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
+      // TODO
       val eventsDiff = Monoid.combineAll(events.map {
         case evt: Events.OrderExecuted =>
           // remaining
@@ -84,25 +82,21 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 
           val submittedCompensation =
             if (evt.submitted.isSellOrder) Map.empty[Asset, Long]
-            else Map(evt.submitted.spentAsset -> {
-              evt.submitted.order.getSpendAmount(evt.executedAmount, evt.submitted.order.price).right.get -
-                evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
-            })
+            else {
+              val scByOrigPrice     = evt.submitted.order.getSpendAmount(evt.executedAmount, evt.submitted.order.price).right.get
+              val scByExecutedPrice = evt.submitted.order.getSpendAmount(evt.executedAmount, price).right.get
+              Map(evt.submitted.spentAsset -> (scByOrigPrice - scByExecutedPrice))
+            }
 
-          val lastExecutionSubmittedCompensation =
-            if (evt.submittedRemaining.isValid) Map.empty[Asset, Long]
-            else if (evt.counterRemaining.isValid) submittedSpent
-            else Map.empty[Asset, Long]
+          val submittedCompensation2 = newOrder.requiredBalance |-| (submittedSpent |+| submittedSpentFee |+| evt.submittedRemaining.requiredBalance)
+          //evt.submitted.requiredBalance |-| (evt.submittedRemaining.requiredBalance |+| submittedSpent |+| submittedSpentFee)
 
           val counterSpent   = Map(evt.counter.spentAsset -> evt.counter.order.getSpendAmount(evt.executedAmount, price).right.get)
           val counterReceive = Map(evt.counter.rcvAsset   -> evt.counter.order.getReceiveAmount(evt.executedAmount, price).right.get)
           val counterSpentFee =
             Map(evt.counter.feeAsset -> AcceptedOrder.partialFee(evt.counter.order.matcherFee, evt.counter.order.amount, evt.executedAmount))
 
-          val lastExecutionCounterCompensation =
-            if (evt.counterRemaining.isValid) Map.empty[Asset, Long]
-            else if (evt.submittedRemaining.isValid) counterSpent
-            else Map.empty[Asset, Long]
+          val counterCompensation = evt.counter.requiredBalance |-| (evt.counterRemaining.requiredBalance |+| counterSpent |+| counterSpentFee)
 
           submittedSpent should matchTo(counterReceive)
           counterSpent should matchTo(submittedReceive)
@@ -111,9 +105,7 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 submitted (amount = ${evt.submitted.amount}):
 ${evt.submitted}
 
-submittedSpent:
-${submittedSpent.mkString("\n")}
-
+---
 submittedReceive:
 ${submittedReceive.mkString("\n")}
 
@@ -123,11 +115,8 @@ ${submittedSpentFee.mkString("\n")}
 submittedCompensation:
 ${submittedCompensation.mkString("\n")}
 
-lastExecutionSubmittedCompensation:
-${lastExecutionSubmittedCompensation.mkString("\n")}
-
-counterSpent:
-${counterSpent.mkString("\n")}
+submittedCompensation2:
+${submittedCompensation2.mkString("\n")}
 
 counterReceive:
 ${counterReceive.mkString("\n")}
@@ -135,8 +124,9 @@ ${counterReceive.mkString("\n")}
 counterSpentFee:
 ${counterSpentFee.mkString("\n")}
 
-lastExecutionCounterCompensation:
-${lastExecutionCounterCompensation.mkString("\n")}
+counterCompensation:
+${counterCompensation.mkString("\n")}
+---
 """)
 
           Monoid.combineAll(
@@ -144,10 +134,9 @@ ${lastExecutionCounterCompensation.mkString("\n")}
               submittedReceive,
               submittedSpentFee,
               submittedCompensation,
-              lastExecutionSubmittedCompensation,
               counterReceive,
               counterSpentFee,
-              lastExecutionCounterCompensation
+              counterCompensation
             ))
 
         case evt: Events.OrderCanceled => evt.acceptedOrder.requiredBalance
@@ -159,7 +148,10 @@ ${lastExecutionCounterCompensation.mkString("\n")}
       // TODO find order in order book and compensate
       //val updatedOrder = ob.allOrders.map(_._2).find(_.order.id() == newOrder.order.id()).get
 
-      val coinsAfter = countCoins(ob) |+| eventsDiff // |+| (newOrder.requiredBalance |-| updatedOrder.requiredBalance)
+      val ordersBefore = (askOrders ++ bidOrders).map(x => x.order.id() -> x).toMap
+      val ordersAfter  = ob.allOrders.map(_._2).toList
+
+      val coinsAfter = countCoins(ob) |+| eventsDiff
 
       val diff = coinsAfter |-| coinsBefore
       val clue =
@@ -254,6 +246,6 @@ Bids (rcv=${assetPair.amountAsset}, spt=${assetPair.priceAsset}):
 ${formatSide(x.getBids)}"""
 
   private def format(x: LimitOrder): String =
-    s"""LimitOrder(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, spt=${x.spentAmount})"""
+    s"""LimitOrder(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, requiredBalance={ ${x.requiredBalance.mkString(", ")} })"""
   private def format(x: Order): String = s"""Order(${x.idStr()}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
 }

@@ -55,6 +55,8 @@ lazy val `waves-integration-it` = project
     `dex-it-common`
   )
 
+lazy val `dex-jmh` = project.dependsOn(dex % "compile;test->test")
+
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",

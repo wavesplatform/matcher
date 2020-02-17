@@ -11,11 +11,14 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fp.MapImplicits.group
+import com.wavesplatform.dex.model.Events.OrderCanceled
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.collection.JavaConverters._
 
 class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers with ScalaCheckPropertyChecks with NoShrink {
 
@@ -35,7 +38,8 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
   private val clients   = (1 to 3).map(clientId => KeyPair(ByteStr(s"client-$clientId".getBytes(StandardCharsets.UTF_8))))
   private val clientGen = Gen.oneOf(clients)
 
-  private val maxOrdersInOrderBook = 6
+  private val maxLevelsInOrderBook = 6
+  private val maxOrdersInLevel     = 2
 
   // TODO migrate to long ranges in 2.13
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -48,8 +52,6 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
 
   private val allPricesGen = Gen.choose(bidPricesMin, askPricesMax)
 
-  private val askLimitOrderGen: Gen[LimitOrder] = limitOrderGen(orderGen(askPricesGen, OrderType.SELL))
-  private val bidLimitOrderGen: Gen[LimitOrder] = limitOrderGen(orderGen(bidPricesGen, OrderType.BUY))
   private val newOrderGen: Gen[AcceptedOrder] = orderTypeGenerator.flatMap { x =>
     Gen.oneOf(
       limitOrderGen(orderGen(allPricesGen, x)),
@@ -57,14 +59,13 @@ class OrderBookSpec extends AnyFreeSpecLike with MatcherSpecBase with Matchers w
     )
   }
 
-  private val invariantTestGen = for {
-    asksNumber <- Gen.choose(1, maxOrdersInOrderBook)
-    askOrders  <- Gen.listOfN(asksNumber, askLimitOrderGen)
-    bidOrders  <- Gen.listOfN(maxOrdersInOrderBook - asksNumber, bidLimitOrderGen)
-    newOrder   <- newOrderGen
+  private val coinsInvariantPropGen = for {
+    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
+    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
+    newOrder                <- newOrderGen
   } yield (askOrders, bidOrders, newOrder)
 
-  "coins invariant" in forAll(invariantTestGen) {
+  "coins invariant" in forAll(coinsInvariantPropGen) {
     case (askOrders, bidOrders, newOrder) =>
       val ob             = mkOrderBook(askOrders, bidOrders)
       val obBefore       = format(ob)
@@ -141,6 +142,101 @@ ${diff.mkString("\n")}
       }
   }
 
+  private val orderIdGen = Gen.alphaNumStr.suchThat(_.nonEmpty).map(x => ByteStr(x.getBytes(StandardCharsets.UTF_8)))
+  private val cancelPropGen = for {
+    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
+    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
+    orderIdToCancel <- {
+      if (askOrders.isEmpty && bidOrders.isEmpty) orderIdGen
+      else Gen.oneOf(orderIdGen, Gen.oneOf((askOrders ++ bidOrders).map(_.order.id())))
+    }
+  } yield (askOrders, bidOrders, orderIdToCancel)
+
+  "cancel" in forAll(cancelPropGen) {
+    case (askOrders, bidOrders, orderIdToCancel) =>
+      val ob             = mkOrderBook(askOrders, bidOrders)
+      val obBefore       = format(ob)
+      val hadOrder       = hasOrder(ob, orderIdToCancel)
+      val orderIdsBefore = orderIds(ob)
+
+      val events = ob.cancel(orderIdToCancel, ts)
+      val clue =
+        s"""
+Order id to cancel: $orderIdToCancel
+Had order: $hadOrder
+
+OrderBook before:
+$obBefore
+
+OrderBook after:
+${format(ob)}
+
+Events:
+${events.mkString("\n")}
+"""
+
+      val orderIdsAfter = orderIds(ob)
+      withClue(clue) {
+        if (hadOrder) {
+          val orderRemoved = events.nonEmpty && !hasOrder(ob, orderIdToCancel)
+          orderRemoved shouldBe true
+        } else {
+          events.isEmpty shouldBe true
+        }
+
+        withClue("no other order was removed: ") {
+          (orderIdsBefore - orderIdToCancel) should matchTo(orderIdsAfter)
+        }
+      }
+  }
+
+  private val cancelAllPropGen = for {
+    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
+    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
+  } yield (askOrders, bidOrders)
+
+  "cancelAll" in forAll(cancelAllPropGen) {
+    case (askOrders, bidOrders) =>
+      val ob             = mkOrderBook(askOrders, bidOrders)
+      val obBefore       = format(ob)
+      val orderIdsBefore = orderIds(ob)
+
+      val events         = ob.cancelAll(ts)
+      val canceledOrders = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+      val clue =
+        s"""
+OrderBook before:
+$obBefore
+
+OrderBook after:
+${format(ob)}
+
+Events:
+${events.mkString("\n")}
+
+Canceled orders:
+${canceledOrders.mkString("\n")}
+"""
+
+      val orderIdsAfter = orderIds(ob)
+      withClue(clue) {
+        orderIdsAfter shouldBe empty
+        events should have size canceledOrders.size
+        events should have size orderIdsBefore.size
+        canceledOrders should matchTo(orderIdsBefore)
+        orderIdsAfter shouldBe empty
+      }
+  }
+
+  private def sideOrdersGen(side: OrderType, maxLevels: Int, pricesGen: Gen[Long]): Gen[(Int, Seq[LimitOrder])] =
+    for {
+      levels <- Gen.choose(0, maxLevels)
+      prices <- Gen.listOfN(levels, pricesGen)
+      orders <- Gen.sequence(prices.map { price =>
+        Gen.resize(maxOrdersInLevel, Gen.listOf(limitOrderGen(orderGen(Gen.const(price), side))))
+      })
+    } yield (levels, orders.asScala.flatten)
+
   private def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
     for {
       order      <- orderGen
@@ -196,6 +292,9 @@ ${diff.mkString("\n")}
         feeAsset = feeAsset
       )
 
+  private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_._2.order.id()).toSet
+  private def hasOrder(ob: OrderBook, id: Order.Id): Boolean = ob.allOrders.exists(_._2.order.id() == id)
+
   private def balancesBy(ob: OrderBook): Map[PublicKey, Map[Asset, Long]] =
     ob.allOrders.foldLeft(Map.empty[PublicKey, Map[Asset, Long]]) {
       case (r, (_, o)) => r |+| balancesBy(o)
@@ -205,7 +304,7 @@ ${diff.mkString("\n")}
 
   private def minAmount(price: Long): Long = math.max(1, Order.PriceConstant / price)
 
-  private def mkOrderBook(askOrders: List[LimitOrder], bidOrders: List[LimitOrder]): OrderBook =
+  private def mkOrderBook(askOrders: Seq[LimitOrder], bidOrders: Seq[LimitOrder]): OrderBook =
     OrderBook(
       OrderBookSnapshot(
         asks = askOrders.groupBy(_.order.price),

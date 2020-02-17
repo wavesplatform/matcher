@@ -202,30 +202,42 @@ class AddressActorSpecification
       Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) }
     }
 
-    val spendableBalancesActor =
-      system.actorOf(
-        Props(new SpendableBalancesActor(allAssetsSpendableBalance)(scala.concurrent.ExecutionContext.Implicits.global))
-      )
-
-    val addressActor =
-      system.actorOf(
-        Props(
-          new AddressActor(
-            address,
-            x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
-            ntpTime,
-            EmptyOrderDB,
-            _ => Future.successful(false),
-            event => {
-              eventsProbe.ref ! event
-              Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
-            },
-            _ => OrderBook.AggregatedSnapshot(),
-            false,
-            spendableBalancesActor
-          )
+    lazy val addressDir = system.actorOf(
+      Props(
+        new AddressDirectory(
+          EmptyOrderDB,
+          createAddressActor,
+          None
         )
       )
+    )
+
+    lazy val spendableBalancesActor =
+      system.actorOf(
+        Props(new SpendableBalancesActor(allAssetsSpendableBalance, addressDir)(scala.concurrent.ExecutionContext.Implicits.global))
+      )
+
+    def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+      Props(
+        new AddressActor(
+          address,
+          x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
+          ntpTime,
+          EmptyOrderDB,
+          _ => Future.successful(false),
+          event => {
+            eventsProbe.ref ! event
+            Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
+          },
+          _ => OrderBook.AggregatedSnapshot(),
+          false,
+          spendableBalancesActor
+        )
+      )
+    }
+
+    val addressActor = system.actorOf(createAddressActor(address, false))
+
     f(
       addressActor,
       eventsProbe,
@@ -241,7 +253,7 @@ class AddressActorSpecification
               .withDefaultValue(0)
 
           addressActor ! CancelNotEnoughCoinsOrders(spendableBalanceChanges)
-          spendableBalancesActor ! SpendableBalancesActor.Command.UpdateDiff(Map(address -> spendableBalanceChanges))
+          spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address -> spendableBalanceChanges))
         }
       }
     )

@@ -1,47 +1,58 @@
 package com.wavesplatform.dex.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import com.wavesplatform.dex.db.TestOrderDB
+import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.{AddressActor, SpendableBalancesActor}
+import com.wavesplatform.dex.{AddressActor, AddressDirectory, SpendableBalancesActor}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time) {
-  private implicit val efc = new ErrorFormatterContext {
-    override def assetDecimals(asset: Asset): Int = 8
-  }
+
+  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
   private val refs                  = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders                = mutable.AnyRefMap.empty[ByteStr, Address]
-  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]))))
+  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]), addressDir)))
+
+  def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
+    Props(
+      new AddressActor(
+        address,
+        _ => Future.successful(0L),
+        time,
+        new TestOrderDB(100),
+        _ => Future.successful(false),
+        e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
+        _ => OrderBook.AggregatedSnapshot(),
+        enableSchedules,
+        spendableBalanceActor
+      )
+    )
+  }
 
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
       ao.order.sender,
-      system.actorOf(
-        Props(
-          new AddressActor(
-            ao.order.sender,
-            _ => Future.successful(0L),
-            time,
-            new TestOrderDB(100),
-            _ => Future.successful(false),
-            e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
-            _ => OrderBook.AggregatedSnapshot(),
-            true,
-            spendableBalanceActor
-          )
-        )
+      system.actorOf(createAddressActor(ao.order.sender, true))
+    )
+
+  lazy val addressDir = system.actorOf(
+    Props(
+      new AddressDirectory(
+        EmptyOrderDB,
+        createAddressActor,
+        None
       )
     )
+  )
 
   def ref(sender: Address): ActorRef  = refs(sender)
   def ref(orderId: ByteStr): ActorRef = refs(orders(orderId))

@@ -4,22 +4,13 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
-import com.wavesplatform.dex.settings.MatcherSettings
-import monix.execution.Scheduler
-import monix.reactive.Observable
 
 import scala.collection.mutable
 
-class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChanges],
-                       settings: MatcherSettings,
-                       orderDB: OrderDB,
-                       addressActorProps: (Address, Boolean) => Props,
-                       historyRouter: Option[ActorRef],
-                       spendableBalancesActor: ActorRef)
+class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) => Props, historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
 
@@ -28,14 +19,6 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
 
   private var startSchedules: Boolean = false
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
-
-  /** Sends balance changes to the AddressActors */
-  spendableBalanceChanges.foreach { spendableBalanceChanges =>
-    spendableBalancesActor ! SpendableBalancesActor.Command.UpdateDiff(spendableBalanceChanges)
-    spendableBalanceChanges.foreach {
-      case (address, assetBalances) => children.get(address) foreach { _ ! AddressActor.Command.CancelNotEnoughCoinsOrders(assetBalances) }
-    }
-  } { Scheduler(context.dispatcher) }
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 

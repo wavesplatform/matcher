@@ -53,11 +53,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val grpcExecutionContext                        = actorSystem.dispatchers.lookup("akka.actor.grpc-dispatcher")
 
   private val time = new NTP(settings.ntpServer)
-  private val wavesBlockchainAsyncClient = WavesBlockchainClientBuilder.async(
-    settings.wavesBlockchainClient,
-    monixScheduler,
-    grpcExecutionContext
-  )
+
+  private val wavesBlockchainAsyncClient =
+    WavesBlockchainClientBuilder.async(
+      settings.wavesBlockchainClient,
+      monixScheduler,
+      grpcExecutionContext
+    )
 
   private implicit val materializer: Materializer = Materializer.matFromSystem(actorSystem)
 
@@ -92,10 +94,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
   }
 
-  private implicit val errorContext: ErrorFormatterContext = {
-    case Asset.Waves        => 8
-    case asset: IssuedAsset => assetsCache.unsafeGetDecimals(asset)
-  }
+  private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
 
   private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val matchingRulesCache    = new MatchingRulesCache(settings)
@@ -305,36 +304,47 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     actorSystem.actorOf(HistoryRouter.props(assetsCache.unsafeGetDecimals, settings.postgresConnection, orderHistorySettings), "history-router")
   }
 
-  private val spendableBalancesActor = actorSystem.actorOf(Props(new SpendableBalancesActor(wavesBlockchainAsyncClient.allAssetsSpendableBalance)))
-
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
         new AddressDirectory(
-          wavesBlockchainAsyncClient.spendableBalanceChanges,
-          settings,
           orderDB,
-          (address, startSchedules) =>
-            Props(
-              new AddressActor(
-                address,
-                asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
-                time,
-                orderDB,
-                wavesBlockchainAsyncClient.forgedOrder,
-                matcherQueue.storeEvent,
-                orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
-                startSchedules,
-                spendableBalancesActor,
-                settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough,
-              )
-          ),
-          historyRouter,
-          spendableBalancesActor
+          createAddressActor,
+          historyRouter
         )
       ),
       "addresses"
     )
+
+  private val spendableBalancesActor = {
+    actorSystem.actorOf(
+      Props(
+        new SpendableBalancesActor(
+          wavesBlockchainAsyncClient.allAssetsSpendableBalance,
+          addressActors
+        )
+      )
+    ) unsafeTap { sba =>
+      wavesBlockchainAsyncClient.spendableBalanceChanges.foreach(sba ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
+    }
+  }
+
+  private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
+    Props(
+      new AddressActor(
+        address,
+        asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
+        time,
+        orderDB,
+        wavesBlockchainAsyncClient.forgedOrder,
+        matcherQueue.storeEvent,
+        orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
+        startSchedules,
+        spendableBalancesActor,
+        settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough,
+      )
+    )
+  }
 
   @volatile var matcherServerBinding: ServerBinding = _
 

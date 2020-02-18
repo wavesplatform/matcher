@@ -63,8 +63,9 @@ object Dependencies {
 
     val supertagged = "1.4"
 
-    val levelDb  = "0.12"
-    val influxDb = "2.17"
+    val javaLevelDb = "0.12"
+    val jniLevelDb  = "1.18.3"
+    val influxDb    = "2.17"
 
     val commonsNet = "3.6"
   }
@@ -116,7 +117,8 @@ object Dependencies {
   private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   private val monixReactive = monixModule("reactive")
   private val supertagged   = "org.rudogma" %% "supertagged" % Version.supertagged
-  private val levelDb       = "org.iq80.leveldb" % "leveldb" % Version.levelDb
+  private val javaLevelDb   = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
+  private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
 
@@ -141,7 +143,8 @@ object Dependencies {
     scalaTest,
     scalaCheck,
     scalaTestPlusCheck,
-    scalaMock
+    scalaMock,
+    javaLevelDb
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
@@ -189,7 +192,7 @@ object Dependencies {
       scopt,
       kafka,
       janino,
-      levelDb,
+      jniLevelDb,
       kamonCore,
       kamonModule("influxdb", Version.kamonInfluxDb),
       kamonModule("system-metrics", Version.kamonSystemMetrics),

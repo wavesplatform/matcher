@@ -9,7 +9,7 @@ import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.Events.OrderCanceled
@@ -28,6 +28,9 @@ class OrderBookSpec
     with NoShrink {
 
   implicit override val generatorDrivenConfig: PropertyCheckConfiguration = PropertyCheckConfiguration(minSuccessful = 1000)
+
+  private val maxLevelsInOrderBook = 6
+  private val maxOrdersInLevel     = 2
 
   // TODO migrate to long ranges in 2.13
   private val askPricesMin = 1000L * Order.PriceConstant
@@ -48,9 +51,8 @@ class OrderBookSpec
   }
 
   private val coinsInvariantPropGen = for {
-    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
-    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
-    newOrder                <- newOrderGen
+    (askOrders, bidOrders) <- flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen)
+    newOrder               <- newOrderGen
   } yield (askOrders, bidOrders, newOrder)
 
   "coins invariant" in forAll(coinsInvariantPropGen) {
@@ -132,8 +134,7 @@ ${diff.mkString("\n")}
 
   private val orderIdGen = Gen.alphaNumStr.suchThat(_.nonEmpty).map(x => ByteStr(x.getBytes(StandardCharsets.UTF_8)))
   private val cancelPropGen = for {
-    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
-    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
+    (askOrders, bidOrders) <- flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen)
     orderIdToCancel <- {
       if (askOrders.isEmpty && bidOrders.isEmpty) orderIdGen
       else Gen.oneOf(orderIdGen, Gen.oneOf((askOrders ++ bidOrders).map(_.order.id())))
@@ -178,10 +179,7 @@ ${events.mkString("\n")}
       }
   }
 
-  private val cancelAllPropGen = for {
-    (asksLevels, askOrders) <- sideOrdersGen(OrderType.SELL, maxLevelsInOrderBook, askPricesGen)
-    (_, bidOrders)          <- sideOrdersGen(OrderType.BUY, maxLevelsInOrderBook - asksLevels, bidPricesGen)
-  } yield (askOrders, bidOrders)
+  private val cancelAllPropGen = flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen)
 
   "cancelAll" in forAll(cancelAllPropGen) {
     case (askOrders, bidOrders) =>

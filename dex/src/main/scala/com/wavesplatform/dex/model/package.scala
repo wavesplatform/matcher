@@ -23,11 +23,13 @@ package object model {
         level.head
     }
 
-    def replaceBest(newBest: LimitOrder): Side = {
+    def replaceBest(newBest: LimitOrder): (LimitOrder, Side) = {
       require(side.nonEmpty, "Cannot replace the best level of an empty side")
       val (price, level) = side.head
       require(level.nonEmpty, "Cannot replace the best element of an empty level")
+      val oldHead = level.head
       side += (price -> (newBest +: level.tail))
+      (oldHead, side)
     }
 
     def remove(price: Price, orderId: ByteStr): LimitOrder = {

@@ -4,7 +4,7 @@ import cats.instances.FutureInstances
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.api.dex.HasDex
+import com.wavesplatform.dex.it.api.dex.{HasDex, HasWebSocket}
 import com.wavesplatform.dex.it.api.node.HasWavesNode
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.matchers.ItMatchers
@@ -41,7 +41,8 @@ trait MatcherSuiteBase
     with InformativeTestStart
     with FutureInstances
     with ToWavesJConversions
-    with ScorexLogging {
+    with ScorexLogging
+    with HasWebSocket {
 
   GenesisConfig.setupAddressScheme()
 
@@ -61,6 +62,7 @@ trait MatcherSuiteBase
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
     stopBaseContainers()
+    terminateWs()
     super.afterAll()
   }
 }

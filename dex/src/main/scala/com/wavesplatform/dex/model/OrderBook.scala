@@ -16,15 +16,13 @@ class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] v
   import OrderBook._
 
   private[model] val orderIds: mutable.Map[Order.Id, (OrderType, Price)] = {
-    val xs = for {
+    val r = mutable.Map.newBuilder[Order.Id, (OrderType, Price)]
+
+    for {
       (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
       lo             <- level
-    } yield lo.order.id() -> (lo.order.orderType, price)
+    } r.+=((lo.order.id(), (lo.order.orderType, price))) // The compiler doesn't allow write this less ugly
 
-    val r = mutable.Map.newBuilder[Order.Id, (OrderType, Price)]
-    xs.foreach { x =>
-      r += x
-    }
     r.result()
   }
 
@@ -43,13 +41,11 @@ class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] v
     } yield price -> lo
   }
 
-  def cancel(orderId: ByteStr, timestamp: Long): Option[OrderCanceled] = {
-    orderIds.get(orderId).map {
-      case (orderType, price) =>
-        val lo = (if (orderType == OrderType.BUY) bids else asks).remove(price, orderId)
-        orderIds -= orderId
-        OrderCanceled(lo, isSystemCancel = false, timestamp)
-    }
+  def cancel(orderId: ByteStr, timestamp: Long): Option[OrderCanceled] = orderIds.get(orderId).map {
+    case (orderType, price) =>
+      val lo = (if (orderType == OrderType.BUY) bids else asks).remove(price, orderId)
+      orderIds -= orderId
+      OrderCanceled(lo, isSystemCancel = false, timestamp)
   }
 
   def cancelAll(timestamp: Long): Seq[OrderCanceled] = {
@@ -66,8 +62,8 @@ class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] v
           tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
 
     val (events, lt) = ao.order.orderType match {
-      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, lastTrade, tickSize, getMakerTakerFee)
-      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, lastTrade, tickSize, getMakerTakerFee)
+      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, orderIds, lastTrade, tickSize, getMakerTakerFee)
+      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, orderIds, lastTrade, tickSize, getMakerTakerFee)
     }
 
     lastTrade = lt
@@ -128,7 +124,7 @@ object OrderBook {
               correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, tickSize)
 
             submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submittedLimitOrder)
-            orderIds += submitted.order.id() -> (submitted.order.orderType, correctedLevelPriceOfSubmittedOrder)
+            orderIds.+=((submitted.order.id(), (submitted.order.orderType, correctedLevelPriceOfSubmittedOrder)))
             (OrderAdded(submittedLimitOrder, eventTs) +: prevEvents, lastTrade)
 
           } { submittedMarketOrder =>
@@ -160,9 +156,10 @@ object OrderBook {
             val newEvents                        = orderExecutedEvent +: prevEvents
             val lt                               = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
-            if (orderExecutedEvent.counterRemaining.isValid) { // counter is not filled
-
-              counterSide.replaceBest(orderExecutedEvent.counterRemaining) // TODO
+            val counterRemaining = orderExecutedEvent.counterRemaining
+            if (counterRemaining.isValid) { // counter is not filled
+              // should not replace orderIds, because the counter order stays
+              counterSide.replaceBest(counterRemaining)
               val submittedRemaining = orderExecutedEvent.submittedRemaining
               // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
               if (submittedRemaining.isValid) (OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs) +: newEvents, lt)
@@ -175,7 +172,8 @@ object OrderBook {
               submitted match {
                 case _: LimitOrder =>
                   val remaining = orderExecutedEvent.submittedRemaining
-                  if (remaining.isValid) doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
+                  if (remaining.isValid)
+                    doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
                   else (newEvents, lt)
 
                 case submittedMarketOrder: MarketOrder =>
@@ -184,7 +182,8 @@ object OrderBook {
                   val canSpendMore      = remaining.availableForSpending > 0
 
                   (isSubmittedFilled, canSpendMore) match {
-                    case (false, true)  => doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
+                    case (false, true) =>
+                      doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
                     case (false, false) => (OrderCanceled(remaining, isSystemCancel = true, eventTs) +: newEvents, lt)
                     case (true, _)      => (newEvents, lt)
                   }

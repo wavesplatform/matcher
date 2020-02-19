@@ -15,7 +15,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase {
     Thread.sleep(10000)
 
     //messages should have size 9
-    for (e <- messages.entrySet) e.getValue should startWith("Now")
+    for (e <- wsMessages.entrySet) e.getValue should startWith("Now")
 
     // close the connection
     wsAlice.success(None)

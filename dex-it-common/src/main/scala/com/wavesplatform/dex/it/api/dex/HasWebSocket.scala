@@ -6,7 +6,7 @@ import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
-import akka.stream.{Attributes, Materializer}
+import akka.stream.{Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -18,11 +18,11 @@ trait HasWebSocket {
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
 
   val sink: Sink[Message, Future[Done]] = Sink.foreach {
-    case message: TextMessage.Strict => messages.put(messages.size.toString, message.text)
+    case message: TextMessage.Strict => wsMessages.put(wsMessages.size, message.text) //TODO: replace 'wsMessages.size' to something else
     case e                           => println(s"Unexpected message error: $e")
   }
 
-  var messages = new ConcurrentHashMap[String, String]() // ._2 could be replaced by something MatcherWsResponse
+  var wsMessages = new ConcurrentHashMap[Int, String]() //TODO: ._2 could be replaced by something like MatcherWsResponse
 
   def mkWebSocket(account: KeyPair, dex: DexContainer): Promise[Option[Message]] = {
     val endpoint = s"ws://127.0.0.1:${dex.restApiAddress.getPort}/ws/time"
@@ -31,7 +31,7 @@ trait HasWebSocket {
   }
 
   def terminateWs(): Unit = {
-    messages.clear
+    wsMessages.clear
     materializer.shutdown
     system.terminate
   }

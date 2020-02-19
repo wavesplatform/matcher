@@ -320,6 +320,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     actorSystem.actorOf(
       Props(
         new SpendableBalancesActor(
+          wavesBlockchainAsyncClient.spendableBalances,
           wavesBlockchainAsyncClient.allAssetsSpendableBalance,
           addressActors
         )
@@ -333,7 +334,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     Props(
       new AddressActor(
         address,
-        asset => wavesBlockchainAsyncClient.spendableBalance(address, asset),
         time,
         orderDB,
         wavesBlockchainAsyncClient.forgedOrder,

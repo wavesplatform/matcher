@@ -18,15 +18,18 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
-  private val refs                  = mutable.AnyRefMap.empty[Address, ActorRef]
-  private val orders                = mutable.AnyRefMap.empty[ByteStr, Address]
-  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]), addressDir)))
+  private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
+  private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
+
+  private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
+  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]]      = _ => Future.successful(Map.empty[Asset, Long])
+
+  private val spendableBalanceActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
 
   def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
     Props(
       new AddressActor(
         address,
-        _ => Future.successful(0L),
         time,
         new TestOrderDB(100),
         _ => Future.successful(false),

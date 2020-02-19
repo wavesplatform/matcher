@@ -10,8 +10,9 @@ import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class SpendableBalancesActor(allAssetsSpendableBalances: Address => Future[Map[Asset, Long]], addressDirectory: ActorRef)(
-    implicit ec: ExecutionContext)
+class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]],
+                             allAssetsSpendableBalances: Address => Future[Map[Asset, Long]],
+                             addressDirectory: ActorRef)(implicit ec: ExecutionContext)
     extends Actor {
 
   var fullState: Map[Address, Map[Asset, Long]]  = Map.empty
@@ -20,7 +21,19 @@ class SpendableBalancesActor(allAssetsSpendableBalances: Address => Future[Map[A
   def receive: Receive = {
 
     case SpendableBalancesActor.Query.GetState(address, assets) =>
-      sender ! SpendableBalancesActor.Reply.GetState(fullState getOrElse (address, Map.empty) filterKeys assets.contains)
+      val maybeAddressState            = fullState.get(address).orElse(addressDff get address)
+      val assetsMaybeBalances          = assets.map(asset => asset -> maybeAddressState.flatMap(_ get asset)).toMap
+      val (knownAssets, unknownAssets) = assetsMaybeBalances.partition { case (_, balance) => balance.isDefined }
+      val knownPreparedState           = knownAssets.collect { case (a, Some(b)) => a -> b }
+
+      if (unknownAssets.isEmpty) sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
+      else {
+        spendableBalances(address, unknownAssets.keySet).map { stateFromNode =>
+          if (fullState contains address) fullState = fullState.updated(address, fullState.getOrElse(address, Map.empty) ++ stateFromNode)
+          else addressDff = addressDff.updated(address, addressDff.getOrElse(address, Map.empty) ++ stateFromNode)
+          SpendableBalancesActor.Reply.GetState(stateFromNode ++ knownPreparedState)
+        } pipeTo sender
+      }
 
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
       fullState.get(address) match {
@@ -42,7 +55,9 @@ class SpendableBalancesActor(allAssetsSpendableBalances: Address => Future[Map[A
               val cleanStateUpdate = stateUpdate.filter { case (a, updatedBalance) => addressFullState.get(a).fold(true)(updatedBalance != _) }
               addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Command.CancelNotEnoughCoinsOrders(cleanStateUpdate))
               fullState = fullState.updated(address, addressFullState ++ stateUpdate)
-            case None => addressDff = addressDff.updated(address, addressDff.getOrElse(address, Map.empty) ++ stateUpdate)
+            case None =>
+              addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Command.CancelNotEnoughCoinsOrders(stateUpdate))
+              addressDff = addressDff.updated(address, addressDff.getOrElse(address, Map.empty) ++ stateUpdate)
           }
       }
 

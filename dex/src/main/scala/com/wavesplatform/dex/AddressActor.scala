@@ -3,10 +3,8 @@ package com.wavesplatform.dex
 import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status}
-import akka.pattern.pipe
-import cats.instances.future.catsStdInstancesForFuture
+import akka.pattern.{ask, pipe}
 import cats.instances.long.catsKernelStdGroupForLong
-import cats.syntax.functor.toFunctorOps
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
@@ -37,7 +35,6 @@ import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success}
 
 class AddressActor(owner: Address,
-                   spendableBalance: Asset => Future[Long],
                    time: Time,
                    orderDB: OrderDB,
                    hasOrderInBlockchain: Order.Id => Future[Boolean],
@@ -123,7 +120,7 @@ class AddressActor(owner: Address,
       }
 
     case command: Command.CancelNotEnoughCoinsOrders =>
-      addressStateDiff = addressStateDiff.updateSpendableAssets(command.newBalance.keySet)
+      if (activeWsConnections.nonEmpty) addressStateDiff = addressStateDiff.updateSpendableAssets(command.newBalance.keySet)
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
 
       if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
@@ -141,9 +138,7 @@ class AddressActor(owner: Address,
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
       val matchingActiveOrders = getActiveLimitOrders(maybePair)
-        .map { ao =>
-          ao.order.id() -> OrderInfo.v3(ao, activeStatus(ao))
-        }
+        .map(ao => ao.order.id() -> OrderInfo.v3(ao, activeStatus(ao)))
         .toSeq
         .sorted
 
@@ -153,9 +148,7 @@ class AddressActor(owner: Address,
 
     case event: Event.StoreFailed =>
       log.trace(s"Got $event")
-      pendingCommands.remove(event.orderId).foreach { item =>
-        item.client ! CanNotPersist(event.reason)
-      }
+      pendingCommands.remove(event.orderId).foreach { _.client ! CanNotPersist(event.reason) }
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")
@@ -318,9 +311,10 @@ class AddressActor(owner: Address,
   }
 
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
-    Future
-      .traverse(forAssets)(asset => spendableBalance(asset) tupleLeft asset)
-      .map(_.toMap |-| openVolume.filterKeys(forAssets.contains))
+    spendableBalancesActor
+      .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self)
+      .mapTo[SpendableBalancesActor.Reply.GetState]
+      .map { _.state |-| openVolume.filterKeys(forAssets.contains) }
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -336,8 +330,10 @@ class AddressActor(owner: Address,
 
     val origAoReservableBalance = activeOrders.get(ao.order.id()).fold(Map.empty[Asset, Long])(_.reservableBalance)
     if (ao.reservableBalance != origAoReservableBalance) {
-      spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, origAoReservableBalance |-| ao.reservableBalance)
-      addressStateDiff = addressStateDiff.updateReservedAssets(ao.reservableBalance.keySet)
+      if (activeWsConnections.nonEmpty) {
+        spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, origAoReservableBalance |-| ao.reservableBalance)
+        addressStateDiff = addressStateDiff.updateReservedAssets(ao.reservableBalance.keySet)
+      }
       openVolume = openVolume |+| (ao.reservableBalance |-| origAoReservableBalance)
     }
 

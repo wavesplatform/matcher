@@ -99,10 +99,12 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     spendableBalanceChangesSubject
   }
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
+  override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
     blockchainService
-      .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
-      .map(_.balance)
+      .spendableAssetsBalances {
+        SpendableAssetsBalancesRequest(address = address.toPB, assets.map(a => SpendableAssetsBalancesRequest.Record(a.toPB)).toSeq)
+      }
+      .map(response => response.balances.map(record => record.assetId.toVanillaAsset -> record.balance).toMap)
   }
 
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] = handlingErrors {

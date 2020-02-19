@@ -101,13 +101,15 @@ class ReservedBalanceSpecification
     )
   )
 
-  private val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]), addressDir)))
+  private val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = (_, _) => Future.successful(Map.empty[Asset, Long])
+  private val allAssetsSpendableBalances: Address => Future[Map[Asset, Long]]      = _ => Future.successful(Map.empty[Asset, Long])
+
+  private val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, addressDir)))
 
   private def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
     Props(
       new AddressActor(
         address,
-        _ => Future.successful(0L),
         ntpTime,
         new TestOrderDB(100),
         _ => Future.successful(false),
@@ -477,7 +479,7 @@ class ReservedBalanceSpecification
   private val USD   = pair.priceAsset
   private val ETH   = mkAssetId("ETH")
 
-  private def addressDirWithSpendableBalance(spendableBalance: Asset => Future[Long],
+  private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]],
                                              orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot(),
                                              testProbe: TestProbe): ActorRef = {
 
@@ -491,13 +493,13 @@ class ReservedBalanceSpecification
       )
     )
 
-    lazy val spendableBalancesActor = system.actorOf(Props(new SpendableBalancesActor(_ => Future.successful(Map.empty[Asset, Long]), addressDir)))
+    lazy val spendableBalancesActor =
+      system.actorOf(Props(new SpendableBalancesActor((_, assets) => spendableBalances(assets), allAssetsSpendableBalances, addressDir)))
 
     def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
       Props(
         new AddressActor(
           owner = address,
-          spendableBalance = spendableBalance,
           time = ntpTime,
           orderDB = new TestOrderDB(100),
           hasOrderInBlockchain = _ => Future.successful(false),
@@ -575,7 +577,7 @@ class ReservedBalanceSpecification
     } {
 
       val tp         = TestProbe()
-      val addressDir = addressDirWithSpendableBalance(balance.mapValues(Future.successful), testProbe = tp)
+      val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.filterKeys(assets.contains) }, testProbe = tp)
       val fee        = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
@@ -679,7 +681,7 @@ class ReservedBalanceSpecification
         }
 
         val tp         = TestProbe()
-        val addressDir = addressDirWithSpendableBalance(balance.mapValues { Future.successful }, orderBookCache, tp)
+        val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.filterKeys(assets.contains) }, orderBookCache, tp)
         val fee        = Some(moFeeAsst.amt(matcherFee))
 
         val (order, counter) = moTpe match {

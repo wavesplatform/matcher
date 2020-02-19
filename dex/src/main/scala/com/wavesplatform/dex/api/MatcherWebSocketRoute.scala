@@ -8,7 +8,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
+import akka.stream.{Materializer, OverflowStrategy}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.PathMatchers.PublicKeyPM
 import com.wavesplatform.dex.api.http.ApiRoute
@@ -30,15 +30,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef)(implicit mat: Mater
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
-  private def accountUpdatesSource(publicKey: PublicKey) /*: ActorRef*/ = {
-
-    val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case _ => CompletionStrategy.immediately }
-    val failureMatcher: PartialFunction[Any, Throwable]             = { case _ => throw new IllegalStateException("Stream processing error") }
-
+  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, Unit] = {
     Source
       .actorRef[WsAddressState](
-//        completionMatcher = completionMatcher,
-//        failureMatcher = failureMatcher,
         bufferSize = 10,
         overflowStrategy = OverflowStrategy.fail
       )

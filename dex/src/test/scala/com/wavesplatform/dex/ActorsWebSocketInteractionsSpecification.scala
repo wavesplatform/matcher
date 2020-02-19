@@ -43,7 +43,7 @@ class ActorsWebSocketInteractionsSpecification
           AcceptedOrder => Unit, // add order
           (AcceptedOrder, Boolean) => Unit, // cancel
           (AcceptedOrder, LimitOrder) => OrderExecuted, // execute
-          (Boolean, Map[Asset, Long]) => Unit, // update spendable balances
+          Map[Asset, Long] => Unit, // update spendable balances
           Map[Asset, WsBalances] => Unit // expect balances diff by web socket
       ) => Unit
   ): Unit = {
@@ -52,20 +52,26 @@ class ActorsWebSocketInteractionsSpecification
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address          = KeyPair("test".getBytes)
 
+    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
+      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).filterKeys(assets.contains) }
+    }
+
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
       Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) }
     }
 
+    lazy val addressDir = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
+
     lazy val spendableBalancesActor =
       system.actorOf(
-        Props(new SpendableBalancesActor(allAssetsSpendableBalance, addressDir)(scala.concurrent.ExecutionContext.Implicits.global))
+        Props(
+          new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir)(scala.concurrent.ExecutionContext.Implicits.global))
       )
 
     def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
       Props(
         new AddressActor(
           address,
-          x => Future.successful { currentPortfolio.get().spendableBalanceOf(x) },
           ntpTime,
           EmptyOrderDB,
           _ => Future.successful(false),
@@ -79,8 +85,6 @@ class ActorsWebSocketInteractionsSpecification
         )
       )
     }
-
-    lazy val addressDir = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
 
     def subscribe(): Unit = {
       addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
@@ -110,22 +114,19 @@ class ActorsWebSocketInteractionsSpecification
       oe
     }
 
-    def updateBalances(notify: Boolean, changes: Map[Asset, Long]): Unit = {
+    def updateBalances(changes: Map[Asset, Long]): Unit = {
 
       val updatedPortfolio = Portfolio(changes.getOrElse(Waves, 0), LeaseBalance.empty, changes.collect { case (a: IssuedAsset, b) => a -> b })
-      val prevPortfolio    = currentPortfolio.getAndSet(updatedPortfolio)
+      val prevPortfolio    = Option(currentPortfolio getAndSet updatedPortfolio).getOrElse(Portfolio.empty)
 
-      if (notify) {
+      val spendableBalanceChanges: Map[Asset, Long] =
+        prevPortfolio
+          .changedAssetIds(updatedPortfolio)
+          .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
+          .toMap
+          .withDefaultValue(0)
 
-        val spendableBalanceChanges: Map[Asset, Long] =
-          prevPortfolio
-            .changedAssetIds(updatedPortfolio)
-            .map(asset => asset -> updatedPortfolio.spendableBalanceOf(asset))
-            .toMap
-            .withDefaultValue(0)
-
-        spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address.toAddress -> spendableBalanceChanges))
-      }
+      spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address.toAddress -> spendableBalanceChanges))
     }
 
     def expectWebSocketBalance(expected: Map[Asset, WsBalances]): Unit = {
@@ -152,7 +153,8 @@ class ActorsWebSocketInteractionsSpecification
 
       "sender places order and then cancel it" in webSocketTest {
         (_, _, address, subscribeAddress, addOrder, cancel, _, updateBalances, expectWsBalance) =>
-          updateBalances(false, Map(Waves -> 100.waves, usd -> 300.usd))
+          updateBalances(Map(Waves -> 100.waves, usd -> 300.usd))
+
           subscribeAddress
           expectWsBalance(Map(Waves -> WsBalances(100.waves, 0), usd -> WsBalances(300.usd, 0)))
 
@@ -168,7 +170,7 @@ class ActorsWebSocketInteractionsSpecification
       "sender places order, receives updates by third asset, partly fills order and then cancels remaining" in webSocketTest {
         (_, _, address, subscribeAddress, addOrder, cancel, executeOrder, updateBalances, expectWsBalance) =>
           withClue("Sender has 100 Waves and 300 USD, requests snapshot\n") {
-            updateBalances(false, Map(Waves -> 100.waves, usd -> 300.usd))
+            updateBalances(Map(Waves -> 100.waves, usd -> 300.usd))
             subscribeAddress
             expectWsBalance(
               Map(
@@ -187,16 +189,16 @@ class ActorsWebSocketInteractionsSpecification
           }
 
           withClue("Sender received some ETH and this transfer transaction was forged\n") {
-            updateBalances(true, Map(Waves -> 100.waves, usd -> 300.usd, eth -> 4.eth))
-            expectWsBalance(Map(eth        -> WsBalances(4.eth, 0)))
+            updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 4.eth))
+            expectWsBalance(Map(eth  -> WsBalances(4.eth, 0)))
           }
 
           val oe = executeOrder(sellOrder, buyOrder)
 
           withClue("Sender's order was partly filled by SELL 5 Waves. Balance changes are not atomic\n") {
-            expectWsBalance(Map(usd        -> WsBalances(270.usd, 15.usd))) // first we send decreased balances
-            updateBalances(true, Map(Waves -> 105.waves, usd -> 285.usd)) // then we receive balance changes from blockchain
-            expectWsBalance(Map(Waves      -> WsBalances(105.waves, 0)))
+            expectWsBalance(Map(usd   -> WsBalances(270.usd, 15.usd))) // first we send decreased balances
+            updateBalances(Map(Waves  -> 105.waves, usd -> 285.usd)) // then we receive balance changes from blockchain
+            expectWsBalance(Map(Waves -> WsBalances(105.waves, 0)))
           }
 
           withClue("Cancelling remaining of the counter order\n") {
@@ -212,7 +214,7 @@ class ActorsWebSocketInteractionsSpecification
           }
 
           val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
-          updateBalances(false, tradableBalance)
+          updateBalances(tradableBalance)
 
           subscribeAddress
           expectWsBalance { Map(Waves -> WsBalances(100.waves, 0), usd -> WsBalances(300.usd, 0), eth -> WsBalances(2.eth, 0)) }
@@ -228,7 +230,7 @@ class ActorsWebSocketInteractionsSpecification
             mo = matchOrders(mo, 10.waves)
             expectWsBalance { Map(usd -> WsBalances(150.usd, 120.usd), eth -> WsBalances(1.99998297.eth, 0.00001363.eth)) }
 
-            updateBalances(true, Map(Waves -> 110.waves, usd -> 270.usd, eth -> 1.99999660.eth)) // transaction forged
+            updateBalances(Map(Waves -> 110.waves, usd -> 270.usd, eth -> 1.99999660.eth)) // transaction forged
             expectWsBalance { Map(Waves -> WsBalances(110.waves, 0)) }
           }
 
@@ -236,7 +238,7 @@ class ActorsWebSocketInteractionsSpecification
             mo = matchOrders(mo, 15.waves)
             expectWsBalance { Map(usd -> WsBalances(150.usd, 75.usd), eth -> WsBalances(1.99998297.eth, 0.00000853.eth)) }
 
-            updateBalances(true, Map(Waves -> 125.waves, usd -> 225.usd, eth -> 1.99999150.eth)) // transaction forged
+            updateBalances(Map(Waves -> 125.waves, usd -> 225.usd, eth -> 1.99999150.eth)) // transaction forged
             expectWsBalance { Map(Waves -> WsBalances(125.waves, 0)) }
           }
 
@@ -244,7 +246,7 @@ class ActorsWebSocketInteractionsSpecification
             mo = matchOrders(mo, 5.waves)
             expectWsBalance { Map(usd -> WsBalances(150.usd, 60.usd), eth -> WsBalances(1.99998297.eth, 0.00000683.eth)) }
 
-            updateBalances(true, Map(Waves -> 130.waves, usd -> 210.usd, eth -> 1.99998980.eth)) // transaction forged
+            updateBalances(Map(Waves -> 130.waves, usd -> 210.usd, eth -> 1.99998980.eth)) // transaction forged
             expectWsBalance { Map(Waves -> WsBalances(130.waves, 0)) }
           }
 
@@ -256,24 +258,24 @@ class ActorsWebSocketInteractionsSpecification
         // TODO Use blockchain updates stream to solve tradable balances toggling! (Node v.1.1.8)
 
 //          withClue(s"1 transaction forged\n") {
-//            updateBalances(true, Map(Waves -> 110.waves, usd -> 270.usd, eth -> 1.99999660.eth))
+//            updateBalances(Map(Waves -> 110.waves, usd -> 270.usd, eth -> 1.99999660.eth))
 //            expectWsBalance { Map(Waves -> WsBalances(110.waves, 0), usd -> WsBalances(270.usd, 0), eth -> WsBalances(1.99999660.eth, 0)) }
 //          }
 //
 //          withClue(s"2 transaction forged\n") {
-//            updateBalances(true, Map(Waves -> 125.waves, usd -> 225.usd, eth -> 1.99999150.eth))
+//            updateBalances(Map(Waves -> 125.waves, usd -> 225.usd, eth -> 1.99999150.eth))
 //            expectWsBalance { Map(Waves -> WsBalances(125.waves, 0), usd -> WsBalances(225.usd, 0), eth -> WsBalances(1.99999150.eth, 0)) }
 //          }
 //
 //          withClue(s"3 transaction forged\n") {
-//            updateBalances(true, Map(Waves -> 130.waves, usd -> 210.usd, eth -> 1.99998980.eth))
+//            updateBalances(Map(Waves -> 130.waves, usd -> 210.usd, eth -> 1.99998980.eth))
 //            expectWsBalance { Map(Waves -> WsBalances(130.waves, 0), usd -> WsBalances(210.usd, 0), eth -> WsBalances(1.99998980.eth, 0)) }
 //          }
       }
 
-      s"there are few subscriptions from single address" in webSocketTest { (ad, _, address, _, addOrder, cancel, _, updateBalances, _) =>
+      "there are few subscriptions from single address" in webSocketTest { (ad, _, address, _, addOrder, cancel, _, updateBalances, _) =>
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
-        updateBalances(false, tradableBalance)
+        updateBalances(tradableBalance)
 
         def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), tp.ref)
 
@@ -287,7 +289,7 @@ class ActorsWebSocketInteractionsSpecification
         subscribe(webSubscription)
         expectWsBalance(webSubscription, Map(Waves -> WsBalances(100.waves, 0), usd -> WsBalances(300.usd, 0), eth -> WsBalances(2.eth, 0)))
 
-        updateBalances(true, Map(Waves           -> 100.waves, usd -> 300.usd, eth -> 5.eth))
+        updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
         expectWsBalance(webSubscription, Map(eth -> WsBalances(5.eth, 0)))
 
         subscribe(mobileSubscription)
@@ -303,6 +305,18 @@ class ActorsWebSocketInteractionsSpecification
 
         cancel(order, true)
         Seq(webSubscription, mobileSubscription, desktopSubscription).foreach { expectWsBalance(_, Map(usd -> WsBalances(300.usd, 0))) }
+      }
+
+      "so far unsubscribed address made some actions and then subscribes" in webSocketTest {
+        (ad, _, address, subscribeAddress, addOrder, cancel, _, updateBalances, expectWsBalance) =>
+          updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth) }
+          addOrder { LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0)) }
+
+          updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
+          updateBalances { Map(Waves -> 115.waves, usd -> 300.usd, eth -> 5.eth) }
+
+          subscribeAddress
+          expectWsBalance { Map(Waves -> WsBalances(115.waves, 0), usd -> WsBalances(297.usd, 3.usd), eth -> WsBalances(5.eth, 0)) }
       }
     }
   }

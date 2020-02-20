@@ -1,24 +1,33 @@
 package com.wavesplatform.it.sync.api
 
+import akka.http.scaladsl.model.ws.Message
 import com.wavesplatform.it.MatcherSuiteBase
-
-import scala.collection.JavaConversions._
 
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase {
 
   "connection should be established" in {
-    // open connection to ws-service, connection will be alive until ws.success() will not called
-    val wsAlice = mkWebSocket(alice, dex1)
-    val wsBob = mkWebSocket(bob, dex1)
 
-    // some actions...
-    Thread.sleep(10000)
+    val wsUri                           = s"${dex1.restApiAddress.getPort}/ws/time"
+    val outputParser: Message => String = _.asTextMessage.getStrictText
 
-    //messages should have size 9
-    for (e <- wsMessages.entrySet) e.getValue should startWith("Now")
+    val wscMobile = mkWebSocketConnection(wsUri, outputParser)
+    val wscWeb    = mkWebSocketConnection(wsUri, outputParser, trackOutput = false)
+    val wscTest   = mkWebSocketConnection(wsUri, outputParser)
 
-    // close the connection
-    wsAlice.success(None)
+    Thread.sleep(2000)
+
+    val wscDesktop = mkWebSocketConnection(wsUri, outputParser)
+
+    Thread.sleep(3000)
+
+    Seq(wscMobile, wscDesktop, wscTest).foreach { connection =>
+      connection.close()
+      connection.getMessagesBuffer.foreach(_ should startWith("Now is"))
+    }
+
+    wscTest.clearMessagesBuffer()
+
+    wscMobile.getMessagesBuffer.size should be > wscDesktop.getMessagesBuffer.size
+    Seq(wscWeb, wscTest).foreach { _.getMessagesBuffer.size shouldBe 0 }
   }
-
 }

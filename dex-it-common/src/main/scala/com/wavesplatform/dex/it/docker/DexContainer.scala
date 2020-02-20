@@ -9,7 +9,7 @@ import cats.instances.try_._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.dex.{DexApi}
+import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
 import com.wavesplatform.dex.it.fp

@@ -424,7 +424,9 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     "should be rejected if user has enough balance to fill market order, but has not enough balance to pay fee in another asset" in {
       dex1.restartWithNewSuiteConfig(
-        ConfigFactory.parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = $FIXED").withFallback(dexInitialSuiteConfig)
+        ConfigFactory
+          .parseString(s"waves.dex.order-fee.-1.fixed.asset = $BtcId\nwaves.dex.order-fee.-1.mode = $FIXED")
+          .withFallback(dexInitialSuiteConfig)
       )
 
       val amount   = 10.waves
@@ -440,5 +442,26 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
         s"0.003 ${BtcId.toString}"
       )
     }
+  }
+
+  "Market order creation is possible when spenadable balance is equal to reservable" in {
+
+    dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.order-fee.-1.mode = $DYNAMIC").withFallback(dexInitialSuiteConfig))
+
+    val carol = KeyPair("carol".getBytes)
+
+    broadcastAndAwait(mkTransfer(alice, carol, 10.waves, Waves))
+
+    val order1 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0)
+    val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0)
+
+    dex1.api.place(order1)
+    dex1.api.reservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
+    wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
+
+    dex1.api.tryPlaceMarket(order2) should failWith(
+      3147270,
+      "Not enough tradable balance"
+    )
   }
 }

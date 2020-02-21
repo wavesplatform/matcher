@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
+import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
 import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.test.InformativeTestStart
@@ -30,6 +31,7 @@ trait MatcherSuiteBase
     with BaseContainersKit
     with HasDex
     with HasWavesNode
+    with HasWebSockets
     with MkWavesEntities
     with ApiExtensions
     with ItMatchers
@@ -61,6 +63,7 @@ trait MatcherSuiteBase
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
     stopBaseContainers()
+    cleanupWebSockets()
     super.afterAll()
   }
 }

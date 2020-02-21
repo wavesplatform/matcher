@@ -63,6 +63,7 @@ trait MatcherSuiteBase
   override protected def afterAll(): Unit = {
     log.debug(s"Perform afterAll")
     stopBaseContainers()
+    cleanupWebSockets()
     super.afterAll()
   }
 }

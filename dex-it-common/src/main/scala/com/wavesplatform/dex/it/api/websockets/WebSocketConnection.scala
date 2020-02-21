@@ -28,4 +28,6 @@ case class WebSocketConnection[Output](uri: String, parseOutput: Message => Outp
   def clearMessagesBuffer(): Unit = messagesBuffer.clear()
 
   def close(): Unit = closed.success(None)
+
+  def isClosed: Boolean = closed.isCompleted
 }

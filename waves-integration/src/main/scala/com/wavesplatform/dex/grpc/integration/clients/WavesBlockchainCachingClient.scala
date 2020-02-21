@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
+import java.net.InetAddress
 import java.time.Duration
 
 import com.wavesplatform.dex.domain.account.Address
@@ -51,5 +52,6 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   override def wereForged(txIds: Seq[ByteStr]): Future[Map[ByteStr, Boolean]]                           = underlying.wereForged(txIds)
   override def broadcastTx(tx: ExchangeTransaction): Future[Boolean]                                    = underlying.broadcastTx(tx)
   override def forgedOrder(orderId: ByteStr): Future[Boolean]                                           = underlying.forgedOrder(orderId)
+  override def getNodeAddress: Future[InetAddress]                                                      = underlying.getNodeAddress
   override def close(): Future[Unit]                                                                    = underlying.close()
 }

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
+import java.net.InetAddress
+
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
@@ -34,6 +36,8 @@ trait WavesBlockchainClient[F[_]] {
   def broadcastTx(tx: ExchangeTransaction): F[Boolean]
 
   def forgedOrder(orderId: ByteStr): F[Boolean]
+
+  def getNodeAddress: F[InetAddress]
 
   def close(): F[Unit]
 }

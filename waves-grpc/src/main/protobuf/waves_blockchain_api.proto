@@ -31,6 +31,8 @@ service WavesBlockchainApi {
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
     rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
+
+    rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
 }
 
 // Common requests
@@ -144,6 +146,10 @@ message BalanceChangesResponse {
         int64 balance = 3;
     }
     repeated Record batch = 1;
+}
+
+message NodeAddressResponse {
+    string address = 1;
 }
 
 // Other entities

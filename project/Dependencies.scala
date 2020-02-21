@@ -25,9 +25,10 @@ object Dependencies {
     val scopt          = "4.0.0-RC2"
     val ficus          = "1.4.7"
 
-    val logback = "1.2.3"
-    val slf4j   = "1.7.30"
-    val janino  = "3.1.0"
+    val logback            = "1.2.3"
+    val slf4j              = "1.7.30"
+    val janino             = "3.1.0"
+    val logbackJsonEncoder = "6.3"
 
     val silencer = "1.4.4"
 
@@ -95,6 +96,7 @@ object Dependencies {
   private val scopt                = "com.github.scopt" %% "scopt" % Version.scopt
   private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
+  private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
   private val slf4j                = "org.slf4j" % "slf4j-api" % Version.slf4j
   private val julToSlf4j           = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
@@ -185,6 +187,7 @@ object Dependencies {
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,
       logback,
+      logbackJsonEncoder % Runtime,
       kindProjector,
       catsTaglessMacros,
       shapeless,

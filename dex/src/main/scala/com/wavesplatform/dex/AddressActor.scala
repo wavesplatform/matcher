@@ -283,7 +283,7 @@ class AddressActor(owner: Address,
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
     Future
       .traverse(forAssets)(asset => spendableBalance(asset) tupleLeft asset)
-      .map(_.toMap |-| openVolume)
+      .map(xs => (xs.toMap |-| openVolume).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {

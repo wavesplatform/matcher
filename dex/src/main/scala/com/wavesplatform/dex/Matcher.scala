@@ -451,8 +451,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         log.info(s"Last queue offset is $lastOffsetQueue")
         waitOffsetReached(lastOffsetQueue, deadline)
       }
+
+      connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
     } yield {
       log.info("Last offset has been reached, notify addresses")
+      log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
       addressActors ! AddressDirectory.StartSchedules
     }
 

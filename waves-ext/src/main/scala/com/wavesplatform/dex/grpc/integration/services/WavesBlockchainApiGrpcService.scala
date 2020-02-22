@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.services
 
+import java.net.InetAddress
+
 import cats.syntax.either._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
@@ -152,5 +154,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
         log.trace(error.formatStackTrace(e))
         Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
     }
+  }
+
+  override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
+    NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 }

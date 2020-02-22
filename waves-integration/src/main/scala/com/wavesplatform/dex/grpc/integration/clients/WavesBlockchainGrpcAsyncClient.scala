@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.grpc.integration.clients
 
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 import com.google.protobuf.ByteString
@@ -70,7 +71,11 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     override def onCompleted(): Unit = log.info("Balance changes stream completed!")
 
     override def onNext(value: BalanceChangesResponse): Unit = {
-      if (isConnectionEstablished.compareAndSet(false, true)) log.info("Connection with Node restored!")
+      if (isConnectionEstablished.compareAndSet(false, true)) {
+        blockchainService.getNodeAddress { Empty() } foreach { response =>
+          log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
+        }
+      }
       spendableBalanceChangesSubject.onNext(groupByAddress(value))
     }
 
@@ -151,5 +156,11 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     channel.shutdownNow()
     // See NettyChannelBuilder.eventLoopGroup
     eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
+  }
+
+  override def getNodeAddress: Future[InetAddress] = handlingErrors {
+    blockchainService.getNodeAddress { Empty() } map { r =>
+      InetAddress.getByName(r.address)
+    }
   }
 }

@@ -283,6 +283,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
       placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 100.waves, 3.00))
 
+      // Balance of bob could be 15k instead of 494994796800000
       wavesNode1.api.broadcast { mkTransfer(bob, alice, wavesNode1.api.balance(bob, Waves) - matcherFee, Waves) }
 
       dex1.api.tryPlace { mkOrderDP(bob, wavesUsdPair, SELL, 100.waves, 3.00) } should failWith(3147270) // BalanceNotEnough

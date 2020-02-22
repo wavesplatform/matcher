@@ -1,12 +1,10 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.feature.BlockchainFeatures
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
-import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities
 import com.wavesplatform.it.MatcherSuiteBase
@@ -21,19 +19,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAssetTestSuite._
 
-  override protected val wavesNodeInitialSuiteConfig: Config =
-    ConfigFactory
-      .parseString(
-        s"""waves {
-           |  miner.minimal-block-generation-offset = 10s
-           |
-           |  blockchain.custom.functionality.pre-activated-features = {
-           |    ${BlockchainFeatures.SmartAssets.id} = 0,
-           |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
-           |  }
-           |}""".stripMargin
-      )
-
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(s"""waves.dex.price-assets = ["${allowAsset.id}", "${denyAsset.id}", "${unscriptedAsset.id}"]""")
 
@@ -46,25 +31,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   override protected def afterEach(): Unit = {
     super.afterEach()
     dex1.api.cancelAll(matcher)
-  }
-
-  "can match orders when SmartAccTrading is still not activated" in {
-    val pair = AssetPair(Waves, allowAsset)
-
-    val counter = mkOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    placeAndAwaitAtDex(counter)
-
-    val submitted = mkOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, matcherFee = smartTradeFee)
-    placeAndAwaitAtDex(submitted, OrderStatus.Filled)
-
-    waitForOrderAtNode(submitted)
-  }
-
-  "wait activation" in {
-    wavesNode1.api.waitForActivationStatus(_.features.exists { x =>
-      x.id == BlockchainFeatures.SmartAccountTrading.id && x.blockchainStatus == BlockchainStatus.Activated
-    })
-    Thread.sleep(3000) // TODO See OrdersFromScriptedAccTestSuite
   }
 
   "can place if the script returns TRUE" in {
@@ -204,6 +170,4 @@ object OrdersFromScriptedAssetTestSuite {
     "AgQAAAAHJG1hdGNoMAUAAAACdHgDCQAAAQAAAAIFAAAAByRtYXRjaDACAAAAE0V4Y2hhbmdlVHJhbnNhY3Rpb24EAAAAAnR4BQAAAAckbWF0Y2gwCQA" +
       "AZwAAAAIAAAAAAAABhqAICAUAAAACdHgAAAAJc2VsbE9yZGVyAAAABmFtb3VudAQAAAAFb3RoZXIFAAAAByRtYXRjaDAGTQhceA=="
   )
-
-  private val activationHeight = 5
 }

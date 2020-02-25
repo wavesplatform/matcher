@@ -14,33 +14,29 @@ import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.{DexContainer, WavesNodeContainer}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
-import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.scalatest
 import org.testcontainers.containers.ToxiproxyContainer
-import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 @NetworkTests
 class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  private val kafkaProxy1: ToxiproxyContainer.ContainerProxy = mkToxiProxy("kafka-dev-aws-fr-1.wvservices.com", 9092)
+  private val dex1KafkaProxy: ToxiproxyContainer.ContainerProxy = mkToxiProxy("kafka-dev-aws-fr-1.wvservices.com", 9092)
 
   override protected def dexInitialSuiteConfig(): Config = {
     ConfigFactory.parseString(s"""waves.dex {
-                                 |
                                  |  events-queue {
                                  |      type = "kafka"
                                  |      kafka {
-                                 |          servers = "$toxiProxyHostName:${getInnerToxiProxyPort(kafkaProxy1)}"
+                                 |          servers = "$toxiProxyHostName:${getInnerToxiProxyPort(dex1KafkaProxy)}"
                                  |          topic = "$toxiProxyHostName"
                                  |          group = "$toxiProxyHostName"
                                  |     }
                                  |  }
-                                 |
                                  |  price-assets = [ "$UsdId", "WAVES" ]
                                  |}""".stripMargin)
   }
 
-  protected def dex2InitialSuiteConfig(): Config = {
+  protected def dex2InitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {
                                  |
                                  |  events-queue {
@@ -51,7 +47,6 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
                                  |          group = "$toxiProxyHostName"
                                  |     }
                                  |  }
-                                 |
                                  |  price-assets = [ "$UsdId", "WAVES" ]
                                  |}""".stripMargin)
   }
@@ -68,7 +63,7 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
   override protected def afterEach(): Unit = {
     //   wavesNodeProxy.toxics().getAll.forEach(_.remove())
-  //  clearOrderBook()
+    //  clearOrderBook()
   }
 
   def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
@@ -89,59 +84,22 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
   "test with kafka" in {
 
-    //kafkaProxy1.toxics().latency("latencyK1Up", ToxicDirection.UPSTREAM, 4500)
-
     val acc1 = createAccountWithBalance(15.015.waves -> Waves)
     val acc2 = createAccountWithBalance(0.015.waves  -> Waves, 15.usd -> usd)
 
-//    dex1.api.place(mkOrder(acc1, wavesUsdPair, OrderType.SELL, 1.waves, 1.usd))
-//    dex1.api.place(mkOrder(acc1, wavesUsdPair, OrderType.SELL, 2.waves, 1.usd))
-//    dex1.api.place(mkOrder(acc1, wavesUsdPair, OrderType.SELL, 3.waves, 1.usd))
-//    dex1.api.place(mkOrder(acc1, wavesUsdPair, OrderType.SELL, 4.waves, 1.usd))
-//    dex1.api.place(mkOrder(acc1, wavesUsdPair, OrderType.SELL, 5.waves, 1.usd))
-
-    //    dex1.api.place(mkOrder(acc2, wavesUsdPair, OrderType.BUY, 1.waves, 1.usd))
-    //    dex1.api.place(mkOrder(acc2, wavesUsdPair, OrderType.BUY, 2.waves, 1.usd))
-    //    dex1.api.place(mkOrder(acc2, wavesUsdPair, OrderType.BUY, 3.waves, 1.usd))
-    //    dex1.api.place(mkOrder(acc2, wavesUsdPair, OrderType.BUY, 4.waves, 1.usd))
-
     (1 to 5).foreach { amt =>
-      placeAndAwaitAtDex(mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, 1.0))
+      placeAndAwaitAtDex(mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, amt))
     }
-
-
 
     dex1.dockerClient.disconnectFromNetworkCmd().withNetworkId(network.getId).withContainerId(getProxyContainer.getContainerId).exec()
+//    dex1KafkaProxy.setConnectionCut(true)
+    Thread.sleep(3000)
 
-
-   // kafkaProxy1.toxics().latency("latencyK1Down2121", ToxicDirection.DOWNSTREAM, 15000000).setJitter(100)
-  //  kafkaProxy1.toxics().latency("latencyK1Down112112", ToxicDirection.UPSTREAM, 10000).setJitter(100)
-
-    (1 to 5).foreach { amt =>
-
-      val order = mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, 1.0)
-
-
-
+    (1 to 3).foreach { amt =>
+      val order = mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
       dex2.api.place(order)
-
-
-
-
-
-
-
-     // dex2.api.waitForOrderStatus(order, OrderStatus.Filled)
-
-//      placeAndAwaitAtDex(mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, 1.0), OrderStatus.Filled, dex2)
+      dex2.api.waitForOrderStatus(order, OrderStatus.Filled)
     }
-
-
-
-
-//    val lastOrder = mkOrder(acc2, wavesUsdPair, OrderType.BUY, 5.waves, 1.usd)
-//    dex1.api.place(lastOrder)
-//    dex1.api.waitForOrderStatus(lastOrder, OrderStatus.Filled)
 
     val orderBook = dex1.api.orderBook(wavesUsdPair)
     orderBook.bids should be(empty)

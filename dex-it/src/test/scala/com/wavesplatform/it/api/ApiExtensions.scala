@@ -7,6 +7,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
@@ -15,9 +16,9 @@ import scala.collection.immutable.TreeMap
 
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
-  protected def placeAndAwaitAtDex(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted): OrderStatusResponse = {
-    dex1.api.place(order)
-    dex1.api.waitForOrderStatus(order, expectedStatus)
+  protected def placeAndAwaitAtDex(order: Order, expectedStatus: OrderStatus = OrderStatus.Accepted, dex: DexContainer = dex1): OrderStatusResponse = {
+    dex.api.place(order)
+    dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
   protected def placeAndAwaitAtNode(order: Order,

@@ -21,7 +21,7 @@ trait HasWavesNode { self: BaseContainersKit =>
   protected def createWavesNode(name: String,
                                 runConfig: Config = wavesNodeRunConfig,
                                 suiteInitialConfig: Config = wavesNodeInitialSuiteConfig): WavesNodeContainer =
-    WavesNodeContainer(name, networkName, network, getIp(name), wavesNodeRunConfig, wavesNodeInitialSuiteConfig, localLogsDir) unsafeTap addKnownContainer
+    WavesNodeContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir) unsafeTap addKnownContainer
 
   lazy val wavesNode1: WavesNodeContainer = createWavesNode("waves-1")
 }

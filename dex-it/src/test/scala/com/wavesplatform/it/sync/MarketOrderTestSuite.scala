@@ -17,6 +17,8 @@ import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest
 
+import scala.concurrent.duration.DurationInt
+
 class MarketOrderTestSuite extends MatcherSuiteBase {
 
   val fixedFee: Long  = 0.003.waves
@@ -452,8 +454,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
     broadcastAndAwait(mkTransfer(alice, carol, 10.waves, Waves))
 
-    val order1 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0)
-    val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0)
+    val order1 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0, ttl = 1.day)
+    val order2 = mkOrderDP(carol, wavesUsdPair, SELL, 9.997.waves, 3.0, ttl = 2.days)
 
     dex1.api.place(order1)
     dex1.api.reservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))

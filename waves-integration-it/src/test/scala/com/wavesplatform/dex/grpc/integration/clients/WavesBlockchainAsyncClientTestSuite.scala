@@ -284,7 +284,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   "spendableBalance" in {
-    wait(client.spendableBalance(bob, Waves)) shouldBe 494994799299998L
+    wait(client.spendableBalance(bob, Waves)) shouldBe 494994798999996L
     wait(client.spendableBalance(bob, randomIssuedAsset)) shouldBe 0L
   }
 

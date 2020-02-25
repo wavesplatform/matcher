@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.grpc.integration.services
 
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
@@ -22,7 +23,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
-import monix.execution.Scheduler
+import monix.eval.Coeval
+import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -32,6 +34,22 @@ import scala.util.control.NonFatal
 class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
+
+  // A clean logic requires more actions, see DEX-606
+  private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
+  private lazy val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+    context.spendableBalanceChanged
+      .bufferTimed(balanceChangesBatchLingerMs)
+      .map { changesBuffer =>
+        val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+        vanillaBatch.map { case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
+      }
+      .filter(_.nonEmpty)
+      .map(BalanceChangesResponse.apply)
+      .foreach { x =>
+        balanceChangesSubscribers.forEach(_.onNext(x))
+      }
+  }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
@@ -136,11 +154,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   }
 
   override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
-    context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
-      val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
-      val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
-      if (pbBatch.nonEmpty) responseObserver.onNext(BalanceChangesResponse(pbBatch))
-    }
+    balanceChangesSubscribers.add(responseObserver)
+    balanceChanges.run()
   }
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {

@@ -36,7 +36,7 @@ trait HasDex { self: BaseContainersKit =>
   }
 
   protected def createDex(name: String, runConfig: Config = dexRunConfig, suiteInitialConfig: Config = dexInitialSuiteConfig): DexContainer =
-    DexContainer(name, networkName, network, getIp(name), dexRunConfig, dexInitialSuiteConfig, localLogsDir) unsafeTap addKnownContainer
+    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")
 

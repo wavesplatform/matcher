@@ -76,7 +76,11 @@ trait BaseContainersKit extends ScorexLogging {
     )
   )
 
-  protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+  protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
+    TryHttpURLConnectionBackend(customizeConnection = conn => {
+      if (conn.getRequestMethod == "POST" && conn.getDoOutput) conn.setChunkedStreamingMode(0)
+    })
+  )
 
   /** A location for logs from containers on local machine */
   protected lazy val localLogsDir: Path = {

@@ -52,7 +52,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap { _.toVanilla }
       .flatMap { tx =>
-        context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
+        if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
+        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }

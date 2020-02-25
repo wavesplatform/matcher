@@ -154,12 +154,23 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   "broadcastTx" - {
-    "returns true if the transaction passed the validation and was added to the UTX pool" in {
-      val pair       = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
-      val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
+    "returns true" - {
+      val pair         = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
+      def mkExchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
-      wait(client.broadcastTx(exchangeTx)) shouldBe true
-      wavesNode1.api.waitForTransaction(exchangeTx.id())
+      "if the transaction passed the validation and was added to the UTX pool" in {
+        val exchangeTx = mkExchangeTx
+
+        wait(client.broadcastTx(exchangeTx)) shouldBe true
+        wavesNode1.api.waitForTransaction(exchangeTx.id())
+      }
+
+      "if the transaction is in the blockchain" in {
+        val exchangeTx = mkExchangeTx
+
+        broadcastAndAwait(exchangeTx)
+        wait(client.broadcastTx(exchangeTx)) shouldBe true
+      }
     }
 
     "returns false if the transaction didn't pass the validation" in {
@@ -273,7 +284,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   "spendableBalance" in {
-    wait(client.spendableBalance(bob, Waves)) shouldBe 494994799299998L
+    wait(client.spendableBalance(bob, Waves)) shouldBe 494994798999996L
     wait(client.spendableBalance(bob, randomIssuedAsset)) shouldBe 0L
   }
 

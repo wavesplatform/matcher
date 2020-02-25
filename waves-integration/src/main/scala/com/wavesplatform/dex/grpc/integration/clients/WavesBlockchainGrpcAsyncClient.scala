@@ -87,7 +87,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   }
 
   /** Performs new gRPC call for receiving of the spendable balance changes stream */
-  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
+  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver) // TODO
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message)   => throw new IllegalArgumentException(message)
@@ -153,7 +153,9 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   }
 
   override def close(): Future[Unit] = {
-    channel.shutdownNow()
+    balanceChangesObserver.onCompleted() // TODO
+    channel.shutdown()
+    channel.awaitTermination(10, TimeUnit.SECONDS)
     // See NettyChannelBuilder.eventLoopGroup
     eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }

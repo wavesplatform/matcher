@@ -19,18 +19,20 @@ import scala.concurrent.Future
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
   @volatile
-  private var server: Server = _
+  private var server: Server                            = _
+  private var apiService: WavesBlockchainApiGrpcService = _
 
   implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
   private def startServer(settings: DEXExtensionSettings): Server = {
+    apiService = new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger)
     val bindAddress = new InetSocketAddress(settings.host, settings.port)
     val server = NettyServerBuilder
       .forAddress(bindAddress)
       .permitKeepAliveWithoutCalls(true)
       .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
-      .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger), apiScheduler))
+      .addService(WavesBlockchainApiGrpc.bindService(apiService, apiScheduler))
       .build()
       .start()
 
@@ -42,7 +44,12 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
   override def shutdown(): Future[Unit] = {
     log.info("Shutting down gRPC DEX extension")
-    if (server != null) server.shutdownNow()
-    Future.successful { Unit }
+    if (server != null) {
+      apiService.close()
+      server.shutdown()
+    }
+
+    server.awaitTermination(10, TimeUnit.SECONDS) // TODO
+    Future.successful(())
   }
 }

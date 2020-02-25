@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
 
@@ -33,11 +33,12 @@ import scala.util.control.NonFatal
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
+    with AutoCloseable
     with ScorexLogging {
 
   // A clean logic requires more actions, see DEX-606
   private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
-  private lazy val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+  private val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
     context.spendableBalanceChanged
       .bufferTimed(balanceChangesBatchLingerMs)
       .map { changesBuffer =>
@@ -46,6 +47,10 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       }
       .filter(_.nonEmpty)
       .map(BalanceChangesResponse.apply)
+      .doOnComplete(Task {
+        balanceChangesSubscribers.forEach(_.onCompleted())
+        balanceChangesSubscribers.clear()
+      })
       .foreach { x =>
         balanceChangesSubscribers.forEach(_.onNext(x))
       }
@@ -153,10 +158,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     ForgedOrderResponse(isForged = seen)
   }
 
-  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
-    balanceChangesSubscribers.add(responseObserver)
-    balanceChanges.run()
-  }
+  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit =
+    if (!balanceChanges().isCompleted) balanceChangesSubscribers.add(responseObserver)
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
@@ -175,4 +178,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
+
+  override def close(): Unit = balanceChanges().cancel()
 }

@@ -8,7 +8,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.PathMatchers.PublicKeyPM
 import com.wavesplatform.dex.api.http.ApiRoute
@@ -31,17 +31,23 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef)(implicit mat: Mater
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, Unit] = {
+
+    val completionMatcher: PartialFunction[Any, CompletionStrategy] = {
+      case akka.actor.Status.Success(s: CompletionStrategy) => s
+      case akka.actor.Status.Success(_)                     => CompletionStrategy.draining
+      case akka.actor.Status.Success                        => CompletionStrategy.draining
+    }
+
+    val failureMatcher: PartialFunction[Any, Throwable] = { case akka.actor.Status.Failure(cause) => cause }
+
     Source
       .actorRef[WsAddressState](
-        bufferSize = 10,
-        overflowStrategy = OverflowStrategy.fail
+        completionMatcher,
+        failureMatcher,
+        10,
+        OverflowStrategy.fail
       )
-      .map(
-        b =>
-          TextMessage.Strict(
-            b.balances.map { case (asset, balances) => s"$asset: reserved = ${balances.reserved}, tradable = ${balances.tradable}" }.mkString("; ")
-        )
-      )
+      .map(wsAddressState => TextMessage.Strict(WsAddressState.format.writes(wsAddressState).toString))
       .mapMaterializedValue { sourceActor =>
         addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription), sourceActor)
       }
@@ -60,7 +66,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef)(implicit mat: Mater
     Flow.fromSinkAndSource(sink, source)
   }
 
-  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters('Timestamp, 'Signature).tflatMap {
+  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters(('Timestamp, 'Signature)).tflatMap {
     case (timestamp, signature) =>
       Base58
         .tryDecodeWithLimit(signature)

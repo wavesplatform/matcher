@@ -68,7 +68,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   private val balanceChangesObserver = new BalanceChangesObserver
 
   /** Performs new gRPC call for receiving of the spendable balance changes stream */
-  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver) // TODO ClientResponseObserver
+  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message)   => throw new IllegalArgumentException(message)
@@ -137,7 +137,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     shuttingDown.set(true)
     balanceChangesObserver.close()
     channel.shutdown()
-    channel.awaitTermination(10, TimeUnit.SECONDS)
+    channel.awaitTermination(500, TimeUnit.MILLISECONDS)
     // See NettyChannelBuilder.eventLoopGroup
     eventLoopGroup.shutdownGracefully(0, 500, TimeUnit.MILLISECONDS).asScala.map(_ => ())
   }
@@ -149,7 +149,6 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   }
 
   private final class BalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesResponse] with AutoCloseable {
-
     private val isConnectionEstablished: AtomicBoolean         = new AtomicBoolean(true)
     private var requestStream: ClientCallStreamObserver[Empty] = _
 
@@ -170,7 +169,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
       requestBalanceChanges()
     }
 
-    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.ABORTED))
+    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
 
     override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = this.requestStream = requestStream
   }

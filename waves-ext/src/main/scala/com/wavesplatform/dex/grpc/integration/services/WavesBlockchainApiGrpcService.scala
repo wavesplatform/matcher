@@ -49,7 +49,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       .filter(_.nonEmpty)
       .map(BalanceChangesResponse.apply)
       .doOnSubscriptionCancel(Task {
-        val shutdownError = new StatusRuntimeException(Status.ABORTED)
+        // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+        val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
         balanceChangesSubscribers.forEach(_.onError(shutdownError))
         balanceChangesSubscribers.clear()
       })

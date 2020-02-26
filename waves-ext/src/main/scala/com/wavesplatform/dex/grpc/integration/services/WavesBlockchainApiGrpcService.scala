@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
@@ -47,7 +48,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       }
       .filter(_.nonEmpty)
       .map(BalanceChangesResponse.apply)
+      .doOnSubscriptionCancel(Task {
+        val shutdownError = new StatusRuntimeException(Status.ABORTED)
+        balanceChangesSubscribers.forEach(_.onError(shutdownError))
+        balanceChangesSubscribers.clear()
+      })
       .doOnComplete(Task {
+        // For consistency
         balanceChangesSubscribers.forEach(_.onCompleted())
         balanceChangesSubscribers.clear()
       })

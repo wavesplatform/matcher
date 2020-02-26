@@ -46,10 +46,9 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
     log.info("Shutting down gRPC DEX extension")
     if (server != null) {
       apiService.close()
-      server.shutdown()
+      server.shutdownNow()
     }
 
-    server.awaitTermination(10, TimeUnit.SECONDS) // TODO
     Future.successful(())
   }
 }

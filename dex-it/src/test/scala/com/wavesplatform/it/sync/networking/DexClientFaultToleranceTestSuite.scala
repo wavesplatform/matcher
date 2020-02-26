@@ -102,7 +102,6 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
     wavesNode2.stopWithoutRemove()
-    forgetContainer(wavesNode2)
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)

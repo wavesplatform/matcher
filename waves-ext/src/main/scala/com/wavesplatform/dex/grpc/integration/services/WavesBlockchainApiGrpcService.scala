@@ -186,5 +186,5 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 
-  override def close(): Unit = balanceChanges().cancel()
+  override def close(): Unit = balanceChanges.foreachL(_.cancel())
 }

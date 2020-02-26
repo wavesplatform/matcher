@@ -23,12 +23,14 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
   private var apiService: WavesBlockchainApiGrpcService = _
 
   implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  // TODO
   implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
-  private def startServer(settings: DEXExtensionSettings): Server = {
-    apiService = new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger)
+  override def start(): Unit = {
+    val settings = context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration")
     val bindAddress = new InetSocketAddress(settings.host, settings.port)
-    val server = NettyServerBuilder
+    apiService = new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger)
+    server = NettyServerBuilder
       .forAddress(bindAddress)
       .permitKeepAliveWithoutCalls(true)
       .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
@@ -37,10 +39,7 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
       .start()
 
     log.info(s"gRPC DEX extension was bound to $bindAddress")
-    server
   }
-
-  override def start(): Unit = server = startServer(context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration"))
 
   override def shutdown(): Future[Unit] = {
     log.info("Shutting down gRPC DEX extension")

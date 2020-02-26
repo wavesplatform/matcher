@@ -80,5 +80,6 @@ object DexApiOps {
     def lastOffset: F[Long]                         = explicitGet(self.tryLastOffset)
     def oldestSnapshotOffset: F[Long]               = explicitGet(self.tryOldestSnapshotOffset)
     def allSnapshotOffsets: F[Map[AssetPair, Long]] = explicitGet(self.tryAllSnapshotOffsets)
+    def saveSnapshots: F[Unit]                      = explicitGet(self.trySaveSnapshots)
   }
 }

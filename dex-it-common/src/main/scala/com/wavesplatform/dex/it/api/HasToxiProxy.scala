@@ -6,18 +6,17 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 import scala.collection.JavaConverters._
 
 trait HasToxiProxy { self: BaseContainersKit =>
+
   protected val toxiProxyHostName = s"$networkName-toxiproxy"
 
   private val container: ToxiproxyContainer = new ToxiproxyContainer()
     .withNetwork(network)
     .withNetworkAliases(toxiProxyHostName)
-    .withExposedPorts(8666, 8666, 8666, 8689)
+    .withExposedPorts(8666)
     .withCreateContainerCmdModifier { cmd =>
       cmd withName toxiProxyHostName
       cmd withIpv4Address getIp(13)
     }
-
-  def getProxyContainer: ToxiproxyContainer = container
 
   protected def getInnerToxiProxyPort(proxy: ContainerProxy): Int = {
     container.getContainerInfo.getNetworkSettings.getPorts.getBindings.asScala

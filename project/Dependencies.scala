@@ -44,10 +44,9 @@ object Dependencies {
 
     val sttp = "1.7.2"
 
-    val testContainers         = "0.34.3"
-    val testContainersPostgres = "1.12.4"
-
-    val toxiProxy = "1.12.4"
+    val testContainers          = "0.35.2"
+    val testContainersPostgres  = "1.12.5"
+    val testContainersToxiProxy = "1.12.5"
 
     val jackson  = "2.10.0"
     val playJson = "2.8.1"
@@ -108,7 +107,7 @@ object Dependencies {
     ExclusionRule(organization = "io.grpc"),
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
-  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
+  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion

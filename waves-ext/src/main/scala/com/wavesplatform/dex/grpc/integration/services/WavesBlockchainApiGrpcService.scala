@@ -34,11 +34,17 @@ import scala.util.control.NonFatal
 
 class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
-    with AutoCloseable
     with ScorexLogging {
 
   // A clean logic requires more actions, see DEX-606
   private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
+  private val cleanupTask: Task[Unit] = Task {
+    // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+    val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
+    balanceChangesSubscribers.forEach(_.onError(shutdownError))
+    balanceChangesSubscribers.clear()
+  }
+
   private val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
     context.spendableBalanceChanged
       .bufferTimed(balanceChangesBatchLingerMs)
@@ -48,19 +54,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       }
       .filter(_.nonEmpty)
       .map(BalanceChangesResponse.apply)
-      .doOnSubscriptionCancel(Task {
-        // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
-        log.info("==> onCancel")
-        val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
-//        balanceChangesSubscribers.forEach(_.onError(shutdownError))
-        balanceChangesSubscribers.clear()
-      })
-      .doOnComplete(Task {
-        log.info("==> onCompleted")
-        // For consistency
-        balanceChangesSubscribers.forEach(_.onCompleted())
-        balanceChangesSubscribers.clear()
-      })
+      .doOnSubscriptionCancel(cleanupTask)
+      .doOnComplete(cleanupTask)
       .foreach { x =>
         balanceChangesSubscribers.forEach(_.onNext(x))
       }
@@ -188,6 +183,4 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
-
-  override def close(): Unit = balanceChanges.foreachL(_.cancel())
 }

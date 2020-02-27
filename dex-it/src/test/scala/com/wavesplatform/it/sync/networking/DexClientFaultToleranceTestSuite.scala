@@ -58,7 +58,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     }
   }
 
-  "DEXClient should switch nodes if connection to one of them was lost due to node shutdown" in {
+  for (method <- Seq("shutdown", "disconnect")) s"DEXClient should switch nodes if connection to one of them was lost due to node $method" in {
 
     // also works for the cases when nodes are disconnected from the network (not stopped),
     // in these cases some delays after disconnections are required
@@ -82,7 +82,10 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
     markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
-    wavesNode1.stopWithoutRemove()
+    method match {
+      case "shutdown" => wavesNode1.stopWithoutRemove()
+      case "disconnect" =>  wavesNode1.disconnectFromNetwork()
+    }
 
     broadcastAndAwait(wavesNode2.api, alice2BobTransferTx)
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)

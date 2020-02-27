@@ -78,6 +78,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode2.api.connect(wavesNode1.networkAddress)
     wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
 
+    wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
     markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
@@ -102,7 +103,6 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
     wavesNode2.stopWithoutRemove()
-    forgetContainer(wavesNode2)
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)

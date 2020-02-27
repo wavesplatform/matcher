@@ -23,7 +23,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
-import monix.eval.Coeval
+import io.grpc.{Status, StatusRuntimeException}
+import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
 
@@ -37,7 +38,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
 
   // A clean logic requires more actions, see DEX-606
   private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
-  private lazy val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+  private val cleanupTask: Task[Unit] = Task {
+    // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+    val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
+    balanceChangesSubscribers.forEach(_.onError(shutdownError))
+    balanceChangesSubscribers.clear()
+  }
+
+  private val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
     context.spendableBalanceChanged
       .bufferTimed(balanceChangesBatchLingerMs)
       .map { changesBuffer =>
@@ -46,6 +54,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       }
       .filter(_.nonEmpty)
       .map(BalanceChangesResponse.apply)
+      .doOnSubscriptionCancel(cleanupTask)
+      .doOnComplete(cleanupTask)
       .foreach { x =>
         balanceChangesSubscribers.forEach(_.onNext(x))
       }
@@ -153,10 +163,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     ForgedOrderResponse(isForged = seen)
   }
 
-  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
-    balanceChangesSubscribers.add(responseObserver)
-    balanceChanges.run()
-  }
+  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit =
+    if (!balanceChanges().isCompleted) balanceChangesSubscribers.add(responseObserver)
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result

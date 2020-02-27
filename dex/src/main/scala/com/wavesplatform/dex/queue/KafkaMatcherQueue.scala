@@ -22,16 +22,16 @@ import org.apache.kafka.common.serialization._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
-  private val producerExecutionContext =
-    ExecutionContext.fromExecutor(
-      Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(true).setNameFormat("queue-kafka-producer-%d").build()))
+  private val producerThreadPool =
+    Executors.newFixedThreadPool(3, new ThreadFactoryBuilder().setDaemon(false).setNameFormat("queue-kafka-producer-%d").build())
+  private val producerExecutionContext = ExecutionContext.fromExecutor(producerThreadPool)
 
-  private implicit val consumerExecutionContext =
-    ExecutionContext.fromExecutor(
-      Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("queue-kafka-consumer-%d").build()))
+  private val consumerThreadPool =
+    Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(false).setNameFormat("queue-kafka-consumer-%d").build())
+  private val consumerExecutionContext = ExecutionContext.fromExecutor(consumerThreadPool)
 
   private val duringShutdown = new AtomicBoolean(false)
 
@@ -55,10 +55,13 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   private val pollTask: Task[IndexedSeq[QueueEventWithMeta]] = Task {
     try {
-      val records = consumer.poll(pollDuration)
-      records.asScala.map { record =>
-        QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
-      }.toIndexedSeq
+      if (duringShutdown.get()) IndexedSeq.empty
+      else {
+        val records = consumer.poll(pollDuration)
+        records.asScala.map { record =>
+          QueueEventWithMeta(record.offset(), record.timestamp(), record.value())
+        }.toIndexedSeq
+      }
     } catch {
       case e: WakeupException => if (duringShutdown.get()) IndexedSeq.empty else throw e
       case e: Throwable =>
@@ -69,6 +72,7 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: Seq[QueueEventWithMeta] => Future[Unit]): Unit = {
     val scheduler = Scheduler(consumerExecutionContext, executionModel = ExecutionModel.AlwaysAsyncExecution)
+    consumerTask.cancel()
     consumerTask = Observable
       .fromTask(Task {
         if (fromOffset > 0) consumer.seek(topicPartition, fromOffset)
@@ -90,7 +94,8 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
 
   override def storeEvent(event: QueueEvent): Future[Option[QueueEventWithMeta]] = producer.storeEvent(event)
 
-  override def lastEventOffset: Future[QueueEventWithMeta.Offset] =
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
+    implicit val context = consumerExecutionContext
     Future(consumer.listTopics())
       .flatMap { topics =>
         val partitions = topics.getOrDefault(settings.topic, java.util.Collections.emptyList()).asScala
@@ -103,17 +108,19 @@ class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogg
           log.error("Can't receive information in time", e)
           throw new TimeoutException("Can't receive information in time")
       }
+  }
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)
 
     producer.close(timeout)
+    producerThreadPool.shutdown()
 
     // Fix by scala.jdk.DurationConverters after migration to Scala 2.13
     val duration = java.time.Duration.ofNanos(timeout.toNanos)
-    consumer.close(duration)
-
+    Await.ready(Future(consumer.close(duration))(consumerExecutionContext), timeout)
     consumerTask.cancel()
+    consumerThreadPool.shutdown()
   }
 }
 

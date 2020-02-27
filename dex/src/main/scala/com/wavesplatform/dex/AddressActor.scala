@@ -377,7 +377,7 @@ class AddressActor(owner: Address,
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
-        case Success(None)        => log.trace(s"Order $orderId saved")
+        case Success(None)        => log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
 

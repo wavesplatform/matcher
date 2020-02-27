@@ -1,11 +1,11 @@
 package com.wavesplatform.dex.it.api
 
-import java.lang
 import java.net.InetAddress
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 import com.github.dockerjava.api.command.CreateNetworkCmd
 import com.github.dockerjava.api.model.Network.Ipam
@@ -55,10 +55,10 @@ trait BaseContainersKit extends ScorexLogging {
     else throw new IllegalArgumentException(s"Can't parse number from '$name'. Know 'dex-' and 'waves-' only")
   }
 
-  protected val knownContainers: ConcurrentHashMap.KeySetView[BaseContainer, lang.Boolean] = ConcurrentHashMap.newKeySet[BaseContainer]()
+  // There is a List to remove containers in a reversed order
+  protected val knownContainers = new AtomicReference[List[BaseContainer]](List.empty)
 
-  protected def addKnownContainer(container: BaseContainer): Unit = knownContainers.add(container)
-  protected def forgetContainer(container: BaseContainer): Unit   = knownContainers.remove(container)
+  protected def addKnownContainer(container: BaseContainer): Unit = knownContainers.updateAndGet(container :: _)
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
@@ -98,6 +98,6 @@ trait BaseContainersKit extends ScorexLogging {
     log.debug("Stopping containers")
     futureHttpBackend.close()
     tryHttpBackend.close()
-    knownContainers.forEach(_.stopWithoutRemove()) // Graceful shutdown to save logs
+    knownContainers.getAndUpdate(_ => List.empty).foreach(_.stopWithoutRemove()) // Graceful shutdown to save logs
   }
 }

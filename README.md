@@ -364,6 +364,8 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
 5. IDE can't find Waves Node's classes in `waves-ext`. Download required artifacts manually: `sbt waves-ext/downloadWavesNodeArtifacts` and 
    then reload SBT configuration in IDE.
 
+6. If you want to run integration tests with Kafka, run the command in sbt before: `set `dex-it`/Test/envVars := Map("KAFKA_SERVER" -> "kafka-host:9092")`
+
 ## 10. Production recommendations
 
 ### Kafka's queue

@@ -110,17 +110,19 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     )
   }
 
-  protected def assetGen(prefix: Byte): Gen[IssuedAsset] = {
+  protected def assetGen: Gen[Asset] = Gen.frequency((9, arbitraryAssetGen), (1, Gen.const(Waves)))
+
+  protected def issuedAssetGen(prefix: Byte): Gen[IssuedAsset] = {
     Gen
       .listOfN(Asset.AssetIdLength - 1, Arbitrary.arbitrary[Byte])
       .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
   }
 
-  protected def arbitraryAssetGen: Gen[IssuedAsset] = assetGen(Random.nextInt(Byte.MaxValue).toByte)
+  protected def arbitraryAssetGen: Gen[IssuedAsset] = issuedAssetGen(Random.nextInt(Byte.MaxValue).toByte)
 
   protected val distinctPairGen: Gen[AssetPair] = for {
-    a1 <- assetGen(1.toByte)
-    a2 <- assetGen(2.toByte)
+    a1 <- issuedAssetGen(1.toByte)
+    a2 <- issuedAssetGen(2.toByte)
   } yield AssetPair(a1, a2)
 
   protected def mkAssetId(prefix: String): IssuedAsset = {
@@ -129,7 +131,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   }
 
   protected val assetPairGen: Gen[AssetPair] = {
-    Gen.frequency((18, distinctPairGen), (1, assetGen(1).map(AssetPair(_, Waves))), (1, assetGen(2).map(AssetPair(Waves, _))))
+    Gen.frequency((18, distinctPairGen), (1, issuedAssetGen(1).map(AssetPair(_, Waves))), (1, issuedAssetGen(2).map(AssetPair(Waves, _))))
   }
 
   private val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
@@ -149,7 +151,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     value.get
   }
 
-  private val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
+  protected val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   private def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 

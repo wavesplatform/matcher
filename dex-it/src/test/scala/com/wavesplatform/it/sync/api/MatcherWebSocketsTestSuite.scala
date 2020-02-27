@@ -78,6 +78,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
       placeAndAwaitAtDex(mkOrderDP(carol, wavesUsdPair, SELL, 1.waves, 3.01))
       dex1.api.cancelAll(carol)
 
+      Thread.sleep(300)
+
       wsc.getMessagesBuffer should matchTo {
         Seq(
           WsAddressState(Map(Waves -> WsBalances(tradable = 100.waves, reserved = 0), btc -> WsBalances(tradable = 1.btc, reserved = 0))),

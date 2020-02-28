@@ -57,9 +57,16 @@ class AddressActor(owner: Address,
   private var openVolume   = Map.empty[Asset, Long]
   private val expiration   = MutableMap.empty[ByteStr, Cancellable]
 
-  private var addressStateDiff                      = AddressStateDiff.empty
-  private var activeWsConnections: Queue[ActorRef]  = Queue.empty
-  private var pendingWsConnections: Queue[ActorRef] = Queue.empty
+  private var addressMutableState = AddressWsMutableState.empty
+
+  private def mkWsAddressState(spendableBalances: Map[Asset, Long]): WsAddressState = {
+    val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)
+    WsAddressState(
+      spendableBalances.map {
+        case (a, _) => a -> WsBalances(tradableBalance.getOrElse(a, 0), openVolume.getOrElse(a, 0))
+      }
+    )
+  }
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
@@ -120,7 +127,10 @@ class AddressActor(owner: Address,
       }
 
     case command: Command.CancelNotEnoughCoinsOrders =>
-      if (activeWsConnections.nonEmpty) addressStateDiff = addressStateDiff.updateSpendableAssets(command.newBalance.keySet)
+      if (addressMutableState.hasActiveConnections) {
+        addressMutableState = addressMutableState.updateSpendableAssets(command.newBalance.keySet)
+      }
+
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
 
       if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
@@ -231,30 +241,26 @@ class AddressActor(owner: Address,
     case Status.Failure(e) => log.error(s"Got $e", e)
 
     case AddWsSubscription =>
+      log.trace(s"Web socket subscription was requested")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      pendingWsConnections = pendingWsConnections.enqueue(sender)
+      addressMutableState = addressMutableState.addPendingSubscription(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
-      val tradableBalance = allAssetsSpendableBalance |-| openVolume
-      val snapshot        = WsAddressState(tradableBalance.map { case (a, tb) => a -> WsBalances(tb, openVolume.getOrElse(a, 0)) })
-
-      pendingWsConnections.foreach(_ ! snapshot)
-
-      if (activeWsConnections.isEmpty) scheduleNextDiffSending
-
-      activeWsConnections ++= pendingWsConnections
-      pendingWsConnections = Queue.empty
+      val snapshot = mkWsAddressState(allAssetsSpendableBalance)
+      addressMutableState.pendingWsConnections.foreach(_ ! snapshot)
+      if (!addressMutableState.hasActiveConnections) scheduleNextDiffSending
+      addressMutableState = addressMutableState.flushPendingConnections()
 
     case PrepareDiffForWsSubscribers =>
-      if (addressStateDiff.getAllAssets.nonEmpty) {
-        spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressStateDiff.getAllAssets)
+      if (addressMutableState.hasActiveConnections && addressMutableState.hasChangedAssets) {
+        spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressMutableState.getAllAssets)
       } else scheduleNextDiffSending
-      addressStateDiff = AddressStateDiff.empty
+
+      addressMutableState = addressMutableState.cleanChangedAssets()
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
-      val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet.contains)
-      val diff            = WsAddressState(tradableBalance.map { case (a, tb) => a -> WsBalances(tb, openVolume.getOrElse(a, 0)) })
-      activeWsConnections.foreach(_ ! diff)
+      val diff = mkWsAddressState(spendableBalances)
+      addressMutableState.activeWsConnections.foreach(_ ! diff)
       scheduleNextDiffSending
   }
 
@@ -330,9 +336,9 @@ class AddressActor(owner: Address,
 
     val origAoReservableBalance = activeOrders.get(ao.order.id()).fold(Map.empty[Asset, Long])(_.reservableBalance)
     if (ao.reservableBalance != origAoReservableBalance) {
-      if (activeWsConnections.nonEmpty) {
+      if (addressMutableState.hasActiveConnections) {
         spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, origAoReservableBalance |-| ao.reservableBalance)
-        addressStateDiff = addressStateDiff.updateReservedAssets(ao.reservableBalance.keySet)
+        addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
       }
       openVolume = openVolume |+| (ao.reservableBalance |-| origAoReservableBalance)
     }
@@ -358,7 +364,7 @@ class AddressActor(owner: Address,
     expiration.remove(ao.order.id()).foreach(_.cancel())
     activeOrders.remove(ao.order.id()).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
 
-    addressStateDiff = addressStateDiff.updateReservedAssets(ao.reservableBalance.keySet)
+    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
 
     orderDB.saveOrderInfo(ao.order.id(), owner, OrderInfo.v3(ao, status))
   }
@@ -393,7 +399,7 @@ class AddressActor(owner: Address,
 
   private def place(ao: AcceptedOrder): Unit = {
     openVolume = openVolume |+| ao.reservableBalance
-    addressStateDiff = addressStateDiff.updateReservedAssets(ao.reservableBalance.keySet)
+    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
     activeOrders.put(ao.order.id(), ao)
 
     storeEvent(ao.order.id())(

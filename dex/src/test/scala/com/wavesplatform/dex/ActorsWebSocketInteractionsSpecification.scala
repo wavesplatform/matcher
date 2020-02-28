@@ -130,7 +130,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def expectWebSocketBalance(expected: Map[Asset, WsBalances]): Unit = {
-      eventsProbe.expectMsgAnyClassOf(10.second, classOf[WsAddressState]).balances should matchTo(expected)
+      eventsProbe.expectMsgAnyClassOf(2.seconds, classOf[WsAddressState]).balances should matchTo(expected)
     }
 
     f(
@@ -197,7 +197,7 @@ class ActorsWebSocketInteractionsSpecification
 
           withClue("Sender's order was partly filled by SELL 5 Waves. Balance changes are not atomic\n") {
             expectWsBalance(Map(usd   -> WsBalances(270.usd, 15.usd))) // first we send decreased balances
-            updateBalances(Map(Waves  -> 105.waves, usd -> 285.usd)) // then we receive balance changes from blockchain
+            updateBalances(Map(Waves  -> 105.waves, usd -> 285.usd, eth -> 4.eth)) // then we receive balance changes from blockchain
             expectWsBalance(Map(Waves -> WsBalances(105.waves, 0)))
           }
 
@@ -308,15 +308,24 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "so far unsubscribed address made some actions and then subscribes" in webSocketTest {
-        (ad, _, address, subscribeAddress, addOrder, cancel, _, updateBalances, expectWsBalance) =>
+        (_, _, address, subscribeAddress, addOrder, _, _, updateBalances, expectWsBalance) =>
           updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth) }
-          addOrder { LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0)) }
+          addOrder { LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address)) }
 
           updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
           updateBalances { Map(Waves -> 115.waves, usd -> 300.usd, eth -> 5.eth) }
 
           subscribeAddress
           expectWsBalance { Map(Waves -> WsBalances(115.waves, 0), usd -> WsBalances(297.usd, 3.usd), eth -> WsBalances(5.eth, 0)) }
+      }
+
+      "spendable balance is equal to reserved " in webSocketTest {
+        (_, _, address, subscribeAddress, addOrder, _, _, updateBalances, expectWsBalance) =>
+          updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
+          addOrder { LimitOrder(createOrder(btcUsdPair, SELL, 1.btc, 8776.0, sender = address)) }
+
+          subscribeAddress
+          expectWsBalance { Map(Waves -> WsBalances(99.997.waves, 0.003.waves), btc -> WsBalances(0, 1.btc)) }
       }
     }
   }

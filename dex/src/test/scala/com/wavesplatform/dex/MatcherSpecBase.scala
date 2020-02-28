@@ -49,6 +49,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
 
   protected val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
   protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
+  protected val btcUsdPair: AssetPair   = AssetPair(btc, usd)
 
   protected val rateCache: RateCache    = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
   protected val smallFee: Option[Price] = Some(toNormalized(1))

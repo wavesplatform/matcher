@@ -26,11 +26,6 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
     dex1.start()
   }
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    cleanupWebSockets()
-  }
-
   private def createAccountUpdatesWsConnection(client: KeyPair): WebSocketConnection[WsAddressState] = {
     val prefix        = "as"
     val timestamp     = System.currentTimeMillis()

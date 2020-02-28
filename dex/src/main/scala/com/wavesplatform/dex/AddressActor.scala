@@ -128,7 +128,7 @@ class AddressActor(owner: Address,
 
     case command: Command.CancelNotEnoughCoinsOrders =>
       if (addressMutableState.hasActiveConnections) {
-        addressMutableState = addressMutableState.updateSpendableAssets(command.newBalance.keySet)
+        addressMutableState = addressMutableState.putSpendableAssets(command.newBalance.keySet)
       }
 
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
@@ -338,9 +338,15 @@ class AddressActor(owner: Address,
 
     val origAoReservableBalance = activeOrders.get(ao.order.id()).fold(Map.empty[Asset, Long])(_.reservableBalance)
     if (ao.reservableBalance != origAoReservableBalance) {
+
+      // OrderExecuted event and ExchangeTransaction creation are separated in time!
+      // We should notify SpendableBalanceActor about balances changing, otherwise WS subscribers
+      // will receive balance changes (its reduction as a result of order partial execution) with
+      // sensible lag (only after exchange transaction will be put in UTX pool). The increase in
+      // the balance will be sent to subscribers after this tx will be forged
       if (addressMutableState.hasActiveConnections) {
         spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, origAoReservableBalance |-| ao.reservableBalance)
-        addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
+        addressMutableState = addressMutableState.putReservedAssets(ao.reservableBalance.keySet)
       }
       openVolume = openVolume |+| (ao.reservableBalance |-| origAoReservableBalance)
     }
@@ -366,7 +372,7 @@ class AddressActor(owner: Address,
     expiration.remove(ao.order.id()).foreach(_.cancel())
     activeOrders.remove(ao.order.id()).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
 
-    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
+    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.putReservedAssets(ao.reservableBalance.keySet)
 
     orderDB.saveOrderInfo(ao.order.id(), owner, OrderInfo.v3(ao, status))
   }
@@ -401,7 +407,7 @@ class AddressActor(owner: Address,
 
   private def place(ao: AcceptedOrder): Unit = {
     openVolume = openVolume |+| ao.reservableBalance
-    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.updateReservedAssets(ao.reservableBalance.keySet)
+    if (addressMutableState.hasActiveConnections) addressMutableState = addressMutableState.putReservedAssets(ao.reservableBalance.keySet)
     activeOrders.put(ao.order.id(), ao)
 
     storeEvent(ao.order.id())(

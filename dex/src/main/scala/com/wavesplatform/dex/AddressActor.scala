@@ -320,7 +320,7 @@ class AddressActor(owner: Address,
 
   private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
     spendableBalancesActor
-      .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self)
+      .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
       .map { _.state |-| openVolume.filterKeys(forAssets.contains) }
   }

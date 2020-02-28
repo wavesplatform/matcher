@@ -184,7 +184,7 @@ class AddressActorSpecification
     lazy val spendableBalancesActor =
       system.actorOf(
         Props(
-          new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir)(scala.concurrent.ExecutionContext.Implicits.global)
+          new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir)
         )
       )
 

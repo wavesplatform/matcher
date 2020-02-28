@@ -7,6 +7,7 @@ case class WsAddressState(balances: Map[Asset, WsBalances])
 
 object WsAddressState {
 
+  // TODO use reads for Map[Asset, T]!
   implicit val balancesMapReads: Reads[Map[Asset, WsBalances]] = Reads {
     case JsObject(ab) => JsSuccess(ab.toMap.map { case (a, b) => AssetPair.extractAsset(a).get -> WsBalances.reads.reads(b).get })
     case _            => JsError("Can't parse asset balances map!")

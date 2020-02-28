@@ -64,8 +64,7 @@ class ActorsWebSocketInteractionsSpecification
 
     lazy val spendableBalancesActor =
       system.actorOf(
-        Props(
-          new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir)(scala.concurrent.ExecutionContext.Implicits.global))
+        Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalance, addressDir))
       )
 
     def createAddressActor(address: Address, enableSchedules: Boolean): Props = {

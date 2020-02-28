@@ -330,6 +330,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     }
   }
 
+  private val addressActorSettings =
+    AddressActor.Settings(
+      wsMessagesInterval = settings.webSocketSettings.messagesInterval,
+      batchCancelTimeout = settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough
+    )
+
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
     Props(
       new AddressActor(
@@ -341,7 +347,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
         startSchedules,
         spendableBalancesActor,
-        settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough,
+        addressActorSettings
       )
     )
   }

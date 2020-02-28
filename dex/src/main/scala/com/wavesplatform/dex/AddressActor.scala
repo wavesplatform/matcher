@@ -42,7 +42,7 @@ class AddressActor(owner: Address,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
-                   batchCancelTimeout: FiniteDuration = 20.seconds)(implicit efc: ErrorFormatterContext)
+                   settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
 
@@ -123,7 +123,7 @@ class AddressActor(owner: Address,
         sender ! api.BatchCancelCompleted(Map.empty)
       } else {
         log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
-        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, batchCancelTimeout))
+        context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, settings.batchCancelTimeout))
       }
 
     case command: Command.CancelNotEnoughCoinsOrders =>
@@ -264,7 +264,9 @@ class AddressActor(owner: Address,
       scheduleNextDiffSending
   }
 
-  private def scheduleNextDiffSending: Cancellable = context.system.scheduler.scheduleOnce(100.millis, self, PrepareDiffForWsSubscribers)
+  private def scheduleNextDiffSending: Cancellable = {
+    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, PrepareDiffForWsSubscribers)
+  }
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
 
@@ -523,4 +525,9 @@ object AddressActor {
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)
 
   private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
+
+  final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration)
+  object Settings {
+    val default: Settings = Settings(100.milliseconds, 20.seconds)
+  }
 }

@@ -155,6 +155,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      interval = 1 day
          |      max-pending-time = 30 days
          |    }
+         |    web-sockets {
+         |      messages-interval = 100ms
+         |    }
          |  }
          |}""".stripMargin
 

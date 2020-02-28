@@ -90,6 +90,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       interval = 1.day,
       maxPendingTime = 30.days
     )
+    settings.webSocketSettings should matchTo(WebSocketSettings(100.milliseconds))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

@@ -29,18 +29,24 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       val maybeAddressState            = fullState.get(address).orElse(incompleteStateChanges get address)
       val assetsMaybeBalances          = assets.map(asset => asset -> maybeAddressState.flatMap(_ get asset)).toMap
       val (knownAssets, unknownAssets) = assetsMaybeBalances.partition { case (_, balance) => balance.isDefined }
-      val knownPreparedState           = knownAssets.collect { case (a, Some(b)) => a -> b }
+
+      lazy val knownPreparedState = knownAssets.collect { case (a, Some(b)) => a -> b }
 
       if (unknownAssets.isEmpty) sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
       else
         spendableBalances(address, unknownAssets.keySet)
-          .map(stateFromNode => SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownPreparedState, stateFromNode))
+          .map(stateFromNode => SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, stateFromNode))
           .pipeTo(self)(sender)
 
-    case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownState, stateFromNode) =>
-      if (fullState contains address) fullState = fullState.updated(address, fullState.getOrElse(address, Map.empty) ++ stateFromNode)
-      else incompleteStateChanges = incompleteStateChanges.updated(address, incompleteStateChanges.getOrElse(address, Map.empty) ++ stateFromNode)
-      sender ! SpendableBalancesActor.Reply.GetState(stateFromNode ++ knownState)
+    case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets, stateFromNode) =>
+      if (!fullState.contains(address)) {
+        incompleteStateChanges = incompleteStateChanges.updated(address, stateFromNode ++ incompleteStateChanges.getOrElse(address, Map.empty))
+      }
+
+      val assets = stateFromNode.keySet ++ knownAssets
+      val result = fullState.getOrElse(address, incompleteStateChanges(address)).filterKeys(assets)
+
+      sender ! SpendableBalancesActor.Reply.GetState(result)
 
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
       fullState.get(address) match {
@@ -94,5 +100,5 @@ object SpendableBalancesActor {
     final case class GetSnapshot(state: Map[Asset, Long]) extends Reply
   }
 
-  final case class NodeBalanceRequestRoundtrip(address: Address, knownState: Map[Asset, Long], stateFromNode: Map[Asset, Long])
+  final case class NodeBalanceRequestRoundtrip(address: Address, knownAssets: Set[Asset], stateFromNode: Map[Asset, Long])
 }

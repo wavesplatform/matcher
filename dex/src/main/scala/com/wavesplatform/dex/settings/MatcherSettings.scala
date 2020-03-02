@@ -58,7 +58,8 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            allowedOrderVersions: Set[Byte],
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
-                           orderHistory: Option[OrderHistorySettings]) {
+                           orderHistory: Option[OrderHistorySettings],
+                           webSocketSettings: WebSocketSettings) {
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -143,6 +144,7 @@ object MatcherSettings {
     val broadcastUntilConfirmed    = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
     val postgresConnection         = config.as[PostgresConnection]("postgres")
     val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
+    val webSocketSettings          = config.as[WebSocketSettings]("web-sockets")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -176,7 +178,8 @@ object MatcherSettings {
       allowedOrderVersions,
       broadcastUntilConfirmed,
       postgresConnection,
-      orderHistory
+      orderHistory,
+      webSocketSettings
     )
   }
 }

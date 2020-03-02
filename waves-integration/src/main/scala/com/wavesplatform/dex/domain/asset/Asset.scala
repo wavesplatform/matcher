@@ -8,7 +8,7 @@ import play.api.libs.json._
 
 import scala.util.Success
 
-sealed trait Asset
+sealed trait Asset extends Product with Serializable
 
 object Asset {
 
@@ -39,6 +39,7 @@ object Asset {
     case JsNull         => JsSuccess(Waves)
     case _              => JsError("Expected base58-encoded assetId or null")
   }
+
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsString(WavesName)
     case IssuedAsset(id) => JsString(id.base58)

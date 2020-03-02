@@ -39,6 +39,7 @@ trait PredefinedAssets {
   val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
   val ethUsdPair: AssetPair   = AssetPair(eth, usd)
   val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
+  val btcUsdPair: AssetPair   = AssetPair(btc, usd)
 
   val ForbiddenAssetId: ByteStr   = ByteStr.decodeBase58("FdbnAsset").get
   val ForbiddenAsset: IssuedAsset = IssuedAsset(ForbiddenAssetId)

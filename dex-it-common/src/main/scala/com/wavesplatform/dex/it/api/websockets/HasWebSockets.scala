@@ -7,8 +7,9 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import mouse.any._
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait HasWebSockets {
+trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
   implicit lazy protected val system: ActorSystem        = ActorSystem()
   implicit lazy protected val materializer: Materializer = Materializer.matFromSystem(system)
@@ -29,5 +30,10 @@ trait HasWebSockets {
       knownWsConnections.forEach(c => if (!c.isClosed) c.close())
       materializer.shutdown()
     }
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    cleanupWebSockets()
   }
 }

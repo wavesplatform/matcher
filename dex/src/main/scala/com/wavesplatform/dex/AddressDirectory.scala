@@ -13,6 +13,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.collection.mutable
+import scala.util.{Failure, Success}
 
 class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChanges],
                        settings: MatcherSettings,
@@ -29,11 +30,12 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
   /** Sends balance changes to the AddressActors */
-  spendableBalanceChanges.foreach {
-    _.foreach {
-      case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances })
+  spendableBalanceChanges
+    .foreach(x => self ! BalanceChanged(x))(Scheduler(context.dispatcher))
+    .onComplete {
+      case Success(_) => log.info("Spendable balance changes stream stopped")
+      case Failure(e) => log.error("Found an error in spendable balance changes stream. It was stopped", e)
     }
-  } { Scheduler(context.dispatcher) }
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
@@ -48,6 +50,11 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   }
 
   override def receive: Receive = {
+    case msg: BalanceChanged =>
+      msg.xs.foreach {
+        case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances })
+      }
+
     case Envelope(address, cmd) => forward(address, cmd)
 
     case e @ Events.OrderAdded(lo, timestamp) =>
@@ -94,6 +101,7 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
 }
 
 object AddressDirectory {
+  case class BalanceChanged(xs: SpendableBalanceChanges) extends AnyVal
   case class Envelope(address: Address, cmd: AddressActor.Message)
   case object StartSchedules
 }

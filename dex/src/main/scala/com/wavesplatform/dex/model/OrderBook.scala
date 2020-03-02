@@ -4,27 +4,16 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{Event, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.settings.MatchingRule
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-import scala.annotation.tailrec
+import scala.collection.immutable.{HashMap, Queue, TreeMap}
 import scala.collection.mutable
 
-class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] val asks: Side, private[OrderBook] var lastTrade: Option[LastTrade]) {
+case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrade], orderIds: HashMap[Order.Id, (OrderType, Price)]) {
   import OrderBook._
-
-  private[model] val orderIds: mutable.Map[Order.Id, (OrderType, Price)] = {
-    val r = mutable.Map.newBuilder[Order.Id, (OrderType, Price)]
-
-    for {
-      (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
-      lo             <- level
-    } r.+=((lo.order.id(), (lo.order.orderType, price))) // The compiler doesn't allow write this less ugly
-
-    r.result()
-  }
 
   // Only for tests, do not use in production
   private[model] def getBids: Side = bids
@@ -41,42 +30,62 @@ class OrderBook private (private[OrderBook] val bids: Side, private[OrderBook] v
     } yield price -> lo
   }
 
-  def cancel(orderId: ByteStr, timestamp: Long): Option[OrderCanceled] = orderIds.get(orderId).map {
-    case (orderType, price) =>
-      val lo = (if (orderType == OrderType.BUY) bids else asks).remove(price, orderId)
-      orderIds -= orderId
-      OrderCanceled(lo, isSystemCancel = false, timestamp)
-  }
+  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[OrderCanceled]) =
+    orderIds
+      .get(orderId)
+      .map {
+        case (orderType, price) =>
+          if (orderType == OrderType.SELL) {
+            val (updatedAsks, lo) = asks.remove(price, orderId)
+            (copy(asks = updatedAsks, orderIds = orderIds - orderId), Some(OrderCanceled(lo, isSystemCancel = false, timestamp)))
+          } else {
+            val (updatedBids, lo) = bids.remove(price, orderId)
+            (copy(bids = updatedBids, orderIds = orderIds - orderId), Some(OrderCanceled(lo, isSystemCancel = false, timestamp)))
+          }
+      }
+      .getOrElse((this, Option.empty[OrderCanceled]))
 
-  def cancelAll(timestamp: Long): Seq[OrderCanceled] = {
+  def cancelAll(timestamp: Long): (OrderBook, Seq[OrderCanceled]) = {
     val canceledOrders = allOrders.map { case (_, lo) => OrderCanceled(lo, isSystemCancel = false, timestamp) }.toSeq
-    bids.clear()
-    asks.clear()
-    orderIds.clear()
-    canceledOrders
+    (OrderBook.empty, canceledOrders)
   }
 
   def add(ao: AcceptedOrder,
           ts: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
-          tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] = {
-
-    val (events, lt) = ao.order.orderType match {
-      case OrderType.BUY  => doMatch(ts, canMatchBuy, ao, Seq.empty, bids, asks, orderIds, lastTrade, tickSize, getMakerTakerFee)
-      case OrderType.SELL => doMatch(ts, canMatchSell, ao, Seq.empty, asks, bids, orderIds, lastTrade, tickSize, getMakerTakerFee)
+          tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
+    ao.order.orderType match {
+      case OrderType.BUY  => doMatch(ts, tickSize, getMakerTakerFee, ao, this, Queue.empty)
+      case OrderType.SELL => doMatch(ts, tickSize, getMakerTakerFee, ao, this, Queue.empty)
     }
 
-    lastTrade = lt
-    events.reverse
-  }
-
-  def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids.toMap, asks.toMap, lastTrade)
+  def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
+
+  def best(tpe: OrderType): Option[(Price, LimitOrder)] = side(tpe).best
+  def side(tpe: OrderType): Side                        = tpe.askBid(asks, bids)
+  def removeBest(tpe: OrderType): OrderBook = tpe.askBid(
+    copy(asks = asks.removeBest()._1),
+    copy(bids = bids.removeBest()._1)
+  )
+
+  def replaceBest(lo: LimitOrder): (OrderBook, LimitOrder) = lo.order.orderType.askBid(
+    asks.replaceBest(lo).copy(copy(asks = _)),
+    asks.replaceBest(lo).copy(copy(bids = _))
+  )
+
+  def overlaps(counter: LimitOrder, submitted: AcceptedOrder): Boolean = overlaps(counter.order, submitted.order)
+  def overlaps(counter: Order, submitted: Order): Boolean =
+    submitted.orderType.askBid(submitted.price <= counter.price, submitted.price >= counter.price)
 }
 
 object OrderBook {
+
+  final implicit class OrderTypeOps(val self: OrderType) extends AnyVal {
+    def askBid[T](ifAsk: => T, ifBid: => T): T = if (self == OrderType.SELL) ifAsk else ifBid
+  }
 
   /** Returns true if submitted buy order can be matched with counter sell order */
   private object canMatchBuy extends ((Long, Long) => Boolean) {
@@ -102,96 +111,66 @@ object OrderBook {
         case OrderType.SELL => (price / normalizedTickSize + 1) * normalizedTickSize
       }
 
-  /** @param canMatch (submittedOrderPrice, counterLevelPrice) => Boolean */
-  @tailrec
   private def doMatch(eventTs: Long,
-                      canMatch: (Long, Long) => Boolean,
-                      submitted: AcceptedOrder,
-                      prevEvents: Seq[Event],
-                      submittedSide: Side,
-                      counterSide: Side,
-                      orderIds: mutable.Map[Order.Id, (OrderType, Price)],
-                      lastTrade: Option[LastTrade],
                       tickSize: Long,
-                      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long)): (Seq[Event], Option[LastTrade]) = {
-    if (!submitted.order.isValid(eventTs)) (OrderCanceled(submitted, isSystemCancel = false, eventTs) +: prevEvents, lastTrade)
-    else {
-      counterSide.best match {
-        case counterAndItsLevelPrice if counterAndItsLevelPrice.forall { case (_, levelPrice) => !canMatch(submitted.order.price, levelPrice) } =>
-          submitted.fold { submittedLimitOrder =>
-            // place limit order into appropriate level according to the tick size
-            val correctedLevelPriceOfSubmittedOrder =
-              correctPriceByTickSize(submittedLimitOrder.price, submittedLimitOrder.order.orderType, tickSize)
+                      getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
+                      submitted: AcceptedOrder,
+                      orderBook: OrderBook,
+                      prevEvents: Queue[Event]): (OrderBook, Queue[Event]) = {
+    @scala.annotation.tailrec
+    def loop(orderBook: OrderBook, submitted: AcceptedOrder, prevEvents: Queue[Event]): (OrderBook, Queue[Event]) =
+      if (!submitted.order.isValid(eventTs)) (orderBook, prevEvents.enqueue(OrderCanceled(submitted, isSystemCancel = false, eventTs)))
+      else
+        orderBook.best(submitted.order.orderType) match {
+          case Some((counterPrice, counter)) if orderBook.overlaps(counter, submitted) =>
+            if (!counter.order.isValid(eventTs))
+              loop(
+                orderBook = orderBook.removeBest(counter.order.orderType),
+                submitted = submitted,
+                prevEvents = prevEvents.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
+              )
+            else {
+              val (maxCounterFee, maxSubmittedFee) = getMakerTakerFee(submitted, counter)
+              val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
+              val updatedEvents                    = prevEvents.enqueue(orderExecutedEvent)
+              val updatedOrderBook =
+                orderBook.copy(lastTrade = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType)))
 
-            submittedSide += correctedLevelPriceOfSubmittedOrder -> (submittedSide.getOrElse(correctedLevelPriceOfSubmittedOrder, Vector.empty) :+ submittedLimitOrder)
-            orderIds.+=((submitted.order.id(), (submitted.order.orderType, correctedLevelPriceOfSubmittedOrder)))
-            (OrderAdded(submittedLimitOrder, eventTs) +: prevEvents, lastTrade)
+              val counterRemaining = orderExecutedEvent.counterRemaining
+              if (counterRemaining.isValid) { // counter is not filled
+                val submittedRemaining = orderExecutedEvent.submittedRemaining
+                // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
+                if (submittedRemaining.isValid)
+                  (
+                    updatedOrderBook.replaceBest(counterRemaining)._1,
+                    updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs))
+                  )
+                else (updatedOrderBook, updatedEvents)
+              } else { // counter is filled
+                val updatedOrderBook2 = updatedOrderBook.removeBest(counter.order.orderType)
+                submitted match {
+                  case _: LimitOrder =>
+                    val submittedRemaining = orderExecutedEvent.submittedRemaining
+                    if (submittedRemaining.isValid) loop(updatedOrderBook2, submittedRemaining, updatedEvents)
+                    else (updatedOrderBook2, updatedEvents)
 
-          } { submittedMarketOrder =>
-            // cancel market order in the absence of counters
-            (OrderCanceled(submittedMarketOrder, isSystemCancel = true, eventTs) +: prevEvents, lastTrade)
-          }
-        case Some((counter, _)) =>
-          if (!submitted.isValid(counter.price)) (OrderCanceled(submitted, isSystemCancel = true, eventTs) +: prevEvents, lastTrade)
-          else if (!counter.order.isValid(eventTs)) {
+                  case submitted: MarketOrder =>
+                    val submittedRemaining = orderExecutedEvent.submittedMarketRemaining(submitted)
+                    val isSubmittedFilled  = !submittedRemaining.isValid
+                    val canSpendMore       = submittedRemaining.availableForSpending > 0
 
-            orderIds -= counterSide.removeBest().order.id()
-            doMatch(
-              eventTs,
-              canMatch,
-              submitted,
-              OrderCanceled(counter, isSystemCancel = false, eventTs) +: prevEvents,
-              submittedSide,
-              counterSide,
-              orderIds,
-              lastTrade,
-              tickSize,
-              getMakerTakerFee
-            )
-
-          } else {
-
-            val (maxCounterFee, maxSubmittedFee) = getMakerTakerFee(submitted, counter)
-            val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
-            val newEvents                        = orderExecutedEvent +: prevEvents
-            val lt                               = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
-
-            val counterRemaining = orderExecutedEvent.counterRemaining
-            if (counterRemaining.isValid) { // counter is not filled
-              // should not replace orderIds, because the counter order stays
-              counterSide.replaceBest(counterRemaining)
-              val submittedRemaining = orderExecutedEvent.submittedRemaining
-              // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
-              if (submittedRemaining.isValid) (OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs) +: newEvents, lt)
-              else (newEvents, lt)
-
-            } else { // counter is filled
-
-              orderIds -= counterSide.removeBest().order.id()
-
-              submitted match {
-                case _: LimitOrder =>
-                  val remaining = orderExecutedEvent.submittedRemaining
-                  if (remaining.isValid)
-                    doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
-                  else (newEvents, lt)
-
-                case submittedMarketOrder: MarketOrder =>
-                  val remaining         = orderExecutedEvent.submittedMarketRemaining(submittedMarketOrder)
-                  val isSubmittedFilled = !remaining.isValid
-                  val canSpendMore      = remaining.availableForSpending > 0
-
-                  (isSubmittedFilled, canSpendMore) match {
-                    case (false, true) =>
-                      doMatch(eventTs, canMatch, remaining, newEvents, submittedSide, counterSide, orderIds, lt, tickSize, getMakerTakerFee)
-                    case (false, false) => (OrderCanceled(remaining, isSystemCancel = true, eventTs) +: newEvents, lt)
-                    case (true, _)      => (newEvents, lt)
-                  }
+                    (isSubmittedFilled, canSpendMore) match {
+                      case (true, _)     => (updatedOrderBook2, updatedEvents)
+                      case (false, true) => loop(updatedOrderBook2, submittedRemaining, updatedEvents)
+                      case (false, false) =>
+                        (updatedOrderBook2, updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)))
+                    }
+                }
               }
             }
-          }
-      }
-    }
+        }
+
+    loop(orderBook, submitted, Queue.empty)
   }
 
   private def formatSide(side: Side): String =
@@ -232,24 +211,37 @@ object OrderBook {
 
   implicit val snapshotFormat: Format[OrderBookSnapshot] = Json.format
 
-  def empty(): OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering), None)
+  val empty: OrderBook = new OrderBook(TreeMap.empty(bidsOrdering), TreeMap.empty(asksOrdering), None, HashMap.empty)
 
   private def transformSide(side: OrderBookSideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
-    val bidMap = mutable.TreeMap.empty[Price, Level](ordering)
+    var bidMap = TreeMap.empty[Price, Level](ordering)
     for ((p, level) <- side) {
-      val v = Vector.newBuilder[LimitOrder]
+      var v = Queue.empty[LimitOrder]
       for (lo <- level) {
         require(lo.order.orderType == expectedSide,
                 s"Expecting $expectedSide only orders in bid list, but ${lo.order.id()} is a ${lo.order.orderType} order")
-        v += lo
+        v = v.enqueue(lo)
       }
-      bidMap += p -> v.result()
+      bidMap += p -> v
     }
     bidMap
   }
 
-  def apply(snapshot: OrderBookSnapshot): OrderBook =
-    new OrderBook(transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
-                  transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
-                  snapshot.lastTrade)
+  def apply(snapshot: OrderBookSnapshot): OrderBook = new OrderBook(
+    transformSide(snapshot.bids, OrderType.BUY, bidsOrdering),
+    transformSide(snapshot.asks, OrderType.SELL, asksOrdering),
+    snapshot.lastTrade,
+    orderIds(snapshot.asks, snapshot.bids)
+  )
+
+  def orderIds(asks: Side, bids: Side): HashMap[Order.Id, (OrderType, Price)] = {
+    val r = HashMap.newBuilder[Order.Id, (OrderType, Price)]
+
+    for {
+      (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
+      lo             <- level
+    } r.+=((lo.order.id(), (lo.order.orderType, price))) // The compiler doesn't allow write this less ugly
+
+    r.result()
+  }
 }

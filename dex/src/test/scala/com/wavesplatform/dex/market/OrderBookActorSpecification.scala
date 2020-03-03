@@ -106,10 +106,10 @@ class OrderBookActorSpecification
 
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
-        val ord = buy(p, 10 * Order.PriceConstant, 100)
-        val ob  = OrderBook.empty()
-        ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
-        obsdb.update(p, 50, Some(ob.snapshot))
+        val ord            = buy(p, 10 * Order.PriceConstant, 100)
+        val ob             = OrderBook.empty
+        val (updatedOb, _) = ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
+        obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>
       tp.expectMsgType[OrderAdded]

@@ -2,14 +2,6 @@ package com.wavesplatform.dex.model.orderbook
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
-import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.model.{Events, OrderBook}
-import com.wavesplatform.dex.model.orderbook.OrderBookCancelBenchmark._
-import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra.Blackhole
-import org.scalacheck.Gen
-
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -48,7 +40,7 @@ object OrderBookCancelBenchmark {
       new Random(ThreadLocalRandom.current()).shuffle(xs).take(initOrderNumber - orderNumberAfterCancel)
     }
 
-    def run(): Seq[Option[Events.OrderCanceled]] = orders.map(orderBook.cancel(_, ts))
+    def run(): OrderBook = orders.foldLeft(orderBook) { case (r, id) => r.cancel(id, ts)._1 }
   }
 
 }

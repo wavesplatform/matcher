@@ -48,7 +48,7 @@ class OrderBookActor(owner: ActorRef,
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
-  private var orderBook   = OrderBook.empty()
+  private var orderBook   = OrderBook.empty
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
@@ -103,7 +103,9 @@ class OrderBookActor(owner: ActorRef,
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               updateSnapshot(OrderBookAggregatedSnapshot.empty)
-              processEvents(orderBook.cancelAll(request.timestamp))
+              val (updatedOrderBook, events) = orderBook.cancelAll(request.timestamp)
+              orderBook = updatedOrderBook
+              processEvents(events)
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               context.stop(self)
@@ -144,8 +146,10 @@ class OrderBookActor(owner: ActorRef,
 
   private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit = cancelTimer.measure {
     orderBook.cancel(id, event.timestamp) match {
-      case Some(cancelEvent) => processEvents(List(cancelEvent))
-      case None =>
+      case (updatedOrderBook, Some(cancelEvent)) =>
+        orderBook = updatedOrderBook
+        processEvents(List(cancelEvent))
+      case _ =>
         log.warn(s"Error applying $event: order not found")
         addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))
     }
@@ -153,7 +157,10 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
+    val (updatedOrderBook, events) =
+      orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize)
+    orderBook = updatedOrderBook
+    processEvents(events)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -229,7 +236,7 @@ object OrderBookActor {
       )
     }
 
-    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.getLastTrade, ob.bestBid, ob.bestAsk)
+    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
   }
 
   case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)

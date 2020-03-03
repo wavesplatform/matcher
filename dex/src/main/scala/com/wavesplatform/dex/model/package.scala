@@ -18,11 +18,10 @@ package object model {
     // TODO Replce getOrElse with apply+default
     def enqueue(levelPrice: Price, lo: LimitOrder): Side = side.updated(levelPrice, side.getOrElse(levelPrice, Queue.empty).enqueue(lo))
 
-    final def removeBest(): (Side, LimitOrder) = side.headOption match {
-      case l if l.forall(_._2.isEmpty) => throw new IllegalArgumentException("Cannot remove the best element from an empty level")
-      case Some((price, level)) =>
+    final def withoutBest: Option[(Side, (Price, LimitOrder))] = side.headOption.map {
+      case (price, level) =>
         val updatedSide = if (level.length == 1) side - price else side.updated(price, level.tail)
-        (updatedSide, level.head)
+        (updatedSide, (price, level.head))
     }
 
     def replaceBest(newBest: LimitOrder): (Side, LimitOrder) = {
@@ -41,6 +40,8 @@ package object model {
       val updatedSide = if (toKeep.isEmpty) side - price else side.updated(price, toKeep)
       (updatedSide, toRemove.head)
     }
+
+    def put(price: Price, lo: LimitOrder): Side = side.updated(price, side.getOrElse(price, Queue.empty).enqueue(lo))
 
     def aggregated: Iterable[LevelAgg] = for { (p, l) <- side.view if l.nonEmpty } yield LevelAgg(l.map(_.amount).sum, p)
     def bestLevel: Option[LevelAgg]    = aggregated.headOption

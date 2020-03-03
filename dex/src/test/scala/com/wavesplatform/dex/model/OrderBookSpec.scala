@@ -62,7 +62,7 @@ class OrderBookSpec
       val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
       val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-      val events = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+      val (obAfter, events) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
       val balancesAfter = events.foldLeft(balancesBefore) {
         case (r, evt: Events.OrderExecuted) =>
@@ -148,7 +148,7 @@ ${diff.mkString("\n")}
       val hadOrder       = hasOrder(ob, orderIdToCancel)
       val orderIdsBefore = orderIds(ob)
 
-      val events = ob.cancel(orderIdToCancel, ts)
+      val (obAfter, events) = ob.cancel(orderIdToCancel, ts)
       val clue =
         s"""
 Order id to cancel: $orderIdToCancel
@@ -164,10 +164,10 @@ Events:
 ${events.mkString("\n")}
 """
 
-      val orderIdsAfter = orderIds(ob)
+      val orderIdsAfter = orderIds(obAfter)
       withClue(clue) {
         if (hadOrder) {
-          val orderRemoved = events.nonEmpty && !hasOrder(ob, orderIdToCancel)
+          val orderRemoved = events.nonEmpty && !hasOrder(obAfter, orderIdToCancel)
           orderRemoved shouldBe true
         } else {
           events.isEmpty shouldBe true
@@ -187,8 +187,8 @@ ${events.mkString("\n")}
       val obBefore       = format(ob)
       val orderIdsBefore = orderIds(ob)
 
-      val events         = ob.cancelAll(ts)
-      val canceledOrders = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+      val (obAfter, events) = ob.cancelAll(ts)
+      val canceledOrders    = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
       val clue =
         s"""
 OrderBook before:
@@ -204,7 +204,7 @@ Canceled orders:
 ${canceledOrders.mkString("\n")}
 """
 
-      val orderIdsAfter = orderIds(ob)
+      val orderIdsAfter = orderIds(obAfter)
       withClue(clue) {
         orderIdsAfter shouldBe empty
         events should have size canceledOrders.size
@@ -229,10 +229,10 @@ ${canceledOrders.mkString("\n")}
 
   private def format(x: OrderBook): String = s"""
 Asks (rcv=${assetPair.priceAsset}, spt=${assetPair.amountAsset}):
-${formatSide(x.getAsks)}
+${formatSide(x.asks)}
 
 Bids (rcv=${assetPair.amountAsset}, spt=${assetPair.priceAsset}):
-${formatSide(x.getBids)}"""
+${formatSide(x.bids)}"""
 
   private def format(x: AcceptedOrder): String = {
     val name = x match {

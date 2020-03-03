@@ -2,16 +2,6 @@ package com.wavesplatform.dex.model.orderbook
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.orderbook.OrderBookAddBenchmark._
-import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
-import com.wavesplatform.dex.model.{AcceptedOrder, Events, OrderBook}
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.infra.Blackhole
-import org.scalacheck.Gen
-
-import scala.collection.JavaConverters._
-
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(4)
@@ -37,14 +27,16 @@ object OrderBookAddBenchmark {
     val bidGen = orderGen(priceGen, OrderType.BUY)
 
     val orderBook: OrderBook = {
-      val ob = OrderBook.empty()
+      val ob = OrderBook.empty
       ordersGen(initOrderNumber).sample.get.foreach(ob.add(_, ts, getMakerTakerFee))
       ob
     }
 
     val orders: List[AcceptedOrder] = ordersGen(orderNumberToAdd).sample.get
 
-    def run(): List[Seq[Events.Event]] = orders.map(orderBook.add(_, ts, getMakerTakerFee))
+    def run(): OrderBook = orders.foldLeft(OrderBook.empty) {
+      case (r, o) => r.add(o, ts, getMakerTakerFee)._1
+    }
 
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =
       for {

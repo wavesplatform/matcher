@@ -2,6 +2,16 @@ package com.wavesplatform.dex.model.orderbook
 
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.model.orderbook.OrderBookAddBenchmark._
+import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
+import com.wavesplatform.dex.model.{AcceptedOrder, Events, OrderBook}
+import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.infra.Blackhole
+import org.scalacheck.Gen
+
+import scala.collection.JavaConverters._
+
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(4)

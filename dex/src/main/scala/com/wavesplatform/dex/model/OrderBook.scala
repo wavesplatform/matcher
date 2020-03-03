@@ -43,11 +43,12 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     (OrderBook.empty, canceledOrders)
   }
 
-  def add(ao: AcceptedOrder,
-          ts: Long,
+  def add(submitted: AcceptedOrder,
+          eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
-    doMatch(ts, tickSize, getMakerTakerFee, ao, this)
+    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, this)
+    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)))
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
@@ -92,6 +93,9 @@ object OrderBook {
         case OrderType.SELL => (price / normalizedTickSize + 1) * normalizedTickSize
       }
 
+  /**
+   * @param submitted It is expected, that submitted is valid on eventTs
+   */
   private def doMatch(eventTs: Long,
                       tickSize: Long,
                       getMakerTakerMaxFee: (AcceptedOrder, LimitOrder) => (Long, Long),
@@ -99,62 +103,51 @@ object OrderBook {
                       orderBook: OrderBook): (OrderBook, Queue[Event]) = {
     @scala.annotation.tailrec
     def loop(orderBook: OrderBook, submitted: AcceptedOrder, events: Queue[Event]): (OrderBook, Queue[Event]) =
-      if (!submitted.order.isValid(eventTs)) (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = false, eventTs)))
-      else
-        orderBook.withoutBest(submitted.order.orderType.opposite) match {
-          case Some((orderBook, (levelPrice, counter))) if overlaps(submitted, levelPrice) =>
-            if (!counter.order.isValid(eventTs))
-              loop(
-                orderBook = orderBook,
-                submitted = submitted,
-                events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
-              )
-            else {
-              val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
-              val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
-              val updatedEvents                    = events.enqueue(orderExecutedEvent)
-              val updatedOrderBook =
-                orderBook.copy(lastTrade = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType)))
+      orderBook.withoutBest(submitted.order.orderType.opposite) match {
+        case Some((orderBook, (levelPrice, counter))) if overlaps(submitted, levelPrice) =>
+          if (counter.order.isValid(eventTs)) {
+            val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
+            val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
+            val updatedEvents                    = events.enqueue(orderExecutedEvent)
+            val updatedOrderBook =
+              orderBook.copy(lastTrade = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType)))
 
-              val counterRemaining   = orderExecutedEvent.counterRemaining
-              val submittedRemaining = orderExecutedEvent.submittedRemaining
-              if (counterRemaining.isValid) { // counter is not filled
+            val submittedRemaining = orderExecutedEvent.submittedRemaining
+            if (submittedRemaining.isValid) {
+              val counterRemaining = orderExecutedEvent.counterRemaining
+              if (counterRemaining.isValid)
+                // TODO why we cancel it?
                 // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
-                if (submittedRemaining.isValid)
-                  (
-                    updatedOrderBook.prependBest(levelPrice, counterRemaining),
-                    updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs))
-                  )
-                else (updatedOrderBook, updatedEvents)
-              } else { // counter is filled
+                (
+                  updatedOrderBook.prependBest(levelPrice, counterRemaining),
+                  updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs))
+                )
+              else
                 submittedRemaining match {
-                  case _: LimitOrder =>
-                    if (submittedRemaining.isValid) loop(updatedOrderBook, submittedRemaining, updatedEvents)
-                    else (updatedOrderBook, updatedEvents)
-
+                  case submittedRemaining: LimitOrder => loop(updatedOrderBook, submittedRemaining, updatedEvents)
                   case submittedRemaining: MarketOrder =>
-                    val isSubmittedFilled = !submittedRemaining.isValid
-                    val canSpendMore      = submittedRemaining.availableForSpending > 0
-                    (isSubmittedFilled, canSpendMore) match {
-                      case (true, _)     => (updatedOrderBook, updatedEvents)
-                      case (false, true) => loop(updatedOrderBook, submittedRemaining, updatedEvents)
-                      case (false, false) =>
-                        (updatedOrderBook, updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)))
-                    }
+                    val canSpendMore = submittedRemaining.availableForSpending > 0
+                    if (canSpendMore) loop(updatedOrderBook, submittedRemaining, updatedEvents)
+                    else (updatedOrderBook, updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)))
                 }
-              }
-            }
+            } else (updatedOrderBook, updatedEvents)
+          } else
+            loop(
+              orderBook = orderBook,
+              submitted = submitted,
+              events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
+            )
 
-          case _ =>
-            submitted match {
-              case submitted: LimitOrder =>
-                val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-                (orderBook.insert(levelPrice, submitted), events.enqueue(OrderAdded(submitted, eventTs)))
-              case submitted: MarketOrder =>
-                // Cancel market order in the absence of counters
-                (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)))
-            }
-        }
+        case _ =>
+          submitted match {
+            case submitted: LimitOrder =>
+              val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
+              (orderBook.insert(levelPrice, submitted), events.enqueue(OrderAdded(submitted, eventTs)))
+            case submitted: MarketOrder =>
+              // Cancel market order in the absence of counters
+              (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)))
+          }
+      }
 
     loop(orderBook, submitted, Queue.empty)
   }

@@ -74,7 +74,7 @@ sealed trait AcceptedOrder {
 
   protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
 
-  def isValid: Boolean = isValid(price)
+  lazy val isValid: Boolean = isValid(price)
   def isValid(counterPrice: Price): Boolean =
     amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
 

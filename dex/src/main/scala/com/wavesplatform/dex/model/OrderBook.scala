@@ -55,6 +55,8 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 
+  def best(tpe: OrderType): Option[(Price, LimitOrder)] = tpe.askBid(asks.best, bids.best)
+
   def withoutBest(tpe: OrderType): Option[(OrderBook, (Price, LimitOrder))] = tpe.askBid(
     asks.withoutBest.map { case (side, x) => (copy(asks = side, orderIds = orderIds - x._2.order.id()), x) },
     bids.withoutBest.map { case (side, x) => (copy(bids = side, orderIds = orderIds - x._2.order.id()), x) },
@@ -71,6 +73,12 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
          orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice))),
     copy(bids = bids.updated(levelPrice, lo +: bids.getOrElse(levelPrice, Queue.empty)),
          orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice)))
+  )
+
+  // orderIds should not be removed, same id, TODO move
+  def replaceBest(lo: LimitOrder): OrderBook = lo.order.orderType.askBid(
+    copy(asks = asks.replaceBest(lo)._1),
+    copy(bids = bids.replaceBest(lo)._1)
   )
 }
 
@@ -94,8 +102,8 @@ object OrderBook {
       }
 
   /**
-   * @param submitted It is expected, that submitted is valid on eventTs
-   */
+    * @param submitted It is expected, that submitted is valid on eventTs
+    */
   private def doMatch(eventTs: Long,
                       tickSize: Long,
                       getMakerTakerMaxFee: (AcceptedOrder, LimitOrder) => (Long, Long),
@@ -103,23 +111,29 @@ object OrderBook {
                       orderBook: OrderBook): (OrderBook, Queue[Event]) = {
     @scala.annotation.tailrec
     def loop(orderBook: OrderBook, submitted: AcceptedOrder, events: Queue[Event]): (OrderBook, Queue[Event]) =
-      orderBook.withoutBest(submitted.order.orderType.opposite) match {
-        case Some((orderBook, (levelPrice, counter))) if overlaps(submitted, levelPrice) =>
+      orderBook.best(submitted.order.orderType.opposite) match {
+        case Some((levelPrice, counter)) if overlaps(submitted, levelPrice) =>
           if (counter.order.isValid(eventTs)) {
             val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
             val updatedEvents                    = events.enqueue(orderExecutedEvent)
-            val updatedOrderBook =
-              orderBook.copy(lastTrade = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType)))
 
             val submittedRemaining = orderExecutedEvent.submittedRemaining
+            val counterRemaining   = orderExecutedEvent.counterRemaining
+
+            val updatedOrderBook = {
+              val lt = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
+              val ob = orderBook.copy(lastTrade = lt)
+              if (counterRemaining.isValid) ob.replaceBest(counterRemaining)
+              else ob.withoutBest(counter.order.orderType).getOrElse(throw new RuntimeException("no best"))._1
+            }
+
             if (submittedRemaining.isValid) {
-              val counterRemaining = orderExecutedEvent.counterRemaining
               if (counterRemaining.isValid)
                 // TODO why we cancel it?
                 // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
                 (
-                  updatedOrderBook.prependBest(levelPrice, counterRemaining),
+                  updatedOrderBook,
                   updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs))
                 )
               else
@@ -133,7 +147,7 @@ object OrderBook {
             } else (updatedOrderBook, updatedEvents)
           } else
             loop(
-              orderBook = orderBook,
+              orderBook = orderBook.withoutBest(counter.order.orderType).getOrElse(throw new RuntimeException("no best"))._1,
               submitted = submitted,
               events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
             )

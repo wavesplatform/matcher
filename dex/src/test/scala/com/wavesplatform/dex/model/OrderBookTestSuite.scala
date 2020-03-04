@@ -32,10 +32,10 @@ class OrderBookTestSuite
     with TableDrivenPropertyChecks {
 
   implicit class OrderBookOps(ob: OrderBook) {
-    def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Seq[Event]) =
+    def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
       ob.add(ao, ts, (t, m) => m.matcherFee -> t.matcherFee, tickSize)
 
-    def appendAll(xs: Seq[AcceptedOrder], ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Seq[Event]) =
+    def appendAll(xs: Seq[AcceptedOrder], ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
       xs.foldLeft((ob, Queue.empty[Event])) {
         case ((ob, events), o) =>
           val (updatedOb, newEvents) = ob.append(o, ts, tickSize = tickSize)
@@ -151,10 +151,10 @@ class OrderBookTestSuite
       val (ob, events2)  = ob1.append(submittedBuyOrder, now + 1)
       val events         = events1 ++ events2
 
-      events shouldBe Queue(
+      events should matchTo(Queue[Event](
         OrderAdded(counterSellOrder, now),
         OrderExecuted(submittedBuyOrder, counterSellOrder, now + 1, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
-      )
+      ))
 
       ob.asks shouldBe empty
       ob.bids shouldBe empty

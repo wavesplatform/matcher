@@ -700,7 +700,7 @@ class ReservedBalanceSpecification
         // since order will be rejected because of the BalanceNotEnough error. Its ok since in these tests we check
         // tricky cases of balance reservation, when afs is not enough to cover market value and fee
 
-        tp.expectMsgAnyClassOf(300.millisecond, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
+        tp.expectMsgAnyClassOf(1.second, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 

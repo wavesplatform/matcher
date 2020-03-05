@@ -5,7 +5,7 @@ import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouter._
-import com.wavesplatform.dex.model.{Events, LimitOrder}
+import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
 import scala.collection.mutable

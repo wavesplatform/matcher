@@ -61,7 +61,7 @@ with SystemTime{
     val ord3 = LimitOrder(buy(pair, 44521418496L, 34000))
 
     val (ob, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3), now)
-    ob.allOrders.map(_._2).toList should matchTo(List(ord2, ord1, ord3))
+    ob.allOrders.toList should matchTo(List(ord2, ord1, ord3))
   }
 
   "place several buy orders at the same price" in {}
@@ -249,14 +249,14 @@ with SystemTime{
     val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
     val (ob1, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2), now)
-    ob1.allOrders.map(_._2).toList should matchTo {
+    ob1.allOrders.toList should matchTo {
       List[LimitOrder](BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
     }
 
     val ord3     = sell(pair, 10 * Order.PriceConstant, 100)
     val (ob2, _) = ob1.append(LimitOrder(ord3), now)
 
-    ob2.allOrders.map(_._2).toList should matchTo(List[LimitOrder](BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
+    ob2.allOrders.toList should matchTo(List[LimitOrder](BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
   }
 
   "execute orders at different price levels" in {
@@ -268,7 +268,7 @@ with SystemTime{
     val (ob, _)    = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3, ord4).map(LimitOrder(_)), now)
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
-    ob.allOrders.map(_._2).toList should matchTo(
+    ob.allOrders.toList should matchTo(
       List[LimitOrder](
         SellLimitOrder(
           restAmount,
@@ -283,7 +283,7 @@ with SystemTime{
     val ord3 = buy(pair, 100000001, 0.00045)
 
     val (ob, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
-    ob.allOrders.map(_._2).toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
   }
 
   "partially execute order with zero fee remaining part" in {
@@ -299,7 +299,7 @@ with SystemTime{
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
     val restFee = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
-    ob.allOrders.map(_._2).toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
   }
 
   "partially execute order with price > 1 and zero fee remaining part " in {
@@ -312,7 +312,7 @@ with SystemTime{
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee    = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
-    ob.allOrders.map(_._2).toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
   }
 
   "buy small amount of pricey asset" in {
@@ -325,7 +325,7 @@ with SystemTime{
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
     val restFee     = s.matcherFee - AcceptedOrder.partialFee(s.matcherFee, s.amount, restSAmount)
-    ob.allOrders.map(_._2).toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, s)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, s)))
   }
 
   "cleanup expired buy orders" in {

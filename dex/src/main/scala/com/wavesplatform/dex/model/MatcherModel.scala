@@ -178,7 +178,6 @@ object AcceptedOrder {
                   counterPrice
                     .multiply(moAmount)
                     .scaleByPowerOfTen(-Order.PriceConstantExponent)
-                    .setScale(0, RoundingMode.FLOOR)
                     .add(new BigDecimal(mo.fee)),
                   0,
                   RoundingMode.FLOOR

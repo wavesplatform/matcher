@@ -12,8 +12,7 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBook
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
-import com.wavesplatform.dex.model.LastTrade
-import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.Time
@@ -81,7 +80,7 @@ class OrderBookActor(owner: ActorRef,
 
       updateMarketStatus(MarketStatus(orderBook))
       updateSnapshot(orderBook.aggregatedSnapshot)
-      processEvents(orderBook.allOrders.map { case (_, lo) => OrderAdded(lo, lo.order.timestamp) })
+      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -129,7 +128,7 @@ class OrderBookActor(owner: ActorRef,
       }
   }
 
-  private def processEvents(events: Iterable[Event]): Unit = {
+  private def processEvents(events: TraversableOnce[Event]): Unit = {
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
     events.foreach(addressActor ! _.unsafeTap(logEvent))

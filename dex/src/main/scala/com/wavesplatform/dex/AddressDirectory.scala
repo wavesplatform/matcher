@@ -46,8 +46,6 @@ class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) =
       lazy val isFirstExecution  = submitted.amount == submitted.order.amount
       lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
 
-      // lazy val isSubmittedFilled = !e.submittedRemaining.asInstanceOf[LimitOrder].isValid // e.submittedRemainingAmount == 0
-
       (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
         case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
         case _                                     => Unit

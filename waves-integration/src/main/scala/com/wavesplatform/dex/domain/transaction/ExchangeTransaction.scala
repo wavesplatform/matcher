@@ -96,7 +96,6 @@ object ExchangeTransaction {
                              sellMatcherFee: Long,
                              fee: Long,
                              timestamp: Long): Either[ValidationError, Unit] = {
-    // TODO make validation in sequence
     Seq(
       (fee <= 0)                                                -> InsufficientFee(),
       (amount <= 0)                                             -> NonPositiveAmount(amount, "assets"),

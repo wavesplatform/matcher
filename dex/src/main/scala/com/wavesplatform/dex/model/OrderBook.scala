@@ -17,29 +17,25 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
   def bestBid: Option[LevelAgg] = bids.bestLevel
   def bestAsk: Option[LevelAgg] = asks.bestLevel
 
-  def allOrders: Iterable[(Price, LimitOrder)] =
-    for {
-      (price, level) <- (bids: Iterable[(Price, Level)]) ++ asks
-      lo             <- level
-    } yield price -> lo
+  def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[OrderCanceled]) =
-    orderIds
-      .get(orderId)
-      .map {
-        case (orderType, price) =>
-          if (orderType == OrderType.SELL) {
-            val (updatedAsks, lo) = asks.remove(price, orderId)
-            (copy(asks = updatedAsks, orderIds = orderIds - orderId), Some(OrderCanceled(lo, isSystemCancel = false, timestamp)))
-          } else {
-            val (updatedBids, lo) = bids.remove(price, orderId)
-            (copy(bids = updatedBids, orderIds = orderIds - orderId), Some(OrderCanceled(lo, isSystemCancel = false, timestamp)))
-          }
-      }
-      .getOrElse((this, Option.empty[OrderCanceled]))
+  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[OrderCanceled]) = {
+    def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
+    orderIds.get(orderId).fold((this, Option.empty[OrderCanceled])) {
+      case (orderType, price) =>
+        val updatedOrderIds = orderIds - orderId
+        if (orderType == OrderType.SELL) {
+          val (updatedAsks, lo) = asks.remove(price, orderId)
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo))
+        } else {
+          val (updatedBids, lo) = bids.remove(price, orderId)
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo))
+        }
+    }
+  }
 
-  def cancelAll(ts: Long): (OrderBook, Seq[OrderCanceled]) = {
-    val canceledOrders = allOrders.map { case (_, lo) => OrderCanceled(lo, isSystemCancel = false, ts) }.toSeq
+  def cancelAll(ts: Long): (OrderBook, List[OrderCanceled]) = {
+    val canceledOrders = allOrders.map { OrderCanceled(_, isSystemCancel = false, ts) }.toList
     (OrderBook.empty, canceledOrders)
   }
 
@@ -57,29 +53,31 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def best(tpe: OrderType): Option[(Price, LimitOrder)] = tpe.askBid(asks.best, bids.best)
 
-  def withoutBest(tpe: OrderType): Option[(OrderBook, (Price, LimitOrder))] = tpe.askBid(
-    asks.withoutBest.map { case (side, x) => (copy(asks = side, orderIds = orderIds - x._2.order.id()), x) },
-    bids.withoutBest.map { case (side, x) => (copy(bids = side, orderIds = orderIds - x._2.order.id()), x) },
+  def unsafeWithoutBest(tpe: OrderType): OrderBook = tpe.askBid(
+    {
+      val (updatedSide, removedOrderId) = asks.unsafeWithoutBest
+      copy(asks = updatedSide, orderIds = orderIds - removedOrderId)
+    }, {
+      val (updatedSide, removedOrderId) = bids.unsafeWithoutBest
+      copy(bids = updatedSide, orderIds = orderIds - removedOrderId)
+    }
   )
 
-  def insert(levelPrice: Price, lo: LimitOrder): OrderBook = lo.order.orderType.askBid(
-    copy(asks = asks.put(levelPrice, lo), orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice))),
-    copy(bids = bids.put(levelPrice, lo), orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice)))
+  /**
+    * Note: orderIds aren't changed, because updated has the same inner order
+    */
+  def unsafeUpdateBest(updated: LimitOrder): OrderBook = updated.order.orderType.askBid(
+    copy(asks = asks.unsafeUpdateBest(updated)),
+    copy(bids = bids.unsafeUpdateBest(updated))
   )
 
-  // TODO orderIds
-  def prependBest(levelPrice: Price, lo: LimitOrder): OrderBook = lo.order.orderType.askBid(
-    copy(asks = asks.updated(levelPrice, lo +: asks.getOrElse(levelPrice, Queue.empty)),
-         orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice))),
-    copy(bids = bids.updated(levelPrice, lo +: bids.getOrElse(levelPrice, Queue.empty)),
-         orderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice)))
-  )
-
-  // orderIds should not be removed, same id, TODO move
-  def replaceBest(lo: LimitOrder): OrderBook = lo.order.orderType.askBid(
-    copy(asks = asks.replaceBest(lo)._1),
-    copy(bids = bids.replaceBest(lo)._1)
-  )
+  def insert(levelPrice: Price, lo: LimitOrder): OrderBook = {
+    val updatedOrderIds = orderIds.updated(lo.order.id(), (lo.order.orderType, levelPrice))
+    lo.order.orderType.askBid(
+      copy(asks = asks.put(levelPrice, lo), orderIds = updatedOrderIds),
+      copy(bids = bids.put(levelPrice, lo), orderIds = updatedOrderIds)
+    )
+  }
 }
 
 object OrderBook {
@@ -124,8 +122,8 @@ object OrderBook {
             val updatedOrderBook = {
               val lt = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
               val ob = orderBook.copy(lastTrade = lt)
-              if (counterRemaining.isValid) ob.replaceBest(counterRemaining)
-              else ob.withoutBest(counter.order.orderType).getOrElse(throw new RuntimeException("no best"))._1
+              if (counterRemaining.isValid) ob.unsafeUpdateBest(counterRemaining)
+              else ob.unsafeWithoutBest(counter.order.orderType)
             }
 
             if (submittedRemaining.isValid) {
@@ -146,7 +144,7 @@ object OrderBook {
             } else (updatedOrderBook, updatedEvents)
           } else
             loop(
-              orderBook = orderBook.withoutBest(counter.order.orderType).getOrElse(throw new RuntimeException("no best"))._1,
+              orderBook = orderBook.unsafeWithoutBest(counter.order.orderType),
               submitted = submitted,
               events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
             )

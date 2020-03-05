@@ -214,12 +214,12 @@ ${canceledOrders.mkString("\n")}
       }
   }
 
-  private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_._2.order.id()).toSet
-  private def hasOrder(ob: OrderBook, id: Order.Id): Boolean = ob.allOrders.exists(_._2.order.id() == id)
+  private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_.order.id()).toSet
+  private def hasOrder(ob: OrderBook, id: Order.Id): Boolean = ob.allOrders.exists(_.order.id() == id)
 
   private def balancesBy(ob: OrderBook): Map[PublicKey, Map[Asset, Long]] =
     ob.allOrders.foldLeft(Map.empty[PublicKey, Map[Asset, Long]]) {
-      case (r, (_, o)) => r |+| balancesBy(o)
+      case (r, o) => r |+| balancesBy(o)
     }
 
   private def balancesBy(o: AcceptedOrder): Map[PublicKey, Map[Asset, Long]] = Map(o.order.senderPublicKey -> o.requiredBalance)

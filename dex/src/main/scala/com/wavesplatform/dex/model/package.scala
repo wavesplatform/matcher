@@ -2,6 +2,7 @@ package com.wavesplatform.dex
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
+import com.wavesplatform.dex.domain.order.Order
 
 import scala.collection.immutable.{Queue, TreeMap}
 
@@ -18,19 +19,20 @@ package object model {
     // TODO Replce getOrElse with apply+default
     def enqueue(levelPrice: Price, lo: LimitOrder): Side = side.updated(levelPrice, side.getOrElse(levelPrice, Queue.empty).enqueue(lo))
 
-    final def withoutBest: Option[(Side, (Price, LimitOrder))] = side.headOption.map {
-      case (price, level) =>
-        val updatedSide = if (level.length == 1) side - price else side.updated(price, level.tail)
-        (updatedSide, (price, level.head))
+    final def unsafeWithoutBest: (Side, Order.Id) = side.headOption match {
+      case Some((price, level)) =>
+        val updated = if (level.length == 1) side - price else side.updated(price, level.tail)
+        (updated, level.head.order.id())
+      case None => throw new IllegalArgumentException("Expected side to have at least one order")
     }
 
-    def replaceBest(newBest: LimitOrder): (Side, LimitOrder) = {
+    def unsafeUpdateBest(updated: LimitOrder): Side = {
       require(side.nonEmpty, "Cannot replace the best level of an empty side")
       val (price, level) = side.head
       require(level.nonEmpty, "Cannot replace the best element of an empty level")
-      val oldHead     = level.head
-      val updatedSide = side.updated(price, newBest +: level.tail)
-      (updatedSide, oldHead)
+      val oldHead = level.head
+      require(oldHead.order.id() == updated.order.id(), "Expected the same order")
+      side.updated(price, updated +: level.tail)
     }
 
     // TODO

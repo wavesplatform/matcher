@@ -44,7 +44,7 @@ object OrderBookCancelBenchmark {
 
     val orderBook: OrderBook = orderBookGen.sample.get
     val orders: Seq[Order.Id] = {
-      val xs = orderBook.allOrders.map(_._2.order.id()).toVector
+      val xs = orderBook.allOrders.map(_.order.id()).toVector
       new Random(ThreadLocalRandom.current()).shuffle(xs).take(initOrderNumber - orderNumberAfterCancel)
     }
 

@@ -53,7 +53,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def best(tpe: OrderType): Option[(Price, LimitOrder)] = tpe.askBid(asks.best, bids.best)
 
-  def unsafeWithoutBest(tpe: OrderType): OrderBook = tpe.askBid(
+  private def unsafeWithoutBest(tpe: OrderType): OrderBook = tpe.askBid(
     {
       val (updatedSide, removedOrderId) = asks.unsafeWithoutBest
       copy(asks = updatedSide, orderIds = orderIds - removedOrderId)
@@ -66,7 +66,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
   /**
     * Note: orderIds aren't changed, because updated has the same inner order
     */
-  def unsafeUpdateBest(updated: LimitOrder): OrderBook = updated.order.orderType.askBid(
+  private def unsafeUpdateBest(updated: LimitOrder): OrderBook = updated.order.orderType.askBid(
     copy(asks = asks.unsafeUpdateBest(updated)),
     copy(bids = bids.unsafeUpdateBest(updated))
   )

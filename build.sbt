@@ -84,7 +84,8 @@ lazy val root = (project in file("."))
     `waves-grpc`,
     `waves-ext`,
     `waves-integration`,
-    `waves-integration-it`
+    `waves-integration-it`,
+    `dex-jmh`
   )
 
 inScope(Global)(
@@ -163,6 +164,7 @@ checkPRRaw := {
     (dex / Test / test).value
     (`waves-ext` / Test / test).value
     (`waves-integration` / Test / test).value
+    (`dex-jmh` / Test / compile).value
   }
 }
 

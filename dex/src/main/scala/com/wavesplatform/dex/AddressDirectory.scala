@@ -5,7 +5,7 @@ import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.history.HistoryRouter._
-import com.wavesplatform.dex.model.Events
+import com.wavesplatform.dex.model.{Events, LimitOrder}
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
 
 import scala.collection.mutable
@@ -45,6 +45,8 @@ class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) =
 
       lazy val isFirstExecution  = submitted.amount == submitted.order.amount
       lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
+
+      // lazy val isSubmittedFilled = !e.submittedRemaining.asInstanceOf[LimitOrder].isValid // e.submittedRemainingAmount == 0
 
       (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
         case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }

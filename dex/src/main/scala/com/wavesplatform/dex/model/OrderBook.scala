@@ -130,7 +130,6 @@ object OrderBook {
 
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
-                // TODO why we cancel it?
                 // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
                 (
                   updatedOrderBook,

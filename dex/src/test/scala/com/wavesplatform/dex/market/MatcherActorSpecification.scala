@@ -17,7 +17,7 @@ import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBoo
 import com.wavesplatform.dex.model.{Events, OrderBookSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -33,7 +33,7 @@ class MatcherActorSpecification
     with PathMockFactory
     with ImplicitSender
     with Eventually
-    with NTPTime {
+    with SystemTime {
 
   private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = {
     Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
@@ -424,7 +424,7 @@ class MatcherActorSpecification
             assetPair,
             _ => {},
             _ => {},
-            ntpTime,
+            time,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
             _ => MatchingRule.DefaultRule,

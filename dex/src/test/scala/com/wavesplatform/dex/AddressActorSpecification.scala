@@ -16,7 +16,6 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -29,7 +28,6 @@ class AddressActorSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
-    with NTPTime
     with MatcherSpecBase {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
@@ -192,7 +190,7 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          ntpTime,
+          time,
           EmptyOrderDB,
           _ => Future.successful(false),
           event => {

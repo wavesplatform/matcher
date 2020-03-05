@@ -20,7 +20,7 @@ import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecu
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")
-    with NTPTime
+    with SystemTime
     with ImplicitSender
     with MatcherSpecBase
     with PathMockFactory
@@ -82,7 +82,7 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        ntpTime,
+        time,
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),

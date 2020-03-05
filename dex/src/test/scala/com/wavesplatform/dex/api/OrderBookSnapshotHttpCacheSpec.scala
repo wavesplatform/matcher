@@ -7,14 +7,14 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPTime with TableDrivenPropertyChecks {
+class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with SystemTime with TableDrivenPropertyChecks {
 
   private val defaultAssetPair                            = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8"))))
   private def getAssetDecimals(asset: Asset): Option[Int] = Some(8)
@@ -55,7 +55,7 @@ class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPT
       using {
         new OrderBookSnapshotHttpCache(
           OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9), None),
-          ntpTime,
+          time,
           getAssetDecimals,
           _ =>
             Some(
@@ -90,7 +90,7 @@ class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPT
     "should clear all depth caches after invalidate" in {
       val depths = List(1, 3, 7, 9)
       using {
-        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths, None), ntpTime, getAssetDecimals, _ => None)
+        new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(1.minute, depths, None), time, getAssetDecimals, _ => None)
       } { cache =>
         val prev = depths.map(x => x -> orderBookFrom(cache.get(defaultAssetPair, Some(x)))).toMap
 
@@ -160,7 +160,7 @@ class OrderBookSnapshotHttpCacheSpec extends AnyFreeSpec with Matchers with NTPT
   }
 
   private def createDefaultCache =
-    new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9), None), ntpTime, getAssetDecimals, _ => None)
+    new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9), None), time, getAssetDecimals, _ => None)
 
   private def orderBookFrom(x: HttpResponse): OrderBookResult = JsonSerializer.deserialize[OrderBookResult](
     x.entity

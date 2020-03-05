@@ -111,7 +111,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed).left.map(_.toJson) should produce("amount should be > 0")
+        OrderValidator.timeAware(time)(signed).left.map(_.toJson) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in blockchainTest() { (ov, bc) =>
@@ -925,7 +925,7 @@ class OrderValidatorSpecification
         bc,
         tc.createTransaction,
         MatcherAccount,
-        ntpTime,
+        time,
         DynamicSettings.symmetric(matcherFee),
         matcherSettings.orderRestrictions,
         assetDescriptions,
@@ -1037,7 +1037,7 @@ class OrderValidatorSpecification
         blockchain,
         transactionCreator,
         MatcherAccount.toAddress,
-        ntpTime,
+        time,
         orderFeeSettings,
         orderRestrictions,
         assetDescriptions = assetsDescriptions,

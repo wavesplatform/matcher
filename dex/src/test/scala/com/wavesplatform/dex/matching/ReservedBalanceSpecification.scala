@@ -15,9 +15,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{OrderBookAggregatedSnapshot, LevelAgg, LimitOrder, MarketOrder, OrderHistoryStub}
+import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot, OrderHistoryStub}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.dex.{MatcherSpecBase, _}
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -77,8 +76,7 @@ class ReservedBalanceSpecification
     with MatcherSpecLike
     with WithDB
     with MatcherSpecBase
-    with TableDrivenPropertyChecks
-    with NTPTime {
+    with TableDrivenPropertyChecks {
 
   override protected def actorSystemName: String = getSimpleName(this)
 
@@ -88,7 +86,7 @@ class ReservedBalanceSpecification
   import system.dispatcher
 
   private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  private var oh: OrderHistoryStub = new OrderHistoryStub(system, ntpTime)
+  private var oh: OrderHistoryStub = new OrderHistoryStub(system, time)
 
   private val addressDir = system.actorOf(
     Props(
@@ -109,7 +107,7 @@ class ReservedBalanceSpecification
     Props(
       new AddressActor(
         address,
-        ntpTime,
+        time,
         new TestOrderDB(100),
         _ => Future.successful(false),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
@@ -135,10 +133,10 @@ class ReservedBalanceSpecification
   }
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
-    addressDir ! OrderAdded(LimitOrder(submitted), ntpTime.getTimestamp())
-    addressDir ! OrderAdded(LimitOrder(counter), ntpTime.getTimestamp())
+    addressDir ! OrderAdded(LimitOrder(submitted), time.getTimestamp())
+    addressDir ! OrderAdded(LimitOrder(counter), time.getTimestamp())
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, submitted.matcherFee, counter.matcherFee)
     addressDir ! exec
     exec
@@ -146,7 +144,7 @@ class ReservedBalanceSpecification
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, ntpTime)
+    oh = new OrderHistoryStub(system, time)
   }
 
   forAll(
@@ -499,7 +497,7 @@ class ReservedBalanceSpecification
       Props(
         new AddressActor(
           owner = address,
-          time = ntpTime,
+          time = time,
           orderDB = new TestOrderDB(100),
           hasOrderInBlockchain = _ => Future.successful(false),
           store = event => {
@@ -527,7 +525,7 @@ class ReservedBalanceSpecification
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
     val executionEvent = OrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp, marketOrder.matcherFee, limitOrder.matcherFee)
 
-    addressDirWithOrderBookCache ! OrderAdded(limitOrder, ntpTime.getTimestamp())
+    addressDirWithOrderBookCache ! OrderAdded(limitOrder, time.getTimestamp())
     addressDirWithOrderBookCache ! executionEvent
 
     executionEvent

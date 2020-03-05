@@ -102,9 +102,7 @@ class OrderBookActor(owner: ActorRef,
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               updateSnapshot(OrderBookAggregatedSnapshot.empty)
-              val (updatedOrderBook, events) = orderBook.cancelAll(request.timestamp)
-              orderBook = updatedOrderBook
-              processEvents(events)
+              process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               context.stop(self)
@@ -128,6 +126,12 @@ class OrderBookActor(owner: ActorRef,
       }
   }
 
+  private def process(result: (OrderBook, TraversableOnce[Event])): Unit = {
+    val (updatedOrderBook, events) = result
+    orderBook = updatedOrderBook
+    processEvents(events)
+  }
+
   private def processEvents(events: TraversableOnce[Event]): Unit = {
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
@@ -146,6 +150,7 @@ class OrderBookActor(owner: ActorRef,
   private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit = cancelTimer.measure {
     orderBook.cancel(id, event.timestamp) match {
       case (updatedOrderBook, Some(cancelEvent)) =>
+        // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         processEvents(List(cancelEvent))
       case _ =>
@@ -156,10 +161,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    val (updatedOrderBook, events) =
-      orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize)
-    orderBook = updatedOrderBook
-    processEvents(events)
+    process(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {

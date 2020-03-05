@@ -1,10 +1,6 @@
 enablePlugins(JmhPlugin)
 
-inTask(Compile / run)(
-  Seq(
-    fork := true,
-    // javaOptions += s"-Dlogback.configurationFile=${(Compile / resourceDirectory).value / "logback.xml"}"
-  ))
+Compile / run / fork := true
 
 // https://github.com/ktoso/sbt-jmh#adding-to-your-project
 inConfig(Jmh)(

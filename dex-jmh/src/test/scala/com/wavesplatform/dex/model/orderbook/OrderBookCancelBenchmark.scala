@@ -3,7 +3,7 @@ package com.wavesplatform.dex.model.orderbook
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.model.{Events, OrderBook}
+import com.wavesplatform.dex.model.OrderBook
 import com.wavesplatform.dex.model.orderbook.OrderBookCancelBenchmark._
 import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
 import org.openjdk.jmh.annotations._
@@ -19,7 +19,7 @@ import scala.util.Random
 @Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class OrderBookCancelBenchmark {
-  @Benchmark def cancel_2500_to_1250_test(st: Cancel_2500_To_1250_State, bh: Blackhole): Unit = bh.consume { st.run() }
+//  @Benchmark def cancel_2500_to_1250_test(st: Cancel_2500_To_1250_State, bh: Blackhole): Unit = bh.consume { st.run() }
   @Benchmark def cancel_1250_to_0_test(st: Cancel_1250_To_0_State, bh: Blackhole): Unit       = bh.consume { st.run() }
 }
 

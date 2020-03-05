@@ -19,16 +19,16 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[OrderCanceled]) = {
+  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event]) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
     orderIds.get(orderId).fold((this, Option.empty[OrderCanceled])) {
       case (orderType, price) =>
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
-          val (updatedAsks, lo) = asks.remove(price, orderId)
+          val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
           (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo))
         } else {
-          val (updatedBids, lo) = bids.remove(price, orderId)
+          val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
           (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo))
         }
     }

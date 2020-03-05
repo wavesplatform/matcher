@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.orderbook.OrderBookAddBenchmark._
 import com.wavesplatform.dex.model.state.OrderBookBenchmarkState
-import com.wavesplatform.dex.model.{AcceptedOrder, Events, OrderBook}
+import com.wavesplatform.dex.model.{AcceptedOrder, OrderBook}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.scalacheck.Gen
@@ -36,11 +36,7 @@ object OrderBookAddBenchmark {
     val askGen = orderGen(priceGen, OrderType.SELL)
     val bidGen = orderGen(priceGen, OrderType.BUY)
 
-    val orderBook: OrderBook = {
-      val ob = OrderBook.empty
-      ordersGen(initOrderNumber).sample.get.foreach(ob.add(_, ts, getMakerTakerFee))
-      ob
-    }
+    val orderBook: OrderBook = ordersGen(initOrderNumber).sample.get.foldLeft(OrderBook.empty)(_.add(_, ts, getMakerTakerFee)._1)
 
     val orders: List[AcceptedOrder] = ordersGen(orderNumberToAdd).sample.get
 

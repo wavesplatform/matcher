@@ -16,10 +16,9 @@ package object model {
     /** Returns the best limit order in this side and the price of its level */
     def best: Option[(Price, LimitOrder)] = side.headOption.flatMap { case (levelPrice, level) => level.headOption.map(levelPrice -> _) }
 
-    // TODO Replce getOrElse with apply+default
     def enqueue(levelPrice: Price, lo: LimitOrder): Side = side.updated(levelPrice, side.getOrElse(levelPrice, Queue.empty).enqueue(lo))
 
-    final def unsafeWithoutBest: (Side, Order.Id) = side.headOption match {
+    def unsafeWithoutBest: (Side, Order.Id) = side.headOption match {
       case Some((price, level)) =>
         val updated = if (level.length == 1) side - price else side.updated(price, level.tail)
         (updated, level.head.order.id())
@@ -35,8 +34,7 @@ package object model {
       side.updated(price, updated +: level.tail)
     }
 
-    // TODO
-    def remove(price: Price, orderId: ByteStr): (Side, LimitOrder) = {
+    def unsafeRemove(price: Price, orderId: ByteStr): (Side, LimitOrder) = {
       val (toRemove, toKeep) = side.getOrElse(price, Queue.empty).partition(_.order.id() == orderId)
       require(toRemove.nonEmpty, s"Order $orderId not found at $price")
       val updatedSide = if (toKeep.isEmpty) side - price else side.updated(price, toKeep)

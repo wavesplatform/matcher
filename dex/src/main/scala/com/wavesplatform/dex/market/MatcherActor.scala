@@ -293,6 +293,7 @@ object MatcherActor {
 
   case class ForceStartOrderBook(assetPair: AssetPair)
   case class OrderBookCreated(assetPair: AssetPair)
+  case class AddWsSubscription(assetPair: AssetPair)
 
   case object GetMarkets
 

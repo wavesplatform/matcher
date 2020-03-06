@@ -96,7 +96,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
 
-  private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
+  private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBookAggregatedSnapshot](1000, 0.9f, 10)
   private val matchingRulesCache    = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
   private val rateCache             = RateCache(db)
@@ -112,7 +112,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
 
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBookAggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
@@ -344,7 +344,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         orderDB,
         wavesBlockchainAsyncClient.forgedOrder,
         matcherQueue.storeEvent,
-        orderBookCache.getOrDefault(_, OrderBook.AggregatedSnapshot()),
+        orderBookCache.getOrDefault(_, OrderBookAggregatedSnapshot.empty),
         startSchedules,
         spendableBalancesActor,
         addressActorSettings

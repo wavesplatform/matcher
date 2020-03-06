@@ -12,8 +12,7 @@ import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBook
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
-import com.wavesplatform.dex.model.OrderBook.LastTrade
-import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.Time
@@ -29,7 +28,7 @@ class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
                      snapshotStore: ActorRef,
                      assetPair: AssetPair,
-                     updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
+                     updateSnapshot: OrderBookAggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
@@ -48,7 +47,7 @@ class OrderBookActor(owner: ActorRef,
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
-  private var orderBook   = OrderBook.empty()
+  private var orderBook   = OrderBook.empty
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
@@ -81,7 +80,7 @@ class OrderBookActor(owner: ActorRef,
 
       updateMarketStatus(MarketStatus(orderBook))
       updateSnapshot(orderBook.aggregatedSnapshot)
-      processEvents(orderBook.allOrders.map { case (_, lo) => OrderAdded(lo, lo.order.timestamp) })
+      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -102,8 +101,8 @@ class OrderBookActor(owner: ActorRef,
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
-              updateSnapshot(OrderBook.AggregatedSnapshot())
-              processEvents(orderBook.cancelAll(request.timestamp))
+              updateSnapshot(OrderBookAggregatedSnapshot.empty)
+              process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               context.stop(self)
@@ -127,7 +126,13 @@ class OrderBookActor(owner: ActorRef,
       }
   }
 
-  private def processEvents(events: Iterable[Event]): Unit = {
+  private def process(result: (OrderBook, TraversableOnce[Event])): Unit = {
+    val (updatedOrderBook, events) = result
+    orderBook = updatedOrderBook
+    processEvents(events)
+  }
+
+  private def processEvents(events: TraversableOnce[Event]): Unit = {
     updateMarketStatus(MarketStatus(orderBook))
     updateSnapshot(orderBook.aggregatedSnapshot)
     events.foreach(addressActor ! _.unsafeTap(logEvent))
@@ -144,8 +149,11 @@ class OrderBookActor(owner: ActorRef,
 
   private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit = cancelTimer.measure {
     orderBook.cancel(id, event.timestamp) match {
-      case Some(cancelEvent) => processEvents(List(cancelEvent))
-      case None =>
+      case (updatedOrderBook, Some(cancelEvent)) =>
+        // TODO replace by process() in Scala 2.13
+        orderBook = updatedOrderBook
+        processEvents(List(cancelEvent))
+      case _ =>
         log.warn(s"Error applying $event: order not found")
         addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))
     }
@@ -153,7 +161,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    processEvents(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
+    process(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -185,7 +193,7 @@ object OrderBookActor {
             addressActor: ActorRef,
             snapshotStore: ActorRef,
             assetPair: AssetPair,
-            updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
+            updateSnapshot: OrderBookAggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
@@ -229,10 +237,10 @@ object OrderBookActor {
       )
     }
 
-    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.getLastTrade, ob.bestBid, ob.bestAsk)
+    def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
   }
 
-  case class Snapshot(eventNr: Option[Long], orderBook: OrderBook.Snapshot)
+  case class Snapshot(eventNr: Option[Long], orderBook: OrderBookSnapshot)
 
   // Internal messages
   case class OrderBookRecovered(assetPair: AssetPair, eventNr: Option[Long])

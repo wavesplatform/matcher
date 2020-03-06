@@ -4,7 +4,7 @@ import akka.actor.{Actor, Props}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.market.OrderBookSnapshotStoreActor._
-import com.wavesplatform.dex.model.OrderBook.Snapshot
+import com.wavesplatform.dex.model.OrderBookSnapshot
 import com.wavesplatform.dex.queue.QueueEventWithMeta.Offset
 
 class OrderBookSnapshotStoreActor(db: OrderBookSnapshotDB) extends Actor {
@@ -27,14 +27,14 @@ object OrderBookSnapshotStoreActor {
     /**
       * @param newSnapshot None if it wasn't changed
       */
-    case class Update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[Snapshot]) extends Message
+    case class Update(assetPair: AssetPair, offset: Offset, newSnapshot: Option[OrderBookSnapshot]) extends Message
 
     case class Delete(assetPair: AssetPair) extends Message
   }
 
   sealed trait Response
   object Response {
-    case class GetSnapshot(result: Option[(Offset, Snapshot)]) extends Response
+    case class GetSnapshot(result: Option[(Offset, OrderBookSnapshot)]) extends Response
     case class Updated(offset: Offset)                         extends Response
     case class Deleted(assetPair: AssetPair)                   extends Response
   }

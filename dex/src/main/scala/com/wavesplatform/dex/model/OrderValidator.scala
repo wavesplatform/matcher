@@ -402,7 +402,7 @@ object OrderValidator extends ScorexLogging {
   private def validateBalance(
       acceptedOrder: AcceptedOrder,
       tradableBalance: Asset => Long,
-      orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(implicit efc: ErrorFormatterContext): Result[AcceptedOrder] = {
+      orderBookCache: AssetPair => OrderBookAggregatedSnapshot)(implicit efc: ErrorFormatterContext): Result[AcceptedOrder] = {
 
     /**
       * According to the current market state calculates cost for buy market orders or amount for sell market orders
@@ -456,7 +456,7 @@ object OrderValidator extends ScorexLogging {
                         tradableBalance: Asset => Long,
                         activeOrderCount: => Int,
                         orderExists: ByteStr => Boolean,
-                        orderBookCache: AssetPair => OrderBook.AggregatedSnapshot)(acceptedOrder: AcceptedOrder)(
+                        orderBookCache: AssetPair => OrderBookAggregatedSnapshot)(acceptedOrder: AcceptedOrder)(
       implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =
     for {
       _ <- lift(acceptedOrder)

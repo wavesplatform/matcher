@@ -14,9 +14,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBook}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -29,7 +28,6 @@ class AddressActorSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
-    with NTPTime
     with MatcherSpecBase {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
@@ -192,14 +190,14 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          ntpTime,
+          time,
           EmptyOrderDB,
           _ => Future.successful(false),
           event => {
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          _ => OrderBook.AggregatedSnapshot(),
+          _ => OrderBookAggregatedSnapshot.empty,
           false,
           spendableBalancesActor
         )

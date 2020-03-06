@@ -71,7 +71,7 @@ trait ExchangeTransaction extends ByteAndJsonSerializable with Proven {
     case _                       => false
   }
 
-  override def hashCode(): Int = id().hashCode()
+  override def hashCode(): Int = id().hashCode
 }
 
 object ExchangeTransaction {

@@ -11,7 +11,6 @@ import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, SpendableBalancesActor}
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time) {
@@ -34,7 +33,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
         new TestOrderDB(100),
         _ => Future.successful(false),
         e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
-        _ => OrderBook.AggregatedSnapshot(),
+        _ => OrderBookAggregatedSnapshot.empty,
         enableSchedules,
         spendableBalanceActor
       )
@@ -44,7 +43,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
       ao.order.sender,
-      system.actorOf(createAddressActor(ao.order.sender, true))
+      system.actorOf(createAddressActor(ao.order.sender, enableSchedules = true))
     )
 
   lazy val addressDir = system.actorOf(

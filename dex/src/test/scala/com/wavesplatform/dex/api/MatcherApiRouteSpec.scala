@@ -316,14 +316,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
       orderBookSnapshot = new OrderBookSnapshotHttpCache(
         settings.orderBookSnapshotHttpCache,
-        ntpTime,
+        time,
         x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
         _ => None
       ),
       matcherSettings = settings,
       matcherStatus = () => Matcher.Status.Working,
       db = db,
-      time = ntpTime,
+      time = time,
       currentOffset = () => 0L,
       lastOffset = () => Future.successful(0L),
       matcherAccountFee = 300000L,

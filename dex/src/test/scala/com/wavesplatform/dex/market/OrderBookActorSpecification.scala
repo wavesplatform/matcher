@@ -6,6 +6,7 @@ import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -76,6 +77,7 @@ class OrderBookActorSpecification
 
     val orderBookActor = TestActorRef(
       new OrderBookActor(
+        OrderBookActor.Settings(100.millis),
         tp.ref,
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
@@ -83,6 +85,7 @@ class OrderBookActorSpecification
         update(pair),
         p => Option(md.get(p)),
         time,
+        new WsOrderBook.Update(8, 8),
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
@@ -106,9 +109,9 @@ class OrderBookActorSpecification
 
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
-        val ord            = buy(p, 10 * Order.PriceConstant, 100)
-        val ob             = OrderBook.empty
-        val (updatedOb, _) = ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
+        val ord               = buy(p, 10 * Order.PriceConstant, 100)
+        val ob                = OrderBook.empty
+        val (updatedOb, _, _) = ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
         obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>

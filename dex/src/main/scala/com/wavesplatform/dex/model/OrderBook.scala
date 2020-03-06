@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.model
 
-import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
@@ -28,10 +27,10 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.mk(orderType, price, updatedAsks))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedAsks))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.mk(orderType, price, updatedBids))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedBids))
         }
     }
   }
@@ -115,7 +114,7 @@ object OrderBook {
             val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
             val updatedEvents                    = events.enqueue(orderExecutedEvent)
-            val updatedLevelChanges              = levelChanges |-| LevelAmounts.mkDiff(levelPrice, orderExecutedEvent)
+            val updatedLevelChanges              = levelChanges.subtract(levelPrice, orderExecutedEvent)
 
             val submittedRemaining = orderExecutedEvent.submittedRemaining
             val counterRemaining   = orderExecutedEvent.counterRemaining
@@ -155,9 +154,7 @@ object OrderBook {
           submitted match {
             case submitted: LimitOrder =>
               val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-              (orderBook.insert(levelPrice, submitted),
-               events.enqueue(OrderAdded(submitted, eventTs)),
-               levelChanges |+| LevelAmounts.mkDiff(levelPrice, submitted))
+              (orderBook.insert(levelPrice, submitted), events.enqueue(OrderAdded(submitted, eventTs)), levelChanges.add(levelPrice, submitted))
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
               (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)

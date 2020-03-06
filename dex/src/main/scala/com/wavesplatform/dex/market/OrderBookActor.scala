@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
-import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.market.MatcherActor.{AddWsSubscription, ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
@@ -102,6 +102,7 @@ class OrderBookActor(owner: ActorRef,
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               updateSnapshot(OrderBookAggregatedSnapshot.empty)
+              // TODO close sockets
               process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
@@ -124,12 +125,16 @@ class OrderBookActor(owner: ActorRef,
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
       }
+
+    case _: AddWsSubscription =>
+
   }
 
-  private def process(result: (OrderBook, TraversableOnce[Event])): Unit = {
-    val (updatedOrderBook, events) = result
+  private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
+    val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
     processEvents(events)
+    // TODO
   }
 
   private def processEvents(events: TraversableOnce[Event]): Unit = {
@@ -149,10 +154,11 @@ class OrderBookActor(owner: ActorRef,
 
   private def onCancelOrder(event: QueueEventWithMeta, id: Order.Id): Unit = cancelTimer.measure {
     orderBook.cancel(id, event.timestamp) match {
-      case (updatedOrderBook, Some(cancelEvent)) =>
+      case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         processEvents(List(cancelEvent))
+        // TODO
       case _ =>
         log.warn(s"Error applying $event: order not found")
         addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))

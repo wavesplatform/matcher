@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.websockets
 import com.wavesplatform.dex.domain.order.OrderType
 import play.api.libs.json._
 
+// TODO options ?
 case class WsLastTrade(price: Double, amount: Double, side: OrderType)
 object WsLastTrade {
   private implicit val doubleFormat = doubleAsStringFormat

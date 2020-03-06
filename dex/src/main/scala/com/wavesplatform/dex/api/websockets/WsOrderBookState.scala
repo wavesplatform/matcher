@@ -1,19 +1,34 @@
 package com.wavesplatform.dex.api.websockets
 
 import com.wavesplatform.dex.api.websockets.WsOrderBookState.WsSide
+import com.wavesplatform.dex.fp.MayBeEmpty
+import com.wavesplatform.dex.json.Implicits.JsPathOps
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBookState(asks: WsSide, bids: WsSide, lastTrade: WsLastTrade)
+case class WsOrderBookState private (asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade])
 object WsOrderBookState {
   type WsSide = TreeMap[Double, Double]
 
-  private implicit val doubleFormat = doubleAsStringFormat
+  private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
+  private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.compare(x, y)
+
+  val empty = WsOrderBookState(
+    asks = TreeMap.empty(asksOrdering),
+    bids = TreeMap.empty(bidsOrdering),
+    lastTrade = None
+  )
+
+  implicit val wsOrderBookStateFormat: Format[WsOrderBookState] =
+    ((JsPath \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+      (JsPath \ "b").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+      (JsPath \ "t").formatNullable[WsLastTrade])(WsOrderBookState.apply, unlift(WsOrderBookState.unapply))
+
   private val priceAmountFormat = Format(
-    fjs = Reads.Tuple2R(doubleFormat, doubleFormat),
-    tjs = Writes.Tuple2W(doubleFormat, doubleFormat)
+    fjs = Reads.Tuple2R(doubleAsStringFormat, doubleAsStringFormat),
+    tjs = Writes.Tuple2W(doubleAsStringFormat, doubleAsStringFormat)
   )
 
   private def sideFormat(pricesOrdering: Ordering[Double]): Format[WsSide] = Format(
@@ -37,12 +52,8 @@ object WsOrderBookState {
     }
   )
 
-  private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
-  private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.compare(x, y)
-
-  implicit val wsOrderBookStateFormat: Format[WsOrderBookState] = {
-    ((JsPath \ "a").format[WsSide](sideFormat(asksOrdering)) and
-      (JsPath \ "b").format[WsSide](sideFormat(bidsOrdering)) and
-      (JsPath \ "t").format[WsLastTrade])(WsOrderBookState.apply, unlift(WsOrderBookState.unapply))
+  private def sideMayBeEmpty(ordering: Ordering[Double]): MayBeEmpty[WsSide] = new MayBeEmpty[WsSide] {
+    override def isEmpty(x: WsSide): Boolean = x.isEmpty
+    override def empty: WsSide               = TreeMap.empty
   }
 }

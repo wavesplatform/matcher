@@ -10,20 +10,6 @@ import scala.collection.immutable.{Queue, TreeMap}
 package object model {
   type Level                 = Queue[LimitOrder]
   type OrderBookSideSnapshot = Map[Price, Seq[LimitOrder]]
-  type LevelAmounts          = Map[(OrderType, Price), Amount]
-
-  val emptyLevelAmounts: LevelAmounts = Map.empty
-  def mkLevelAmounts(tpe: OrderType, levelPrice: Price, updatedSide: Side): LevelAmounts = Map(
-    (tpe, levelPrice) -> updatedSide.get(levelPrice).fold(0L)(_.map(_.amount).sum)
-  )
-
-  def mkLevelAmounts(levelPrice: Price, lo: LimitOrder): LevelAmounts = Map(
-    (lo.order.orderType, levelPrice) -> lo.amount
-  )
-
-  def mkLevelAmounts(levelPrice: Price, event: OrderExecuted): LevelAmounts = Map(
-    (event.counter.order.orderType, levelPrice) -> event.executedAmount
-  )
 
   type Side = TreeMap[Price, Level]
   implicit class SideExt(val side: Side) extends AnyVal {

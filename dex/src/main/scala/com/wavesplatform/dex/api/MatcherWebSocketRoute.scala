@@ -12,7 +12,7 @@ import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.http.ApiRoute
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBookState}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
@@ -57,13 +57,13 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
 
   private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, Unit] =
     Source
-      .actorRef[WsOrderBookState](
+      .actorRef[WsOrderBook](
         completionMatcher,
         failureMatcher,
         10,
         OverflowStrategy.fail
       )
-      .map(wsOrderBookState => TextMessage.Strict(WsOrderBookState.wsOrderBookStateFormat.writes(wsOrderBookState).toString))
+      .map(wsOrderBookState => TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(wsOrderBookState).toString))
       .mapMaterializedValue { sourceActor =>
         matcher.tell(MatcherActor.AddWsSubscription(pair), sourceActor)
       }
@@ -86,6 +86,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
   }
 
   private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
+    // TODO depth
     withAssetPair(p) { pair =>
       handleWebSocketMessages(Flow.fromSinkAndSource(Sink.cancelled[Message], orderBookUpdatesSource(pair)))
     }

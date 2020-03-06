@@ -35,4 +35,9 @@ object OrderType {
     case BUY  => SELL
     case SELL => BUY
   }
+
+  final implicit class OrderTypeOps(val self: OrderType) extends AnyVal {
+    def askBid[T](ifAsk: => T, ifBid: => T): T = if (self == OrderType.SELL) ifAsk else ifBid
+    def opposite: OrderType                    = askBid(OrderType.BUY, OrderType.SELL)
+  }
 }

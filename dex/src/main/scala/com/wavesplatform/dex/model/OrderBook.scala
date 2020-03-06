@@ -1,12 +1,10 @@
 package com.wavesplatform.dex.model
 
-import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.settings.MatchingRule
 import play.api.libs.functional.syntax._
@@ -25,22 +23,22 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
   def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
 
-    orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], emptyLevelAmounts)) {
+    orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], LevelAmounts.empty)) {
       case (orderType, price) =>
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), mkLevelAmounts(orderType, price, updatedAsks))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.mk(orderType, price, updatedAsks))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), mkLevelAmounts(orderType, price, updatedBids))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.mk(orderType, price, updatedBids))
         }
     }
   }
 
   def cancelAll(ts: Long): (OrderBook, List[OrderCanceled], LevelAmounts) = {
     val canceledOrders = allOrders.map { OrderCanceled(_, isSystemCancel = false, ts) }.toList
-    (OrderBook.empty, canceledOrders, emptyLevelAmounts)
+    (OrderBook.empty, canceledOrders, LevelAmounts.empty)
   }
 
   def add(submitted: AcceptedOrder,
@@ -48,7 +46,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event], LevelAmounts) =
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, this)
-    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), emptyLevelAmounts)
+    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
@@ -86,11 +84,6 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
 object OrderBook {
 
-  final implicit class OrderTypeOps(val self: OrderType) extends AnyVal {
-    def askBid[T](ifAsk: => T, ifBid: => T): T = if (self == OrderType.SELL) ifAsk else ifBid
-    def opposite: OrderType                    = askBid(OrderType.BUY, OrderType.SELL)
-  }
-
   /**
     * Corrects order price by the tick size in favor of the client.
     * Buy order prices are rounded '''down''', sell order prices are rounded '''upwards'''
@@ -122,7 +115,7 @@ object OrderBook {
             val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
             val updatedEvents                    = events.enqueue(orderExecutedEvent)
-            val updatedLevelChanges              = levelChanges |-| mkLevelAmounts(levelPrice, orderExecutedEvent)
+            val updatedLevelChanges              = levelChanges |-| LevelAmounts.mkDiff(levelPrice, orderExecutedEvent)
 
             val submittedRemaining = orderExecutedEvent.submittedRemaining
             val counterRemaining   = orderExecutedEvent.counterRemaining
@@ -164,14 +157,14 @@ object OrderBook {
               val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
               (orderBook.insert(levelPrice, submitted),
                events.enqueue(OrderAdded(submitted, eventTs)),
-               levelChanges |+| mkLevelAmounts(levelPrice, submitted))
+               levelChanges |+| LevelAmounts.mkDiff(levelPrice, submitted))
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
               (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)
           }
       }
 
-    loop(orderBook, submitted, Queue.empty, emptyLevelAmounts)
+    loop(orderBook, submitted, Queue.empty, LevelAmounts.empty)
   }
 
   private def formatSide(side: Side): String =

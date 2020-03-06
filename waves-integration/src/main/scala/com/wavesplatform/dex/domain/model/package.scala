@@ -8,6 +8,8 @@ package object model {
   /** Converts amounts, prices and fees from denormalized values (decimal numbers) to normalized ones (longs) */
   object Normalization {
 
+    // TODO math?
+    // AmountOrFee?
     def normalizeAmountAndFee(value: BigDecimal, assetDecimals: Int): Amount =
       (value * BigDecimal(10).pow(assetDecimals)).toLong
 

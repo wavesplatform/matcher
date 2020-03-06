@@ -1,9 +1,8 @@
 package com.wavesplatform.dex
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.OrderExecuted
+import com.wavesplatform.dex.domain.model.Price
+import com.wavesplatform.dex.domain.order.Order
 
 import scala.collection.immutable.{Queue, TreeMap}
 

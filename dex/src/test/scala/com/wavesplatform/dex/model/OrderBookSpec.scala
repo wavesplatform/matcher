@@ -62,7 +62,7 @@ class OrderBookSpec
       val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
       val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-      val (obAfter, events) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+      val (obAfter, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
       val balancesAfter = events.foldLeft(balancesBefore) {
         case (r, evt: Events.OrderExecuted) =>
@@ -148,7 +148,7 @@ ${diff.mkString("\n")}
       val hadOrder       = hasOrder(ob, orderIdToCancel)
       val orderIdsBefore = orderIds(ob)
 
-      val (obAfter, events) = ob.cancel(orderIdToCancel, ts)
+      val (obAfter, events, _) = ob.cancel(orderIdToCancel, ts)
       val clue =
         s"""
 Order id to cancel: $orderIdToCancel
@@ -187,7 +187,7 @@ ${events.mkString("\n")}
       val obBefore       = format(ob)
       val orderIdsBefore = orderIds(ob)
 
-      val (obAfter, events) = ob.cancelAll(ts)
+      val (obAfter, events, _) = ob.cancelAll(ts)
       val canceledOrders    = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
       val clue =
         s"""

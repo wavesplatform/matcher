@@ -14,7 +14,7 @@ import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.dex.api.websockets.WsOrderBook
-import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute, OrderBookSnapshotHttpCache, websockets}
+import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -121,6 +121,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
+      OrderBookActor.Settings(100.millis),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,
@@ -230,7 +231,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute(addressActors)
+      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder)
     )
   }
 

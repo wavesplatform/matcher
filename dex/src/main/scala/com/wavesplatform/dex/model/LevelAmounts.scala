@@ -8,7 +8,11 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.model.Events.OrderExecuted
 
-case class LevelAmounts(asks: Map[Price, Amount] = Map.empty, bids: Map[Price, Amount] = Map.empty)
+// TODO separate diff and full state? See OrderBookTestSuite.appendAll
+case class LevelAmounts(asks: Map[Price, Amount] = Map.empty, bids: Map[Price, Amount] = Map.empty) {
+  def put(other: LevelAmounts): LevelAmounts = LevelAmounts(asks ++ other.asks, bids ++ other.bids)
+}
+
 object LevelAmounts {
   val empty: LevelAmounts = LevelAmounts()
 

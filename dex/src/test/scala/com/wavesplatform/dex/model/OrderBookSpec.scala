@@ -9,16 +9,16 @@ import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
-import com.wavesplatform.dex.model.Events.{Event, OrderCanceled}
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class OrderBookSpec
@@ -95,11 +95,10 @@ ${events.mkString("\n")}
     "coins invariant" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob             = mkOrderBook(askOrders, bidOrders)
-        val obBefore       = format(ob)
         val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
         val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-        val (_, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val (updatedOb, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
         val balancesAfter = events.foldLeft(balancesBefore) {
           case (r, evt: Events.OrderExecuted) =>
@@ -134,7 +133,7 @@ ${events.mkString("\n")}
 
         val diff = coinsAfter |-| coinsBefore
         val clue =
-          s"""Coins invariant
+          s"""
 Pair:
 $assetPair
 
@@ -142,10 +141,10 @@ Order:
 ${format(newOrder)}
 
 OrderBook before:
-$obBefore
+${format(ob)}
 
 OrderBook after:
-${format(ob)}
+${format(updatedOb)}
 
 Events:
 ${events.mkString("\n")}
@@ -156,6 +155,90 @@ ${diff.mkString("\n")}
 
         withClue(clue) {
           coinsBefore should matchTo(coinsAfter)
+        }
+    }
+
+    "updatedOrderBook.level contains result.levelChanges" in forAll(coinsInvariantPropGen) {
+      case (askOrders, bidOrders, newOrder) =>
+        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+
+        val snapshot = updatedOb.aggregatedSnapshot
+        def getSnapshotLevel(tpe: OrderType, levelPrice: Long): Long =
+          tpe.askBid(snapshot.asks, snapshot.bids).collectFirst { case x: LevelAgg if x.price == levelPrice => x.amount }.getOrElse(0L)
+
+        val filteredAsks = levelChanges.asks.map { case (price, _) => price -> getSnapshotLevel(OrderType.SELL, price) }
+        val filteredBids = levelChanges.bids.map { case (price, _) => price -> getSnapshotLevel(OrderType.BUY, price) }
+
+        val clue =
+          s"""
+Pair:
+$assetPair
+
+Order:
+${format(newOrder)}
+
+OrderBook before:
+${format(ob)}
+
+OrderBook after:
+${format(updatedOb)}
+
+Events:
+${events.mkString("\n")}
+
+Level changes:
+${format(levelChanges)}
+
+Aggregated snapshot:
+${updatedOb.aggregatedSnapshot}
+"""
+
+        withClue(clue) {
+          withClue("asks: ") {
+            filteredAsks should matchTo(levelChanges.asks)
+          }
+
+          withClue("bids: ") {
+            filteredBids should matchTo(levelChanges.bids)
+          }
+        }
+    }
+
+    "result.levelChanges.prices == all(event.executedPrice)" in forAll(coinsInvariantPropGen) {
+      case (askOrders, bidOrders, newOrder) =>
+        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+
+        val levelChangesPrices = levelChanges.asks.keySet ++ levelChanges.bids.keySet
+
+        // tickSize == 1
+        val eventPrices = events.collect {
+          case evt: OrderAdded                          => evt.order.price
+          case evt: OrderExecuted                       => evt.counter.price
+          case evt @ OrderCanceled(_: LimitOrder, _, _) => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
+        }.toSet
+
+        val clue =
+          s"""
+Order:
+${format(newOrder)}
+
+Events:
+${events.mkString("\n")}
+
+Level changes:
+${format(levelChanges)}
+
+Level changes prices:
+${levelChangesPrices.toVector.sorted.mkString("\n")}
+
+Event prices:
+${eventPrices.toVector.sorted.mkString("\n")}
+"""
+
+        withClue(clue) {
+          levelChangesPrices should matchTo(eventPrices)
         }
     }
   }
@@ -274,6 +357,10 @@ ${canceledOrders.mkString("\n")}
   private def spentFee(ao: AcceptedOrder, executedAmount: Long) =
     Map(ao.feeAsset -> AcceptedOrder.partialFee(ao.order.matcherFee, ao.order.amount, executedAmount))
 
+  private def format(x: LevelAmounts): String = s"""Asks: ${x.asks.mkString(", ")}
+Bids: ${x.bids.mkString(", ")}
+"""
+
   private def formatSide(xs: Iterable[(Long, Level)]): String =
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
 
@@ -293,5 +380,5 @@ ${formatSide(x.bids)}"""
     s"""$name(a=${x.amount}, f=${x.fee}, ${format(x.order)}, rcv=${x.receiveAmount}, requiredBalance={ ${x.requiredBalance.mkString(", ")} })"""
   }
 
-  private def format(x: Order): String = s"""Order(${x.idStr()}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
+  private def format(x: Order): String = s"""Order(${x.idStr()}, ${x.orderType}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
 }

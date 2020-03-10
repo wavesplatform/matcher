@@ -21,9 +21,9 @@ object LevelAmounts {
   def apply(tpe: OrderType, levelPrice: Price, side: Side): LevelAmounts =
     LevelAmounts(tpe, levelPrice, side.get(levelPrice).fold(0L)(_.map(_.amount).sum))
 
-  private def asks(xs: Map[Price, Amount]): LevelAmounts = new LevelAmounts(asks = xs)
-  private def bids(xs: Map[Price, Amount]): LevelAmounts = new LevelAmounts(bids = xs)
-  private def apply(tpe: OrderType, levelPrice: Price, levelAmount: Amount): LevelAmounts = {
+  def asks(xs: Map[Price, Amount]): LevelAmounts = new LevelAmounts(asks = xs)
+  def bids(xs: Map[Price, Amount]): LevelAmounts = new LevelAmounts(bids = xs)
+  def apply(tpe: OrderType, levelPrice: Price, levelAmount: Amount): LevelAmounts = {
     val xs = Map(levelPrice -> levelAmount)
     tpe.askBid(asks(xs), bids(xs))
   }

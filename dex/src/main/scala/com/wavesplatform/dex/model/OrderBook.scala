@@ -19,6 +19,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
+  // TODO Absolute levels
   def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
 
@@ -48,11 +49,13 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
-  def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
+  def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toList, asks.aggregated.toList)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 
-  def best(tpe: OrderType): Option[(Price, LimitOrder)] = tpe.askBid(asks.best, bids.best)
+  def side(tpe: OrderType): Side = tpe.askBid(asks, bids)
+
+  def best(tpe: OrderType): Option[(Price, LimitOrder)] = side(tpe).best
 
   private def unsafeWithoutBest(tpe: OrderType): OrderBook = tpe.askBid(
     {
@@ -79,6 +82,10 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
       copy(bids = bids.put(levelPrice, lo), orderIds = updatedOrderIds)
     )
   }
+
+  // TODO Remove during optimization
+  private def levelAmountsAt(tpe: OrderType, levelPrice: Price): LevelAmounts =
+    LevelAmounts(tpe, levelPrice, side(tpe))
 }
 
 object OrderBook {
@@ -114,7 +121,6 @@ object OrderBook {
             val (maxCounterFee, maxSubmittedFee) = getMakerTakerMaxFee(submitted, counter)
             val orderExecutedEvent               = OrderExecuted(submitted, counter, eventTs, maxSubmittedFee, maxCounterFee)
             val updatedEvents                    = events.enqueue(orderExecutedEvent)
-            val updatedLevelChanges              = levelChanges.subtract(levelPrice, orderExecutedEvent)
 
             val submittedRemaining = orderExecutedEvent.submittedRemaining
             val counterRemaining   = orderExecutedEvent.counterRemaining
@@ -125,6 +131,9 @@ object OrderBook {
               if (counterRemaining.isValid) ob.unsafeUpdateBest(counterRemaining)
               else ob.unsafeWithoutBest(counter.order.orderType)
             }
+
+            // TODO replace by levelChanges.subtract(levelPrice, orderExecutedEvent) during optimization
+            val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(counter.order.orderType, levelPrice))
 
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
@@ -154,7 +163,10 @@ object OrderBook {
           submitted match {
             case submitted: LimitOrder =>
               val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-              (orderBook.insert(levelPrice, submitted), events.enqueue(OrderAdded(submitted, eventTs)), levelChanges.add(levelPrice, submitted))
+              val updatedOrderBook = orderBook.insert(levelPrice, submitted)
+              // TODO replace by levelChanges.add(levelPrice, submitted) during optimization
+              val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(submitted.order.orderType, levelPrice))
+              (updatedOrderBook, events.enqueue(OrderAdded(submitted, eventTs)), updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
               (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)

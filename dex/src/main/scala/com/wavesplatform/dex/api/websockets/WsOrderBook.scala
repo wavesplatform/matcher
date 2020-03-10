@@ -10,7 +10,7 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBook private (asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade]) {
+case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade]) {
   def nonEmpty: Boolean = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
 }
 
@@ -28,7 +28,7 @@ object WsOrderBook {
 
   implicit val wsOrderBookStateFormat: Format[WsOrderBook] =
     ((JsPath \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
-      (JsPath \ "b").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+      (JsPath \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
       (JsPath \ "t").formatNullable[WsLastTrade])(WsOrderBook.apply, unlift(WsOrderBook.unapply))
 
   private val priceAmountFormat = Format(
@@ -48,12 +48,12 @@ object WsOrderBook {
               _               <- if (r.contains(price)) JsError(JsPath \ i \ 0, s"Side contains price $price twice") else JsSuccess(())
             } yield r.updated(price, amount)
 
-          case (_, (x, i)) => JsError(JsPath \ i, "Can't read as price+amount pair")
+          case (_, (_, i)) => JsError(JsPath \ i, "Can't read as price+amount pair")
         }
       case x => JsError(JsPath, s"Can't read Side from ${x.getClass.getName}")
     },
     tjs = Writes { xs =>
-      Json.arr(xs.map(priceAmountFormat.writes))
+      JsArray(xs.map(priceAmountFormat.writes)(collection.breakOut))
     }
   )
 

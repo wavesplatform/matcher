@@ -1,7 +1,11 @@
 package com.wavesplatform.dex.api.websockets
 
 import com.softwaremill.diffx.Diff
+import com.wavesplatform.dex.api.http.PlayJsonException
+import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
@@ -9,7 +13,9 @@ import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.libs.json.Format
+import play.api.libs.json.{Format, Json}
+
+import scala.collection.immutable.TreeMap
 
 class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
 
@@ -69,4 +75,61 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
   "WsOrder" in serdeTest(wsOrderGen)
 
   "WsAddressState" in serdeTest(wsAddressStateGen)
+
+  private val askPricesMin = 1000L * Order.PriceConstant
+  private val askPricesMax = 2000L * Order.PriceConstant
+  private val askPricesGen = Gen.choose(askPricesMin, askPricesMax)
+
+  private val bidPricesMin = 1L * Order.PriceConstant
+  private val bidPricesMax = 999L * Order.PriceConstant
+  private val bidPricesGen = Gen.choose(bidPricesMin, bidPricesMax)
+
+  private val amountGen = Gen.choose(1L, 2000L)
+
+  private val amountDecimals = 8
+  private val priceDecimals  = 2
+
+  private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
+    val itemGen = Gen.zip(pricesGen, amountGen)
+    Gen.listOf(itemGen).map { xs =>
+      TreeMap(xs.map {
+        case (price, amount) =>
+          Denormalization.denormalizePrice(price, amountDecimals, priceDecimals).toDouble ->
+            Denormalization.denormalizeAmountAndFee(amount, amountDecimals).toDouble
+      }: _*)
+    }
+  }
+
+  private val lastTrade: Gen[WsLastTrade] = for {
+    price     <- Gen.chooseNum(1, Long.MaxValue)
+    amount    <- Gen.chooseNum(1, Long.MaxValue)
+    orderType <- orderTypeGenerator
+  } yield
+    WsLastTrade(
+      price = Denormalization.denormalizePrice(price, 8, 2).toDouble,
+      amount = Denormalization.denormalizeAmountAndFee(amount, 8).toDouble,
+      orderType
+    )
+
+  private val wsOrderBookGen: Gen[WsOrderBook] = for {
+    asks      <- wsSide(askPricesGen)
+    bids      <- wsSide(bidPricesGen)
+    lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTrade.map(Option(_)))
+  } yield WsOrderBook(asks, bids, lastTrade)
+
+  "WsOrderBook" in forAll(wsOrderBookGen) { origOb =>
+    val json = WsOrderBook.wsOrderBookStateFormat.writes(origOb)
+    println(Json.stringify(json))
+
+    withClue(s"${Json.stringify(json)}: ") {
+      val restoredOb = WsOrderBook.wsOrderBookStateFormat
+        .reads(json)
+        .fold(
+          e => throw PlayJsonException(None, e),
+          identity
+        )
+
+      restoredOb should matchTo(origOb)
+    }
+  }
 }

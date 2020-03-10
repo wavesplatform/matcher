@@ -2,15 +2,23 @@ package com.wavesplatform.it.sync.api
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsLastTrade, WsOrderBook}
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketConnection}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ResponseOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
+
+import scala.collection.immutable.TreeMap
 
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
@@ -55,6 +63,15 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
     connection.getOrderChanges should matchTo(expectedOrdersChanges)
 
     connection.clearMessagesBuffer()
+  }
+
+  private def createOrderBookWsConnection(assetPair: AssetPair): WebSocketConnection[WsOrderBook] = {
+    val wsUri = s"127.0.0.1:${dex1.restApiAddress.getPort}/ws/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
+    mkWebSocketConnection(wsUri) { msg =>
+      val text = msg.asTextMessage.getStrictText
+      log.info(s"Got message: $text")
+      Json.parse(text).as[WsOrderBook]
+    }
   }
 
   "Connection should be established" in {
@@ -174,5 +191,77 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         wsac.close()
       }
     }
+
+    "orderbook" - {
+      "should send a full state after connection" in {
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403))
+
+        markup("One order")
+
+        val wsc1 = createOrderBookWsConnection(wavesBtcPair)
+        Thread.sleep(1000) // Waiting for a message
+        wsc1.close()
+
+        val buffer1 = wsc1.getMessagesBuffer
+        buffer1 should have size 1
+        squash(buffer1) shouldBe WsOrderBook(
+          asks = TreeMap.empty,
+          bids = TreeMap(0.00011403d -> 1.05d),
+          lastTrade = None
+        )
+
+        markup("Two orders")
+
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00012))
+
+        val wsc2 = createOrderBookWsConnection(wavesBtcPair)
+        Thread.sleep(1000) // Waiting for a message
+        wsc2.close()
+
+        log.info(s"${dex1.api.orderBook(wavesBtcPair)}")
+
+        val buffer2 = wsc2.getMessagesBuffer
+        buffer2 should have size 1
+        squash(buffer2) shouldBe WsOrderBook(
+          asks = TreeMap(0.00012d    -> 1d),
+          bids = TreeMap(0.00011403d -> 1.05d),
+          lastTrade = None
+        )
+
+        markup("Two orders and trade")
+
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), OrderStatus.Filled)
+
+        val wsc3 = createOrderBookWsConnection(wavesBtcPair)
+        Thread.sleep(1000) // Waiting for a message
+        wsc3.close()
+
+        log.info(s"${dex1.api.orderBook(wavesBtcPair)}")
+
+        val buffer3 = wsc3.getMessagesBuffer
+        buffer3.size should (be >= 1 and be <= 2)
+        squash(buffer3) shouldBe WsOrderBook(
+          asks = TreeMap(0.00012d    -> 0.5d),
+          bids = TreeMap(0.00011403d -> 1.05d),
+          lastTrade = Some(
+            WsLastTrade(
+              price = 0.00012d,
+              amount = 0.5,
+              side = OrderType.BUY
+            ))
+        )
+      }
+
+      "should send updates" in {}
+    }
+  }
+
+  private def squash(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
+    case (r, x) =>
+      WsOrderBook(
+        asks = r.asks ++ x.asks,
+        bids = r.bids ++ x.bids,
+        lastTrade = r.lastTrade.orElse(x.lastTrade)
+      )
   }
 }

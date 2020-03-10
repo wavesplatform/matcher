@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.market
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Terminated}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
@@ -135,16 +135,24 @@ class OrderBookActor(settings: Settings,
 
     case _: AddWsSubscription =>
       if (!wsState.hasSubscriptions) scheduleNextSendWsUpdates()
+      wsState = wsState.addSubscription(sender)
       sender ! wsSnapshotOf(orderBook)
+      log.info(s"Connected $sender")
+      context.watch(sender)
 
     case SendWsUpdates =>
       wsState = wsState.flushed()
       scheduleNextSendWsUpdates()
+
+    case Terminated(ws) =>
+      log.info(s"Terminated $ws")
+      wsState = wsState.withoutSubscription(sender)
   }
 
   private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
+    log.debug(s"Updated order book: ${updatedOrderBook}")
     wsState = wsState.withLevelChanges(levelChanges)
     orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
     processEvents(events)

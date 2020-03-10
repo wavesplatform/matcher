@@ -75,11 +75,12 @@ object WsOrderBook {
       side = x.side
     )
 
-    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
-      xs.map { x =>
-        Denormalization.denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-          Denormalization.denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
-      }(collection.breakOut)
+    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide = TreeMap {
+        xs.map { x =>
+          Denormalization.denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
+            Denormalization.denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
+        }.toSeq: _*
+      }(ordering)
 
     def withLevelChanges(orig: WsOrderBook, updated: LevelAmounts): WsOrderBook = orig.copy(
       asks = orig.asks ++ denormalized(updated.asks),

@@ -8,16 +8,27 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 
-class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean)(implicit system: ActorSystem,
-                                                                                                     materializer: Materializer) {
+case class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean)(implicit system: ActorSystem,
+                                                                                                          materializer: Materializer)
+    extends ScorexLogging {
+
+  log.info(s"Connecting to ws://$uri")
 
   private val messagesBuffer: ConcurrentLinkedQueue[Output] = new ConcurrentLinkedQueue[Output]()
 
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach { parseOutput andThen (output => if (trackOutput) messagesBuffer add output) }
+  private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
+    try {
+      val output = parseOutput(x)
+      if (trackOutput) messagesBuffer.add(output)
+    } catch {
+      case e: Throwable => log.error(s"Can't parse message: $x", e)
+    }
+  }
 
   // using Source.maybe materializes into a promise
   // which will allow us to complete the source later

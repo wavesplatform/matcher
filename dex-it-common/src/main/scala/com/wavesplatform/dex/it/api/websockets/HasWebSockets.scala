@@ -40,6 +40,10 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     new WebSocketAuthenticatedConnection(wsUri)
   }
 
+  protected def mkWebSocketConnection[Output](uri: String)(parseOutput: Message => Output): WebSocketConnection[Output] = {
+    WebSocketConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
+  }
+
   protected def cleanupWebSockets(): Unit = {
     if (!knownWsConnections.isEmpty) {
       knownWsConnections.forEach(c => if (!c.isClosed) c.close())

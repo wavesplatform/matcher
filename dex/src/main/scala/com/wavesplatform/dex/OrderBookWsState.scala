@@ -7,15 +7,16 @@ import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
 import scala.collection.immutable.Queue
 
 case class OrderBookWsState(update: WsOrderBook.Update, wsConnections: Queue[ActorRef], changes: WsOrderBook) {
-  def addSubscription(x: ActorRef): OrderBookWsState = copy(wsConnections = wsConnections.enqueue(x))
-  def hasSubscriptions: Boolean                      = wsConnections.nonEmpty
+  def addSubscription(x: ActorRef): OrderBookWsState     = copy(wsConnections = wsConnections.enqueue(x))
+  def withoutSubscription(x: ActorRef): OrderBookWsState = copy(wsConnections = wsConnections.filterNot(_ == x))
+  def hasSubscriptions: Boolean                          = wsConnections.nonEmpty
 
-  def withLastTrade(x: LastTrade): OrderBookWsState = if (wsConnections.isEmpty) this else copy(changes = update.withLastTrade(changes, x))
+  def withLastTrade(x: LastTrade): OrderBookWsState = if (hasSubscriptions) copy(changes = update.withLastTrade(changes, x)) else this
   def withLevelChanges(xs: LevelAmounts): OrderBookWsState =
-    if (wsConnections.isEmpty) this else copy(changes = update.withLevelChanges(changes, xs))
+    if (hasSubscriptions) copy(changes = update.withLevelChanges(changes, xs)) else this
 
   def flushed(): OrderBookWsState = {
-    wsConnections.foreach(_ ! changes)
+    if (changes.nonEmpty) wsConnections.foreach(_ ! changes)
     copy(changes = WsOrderBook.empty)
   }
 

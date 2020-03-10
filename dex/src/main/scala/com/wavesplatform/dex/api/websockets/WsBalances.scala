@@ -9,7 +9,7 @@ object WsBalances {
   implicit val reads: Reads[WsBalances] = Reads {
     _.validate[Seq[Long]] flatMap {
       case Seq(tradable, reserved) => JsSuccess(WsBalances(tradable, reserved))
-      case _                       => JsError(s"Can't read balances!")
+      case _                       => JsError(s"Cannot parse balances!")
     }
   }
 

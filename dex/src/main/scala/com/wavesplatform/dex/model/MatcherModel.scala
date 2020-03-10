@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode
@@ -29,6 +30,8 @@ sealed trait AcceptedOrder {
   def amount: Long // could be remaining or executed, see OrderExecuted
   def fee: Long    // same
   def order: Order
+
+  lazy val id: Order.Id = order.id()
 
   def price: Price = order.price
 
@@ -56,6 +59,9 @@ sealed trait AcceptedOrder {
   def availableBalanceBySpendableAssets(tradableBalance: Asset => Long): Map[Asset, Long] = {
     Set(spentAsset, feeAsset).map(asset => asset -> tradableBalance(asset)).toMap
   }
+
+  // TODO Separate task for average filled price among all trades (DEX-651)
+  val fillingInfo: FillingInfo = FillingInfo(amount == order.amount, order.amount - amount, order.matcherFee - fee, order.price)
 
   def amountOfPriceAsset: Long  = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
   def amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
@@ -158,9 +164,11 @@ object AcceptedOrder {
       case mo =>
         if (mo.spentAsset == mo.feeAsset)
           minBetweenMatchedAmountAnd { (BigDecimal(mo.availableForSpending) * mo.amount / (mo.amount + mo.fee)).toLong } else
-          minBetweenMatchedAmountAnd { mo.availableForSpending }
+          minBetweenMatchedAmountAnd(mo.availableForSpending)
     }
   }
+
+  final case class FillingInfo(isNew: Boolean, filledAmount: Long, filledFee: Long, avgFilledPrice: Long)
 }
 
 sealed trait BuyOrder extends AcceptedOrder {
@@ -282,18 +290,27 @@ object OrderStatus {
   }
 
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
-    val name           = "PartiallyFilled"
+    val name: String   = PartiallyFilled.name
     def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+  }
+  object PartiallyFilled {
+    val name = "PartiallyFilled"
   }
 
   case class Filled(filledAmount: Long, filledFee: Long) extends Final {
-    val name           = "Filled"
+    val name: String   = Filled.name
     def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+  }
+  object Filled {
+    val name = "Filled"
   }
 
   case class Cancelled(filledAmount: Long, filledFee: Long) extends Final {
-    val name           = "Cancelled"
+    val name: String   = Cancelled.name
     def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+  }
+  object Cancelled {
+    val name = "Cancelled"
   }
 
   def finalStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {

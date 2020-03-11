@@ -181,7 +181,6 @@ class MatcherActor(settings: MatcherSettings,
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
     case request @ AddWsSubscription(pair) =>
-      // TODO better error for new order books
       runFor(pair, autoCreate = false) { (sender, ref) =>
         ref.tell(request, sender)
       }

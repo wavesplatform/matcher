@@ -19,7 +19,6 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  // TODO Absolute levels
   def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
 
@@ -49,7 +48,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
-  def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toList, asks.aggregated.toList)
+  def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 

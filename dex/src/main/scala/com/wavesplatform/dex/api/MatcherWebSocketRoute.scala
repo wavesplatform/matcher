@@ -96,7 +96,6 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
   }
 
   private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
-    // TODO depth
     withAssetPair(p) { pair =>
       handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, orderBookUpdatesSource(pair)))
     }

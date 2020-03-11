@@ -121,7 +121,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
-      OrderBookActor.Settings(100.millis),
+      OrderBookActor.Settings(settings.webSocketSettings.messagesInterval),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,

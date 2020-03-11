@@ -109,7 +109,7 @@ class OrderBookActor(settings: Settings,
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               updateSnapshot(OrderBookAggregatedSnapshot.empty)
-              // TODO close sockets
+              wsState = wsState.withoutSubscriptions
               process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
@@ -137,24 +137,27 @@ class OrderBookActor(settings: Settings,
       if (!wsState.hasSubscriptions) scheduleNextSendWsUpdates()
       wsState = wsState.addSubscription(sender)
       sender ! wsSnapshotOf(orderBook)
-      log.info(s"Connected $sender")
+      log.trace(s"[${sender.hashCode()}] WebSocket connected")
       context.watch(sender)
 
     case SendWsUpdates =>
       wsState = wsState.flushed()
-      scheduleNextSendWsUpdates()
+      if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
 
     case Terminated(ws) =>
-      log.info(s"Terminated $ws")
-      wsState = wsState.withoutSubscription(sender)
+      log.trace(s"[${ws.hashCode()}] WebSocket terminated")
+      wsState = wsState.withoutSubscription(ws)
   }
 
   private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
-    log.debug(s"Updated order book: ${updatedOrderBook}")
     wsState = wsState.withLevelChanges(levelChanges)
-    orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
+    val hasTrades = events.exists {
+      case _: Events.OrderExecuted => true
+      case _                       => false
+    }
+    if (hasTrades) orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
     processEvents(events)
   }
 

@@ -24,7 +24,7 @@ import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder}
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
@@ -66,6 +66,16 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
       .map(wsOrderBookState => TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(wsOrderBookState).toString))
       .mapMaterializedValue { sourceActor =>
         matcher.tell(MatcherActor.AddWsSubscription(pair), sourceActor)
+        sourceActor
+      }
+      .watchTermination() {
+        case (actorRef, r) =>
+          r.onComplete {
+            case Success(_) =>
+              log.trace(s"[${actorRef.hashCode()}] WebSocket connection successfully closed")
+            case Failure(e) =>
+              log.trace(s"[${actorRef.hashCode()}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
+          }(mat.executionContext)
       }
 
   private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters(('Timestamp, 'Signature)).tflatMap {
@@ -81,14 +91,14 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
   private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
     signedGet("as", publicKey) {
-      handleWebSocketMessages(Flow.fromSinkAndSource(Sink.cancelled[Message], accountUpdatesSource(publicKey)))
+      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.cancelled[Message], accountUpdatesSource(publicKey)))
     }
   }
 
   private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     // TODO depth
     withAssetPair(p) { pair =>
-      handleWebSocketMessages(Flow.fromSinkAndSource(Sink.cancelled[Message], orderBookUpdatesSource(pair)))
+      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, orderBookUpdatesSource(pair)))
     }
   }
 

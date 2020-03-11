@@ -55,6 +55,8 @@ lazy val `waves-integration-it` = project
     `dex-it-common`
   )
 
+lazy val `dex-jmh` = project.dependsOn(dex % "compile;test->test")
+
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
@@ -82,7 +84,8 @@ lazy val root = (project in file("."))
     `waves-grpc`,
     `waves-ext`,
     `waves-integration`,
-    `waves-integration-it`
+    `waves-integration-it`,
+    `dex-jmh`
   )
 
 inScope(Global)(
@@ -161,6 +164,7 @@ checkPRRaw := {
     (dex / Test / test).value
     (`waves-ext` / Test / test).value
     (`waves-integration` / Test / test).value
+    (`dex-jmh` / Test / compile).value
   }
 }
 

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.model
 
+import java.math.{BigDecimal, RoundingMode}
+
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group._
 import com.wavesplatform.dex.domain.asset.Asset
@@ -11,12 +13,18 @@ import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
 import play.api.libs.json.{JsObject, JsValue, Json}
 
-import scala.math.BigDecimal.RoundingMode
-
 object MatcherModel {
+  def getCost(amount: Long, price: Long): Long =
+    new BigDecimal(price)
+      .multiply(new BigDecimal(amount))
+      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+      .setScale(0, RoundingMode.FLOOR)
+      .longValue()
 
-  def getCost(amount: Long, price: Long): Long                              = (BigDecimal(price) * amount / Order.PriceConstant).toLong
-  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double = { BigDecimal(value) * BigDecimal(10).pow(assetDecimals - 8) }.toDouble
+  def correctRateByAssetDecimals(value: Double, assetDecimals: Int): Double =
+    new BigDecimal(value)
+      .scaleByPowerOfTen(assetDecimals - 8)
+      .doubleValue()
 
   sealed trait DecimalsFormat
   final case object Denormalized extends DecimalsFormat
@@ -52,6 +60,9 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
+  // TODO Separate task for average filled price among all trades (DEX-651)
+  val fillingInfo: FillingInfo = FillingInfo(amount == order.amount, order.amount - amount, order.matcherFee - fee, order.price)
+
   def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
@@ -60,23 +71,33 @@ sealed trait AcceptedOrder {
     Set(spentAsset, feeAsset).map(asset => asset -> tradableBalance(asset)).toMap
   }
 
-  // TODO Separate task for average filled price among all trades (DEX-651)
-  val fillingInfo: FillingInfo = FillingInfo(amount == order.amount, order.amount - amount, order.matcherFee - fee, order.price)
-
-  def amountOfPriceAsset: Long  = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-  def amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
+  lazy val amountOfPriceAsset: Long = new BigDecimal(amount)
+    .multiply(new BigDecimal(price))
+    .scaleByPowerOfTen(-Order.PriceConstantExponent)
+    .setScale(0, RoundingMode.FLOOR)
+    .longValue()
+  lazy val amountOfAmountAsset: Long = correctedAmountOfAmountAsset(amount, price)
 
   protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
 
-  def isValid: Boolean = isValid(price)
+  lazy val isValid: Boolean = isValid(price)
   def isValid(counterPrice: Price): Boolean =
     amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
 
-  private def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
+  private def minimalAmountOfAmountAssetByPrice(p: Long): Long =
+    Order.PriceConstantDecimal.divide(new BigDecimal(p), 0, RoundingMode.CEILING).longValue()
 
-  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
-    val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-    (BigDecimal(settledTotal) / p * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
+  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = correctedAmountOfAmountAsset(new BigDecimal(a), new BigDecimal(p))
+  protected def correctedAmountOfAmountAsset(a: BigDecimal, p: BigDecimal): Long = {
+    val settledTotal = a
+      .multiply(p)
+      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+      .setScale(0, RoundingMode.FLOOR)
+
+    settledTotal
+      .scaleByPowerOfTen(Order.PriceConstantExponent)
+      .divide(p, 0, RoundingMode.CEILING)
+      .longValue()
   }
 
   def fold[A](fl: LimitOrder => A)(fm: MarketOrder => A): A = this match {
@@ -144,27 +165,44 @@ object AcceptedOrder {
     */
   def executedAmount(submitted: AcceptedOrder, counter: LimitOrder): Long = {
 
-    val matchedAmount                                 = math.min(submitted.executionAmount(counter.price), counter.amountOfAmountAsset)
-    def minBetweenMatchedAmountAnd(value: Long): Long = math.min(matchedAmount, value)
-    def correctByCounterPrice(value: Long): Long      = submitted.correctedAmountOfAmountAsset(value, counter.price)
+    val matchedAmount     = math.min(submitted.executionAmount(counter.price), counter.amountOfAmountAsset)
+    lazy val counterPrice = new BigDecimal(counter.price)
 
-    submitted.fold(_ => matchedAmount) {
-      case mo if mo.isBuyOrder =>
-        if (mo.spentAsset == mo.feeAsset)
-          minBetweenMatchedAmountAnd {
-            correctByCounterPrice {
-              (BigDecimal(mo.availableForSpending) * mo.amount / (BigDecimal(counter.price) * mo.amount / Order.PriceConstant + mo.fee)).toLong
-            }
-          } else
-          minBetweenMatchedAmountAnd {
-            correctByCounterPrice {
-              (BigDecimal(mo.availableForSpending) * Order.PriceConstant / counter.price).toLong
+    def minBetweenMatchedAmountAnd(value: Long): Long            = math.min(matchedAmount, value)
+    def correctByCounterPrice(value: java.math.BigDecimal): Long = submitted.correctedAmountOfAmountAsset(value, counterPrice)
+
+    submitted.fold(_ => matchedAmount) { mo =>
+      minBetweenMatchedAmountAnd {
+        if (mo.isBuyOrder) {
+          correctByCounterPrice {
+            if (mo.spentAsset == mo.feeAsset) {
+              // mo.availableForSpending * mo.amount / (counter.price * mo.amount / Order.PriceConstant + mo.fee)
+              val moAmount = new BigDecimal(mo.amount)
+              new BigDecimal(mo.availableForSpending)
+                .multiply(moAmount)
+                .divide(
+                  counterPrice
+                    .multiply(moAmount)
+                    .scaleByPowerOfTen(-Order.PriceConstantExponent)
+                    .add(new BigDecimal(mo.fee)),
+                  0,
+                  RoundingMode.FLOOR
+                )
+            } else {
+              // mo.availableForSpending * Order.PriceConstant / counter.price
+              new BigDecimal(mo.availableForSpending)
+                .scaleByPowerOfTen(Order.PriceConstantExponent)
+                .divide(counterPrice, 0, RoundingMode.FLOOR)
             }
           }
-      case mo =>
-        if (mo.spentAsset == mo.feeAsset)
-          minBetweenMatchedAmountAnd { (BigDecimal(mo.availableForSpending) * mo.amount / (mo.amount + mo.fee)).toLong } else
-          minBetweenMatchedAmountAnd(mo.availableForSpending)
+        } else if (mo.spentAsset == mo.feeAsset) {
+          // mo.availableForSpending * mo.amount / (mo.amount + mo.fee)
+          new BigDecimal(mo.availableForSpending)
+            .multiply(new BigDecimal(mo.amount))
+            .divide(new BigDecimal(mo.amount + mo.fee), 0, RoundingMode.FLOOR)
+            .longValue()
+        } else mo.availableForSpending
+      }
     }
   }
 
@@ -189,15 +227,9 @@ sealed trait LimitOrder extends AcceptedOrder {
 }
 
 object LimitOrder {
-
-  def apply(o: Order): LimitOrder = {
-
-    val pf = AcceptedOrder.partialFee(o.matcherFee, o.amount, o.amount)
-
-    o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(o.amount, pf, o)
-      case OrderType.SELL => SellLimitOrder(o.amount, pf, o)
-    }
+  def apply(o: Order): LimitOrder = o.orderType match {
+    case OrderType.BUY  => BuyLimitOrder(o.amount, o.matcherFee, o)
+    case OrderType.SELL => SellLimitOrder(o.amount, o.matcherFee, o)
   }
 }
 

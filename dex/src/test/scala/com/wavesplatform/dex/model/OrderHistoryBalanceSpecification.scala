@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalatest._
 import org.scalatest.matchers.should.Matchers
@@ -26,17 +26,17 @@ class OrderHistoryBalanceSpecification
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterEach
-    with NTPTime {
+    with SystemTime {
 
   import OrderHistoryBalanceSpecification._
 
   private val WctBtc   = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))
 
-  private var oh = new OrderHistoryStub(system, ntpTime)
+  private var oh = new OrderHistoryStub(system, time)
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, ntpTime)
+    oh = new OrderHistoryStub(system, time)
   }
 
   def openVolume(address: Address, asset: Asset): Long = oh.ref(address).openVolume(asset)
@@ -51,7 +51,7 @@ class OrderHistoryBalanceSpecification
     val ord = buy(WctBtc, 10000, 0.0007)
 
     val lo = LimitOrder(ord)
-    oh.process(OrderAdded(lo, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(lo, time.getTimestamp()))
 
     withClue("info") {
       orderStatus(ord.id()) shouldBe OrderStatus.Accepted
@@ -77,7 +77,7 @@ class OrderHistoryBalanceSpecification
   property("New sell order added") {
     val ord = sell(WctBtc, 10000, 0.0007)
 
-    oh.process(OrderAdded(LimitOrder(ord), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(ord), time.getTimestamp()))
 
     withClue("info") {
       orderStatus(ord.id()) shouldBe OrderStatus.Accepted
@@ -104,7 +104,7 @@ class OrderHistoryBalanceSpecification
     val ord = buy(WavesBtc, 1000, 0.008, matcherFee = Some(3000))
     val lo  = LimitOrder(ord)
 
-    oh.process(OrderAdded(lo, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(lo, time.getTimestamp()))
 
     withClue("info") {
       orderStatus(ord.id()) shouldBe OrderStatus.Accepted
@@ -122,7 +122,7 @@ class OrderHistoryBalanceSpecification
     val ord = sell(WavesBtc, 10000, 0.0008)
     val lo  = LimitOrder(ord)
 
-    oh.process(OrderAdded(lo, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(lo, time.getTimestamp()))
     orderStatus(ord.id()) shouldBe OrderStatus.Accepted
     openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 10000L + ord.matcherFee
     openVolume(ord.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
@@ -134,7 +134,7 @@ class OrderHistoryBalanceSpecification
     val pair = AssetPair(mkAssetId("BTC"), Waves)
     val ord  = sell(pair, 100000, 0.01, matcherFee = Some(1000L))
 
-    oh.process(OrderAdded(LimitOrder(ord), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(ord), time.getTimestamp()))
     orderStatus(ord.id()) shouldBe OrderStatus.Accepted
 
     openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
@@ -143,7 +143,7 @@ class OrderHistoryBalanceSpecification
   property("Should not reserve fee, if buyer receives more WAVES than total fee in buy order") {
     val ord = buy(WavesBtc, 100000, 0.0007, matcherFee = Some(1000L))
 
-    oh.process(OrderAdded(LimitOrder(ord), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(ord), time.getTimestamp()))
     orderStatus(ord.id()) shouldBe OrderStatus.Accepted
 
     openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L
@@ -154,7 +154,7 @@ class OrderHistoryBalanceSpecification
     val ord1 = sell(WavesBtc, 10000, 0.0005, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis()))
     val ord2 = sell(WavesBtc, 16000, 0.0008, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis() + 1))
 
-    oh.processAll(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()), OrderAdded(LimitOrder(ord2), ntpTime.getTimestamp()))
+    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), OrderAdded(LimitOrder(ord2), time.getTimestamp()))
 
     withClue("all orders accepted") {
       orderStatus(ord1.id()) shouldBe OrderStatus.Accepted
@@ -181,7 +181,7 @@ class OrderHistoryBalanceSpecification
     val counter   = buy(WavesBtc, 100000, 0.0008, matcherFee = Some(2000L))
     val submitted = sell(WavesBtc, 100000, 0.0007, matcherFee = Some(1000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.process(exec)
@@ -224,7 +224,7 @@ class OrderHistoryBalanceSpecification
     val submitted = buy(WavesBtc, 425532L, 0.00000238, matcherFee = Some(300000L))
 
     val counterLo = LimitOrder(counter)
-    oh.process(OrderAdded(counterLo, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(counterLo, time.getTimestamp()))
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
       openVolume(counter.senderPublicKey, WavesBtc.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey) shouldBe Seq(counter.id())
@@ -284,10 +284,10 @@ class OrderHistoryBalanceSpecification
     val counter   = LimitOrder(sell(WavesBtc, 100000000, 0.0008, matcherFee = Some(2000L)))
     val submitted = LimitOrder(buy(WavesBtc, 120000000, 0.00085, matcherFee = Some(1000L)))
 
-    oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(counter, time.getTimestamp()))
 
     val exec = OrderExecuted(submitted, counter)
-    oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), ntpTime.getTimestamp()))
+    oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), time.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
       exec.counterRemainingAmount shouldBe 0L
@@ -331,7 +331,7 @@ class OrderHistoryBalanceSpecification
     val submitted1 = LimitOrder(sell(WavesBtc, 50000000, 0.00075, matcherFee = Some(300001L)))
     val submitted2 = LimitOrder(sell(WavesBtc, 80000000, 0.0008, matcherFee = Some(300001L)))
 
-    oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(counter, time.getTimestamp()))
     val exec1 = OrderExecuted(submitted1, counter)
     oh.process(exec1)
 
@@ -339,7 +339,7 @@ class OrderHistoryBalanceSpecification
     orderStatus(submitted1.order.id()) shouldBe OrderStatus.Filled(50000000, 300001)
 
     val exec2 = OrderExecuted(submitted2, exec1.counterRemaining)
-    oh.processAll(exec2, OrderAdded(exec2.submittedLimitRemaining(submitted2), ntpTime.getTimestamp()))
+    oh.processAll(exec2, OrderAdded(exec2.submittedLimitRemaining(submitted2), time.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
       orderStatus(counter.order.id()) shouldBe OrderStatus.Filled(100000000, 300000)
@@ -367,9 +367,9 @@ class OrderHistoryBalanceSpecification
     val counter   = sell(pair, 347, 0.12739213, matcherFee = Some(300000L))
     val submitted = buy(pair, 146, 0.12739213, matcherFee = Some(300000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, isSystemCancel = true, ntpTime.getTimestamp()))
+    oh.processAll(exec, OrderCanceled(exec.submittedRemaining, isSystemCancel = true, time.getTimestamp()))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
@@ -391,7 +391,7 @@ class OrderHistoryBalanceSpecification
     val counter   = buy(pair, 5000000, 0.001, matcherFee = Some(1000L))
     val submitted = sell(pair, 5000000, 0.00099908, matcherFee = Some(1000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.process(exec)
 
@@ -408,11 +408,11 @@ class OrderHistoryBalanceSpecification
     val counter2  = LimitOrder(sell(pair, 7237977, 0.003, matcherFee = Some(300000L)))
     val submitted = LimitOrder(buy(pair, 4373667, 0.003, matcherFee = Some(300000L)))
 
-    oh.processAll(OrderAdded(counter1, ntpTime.getTimestamp()), OrderAdded(counter2, ntpTime.getTimestamp()))
+    oh.processAll(OrderAdded(counter1, time.getTimestamp()), OrderAdded(counter2, time.getTimestamp()))
     val exec1 = OrderExecuted(submitted, counter1)
     oh.processAll(
       exec1,
-      OrderCanceled(exec1.counterRemaining, isSystemCancel = true, ntpTime.getTimestamp()),
+      OrderCanceled(exec1.counterRemaining, isSystemCancel = true, time.getTimestamp()),
       OrderExecuted(exec1.submittedLimitRemaining(submitted), counter2)
     )
 
@@ -427,13 +427,13 @@ class OrderHistoryBalanceSpecification
     val counter   = sell(pair, 57918, 0.001356, matcherFee = Some(300000L))
     val submitted = buy(pair, 46978, 0.003333, matcherFee = Some(300000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.processAll(
       exec,
-      OrderCanceled(exec.submittedRemaining, isSystemCancel = true, ntpTime.getTimestamp()),
-      OrderCanceled(exec.counterRemaining, isSystemCancel = false, ntpTime.getTimestamp()) // Cancelled by user
+      OrderCanceled(exec.submittedRemaining, isSystemCancel = true, time.getTimestamp()),
+      OrderCanceled(exec.counterRemaining, isSystemCancel = false, time.getTimestamp()) // Cancelled by user
     )
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
@@ -450,10 +450,10 @@ class OrderHistoryBalanceSpecification
     val counter2  = LimitOrder(buy(pair, 200, 200000000L, matcherFee = Some(300000)))
     val submitted = LimitOrder(sell(pair, 350, 210000000L, matcherFee = Some(300000)))
 
-    oh.processAll(OrderAdded(counter1, ntpTime.getTimestamp()), OrderAdded(counter2, ntpTime.getTimestamp()))
+    oh.processAll(OrderAdded(counter1, time.getTimestamp()), OrderAdded(counter2, time.getTimestamp()))
     val exec1 = OrderExecuted(submitted, counter1)
     oh.processAll(exec1,
-                  OrderAdded(exec1.submittedLimitRemaining(submitted), ntpTime.getTimestamp()),
+                  OrderAdded(exec1.submittedLimitRemaining(submitted), time.getTimestamp()),
                   OrderExecuted(exec1.submittedLimitRemaining(submitted), counter2))
 
     orderStatus(submitted.order.id()) shouldBe OrderStatus.Filled(350, 299999)
@@ -464,9 +464,9 @@ class OrderHistoryBalanceSpecification
     val counter   = LimitOrder(buy(WavesBtc, 100000000, 0.0008, Some(pk), Some(300000L)))
     val submitted = LimitOrder(sell(WavesBtc, 210000000, 0.00079, Some(pk), Some(300000L)))
 
-    oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(counter, time.getTimestamp()))
     val exec = OrderExecuted(submitted, counter)
-    oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), ntpTime.getTimestamp()))
+    oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), time.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
       exec.counterRemainingAmount shouldBe 0L
@@ -493,8 +493,7 @@ class OrderHistoryBalanceSpecification
   property("Cancel buy order") {
     val ord1 = buy(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
 
-    oh.processAll(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()),
-                  OrderCanceled(LimitOrder(ord1), isSystemCancel = false, ntpTime.getTimestamp()))
+    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
@@ -515,8 +514,8 @@ class OrderHistoryBalanceSpecification
   property("Cancel sell order") {
     val ord1 = sell(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
 
-    oh.process(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()))
-    oh.process(OrderCanceled(LimitOrder(ord1), isSystemCancel = false, ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(ord1), time.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 
@@ -529,11 +528,11 @@ class OrderHistoryBalanceSpecification
     val counter   = sell(WavesBtc, 2100000000, 0.0008, matcherFee = Some(300000L))
     val submitted = buy(WavesBtc, 1000000000, 0.00081, matcherFee = Some(300000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.processAll(
       exec1,
-      OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), isSystemCancel = false, ntpTime.getTimestamp()))
+      OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), isSystemCancel = false, time.getTimestamp()))
 
     orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000, 142857)
     orderStatus(submitted.id()) shouldBe OrderStatus.Filled(1000000000, 300000)
@@ -563,16 +562,16 @@ class OrderHistoryBalanceSpecification
     val ord5 = LimitOrder(buy(WavesBtc, 130000000, 0.0004, Some(pk), Some(300000L), Some(45))) // Accepted
 
     oh.processAll(
-      OrderAdded(ord1, ntpTime.getTimestamp()),
-      OrderAdded(ord2, ntpTime.getTimestamp()),
-      OrderAdded(ord3, ntpTime.getTimestamp())
+      OrderAdded(ord1, time.getTimestamp()),
+      OrderAdded(ord2, time.getTimestamp()),
+      OrderAdded(ord3, time.getTimestamp())
     )
     val exec = OrderExecuted(ord4, ord1)
     oh.processAll(
       exec,
-      OrderAdded(exec.submittedLimitRemaining(ord4), ntpTime.getTimestamp()),
-      OrderCanceled(ord3, isSystemCancel = false, ntpTime.getTimestamp()),
-      OrderAdded(ord5, ntpTime.getTimestamp())
+      OrderAdded(exec.submittedLimitRemaining(ord4), time.getTimestamp()),
+      OrderCanceled(ord3, isSystemCancel = false, time.getTimestamp()),
+      OrderAdded(ord5, time.getTimestamp())
     )
 
     allOrderIds(ord1.order.senderPublicKey) shouldBe
@@ -598,15 +597,15 @@ class OrderHistoryBalanceSpecification
     val pk = KeyPair("private".getBytes("utf-8"))
     val origOrders = (0 until matcherSettings.maxOrdersPerRequest).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
-      oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, ntpTime.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, time.getTimestamp()))
 
     val newOrder = buy(WavesBtc, 100000000, 0.001, Some(pk), Some(300000L), Some(1L))
 
-    oh.process(OrderAdded(LimitOrder(newOrder), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(newOrder), time.getTimestamp()))
 
     withClue("orders list") {
       // 'last' is canceled, remove it
@@ -625,11 +624,11 @@ class OrderHistoryBalanceSpecification
     val pk = KeyPair("private".getBytes("utf-8"))
     val origOrders = (0 to matcherSettings.maxOrdersPerRequest).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
-      oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, ntpTime.getTimestamp()))
+    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, time.getTimestamp()))
 
     withClue("orders list") {
       // 'last' is canceled, remove it
@@ -648,7 +647,7 @@ class OrderHistoryBalanceSpecification
 
     val orders = (1 to MaxElements).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
-      oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
@@ -672,12 +671,12 @@ class OrderHistoryBalanceSpecification
 
     val allOrders = (1 to MaxElements + 10).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
-      oh.processAll(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.processAll(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
     val (ordersToCancel, activeOrders) = allOrders.splitAt(MaxElements)
-    ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, ntpTime.getTimestamp())))
+    ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
     val expectedActiveOrderIds = activeOrders.map(_.id()).reverse
 
     withClue("common") {
@@ -704,11 +703,11 @@ class OrderHistoryBalanceSpecification
 
     val pair1Orders = (1 to MaxElements).map { i =>
       val o = buy(pair1, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
-      oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    pair1Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, ntpTime.getTimestamp())))
+    pair1Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
 
     withClue("after 1 step") {
       activeOrderIds(pk) shouldBe empty
@@ -735,11 +734,11 @@ class OrderHistoryBalanceSpecification
 
     val pair2Orders = (1 to 10).map { i =>
       val o = buy(pair2, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(1000L + i))
-      oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
+      oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    pair2Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, ntpTime.getTimestamp())))
+    pair2Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
 
     withClue("after 2 step") {
       activeOrderIds(pk) shouldBe empty
@@ -795,7 +794,7 @@ class OrderHistoryBalanceSpecification
     val ord = buy(WctBtc, 10000, 0.0007)
 
     val lo  = LimitOrder(ord)
-    val add = OrderAdded(lo, ntpTime.getTimestamp())
+    val add = OrderAdded(lo, time.getTimestamp())
     oh.processAll(add, add)
 
     withClue("info") {
@@ -823,7 +822,7 @@ class OrderHistoryBalanceSpecification
     val counter   = buy(WavesBtc, 100000, 0.0008, matcherFee = Some(2000L))
     val submitted = sell(WavesBtc, 100000, 0.0007, matcherFee = Some(1000L))
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
 
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.processAll(exec, exec)
@@ -863,8 +862,8 @@ class OrderHistoryBalanceSpecification
 
   property("Idempotence - OrderCancelled") {
     val ord1   = buy(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
-    val cancel = OrderCanceled(LimitOrder(ord1), isSystemCancel = false, ntpTime.getTimestamp())
-    oh.processAll(OrderAdded(LimitOrder(ord1), ntpTime.getTimestamp()), cancel, cancel)
+    val cancel = OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp())
+    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), cancel, cancel)
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 

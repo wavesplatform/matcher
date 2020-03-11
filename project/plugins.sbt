@@ -6,15 +6,16 @@ resolvers ++= Seq(
 )
 
 Seq(
-  "com.thesamet"      % "sbt-protoc"             % "0.99.27",
-  "org.jetbrains"     % "sbt-ide-settings"       % "1.0.0",
-  "com.typesafe.sbt"  % "sbt-native-packager"    % "1.4.1",
-  "org.scalastyle"    %% "scalastyle-sbt-plugin" % "1.0.0",
-  "org.scoverage"     % "sbt-scoverage"          % "1.5.1",
-  "se.marcuslonnberg" % "sbt-docker"             % "1.5.0",
-  "com.typesafe.sbt"  % "sbt-git"                % "0.9.3",
-  "org.scalameta"     % "sbt-scalafmt"           % "2.0.1",
-  "ch.epfl.scala"     % "sbt-scalafix"           % "0.9.11",
+  "com.thesamet"       % "sbt-protoc"             % "0.99.27",
+  "org.jetbrains"      % "sbt-ide-settings"       % "1.0.0",
+  "com.typesafe.sbt"   % "sbt-native-packager"    % "1.4.1",
+  "pl.project13.scala" % "sbt-jmh"                % "0.3.7",
+  "org.scalastyle"     %% "scalastyle-sbt-plugin" % "1.0.0",
+  "org.scoverage"      % "sbt-scoverage"          % "1.5.1",
+  "se.marcuslonnberg"  % "sbt-docker"             % "1.5.0",
+  "com.typesafe.sbt"   % "sbt-git"                % "0.9.3",
+  "org.scalameta"      % "sbt-scalafmt"           % "2.0.1",
+  "ch.epfl.scala"      % "sbt-scalafix"           % "0.9.11",
   /*
   undeclaredCompileDependencies{test}
   unusedCompileDependencies{test}

@@ -15,10 +15,8 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.OrderBook._
-import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderHistoryStub}
+import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot, OrderHistoryStub}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.dex.{MatcherSpecBase, _}
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -73,13 +71,7 @@ import scala.math.BigDecimal.RoundingMode.CEILING
   * Buy         | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
-class ReservedBalanceSpecification
-    extends AnyPropSpecLike
-    with MatcherSpecLike
-    with WithDB
-    with MatcherSpecBase
-    with TableDrivenPropertyChecks
-    with NTPTime {
+class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike with WithDB with MatcherSpecBase with TableDrivenPropertyChecks {
 
   override protected def actorSystemName: String = getSimpleName(this)
 
@@ -89,7 +81,7 @@ class ReservedBalanceSpecification
   import system.dispatcher
 
   private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  private var oh: OrderHistoryStub = new OrderHistoryStub(system, ntpTime)
+  private var oh: OrderHistoryStub = new OrderHistoryStub(system, time)
 
   private val addressDir = system.actorOf(
     Props(
@@ -110,11 +102,11 @@ class ReservedBalanceSpecification
     Props(
       new AddressActor(
         address,
-        ntpTime,
+        time,
         new TestOrderDB(100),
         _ => Future.successful(false),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-        orderBookCache = _ => AggregatedSnapshot(),
+        orderBookCache = _ => OrderBookAggregatedSnapshot.empty,
         enableSchedules,
         spendableBalancesActor
       )
@@ -136,10 +128,10 @@ class ReservedBalanceSpecification
   }
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
-    addressDir ! OrderAdded(LimitOrder(submitted), ntpTime.getTimestamp())
-    addressDir ! OrderAdded(LimitOrder(counter), ntpTime.getTimestamp())
+    addressDir ! OrderAdded(LimitOrder(submitted), time.getTimestamp())
+    addressDir ! OrderAdded(LimitOrder(counter), time.getTimestamp())
 
-    oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
+    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, submitted.matcherFee, counter.matcherFee)
     addressDir ! exec
     exec
@@ -147,7 +139,7 @@ class ReservedBalanceSpecification
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, ntpTime)
+    oh = new OrderHistoryStub(system, time)
   }
 
   forAll(
@@ -480,7 +472,7 @@ class ReservedBalanceSpecification
   private val ETH   = mkAssetId("ETH")
 
   private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]],
-                                             orderBookCache: AssetPair => AggregatedSnapshot = _ => AggregatedSnapshot(),
+                                             orderBookCache: AssetPair => OrderBookAggregatedSnapshot = _ => OrderBookAggregatedSnapshot.empty,
                                              testProbe: TestProbe): ActorRef = {
 
     lazy val addressDir = system.actorOf(
@@ -500,7 +492,7 @@ class ReservedBalanceSpecification
       Props(
         new AddressActor(
           owner = address,
-          time = ntpTime,
+          time = time,
           orderDB = new TestOrderDB(100),
           hasOrderInBlockchain = _ => Future.successful(false),
           store = event => {
@@ -528,7 +520,7 @@ class ReservedBalanceSpecification
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
     val executionEvent = OrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp, marketOrder.matcherFee, limitOrder.matcherFee)
 
-    addressDirWithOrderBookCache ! OrderAdded(limitOrder, ntpTime.getTimestamp())
+    addressDirWithOrderBookCache ! OrderAdded(limitOrder, time.getTimestamp())
     addressDirWithOrderBookCache ! executionEvent
 
     executionEvent
@@ -672,11 +664,11 @@ class ReservedBalanceSpecification
         s"Reserves of the market order (${printMarketOrderInfo(moTpe, moAmt, moPrc, moFeeAsst, balance)}) executed with the counter order (${printLimitOrderInfo(moTpe.opposite, loAmt, loPrc)}) should be correct"
       } {
 
-        val orderBookCache: AssetPair => AggregatedSnapshot = _ => {
+        val orderBookCache: AssetPair => OrderBookAggregatedSnapshot = _ => {
           val levels = Seq(LevelAgg(loAmt, loPrc))
           moTpe match {
-            case BUY  => AggregatedSnapshot(asks = levels)
-            case SELL => AggregatedSnapshot(bids = levels)
+            case BUY  => OrderBookAggregatedSnapshot(asks = levels)
+            case SELL => OrderBookAggregatedSnapshot(bids = levels)
           }
         }
 
@@ -703,7 +695,7 @@ class ReservedBalanceSpecification
         // since order will be rejected because of the BalanceNotEnough error. Its ok since in these tests we check
         // tricky cases of balance reservation, when afs is not enough to cover market value and fee
 
-        tp.expectMsgAnyClassOf(300.millisecond, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
+        tp.expectMsgAnyClassOf(1.second, classOf[QueueEvent.PlacedMarket], classOf[OrderRejected])
 
         val orderExecutedEvent = executeMarketOrder(addressDir, marketOrder, LimitOrder(counter))
 

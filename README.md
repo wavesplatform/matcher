@@ -391,7 +391,28 @@ Note, it is not recommended to change this options if you aren't face the issue.
     sudo sysctl -p
     ```
 
-## 11. Contributor notes
+## 11. Benchmarks
+
+We use [sbt-jmh](https://github.com/ktoso/sbt-jmh). For more information, please read its documentation.
+
+To run a benchmark by mask without profiling, use the command:
+
+```
+dex-jmh/jmh:run .*OrderBookAddBenchmark
+```
+
+To run with a benchmark (for example, [async-profiler](https://github.com/jvm-profiling-tools/async-profiler)):
+ 
+1. Make sure you have downloaded it
+2. Add an additional option `-prof`, e.g.:
+
+    ```
+    dex-jmh/jmh:run .*OrderBookAddBenchmark -prof "jmh.extras.Async:asyncProfilerDir=/path/to/async-profiler/directory;dir=/path/to/output/directory;jfr=true"
+    ```
+
+JFR files could be read with [jmc](https://adoptopenjdk.net/jmc.html).
+
+## 12. Contributor notes
 
 ### Branches
 

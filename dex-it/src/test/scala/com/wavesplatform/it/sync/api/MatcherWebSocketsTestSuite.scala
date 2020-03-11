@@ -60,6 +60,18 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
     "should send account updates to authenticated user" - {
 
+      "when account is empty" in {
+
+        val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("JIo6cTep_u3_6ocToHa"), dex1)
+
+        Thread.sleep(1000)
+
+        wsac.getBalancesSnapshot shouldBe Map(Waves -> WsBalances(0, 0))
+        wsac.getOrdersSnapshot shouldBe empty
+
+        wsac.close()
+      }
+
       "when sender places and cancels orders" in {
 
         // Carol has 100 Waves and 1 BTC
@@ -67,13 +79,13 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Thread.sleep(1000)
 
-        val buyOrder1 = mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00011403)
+        val buyOrder  = mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00011403)
         val sellOrder = mkOrderDP(carol, wavesUsdPair, SELL, 1.waves, 3.01)
 
-        placeAndAwaitAtDex(buyOrder1)
+        placeAndAwaitAtDex(buyOrder)
         placeAndAwaitAtDex(sellOrder)
 
-        Seq(buyOrder1, sellOrder).foreach { o =>
+        Seq(buyOrder, sellOrder).foreach { o =>
           dex1.api.cancel(carol, o)
           dex1.api.waitForOrderStatus(o, ResponseOrderStatus.Cancelled)
         }
@@ -86,6 +98,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         wsac.getOrdersSnapshot shouldBe empty
 
+        wsac.getBalancesChanges.size should (be >= 2 and be <= 4)
+
         squashBalanceChanges(wsac.getBalancesChanges) should matchTo {
           squashBalanceChanges(
             Seq(
@@ -97,11 +111,13 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
           )
         }
 
+        wsac.getOrderChanges.size shouldEqual 4
+
         wsac.getOrderChanges should matchTo {
           Seq(
-            WsOrder.fromDomain(LimitOrder(buyOrder1), OrderStatus.Accepted),
+            WsOrder.fromDomain(LimitOrder(buyOrder), OrderStatus.Accepted),
             WsOrder.fromDomain(LimitOrder(sellOrder), OrderStatus.Accepted),
-            WsOrder(buyOrder1.id(), status = OrderStatus.Cancelled.name.some),
+            WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some),
             WsOrder(sellOrder.id(), status = OrderStatus.Cancelled.name.some)
           )
         }
@@ -139,6 +155,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Thread.sleep(1000)
 
+        wsac.getBalancesChanges.size should (be >= 3 and be <= 8)
+
         squashBalanceChanges(wsac.getBalancesChanges) should matchTo {
           squashBalanceChanges(
             Seq(
@@ -150,6 +168,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
             )
           )
         }
+
+        wsac.getOrderChanges.size shouldEqual 2
 
         wsac.getOrderChanges should matchTo {
           Seq(

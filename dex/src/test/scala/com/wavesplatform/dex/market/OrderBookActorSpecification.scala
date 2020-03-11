@@ -15,12 +15,12 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
-import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.market.OrderBookActor.{Snapshot => _, _}
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
@@ -29,19 +29,19 @@ import scala.concurrent.duration._
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")
-    with NTPTime
+    with SystemTime
     with ImplicitSender
     with MatcherSpecBase
     with PathMockFactory
     with Eventually {
 
-  private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
+  private val obc = new ConcurrentHashMap[AssetPair, OrderBookAggregatedSnapshot]
   private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
 
-  private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
+  private def update(ap: AssetPair)(snapshot: OrderBookAggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => ()) { (pair, actor, probe) =>
@@ -82,7 +82,7 @@ class OrderBookActorSpecification
         pair,
         update(pair),
         p => Option(md.get(p)),
-        ntpTime,
+        time,
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
@@ -99,17 +99,17 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBook.Snapshot.empty))
+      obsdb.update(p, 50, Some(OrderBookSnapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
-        val ord = buy(p, 10 * Order.PriceConstant, 100)
-        val ob  = OrderBook.empty()
-        ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
-        obsdb.update(p, 50, Some(ob.snapshot))
+        val ord            = buy(p, 10 * Order.PriceConstant, 100)
+        val ob             = OrderBook.empty
+        val (updatedOb, _) = ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
+        obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>
       tp.expectMsgType[OrderAdded]

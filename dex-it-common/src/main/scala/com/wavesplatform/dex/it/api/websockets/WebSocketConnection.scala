@@ -25,7 +25,6 @@ class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, t
   private val flow: Flow[Message, Message, Promise[Option[Message]]] = Flow.fromSinkAndSourceMat(sink, Source.maybe[Message])(Keep.right)
   private val (_, closed)                                            = Http().singleWebSocketRequest(WebSocketRequest(s"ws://$uri"), flow)
 
-//  def getMessagesBuffer: mutable.Queue[Output] = messagesBuffer
   def getMessagesBuffer: Seq[Output] = messagesBuffer.iterator().asScala.toSeq
 
   def clearMessagesBuffer(): Unit = messagesBuffer.clear()

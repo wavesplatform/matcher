@@ -14,10 +14,10 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
 import com.wavesplatform.dex.market.OrderBookActor.{OrderBookRecovered, OrderBookSnapshotUpdateCompleted}
-import com.wavesplatform.dex.model.{Events, OrderBook}
+import com.wavesplatform.dex.model.{Events, OrderBookSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -33,7 +33,7 @@ class MatcherActorSpecification
     with PathMockFactory
     with ImplicitSender
     with Eventually
-    with NTPTime {
+    with SystemTime {
 
   private def assetDescription(assetId: Asset): Option[BriefAssetDescription] = {
     Some(BriefAssetDescription(name = "Unknown", decimals = 8, hasScript = false))
@@ -424,7 +424,7 @@ class MatcherActorSpecification
             assetPair,
             _ => {},
             _ => {},
-            ntpTime,
+            time,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
             _ => MatchingRule.DefaultRule,
@@ -440,7 +440,7 @@ class MatcherActorSpecification
 
   private def matcherHadOrderBooksBefore(apdb: AssetPairsDB, obsdb: OrderBookSnapshotDB, pairs: (AssetPair, Long)*): Unit = {
     pairs.map(_._1).foreach(apdb.add)
-    pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBook.Snapshot.empty)) }
+    pairs.foreach { case (pair, offset) => obsdb.update(pair, offset, Some(OrderBookSnapshot.empty)) }
   }
 
   private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}

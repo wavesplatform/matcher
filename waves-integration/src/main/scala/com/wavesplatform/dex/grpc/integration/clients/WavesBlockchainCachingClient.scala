@@ -28,6 +28,7 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
   override def spendableBalanceChanges: Observable[SpendableBalanceChanges]                      = underlying.spendableBalanceChanges
+  override def spendableBalance(address: Address, asset: Asset): Future[Long]                    = underlying.spendableBalance(address, asset)
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]]             = underlying.allAssetsSpendableBalance(address)
 

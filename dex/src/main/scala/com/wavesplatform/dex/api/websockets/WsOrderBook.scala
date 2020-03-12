@@ -59,7 +59,7 @@ object WsOrderBook {
 
   private def sideMayBeEmpty(ordering: Ordering[Double]): MayBeEmpty[WsSide] = new MayBeEmpty[WsSide] {
     override def isEmpty(x: WsSide): Boolean = x.isEmpty
-    override def empty: WsSide               = TreeMap.empty
+    override def empty: WsSide               = TreeMap.empty(ordering)
   }
 
   class Update(amountAssetDecimals: Int, priceAssetDecimals: Int) {

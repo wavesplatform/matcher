@@ -255,15 +255,19 @@ class AddressActor(owner: Address,
       }
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
-      val diff =
-        WsAddressState(
-          balances = mkWsBalances(spendableBalances),
-          orders = addressWsMutableState.getAllOrderChanges
-        )
+      if (addressWsMutableState.hasActiveConnections) {
 
-      addressWsMutableState.activeWsConnections.foreach(_ ! diff)
+        val diff =
+          WsAddressState(
+            balances = mkWsBalances(spendableBalances),
+            orders = addressWsMutableState.getAllOrderChanges
+          )
+
+        addressWsMutableState.activeWsConnections.foreach(_ ! diff)
+        scheduleNextDiffSending
+      }
+
       addressWsMutableState = addressWsMutableState.cleanChanges()
-      scheduleNextDiffSending
   }
 
   private def scheduleNextDiffSending: Cancellable = {

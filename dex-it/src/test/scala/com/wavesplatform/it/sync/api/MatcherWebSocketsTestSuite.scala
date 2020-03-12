@@ -3,12 +3,12 @@ package com.wavesplatform.it.sync.api
 import akka.http.scaladsl.model.ws.Message
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ResponseOrderStatus}
-import com.wavesplatform.dex.it.api.websockets.HasWebSockets
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -27,6 +27,33 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
   }
 
   private def squashBalanceChanges(xs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = xs.foldLeft(Map.empty[Asset, WsBalances]) { _ ++ _ }
+
+  private def assertAddressStateSnapshot(connection: WebSocketAuthenticatedConnection, expectedSnapshot: WsAddressState): Unit = {
+    eventually { connection.getMessagesBuffer should have size 1 }
+    Thread.sleep(200)
+    connection.getSnapshot should matchTo(expectedSnapshot)
+    connection.clearMessagesBuffer()
+  }
+
+  private def assertAddressStateChanges(connection: WebSocketAuthenticatedConnection,
+                                        balancesChangesCountBorders: (Int, Int),
+                                        ordersChangesCount: Int,
+                                        expectedBalanceChanges: Map[Asset, WsBalances],
+                                        expectedOrdersChanges: Seq[WsOrder]): Unit = {
+    eventually {
+      connection.getBalancesChanges.size should be >= balancesChangesCountBorders._1
+      connection.getOrderChanges.size shouldEqual ordersChangesCount
+    }
+
+    Thread.sleep(200)
+
+    connection.getBalancesChanges.size should be <= balancesChangesCountBorders._2
+
+    squashBalanceChanges(connection.getBalancesChanges) should matchTo(expectedBalanceChanges)
+    connection.getOrderChanges should matchTo(expectedOrdersChanges)
+
+    connection.clearMessagesBuffer()
+  }
 
   "Connection should be established" in {
 
@@ -61,14 +88,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
     "should send account updates to authenticated user" - {
 
       "when account is empty" in {
-
         val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("JIo6cTep_u3_6ocToHa"), dex1)
-
-        Thread.sleep(1000)
-
-        wsac.getBalancesSnapshot shouldBe Map(Waves -> WsBalances(0, 0))
-        wsac.getOrdersSnapshot shouldBe empty
-
+        assertAddressStateSnapshot(wsac, WsAddressState.empty)
         wsac.close()
       }
 
@@ -77,7 +98,13 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         // Carol has 100 Waves and 1 BTC
         val wsac = mkWebSocketAuthenticatedConnection(carol, dex1)
 
-        Thread.sleep(1000)
+        assertAddressStateSnapshot(
+          connection = wsac,
+          expectedSnapshot = WsAddressState(
+            balances = Map(Waves -> WsBalances(100.waves, 0), btc -> WsBalances(1.btc, 0)),
+            orders = Seq.empty
+          )
+        )
 
         val buyOrder  = mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00011403)
         val sellOrder = mkOrderDP(carol, wavesUsdPair, SELL, 1.waves, 3.01)
@@ -90,37 +117,25 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
           dex1.api.waitForOrderStatus(o, ResponseOrderStatus.Cancelled)
         }
 
-        Thread.sleep(1000)
-
-        wsac.getBalancesSnapshot should matchTo {
-          Map(Waves -> WsBalances(tradable = 100.waves, reserved = 0), btc -> WsBalances(tradable = 1.btc, reserved = 0))
-        }
-
-        wsac.getOrdersSnapshot shouldBe empty
-
-        wsac.getBalancesChanges.size should (be >= 2 and be <= 4)
-
-        squashBalanceChanges(wsac.getBalancesChanges) should matchTo {
-          squashBalanceChanges(
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (2, 4),
+          ordersChangesCount = 4,
+          expectedBalanceChanges = squashBalanceChanges(
             Seq(
               Map(btc   -> WsBalances(tradable = 0.99988597.btc, reserved = 0.00011403.btc)), // reserve
               Map(Waves -> WsBalances(tradable = 98.997.waves, reserved = 1.003.waves)), // reserve
               Map(btc   -> WsBalances(tradable = 1.btc, reserved = 0)), // cancel
               Map(Waves -> WsBalances(tradable = 100.waves, reserved = 0)) // cancel
             )
-          )
-        }
-
-        wsac.getOrderChanges.size shouldEqual 4
-
-        wsac.getOrderChanges should matchTo {
-          Seq(
+          ),
+          expectedOrdersChanges = Seq(
             WsOrder.fromDomain(LimitOrder(buyOrder), OrderStatus.Accepted),
             WsOrder.fromDomain(LimitOrder(sellOrder), OrderStatus.Accepted),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some),
             WsOrder(sellOrder.id(), status = OrderStatus.Cancelled.name.some)
           )
-        }
+        )
 
         wsac.close()
       }
@@ -132,17 +147,13 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         // Carol has 100 Waves, 1 BTC and 200 USD
         val wsac = mkWebSocketAuthenticatedConnection(carol, dex1)
 
-        Thread.sleep(1000)
-
-        wsac.getBalancesSnapshot should matchTo {
-          Map(
-            Waves -> WsBalances(100.waves, 0),
-            btc   -> WsBalances(1.btc, 0),
-            usd   -> WsBalances(200.usd, 0)
+        assertAddressStateSnapshot(
+          connection = wsac,
+          expectedSnapshot = WsAddressState(
+            balances = Map(Waves -> WsBalances(100.waves, 0), btc -> WsBalances(1.btc, 0), usd -> WsBalances(200.usd, 0)),
+            orders = Seq.empty
           )
-        }
-
-        wsac.getOrdersSnapshot shouldBe empty
+        )
 
         placeAndAwaitAtDex(mkOrderDP(bob, wavesUsdPair, SELL, 6.waves, 3.0))
 
@@ -153,12 +164,11 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         dex1.api.cancel(carol, buyOrder)
         dex1.api.waitForOrderStatus(buyOrder, ResponseOrderStatus.Cancelled)
 
-        Thread.sleep(1000)
-
-        wsac.getBalancesChanges.size should (be >= 3 and be <= 8)
-
-        squashBalanceChanges(wsac.getBalancesChanges) should matchTo {
-          squashBalanceChanges(
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (3, 8),
+          ordersChangesCount = 2,
+          expectedBalanceChanges = squashBalanceChanges(
             Seq(
               Map(usd   -> WsBalances(200.usd, 0)), // transfer
               Map(usd   -> WsBalances(164.usd, 36.usd), btc -> WsBalances(0.99999966.btc, 0.00000034.btc)), // reserve
@@ -166,13 +176,8 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
               Map(Waves -> WsBalances(106.waves, 0)), // execution
               Map(usd   -> WsBalances(182.usd, 0), btc -> WsBalances(0.99999983.btc, 0)) // cancelling
             )
-          )
-        }
-
-        wsac.getOrderChanges.size shouldEqual 2
-
-        wsac.getOrderChanges should matchTo {
-          Seq(
+          ),
+          expectedOrdersChanges = Seq(
             WsOrder
               .fromDomain(LimitOrder(buyOrder), OrderStatus.PartiallyFilled(6.waves, 0.00000017.btc))
               .copy(
@@ -182,7 +187,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
               ),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some)
           )
-        }
+        )
 
         wsac.close()
       }

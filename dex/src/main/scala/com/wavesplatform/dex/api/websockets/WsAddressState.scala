@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.websockets
 
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -7,6 +8,8 @@ import play.api.libs.json._
 case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder])
 
 object WsAddressState {
+
+  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty)
 
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
     { // TODO use reads for Map[Asset, T]!

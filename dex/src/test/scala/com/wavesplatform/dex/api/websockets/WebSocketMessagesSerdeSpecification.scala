@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.websockets
 
+import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalacheck.Gen
@@ -57,8 +58,8 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     orders         <- Gen.listOfN(orderChanges, wsOrderGen)
   } yield WsAddressState((assets zip balances).toMap, orders)
 
-  private def serdeTest[T](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { x =>
-    x shouldBe format.reads(format writes x).get
+  private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { x =>
+    x should matchTo { format.reads(format writes x).get }
   }
 
   "WsOrder" in serdeTest(wsOrderGen)

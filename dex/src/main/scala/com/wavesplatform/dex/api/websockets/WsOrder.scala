@@ -53,11 +53,7 @@ object WsOrder {
 
   object Status extends Enumeration {
     type Status = Value
-
-    val ACCEPTED         = Value("ACCEPTED")
-    val FILLED           = Value("FILLED")
-    val PARTIALLY_FILLED = Value("PARTIALLY_FILLED")
-    val CANCELLED        = Value("CANCELLED")
+    val ACCEPTED, FILLED, PARTIALLY_FILLED, CANCELLED = Value
   }
 
   val orderStatusFormat: Format[String] = Format(

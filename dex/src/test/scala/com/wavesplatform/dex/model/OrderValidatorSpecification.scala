@@ -953,19 +953,24 @@ class OrderValidatorSpecification
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
-  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = {
-    order =>
-      OrderValidator.accountStateAware(
-        sender = order.sender.toAddress,
-        tradableBalance = b.withDefaultValue(0L).apply,
-        activeOrderCount = 0,
-        orderExists = _ => false,
-        orderBookCache = _ => aggregatedSnapshot
-      ) { MarketOrder(order, b.apply _) }
+  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(
+      b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
+    OrderValidator.accountStateAware(
+      sender = order.sender.toAddress,
+      tradableBalance = b.withDefaultValue(0L).apply,
+      activeOrderCount = 0,
+      orderExists = _ => false,
+      orderBookCache = _ => aggregatedSnapshot
+    ) { MarketOrder(order, b.apply _) }
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache, DynamicSettings.symmetric(matcherFee))
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey,
+                                        ba,
+                                        matcherSettings,
+                                        getDefaultAssetDescriptions(_).decimals,
+                                        rateCache,
+                                        DynamicSettings.symmetric(matcherFee))
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,

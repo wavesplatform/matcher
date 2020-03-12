@@ -134,7 +134,7 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "retries" when {
       "failed to confirm (retry checks)" in {
-        val firstProcessed  = new AtomicBoolean(false)
+        val firstProcessed = new AtomicBoolean(false)
         var triedToConfirm = Seq.empty[ByteStr]
         val actor = defaultActor(
           time,

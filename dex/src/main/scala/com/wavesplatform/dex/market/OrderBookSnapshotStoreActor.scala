@@ -35,8 +35,8 @@ object OrderBookSnapshotStoreActor {
   sealed trait Response
   object Response {
     case class GetSnapshot(result: Option[(Offset, OrderBookSnapshot)]) extends Response
-    case class Updated(offset: Offset)                         extends Response
-    case class Deleted(assetPair: AssetPair)                   extends Response
+    case class Updated(offset: Offset)                                  extends Response
+    case class Deleted(assetPair: AssetPair)                            extends Response
   }
 
   def props(db: OrderBookSnapshotDB): Props = Props(new OrderBookSnapshotStoreActor(db))

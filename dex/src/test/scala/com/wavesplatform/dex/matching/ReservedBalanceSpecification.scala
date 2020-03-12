@@ -71,12 +71,7 @@ import scala.math.BigDecimal.RoundingMode.CEILING
   * Buy         | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
-class ReservedBalanceSpecification
-    extends AnyPropSpecLike
-    with MatcherSpecLike
-    with WithDB
-    with MatcherSpecBase
-    with TableDrivenPropertyChecks {
+class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike with WithDB with MatcherSpecBase with TableDrivenPropertyChecks {
 
   override protected def actorSystemName: String = getSimpleName(this)
 

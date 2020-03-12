@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
-import com.wavesplatform.dex.model.{OrderInfo, OrderBookSnapshot}
+import com.wavesplatform.dex.model.{OrderBookSnapshot, OrderInfo}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 
 import scala.collection.mutable

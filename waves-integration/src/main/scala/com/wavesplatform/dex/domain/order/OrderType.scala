@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.domain.order
 
+import play.api.libs.json.{Format, JsError, JsString, JsSuccess}
+
 sealed trait OrderType {
   def bytes: Array[Byte]
   def opposite: OrderType
@@ -35,4 +37,15 @@ object OrderType {
     case BUY  => SELL
     case SELL => BUY
   }
+
+  implicit val format: Format[OrderType] = Format(
+    {
+      case JsString("BUY")  => JsSuccess(BUY)
+      case JsString("SELL") => JsSuccess(SELL)
+      case _                => JsError("Cannot parse order type!")
+    }, {
+      case BUY  => JsString("BUY")
+      case SELL => JsString("SELL")
+    }
+  )
 }

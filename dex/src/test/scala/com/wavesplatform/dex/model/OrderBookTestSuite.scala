@@ -29,7 +29,7 @@ class OrderBookTestSuite
     with MatcherSpecBase
     with NoShrink
     with TableDrivenPropertyChecks
-with SystemTime{
+    with SystemTime {
 
   implicit class OrderBookOps(ob: OrderBook) {
     def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
@@ -429,7 +429,7 @@ with SystemTime{
       val gmtf  = Matcher.getMakerTakerFee(ofs)(_, _)
 
       // Ignore first OrderAdded, take first OrderExecuted, other events aren't interesting
-      val evt   = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, now, gmtf))._2.tail.head
+      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, now, gmtf))._2.tail.head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]

@@ -43,7 +43,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
       ao.order.sender,
-      system.actorOf(createAddressActor(ao.order.sender, enableSchedules = true))
+      system.actorOf(createAddressActor(ao.order.sender, true))
     )
 
   lazy val addressDir = system.actorOf(

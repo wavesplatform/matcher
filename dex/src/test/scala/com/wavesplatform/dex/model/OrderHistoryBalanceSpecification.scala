@@ -493,8 +493,7 @@ class OrderHistoryBalanceSpecification
   property("Cancel buy order") {
     val ord1 = buy(WctBtc, 100000000, 0.0008, matcherFee = Some(300000L))
 
-    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()),
-                  OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
+    oh.processAll(OrderAdded(LimitOrder(ord1), time.getTimestamp()), OrderCanceled(LimitOrder(ord1), isSystemCancel = false, time.getTimestamp()))
 
     orderStatus(ord1.id()) shouldBe OrderStatus.Cancelled(0, 0)
 

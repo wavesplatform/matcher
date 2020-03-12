@@ -221,9 +221,9 @@ class ActorsWebSocketInteractionsSpecification
                 WsOrder(
                   id = buyOrder.id,
                   status = OrderStatus.PartiallyFilled.name.some,
-                  filledAmount = 5.waves.some,
-                  filledFee = 0.0015.waves.some,
-                  avgFilledPrice = 3.0.usd.some
+                  filledAmount = 5.0.some,
+                  filledFee = 0.0015.some,
+                  avgFilledPrice = 3.0.some
                 )
               )
             )
@@ -280,8 +280,8 @@ class ActorsWebSocketInteractionsSpecification
 
             val expectedWsOrder = WsOrder.fromDomain(mo, OrderStatus.PartiallyFilled(10.waves, 0.00000340.eth))
 
-            expectedWsOrder.filledAmount shouldBe 10.waves.some
-            expectedWsOrder.filledFee shouldBe 0.00000340.eth.some
+            expectedWsOrder.filledAmount shouldBe 10.some
+            expectedWsOrder.filledFee shouldBe 0.00000340.some
             expectedWsOrder.status shouldBe OrderStatus.PartiallyFilled.name.some
 
             expectWsBalancesAndOrders(
@@ -298,9 +298,9 @@ class ActorsWebSocketInteractionsSpecification
                 WsOrder(
                   id = mo.id,
                   status = OrderStatus.PartiallyFilled.name.some,
-                  filledAmount = 25.waves.some,
-                  filledFee = 0.00000850.eth.some,
-                  avgFilledPrice = 3.0.usd.some
+                  filledAmount = 25.0.some,
+                  filledFee = 0.00000850.some,
+                  avgFilledPrice = 3.0.some
                 )
               )
             )
@@ -314,9 +314,9 @@ class ActorsWebSocketInteractionsSpecification
                 WsOrder(
                   id = mo.id,
                   status = OrderStatus.PartiallyFilled.name.some,
-                  filledAmount = 30.waves.some,
-                  filledFee = 0.00001020.eth.some,
-                  avgFilledPrice = 3.0.usd.some
+                  filledAmount = 30.0.some,
+                  filledFee = 0.00001020.some,
+                  avgFilledPrice = 3.0.some
                 )
               )
             )
@@ -472,9 +472,9 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder(id = counter1.id,
                       status = OrderStatus.Filled.name.some,
-                      filledAmount = 5.waves.some,
-                      filledFee = 0.003.waves.some,
-                      avgFilledPrice = 3.0.usd.some)
+                      filledAmount = 5.0.some,
+                      filledFee = 0.003.some,
+                      avgFilledPrice = 3.0.some)
             )
           )
 
@@ -484,9 +484,9 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder(id = counter2.id,
                       status = OrderStatus.Filled.name.some,
-                      filledAmount = 5.waves.some,
-                      filledFee = 0.003.waves.some,
-                      avgFilledPrice = 3.1.usd.some)
+                      filledAmount = 5.0.some,
+                      filledFee = 0.003.some,
+                      avgFilledPrice = 3.1.some)
             )
           )
 
@@ -496,9 +496,9 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder(id = counter3.id,
                       status = OrderStatus.PartiallyFilled.name.some,
-                      filledAmount = 2.waves.some,
-                      filledFee = 0.0012.waves.some,
-                      avgFilledPrice = 3.2.usd.some)
+                      filledAmount = 2.0.some,
+                      filledFee = 0.0012.some,
+                      avgFilledPrice = 3.2.some)
             )
           )
 
@@ -547,8 +547,8 @@ class ActorsWebSocketInteractionsSpecification
 
           val expectedWsOrder = WsOrder.fromDomain(mo, OrderStatus.PartiallyFilled(5.waves, 0.00125.waves))
 
-          expectedWsOrder.filledAmount shouldBe 5.waves.some
-          expectedWsOrder.filledFee shouldBe 0.00125.waves.some
+          expectedWsOrder.filledAmount shouldBe 5.0.some
+          expectedWsOrder.filledFee shouldBe 0.00125.some
           expectedWsOrder.status shouldBe OrderStatus.PartiallyFilled.name.some
 
           expectWsBalancesAndOrders(
@@ -562,9 +562,9 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder(id = mo.id,
                       status = OrderStatus.PartiallyFilled.name.some,
-                      filledAmount = 10.waves.some,
-                      filledFee = 0.0025.waves.some,
-                      avgFilledPrice = 3.0.usd.some)
+                      filledAmount = 10.0.some,
+                      filledFee = 0.0025.some,
+                      avgFilledPrice = 3.0.some)
             )
           )
 
@@ -572,11 +572,13 @@ class ActorsWebSocketInteractionsSpecification
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 0)),
             Seq(
-              WsOrder(id = mo.id,
-                      status = OrderStatus.Filled.name.some,
-                      filledAmount = 12.waves.some,
-                      filledFee = 0.003.waves.some,
-                      avgFilledPrice = 3.0.usd.some)
+              WsOrder(
+                id = mo.id,
+                status = OrderStatus.Filled.name.some,
+                filledAmount = 12.0.some,
+                filledFee = 0.003.some,
+                avgFilledPrice = 3.0.some
+              )
             )
           )
 

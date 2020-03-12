@@ -7,12 +7,15 @@ import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ResponseOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
+
+  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
   private val carol = mkKeyPair("carol")
 
@@ -181,9 +184,9 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
             WsOrder
               .fromDomain(LimitOrder(buyOrder), OrderStatus.PartiallyFilled(6.waves, 0.00000017.btc))
               .copy(
-                filledAmount = 6.waves.some,
-                filledFee = 0.00000017.btc.some,
-                avgFilledPrice = 3.0.usd.some
+                filledAmount = 6.0.some,
+                filledFee = 0.00000017.some,
+                avgFilledPrice = 3.0.some
               ),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some)
           )

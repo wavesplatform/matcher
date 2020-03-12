@@ -2,7 +2,9 @@ package com.wavesplatform.dex.api.websockets
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -13,18 +15,25 @@ case class WsOrder(id: Order.Id,
                    priceAsset: Option[Asset] = None,
                    side: Option[OrderType] = None,
                    isMarket: Option[Boolean] = None,
-                   price: Option[Long] = None,
-                   amount: Option[Long] = None,
-                   fee: Option[Long] = None,
+                   price: Option[Double] = None,
+                   amount: Option[Double] = None,
+                   fee: Option[Double] = None,
                    feeAsset: Option[Asset] = None,
                    status: Option[String] = None,
-                   filledAmount: Option[Long] = None,
-                   filledFee: Option[Long] = None,
-                   avgFilledPrice: Option[Long] = None)
+                   filledAmount: Option[Double] = None,
+                   filledFee: Option[Double] = None,
+                   avgFilledPrice: Option[Double] = None)
 
 object WsOrder {
 
-  def fromDomain(ao: AcceptedOrder, status: OrderStatus): WsOrder =
+  def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
+
+    val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
+    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
+
+    def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+
     WsOrder(
       ao.id,
       ao.order.timestamp.some,
@@ -32,15 +41,16 @@ object WsOrder {
       ao.order.assetPair.priceAsset.some,
       ao.order.orderType.some,
       ao.isMarket.some,
-      ao.price.some,
-      ao.order.amount.some,
-      ao.order.matcherFee.some,
+      ao.price.some.map(denormalizePrice),
+      ao.order.amount.some.map(denormalizeAmountAndFee),
+      ao.order.matcherFee.some.map(denormalizeAmountAndFee),
       ao.feeAsset.some,
       status.name.some,
-      ao.fillingInfo.filledAmount.some,
-      ao.fillingInfo.filledFee.some,
-      ao.fillingInfo.avgFilledPrice.some
+      ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee),
+      ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee),
+      ao.fillingInfo.avgFilledPrice.some.map(denormalizePrice)
     )
+  }
 
   val isMarketFormat: Format[Boolean] = Format(
     {
@@ -73,19 +83,19 @@ object WsOrder {
 
   implicit val format: Format[WsOrder] =
     (
-      (JsPath \ "i").format[Order.Id] and                            // id
-        (JsPath \ "t").formatNullable[Long] and                      // timestamp
-        (JsPath \ "A").formatNullable[Asset] and                     // amount asset
-        (JsPath \ "P").formatNullable[Asset] and                     // price asset
-        (JsPath \ "S").formatNullable[OrderType] and                 // side: BUY or SELL
-        (JsPath \ "T").formatNullable[Boolean](isMarketFormat) and   // type: MARKET or LIMIT
-        (JsPath \ "p").formatNullable[Long] and                      // price
-        (JsPath \ "a").formatNullable[Long] and                      // amount
-        (JsPath \ "f").formatNullable[Long] and                      // fee
-        (JsPath \ "F").formatNullable[Asset] and                     // fee asset
-        (JsPath \ "s").formatNullable[String](orderStatusFormat) and // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
-        (JsPath \ "q").formatNullable[Long] and                      // filled amount
-        (JsPath \ "Q").formatNullable[Long] and                      // filled fee
-        (JsPath \ "r").formatNullable[Long]                          // average filled price among all trades
+      (JsPath \ "i").format[Order.Id] and                               // id
+        (JsPath \ "t").formatNullable[Long] and                         // timestamp
+        (JsPath \ "A").formatNullable[Asset] and                        // amount asset
+        (JsPath \ "P").formatNullable[Asset] and                        // price asset
+        (JsPath \ "S").formatNullable[OrderType] and                    // side: BUY or SELL
+        (JsPath \ "T").formatNullable[Boolean](isMarketFormat) and      // type: MARKET or LIMIT
+        (JsPath \ "p").formatNullable[Double](doubleAsStringFormat) and // price
+        (JsPath \ "a").formatNullable[Double](doubleAsStringFormat) and // amount
+        (JsPath \ "f").formatNullable[Double](doubleAsStringFormat) and // fee
+        (JsPath \ "F").formatNullable[Asset] and                        // fee asset
+        (JsPath \ "s").formatNullable[String](orderStatusFormat) and    // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
+        (JsPath \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
+        (JsPath \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
+        (JsPath \ "r").formatNullable[Double](doubleAsStringFormat)     // average filled price among all trades
     )(WsOrder.apply, unlift(WsOrder.unapply))
 }

@@ -4,7 +4,9 @@ import akka.actor.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrder
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
 import scala.collection.immutable.Queue
@@ -44,16 +46,20 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
       }
     )
 
-  def putOrderFillingInfoAndStatusUpdate(id: Order.Id, fillingInfo: AcceptedOrder.FillingInfo, newStatus: OrderStatus): AddressWsMutableState = {
+  def putOrderFillingInfoAndStatusUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): AddressWsMutableState = {
+
+    val ad = efc.assetDecimals(ao.order.assetPair.amountAsset)
+    val pd = efc.assetDecimals(ao.order.assetPair.priceAsset)
+
     putOrderUpdate(
-      id = id,
+      id = ao.id,
       update = ordersChanges
-        .getOrElse(id, WsOrder(id))
+        .getOrElse(ao.id, WsOrder(ao.id))
         .copy(
           status = newStatus.name.some,
-          filledAmount = fillingInfo.filledAmount.some,
-          filledFee = fillingInfo.filledFee.some,
-          avgFilledPrice = fillingInfo.avgFilledPrice.some
+          filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
+          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, ad).toDouble),
+          avgFilledPrice = ao.fillingInfo.avgFilledPrice.some.map(denormalizePrice(_, ad, pd).toDouble)
         )
     )
   }

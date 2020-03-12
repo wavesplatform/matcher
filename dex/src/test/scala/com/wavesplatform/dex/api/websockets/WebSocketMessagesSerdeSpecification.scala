@@ -1,6 +1,8 @@
 package com.wavesplatform.dex.api.websockets
 
 import com.softwaremill.diffx.Diff
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalacheck.Gen
@@ -10,6 +12,8 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.Format
 
 class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
+
+  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
   private val wsBalancesGen = for {
     tradable <- maxWavesAmountGen

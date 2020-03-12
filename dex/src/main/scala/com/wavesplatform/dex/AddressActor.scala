@@ -15,7 +15,7 @@ import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFee
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
@@ -275,15 +275,11 @@ class AddressActor(owner: Address,
     context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, PrepareDiffForWsSubscribers)
   }
 
-  private def denormalize(value: Long, asset: Asset): Double = Denormalization.denormalizeAmountAndFee(value, efc assetDecimals asset).toDouble
-
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
     val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)
     spendableBalances.keySet.map { asset =>
-      asset -> WsBalances(
-        tradable = denormalize(tradableBalance.getOrElse(asset, 0), asset),
-        reserved = denormalize(openVolume.getOrElse(asset, 0), asset)
-      )
+      val balanceValue: Map[Asset, Long] => Double = source => denormalizeAmountAndFee(source.getOrElse(asset, 0), efc assetDecimals asset).toDouble
+      asset -> WsBalances(balanceValue(tradableBalance), balanceValue(openVolume))
     }(collection.breakOut)
   }
 
@@ -394,7 +390,7 @@ class AddressActor(owner: Address,
 
     addressWsMutableState = {
       if (sendFullOrderInfo) addressWsMutableState.putOrderUpdate(ao.id, WsOrder.fromDomain(ao, status))
-      else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(ao.id, ao.fillingInfo, status)
+      else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(ao, status)
     }.putReservedAssets(previousReservableBalance.keySet)
   }
 

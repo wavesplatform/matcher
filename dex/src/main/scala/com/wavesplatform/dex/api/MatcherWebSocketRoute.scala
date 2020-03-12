@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -91,7 +91,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
   private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
     signedGet("as", publicKey) {
-      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.cancelled[Message], accountUpdatesSource(publicKey)))
+      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, accountUpdatesSource(publicKey)))
     }
   }
 

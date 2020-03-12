@@ -101,7 +101,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         assertAddressStateSnapshot(
           connection = wsac,
           expectedSnapshot = WsAddressState(
-            balances = Map(Waves -> WsBalances(100.waves, 0), btc -> WsBalances(1.btc, 0)),
+            balances = Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
             orders = Seq.empty
           )
         )
@@ -123,10 +123,10 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
           ordersChangesCount = 4,
           expectedBalanceChanges = squashBalanceChanges(
             Seq(
-              Map(btc   -> WsBalances(tradable = 0.99988597.btc, reserved = 0.00011403.btc)), // reserve
-              Map(Waves -> WsBalances(tradable = 98.997.waves, reserved = 1.003.waves)), // reserve
-              Map(btc   -> WsBalances(tradable = 1.btc, reserved = 0)), // cancel
-              Map(Waves -> WsBalances(tradable = 100.waves, reserved = 0)) // cancel
+              Map(btc   -> WsBalances(tradable = 0.99988597, reserved = 0.00011403)), // reserve
+              Map(Waves -> WsBalances(tradable = 98.997, reserved = 1.003)), // reserve
+              Map(btc   -> WsBalances(tradable = 1, reserved = 0)), // cancel
+              Map(Waves -> WsBalances(tradable = 100, reserved = 0)) // cancel
             )
           ),
           expectedOrdersChanges = Seq(
@@ -150,7 +150,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         assertAddressStateSnapshot(
           connection = wsac,
           expectedSnapshot = WsAddressState(
-            balances = Map(Waves -> WsBalances(100.waves, 0), btc -> WsBalances(1.btc, 0), usd -> WsBalances(200.usd, 0)),
+            balances = Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0), usd -> WsBalances(200, 0)),
             orders = Seq.empty
           )
         )
@@ -170,11 +170,11 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
           ordersChangesCount = 2,
           expectedBalanceChanges = squashBalanceChanges(
             Seq(
-              Map(usd   -> WsBalances(200.usd, 0)), // transfer
-              Map(usd   -> WsBalances(164.usd, 36.usd), btc -> WsBalances(0.99999966.btc, 0.00000034.btc)), // reserve
-              Map(usd   -> WsBalances(164.usd, 18.usd), btc -> WsBalances(0.99999966.btc, 0.00000017.btc)), // execution
-              Map(Waves -> WsBalances(106.waves, 0)), // execution
-              Map(usd   -> WsBalances(182.usd, 0), btc -> WsBalances(0.99999983.btc, 0)) // cancelling
+              Map(usd   -> WsBalances(200, 0)), // transfer
+              Map(usd   -> WsBalances(164, 36), btc -> WsBalances(0.99999966, 0.00000034)), // reserve
+              Map(usd   -> WsBalances(164, 18), btc -> WsBalances(0.99999966, 0.00000017)), // execution
+              Map(Waves -> WsBalances(106, 0)), // execution
+              Map(usd   -> WsBalances(182, 0), btc -> WsBalances(0.99999983, 0)) // cancelling
             )
           ),
           expectedOrdersChanges = Seq(

@@ -112,7 +112,8 @@ class ReservedBalanceSpecification
               _ => Future.successful(false),
               _ => Future.failed(new IllegalStateException("Should not be used in the test")),
               orderBookCache = _ => AggregatedSnapshot(),
-              enableSchedules
+              enableSchedules,
+              100
             )
         ),
         None
@@ -500,7 +501,8 @@ class ReservedBalanceSpecification
                   Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
                 },
                 orderBookCache = orderBookCache,
-                enableSchedules
+                enableSchedules,
+                100
               )
           ),
           None

@@ -34,7 +34,8 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             _ => Future.successful(false),
             e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
             _ => OrderBook.AggregatedSnapshot(),
-            true
+            true,
+            100
           )
         )
       )

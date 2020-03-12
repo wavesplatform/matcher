@@ -229,7 +229,8 @@ class AddressActorSpecification
               Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
             },
             _ => OrderBook.AggregatedSnapshot(),
-            false
+            false,
+            100
           )
         )
       )

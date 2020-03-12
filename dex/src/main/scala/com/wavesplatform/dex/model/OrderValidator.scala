@@ -46,7 +46,6 @@ object OrderValidator extends ScorexLogging {
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
   val MinExpiration: Long  = 60 * 1000L
-  val MaxActiveOrders: Int = 200
 
   val exchangeTransactionCreationFee: Long = 30000L
   val ScriptExtraFee                       = 400000L

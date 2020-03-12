@@ -356,7 +356,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     def mkAliceOrder(i: Int, tpe: OrderType) = mkOrder(alice, pair, tpe, 100L + i, Order.PriceConstant)
 
-    val orders = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+    val orders = (1 to (OrderDB.maxOrders + 5)).flatMap { i =>
       List(
         mkAliceOrder(i, OrderType.BUY),
         mkAliceOrder(i, OrderType.SELL)

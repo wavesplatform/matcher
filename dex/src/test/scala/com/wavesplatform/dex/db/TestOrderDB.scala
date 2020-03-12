@@ -26,13 +26,10 @@ class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
 
   override def saveOrder(o: Order): Unit = knownOrders += o.id() -> o
 
-  override def loadRemainingOrders(owner: Address,
-                                   maybePair: Option[AssetPair],
-                                   activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
-    activeOrders ++ (for {
+  override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
+    (for {
       id   <- maybePair.fold(idsForAddress(owner))(p => idsForPair(owner -> p))
       info <- orderInfo.get(id)
     } yield id -> info)
       .sortBy { case (_, oi) => -oi.timestamp }
-      .take(maxOrdersPerRequest - activeOrders.length)
 }

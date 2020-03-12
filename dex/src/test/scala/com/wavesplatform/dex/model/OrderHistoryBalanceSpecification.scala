@@ -596,7 +596,7 @@ class OrderHistoryBalanceSpecification
 
   property("History with more than max limit") {
     val pk = KeyPair("private".getBytes("utf-8"))
-    val origOrders = (0 until matcherSettings.maxOrdersPerRequest).map { i =>
+    val origOrders = (0 until matcherSettings.orderDb.maxOrders).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
       o
@@ -616,14 +616,14 @@ class OrderHistoryBalanceSpecification
       // 'last' is canceled. It should be moved to the end of all orders' list, but it doesn't fit. So we remove it
       val expectedAllOrders = origOrders.init.reverse :+ newOrder
       val actualAllOrders   = allOrderIds(pk)
-      actualAllOrders should have length matcherSettings.maxOrdersPerRequest
+      actualAllOrders should have length matcherSettings.orderDb.maxOrders
       actualAllOrders shouldBe expectedAllOrders.map(_.id())
     }
   }
 
   property("History with canceled order and more than max limit") {
     val pk = KeyPair("private".getBytes("utf-8"))
-    val origOrders = (0 to matcherSettings.maxOrdersPerRequest).map { i =>
+    val origOrders = (0 to matcherSettings.orderDb.maxOrders).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), ntpTime.getTimestamp()))
       o
@@ -638,7 +638,7 @@ class OrderHistoryBalanceSpecification
       // 'last' is removed, because it doesn't fit in 'matcherSettings.maxOrdersPerRequest'
       val expectedAllOrders = origOrders.init.reverse
       val actualAllOrders   = allOrderIds(pk)
-      actualAllOrders should have length matcherSettings.maxOrdersPerRequest
+      actualAllOrders should have length matcherSettings.orderDb.maxOrders
       allOrderIds(pk) shouldBe expectedAllOrders.map(_.id())
     }
   }

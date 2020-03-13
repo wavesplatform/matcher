@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, WithDB}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -418,6 +419,7 @@ class MatcherActorSpecification
         ob,
         (assetPair, matcher) =>
           OrderBookActor.props(
+            OrderBookActor.Settings(100.millis),
             matcher,
             addressActor,
             snapshotStoreActor,
@@ -425,6 +427,7 @@ class MatcherActorSpecification
             _ => {},
             _ => {},
             time,
+            new WsOrderBook.Update(8, 8),
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
             _ => MatchingRule.DefaultRule,

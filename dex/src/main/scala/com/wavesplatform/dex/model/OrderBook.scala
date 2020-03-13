@@ -19,39 +19,42 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
   def allOrders: Iterator[LimitOrder] = (bids.valuesIterator ++ asks.valuesIterator).flatten
 
-  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event]) = {
+  def cancel(orderId: ByteStr, timestamp: Long): (OrderBook, Option[Event], LevelAmounts) = {
     def mkEvent(lo: LimitOrder): Option[OrderCanceled] = Some(OrderCanceled(lo, isSystemCancel = false, timestamp))
-    orderIds.get(orderId).fold((this, Option.empty[OrderCanceled])) {
+
+    orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], LevelAmounts.empty)) {
       case (orderType, price) =>
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedAsks))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedBids))
         }
     }
   }
 
-  def cancelAll(ts: Long): (OrderBook, List[OrderCanceled]) = {
+  def cancelAll(ts: Long): (OrderBook, List[OrderCanceled], LevelAmounts) = {
     val canceledOrders = allOrders.map { OrderCanceled(_, isSystemCancel = false, ts) }.toList
-    (OrderBook.empty, canceledOrders)
+    (OrderBook.empty, canceledOrders, LevelAmounts.empty)
   }
 
   def add(submitted: AcceptedOrder,
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
-          tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event]) =
+          tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event], LevelAmounts) =
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, this)
-    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)))
+    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 
   override def toString: String = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 
-  def best(tpe: OrderType): Option[(Price, LimitOrder)] = tpe.askBid(asks.best, bids.best)
+  def side(tpe: OrderType): Side = tpe.askBid(asks, bids)
+
+  def best(tpe: OrderType): Option[(Price, LimitOrder)] = side(tpe).best
 
   private def unsafeWithoutBest(tpe: OrderType): OrderBook = tpe.askBid(
     {
@@ -78,14 +81,13 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
       copy(bids = bids.put(levelPrice, lo), orderIds = updatedOrderIds)
     )
   }
+
+  // TODO Remove during optimization
+  private def levelAmountsAt(tpe: OrderType, levelPrice: Price): LevelAmounts =
+    LevelAmounts(tpe, levelPrice, side(tpe))
 }
 
 object OrderBook {
-
-  final implicit class OrderTypeOps(val self: OrderType) extends AnyVal {
-    def askBid[T](ifAsk: => T, ifBid: => T): T = if (self == OrderType.SELL) ifAsk else ifBid
-    def opposite: OrderType                    = askBid(OrderType.BUY, OrderType.SELL)
-  }
 
   /**
     * Corrects order price by the tick size in favor of the client.
@@ -106,9 +108,12 @@ object OrderBook {
                       tickSize: Long,
                       getMakerTakerMaxFee: (AcceptedOrder, LimitOrder) => (Long, Long),
                       submitted: AcceptedOrder,
-                      orderBook: OrderBook): (OrderBook, Queue[Event]) = {
+                      orderBook: OrderBook): (OrderBook, Queue[Event], LevelAmounts) = {
     @scala.annotation.tailrec
-    def loop(orderBook: OrderBook, submitted: AcceptedOrder, events: Queue[Event]): (OrderBook, Queue[Event]) =
+    def loop(orderBook: OrderBook,
+             submitted: AcceptedOrder,
+             events: Queue[Event],
+             levelChanges: LevelAmounts): (OrderBook, Queue[Event], LevelAmounts) =
       orderBook.best(submitted.order.orderType.opposite) match {
         case Some((levelPrice, counter)) if overlaps(submitted, levelPrice) =>
           if (counter.order.isValid(eventTs)) {
@@ -126,41 +131,48 @@ object OrderBook {
               else ob.unsafeWithoutBest(counter.order.orderType)
             }
 
+            // TODO replace by levelChanges.subtract(levelPrice, orderExecutedEvent) during optimization
+            val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(counter.order.orderType, levelPrice))
+
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
                 // if submitted is not filled (e.g. LimitOrder: rounding issues, MarkerOrder: afs = 0) cancel its remaining
-                (
-                  updatedOrderBook,
-                  updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs))
-                )
+                (updatedOrderBook, updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)), updatedLevelChanges)
               else
                 submittedRemaining match {
-                  case submittedRemaining: LimitOrder => loop(updatedOrderBook, submittedRemaining, updatedEvents)
+                  case submittedRemaining: LimitOrder => loop(updatedOrderBook, submittedRemaining, updatedEvents, updatedLevelChanges)
                   case submittedRemaining: MarketOrder =>
                     val canSpendMore = submittedRemaining.availableForSpending > 0
-                    if (canSpendMore) loop(updatedOrderBook, submittedRemaining, updatedEvents)
-                    else (updatedOrderBook, updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)))
+                    if (canSpendMore) loop(updatedOrderBook, submittedRemaining, updatedEvents, updatedLevelChanges)
+                    else
+                      (updatedOrderBook,
+                       updatedEvents.enqueue(OrderCanceled(submittedRemaining, isSystemCancel = true, eventTs)),
+                       updatedLevelChanges)
                 }
-            } else (updatedOrderBook, updatedEvents)
+            } else (updatedOrderBook, updatedEvents, updatedLevelChanges)
           } else
             loop(
               orderBook = orderBook.unsafeWithoutBest(counter.order.orderType),
               submitted = submitted,
-              events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs))
+              events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs)),
+              levelChanges = levelChanges
             )
 
         case _ =>
           submitted match {
             case submitted: LimitOrder =>
               val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-              (orderBook.insert(levelPrice, submitted), events.enqueue(OrderAdded(submitted, eventTs)))
+              val updatedOrderBook = orderBook.insert(levelPrice, submitted)
+              // TODO replace by levelChanges.add(levelPrice, submitted) during optimization
+              val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(submitted.order.orderType, levelPrice))
+              (updatedOrderBook, events.enqueue(OrderAdded(submitted, eventTs)), updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
-              (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)))
+              (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)
           }
       }
 
-    loop(orderBook, submitted, Queue.empty)
+    loop(orderBook, submitted, Queue.empty, LevelAmounts.empty)
   }
 
   private def formatSide(side: Side): String =

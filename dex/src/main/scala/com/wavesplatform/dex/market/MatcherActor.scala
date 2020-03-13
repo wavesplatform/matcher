@@ -180,6 +180,11 @@ class MatcherActor(settings: MatcherSettings,
       val s       = sender()
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
+    case request @ AddWsSubscription(pair) =>
+      runFor(pair, autoCreate = false) { (sender, ref) =>
+        ref.tell(request, sender)
+      }
+
     case ForceSaveSnapshots => context.children.foreach(_ ! SaveSnapshot(lastProcessedNr))
   }
 
@@ -293,6 +298,7 @@ object MatcherActor {
 
   case class ForceStartOrderBook(assetPair: AssetPair)
   case class OrderBookCreated(assetPair: AssetPair)
+  case class AddWsSubscription(assetPair: AssetPair)
 
   case object GetMarkets
 

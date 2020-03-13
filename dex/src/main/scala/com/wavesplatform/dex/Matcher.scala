@@ -13,6 +13,7 @@ import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
@@ -120,6 +121,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
+      OrderBookActor.Settings(settings.webSocketSettings.messagesInterval),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,
@@ -127,6 +129,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       updateOrderBookCache(assetPair),
       marketStatuses.put(assetPair, _),
       time,
+      wsUpdates = new WsOrderBook.Update(assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset)),
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
@@ -228,7 +231,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute(addressActors)
+      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder)
     )
   }
 

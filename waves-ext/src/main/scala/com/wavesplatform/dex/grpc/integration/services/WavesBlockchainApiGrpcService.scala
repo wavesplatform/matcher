@@ -122,6 +122,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     RunScriptResponse(r)
   }
 
+  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
+    val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
+    val assetId = request.assetId.toVanillaAsset
+    SpendableAssetBalanceResponse(context.utx.spendableBalance(addr, assetId))
+  }
+
   override def spendableAssetsBalances(request: SpendableAssetsBalancesRequest): Future[SpendableAssetsBalancesResponse] = Future {
 
     val address = Address.fromBytes(request.address.toVanilla).explicitGetErr()
@@ -164,16 +170,16 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     }
   }
 
-  override def allAssetsSpendableBalance(request: AddressRequest): Future[SpendableAssetsBalancesResponse] = {
+  override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
     import com.wavesplatform.state.Portfolio.monoid
     Future {
 
       val address              = request.address.toVanillaAddress
       val pessimisticPortfolio = context.blockchain.portfolio(address) |+| context.utx.pessimisticPortfolio(address)
 
-      SpendableAssetsBalancesResponse(
+      AllAssetsSpendableBalanceResponse(
         (pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)).map {
-          case (a, b) => SpendableAssetsBalancesResponse.Record(a.toPB, b)
+          case (a, b) => AllAssetsSpendableBalanceResponse.Record(a.toPB, b)
         }.toSeq
       )
     }

@@ -274,6 +274,11 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     }
   }
 
+  "spendableBalance" in {
+    wait(client.spendableBalance(bob, Waves)) shouldBe 494994799299998L
+    wait(client.spendableBalance(bob, randomIssuedAsset)) shouldBe 0L
+  }
+
   "spendableBalances" in {
     val issuedAsset = randomIssuedAsset
     wait { client.spendableBalances(bob, Set(Waves, issuedAsset)) } should matchTo(Map(Waves -> 494994799299998L, issuedAsset -> 0L))

@@ -8,13 +8,13 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatus => ResponseOrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import play.api.libs.json.Json
 
-import scala.collection.immutable.{Queue, TreeMap}
+import scala.collection.immutable.TreeMap
 
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
@@ -109,7 +109,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Seq(buyOrder, sellOrder).foreach { o =>
           dex1.api.cancel(carol, o)
-          dex1.api.waitForOrderStatus(o, ResponseOrderStatus.Cancelled)
+          dex1.api.waitForOrderStatus(o, ApiOrderStatus.Cancelled)
         }
 
         assertAddressStateChanges(
@@ -157,7 +157,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         placeAndAwaitAtNode(buyOrder)
 
         dex1.api.cancel(carol, buyOrder)
-        dex1.api.waitForOrderStatus(buyOrder, ResponseOrderStatus.Cancelled)
+        dex1.api.waitForOrderStatus(buyOrder, ApiOrderStatus.Cancelled)
 
         assertAddressStateChanges(
           connection = wsac,
@@ -186,8 +186,6 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         wsac.close()
       }
-
-      wsc.close()
     }
 
     "orderbook" - {
@@ -196,7 +194,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
         placeAndAwaitAtDex(firstOrder)
         dex1.api.cancelAll(carol)
-        dex1.api.waitForOrderStatus(firstOrder, OrderStatus.Cancelled)
+        dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
 
         markup("No orders")
         val wsc0    = createOrderBookWsConnection(wavesBtcPair)
@@ -242,7 +240,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         markup("Two orders and trade")
 
-        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), OrderStatus.Filled)
+        placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Filled)
 
         val wsc3    = createOrderBookWsConnection(wavesBtcPair)
         val buffer3 = receiveAtLeastN(wsc3, 1)
@@ -297,7 +295,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
         placeAndAwaitAtDex(firstOrder)
         dex1.api.cancelAll(carol)
-        dex1.api.waitForOrderStatus(firstOrder, OrderStatus.Cancelled)
+        dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
 
         val wsc = createOrderBookWsConnection(wavesBtcPair)
         receiveAtLeastN(wsc, 1)
@@ -317,7 +315,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         markup("An execution and adding a new order")
         val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
-        placeAndAwaitAtDex(order, OrderStatus.PartiallyFilled)
+        placeAndAwaitAtDex(order, ApiOrderStatus.PartiallyFilled)
 
         val buffer2 = receiveAtLeastN(wsc, 1)
         buffer2.size should (be >= 1 and be <= 2)
@@ -334,7 +332,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         wsc.clearMessagesBuffer()
 
         dex1.api.cancelAll(carol)
-        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+        dex1.api.waitForOrderStatus(order, ApiOrderStatus.Cancelled)
 
         val buffer3 = receiveAtLeastN(wsc, 1)
         buffer3.size shouldBe 1
@@ -357,7 +355,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
       )
   }
 
-  private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Queue[T] = {
+  private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Seq[T] = {
     eventually {
       wsc.getMessagesBuffer.size should be >= n
     }

@@ -10,7 +10,6 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
-import scala.collection.immutable.Queue
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}

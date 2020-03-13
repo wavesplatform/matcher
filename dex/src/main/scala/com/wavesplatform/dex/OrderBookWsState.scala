@@ -9,11 +9,9 @@ import scala.collection.immutable.Queue
 case class OrderBookWsState(update: WsOrderBook.Update, wsConnections: Queue[ActorRef], changes: WsOrderBook) {
   def addSubscription(x: ActorRef): OrderBookWsState = copy(wsConnections = wsConnections.enqueue(x))
 
-  def withoutSubscription(x: ActorRef): OrderBookWsState = {
-    val updatedWsConnections = wsConnections.filterNot(_ == x)
-    if (wsConnections.isEmpty) copy(wsConnections = Queue.empty, changes = WsOrderBook.empty)
-    else copy(wsConnections = updatedWsConnections)
-  }
+  def withoutSubscription(x: ActorRef): OrderBookWsState =
+    if (wsConnections.lengthCompare(1) == 0) copy(wsConnections = Queue.empty, changes = WsOrderBook.empty)
+    else copy(wsConnections = wsConnections.filterNot(_ == x))
 
   def withoutSubscriptions: OrderBookWsState = copy(wsConnections = Queue.empty)
 

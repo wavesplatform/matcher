@@ -2,6 +2,7 @@ package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
 
+import akka.Done
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.ws.TextMessage
@@ -24,6 +25,7 @@ import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder}
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Path("/ws")
@@ -53,7 +55,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
       .map(wsAddressState => TextMessage.Strict(WsAddressState.format.writes(wsAddressState).toString))
       .mapMaterializedValue { sourceActor =>
         addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription), sourceActor)
+        sourceActor
       }
+      .watchTermination()(handleTermination)
 
   private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, Unit] =
     Source
@@ -68,15 +72,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
         matcher.tell(MatcherActor.AddWsSubscription(pair), sourceActor)
         sourceActor
       }
-      .watchTermination() {
-        case (actorRef, r) =>
-          r.onComplete {
-            case Success(_) =>
-              log.trace(s"[${actorRef.hashCode()}] WebSocket connection successfully closed")
-            case Failure(e) =>
-              log.trace(s"[${actorRef.hashCode()}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
-          }(mat.executionContext)
-      }
+      .watchTermination()(handleTermination)
 
   private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters(('Timestamp, 'Signature)).tflatMap {
     case (timestamp, signature) =>
@@ -111,4 +107,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
       case Left(e)  => complete { formatError(e) }
     }
   }
+
+  private def handleTermination(actorRef: ActorRef, r: Future[Done]): Unit =
+    r.onComplete {
+      case Success(_) =>
+        log.trace(s"[${actorRef.hashCode()}] WebSocket connection successfully closed")
+      case Failure(e) =>
+        log.trace(s"[${actorRef.hashCode()}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
+    }(mat.executionContext)
 }

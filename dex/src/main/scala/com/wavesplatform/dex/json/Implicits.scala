@@ -10,12 +10,8 @@ object Implicits {
       self
         .formatNullable[T]
         .inmap[T](
-          {
-            case None    => mayBeEmpty.empty
-            case Some(x) => x
-          }, { x =>
-            if (mayBeEmpty.isEmpty(x)) None else Some(x)
-        }
-      )
+          _.fold(mayBeEmpty.empty)(identity),
+          Option(_).filterNot(mayBeEmpty.isEmpty)
+        )
   }
 }

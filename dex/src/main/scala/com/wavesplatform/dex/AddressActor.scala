@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef, Cancellable, Status}
 import akka.pattern.pipe
 import cats.instances.future.catsStdInstancesForFuture
 import cats.instances.long.catsKernelStdGroupForLong
+import cats.kernel.Group
 import cats.syntax.functor.toFunctorOps
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
@@ -19,6 +20,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
+import com.wavesplatform.dex.fp.MapImplicits
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -128,7 +130,7 @@ class AddressActor(owner: Address,
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume)
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets)(MapImplicits.group).map(Reply.Balance).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
@@ -280,11 +282,10 @@ class AddressActor(owner: Address,
                          orderBookCache)(acceptedOrder)
   }
 
-  private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
+  private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] =
     Future
       .traverse(forAssets)(asset => spendableBalance(asset) tupleLeft asset)
-      .map(xs => (xs.toMap |-| openVolume).withDefaultValue(0L))
-  }
+      .map(xs => (xs.toMap |-| openVolume.filterKeys(forAssets.contains)).withDefaultValue(0L))
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
     val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)

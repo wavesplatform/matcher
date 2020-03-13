@@ -223,4 +223,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       )
     }
   }
+
+  override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
+    NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
+  }
 }

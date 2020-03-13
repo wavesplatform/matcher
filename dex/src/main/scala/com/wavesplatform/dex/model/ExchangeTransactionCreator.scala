@@ -4,9 +4,8 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.error.ValidationError
-import com.wavesplatform.dex.domain.error.ValidationError.ActivationError
-import com.wavesplatform.dex.domain.order.{Order, OrderV1}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.ExchangeTransactionCreator._
@@ -74,20 +73,7 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
 
     // matcher always pays fee to the miners in Waves
     val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
-
-    if (buy.version >= 2 || sell.version >= 2) {
-      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
-    } else
-      for {
-        v1Buy  <- toV1(buy)
-        v1Sell <- toV1(sell)
-        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, v1Buy, v1Sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
-      } yield tx
-  }
-
-  private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
-    case x: OrderV1 => Right(x)
-    case _          => Left(ActivationError("Smart Account Trading feature has not been activated yet"))
+    ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
   }
 }
 

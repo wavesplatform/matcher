@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.domain.transaction.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
@@ -40,26 +40,19 @@ class ExchangeTransactionCreatorSpecification
   }
 
   "ExchangeTransactionCreator" should {
-    "create an ExchangeTransactionV1" in {
+    "create an ExchangeTransactionV2" when {
+      (List(1, 2, 3) ++ List(1, 2, 3)).combinations(2).foreach {
+        case List(counterVersion, submittedVersion) =>
+          s"counterVersion=$counterVersion, submittedVersion=$submittedVersion" in {
+            val counter   = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = counterVersion.toByte)
+            val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = submittedVersion.toByte)
 
-      val counter   = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L))
-      val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L))
+            val tc = getExchangeTransactionCreator()
+            val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
 
-      val tc = getExchangeTransactionCreator()
-      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
-
-      tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV1]
-    }
-
-    "create an ExchangeTransactionV2" in {
-
-      val counter   = buy(wavesBtcPair, 100000, 0.0008, matcherFee = Some(2000L), version = 2)
-      val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = 2)
-
-      val tc = getExchangeTransactionCreator()
-      val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
-
-      tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
+            tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
+          }
+      }
     }
   }
 

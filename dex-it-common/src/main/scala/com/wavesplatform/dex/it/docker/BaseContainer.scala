@@ -6,7 +6,7 @@ import java.nio.file._
 
 import cats.Id
 import com.dimafeng.testcontainers.GenericContainer
-import com.github.dockerjava.api.exception.NotFoundException
+import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedException}
 import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
 import com.github.dockerjava.core.command.ExecStartResultCallback
 import com.typesafe.config.Config
@@ -105,15 +105,20 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     printState()
     log.debug(s"$prefix Stopping...")
 
-    dockerClient.stopContainerCmd(underlying.containerId).withTimeout(20).exec()
-    Iterator
-      .continually {
-        Thread.sleep(1000)
-        dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
-      }
-      .zipWithIndex
-      .find { case (state, attempt) => !state.getRunning || attempt == 20 }
-      .fold(log.warn(s"Can't stop ${underlying.containerId}"))(_ => ())
+    try {
+      dockerClient.stopContainerCmd(underlying.containerId).withTimeout(20).exec()
+      Iterator
+        .continually {
+          Thread.sleep(1000)
+          dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
+        }
+        .zipWithIndex
+        .find { case (state, attempt) => !state.getRunning || attempt == 20 }
+        .fold(log.warn(s"Can't stop ${underlying.containerId}"))(_ => ())
+    } catch {
+      case e: NotModifiedException => log.warn(s"$prefix Can't stop", e)
+      case e: Throwable            => throw e
+    }
   }
 
   private def sendStartCmd(): Unit = dockerClient.startContainerCmd(underlying.containerId).exec()

@@ -6,6 +6,7 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 import scala.collection.JavaConverters._
 
 trait HasToxiProxy { self: BaseContainersKit =>
+
   protected val toxiProxyHostName = s"$networkName-toxiproxy"
 
   private val container: ToxiproxyContainer = new ToxiproxyContainer()

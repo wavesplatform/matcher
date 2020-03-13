@@ -80,6 +80,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryLastOffset: F[Either[MatcherError, Long]]
   def tryOldestSnapshotOffset: F[Either[MatcherError, Long]]
   def tryAllSnapshotOffsets: F[Either[MatcherError, Map[AssetPair, Long]]]
+  def trySaveSnapshots: F[Either[MatcherError, Unit]]
 
   // TODO move
 
@@ -325,6 +326,10 @@ object DexApi {
 
       override def tryAllSnapshotOffsets: F[Either[MatcherError, Map[AssetPair, Long]]] =
         tryParseJson(sttp.get(uri"$apiUri/debug/allSnapshotOffsets").headers(apiKeyHeaders))
+
+      override def trySaveSnapshots: F[Either[MatcherError, Unit]] = tryUnit {
+        sttp.post(uri"$apiUri/debug/saveSnapshots").headers(apiKeyHeaders)
+      }
 
       override def waitReady: F[Unit] = {
         def request: F[Boolean] = M.handleErrorWith(tryAllOrderBooks.map(_.isRight)) {

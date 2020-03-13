@@ -5,6 +5,7 @@ import java.time.{Instant, Duration => JDuration}
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
 import cats.instances.long.catsKernelStdGroupForLong
+import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
@@ -19,6 +20,7 @@ import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFe
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
+import com.wavesplatform.dex.fp.MapImplicits
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
@@ -135,7 +137,7 @@ class AddressActor(owner: Address,
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume)
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets)(MapImplicits.group).map(Reply.Balance).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
@@ -338,11 +340,11 @@ class AddressActor(owner: Address,
                          orderBookCache)(acceptedOrder)
   }
 
-  private def getTradableBalance(forAssets: Set[Asset]): Future[Map[Asset, Long]] = {
+  private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map { _.state |-| openVolume.filterKeys(forAssets.contains) }
+      .map { xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).withDefaultValue(0L) }
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -473,7 +475,7 @@ class AddressActor(owner: Address,
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
-        case Success(None)        => log.trace(s"Order $orderId saved")
+        case Success(None)        => log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
 

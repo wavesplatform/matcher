@@ -1,6 +1,8 @@
 package com.wavesplatform.dex.time
 
 import java.net.{InetAddress, SocketTimeoutException}
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import monix.eval.Task
@@ -17,7 +19,17 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   private val RetryDelay           = 10.seconds
   private val ResponseTimeout      = 10.seconds
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread(name = "time-impl", executionModel = ExecutionModel.AlwaysAsyncExecution)
+  private val duringShutdown = new AtomicBoolean(false)
+
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread(
+    name = "time-impl",
+    daemonic = false,
+    executionModel = ExecutionModel.AlwaysAsyncExecution,
+    reporter = {
+      case _: RejectedExecutionException if duringShutdown.get() => // ignore
+      case e: Throwable                                          => log.error("An uncaught error", e)
+    }
+  )
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
@@ -26,7 +38,6 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   private val updateTask: Task[Unit] = {
     def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
-        client.open()
         val info = client.getTime(InetAddress.getByName(ntpServer))
         info.computeDetails()
         Option(info.getOffset).map { offset =>
@@ -39,8 +50,6 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
         case t: Throwable =>
           log.warn("Problems with NTP: ", t)
           None
-      } finally {
-        client.close()
       }
     }
 
@@ -68,9 +77,10 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     case _       =>
   }
 
-  override def close(): Unit = {
+  override def close(): Unit = if (duringShutdown.compareAndSet(false, true)) {
     log.info("Shutting down Time")
     taskHandle.cancel()
+    if (client.isOpen) client.close()
     scheduler.shutdown()
   }
 }

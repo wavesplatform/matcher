@@ -1,5 +1,8 @@
 package com.wavesplatform.dex.grpc.integration.services
 
+import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.syntax.either._
 import cats.syntax.monoid._
 import com.google.protobuf.ByteString
@@ -20,8 +23,10 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.stub.StreamObserver
-import monix.execution.Scheduler
+import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
+import io.grpc.{Status, StatusRuntimeException}
+import monix.eval.{Coeval, Task}
+import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
 
 import scala.concurrent.Future
@@ -31,6 +36,37 @@ import scala.util.control.NonFatal
 class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
+
+  // A clean logic requires more actions, see DEX-606
+  private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
+  private val cleanupTask: Task[Unit] = Task {
+    log.info("Closing balance changes stream...")
+    // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+    val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
+    balanceChangesSubscribers.forEach(_.onError(shutdownError))
+    balanceChangesSubscribers.clear()
+  }
+
+  private val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+    context.spendableBalanceChanged
+      .bufferTimed(balanceChangesBatchLingerMs)
+      .map { changesBuffer =>
+        val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+        vanillaBatch.map { case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
+      }
+      .filter(_.nonEmpty)
+      .map(BalanceChangesResponse.apply)
+      .doOnSubscriptionCancel(cleanupTask)
+      .doOnComplete(cleanupTask)
+      .foreach { x =>
+        balanceChangesSubscribers.forEach { subscriber =>
+          try subscriber.onNext(x)
+          catch {
+            case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e)
+          }
+        }
+      }
+  }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
@@ -51,7 +87,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap { _.toVanilla }
       .flatMap { tx =>
-        context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
+        if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
+        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }
@@ -148,13 +185,15 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     ForgedOrderResponse(isForged = seen)
   }
 
-  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
-    context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
-      val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
-      val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
-      if (pbBatch.nonEmpty) responseObserver.onNext(BalanceChangesResponse(pbBatch))
+  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit =
+    if (!balanceChanges().isCompleted) {
+      responseObserver match {
+        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => balanceChangesSubscribers.remove(x))
+        case x                              => log.warn(s"Can't register cancel handler for $x")
+      }
+
+      balanceChangesSubscribers.add(responseObserver)
     }
-  }
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
@@ -183,5 +222,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
         }.toSeq
       )
     }
+  }
+
+  override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
+    NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 }

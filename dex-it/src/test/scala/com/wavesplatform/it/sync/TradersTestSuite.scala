@@ -257,19 +257,20 @@ class TradersTestSuite extends MatcherSuiteBase {
           dex1.api.reservedBalance(bob) shouldBe Map(wct -> 400, newFeeAsset -> 1)
 
           broadcastAndAwait(mkTransfer(bob, alice, bobAssetQuantity, newFeeAsset, matcherFee))
+          val currHeight = wavesNode1.api.currentHeight
 
           withClue(s"The order '${bobOrder.idStr()}' was cancelled") {
             dex1.api.waitForOrderStatus(bobOrder, OrderStatus.Cancelled)
           }
+
+          dex1.api.cancelAll(alice)
+          dex1.api.cancelAll(bob)
+          wavesNode1.api.waitForHeight(currHeight + 1)
         }
       }
     }
 
     "DEX should consider pessimistic portfolio when obtains spendable balance" in {
-
-      dex1.api.cancelAll(alice)
-      dex1.api.cancelAll(bob)
-
       wavesNode1.restartWithNewSuiteConfig(
         ConfigFactory.parseString(
           s"""waves.miner {

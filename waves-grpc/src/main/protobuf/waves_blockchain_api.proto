@@ -35,6 +35,8 @@ service WavesBlockchainApi {
     rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
+
+    rpc GetNodeAddress (google.protobuf.Empty) returns (NodeAddressResponse);
 }
 
 // Common requests
@@ -176,6 +178,10 @@ message AllAssetsSpendableBalanceResponse {
         int64 balance = 2;
     }
     repeated Record balances = 1;
+}
+
+message NodeAddressResponse {
+    string address = 1;
 }
 
 // Other entities

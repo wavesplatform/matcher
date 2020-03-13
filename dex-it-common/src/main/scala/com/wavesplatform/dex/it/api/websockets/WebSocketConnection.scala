@@ -42,6 +42,7 @@ case class WebSocketConnection[Output](uri: String, parseOutput: Message => Outp
       }(materializer.executionContext)
       r
     }
+
   private val (_, closed) = Http().singleWebSocketRequest(WebSocketRequest(s"ws://$uri"), flow)
 
   def getMessagesBuffer: Seq[Output] = messagesBuffer.iterator().asScala.toSeq

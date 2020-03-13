@@ -29,6 +29,16 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
   def flushPendingConnections(): AddressWsMutableState =
     copy(activeWsConnections = activeWsConnections ++ pendingWsConnections, pendingWsConnections = Queue.empty)
 
+  def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
+    if (activeWsConnections.lengthCompare(1) == 0)
+      copy(activeWsConnections = Queue.empty,
+           changedReservableAssets = Set.empty,
+           changedSpendableAssets = Set.empty,
+           ordersChanges = Map.empty,
+           trackedOrders = Set.empty)
+    else copy(activeWsConnections = activeWsConnections.filterNot(_ == subscriber))
+  }
+
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
   def putSpendableAssets(diff: Set[Asset]): AddressWsMutableState = copy(changedSpendableAssets = changedSpendableAssets ++ diff)
 

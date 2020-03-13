@@ -2,7 +2,7 @@ package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
 
-import akka.actor.{Actor, ActorRef, Cancellable, Status}
+import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
@@ -233,9 +233,10 @@ class AddressActor(owner: Address,
     case Status.Failure(e) => log.error(s"Got $e", e)
 
     case AddWsSubscription =>
-      log.trace(s"Web socket subscription was requested")
+      log.trace(s"[${sender.hashCode()}] Web socket subscription was requested")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
       addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
+      context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       val snapshot =
@@ -269,6 +270,10 @@ class AddressActor(owner: Address,
       }
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
+
+    case Terminated(wsSource) =>
+      log.info(s"[${wsSource.hashCode()}] Web socket connection closed")
+      addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
   private def scheduleNextDiffSending: Cancellable = {

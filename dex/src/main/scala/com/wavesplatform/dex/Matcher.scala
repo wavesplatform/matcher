@@ -365,6 +365,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         Option(matcherServerBinding).fold[Future[HttpTerminated]](Future.successful(HttpServerTerminated))(_.terminate(1.second))
       }
       _ <- {
+        log.info("Shutting down actors...")
+        gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown)
+      }
+      _ <- {
         log.info("Shutting down gRPC client...")
         wavesBlockchainAsyncClient.close()
       }
@@ -375,10 +379,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       _ <- {
         log.info("Shutting down caches...")
         Future.successful(orderBooksSnapshotCache.close())
-      }
-      _ <- {
-        log.info("Shutting down actors...")
-        gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown)
       }
       _ <- {
         log.info("Shutting down materializer...")
@@ -476,8 +476,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         log.info(s"Last queue offset is $lastOffsetQueue")
         waitOffsetReached(lastOffsetQueue, deadline)
       }
+
+      connectedNodeAddress <- wavesBlockchainAsyncClient.getNodeAddress
     } yield {
       log.info("Last offset has been reached, notify addresses")
+      log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
       addressActors ! AddressDirectory.StartSchedules
     }
 

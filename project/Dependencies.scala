@@ -25,9 +25,10 @@ object Dependencies {
     val scopt          = "4.0.0-RC2"
     val ficus          = "1.4.7"
 
-    val logback = "1.2.3"
-    val slf4j   = "1.7.30"
-    val janino  = "3.1.0"
+    val logback            = "1.2.3"
+    val slf4j              = "1.7.30"
+    val janino             = "3.1.0"
+    val logbackJsonEncoder = "6.3"
 
     val silencer = "1.4.4"
 
@@ -43,10 +44,9 @@ object Dependencies {
 
     val sttp = "1.7.2"
 
-    val testContainers         = "0.34.3"
-    val testContainersPostgres = "1.12.4"
-
-    val toxiProxy = "1.12.4"
+    val testContainers          = "0.35.2"
+    val testContainersPostgres  = "1.12.5"
+    val testContainersToxiProxy = "1.12.5"
 
     val jackson  = "2.10.0"
     val playJson = "2.8.1"
@@ -63,8 +63,9 @@ object Dependencies {
 
     val supertagged = "1.4"
 
-    val levelDb  = "0.12"
-    val influxDb = "2.17"
+    val javaLevelDb = "0.12"
+    val jniLevelDb  = "1.18.3"
+    val influxDb    = "2.17"
 
     val commonsNet = "3.6"
   }
@@ -94,6 +95,7 @@ object Dependencies {
   private val scopt                = "com.github.scopt" %% "scopt" % Version.scopt
   private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
+  private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
   private val slf4j                = "org.slf4j" % "slf4j-api" % Version.slf4j
   private val julToSlf4j           = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
@@ -105,7 +107,7 @@ object Dependencies {
     ExclusionRule(organization = "io.grpc"),
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
-  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
+  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
@@ -116,7 +118,8 @@ object Dependencies {
   private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   private val monixReactive = monixModule("reactive")
   private val supertagged   = "org.rudogma" %% "supertagged" % Version.supertagged
-  private val levelDb       = "org.iq80.leveldb" % "leveldb" % Version.levelDb
+  private val javaLevelDb   = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
+  private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
 
@@ -141,7 +144,8 @@ object Dependencies {
     scalaTest,
     scalaCheck,
     scalaTestPlusCheck,
-    scalaMock
+    scalaMock,
+    javaLevelDb
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
@@ -182,6 +186,7 @@ object Dependencies {
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,
       logback,
+      logbackJsonEncoder % Runtime,
       kindProjector,
       catsTaglessMacros,
       shapeless,
@@ -189,7 +194,7 @@ object Dependencies {
       scopt,
       kafka,
       janino,
-      levelDb,
+      jniLevelDb,
       kamonCore,
       kamonModule("influxdb", Version.kamonInfluxDb),
       kamonModule("system-metrics", Version.kamonSystemMetrics),

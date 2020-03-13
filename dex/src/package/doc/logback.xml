@@ -35,8 +35,9 @@
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/>
 
     <!-- DEX Actors -->
-    <logger name="com.wavesplatform.matcher.market.OrderBookActor" level="INFO"/>
-    <logger name="com.wavesplatform.matcher.market.MatcherActor" level="TRACE"/>
+    <logger name="com.wavesplatform.dex.market.OrderBookActor" level="INFO"/>
+    <logger name="com.wavesplatform.dex.market.MatcherActor" level="TRACE"/>
+    <logger name="com.wavesplatform.dex.AddressActor" level="TRACE"/>
 
     <!-- REST API -->
     <logger name="io.swagger" level="INFO"/>

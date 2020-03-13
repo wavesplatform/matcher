@@ -4,6 +4,8 @@ import sbt.Keys._
 import sbt._
 import sbt.internal.inc.ReflectUtilities
 
+Global / resolvers += Resolver.bintrayRepo("ethereum", "maven") // JNI LevelDB
+
 // Scalafix
 scalafixDependencies in ThisBuild += "org.scalatest" %% "autofix" % "3.1.0.0"
 addCompilerPlugin(scalafixSemanticdb)

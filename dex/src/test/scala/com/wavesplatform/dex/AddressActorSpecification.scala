@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
+import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
+import com.wavesplatform.dex.AddressActor.Reply.Balance
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -16,6 +18,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -28,6 +31,7 @@ class AddressActorSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
+    with DiffMatcherWithImplicits
     with MatcherSpecBase {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
@@ -117,6 +121,19 @@ class AddressActorSpecification
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))))
           eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
         }
+      }
+    }
+
+    "return reservable balance without excess assets" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio)
+
+      addOrder(LimitOrder(sellTokenOrder1))
+
+      ref ! GetTradableBalance(Set(Waves))
+      expectMsgPF(hint = "Balance") {
+        case r: Balance => r should matchTo(Balance(Map(Waves -> 0L)))
+        case _          =>
       }
     }
 

@@ -2,21 +2,17 @@ package com.wavesplatform.it.sync.api
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsLastTrade, WsOrderBook}
-import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsLastTrade, WsOrder, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketConnection}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ResponseOrderStatus}
-import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatus => ResponseOrderStatus}
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
+import play.api.libs.json.Json
 
 import scala.collection.immutable.{Queue, TreeMap}
 
@@ -75,7 +71,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
   }
 
   "Connection should be established" in {
-    val wsc = createAccountUpdatesWsConnection(alice)
+    val wsc = mkWebSocketAuthenticatedConnection(alice, dex1)
     wsc.close()
     wsc.getMessagesBuffer.foreach { x =>
       x.balances should not be empty

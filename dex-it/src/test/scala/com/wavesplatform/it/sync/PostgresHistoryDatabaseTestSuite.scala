@@ -104,6 +104,11 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     dex1.api.upsertRate(usd, 0.5)
   }
 
+  override def afterEach(): Unit = {
+    super.afterEach()
+    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+  }
+
   private lazy val ctx =
     new PostgresJdbcContext(
       SnakeCase,
@@ -179,7 +184,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
         EventBriefInfo(r.orderId, r.eventType, r.filled.toDouble, r.totalFilled.toDouble, r.feeFilled.toDouble, r.feeTotalFilled.toDouble, r.status)
       }
 
-  "Order history should save all orders and events" in {
+  "Postgres order history should save all orders and events" in {
     val ordersCount = OrderValidator.MaxActiveOrders
 
     (1 to ordersCount)
@@ -194,7 +199,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events: 1 big counter and 2 small submitted" in {
+  "Postgres order history should correctly save events: 1 big counter and 2 small submitted" in {
 
     def sellOrder: Order = mkOrderDP(bob, wctUsdPair, SELL, 100.wct, 0.35, matcherFee = 0.00000030.btc, feeAsset = btc)
     val buyOrder         = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
@@ -263,7 +268,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events with Waves as amount and fee" in {
+  "Postgres order history should correctly save events with Waves as amount and fee" in {
     val buyOrder  = mkOrderDP(alice, wavesUsdPair, BUY, 300.waves, 0.35, matcherFee = 0.00370300.waves, feeAsset = Waves)
     val sellOrder = mkOrderDP(bob, wavesUsdPair, SELL, 300.waves, 0.35, matcherFee = 0.30.usd, feeAsset = usd)
 
@@ -295,7 +300,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save events: 1 small counter and 1 big submitted" in {
+  "Postgres order history should correctly save events: 1 small counter and 1 big submitted" in {
 
     val smallBuyOrder = mkOrderDP(alice, wctUsdPair, BUY, 300.wct, 0.35, 0.00001703.eth, feeAsset = eth)
     val bigSellOrder  = mkOrderDP(bob, wctUsdPair, SELL, 900.wct, 0.35, 0.00000030.btc, feeAsset = btc)
@@ -347,10 +352,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Order history should correctly save market orders and their events" in {
-
-    dex1.api.cancelAll(bob)
-    dex1.api.cancelAll(alice)
+  "Postgres order history should correctly save market orders and their events" in {
 
     def bigBuyOrder: Order = mkOrderDP(alice, wctUsdPair, BUY, 500.wct, 0.35, matcherFee = 0.00001703.eth, feeAsset = eth)
 
@@ -425,6 +427,32 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
           )
         )
       }
+    }
+  }
+
+  "Postgres order history should save orders that are filled with rounding issues" in {
+    Seq(limitOrderType, marketOrderType).foreach { orderType =>
+      val buyOrder = mkOrderDP(alice, wavesUsdPair, BUY, 1.23456789.waves, 1.03)
+
+      dex1.api.place(mkOrderDP(bob, wavesUsdPair, SELL, 2.waves, 1.03))
+      if (orderType == limitOrderType) dex1.api.place(buyOrder) else dex1.api.placeMarket(buyOrder)
+
+      eventually {
+        getOrderInfoById(buyOrder.id()).get should matchTo(
+          OrderBriefInfo(buyOrder.idStr(),
+                         orderType,
+                         alice.publicKey.toString,
+                         buySide,
+                         Waves.toString,
+                         usd.toString,
+                         Waves.toString,
+                         1.23456789,
+                         1.03,
+                         0.003)
+        )
+      }
+
+      Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
     }
   }
 }

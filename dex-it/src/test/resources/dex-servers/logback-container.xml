@@ -30,6 +30,10 @@
         <appender-ref ref="DETAILED"/>
     </root>
 
+    <logger name="com.wavesplatform.dex.AddressActor" level="TRACE" additivity="false">
+        <appender-ref ref="DETAILED"/>
+    </logger>
+
     <!-- Networking -->
     <logger name="io.netty" level="INFO" additivity="false">
         <appender-ref ref="DETAILED"/>

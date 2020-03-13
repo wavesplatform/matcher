@@ -119,7 +119,7 @@ object GenesisConfigGenerator {
          |    signature: ${genesisBlock.signerData.signature}
          |    initial-balance: ${settings.initialBalance}
          |    initial-base-target: ${settings.initialBaseTarget}
-         |    average-block-delay: ${settings.averageBlockDelay.toMillis}ms
+         |    average-block-delay: 60000ms
          |    block-timestamp: ${settings.blockTimestamp}
          |    transactions = [
          |      ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}

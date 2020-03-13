@@ -119,8 +119,6 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
 
   "WsOrderBook" in forAll(wsOrderBookGen) { origOb =>
     val json = WsOrderBook.wsOrderBookStateFormat.writes(origOb)
-    println(Json.stringify(json))
-
     withClue(s"${Json.stringify(json)}: ") {
       val restoredOb = WsOrderBook.wsOrderBookStateFormat
         .reads(json)

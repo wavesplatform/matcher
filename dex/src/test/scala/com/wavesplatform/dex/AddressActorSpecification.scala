@@ -6,6 +6,8 @@ import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
 import com.wavesplatform.dex.AddressActor.Command.{CancelNotEnoughCoinsOrders, PlaceOrder}
+import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
+import com.wavesplatform.dex.AddressActor.Reply.Balance
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -17,6 +19,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
 import com.wavesplatform.dex.model.{LimitOrder, OrderBook}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.NTPTime
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -30,6 +33,7 @@ class AddressActorSpecification
     with Matchers
     with BeforeAndAfterAll
     with ImplicitSender
+    with DiffMatcherWithImplicits
     with NTPTime {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
@@ -123,6 +127,20 @@ class AddressActorSpecification
           updatePortfolio(initPortfolio.copy(lease = LeaseBalance(0, leasedWaves(initPortfolio))), true)
           eventsProbe.expectMsg(QueueEvent.Canceled(sellWavesOrder.assetPair, sellWavesOrder.id()))
         }
+      }
+    }
+
+    "return reservable balance without excess assets" in test { (ref, eventsProbe, updatePortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio, false)
+
+      ref ! PlaceLimitOrder(sellTokenOrder1)
+      eventsProbe.expectMsg(QueueEvent.Placed(LimitOrder(sellTokenOrder1)))
+
+      ref ! GetTradableBalance(Set(Waves))
+      expectMsgPF(hint = "Balance") {
+        case r: Balance => r should matchTo(Balance(Map(Waves -> 0L)))
+        case _          =>
       }
     }
 

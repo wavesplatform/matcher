@@ -66,15 +66,8 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     assets         <- Gen.listOfN(balanceChanges, assetGen)
     balances       <- Gen.listOfN(balanceChanges, wsBalancesGen)
     orders         <- Gen.listOfN(orderChanges, wsOrderGen)
-  } yield WsAddressState((assets zip balances).toMap, orders)
-
-  private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { x =>
-    x should matchTo { format.reads(format writes x).get }
-  }
-
-  "WsOrder" in serdeTest(wsOrderGen)
-
-  "WsAddressState" in serdeTest(wsAddressStateGen)
+    ts             <- Gen.choose(0L, Long.MaxValue)
+  } yield WsAddressState((assets zip balances).toMap, orders, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
   private val askPricesMax = 2000L * Order.PriceConstant
@@ -89,18 +82,7 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
   private val amountDecimals = 8
   private val priceDecimals  = 2
 
-  private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
-    val itemGen = Gen.zip(pricesGen, amountGen)
-    Gen.listOf(itemGen).map { xs =>
-      TreeMap(xs.map {
-        case (price, amount) =>
-          Denormalization.denormalizePrice(price, amountDecimals, priceDecimals).toDouble ->
-            Denormalization.denormalizeAmountAndFee(amount, amountDecimals).toDouble
-      }: _*)
-    }
-  }
-
-  private val lastTrade: Gen[WsLastTrade] = for {
+  private val lastTradeGen: Gen[WsLastTrade] = for {
     price     <- Gen.chooseNum(1, Long.MaxValue)
     amount    <- Gen.chooseNum(1, Long.MaxValue)
     orderType <- orderTypeGenerator
@@ -114,20 +96,39 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
   private val wsOrderBookGen: Gen[WsOrderBook] = for {
     asks      <- wsSide(askPricesGen)
     bids      <- wsSide(bidPricesGen)
-    lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTrade.map(Option(_)))
-  } yield WsOrderBook(asks, bids, lastTrade)
+    lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
+    ts        <- Gen.choose(0L, Long.MaxValue)
+  } yield WsOrderBook(asks, bids, lastTrade, ts)
 
-  "WsOrderBook" in forAll(wsOrderBookGen) { origOb =>
-    val json = WsOrderBook.wsOrderBookStateFormat.writes(origOb)
-    withClue(s"${Json.stringify(json)}: ") {
-      val restoredOb = WsOrderBook.wsOrderBookStateFormat
-        .reads(json)
-        .fold(
-          e => throw PlayJsonException(None, e),
-          identity
-        )
-
-      restoredOb should matchTo(origOb)
+  private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
+    val itemGen = Gen.zip(pricesGen, amountGen)
+    Gen.listOf(itemGen).map { xs =>
+      TreeMap(xs.map {
+        case (price, amount) =>
+          Denormalization.denormalizePrice(price, amountDecimals, priceDecimals).toDouble ->
+            Denormalization.denormalizeAmountAndFee(amount, amountDecimals).toDouble
+      }: _*)
     }
   }
+
+  private def serdeTest[T <: Product with Serializable: Diff](gen: Gen[T])(implicit format: Format[T]): Unit = forAll(gen) { original =>
+    val json = format writes original
+    withClue(s"${Json.stringify(json)}: ") {
+      val restored =
+        format
+          .reads(json)
+          .fold(
+            e => throw PlayJsonException(None, e),
+            identity
+          )
+
+      original should matchTo(restored)
+    }
+  }
+
+  "WsOrder" in serdeTest(wsOrderGen)
+
+  "WsAddressState" in serdeTest(wsAddressStateGen)
+
+  "WsOrderBook" in serdeTest(wsOrderBookGen)
 }

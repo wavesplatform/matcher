@@ -83,19 +83,19 @@ object WsOrder {
 
   implicit val format: Format[WsOrder] =
     (
-      (JsPath \ "i").format[Order.Id] and                               // id
-        (JsPath \ "t").formatNullable[Long] and                         // timestamp
-        (JsPath \ "A").formatNullable[Asset] and                        // amount asset
-        (JsPath \ "P").formatNullable[Asset] and                        // price asset
-        (JsPath \ "S").formatNullable[OrderType] and                    // side: BUY or SELL
-        (JsPath \ "T").formatNullable[Boolean](isMarketFormat) and      // type: MARKET or LIMIT
-        (JsPath \ "p").formatNullable[Double](doubleAsStringFormat) and // price
-        (JsPath \ "a").formatNullable[Double](doubleAsStringFormat) and // amount
-        (JsPath \ "f").formatNullable[Double](doubleAsStringFormat) and // fee
-        (JsPath \ "F").formatNullable[Asset] and                        // fee asset
-        (JsPath \ "s").formatNullable[String](orderStatusFormat) and    // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
-        (JsPath \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
-        (JsPath \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
-        (JsPath \ "r").formatNullable[Double](doubleAsStringFormat)     // average filled price among all trades
+      (__ \ "i").format[Order.Id] and                               // id
+        (__ \ "t").formatNullable[Long] and                         // timestamp
+        (__ \ "A").formatNullable[Asset] and                        // amount asset
+        (__ \ "P").formatNullable[Asset] and                        // price asset
+        (__ \ "S").formatNullable[OrderType] and                    // side: BUY or SELL
+        (__ \ "T").formatNullable[Boolean](isMarketFormat) and      // type: MARKET or LIMIT
+        (__ \ "p").formatNullable[Double](doubleAsStringFormat) and // price
+        (__ \ "a").formatNullable[Double](doubleAsStringFormat) and // amount
+        (__ \ "f").formatNullable[Double](doubleAsStringFormat) and // fee
+        (__ \ "F").formatNullable[Asset] and                        // fee asset
+        (__ \ "s").formatNullable[String](orderStatusFormat) and    // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
+        (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
+        (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
+        (__ \ "r").formatNullable[Double](doubleAsStringFormat)     // average filled price among all trades
     )(WsOrder.apply, unlift(WsOrder.unapply))
 }

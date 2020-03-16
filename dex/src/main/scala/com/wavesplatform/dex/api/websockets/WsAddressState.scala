@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder])
+case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], timestamp: Long = System.currentTimeMillis)
 
 object WsAddressState {
 
@@ -24,19 +24,12 @@ object WsAddressState {
     }
   )
 
-  implicit val writes: Writes[WsAddressState] =
-    (
-      (JsPath \ "b").writeNullable[Map[Asset, WsBalances]](balancesMapFormat.writes) and
-        (JsPath \ "o").writeNullable[Seq[WsOrder]]
-    )(unlift(WsAddressState.unapply) andThen { case (b, o) => Option(b).filter(_.nonEmpty) -> Option(o).filter(_.nonEmpty) })
-
-  implicit val reads: Reads[WsAddressState] =
-    (
-      (JsPath \ "b").readNullable[Map[Asset, WsBalances]](balancesMapFormat.reads) and
-        (JsPath \ "o").readNullable[Seq[WsOrder]]
-    ) { (maybeBalances, maybeOrders) =>
-      WsAddressState(maybeBalances.getOrElse(Map.empty), maybeOrders.getOrElse(Seq.empty))
-    }
-
-  implicit val format: Format[WsAddressState] = Format(reads, writes)
+  implicit val format: Format[WsAddressState] = (
+    (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
+      (__ \ "o").formatNullable[Seq[WsOrder]] and
+      (__ \ "_").format[Long]
+  )(
+    (maybeBalances, maybeOrders, timestamp) => WsAddressState(maybeBalances.getOrElse(Map.empty), maybeOrders.getOrElse(Seq.empty), timestamp),
+    unlift(WsAddressState.unapply) andThen { case (b, o, t) => (Option(b).filter(_.nonEmpty), Option(o).filter(_.nonEmpty), t) }
+  )
 }

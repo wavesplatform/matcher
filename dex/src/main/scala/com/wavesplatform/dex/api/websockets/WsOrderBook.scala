@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.api.websockets
 
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
-import com.wavesplatform.dex.domain.model.{Amount, Denormalization, Price}
+import com.wavesplatform.dex.domain.model.Denormalization._
+import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts}
@@ -10,7 +11,7 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade]) {
+case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], timestamp: Long = System.currentTimeMillis) {
   def nonEmpty: Boolean = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
 }
 
@@ -20,16 +21,18 @@ object WsOrderBook {
   private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
   private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.compare(x, y)
 
-  val empty = WsOrderBook(
-    asks = TreeMap.empty(asksOrdering),
-    bids = TreeMap.empty(bidsOrdering),
-    lastTrade = None
-  )
+  val empty: WsOrderBook =
+    WsOrderBook(
+      asks = TreeMap.empty(asksOrdering),
+      bids = TreeMap.empty(bidsOrdering),
+      lastTrade = None
+    )
 
   implicit val wsOrderBookStateFormat: Format[WsOrderBook] =
-    ((JsPath \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
-      (JsPath \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
-      (JsPath \ "t").formatNullable[WsLastTrade])(WsOrderBook.apply, unlift(WsOrderBook.unapply))
+    ((__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+      (__ \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
+      (__ \ "t").formatNullable[WsLastTrade] and
+      (__ \ "_").format[Long])(WsOrderBook.apply, unlift(WsOrderBook.unapply))
 
   private val priceAmountFormat = Format(
     fjs = Reads.Tuple2R(doubleAsStringFormat, doubleAsStringFormat),
@@ -63,36 +66,36 @@ object WsOrderBook {
   }
 
   class Update(amountAssetDecimals: Int, priceAssetDecimals: Int) {
-    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade]): WsOrderBook = WsOrderBook(
-      asks = side(asks, asksOrdering),
-      bids = side(bids, bidsOrdering),
-      lastTrade = lt.map(lastTrade)
-    )
+    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade]): WsOrderBook =
+      WsOrderBook(asks = side(asks, asksOrdering), bids = side(bids, bidsOrdering), lastTrade = lt.map(lastTrade))
 
     def lastTrade(x: LastTrade): WsLastTrade = WsLastTrade(
-      price = Denormalization.denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble,
-      amount = Denormalization.denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble,
+      price = denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble,
+      amount = denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble,
       side = x.side
     )
 
-    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide = TreeMap {
+    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
+      TreeMap(
         xs.map { x =>
-          Denormalization.denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-            Denormalization.denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
+          denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
+            denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
         }.toSeq: _*
-      }(ordering)
+      )(ordering)
 
     def withLevelChanges(orig: WsOrderBook, updated: LevelAmounts): WsOrderBook = orig.copy(
       asks = orig.asks ++ denormalized(updated.asks),
-      bids = orig.bids ++ denormalized(updated.bids)
+      bids = orig.bids ++ denormalized(updated.bids),
+      timestamp = System.currentTimeMillis
     )
 
-    def withLastTrade(orig: WsOrderBook, x: LastTrade): WsOrderBook = orig.copy(lastTrade = Some(lastTrade(x)))
+    def withLastTrade(orig: WsOrderBook, x: LastTrade): WsOrderBook =
+      orig.copy(lastTrade = Some(lastTrade(x)), timestamp = System.currentTimeMillis)
 
     private def denormalized(xs: Map[Price, Amount]): Map[Double, Double] = xs.map {
       case (price, amount) =>
-        Denormalization.denormalizePrice(price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-          Denormalization.denormalizeAmountAndFee(amount, amountAssetDecimals).toDouble
+        denormalizePrice(price, amountAssetDecimals, priceAssetDecimals).toDouble ->
+          denormalizeAmountAndFee(amount, amountAssetDecimals).toDouble
     }
   }
 }

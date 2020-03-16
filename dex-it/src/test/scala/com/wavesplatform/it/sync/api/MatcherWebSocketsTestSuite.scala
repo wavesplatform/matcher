@@ -1,10 +1,11 @@
 package com.wavesplatform.it.sync.api
 
 import cats.syntax.option._
+import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsLastTrade, WsOrder, WsOrderBook}
+import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -12,11 +13,13 @@ import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
-import play.api.libs.json.Json
 
 import scala.collection.immutable.TreeMap
 
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
+
+  private implicit val derivedAddressStateDiff: Diff[WsAddressState] = Derived(Diff.gen[WsAddressState].value.ignore(_.timestamp))
+  private implicit val derivedOrderBookDiff: Diff[WsOrderBook]       = Derived(Diff.gen[WsOrderBook].value.ignore(_.timestamp))
 
   private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
@@ -61,13 +64,19 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
     connection.clearMessagesBuffer()
   }
 
-  private def createOrderBookWsConnection(assetPair: AssetPair): WebSocketConnection[WsOrderBook] = {
-    val wsUri = s"127.0.0.1:${dex1.restApiAddress.getPort}/ws/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
-    mkWebSocketConnection(wsUri) { msg =>
-      val text = msg.asTextMessage.getStrictText
-      log.info(s"Got message: $text")
-      Json.parse(text).as[WsOrderBook]
-    }
+  private def squashOrderBooks(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
+    case (r, x) =>
+      WsOrderBook(
+        asks = r.asks ++ x.asks,
+        bids = r.bids ++ x.bids,
+        lastTrade = r.lastTrade.orElse(x.lastTrade)
+      )
+  }
+
+  private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Seq[T] = {
+    eventually { wsc.getMessagesBuffer.size should be >= n }
+    Thread.sleep(200) // Waiting for additional messages
+    wsc.getMessagesBuffer
   }
 
   "Connection should be established" in {
@@ -161,7 +170,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         assertAddressStateChanges(
           connection = wsac,
-          balancesChangesCountBorders = (3, 8),
+          balancesChangesCountBorders = (2, 8),
           ordersChangesCount = 2,
           expectedBalanceChanges = squashBalanceChanges(
             Seq(
@@ -197,65 +206,72 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
 
         markup("No orders")
-        val wsc0    = createOrderBookWsConnection(wavesBtcPair)
+        val wsc0    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         val buffer0 = receiveAtLeastN(wsc0, 1)
         wsc0.close()
 
         buffer0 should have size 1
-        squash(buffer0) shouldBe WsOrderBook(
-          asks = TreeMap.empty,
-          bids = TreeMap.empty,
-          lastTrade = None
+        squashOrderBooks(buffer0) should matchTo(
+          WsOrderBook(
+            asks = TreeMap.empty,
+            bids = TreeMap.empty,
+            lastTrade = None
+          )
         )
 
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403))
 
         markup("One order")
 
-        val wsc1    = createOrderBookWsConnection(wavesBtcPair)
+        val wsc1    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         val buffer1 = receiveAtLeastN(wsc1, 1)
         wsc1.close()
 
         buffer1 should have size 1
-        squash(buffer1) shouldBe WsOrderBook(
-          asks = TreeMap.empty,
-          bids = TreeMap(0.00011403d -> 1.05d),
-          lastTrade = None
+        squashOrderBooks(buffer1) should matchTo(
+          WsOrderBook(
+            asks = TreeMap.empty,
+            bids = TreeMap(0.00011403d -> 1.05d),
+            lastTrade = None
+          )
         )
 
         markup("Two orders")
 
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00012))
 
-        val wsc2    = createOrderBookWsConnection(wavesBtcPair)
+        val wsc2    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         val buffer2 = receiveAtLeastN(wsc2, 1)
         wsc2.close()
 
         buffer2 should have size 1
-        squash(buffer2) shouldBe WsOrderBook(
-          asks = TreeMap(0.00012d    -> 1d),
-          bids = TreeMap(0.00011403d -> 1.05d),
-          lastTrade = None
+        squashOrderBooks(buffer2) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(0.00012d    -> 1d),
+            bids = TreeMap(0.00011403d -> 1.05d),
+            lastTrade = None
+          )
         )
 
         markup("Two orders and trade")
 
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Filled)
 
-        val wsc3    = createOrderBookWsConnection(wavesBtcPair)
+        val wsc3    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         val buffer3 = receiveAtLeastN(wsc3, 1)
         wsc3.close()
 
         buffer3.size should (be >= 1 and be <= 2)
-        squash(buffer3) shouldBe WsOrderBook(
-          asks = TreeMap(0.00012d    -> 0.5d),
-          bids = TreeMap(0.00011403d -> 1.05d),
-          lastTrade = Some(
-            WsLastTrade(
+        squashOrderBooks(buffer3) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(0.00012d    -> 0.5d),
+            bids = TreeMap(0.00011403d -> 1.05d),
+            lastTrade = WsLastTrade(
               price = 0.00012d,
               amount = 0.5,
               side = OrderType.BUY
-            ))
+            ).some
+          )
         )
 
         markup("Four orders")
@@ -265,27 +281,28 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
           mkOrderDP(carol, wavesBtcPair, BUY, 0.7.waves, 0.000115)
         ).foreach(placeAndAwaitAtDex(_))
 
-        val wsc4    = createOrderBookWsConnection(wavesBtcPair)
+        val wsc4    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         val buffer4 = receiveAtLeastN(wsc4, 1)
         wsc4.close()
 
         buffer4.size should (be >= 1 and be <= 2)
         // TODO this test won't check ordering :(
-        squash(buffer4) shouldBe WsOrderBook(
-          asks = TreeMap(
-            0.00012d -> 0.5d,
-            0.00013d -> 0.6d,
-          ),
-          bids = TreeMap(
-            0.000115d   -> 0.7d,
-            0.00011403d -> 1.05d
-          ),
-          lastTrade = Some(
-            WsLastTrade(
+        squashOrderBooks(buffer4) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(
+              0.00012d -> 0.5d,
+              0.00013d -> 0.6d,
+            ),
+            bids = TreeMap(
+              0.000115d   -> 0.7d,
+              0.00011403d -> 1.05d
+            ),
+            lastTrade = WsLastTrade(
               price = 0.00012d,
               amount = 0.5,
               side = OrderType.BUY
-            ))
+            ).some
+          )
         )
 
         dex1.api.cancelAll(carol)
@@ -297,7 +314,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
         dex1.api.cancelAll(carol)
         dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
 
-        val wsc = createOrderBookWsConnection(wavesBtcPair)
+        val wsc = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         receiveAtLeastN(wsc, 1)
         wsc.clearMessagesBuffer()
 
@@ -306,10 +323,12 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         val buffer1 = receiveAtLeastN(wsc, 1)
         buffer1 should have size 1
-        squash(buffer1) shouldBe WsOrderBook(
-          asks = TreeMap.empty,
-          bids = TreeMap(0.00012d -> 1d),
-          lastTrade = None
+        squashOrderBooks(buffer1) should matchTo(
+          WsOrderBook(
+            asks = TreeMap.empty,
+            bids = TreeMap(0.00012d -> 1d),
+            lastTrade = None
+          )
         )
         wsc.clearMessagesBuffer()
 
@@ -319,15 +338,16 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         val buffer2 = receiveAtLeastN(wsc, 1)
         buffer2.size should (be >= 1 and be <= 2)
-        squash(buffer2) shouldBe WsOrderBook(
-          asks = TreeMap(0.00012d -> 0.5d),
-          bids = TreeMap(0.00012d -> 0d),
-          lastTrade = Some(
-            WsLastTrade(
+        squashOrderBooks(buffer2) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(0.00012d -> 0.5d),
+            bids = TreeMap(0.00012d -> 0d),
+            lastTrade = WsLastTrade(
               price = 0.00012d,
               amount = 1,
               side = OrderType.SELL
-            ))
+            ).some
+          )
         )
         wsc.clearMessagesBuffer()
 
@@ -336,31 +356,15 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         val buffer3 = receiveAtLeastN(wsc, 1)
         buffer3.size shouldBe 1
-        squash(buffer3) shouldBe WsOrderBook(
-          asks = TreeMap(0.00012d -> 0d),
-          bids = TreeMap.empty,
-          lastTrade = None
+        squashOrderBooks(buffer3) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(0.00012d -> 0d),
+            bids = TreeMap.empty,
+            lastTrade = None
+          )
         )
         wsc.clearMessagesBuffer()
       }
     }
   }
-
-  private def squash(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
-    case (r, x) =>
-      WsOrderBook(
-        asks = r.asks ++ x.asks,
-        bids = r.bids ++ x.bids,
-        lastTrade = r.lastTrade.orElse(x.lastTrade)
-      )
-  }
-
-  private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Seq[T] = {
-    eventually {
-      wsc.getMessagesBuffer.size should be >= n
-    }
-    Thread.sleep(200) // Waiting for additional messages
-    wsc.getMessagesBuffer
-  }
-
 }

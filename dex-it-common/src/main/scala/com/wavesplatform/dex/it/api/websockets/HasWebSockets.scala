@@ -8,10 +8,13 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.it.docker.DexContainer
 import mouse.any._
 import org.scalatest.{BeforeAndAfterAll, Suite}
+import play.api.libs.json.Json
 
 trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
@@ -40,8 +43,15 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     new WebSocketAuthenticatedConnection(wsUri)
   }
 
+  protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WebSocketConnection[WsOrderBook] = {
+    val wsUri = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
+    mkWebSocketConnection(wsUri) { msg =>
+      Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
+    }
+  }
+
   protected def mkWebSocketConnection[Output](uri: String)(parseOutput: Message => Output): WebSocketConnection[Output] = {
-    WebSocketConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
+    new WebSocketConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
   }
 
   protected def cleanupWebSockets(): Unit = {

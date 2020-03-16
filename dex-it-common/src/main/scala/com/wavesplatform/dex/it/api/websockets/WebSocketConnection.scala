@@ -14,8 +14,8 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-case class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean)(implicit system: ActorSystem,
-                                                                                                          materializer: Materializer)
+class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean)(implicit system: ActorSystem,
+                                                                                                     materializer: Materializer)
     extends ScorexLogging {
 
   log.info(s"Connecting to ws://$uri")
@@ -26,6 +26,7 @@ case class WebSocketConnection[Output](uri: String, parseOutput: Message => Outp
     try {
       val output = parseOutput(x)
       if (trackOutput) messagesBuffer.add(output)
+      log.info(s"Got message: ${x.asTextMessage.getStrictText}")
     } catch {
       case e: Throwable => log.error(s"Can't parse message: $x", e)
     }

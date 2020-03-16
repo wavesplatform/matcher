@@ -65,8 +65,8 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
 
-      lazy val isFirstExecution  = submitted.amount == submitted.order.amount
-      lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
+      lazy val isFirstExecution = submitted.amount == submitted.order.amount
+      lazy val isSubmittedFilled = !e.submittedRemaining.isValid
 
       (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
         case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }

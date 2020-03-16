@@ -11,6 +11,9 @@ import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import org.iq80.leveldb.DB
 
+/**
+ * Contains only finalized orders
+ */
 trait OrderDB {
   def containsInfo(id: Order.Id): Boolean
   def status(id: Order.Id): OrderStatus.Final

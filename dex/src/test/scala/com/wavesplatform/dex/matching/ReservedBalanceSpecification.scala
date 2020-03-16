@@ -94,7 +94,9 @@ class ReservedBalanceSpecification
   private val ignoreSpendableBalanceChanges: Subject[SpendableBalanceChanges, SpendableBalanceChanges] = Subject.empty[SpendableBalanceChanges]
 
   private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  private var oh: OrderHistoryStub = new OrderHistoryStub(system, ntpTime)
+
+  private def mkOrderHistory = new OrderHistoryStub(system, ntpTime, 100, 70)
+  private var oh: OrderHistoryStub = mkOrderHistory
 
   private val addressDir = system.actorOf(
     Props(
@@ -147,7 +149,7 @@ class ReservedBalanceSpecification
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, ntpTime)
+    oh = mkOrderHistory
   }
 
   forAll(

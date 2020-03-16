@@ -5,7 +5,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
-class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
+class TestOrderDB(maxFinalizedOrders: Int) extends OrderDB {
 
   private var knownOrders   = Map.empty[Order.Id, Order]
   private var orderInfo     = Map.empty[Order.Id, OrderInfo[OrderStatus.Final]]
@@ -20,8 +20,8 @@ class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
 
   override def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = if (!containsInfo(id)) {
     orderInfo += id                      -> oi
-    idsForAddress += sender              -> (id +: idsForAddress(sender))
-    idsForPair += (sender, oi.assetPair) -> (id +: idsForPair(sender -> oi.assetPair))
+    idsForAddress += sender              -> (id +: idsForAddress(sender)).take(maxFinalizedOrders)
+    idsForPair += (sender, oi.assetPair) -> (id +: idsForPair(sender -> oi.assetPair)).take(maxFinalizedOrders)
   }
 
   override def saveOrder(o: Order): Unit = knownOrders += o.id() -> o

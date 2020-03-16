@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
-import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
@@ -30,11 +29,14 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
   private val postgresContainerName = "pgc"
   private val postgresContainerPort = 5432
 
+  private val maxOrders = 99
+
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""
        |waves.dex {
        |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId", "$WctId" ]
        |  ${getPostgresConnectionCfgString(postgresContainerName, postgresContainerPort)}
+       |  order-db.max-orders = $maxOrders
        |  order-history.enabled = yes
        |}
     """.stripMargin
@@ -185,17 +187,15 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
       }
 
   "Postgres order history should save all orders and events" in {
-    val ordersCount = OrderValidator.MaxActiveOrders
-
-    (1 to ordersCount)
+    (1 to maxOrders)
       .foreach { i =>
         dex1.api.place(mkOrderDP(alice, wctUsdPair, BUY, 1.wct, 0.35, 0.003.waves, ttl = 1.day + i.seconds))
         dex1.api.place(mkOrderDP(bob, wctUsdPair, SELL, 1.wct, 0.35, 0.003.waves, ttl = 1.day + i.seconds))
       }
 
     eventually {
-      getOrdersCount shouldBe ordersCount * 2
-      getEventsCount shouldBe ordersCount * 2
+      getOrdersCount shouldBe maxOrders * 2
+      getEventsCount shouldBe maxOrders * 2
     }
   }
 

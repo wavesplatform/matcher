@@ -53,10 +53,21 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]]
 
+  /**
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
   def tryOrderHistory(owner: KeyPair,
                       activeOnly: Option[Boolean] = None,
                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+
+  /**
+   * param @activeOnly Server treats this parameter as true if it wasn't specified
+   */
   def tryOrderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+
+  /**
+   * param @activeOnly Server treats this parameter as false if it wasn't specified
+   */
   def tryOrderHistoryByPair(owner: KeyPair,
                             assetPair: AssetPair,
                             activeOnly: Option[Boolean] = None,

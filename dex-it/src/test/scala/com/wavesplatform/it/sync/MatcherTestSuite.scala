@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._

@@ -26,7 +26,14 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -222,7 +229,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           Json.obj(
             "priceAssets"   -> matcherSettings.priceAssets,
             "orderFee"      -> getActualOrderFeeSettings().getJson(matcherAccountFee, rateCache.getJson).value,
-            "orderVersions" -> allowedOrderVersions.toSeq.sorted
+            "orderVersions" -> allowedOrderVersions.toSeq.sorted,
+            "networkByte"   -> matcherSettings.addressSchemeCharacter.toInt
           )
         )
       }

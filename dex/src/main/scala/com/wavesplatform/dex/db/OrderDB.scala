@@ -52,7 +52,7 @@ object OrderDB {
 
           val newPairSeqNr = rw.inc(MatcherKeys.finalizedPairSeqNr(sender, oi.assetPair))
           rw.put(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
-          if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if newPairSeqNr=101, we delete 1 (the first)
+          if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
             rw.get(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
               .map(MatcherKeys.order)
               .foreach(x => rw.delete(x))

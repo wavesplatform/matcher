@@ -345,7 +345,7 @@ object OrderStatus {
     val name = "Cancelled"
   }
 
-  def finalStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {
+  def finalCancelStatus(ao: AcceptedOrder, isSystemCancel: Boolean): Final = {
     val filledAmount     = ao.order.amount - ao.amount
     val filledMatcherFee = ao.order.matcherFee - ao.fee
     if (isSystemCancel && (filledAmount > 0 || ao.isMarket)) Filled(filledAmount, filledMatcherFee) else Cancelled(filledAmount, filledMatcherFee)
@@ -369,7 +369,7 @@ object Events {
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
     def counterExecutedFee: Long     = AcceptedOrder.partialFee(maxCounterFee, counter.order.amount, executedAmount)
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
-    def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
+    lazy val counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
     def submittedExecutedFee: Long     = AcceptedOrder.partialFee(maxSubmittedFee, submitted.order.amount, executedAmount)
@@ -391,7 +391,7 @@ object Events {
       submittedLimitOrder.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
     }
 
-    def submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder] { submittedLimitRemaining } { submittedMarketRemaining }
+    lazy val submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder] { submittedLimitRemaining } { submittedMarketRemaining }
   }
 
   case class OrderAdded(order: AcceptedOrder, timestamp: Long) extends Event

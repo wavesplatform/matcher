@@ -15,7 +15,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot, OrderHistoryStub}
+import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.util.getSimpleName
 import com.wavesplatform.dex.{MatcherSpecBase, _}
@@ -80,8 +80,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   import system.dispatcher
 
-  private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
-  private var oh: OrderHistoryStub = new OrderHistoryStub(system, time)
+  private val pair: AssetPair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
 
   private val addressDir = system.actorOf(
     Props(
@@ -128,10 +127,10 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   }
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
-    addressDir ! OrderAdded(LimitOrder(submitted), time.getTimestamp())
-    addressDir ! OrderAdded(LimitOrder(counter), time.getTimestamp())
+    val now = time.getTimestamp()
 
-    oh.process(OrderAdded(LimitOrder(counter), time.getTimestamp()))
+    addressDir ! OrderAdded(LimitOrder(submitted), now)
+    addressDir ! OrderAdded(LimitOrder(counter), now)
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, submitted.matcherFee, counter.matcherFee)
     addressDir ! exec
     exec
@@ -139,7 +138,6 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, time)
   }
 
   forAll(
@@ -279,7 +277,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       withClue(s"Counter sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (minAmountFor(counterPrice), 0)
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve // <--
       }
 
       withClue(s"Submitted sender should not have reserves:") {

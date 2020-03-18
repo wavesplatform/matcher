@@ -11,6 +11,7 @@ import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
 import scala.collection.immutable.Queue
 
+// TODO remove trackedOrders
 case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
                                  pendingWsConnections: Queue[ActorRef],
                                  changedSpendableAssets: Set[Asset],

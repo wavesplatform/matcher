@@ -216,9 +216,9 @@ ${updatedOb.aggregatedSnapshot}
         // tickSize == 1
         val eventPrices = events
           .collect {
-            case evt: OrderAdded                          => evt.order.price
-            case evt: OrderExecuted                       => evt.counter.price
-            case evt @ OrderCanceled(_: LimitOrder, _, _) => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
+            case evt: OrderAdded    => evt.order.price
+            case evt: OrderExecuted => evt.counter.price
+            case evt: OrderCanceled => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
           }
           .filter(p => ob.hasPrice(p) || updatedOb.hasPrice(p))
           .toSet

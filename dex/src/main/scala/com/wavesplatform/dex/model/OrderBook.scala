@@ -44,11 +44,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
           tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event], LevelAmounts) = {
-    val events = submitted match {
-      case submitted: LimitOrder => Queue(OrderAdded(submitted, eventTs))
-      case _: MarketOrder        => Queue.empty[Event]
-    }
-
+    val events = Queue(OrderAdded(submitted, eventTs))
     if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
     else (this, events.enqueue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
   }

@@ -394,7 +394,7 @@ object Events {
     def submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder] { submittedLimitRemaining } { submittedMarketRemaining }
   }
 
-  case class OrderAdded(order: LimitOrder, timestamp: Long) extends Event
+  case class OrderAdded(order: AcceptedOrder, timestamp: Long) extends Event
 
   case class OrderCanceled(acceptedOrder: AcceptedOrder, isSystemCancel: Boolean, timestamp: Long) extends Event
 

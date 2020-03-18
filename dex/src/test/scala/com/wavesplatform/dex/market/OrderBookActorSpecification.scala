@@ -431,7 +431,7 @@ class OrderBookActorSpecification
         }
 
         orderBook ! wrapMarketOrder(marketOrder)
-
+        tp.expectMsgType[OrderAdded]
         val oe1 = tp.expectMsgType[OrderExecuted]
         oe1.submitted shouldBe marketOrder
         oe1.counter shouldBe LimitOrder(counterOrder1)
@@ -491,6 +491,7 @@ class OrderBookActorSpecification
 
         withClue("Stop condition - no counter orders:") {
           orderBook ! wrapMarketOrder(marketOrder)
+          tp.expectMsgType[OrderAdded]
           val oc = tp.expectMsgType[OrderCanceled]
 
           oc.acceptedOrder shouldBe marketOrder
@@ -505,7 +506,7 @@ class OrderBookActorSpecification
           tp.expectMsgType[OrderAdded]
 
           orderBook ! wrapMarketOrder(marketOrder)
-
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
@@ -565,6 +566,7 @@ class OrderBookActorSpecification
 
           orderBook ! wrapMarketOrder(marketOrder)
 
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)

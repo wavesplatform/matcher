@@ -9,6 +9,7 @@ import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.fp.MapImplicits.group
@@ -65,7 +66,7 @@ class OrderBookSpec
         val (_, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
         val clue =
           s"""Events:
-${events.mkString("\n")}
+${formatEvents(events)}
 """
 
         withClue(clue) {
@@ -147,7 +148,7 @@ OrderBook after:
 ${format(updatedOb)}
 
 Events:
-${events.mkString("\n")}
+${formatEvents(events)}
 
 Diff:
 ${diff.mkString("\n")}
@@ -185,7 +186,7 @@ OrderBook after:
 ${format(updatedOb)}
 
 Events:
-${events.mkString("\n")}
+${formatEvents(events)}
 
 Level changes:
 ${format(levelChanges)}
@@ -213,11 +214,14 @@ ${updatedOb.aggregatedSnapshot}
         val levelChangesPrices = levelChanges.asks.keySet ++ levelChanges.bids.keySet
 
         // tickSize == 1
-        val eventPrices = events.collect {
-          case evt: OrderAdded                          => evt.order.price
-          case evt: OrderExecuted                       => evt.counter.price
-          case evt @ OrderCanceled(_: LimitOrder, _, _) => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
-        }.toSet
+        val eventPrices = events
+          .collect {
+            case evt: OrderAdded                          => evt.order.price
+            case evt: OrderExecuted                       => evt.counter.price
+            case evt @ OrderCanceled(_: LimitOrder, _, _) => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
+          }
+          .filter(p => ob.hasPrice(p) || updatedOb.hasPrice(p))
+          .toSet
 
         val clue =
           s"""
@@ -225,7 +229,7 @@ Order:
 ${format(newOrder)}
 
 Events:
-${events.mkString("\n")}
+${formatEvents(events)}
 
 Level changes:
 ${format(levelChanges)}
@@ -238,7 +242,7 @@ ${eventPrices.toVector.sorted.mkString("\n")}
 """
 
         withClue(clue) {
-          levelChangesPrices should matchTo(eventPrices)
+          levelChangesPrices.toList.sorted should matchTo(eventPrices.toList.sorted)
         }
     }
   }
@@ -296,7 +300,7 @@ OrderBook after:
 ${format(obAfter)}
 
 Events:
-${event.mkString("\n")}
+${formatEvents(event)}
 
 Level changes:
 $levelChanges
@@ -322,7 +326,7 @@ OrderBook after:
 ${format(ob)}
 
 Events:
-${events.mkString("\n")}
+${formatEvents(events)}
 
 Canceled orders:
 ${canceledOrders.mkString("\n")}
@@ -357,12 +361,14 @@ ${canceledOrders.mkString("\n")}
   private def spentFee(ao: AcceptedOrder, executedAmount: Long) =
     Map(ao.feeAsset -> AcceptedOrder.partialFee(ao.order.matcherFee, ao.order.amount, executedAmount))
 
-  private def format(x: LevelAmounts): String = s"""Asks: ${x.asks.mkString(", ")}
-Bids: ${x.bids.mkString(", ")}
-"""
-
   private def formatSide(xs: Iterable[(Long, Level)]): String =
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
+
+  private def formatEvents(xs: TraversableOnce[Event]): String =
+    xs.map(format).mkString("\n")
+
+  private def format(x: LevelAmounts): String = s"""Asks: ${x.asks.mkString(", ")}
+Bids: ${x.bids.mkString(", ")}"""
 
   private def format(x: OrderBook): String = s"""
 Asks (rcv=${assetPair.priceAsset}, spt=${assetPair.amountAsset}):
@@ -370,6 +376,12 @@ ${formatSide(x.asks)}
 
 Bids (rcv=${assetPair.amountAsset}, spt=${assetPair.priceAsset}):
 ${formatSide(x.bids)}"""
+
+  private def format(x: Event): String = x match {
+    case x: OrderExecuted => s"executed(a=${x.executedAmount}, c=${format(x.counter)}, s=${format(x.submitted)})"
+    case x: OrderAdded    => s"added(${format(x.order)})"
+    case x: OrderCanceled => s"canceled(s=${x.isSystemCancel}, ${format(x.acceptedOrder)})"
+  }
 
   private def format(x: AcceptedOrder): String = {
     val name = x match {
@@ -381,4 +393,8 @@ ${formatSide(x.bids)}"""
   }
 
   private def format(x: Order): String = s"""Order(${x.idStr()}, ${x.orderType}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
+
+  private implicit class OrderBookOps(val self: OrderBook) {
+    def hasPrice(x: Price): Boolean = self.asks.contains(x) || self.bids.contains(x)
+  }
 }

@@ -5,7 +5,7 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.domain.asset.AssetPair._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -31,6 +31,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            wavesBlockchainClient: WavesBlockchainClientSettings,
                            ntpServer: String,
                            restApi: RestAPISettings,
+                           maxActiveOrders: Int,
                            exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
@@ -43,7 +44,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            priceAssets: Seq[Asset],
                            blacklistedAssets: Set[Asset.IssuedAsset],
                            blacklistedNames: Seq[Regex],
-                           maxOrdersPerRequest: Int,
+                           orderDb: OrderDB.Settings,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
@@ -128,7 +129,7 @@ object MatcherSettings {
         .toSet
 
     val blacklistedNames           = config.as[List[String]]("blacklisted-names").map(_.r)
-    val maxOrdersPerRequest        = config.as[Int]("rest-order-limit")
+    val maxActiveOrders            = config.as[Int]("max-active-orders")
     val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
     val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
@@ -143,6 +144,7 @@ object MatcherSettings {
     val broadcastUntilConfirmed    = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
     val postgresConnection         = config.as[PostgresConnection]("postgres")
     val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
+    val orderDb                    = config.as[OrderDB.Settings]("order-db")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -150,6 +152,7 @@ object MatcherSettings {
       wavesBlockchainClient,
       ntpServer,
       restApiSettings,
+      maxActiveOrders,
       exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,
@@ -162,7 +165,7 @@ object MatcherSettings {
       priceAssets,
       blacklistedAssets,
       blacklistedNames,
-      maxOrdersPerRequest,
+      orderDb,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
       eventsQueue,

@@ -13,7 +13,7 @@ import com.wavesplatform.dex.time.Time
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class OrderHistoryStub(system: ActorSystem, time: Time) {
+class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, maxFinalizedOrders: Int) {
   private implicit val efc = new ErrorFormatterContext {
     override def assetDecimals(asset: Asset): Int = 8
   }
@@ -30,11 +30,12 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             ao.order.sender,
             _ => Future.successful(0L),
             time,
-            new TestOrderDB(100),
+            new TestOrderDB(maxFinalizedOrders),
             _ => Future.successful(false),
             e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
             _ => OrderBook.AggregatedSnapshot(),
-            true
+            true,
+            maxActiveOrders
           )
         )
       )

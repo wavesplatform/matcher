@@ -45,6 +45,7 @@ class AddressActor(owner: Address,
                    store: StoreEvent,
                    orderBookCache: AssetPair => OrderBook.AggregatedSnapshot,
                    var enableSchedules: Boolean,
+                   maxActiveOrders: Int,
                    batchCancelTimeout: FiniteDuration = 20.seconds)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
@@ -62,12 +63,11 @@ class AddressActor(owner: Address,
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
-      import OrderValidator.MaxActiveOrders
       log.trace(s"Got $command")
       val orderId = command.order.id()
 
       if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
-      else if (totalActiveOrders >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
+      else if (totalActiveOrders >= maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(maxActiveOrders))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -142,7 +142,7 @@ class AddressActor(owner: Address,
         .sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")
-      val orders = if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders)
+      val orders = if (onlyActive) matchingActiveOrders else matchingActiveOrders ++ orderDB.getFinalizedOrders(owner, maybePair)
       sender ! Reply.OrdersStatuses(orders)
 
     case event: Event.StoreFailed =>

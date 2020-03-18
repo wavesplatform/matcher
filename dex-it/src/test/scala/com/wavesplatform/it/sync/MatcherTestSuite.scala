@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
-import com.wavesplatform.dex.db.OrderDB
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -31,6 +31,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
+
+  private val maxOrders = 99
+
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  order-db.max-orders = $maxOrders
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -356,7 +364,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     def mkAliceOrder(i: Int, tpe: OrderType) = mkOrder(alice, pair, tpe, 100L + i, Order.PriceConstant)
 
-    val orders = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+    val orders = (1 to (maxOrders + 5)).flatMap { i =>
       List(
         mkAliceOrder(i, OrderType.BUY),
         mkAliceOrder(i, OrderType.SELL)

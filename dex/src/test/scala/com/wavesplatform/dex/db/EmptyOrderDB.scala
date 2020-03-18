@@ -12,8 +12,6 @@ object EmptyOrderDB extends OrderDB {
   override def get(id: Order.Id): Option[Order]                                                     = None
   override def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = {}
   override def saveOrder(o: Order): Unit                                                            = {}
-  override def loadRemainingOrders(owner: Address,
-                                   maybePair: Option[AssetPair],
-                                   activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
+  override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
     Seq.empty
 }

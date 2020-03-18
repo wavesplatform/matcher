@@ -3,7 +3,7 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -56,7 +56,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.snapshotsInterval should be(999)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
-    settings.maxOrdersPerRequest should be(100)
+    settings.orderDb should be(OrderDB.Settings(199))
     settings.priceAssets should be(
       Seq(
         Waves,

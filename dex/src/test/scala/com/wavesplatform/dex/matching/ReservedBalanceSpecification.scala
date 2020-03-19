@@ -277,7 +277,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       withClue(s"Counter sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (minAmountFor(counterPrice), 0)
         openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve // <--
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
 
       withClue(s"Submitted sender should not have reserves:") {

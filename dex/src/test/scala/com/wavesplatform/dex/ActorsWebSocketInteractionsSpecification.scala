@@ -90,13 +90,8 @@ class ActorsWebSocketInteractionsSpecification
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
-      ao.fold { lo =>
-        eventsProbe.expectMsg(QueueEvent.Placed(lo))
-        addressDir ! OrderAdded(lo, System.currentTimeMillis)
-      } { mo =>
-        eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
-        addressDir ! OrderAdded(mo, System.currentTimeMillis)
-      }
+      eventsProbe.expectMsg(ao.fold[QueueEvent](QueueEvent.Placed)(QueueEvent.PlacedMarket))
+      addressDir ! OrderAdded(ao, System.currentTimeMillis)
     }
 
     def cancelOrder(ao: AcceptedOrder, isSystemCancel: Boolean): Unit = {

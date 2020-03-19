@@ -339,7 +339,7 @@ class AddressActor(owner: Address,
   }
 
   private def refreshOrderState(remaining: AcceptedOrder, event: OrderEvent): Unit = {
-    val origActiveOrder            = activeOrders.get(remaining.order.id())
+    val origActiveOrder            = activeOrders.get(remaining.id)
     lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
     lazy val openVolumeDiff        = remaining.reservableBalance |-| origReservableBalance
 
@@ -385,10 +385,11 @@ class AddressActor(owner: Address,
 
       // Further improvements will be made in DEX-467
       addressWsMutableState = (status match {
-        case OrderStatus.Accepted                    => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case _: OrderStatus.Cancelled                => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-        case _: OrderStatus.Filled if isSystemCancel => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-        case _                                       => addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+        case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+        case _: OrderStatus.Cancelled => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+        case _ =>
+          if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+          else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
       }).putReservedAssets(openVolumeDiff.keySet)
     }
   }

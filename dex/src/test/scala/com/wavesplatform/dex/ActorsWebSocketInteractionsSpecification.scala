@@ -88,7 +88,6 @@ class ActorsWebSocketInteractionsSpecification
       addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
     }
 
-    // TODO
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       ao.fold { lo =>
@@ -96,6 +95,7 @@ class ActorsWebSocketInteractionsSpecification
         addressDir ! OrderAdded(lo, System.currentTimeMillis)
       } { mo =>
         eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
+        addressDir ! OrderAdded(mo, System.currentTimeMillis)
       }
     }
 
@@ -272,7 +272,7 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(mo)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(150, 150), eth -> WsBalances(1.99998297, 0.00001703)),
-              Seq.empty // since market order cannot be added in order book
+              Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted))
             )
           }
 
@@ -547,7 +547,7 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(mo)
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 12.003)),
-            Seq.empty
+            Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted))
           )
 
           mo = matchOrders(mo, counter1)

@@ -103,7 +103,7 @@ object HistoryRouter {
               totalFilled = denormalizeAmountAndFee(submitted.order.amount - submitted.amount, assetPair.amountAsset),
               feeFilled = 0,
               feeTotalFilled = denormalizeAmountAndFee(submitted.order.matcherFee - submitted.fee, submitted.order.feeAsset),
-              status = OrderStatus.finalStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
+              status = OrderStatus.finalCancelStatus(submitted, isSystemCancel) match { case _: Filled => statusFilled; case _ => statusCancelled }
             )
           )
       }

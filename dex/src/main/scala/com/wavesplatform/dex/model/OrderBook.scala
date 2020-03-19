@@ -43,9 +43,11 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
   def add(submitted: AcceptedOrder,
           eventTs: Long,
           getMakerTakerFee: (AcceptedOrder, LimitOrder) => (Long, Long),
-          tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event], LevelAmounts) =
-    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, this)
-    else (this, Queue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
+          tickSize: Long = MatchingRule.DefaultRule.tickSize): (OrderBook, Queue[Event], LevelAmounts) = {
+    val events = Queue(OrderAdded(submitted, eventTs))
+    if (submitted.order.isValid(eventTs)) doMatch(eventTs, tickSize, getMakerTakerFee, submitted, events, this)
+    else (this, events.enqueue(OrderCanceled(submitted, isSystemCancel = false, eventTs)), LevelAmounts.empty)
+  }
 
   def snapshot: OrderBookSnapshot                     = OrderBookSnapshot(bids, asks, lastTrade)
   def aggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
@@ -108,6 +110,7 @@ object OrderBook {
                       tickSize: Long,
                       getMakerTakerMaxFee: (AcceptedOrder, LimitOrder) => (Long, Long),
                       submitted: AcceptedOrder,
+                      events: Queue[Event],
                       orderBook: OrderBook): (OrderBook, Queue[Event], LevelAmounts) = {
     @scala.annotation.tailrec
     def loop(orderBook: OrderBook,
@@ -161,18 +164,18 @@ object OrderBook {
         case _ =>
           submitted match {
             case submitted: LimitOrder =>
-              val levelPrice = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
+              val levelPrice       = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
               val updatedOrderBook = orderBook.insert(levelPrice, submitted)
               // TODO replace by levelChanges.add(levelPrice, submitted) during optimization
               val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(submitted.order.orderType, levelPrice))
-              (updatedOrderBook, events.enqueue(OrderAdded(submitted, eventTs)), updatedLevelChanges)
+              (updatedOrderBook, events, updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters
               (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)
           }
       }
 
-    loop(orderBook, submitted, Queue.empty, LevelAmounts.empty)
+    loop(orderBook, submitted, events, LevelAmounts.empty)
   }
 
   private def formatSide(side: Side): String =

@@ -165,6 +165,7 @@ class OrderBookTestSuite
       events should matchTo(
         Queue[Event](
           OrderAdded(counterSellOrder, now),
+          OrderAdded(submittedBuyOrder, now + 1),
           OrderExecuted(submittedBuyOrder, counterSellOrder, now + 1, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
         ))
 
@@ -204,7 +205,8 @@ class OrderBookTestSuite
       events1 should matchTo(Queue[Event](OrderAdded(counter, counterTs)))
 
       val (ob2, events2, _) = ob1.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1))
-      events2 should matchTo(Queue[Event](OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)))
+      events2 should matchTo(
+        Queue[Event](OrderAdded(submitted, submittedTs), OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)))
 
       ob2.asks shouldBe empty
       ob2.bids shouldBe empty
@@ -430,8 +432,8 @@ class OrderBookTestSuite
       val taker = if (isTMarket) market(tAmt, BUY, normalizedOrderTFee, tFeeAsset) else limit(tAmt, BUY, normalizedOrderTFee, tFeeAsset)
       val gmtf  = Matcher.getMakerTakerFee(ofs)(_, _)
 
-      // Ignore first OrderAdded, take first OrderExecuted, other events aren't interesting
-      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, now, gmtf))._2.tail.head
+      // Ignore first two OrderAdded, take next OrderExecuted, other events aren't interesting
+      val evt = OrderBook.empty.appendAll(List(maker, taker))(_.add(_, now, gmtf))._2.drop(2).head
 
       evt shouldBe a[OrderExecuted]
       val oe = evt.asInstanceOf[OrderExecuted]

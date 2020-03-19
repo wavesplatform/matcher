@@ -54,9 +54,11 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
       connection.getOrderChanges.size shouldEqual ordersChangesCount
     }
 
-    Thread.sleep(200)
+    Thread.sleep(200) // Wait an additional time for extra events
 
-    connection.getBalancesChanges.size should be <= balancesChangesCountBorders._2
+    withClue(s"Order changes are ${expectedOrdersChanges.mkString(", ")}: ") {
+      connection.getBalancesChanges.size should be <= balancesChangesCountBorders._2
+    }
 
     squashBalanceChanges(connection.getBalancesChanges) should matchTo(expectedBalanceChanges)
     connection.getOrderChanges should matchTo(expectedOrdersChanges)
@@ -74,7 +76,9 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
   }
 
   private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Seq[T] = {
-    eventually { wsc.getMessagesBuffer.size should be >= n }
+    withClue(s"Messages buffer is ${wsc.getMessagesBuffer.mkString(", ")}: ") {
+      eventually(wsc.getMessagesBuffer.size should be >= n)
+    }
     Thread.sleep(200) // Waiting for additional messages
     wsc.getMessagesBuffer
   }

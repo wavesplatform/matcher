@@ -6,7 +6,8 @@ import play.api.libs.json._
 sealed trait AcceptedOrderType
 
 object AcceptedOrderType {
-  case object Limit extends AcceptedOrderType
+
+  case object Limit  extends AcceptedOrderType
   case object Market extends AcceptedOrderType
 
   implicit val acceptedOrderTypeFormat: Format[AcceptedOrderType] = Format(

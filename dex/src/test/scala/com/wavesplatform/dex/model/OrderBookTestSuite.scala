@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import java.math.BigInteger
 import java.nio.ByteBuffer
 
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -8,7 +9,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.{Normalization, Price}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.SystemTime
@@ -254,13 +255,14 @@ class OrderBookTestSuite
 
     val (ob1, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2), now)
     ob1.allOrders.toList should matchTo {
-      List[LimitOrder](BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))
+      List[LimitOrder](BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2, BigInteger.ZERO),
+                       BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO))
     }
 
     val ord3        = sell(pair, 10 * Order.PriceConstant, 100)
     val (ob2, _, _) = ob1.append(LimitOrder(ord3), now)
 
-    ob2.allOrders.toList should matchTo(List[LimitOrder](BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
+    ob2.allOrders.toList should matchTo(List[LimitOrder](BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO)))
   }
 
   "execute orders at different price levels" in {
@@ -269,7 +271,7 @@ class OrderBookTestSuite
     val ord3 = sell(pair, 10 * Order.PriceConstant, 110)
     val ord4 = buy(pair, 22 * Order.PriceConstant, 115)
 
-    val (ob, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3, ord4).map(LimitOrder(_)), now)
+    val (ob, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3, ord4).map(LimitOrder.apply), now)
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
     ob.allOrders.toList should matchTo(
@@ -277,8 +279,11 @@ class OrderBookTestSuite
         SellLimitOrder(
           restAmount,
           ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
-          ord3
-        )))
+          ord3,
+          (BigInt(7) * Order.PriceConstant * 110 * Order.PriceConstant).bigInteger
+        )
+      )
+    )
   }
 
   "partially execute order with small remaining part" in {
@@ -287,13 +292,13 @@ class OrderBookTestSuite
     val ord3 = buy(pair, 100000001, 0.00045)
 
     val (ob, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
-    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO)))
   }
 
   "partially execute order with zero fee remaining part" in {
-    val ord1 = sell(pair, 1500.waves, 0.0006999)
-    val ord2 = sell(pair, 3075248828L, 0.00067634)
-    val ord3 = buy(pair, 3075363900L, 0.00073697)
+    val ord1 = sell(pair, 1500.waves, 0.00069990)
+    val ord2 = sell(pair, 30.75248828.waves, 0.00067634)
+    val ord3 = buy(pair, 30.75363900.waves, 0.00073697)
 
     val (ob, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
 
@@ -303,33 +308,35 @@ class OrderBookTestSuite
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
     val restFee = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
-    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1, (BigInt(corrected2) * 69990L).bigInteger)))
   }
 
   "partially execute order with price > 1 and zero fee remaining part " in {
     val pair = AssetPair(IssuedAsset(ByteStr("BTC".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
     val ord1 = sell(pair, 0.1.waves, 1850)
     val ord2 = sell(pair, 0.01.waves, 1840)
-    val ord3 = buy(pair, 0.0100001.waves, 2000)
+    val ord3 = buy(pair, 0.01000010.waves, 2000)
 
     val (ob, _, _) = OrderBook.empty.appendAllLimit(List(ord1, ord2, ord3), now)
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
     val restFee    = ord1.matcherFee - AcceptedOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
-    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1)))
+    ob.allOrders.toList should matchTo {
+      List[LimitOrder](SellLimitOrder(restAmount, restFee, ord1, (BigInt(1850) * Order.PriceConstant * 0.00000010.waves).bigInteger))
+    }
   }
 
   "buy small amount of pricey asset" in {
     val p = AssetPair(IssuedAsset(ByteStr("WAVES".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
-    val b = rawBuy(p, 700000L, 280)
-    val s = rawSell(p, 30000000000L, 280)
+    val b = rawBuy(p, 0.007.waves, 280)
+    val s = rawSell(p, 300.0.waves, 280)
 
     val (ob, _, _) = OrderBook.empty.appendAllLimit(List(s, b), now)
 
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
     val restFee     = s.matcherFee - AcceptedOrder.partialFee(s.matcherFee, s.amount, restSAmount)
-    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, s)))
+    ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(restAmount, restFee, s, (BigInt(restSAmount) * 280).bigInteger)))
   }
 
   "cleanup expired buy orders" in {
@@ -348,21 +355,28 @@ class OrderBookTestSuite
     val dest = new mutable.ArrayBuilder.ofByte
     OrderBookSideSnapshot.serialize(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    OrderBookSideSnapshot.loFromBytes(bb) shouldBe x
+    OrderBookSideSnapshot.loFromBytes(bb) should matchTo(x)
+
+    withClue("Using old serialization:\n") {
+      val dest = new mutable.ArrayBuilder.ofByte
+      OrderBookSideSnapshot.serializeOld(dest, x)
+      val bb = ByteBuffer.wrap(dest.result())
+      OrderBookSideSnapshot.loFromBytes(bb) should matchTo(x)
+    }
   }
 
   "OrderBookSideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
     OrderBookSideSnapshot.serialize(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    OrderBookSideSnapshot.fromBytes(bb) shouldBe x
+    OrderBookSideSnapshot.fromBytes(bb) should matchTo(x)
   }
 
   "LastTrade serialization" in forAll(lastTradeGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
     LastTrade.serialize(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    LastTrade.fromBytes(bb) shouldBe x
+    LastTrade.fromBytes(bb) should matchTo(x)
   }
 
   "OrderBookSnapshot serialization" in forAll(snapshotGen) { x =>
@@ -370,9 +384,9 @@ class OrderBookTestSuite
     OrderBookSnapshot.serialize(dest, x)
     val bb       = ByteBuffer.wrap(dest.result())
     val restored = OrderBookSnapshot.fromBytes(bb)
-    restored.asks shouldBe x.asks
-    restored.bids shouldBe x.bids
-    restored.lastTrade shouldBe x.lastTrade
+    restored.asks should matchTo(x.asks)
+    restored.bids should matchTo(x.bids)
+    restored.lastTrade should matchTo(x.lastTrade)
   }
 
   "create OrderExecuted events with different executed fee for maker and taker" in {
@@ -439,6 +453,65 @@ class OrderBookTestSuite
       val oe = evt.asInstanceOf[OrderExecuted]
       oe.counterExecutedFee shouldBe eMFee
       oe.submittedExecutedFee shouldBe eTFee
+    }
+  }
+
+  "correctly calculates average price" in {
+
+    val balance   = Map[Asset, Long](usd -> 500.usd).withDefaultValue(0L)
+    val submitted = createOrder(wavesUsdPair, BUY, 200.waves, 3.0)
+
+    Seq(LimitOrder(submitted), MarketOrder(submitted, a => balance(a))).foreach { buy =>
+      val orderType = buy.fold(_ => "Limit order")(_ => "Market order")
+      val ob        = OrderBook.empty
+
+      val sell1 = LimitOrder(createOrder(wavesUsdPair, SELL, 10.waves, 2.5))
+      val sell2 = LimitOrder(createOrder(wavesUsdPair, SELL, 50.waves, 2.7))
+      val sell3 = LimitOrder(createOrder(wavesUsdPair, SELL, 110.waves, 3.0))
+
+      val (_, events, _) = ob.appendAll(Seq(sell1, sell2, sell3, buy).zipWithIndex) {
+        case (ob, (order, timeOffset)) => ob.add(order, now + timeOffset, _.matcherFee -> _.matcherFee)
+      }
+
+      events should have size buy.fold(_ => 7)(_ => 8)
+      (0 to 3).foreach(events(_) shouldBe a[OrderAdded])
+
+      forAll(
+        Table(
+          ("event id", "execution number", "submitted weighed price", "submitted avg price", "counter weighed price", "counter avg price"),
+          (4, "first", 25.waves.usd, 2.5.usd, 25.waves.usd, 2.5.usd),
+          (5, "second", 160.waves.usd, 2.66.usd, 135.waves.usd, 2.7.usd),
+          (6, "third", 490.waves.usd, 2.88.usd, 330.waves.usd, 3.0.usd),
+        )
+        // format: off
+      ) { (eventId: Int, executionNumber: String, sAvgWeighedPriceNominator: Long, submittedAvgPrice: Long, cAvgWeighedPriceNominator: Long, counterAvgPrice: Long) =>
+        // format: on
+
+        withClue(s"$orderType, $executionNumber execution of 3:\n") {
+          events(eventId) shouldBe a[OrderExecuted]
+          val oe = events(eventId).asInstanceOf[OrderExecuted]
+
+          oe.submittedRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(sAvgWeighedPriceNominator)
+          oe.submittedRemaining.fillingInfo.avgWeighedPrice shouldBe submittedAvgPrice
+
+          oe.counterRemaining.avgWeighedPriceNominator shouldBe BigInteger.valueOf(cAvgWeighedPriceNominator)
+          oe.counterRemaining.fillingInfo.avgWeighedPrice shouldBe counterAvgPrice
+        }
+      }
+
+      buy.forMarket { buyMo =>
+        withClue(s"$orderType submitted remaining:\n") {
+
+          val remainingAmount = 30.waves
+          val remainingFee    = 0.00045.waves
+          val awpNominator    = BigInteger.valueOf(490.waves.usd)
+
+          events(7) shouldBe a[OrderCanceled]
+          events(7).asInstanceOf[OrderCanceled] should matchTo {
+            OrderCanceled(buyMo.partial(remainingAmount, remainingFee, 10.usd, awpNominator), isSystemCancel = true, now + 3)
+          }
+        }
+      }
     }
   }
 

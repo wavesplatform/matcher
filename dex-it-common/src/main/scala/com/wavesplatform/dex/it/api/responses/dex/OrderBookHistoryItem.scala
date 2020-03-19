@@ -16,7 +16,8 @@ case class OrderBookHistoryItem(id: Order.Id,
                                 feeAsset: Asset,
                                 timestamp: Long,
                                 status: OrderStatus,
-                                assetPair: AssetPair)
+                                assetPair: AssetPair,
+                                avgWeighedPrice: Long)
 
 object OrderBookHistoryItem {
   implicit val orderbookHistory: Format[OrderBookHistoryItem] = Json.format

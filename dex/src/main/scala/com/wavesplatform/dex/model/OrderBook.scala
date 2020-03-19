@@ -2,12 +2,9 @@ package com.wavesplatform.dex.model
 
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
-import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.settings.MatchingRule
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
 
 import scala.collection.immutable.{HashMap, Queue, TreeMap}
 
@@ -188,33 +185,6 @@ object OrderBook {
 
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
-
-  private def limitOrder(remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = o.orderType match {
-    case OrderType.BUY  => BuyLimitOrder(remainingAmount, remainingFee, o)
-    case OrderType.SELL => SellLimitOrder(remainingAmount, remainingFee, o)
-  }
-
-  private implicit val limitOrderFormat: Format[LimitOrder] = Format(
-    Reads[LimitOrder] {
-      case js: JsObject =>
-        val amount = (js \ "amount").as[Long]
-        val order  = (js \ "order").as[Order]
-        val fee    = (js \ "fee").asOpt[Long].getOrElse(AcceptedOrder.partialFee(order.matcherFee, order.amount, amount))
-        JsSuccess(limitOrder(amount, fee, order))
-      case _ => JsError("failed to deserialize LimitOrder")
-    },
-    ((__ \ "amount").format[Long] and
-      (__ \ "fee").format[Long] and
-      (__ \ "order").format[Order])(limitOrder, (lo: LimitOrder) => (lo.amount, lo.fee, lo.order))
-  )
-
-  implicit val priceMapFormat: Format[OrderBookSideSnapshot] =
-    implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
-      _.map { case (k, v) => k.toLong   -> v },
-      _.map { case (k, v) => k.toString -> v }
-    )
-
-  implicit val snapshotFormat: Format[OrderBookSnapshot] = Json.format
 
   val empty: OrderBook = new OrderBook(TreeMap.empty(bidsOrdering), TreeMap.empty(asksOrdering), None, HashMap.empty)
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import java.math.BigInteger
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs}
@@ -33,8 +34,7 @@ object OrderBookSideSnapshot {
     r.result()
   }
 
-  def serialize(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
-
+  def serializeOld(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
     dest ++= lo.order.orderType.bytes
     dest ++= Longs.toByteArray(lo.amount)
     dest ++= Longs.toByteArray(lo.fee)
@@ -46,17 +46,44 @@ object OrderBookSideSnapshot {
     dest ++= orderBytes
   }
 
+  def serialize(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+
+    dest ++= lo.order.orderType.bytes.map(b => (b | 2).toByte)
+    dest ++= Longs.toByteArray(lo.amount)
+    dest ++= Longs.toByteArray(lo.fee)
+    dest += lo.order.version
+
+    val orderBytes               = lo.order.bytes()
+    val avgWeighedPriceNominator = lo.avgWeighedPriceNominator.toByteArray
+
+    dest ++= Ints.toByteArray(orderBytes.length)
+    dest ++= orderBytes
+
+    dest ++= Ints.toByteArray(avgWeighedPriceNominator.length)
+    dest ++= avgWeighedPriceNominator
+  }
+
   def loFromBytes(bb: ByteBuffer): LimitOrder = {
 
-    val orderType = OrderType(bb.get)
-    val amount    = bb.getLong
-    val fee       = bb.getLong
-    val version   = bb.get
-    val order     = Order.fromBytes(version, bb.getBytes)
+    val header           = bb.get
+    val structureVersion = header >> 1
+    val orderType        = (header & 1).toByte
 
-    orderType match {
-      case OrderType.SELL => SellLimitOrder(amount, fee, order)
-      case OrderType.BUY  => BuyLimitOrder(amount, fee, order)
+    val amount  = bb.getLong
+    val fee     = bb.getLong
+    val version = bb.get
+    val order   = Order.fromBytes(version, bb.getBytes)
+
+    val avgWeighedPriceNominator =
+      if (structureVersion == 1) new BigInteger(bb.getBytes)
+      else {
+        val filledAmount = order.amount - amount
+        (BigInt(order.price) * filledAmount).bigInteger
+      }
+
+    OrderType(orderType) match {
+      case OrderType.SELL => SellLimitOrder(amount, fee, order, avgWeighedPriceNominator)
+      case OrderType.BUY  => BuyLimitOrder(amount, fee, order, avgWeighedPriceNominator)
     }
   }
 }

@@ -209,7 +209,7 @@ ${updatedOb.aggregatedSnapshot}
     "result.levelChanges.prices == all(event.executedPrice)" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob                                = mkOrderBook(askOrders, bidOrders)
-        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, _.matcherFee -> _.matcherFee)
 
         val levelChangesPrices = levelChanges.asks.keySet ++ levelChanges.bids.keySet
 

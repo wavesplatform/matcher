@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.gen
 
+import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -73,8 +74,8 @@ trait OrderBookGen {
     } yield {
       val restFee = AcceptedOrder.partialFee(order.matcherFee, order.amount, restAmount)
       order.orderType match {
-        case OrderType.SELL => SellLimitOrder(restAmount, restFee, order)
-        case OrderType.BUY  => BuyLimitOrder(restAmount, restFee, order)
+        case OrderType.SELL => SellLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price))
+        case OrderType.BUY  => BuyLimitOrder(restAmount, restFee, order, BigInteger.valueOf(order.price))
       }
     }
 
@@ -84,8 +85,8 @@ trait OrderBookGen {
       availableForSpending <- Gen.choose(minAmount(order.price), order.amount)
     } yield {
       order.orderType match {
-        case OrderType.SELL => SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending)
-        case OrderType.BUY  => BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending)
+        case OrderType.SELL => SellMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price))
+        case OrderType.BUY  => BuyMarketOrder(order.amount, order.matcherFee, order, availableForSpending, BigInteger.valueOf(order.price))
       }
     }
 

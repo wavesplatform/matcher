@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.model
 
+import java.math.BigInteger
+
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
@@ -532,7 +534,10 @@ class OrderHistoryBalanceSpecification
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
     oh.processAll(
       exec1,
-      OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), isSystemCancel = false, time.getTimestamp()))
+      OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee, BigInteger.ZERO),
+                    isSystemCancel = false,
+                    time.getTimestamp())
+    )
 
     orderStatus(counter.id()) shouldBe OrderStatus.Cancelled(1000000000, 142857)
     orderStatus(submitted.id()) shouldBe OrderStatus.Filled(1000000000, 300000)

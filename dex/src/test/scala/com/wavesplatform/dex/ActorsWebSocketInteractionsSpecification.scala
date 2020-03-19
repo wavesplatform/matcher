@@ -430,7 +430,6 @@ class ActorsWebSocketInteractionsSpecification
           ad ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
           ep.expectMsg(QueueEvent.Placed(submitted))
 
-          // TODO check other tests: OrderAdded should be after place
           ad ! OrderAdded(submitted, now)
           val oe = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
           ad ! oe

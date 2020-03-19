@@ -179,13 +179,8 @@ class AddressActor(owner: Address,
 
     case event @ OrderAdded(submitted, _) =>
       import submitted.order
-
-      val updatedStatus = activeStatus(submitted)
-      log.trace(s"OrderAdded(${order.id()}), new status is $updatedStatus")
-      orderDB.saveOrder(submitted.order)
-      refresh(submitted, event)
-      scheduleExpiration(submitted.order)
-
+      log.trace(s"OrderAdded(${order.id()})")
+      refreshOrderState(submitted, event)
       pendingCommands.remove(order.id()).foreach { command =>
         log.trace(s"Confirming placement for ${order.id()}")
         command.client ! api.OrderAccepted(order)
@@ -193,15 +188,14 @@ class AddressActor(owner: Address,
 
     case event: OrderExecuted =>
       log.trace(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
-      List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refresh(_, event))
+      List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
       context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
     case event @ OrderCanceled(ao, isSystemCancel, _) =>
       val id       = ao.id
       val isActive = activeOrders.contains(id)
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
-      if (isActive) refresh(ao, event)
-
+      if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancelation for $id")
         pc.client ! api.OrderCanceled(id)
@@ -344,11 +338,10 @@ class AddressActor(owner: Address,
       order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
   }
 
-  private def refresh(remaining: AcceptedOrder, event: OrderEvent): Unit = {
+  private def refreshOrderState(remaining: AcceptedOrder, event: OrderEvent): Unit = {
     val origActiveOrder            = activeOrders.get(remaining.order.id())
     lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
-
-    lazy val openVolumeDiff = remaining.reservableBalance |-| origReservableBalance
+    lazy val openVolumeDiff        = remaining.reservableBalance |-| origReservableBalance
 
     val (status, isSystemCancel) = event match {
       case _: OrderAdded        => (activeStatus(remaining), false)
@@ -370,6 +363,12 @@ class AddressActor(owner: Address,
       case _ =>
         activeOrders.put(remaining.id, remaining)
         openVolume = openVolume |+| openVolumeDiff
+        status match {
+          case OrderStatus.Accepted =>
+            orderDB.saveOrder(remaining.order)
+            scheduleExpiration(remaining.order)
+          case _ =>
+        }
     }
 
     if (addressWsMutableState.hasActiveConnections) {

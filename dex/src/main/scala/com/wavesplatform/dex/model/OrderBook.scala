@@ -80,10 +80,6 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
       copy(bids = bids.put(levelPrice, lo), orderIds = updatedOrderIds)
     )
   }
-
-  // TODO Remove during optimization
-  private def levelAmountsAt(tpe: OrderType, levelPrice: Price): LevelAmounts =
-    LevelAmounts(tpe, levelPrice, side(tpe))
 }
 
 object OrderBook {
@@ -131,8 +127,7 @@ object OrderBook {
               else ob.unsafeWithoutBest(counter.order.orderType)
             }
 
-            // TODO replace by levelChanges.subtract(levelPrice, orderExecutedEvent) during optimization
-            val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(counter.order.orderType, levelPrice))
+            val updatedLevelChanges = levelChanges.subtract(levelPrice, orderExecutedEvent)
 
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
@@ -161,10 +156,9 @@ object OrderBook {
         case _ =>
           submitted match {
             case submitted: LimitOrder =>
-              val levelPrice       = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-              val updatedOrderBook = orderBook.insert(levelPrice, submitted)
-              // TODO replace by levelChanges.add(levelPrice, submitted) during optimization
-              val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(submitted.order.orderType, levelPrice))
+              val levelPrice          = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
+              val updatedOrderBook    = orderBook.insert(levelPrice, submitted)
+              val updatedLevelChanges = levelChanges.add(levelPrice, submitted)
               (updatedOrderBook, events, updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters

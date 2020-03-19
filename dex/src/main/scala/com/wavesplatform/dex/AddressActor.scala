@@ -39,9 +39,8 @@ import scala.util.{Failure, Success}
 class AddressActor(owner: Address,
                    time: Time,
                    orderDB: OrderDB,
-                   hasOrderInBlockchain: Order.Id => Future[Boolean],
+                   validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
                    store: StoreEvent,
-                   orderBookCache: AssetPair => OrderBookAggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
@@ -66,8 +65,8 @@ class AddressActor(owner: Address,
       log.debug(s"Got $command")
       val orderId = command.order.id()
 
-      if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
-      else if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
+      if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
+      if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -295,18 +294,15 @@ class AddressActor(owner: Address,
         case Some(nextCommand) =>
           nextCommand.command match {
             case command: Command.PlaceOrder =>
-              val validationResult = {
-                for {
-                  hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
-                  tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
-                } yield {
-                  val ao = command.toAcceptedOrder(tradableBalance)
-                  accountStateValidator(ao, tradableBalance, hasOrderInBlockchain) match {
-                    case Left(error) => Event.ValidationFailed(ao.id, error)
-                    case Right(_)    => Event.ValidationPassed(ao)
-                  }
+              val validationResult = for {
+                tradableBalance <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+                ao = command.toAcceptedOrder(tradableBalance)
+                r <- validate(ao, tradableBalance)
+              } yield
+                r match {
+                  case Left(error) => Event.ValidationFailed(ao.id, error)
+                  case Right(_)    => Event.ValidationPassed(ao)
                 }
-              }
 
               validationResult recover {
                 case ex: WavesNodeConnectionLostException =>
@@ -317,21 +313,41 @@ class AddressActor(owner: Address,
                   Event.ValidationFailed(command.order.id(), UnexpectedError)
               } pipeTo self
 
+//              val validationResult = for {
+//                hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
+//                tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+//                ao = command.toAcceptedOrder(tradableBalance)
+//                r <- accountStateValidator(ao, tradableBalance, hasOrderInBlockchain).value
+//              } yield
+//                r match {
+//                  case Left(error) => Event.ValidationFailed(ao.id, error)
+//                  case Right(_)    => Event.ValidationPassed(ao)
+//                }
+//
+//              validationResult recover {
+//                case ex: WavesNodeConnectionLostException =>
+//                  log.error("Waves Node connection lost", ex)
+//                  Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
+//                case ex =>
+//                  log.error("An unexpected error occurred", ex)
+//                  Event.ValidationFailed(command.order.id(), UnexpectedError)
+//              } pipeTo self
+
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }
       }
   }
 
-  private def accountStateValidator(acceptedOrder: AcceptedOrder,
-                                    tradableBalance: Map[Asset, Long],
-                                    hasOrderInBlockchain: Boolean): OrderValidator.Result[AcceptedOrder] = {
-    OrderValidator
-      .accountStateAware(acceptedOrder.order.sender,
-                         tradableBalance.withDefaultValue(0L),
-                         totalActiveOrders,
-                         hasOrder(_, hasOrderInBlockchain),
-                         orderBookCache)(acceptedOrder)
-  }
+//  private def accountStateValidator(acceptedOrder: AcceptedOrder,
+//                                    tradableBalance: Map[Asset, Long],
+//                                    hasOrderInBlockchain: Boolean): FutureResult[AcceptedOrder] = for {
+//    orderBookCache <- Future.failed()
+//  } yield OrderValidator
+//    .accountStateAware(acceptedOrder.order.sender,
+//      tradableBalance.withDefaultValue(0L),
+//      totalActiveOrders,
+//      hasOrder(_, hasOrderInBlockchain),
+//      orderBookCache)(acceptedOrder)
 
   private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
     spendableBalancesActor
@@ -470,8 +486,7 @@ class AddressActor(owner: Address,
         case _                    => throw new IllegalStateException("Impossibru")
       }
 
-  private def hasOrder(id: Order.Id, hasOrderInBlockchain: Boolean): Boolean =
-    activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain
+  private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || pendingCommands.contains(id) || orderDB.containsInfo(id)
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
 

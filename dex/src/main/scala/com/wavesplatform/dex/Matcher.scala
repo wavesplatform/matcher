@@ -14,7 +14,7 @@ import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
 import com.wavesplatform.dex.api.websockets.WsOrderBook
-import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -30,7 +30,6 @@ import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
@@ -99,30 +98,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
 
-  private val orderBookCache        = new ConcurrentHashMap[AssetPair, OrderBookAggregatedSnapshot](1000, 0.9f, 10)
   private val matchingRulesCache    = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
   private val rateCache             = RateCache(db)
-
-  private val orderBooksSnapshotCache =
-    new OrderBookSnapshotHttpCache(
-      settings.orderBookSnapshotHttpCache,
-      time,
-      assetsCache.get(_).map(_.decimals),
-      p => Option { orderBookCache.get(p) }
-    )
-
-  private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
-  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
-
-  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = {
-    getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
-  }
-
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBookAggregatedSnapshot): Unit = {
-    orderBookCache.put(assetPair, newSnapshot)
-    orderBooksSnapshotCache.invalidate(assetPair)
-  }
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
@@ -132,8 +110,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       addressActors,
       orderBookSnapshotStore,
       assetPair,
-      updateOrderBookCache(assetPair),
-      marketStatuses.put(assetPair, _),
       time,
       wsUpdates = new WsOrderBook.Update(assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset)),
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
@@ -171,7 +147,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       for {
         _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
         _ <- timeAware(time)(o)
-        _ <- marketAware(actualOrderFeeSettings, settings.deviation, getMarketStatus(o.assetPair))(o)
         _ <- tickSizeAware(actualTickSize)(o)
       } yield o
     }
@@ -192,6 +167,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     for {
       _ <- liftAsync { syncValidation(assetsCache.unsafeGetDecimals) }
+      _ <- if (settings.deviation.enabled) {
+        orderBooks.get().get(o.assetPair)
+        marketAware(actualOrderFeeSettings, settings.deviation, getMarketStatus(o.assetPair))(o)
+        Future.failed(???)
+      } else liftValueAsync(o)
       _ <- asyncValidation(assetsCache.unsafeGet)
     } yield o
   }
@@ -205,12 +185,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         addressActors,
         matcherQueue.storeEvent,
         p => Option { orderBooks.get() } flatMap (_ get p),
-        p => Option { marketStatuses.get(p) },
         getActualTickSize = assetPair => {
           matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
         },
         validateOrder,
-        orderBooksSnapshotCache,
         settings,
         () => status.get(),
         db,
@@ -232,7 +210,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       ),
       MatcherApiRouteV1(
         pairBuilder,
-        orderBooksSnapshotCache,
         () => status.get(),
         apiKeyHash,
         settings
@@ -363,10 +340,15 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       new AddressActor(
         address,
         time,
-        orderDB,
-        wavesBlockchainAsyncClient.forgedOrder,
+        orderDB, { (ao, tradableBalance) =>
+          for {
+            hasOrderInBlockchain <- wavesBlockchainAsyncClient.forgedOrder(ao.id)
+            orderBookCache       <- Future.failed()
+          } yield
+            OrderValidator
+              .accountStateAware(ao.order.sender, tradableBalance.withDefaultValue(0L), hasOrderInBlockchain, orderBookCache)(ao)
+        },
         matcherQueue.storeEvent,
-        orderBookCache.getOrDefault(_, OrderBookAggregatedSnapshot.empty),
         startSchedules,
         spendableBalancesActor,
         settings.addressActorSettings
@@ -394,10 +376,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       _ <- {
         log.info("Shutting down queue...")
         Future(blocking(matcherQueue.close(5.seconds)))
-      }
-      _ <- {
-        log.info("Shutting down caches...")
-        Future.successful(orderBooksSnapshotCache.close())
       }
       _ <- {
         log.info("Shutting down materializer...")

@@ -17,7 +17,6 @@ import javax.ws.rs.Path
 @Path("/api/v1")
 @Api(value = "/api v1/")
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
-                             orderBookSnapshot: OrderBookSnapshotHttpCache,
                              matcherStatus: () => Matcher.Status,
                              apiKeyHash: Option[Array[Byte]],
                              matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)

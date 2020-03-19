@@ -34,7 +34,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
 
       if (unknownAssets.isEmpty) sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
       else
-        spendableBalances(address, unknownAssets.keySet)
+        spendableBalances(address, unknownAssets.keySet) // TODO what if this future fail?
           .map(stateFromNode => SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, stateFromNode))
           .pipeTo(self)(sender)
 

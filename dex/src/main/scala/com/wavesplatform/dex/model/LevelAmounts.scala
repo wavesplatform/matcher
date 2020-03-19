@@ -10,6 +10,7 @@ import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.LevelAmounts.mkDiff
 
 case class LevelAmounts(asks: Map[Price, Amount] = Map.empty, bids: Map[Price, Amount] = Map.empty) {
+  def isEmpty: Boolean                                                = asks.isEmpty && bids.isEmpty
   def put(other: LevelAmounts): LevelAmounts                          = LevelAmounts(asks ++ other.asks, bids ++ other.bids)
   def add(levelPrice: Price, lo: LimitOrder): LevelAmounts            = this |+| mkDiff(levelPrice, lo)
   def subtract(levelPrice: Price, event: OrderExecuted): LevelAmounts = this |-| mkDiff(levelPrice, event)

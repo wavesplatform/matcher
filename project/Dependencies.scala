@@ -79,6 +79,7 @@ object Dependencies {
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon"                      %% s"kamon-$module"  % version
 
   private val akkaActor            = akkaModule("akka-actor", Version.akka)
+  private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
@@ -153,6 +154,7 @@ object Dependencies {
   val globalEnforcedVersions = Def.setting(
     Seq(
       akkaActor,
+      akkaActorTyped,
       akkaHttp,
       akkaModule("akka-stream", Version.akka),
       jacksonModule("core", "core"),
@@ -182,6 +184,7 @@ object Dependencies {
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,
+      akkaActorTyped,
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,

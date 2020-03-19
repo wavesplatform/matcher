@@ -1,6 +1,10 @@
 package com.wavesplatform.dex.market
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Terminated}
+import java.io.EOFException
+
+import akka.actor.typed
+import akka.actor.typed.scaladsl.adapter._
+import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
@@ -28,23 +32,24 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 class OrderBookActor(settings: Settings,
-                     owner: ActorRef,
-                     addressActor: ActorRef,
-                     snapshotStore: ActorRef,
+                     owner: classic.ActorRef,
+                     addressActor: classic.ActorRef,
+                     snapshotStore: classic.ActorRef,
                      assetPair: AssetPair,
-                     updateSnapshot: OrderBookAggregatedSnapshot => Unit,
-                     updateMarketStatus: MarketStatus => Unit,
                      time: Time,
                      wsUpdates: WsOrderBook.Update,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
                      getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext)
-    extends Actor
+    extends classic.Actor
     with WorkingStash
     with ScorexLogging {
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
+
+  // TODO context watch
+  private var aggregated: typed.ActorRef[AggregatedOrderBookActor.Message] = _
 
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
@@ -67,9 +72,7 @@ class OrderBookActor(settings: Settings,
     }
   }
 
-  override def receive: Receive = recovering
-
-  private def recovering: Receive = {
+  private val recovering: Receive = {
     case OrderBookSnapshotStoreActor.Response.GetSnapshot(result) =>
       result.foreach { case (_, snapshot) => orderBook = OrderBook(snapshot) }
 
@@ -85,8 +88,8 @@ class OrderBookActor(settings: Settings,
 
       lastProcessedOffset foreach actualizeRules
 
-      updateMarketStatus(MarketStatus(orderBook))
-      updateSnapshot(orderBook.aggregatedSnapshot)
+      // TODO
+      aggregated = context.spawn(AggregatedOrderBookActor(assetPair, 8, 8, AggregatedOrderBookActor.State.fromOrderBook(orderBook)), "aggregated")
       processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
@@ -96,7 +99,7 @@ class OrderBookActor(settings: Settings,
     case x => stash(x)
   }
 
-  private def working: Receive = {
+  private val working: Receive = {
     case request: QueueEventWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
@@ -108,7 +111,7 @@ class OrderBookActor(settings: Settings,
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
-              updateSnapshot(OrderBookAggregatedSnapshot.empty)
+              wsState.wsConnections.foreach(_ ! wsCloseMessage)
               wsState = wsState.withoutSubscriptions
               process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
@@ -144,10 +147,15 @@ class OrderBookActor(settings: Settings,
       wsState = wsState.flushed()
       if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
 
-    case Terminated(ws) =>
-      log.trace(s"[${ws.hashCode()}] WebSocket terminated")
-      wsState = wsState.withoutSubscription(ws)
+    case classic.Terminated(ws) =>
+      if (ws == aggregated) log.error("Terminated aggregated actor!")
+      else {
+        log.trace(s"[${ws.hashCode()}] WebSocket terminated")
+        wsState = wsState.withoutSubscription(ws)
+      }
   }
+
+  override val receive: Receive = recovering
 
   private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
@@ -158,14 +166,11 @@ class OrderBookActor(settings: Settings,
       case _                       => false
     }
     if (hasTrades) orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
+    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO
     processEvents(events)
   }
 
-  private def processEvents(events: TraversableOnce[Event]): Unit = {
-    updateMarketStatus(MarketStatus(orderBook))
-    updateSnapshot(orderBook.aggregatedSnapshot)
-    events.foreach(addressActor ! _.unsafeTap(logEvent))
-  }
+  private def processEvents(events: TraversableOnce[Event]): Unit = events.foreach(addressActor ! _.unsafeTap(logEvent))
 
   private def logEvent(e: Event): Unit = log.info {
     import Events._
@@ -182,6 +187,7 @@ class OrderBookActor(settings: Settings,
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         wsState = wsState.withLevelChanges(levelChanges)
+        aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")
@@ -205,7 +211,8 @@ class OrderBookActor(settings: Settings,
     lt = ob.lastTrade
   )
 
-  private def scheduleNextSendWsUpdates(): Cancellable = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, SendWsUpdates)
+  private def scheduleNextSendWsUpdates(): classic.Cancellable =
+    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, SendWsUpdates)
 
   private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit = {
     val saveSnapshot = (lastSavedSnapshotOffset, lastProcessedOffset).tupled.forall { case (saved, processed) => saved < processed }
@@ -227,30 +234,31 @@ class OrderBookActor(settings: Settings,
 
 object OrderBookActor {
 
+  private val reason = new EOFException("Order book was deleted")
+  reason.setStackTrace(Array.empty)
+
+  private val wsCloseMessage = classic.Status.Failure(reason)
+
   case class Settings(wsMessagesInterval: FiniteDuration)
 
   def props(settings: Settings,
-            parent: ActorRef,
-            addressActor: ActorRef,
-            snapshotStore: ActorRef,
+            parent: classic.ActorRef,
+            addressActor: classic.ActorRef,
+            snapshotStore: classic.ActorRef,
             assetPair: AssetPair,
-            updateSnapshot: OrderBookAggregatedSnapshot => Unit,
-            updateMarketStatus: MarketStatus => Unit,
             time: Time,
             wsUpdates: WsOrderBook.Update,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext): Props =
-    Props(
+            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext): classic.Props =
+    classic.Props(
       new OrderBookActor(
         settings,
         parent,
         addressActor,
         snapshotStore,
         assetPair,
-        updateSnapshot,
-        updateMarketStatus,
         time,
         wsUpdates,
         matchingRules,

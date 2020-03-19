@@ -451,7 +451,6 @@ object OrderValidator extends ScorexLogging {
 
   def accountStateAware(sender: Address,
                         tradableBalance: Asset => Long,
-                        activeOrderCount: => Int,
                         orderExists: ByteStr => Boolean,
                         orderBookCache: AssetPair => OrderBookAggregatedSnapshot)(acceptedOrder: AcceptedOrder)(
       implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =

@@ -135,8 +135,8 @@ class AddressActor(owner: Address,
         toCancel.foreach(x => cancel(x.order))
       }
 
-    case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume)
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
+    case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
@@ -334,7 +334,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).filter(_._2 > 0).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {

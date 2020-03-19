@@ -11,13 +11,11 @@ import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
 import scala.collection.immutable.Queue
 
-// TODO remove trackedOrders
 case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
                                  pendingWsConnections: Queue[ActorRef],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
-                                 ordersChanges: Map[Order.Id, WsOrder],
-                                 trackedOrders: Set[Order.Id]) {
+                                 ordersChanges: Map[Order.Id, WsOrder]) {
 
   val hasActiveConnections: Boolean = activeWsConnections.nonEmpty
   val hasChangedAssets: Boolean     = getAllChangedAssets.nonEmpty
@@ -35,26 +33,19 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
       copy(activeWsConnections = Queue.empty,
            changedReservableAssets = Set.empty,
            changedSpendableAssets = Set.empty,
-           ordersChanges = Map.empty,
-           trackedOrders = Set.empty)
+           ordersChanges = Map.empty)
     else copy(activeWsConnections = activeWsConnections.filterNot(_ == subscriber))
   }
 
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
   def putSpendableAssets(diff: Set[Asset]): AddressWsMutableState = copy(changedSpendableAssets = changedSpendableAssets ++ diff)
 
-  def putOrderUpdate(id: Order.Id, update: WsOrder): AddressWsMutableState =
-    copy(ordersChanges = ordersChanges + (id -> update), trackedOrders = trackedOrders + id)
+  def putOrderUpdate(id: Order.Id, update: WsOrder): AddressWsMutableState = copy(ordersChanges = ordersChanges + (id -> update))
 
   def putOrderStatusUpdate(id: Order.Id, newStatus: OrderStatus): AddressWsMutableState =
     putOrderUpdate(
       id = id,
       update = ordersChanges.getOrElse(id, WsOrder(id)).copy(status = newStatus.name.some)
-    ).copy(
-      trackedOrders = newStatus match {
-        case _: OrderStatus.Final => trackedOrders - id
-        case _                    => trackedOrders
-      }
     )
 
   def putOrderFillingInfoAndStatusUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): AddressWsMutableState = {
@@ -79,5 +70,5 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
 }
 
 object AddressWsMutableState {
-  val empty: AddressWsMutableState = AddressWsMutableState(Queue.empty, Queue.empty, Set.empty, Set.empty, Map.empty, Set.empty)
+  val empty: AddressWsMutableState = AddressWsMutableState(Queue.empty, Queue.empty, Set.empty, Set.empty, Map.empty)
 }

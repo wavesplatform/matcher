@@ -20,12 +20,11 @@ import com.wavesplatform.dex.domain.model.Denormalization.denormalizeAmountAndFe
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError, UnexpectedError, WavesNodeConnectionBroken}
-import com.wavesplatform.dex.fp.MapImplicits
-import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.{BatchOrderCancelActor, CreateExchangeTransactionActor}
-import com.wavesplatform.dex.model.Events.{Event => OrderEvent, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
@@ -137,7 +136,7 @@ class AddressActor(owner: Address,
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume)
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets)(MapImplicits.group).map(Reply.Balance).pipeTo(sender)
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
@@ -178,7 +177,7 @@ class AddressActor(owner: Address,
           } else log.warn(s"Received stale $event for $orderId")
       }
 
-    case event @ OrderAdded(submitted, _) if submitted.order.sender.toAddress == owner => // TODO why?
+    case event @ OrderAdded(submitted, _) =>
       import submitted.order
 
       val updatedStatus = activeStatus(submitted)
@@ -335,7 +334,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -349,7 +348,6 @@ class AddressActor(owner: Address,
     val origActiveOrder            = activeOrders.get(remaining.order.id())
     lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
 
-    // TODO non-cleaning and use it in putReservedAssets
     lazy val openVolumeDiff = remaining.reservableBalance |-| origReservableBalance
 
     val (status, isSystemCancel) = event match {
@@ -386,17 +384,13 @@ class AddressActor(owner: Address,
         spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, correction)
       }
 
+      // Further improvements will be made in DEX-467
       addressWsMutableState = (status match {
-        case OrderStatus.Accepted => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case status: OrderStatus.Cancelled =>
-          addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-
-        case _: OrderStatus.Filled =>
-          if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-          else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
-
-        case _ => addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
-      }).putReservedAssets(origReservableBalance.keySet)
+        case OrderStatus.Accepted                    => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+        case _: OrderStatus.Cancelled                => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+        case _: OrderStatus.Filled if isSystemCancel => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+        case _                                       => addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+      }).putReservedAssets(openVolumeDiff.keySet)
     }
   }
 

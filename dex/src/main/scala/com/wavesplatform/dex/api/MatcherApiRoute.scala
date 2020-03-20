@@ -12,7 +12,7 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, PlayJsonException, SwaggerDocService}
+import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -116,7 +116,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           handleRejections(invalidJsonParsingRejectionsHandler) {
             getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
               getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
-              historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+              historyDelete ~ cancel ~ cancelAll ~ cancelAllById ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
               upsertRate ~ deleteRate ~ saveSnapshots
           }
         }
@@ -524,6 +524,39 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     handleCancelRequest(None)
   }
 
+  @Path("/orderbook/cancel")
+  @ApiOperation(
+    value = "Cancel all active orders",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json",
+    response = classOf[Any]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "body",
+        value = "Json with data",
+        required = true,
+        paramType = "body",
+        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
+      ),
+      new ApiImplicitParam(
+        name = `X-User-Public-Key`.headerName,
+        value = "User's public key",
+        required = true,
+        dataType = "string",
+        paramType = "header",
+        defaultValue = ""
+      ),
+    )
+  )
+  def cancelAllById: Route = (path("orders" / "cancel") & post & withAuth & withUserPublicKey) { userPublicKey =>
+    entity(as[Set[ByteStr]]) { xs =>
+      complete { askAddressActor(userPublicKey.toAddress, AddressActor.Command.CancelOrders(xs)) }
+    } ~ complete(StatusCodes.BadRequest)
+  }
+
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete")
   @Deprecated
   @ApiOperation(
@@ -661,13 +694,23 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = `X-User-Public-Key`.headerName,
+        value = "User's public key",
+        required = false,
+        dataType = "string",
+        paramType = "header",
+        defaultValue = ""
+      ),
     )
   )
-  def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
-    DBUtils.order(db, orderId) match {
-      case Some(order) => handleCancelRequest(None, order.sender, Some(orderId), None)
-      case None        => complete(OrderCancelRejected(error.OrderNotFound(orderId)))
+  def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
+    def reject = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
+    (DBUtils.order(db, orderId), userPublicKey) match {
+      case (None, _)                                               => reject
+      case (Some(order), Some(pk)) if pk.toAddress != order.sender => reject
+      case (Some(order), _)                                        => handleCancelRequest(None, order.sender, Some(orderId), None)
     }
   }
 
@@ -741,7 +784,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
-    signedGet(publicKey) {
+    (signedGet(publicKey) | withAuth) {
       complete {
         askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
           stringifyAssetIds(r.balance)

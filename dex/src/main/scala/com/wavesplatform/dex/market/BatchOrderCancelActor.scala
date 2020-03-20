@@ -11,8 +11,13 @@ import com.wavesplatform.dex.{api, error}
 
 import scala.concurrent.duration.FiniteDuration
 
-class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef, timeout: FiniteDuration)
-    extends Actor
+class BatchOrderCancelActor private (
+    orderIds: Set[Order.Id],
+    processorActor: ActorRef,
+    clientActor: ActorRef,
+    timeout: FiniteDuration,
+    initResponse: Map[Order.Id, api.MatcherResponse]
+) extends Actor
     with ScorexLogging {
 
   import BatchOrderCancelActor._
@@ -20,7 +25,7 @@ class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: Act
 
   orderIds.foreach(processorActor ! CancelOrder(_))
 
-  override def receive: Receive = state(orderIds, Map.empty, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
+  override def receive: Receive = state(orderIds, initResponse, context.system.scheduler.scheduleOnce(timeout, self, TimedOut))
 
   private def state(restOrderIds: Set[Order.Id], response: Map[Order.Id, api.MatcherResponse], timer: Cancellable): Receive = {
     case CancelResponse(id, x) =>
@@ -45,9 +50,13 @@ class BatchOrderCancelActor private(orderIds: Set[Order.Id], processorActor: Act
 }
 
 object BatchOrderCancelActor {
-  def props(orderIds: Set[Order.Id], processorActor: ActorRef, clientActor: ActorRef, timeout: FiniteDuration): Props = {
+  def props(orderIds: Set[Order.Id],
+            processorActor: ActorRef,
+            clientActor: ActorRef,
+            timeout: FiniteDuration,
+            initResponse: Map[Order.Id, api.MatcherResponse] = Map.empty): Props = {
     require(orderIds.nonEmpty, "orderIds is empty")
-    Props(new BatchOrderCancelActor(orderIds, processorActor, clientActor, timeout))
+    Props(new BatchOrderCancelActor(orderIds, processorActor, clientActor, timeout, initResponse))
   }
 
   object CancelResponse {

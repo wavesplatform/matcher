@@ -85,6 +85,7 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       dex1.api.placeMarket(smo)
       waitForOrderAtNode(smo)
 
+      eventually { wsc.getAllOrders.size should be >= 3 }
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 51.003, reserved = 0.0))
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 1.0, reserved = 0.0))
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 55.5, reserved = 0.0))
@@ -96,7 +97,7 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
             .copy(
               filledAmount = 50.0.some,
               filledFee = 0.003.some,
-              avgFilledPrice = 1.0.some // TODO change after DEX-594
+              avgWeighedPrice = 1.11.some // (15*120 + 25*110 + 10*100)/50
             )
         )
       )

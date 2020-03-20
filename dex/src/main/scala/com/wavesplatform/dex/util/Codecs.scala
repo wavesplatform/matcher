@@ -2,7 +2,6 @@ package com.wavesplatform.dex.util
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.Ints
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -11,11 +10,6 @@ import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 object Codecs {
 
   implicit class ByteBufferExt(val b: ByteBuffer) extends AnyVal {
-
-    def putBytes(array: Array[Byte]): ByteBuffer = {
-      b.put(Ints.toByteArray(array.length))
-      b.put(array)
-    }
 
     def getBytes: Array[Byte] = {
       val len = b.getInt

@@ -49,8 +49,8 @@ sealed trait AcceptedOrder {
   def spentAmount: Long
   def receiveAmount: Long
 
-  def isMarket: Boolean = this.fold(_ => false)(_ => true)
-  def isLimit: Boolean  = this.fold(_ => true)(_ => false)
+  def isMarket: Boolean
+  def isLimit: Boolean
 
   def isBuyOrder: Boolean  = order.orderType == OrderType.BUY
   def isSellOrder: Boolean = order.orderType == OrderType.SELL
@@ -108,13 +108,8 @@ sealed trait AcceptedOrder {
       .longValue()
   }
 
-  def fold[A](fl: LimitOrder => A)(fm: MarketOrder => A): A = this match {
-    case lo: LimitOrder  => fl(lo)
-    case mo: MarketOrder => fm(mo)
-  }
-
-  def forMarket(fm: MarketOrder => Unit): Unit = fold(_ => ())(fm)
-  def forLimit(fl: LimitOrder => Unit): Unit   = fold(fl)(_ => ())
+  def forMarket(fm: MarketOrder => Unit): Unit
+  def forLimit(fl: LimitOrder => Unit): Unit
 }
 
 object AcceptedOrder {
@@ -182,38 +177,40 @@ object AcceptedOrder {
     def minBetweenMatchedAmountAnd(value: Long): Long            = math.min(matchedAmount, value)
     def correctByCounterPrice(value: java.math.BigDecimal): Long = submitted.correctedAmountOfAmountAsset(value, counterPrice)
 
-    submitted.fold(_ => matchedAmount) { mo =>
-      minBetweenMatchedAmountAnd {
-        if (mo.isBuyOrder) {
-          correctByCounterPrice {
-            if (mo.spentAsset == mo.feeAsset) {
-              // mo.availableForSpending * mo.amount / (counter.price * mo.amount / Order.PriceConstant + mo.fee)
-              val moAmount = new BigDecimal(mo.amount)
-              new BigDecimal(mo.availableForSpending)
-                .multiply(moAmount)
-                .divide(
-                  counterPrice
-                    .multiply(moAmount)
-                    .scaleByPowerOfTen(-Order.PriceConstantExponent)
-                    .add(new BigDecimal(mo.fee)),
-                  0,
-                  RoundingMode.FLOOR
-                )
-            } else {
-              // mo.availableForSpending * Order.PriceConstant / counter.price
-              new BigDecimal(mo.availableForSpending)
-                .scaleByPowerOfTen(Order.PriceConstantExponent)
-                .divide(counterPrice, 0, RoundingMode.FLOOR)
+    submitted match {
+      case _: LimitOrder => matchedAmount
+      case mo: MarketOrder =>
+        minBetweenMatchedAmountAnd {
+          if (mo.isBuyOrder) {
+            correctByCounterPrice {
+              if (mo.spentAsset == mo.feeAsset) {
+                // mo.availableForSpending * mo.amount / (counter.price * mo.amount / Order.PriceConstant + mo.fee)
+                val moAmount = new BigDecimal(mo.amount)
+                new BigDecimal(mo.availableForSpending)
+                  .multiply(moAmount)
+                  .divide(
+                    counterPrice
+                      .multiply(moAmount)
+                      .scaleByPowerOfTen(-Order.PriceConstantExponent)
+                      .add(new BigDecimal(mo.fee)),
+                    0,
+                    RoundingMode.FLOOR
+                  )
+              } else {
+                // mo.availableForSpending * Order.PriceConstant / counter.price
+                new BigDecimal(mo.availableForSpending)
+                  .scaleByPowerOfTen(Order.PriceConstantExponent)
+                  .divide(counterPrice, 0, RoundingMode.FLOOR)
+              }
             }
-          }
-        } else if (mo.spentAsset == mo.feeAsset) {
-          // mo.availableForSpending * mo.amount / (mo.amount + mo.fee)
-          new BigDecimal(mo.availableForSpending)
-            .multiply(new BigDecimal(mo.amount))
-            .divide(new BigDecimal(mo.amount + mo.fee), 0, RoundingMode.FLOOR)
-            .longValue()
-        } else mo.availableForSpending
-      }
+          } else if (mo.spentAsset == mo.feeAsset) {
+            // mo.availableForSpending * mo.amount / (mo.amount + mo.fee)
+            new BigDecimal(mo.availableForSpending)
+              .multiply(new BigDecimal(mo.amount))
+              .divide(new BigDecimal(mo.amount + mo.fee), 0, RoundingMode.FLOOR)
+              .longValue()
+          } else mo.availableForSpending
+        }
     }
   }
 
@@ -233,8 +230,15 @@ sealed trait SellOrder extends AcceptedOrder {
 }
 
 sealed trait LimitOrder extends AcceptedOrder {
+
   def partial(amount: Long, fee: Long, avgWeighedPriceNominator: BigInteger): LimitOrder
   def reservableBalance: Map[Asset, Long] = requiredBalance
+
+  override def isLimit: Boolean  = true
+  override def isMarket: Boolean = false
+
+  override def forMarket(fm: MarketOrder => Unit): Unit = ()
+  override def forLimit(fl: LimitOrder => Unit): Unit   = fl(this)
 }
 
 object LimitOrder {
@@ -266,6 +270,12 @@ sealed trait MarketOrder extends AcceptedOrder {
     else requiredBalance.updated(order.getSpendAssetId, availableForSpending)
 
   def partial(amount: Long, fee: Long, availableForSpending: Long, avgWeighedPriceNominator: BigInteger): MarketOrder
+
+  override def isLimit: Boolean  = false
+  override def isMarket: Boolean = true
+
+  override def forMarket(fm: MarketOrder => Unit): Unit = fm(this)
+  override def forLimit(fl: LimitOrder => Unit): Unit   = ()
 }
 
 object MarketOrder {
@@ -413,7 +423,10 @@ object Events {
       )
     }
 
-    lazy val submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder](submittedLimitRemaining)(submittedMarketRemaining)
+    lazy val submittedRemaining: AcceptedOrder = submitted match {
+      case lo: LimitOrder  => submittedLimitRemaining(lo)
+      case mo: MarketOrder => submittedMarketRemaining(mo)
+    }
   }
 
   case class OrderAdded(order: AcceptedOrder, timestamp: Long) extends Event

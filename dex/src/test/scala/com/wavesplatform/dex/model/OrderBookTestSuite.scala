@@ -352,24 +352,20 @@ class OrderBookTestSuite
   }
 
   "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
-    val dest = new mutable.ArrayBuilder.ofByte
-    OrderBookSideSnapshot.serialize(dest, x)
-    val bb = ByteBuffer.wrap(dest.result())
-    OrderBookSideSnapshot.loFromBytes(bb) should matchTo(x)
-
-    withClue("Using old serialization:\n") {
+    import OrderBookSideSnapshot.{encodeLoV1, encodeLoV2}
+    Seq(encodeLoV1 _, encodeLoV2 _).foreach { encode =>
       val dest = new mutable.ArrayBuilder.ofByte
-      OrderBookSideSnapshot.serializeOld(dest, x)
+      encode(dest, x)
       val bb = ByteBuffer.wrap(dest.result())
-      OrderBookSideSnapshot.loFromBytes(bb) should matchTo(x)
+      OrderBookSideSnapshot.decodeLo(bb) should matchTo(x)
     }
   }
 
   "OrderBookSideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
-    OrderBookSideSnapshot.serialize(dest, x)
+    OrderBookSideSnapshot.encode(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    OrderBookSideSnapshot.fromBytes(bb) should matchTo(x)
+    OrderBookSideSnapshot.decode(bb) should matchTo(x)
   }
 
   "LastTrade serialization" in forAll(lastTradeGen) { x =>
@@ -462,7 +458,7 @@ class OrderBookTestSuite
     val submitted = createOrder(wavesUsdPair, BUY, 200.waves, 3.0)
 
     Seq(LimitOrder(submitted), MarketOrder(submitted, a => balance(a))).foreach { buy =>
-      val orderType = buy.fold(_ => "Limit order")(_ => "Market order")
+      val orderType = if (buy.isLimit) "Limit order" else "Market order"
       val ob        = OrderBook.empty
 
       val sell1 = LimitOrder(createOrder(wavesUsdPair, SELL, 10.waves, 2.5))
@@ -473,7 +469,7 @@ class OrderBookTestSuite
         case (ob, (order, timeOffset)) => ob.add(order, now + timeOffset, _.matcherFee -> _.matcherFee)
       }
 
-      events should have size buy.fold(_ => 7)(_ => 8)
+      events should have size (if (buy.isLimit) 7 else 8)
       (0 to 3).foreach(events(_) shouldBe a[OrderAdded])
 
       forAll(

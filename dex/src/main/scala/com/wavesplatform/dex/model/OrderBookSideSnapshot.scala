@@ -12,29 +12,30 @@ import scala.collection.mutable
 
 object OrderBookSideSnapshot {
 
-  def serialize(dest: mutable.ArrayBuilder[Byte], snapshot: OrderBookSideSnapshot): Unit = {
+  def encode(dest: mutable.ArrayBuilder[Byte], snapshot: OrderBookSideSnapshot): Unit = {
     dest ++= Ints.toByteArray(snapshot.size)
     snapshot.foreach {
       case (price, xs) =>
         dest ++= Longs.toByteArray(price)
         dest ++= Ints.toByteArray(xs.size)
-        xs.foreach(serialize(dest, _))
+        xs.foreach(encodeLoV2(dest, _))
     }
   }
 
-  def fromBytes(bb: ByteBuffer): OrderBookSideSnapshot = {
+  def decode(bb: ByteBuffer): OrderBookSideSnapshot = {
     val snapshotSize = bb.getInt
     val r            = Map.newBuilder[Price, Seq[LimitOrder]]
     (1 to snapshotSize).foreach { _ =>
       val price       = bb.getLong
       val levelSize   = bb.getInt
-      val limitOrders = (1 to levelSize).map(_ => loFromBytes(bb))
+      val limitOrders = (1 to levelSize).map(_ => decodeLo(bb))
       r += price -> limitOrders
     }
     r.result()
   }
 
-  def serializeOld(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+  def encodeLoV1(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+
     dest ++= lo.order.orderType.bytes
     dest ++= Longs.toByteArray(lo.amount)
     dest ++= Longs.toByteArray(lo.fee)
@@ -46,36 +47,30 @@ object OrderBookSideSnapshot {
     dest ++= orderBytes
   }
 
-  def serialize(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+  def encodeLoV2(dest: mutable.ArrayBuilder[Byte], lo: LimitOrder): Unit = {
+    val avgWeighedPriceNominatorBytes = lo.avgWeighedPriceNominator.toByteArray
 
-    dest ++= lo.order.orderType.bytes.map(b => (b | 2).toByte)
-    dest ++= Longs.toByteArray(lo.amount)
-    dest ++= Longs.toByteArray(lo.fee)
-    dest += lo.order.version
+    dest += 2
 
-    val orderBytes               = lo.order.bytes()
-    val avgWeighedPriceNominator = lo.avgWeighedPriceNominator.toByteArray
+    encodeLoV1(dest, lo)
 
-    dest ++= Ints.toByteArray(orderBytes.length)
-    dest ++= orderBytes
-
-    dest ++= Ints.toByteArray(avgWeighedPriceNominator.length)
-    dest ++= avgWeighedPriceNominator
+    dest ++= Ints.toByteArray(avgWeighedPriceNominatorBytes.length)
+    dest ++= avgWeighedPriceNominatorBytes
   }
 
-  def loFromBytes(bb: ByteBuffer): LimitOrder = {
+  def decodeLo(bb: ByteBuffer): LimitOrder = {
 
-    val header           = bb.get
-    val structureVersion = header >> 1
-    val orderType        = (header & 1).toByte
+    val header    = bb.get
+    val version   = if (header == 2) 2 else 1
+    val orderType = if (version == 1) header else bb.get
 
-    val amount  = bb.getLong
-    val fee     = bb.getLong
-    val version = bb.get
-    val order   = Order.fromBytes(version, bb.getBytes)
+    val amount       = bb.getLong
+    val fee          = bb.getLong
+    val orderVersion = bb.get
+    val order        = Order.fromBytes(orderVersion, bb.getBytes)
 
     val avgWeighedPriceNominator =
-      if (structureVersion == 1) new BigInteger(bb.getBytes)
+      if (version == 2) new BigInteger(bb.getBytes)
       else {
         val filledAmount = order.amount - amount
         (BigInt(order.price) * filledAmount).bigInteger

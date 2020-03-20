@@ -143,6 +143,10 @@ trait MkWavesEntities {
                              timestamp)
   }
 
+  def mkBurn(issuer: KeyPair, assetId: String, amount: Long, fee: Long = issueFee, timestamp: Long = System.currentTimeMillis): BurnTransactionV2 = {
+    Transactions.makeBurnTx(issuer, AddressScheme.current.chainId, assetId, amount, fee, timestamp)
+  }
+
   def mkIssueExtended(issuer: KeyPair,
                       name: String,
                       quantity: Long,

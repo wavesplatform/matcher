@@ -13,4 +13,9 @@ class WebSocketAuthenticatedConnection(uri: String)(implicit system: ActorSystem
   def getOrderChanges: Seq[WsOrder]                   = getMessagesBuffer.flatMap(_.orders).distinct
 
   def getSnapshot: WsAddressState = getMessagesBuffer.headOption.getOrElse(WsAddressState.empty)
+
+  def getAllBalances = getMessagesBuffer.flatMap(_.balances).toList
+
+  def getAllOrders = getMessagesBuffer.flatMap(_.orders).toList
+
 }

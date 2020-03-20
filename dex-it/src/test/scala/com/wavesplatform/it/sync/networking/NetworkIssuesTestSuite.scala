@@ -95,7 +95,7 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
     dex1.restartWithNewSuiteConfig(conf)
 
-    val account = createAccountWithBalance(5.004.waves -> Waves)
+    val account = mkAccountWithBalance(5.004.waves -> Waves)
 
     markup("Place order")
     val order = mkOrder(account, wavesUsdPair, SELL, 5.waves, 5.usd)
@@ -120,21 +120,6 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
     markup("Place order")
     placeAndAwaitAtDex(mkOrder(account, wavesUsdPair, SELL, 1.waves, 5.usd))
-  }
-
-  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
-
-    balances.foreach {
-      case (balance, asset) => {
-        assert(
-          wavesNode1.api.balance(alice, asset) >= balance,
-          s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
-        )
-        broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
-      }
-    }
-    account
   }
 
   private def clearOrderBook(): Unit = {

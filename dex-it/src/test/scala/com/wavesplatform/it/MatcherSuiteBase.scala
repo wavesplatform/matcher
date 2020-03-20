@@ -1,7 +1,13 @@
 package com.wavesplatform.it
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
+
 import cats.instances.FutureInstances
 import com.wavesplatform.dex.asset.DoubleOps
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
@@ -13,6 +19,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
+import org.scalatest
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -23,7 +30,7 @@ import scala.concurrent.duration.DurationInt
 trait MatcherSuiteBase
     extends AnyFreeSpec
     with Matchers
-    with CancelAfterFailure
+   // with CancelAfterFailure
     with BeforeAndAfterAll
     with BeforeAndAfterEach
     with Eventually
@@ -62,5 +69,21 @@ trait MatcherSuiteBase
     log.debug(s"Perform afterAll")
     stopBaseContainers()
     super.afterAll()
+  }
+
+  def mkAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+
+    balances.foreach {
+      case (balance, asset) =>
+        asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
+          assert(
+            wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
+            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
+          )
+        }
+        broadcastAndAwait { mkTransfer(alice, account, balance, asset, 0.003.waves) }
+    }
+    account
   }
 }

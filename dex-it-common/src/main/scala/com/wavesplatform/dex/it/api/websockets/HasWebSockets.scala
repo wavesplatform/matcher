@@ -8,15 +8,20 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.websockets.WsOrderBook
+import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.docker.DexContainer
 import mouse.any._
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.Json
 
 trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
+
+  private implicit val derivedAddressStateDiff: Diff[WsAddressState] = Derived(Diff.gen[WsAddressState].value.ignore(_.timestamp))
+  private implicit val derivedOrderBookDiff: Diff[WsOrderBook]       = Derived(Diff.gen[WsOrderBook].value.ignore(_.timestamp))
 
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
@@ -35,7 +40,7 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
   protected def mkWebSocketAuthenticatedConnection(client: KeyPair, dex: DexContainer): WebSocketAuthenticatedConnection = {
 
     val prefix        = "as"
-    val timestamp     = System.currentTimeMillis()
+    val timestamp     = System.currentTimeMillis() + 86400000
     val signedMessage = prefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
     val wsUri         = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/${client.publicKey}?Timestamp=$timestamp&Signature=$signature"
@@ -60,6 +65,17 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
       materializer.shutdown()
     }
   }
+
+  protected def squashOrderBooks(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
+    case (r, x) =>
+      WsOrderBook(
+        asks = r.asks ++ x.asks,
+        bids = r.bids ++ x.bids,
+        lastTrade = r.lastTrade.orElse(x.lastTrade)
+      )
+  }
+
+  protected def squashBalanceChanges(xs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = xs.foldLeft(Map.empty[Asset, WsBalances]) { _ ++ _ }
 
   override def afterAll(): Unit = {
     super.afterAll()

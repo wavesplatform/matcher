@@ -30,7 +30,7 @@ import scala.concurrent.duration.DurationInt
 trait MatcherSuiteBase
     extends AnyFreeSpec
     with Matchers
-   // with CancelAfterFailure
+    with CancelAfterFailure
     with BeforeAndAfterAll
     with BeforeAndAfterEach
     with Eventually

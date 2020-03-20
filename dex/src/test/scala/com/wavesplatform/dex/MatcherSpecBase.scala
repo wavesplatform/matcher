@@ -1,5 +1,6 @@
 package com.wavesplatform.dex
 
+import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
 
@@ -265,7 +266,11 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield BuyLimitOrder(amount, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield
+    BuyLimitOrder(amount,
+                  matcherFee,
+                  Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+                  BigInteger.ZERO)
 
   protected val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: KeyPair    <- accountGen
@@ -276,7 +281,11 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield
+    SellLimitOrder(amount,
+                   matcherFee,
+                   Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+                   BigInteger.ZERO)
 
   protected val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
 

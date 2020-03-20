@@ -39,23 +39,14 @@ class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) =
       forward(lo.order.sender, e)
       historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 
-    case e @ Events.OrderExecuted(submitted, counter, timestamp, _, _) =>
+    case e: Events.OrderExecuted =>
+      import e.{submitted, counter}
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
-
-      lazy val isFirstExecution  = submitted.amount == submitted.order.amount
-      lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
-
-      (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
-        case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
-        case _                                     => Unit
-      }
-
       historyRouter foreach { _ ! SaveEvent(e) }
 
-    case e @ Events.OrderCanceled(ao, _, timestamp) =>
-      forward(ao.order.sender, e)
-      if (ao.isMarket && ao.amount == ao.order.amount) historyRouter foreach { _ ! SaveOrder(ao, timestamp) }
+    case e: Events.OrderCanceled =>
+      forward(e.acceptedOrder.order.sender, e)
       historyRouter foreach { _ ! SaveEvent(e) }
 
     case e: OrderCancelFailed =>

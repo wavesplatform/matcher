@@ -6,5 +6,4 @@ import com.wavesplatform.it.MatcherSuiteBase
 class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
   //TODO: remove
-
 }

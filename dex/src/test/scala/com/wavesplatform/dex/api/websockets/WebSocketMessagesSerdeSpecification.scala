@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.api.websockets
 
+import java.math.BigInteger
+
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
@@ -39,8 +41,8 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     val ao = (isNew, isMarket) match {
       case (true, true)   => MarketOrder(order, _ => Long.MaxValue)
       case (true, false)  => LimitOrder(order)
-      case (false, true)  => MarketOrder(order, _ => Long.MaxValue).partial(partialAmount, partialFee, Long.MaxValue)
-      case (false, false) => LimitOrder(order).partial(partialAmount, partialFee)
+      case (false, true)  => MarketOrder(order, _ => Long.MaxValue).partial(partialAmount, partialFee, Long.MaxValue, BigInteger.valueOf(order.price))
+      case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
     val result = WsOrder.fromDomain(ao, AddressActor.activeStatus(ao))

@@ -140,21 +140,26 @@ class OrderBookActorSpecification
       val ord2 = sell(pair, 15 * Order.PriceConstant, 100)
 
       actor ! wrapLimitOrder(ord1)
-      actor ! wrapLimitOrder(ord2)
+      tp.expectMsgType[OrderAdded]
 
-      tp.receiveN(3)
+      actor ! wrapLimitOrder(ord2)
+      tp.expectMsgType[OrderAdded]
+      tp.expectMsgType[OrderExecuted]
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
 
       actor ! RestartActor
       tp.expectMsg(
-        OrderAdded(SellLimitOrder(
-                     ord2.amount - ord1.amount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+        OrderAdded(
+          SellLimitOrder(
+            ord2.amount - ord1.amount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+            ord2,
+            (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -167,7 +172,7 @@ class OrderBookActorSpecification
       actor ! wrapLimitOrder(ord1)
       actor ! wrapLimitOrder(ord2)
       actor ! wrapLimitOrder(ord3)
-      tp.receiveN(4)
+      tp.receiveN(5)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
@@ -175,12 +180,15 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(BuyLimitOrder(
-                     restAmount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+        OrderAdded(
+          BuyLimitOrder(
+            restAmount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+            ord2,
+            (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -195,7 +203,7 @@ class OrderBookActorSpecification
       actor ! wrapLimitOrder(ord2)
       actor ! wrapLimitOrder(ord3)
       actor ! wrapLimitOrder(ord4)
-      tp.receiveN(6)
+      tp.receiveN(7)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
@@ -207,10 +215,12 @@ class OrderBookActorSpecification
           SellLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-            ord2
+            ord2,
+            (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
           ),
           ord2.timestamp
-        ))
+        )
+      )
       tp.expectMsgType[OrderBookRecovered]
     }
 
@@ -429,7 +439,7 @@ class OrderBookActorSpecification
         }
 
         orderBook ! wrapMarketOrder(marketOrder)
-
+        tp.expectMsgType[OrderAdded]
         val oe1 = tp.expectMsgType[OrderExecuted]
         oe1.submitted shouldBe marketOrder
         oe1.counter shouldBe LimitOrder(counterOrder1)
@@ -489,6 +499,7 @@ class OrderBookActorSpecification
 
         withClue("Stop condition - no counter orders:") {
           orderBook ! wrapMarketOrder(marketOrder)
+          tp.expectMsgType[OrderAdded]
           val oc = tp.expectMsgType[OrderCanceled]
 
           oc.acceptedOrder shouldBe marketOrder
@@ -503,7 +514,7 @@ class OrderBookActorSpecification
           tp.expectMsgType[OrderAdded]
 
           orderBook ! wrapMarketOrder(marketOrder)
-
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
@@ -563,6 +574,7 @@ class OrderBookActorSpecification
 
           orderBook ! wrapMarketOrder(marketOrder)
 
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)

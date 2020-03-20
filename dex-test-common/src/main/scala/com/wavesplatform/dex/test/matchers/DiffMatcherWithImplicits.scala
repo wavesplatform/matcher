@@ -18,8 +18,10 @@ object DiffMatcherWithImplicits {
 
   case class DiffForMatcher[A: Diff](right: A) extends Matcher[A] {
     override def apply(left: A): MatchResult = Diff[A].apply(left, right) match {
-      case c: DiffResultDifferent => MatchResult(matches = false, s"Matching error:\n${Console.RESET}${c.show}${Console.RESET}", "")
-      case _                      => MatchResult(matches = true, "", "")
+      case c: DiffResultDifferent =>
+        val diff = c.show.split('\n').mkString(Console.RESET, s"${Console.RESET}\n${Console.RESET}", Console.RESET)
+        MatchResult(matches = false, s"Matching error:\n$diff", "")
+      case _ => MatchResult(matches = true, "", "")
     }
   }
 

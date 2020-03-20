@@ -22,7 +22,7 @@ case class WsOrder(id: Order.Id,
                    status: Option[String] = None,
                    filledAmount: Option[Double] = None,
                    filledFee: Option[Double] = None,
-                   avgFilledPrice: Option[Double] = None)
+                   avgWeighedPrice: Option[Double] = None)
 
 object WsOrder {
 
@@ -48,7 +48,7 @@ object WsOrder {
       status.name.some,
       ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee),
       ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee),
-      ao.fillingInfo.avgFilledPrice.some.map(denormalizePrice)
+      ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
     )
   }
 
@@ -96,6 +96,6 @@ object WsOrder {
         (__ \ "s").formatNullable[String](orderStatusFormat) and    // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
         (__ \ "q").formatNullable[Double](doubleAsStringFormat) and // filled amount
         (__ \ "Q").formatNullable[Double](doubleAsStringFormat) and // filled fee
-        (__ \ "r").formatNullable[Double](doubleAsStringFormat)     // average filled price among all trades
+        (__ \ "r").formatNullable[Double](doubleAsStringFormat)     // average weighed price among all trades
     )(WsOrder.apply, unlift(WsOrder.unapply))
 }

@@ -16,7 +16,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.OrderAdded
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, OrderBookAggregatedSnapshot}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.BeforeAndAfterAll
@@ -225,11 +225,12 @@ class AddressActorSpecification
 
     def addOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
-      ao.fold { lo =>
-        eventsProbe.expectMsg(QueueEvent.Placed(lo))
-        addressDir ! OrderAdded(lo, System.currentTimeMillis)
-      } { mo =>
-        eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
+      ao match {
+        case lo: LimitOrder =>
+          eventsProbe.expectMsg(QueueEvent.Placed(lo))
+          addressDir ! OrderAdded(lo, System.currentTimeMillis)
+        case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
+
       }
     }
 

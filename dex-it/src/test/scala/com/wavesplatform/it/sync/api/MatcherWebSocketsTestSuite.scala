@@ -191,7 +191,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
               .copy(
                 filledAmount = 6.0.some,
                 filledFee = 0.00000017.some,
-                avgFilledPrice = 3.0.some
+                avgWeighedPrice = 3.0.some
               ),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some)
           )

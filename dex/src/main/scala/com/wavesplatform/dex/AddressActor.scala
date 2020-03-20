@@ -358,7 +358,7 @@ class AddressActor(owner: Address,
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
         activeOrders.remove(remaining.id).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
-        orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v3(remaining, status))
+        orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v4(remaining, status))
 
       case _ =>
         activeOrders.put(remaining.id, remaining)

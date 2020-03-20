@@ -61,7 +61,7 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
           status = newStatus.name.some,
           filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
           filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, ad).toDouble),
-          avgFilledPrice = ao.fillingInfo.avgFilledPrice.some.map(denormalizePrice(_, ad, pd).toDouble)
+          avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble)
         )
     )
   }

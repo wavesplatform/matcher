@@ -90,7 +90,7 @@ class ActorsWebSocketInteractionsSpecification
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
-      eventsProbe.expectMsg(ao.fold[QueueEvent](QueueEvent.Placed)(QueueEvent.PlacedMarket))
+      eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
       addressDir ! OrderAdded(ao, System.currentTimeMillis)
     }
 
@@ -219,7 +219,7 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 5.0.some,
                   filledFee = 0.0015.some,
-                  avgFilledPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some
                 )
               )
             )
@@ -281,7 +281,7 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 10.0.some,
                   filledFee = 0.00000340.some,
-                  avgFilledPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some
                 )
               )
             )
@@ -297,7 +297,7 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 25.0.some,
                   filledFee = 0.00000850.some,
-                  avgFilledPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some
                 )
               )
             )
@@ -313,7 +313,7 @@ class ActorsWebSocketInteractionsSpecification
                   status = OrderStatus.PartiallyFilled.name.some,
                   filledAmount = 30.0.some,
                   filledFee = 0.00001020.some,
-                  avgFilledPrice = 3.0.some
+                  avgWeighedPrice = 3.0.some
                 )
               )
             )
@@ -475,7 +475,7 @@ class ActorsWebSocketInteractionsSpecification
                       status = OrderStatus.Filled.name.some,
                       filledAmount = 5.0.some,
                       filledFee = 0.003.some,
-                      avgFilledPrice = 3.0.some)
+                      avgWeighedPrice = 3.0.some)
             )
           )
 
@@ -487,7 +487,7 @@ class ActorsWebSocketInteractionsSpecification
                       status = OrderStatus.Filled.name.some,
                       filledAmount = 5.0.some,
                       filledFee = 0.003.some,
-                      avgFilledPrice = 3.1.some)
+                      avgWeighedPrice = 3.1.some)
             )
           )
 
@@ -499,7 +499,7 @@ class ActorsWebSocketInteractionsSpecification
                       status = OrderStatus.PartiallyFilled.name.some,
                       filledAmount = 2.0.some,
                       filledFee = 0.0012.some,
-                      avgFilledPrice = 3.2.some)
+                      avgWeighedPrice = 3.2.some)
             )
           )
 
@@ -550,10 +550,10 @@ class ActorsWebSocketInteractionsSpecification
             Seq(
               WsOrder(
                 id = mo.id,
-                avgFilledPrice = 3.0.some,
+                status = OrderStatus.PartiallyFilled.name.some,
                 filledAmount = 5.0.some,
                 filledFee = 0.00125.some,
-                status = OrderStatus.PartiallyFilled.name.some
+                avgWeighedPrice = 3.0.some
               )
             )
           )
@@ -566,7 +566,7 @@ class ActorsWebSocketInteractionsSpecification
                       status = OrderStatus.PartiallyFilled.name.some,
                       filledAmount = 10.0.some,
                       filledFee = 0.0025.some,
-                      avgFilledPrice = 3.0.some)
+                      avgWeighedPrice = 3.05.some)
             )
           )
 
@@ -579,7 +579,7 @@ class ActorsWebSocketInteractionsSpecification
                 status = OrderStatus.Filled.name.some,
                 filledAmount = 12.0.some,
                 filledFee = 0.003.some,
-                avgFilledPrice = 3.0.some
+                avgWeighedPrice = 3.07.some
               )
             )
           )

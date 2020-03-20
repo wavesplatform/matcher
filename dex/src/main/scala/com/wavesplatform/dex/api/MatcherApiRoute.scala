@@ -554,18 +554,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       StatusCodes.OK -> reply.xs.map {
         case (id, oi) =>
           Json.obj(
-            "id"        -> id.toString,
-            "type"      -> oi.side.toString,
-            "orderType" -> oi.orderType,
-            "amount"    -> oi.amount,
-            "fee"       -> oi.matcherFee,
-            "price"     -> oi.price,
-            "timestamp" -> oi.timestamp,
-            "filled"    -> oi.status.filledAmount,
-            "filledFee" -> oi.status.filledFee,
-            "feeAsset"  -> oi.feeAsset,
-            "status"    -> oi.status.name,
-            "assetPair" -> oi.assetPair.json
+            "id"              -> id.toString,
+            "type"            -> oi.side.toString,
+            "orderType"       -> oi.orderType,
+            "amount"          -> oi.amount,
+            "fee"             -> oi.matcherFee,
+            "price"           -> oi.price,
+            "timestamp"       -> oi.timestamp,
+            "filled"          -> oi.status.filledAmount,
+            "filledFee"       -> oi.status.filledFee,
+            "feeAsset"        -> oi.feeAsset,
+            "status"          -> oi.status.name,
+            "assetPair"       -> oi.assetPair.json,
+            "avgWeighedPrice" -> oi.avgWeighedPrice
           )
       }
     }

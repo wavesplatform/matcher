@@ -151,12 +151,15 @@ class OrderBookActorSpecification
 
       actor ! RestartActor
       tp.expectMsg(
-        OrderAdded(SellLimitOrder(
-                     ord2.amount - ord1.amount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+        OrderAdded(
+          SellLimitOrder(
+            ord2.amount - ord1.amount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+            ord2,
+            (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -177,12 +180,15 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(BuyLimitOrder(
-                     restAmount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+        OrderAdded(
+          BuyLimitOrder(
+            restAmount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+            ord2,
+            (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -209,10 +215,12 @@ class OrderBookActorSpecification
           SellLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-            ord2
+            ord2,
+            (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
           ),
           ord2.timestamp
-        ))
+        )
+      )
       tp.expectMsgType[OrderBookRecovered]
     }
 

@@ -120,7 +120,7 @@ class AddressActor(owner: Address,
 
     case command: Command.CancelOrders =>
       val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
-      val toCancelIds       = allActiveOrderIds -- command.orderIds
+      val toCancelIds       = allActiveOrderIds.intersect(command.orderIds)
       val unknownIds        = command.orderIds -- allActiveOrderIds
       log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknownIds: ${unknownIds.mkString(", ")}")
 

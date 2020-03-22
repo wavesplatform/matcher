@@ -78,6 +78,16 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
     TryHttpURLConnectionBackend(customizeConnection = conn => {
+      conn.setConnectTimeout(10000)
+      conn.setReadTimeout(10000)
+
+      conn.setDefaultUseCaches(false)
+      conn.setUseCaches(false)
+      conn.setRequestProperty("Cache-Control", "no-store")
+      conn.setRequestProperty("Pragma", "no-cache")
+      conn.setRequestProperty("If-Modified-Since", "Sat, 1 Jan 2000 00:00:00 GMT")
+      conn.setRequestProperty("Expired", "0")
+
       if (conn.getRequestMethod == "POST" && conn.getDoOutput) conn.setChunkedStreamingMode(0)
     })
   )

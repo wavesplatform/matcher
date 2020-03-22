@@ -83,20 +83,47 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       }
     }
 
-    "with API key" in {
-      val order = mkBobOrder
-      placeAndAwaitAtDex(order)
+    "with API key" - {
+      "and without X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
 
-      dex1.api.cancelWithApiKey(order)
-      dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+        dex1.api.cancelWithApiKey(order)
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-      dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
 
-      dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
 
-      val orderBook = dex1.api.orderBook(wavesUsdPair)
-      orderBook.bids shouldBe empty
-      orderBook.asks shouldBe empty
+        val orderBook = dex1.api.orderBook(wavesUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+
+      "and with a valid X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
+
+        dex1.api.cancelWithApiKey(order, Some(order.senderPublicKey))
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+        val orderBook = dex1.api.orderBook(wavesUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+
+      "and with an invalid X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
+
+        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193)
+        dex1.api.cancelWithApiKey(order)
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+      }
     }
   }
 
@@ -144,6 +171,28 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       wavesBtcOrders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Cancelled))
       wavesUsdOrders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+    }
+  }
+
+  "Batch cancel by id" - {
+    "works for specified orders placed by an address" in {
+      val orders = mkBobOrders(wavesUsdPair) ::: mkBobOrders(wavesBtcPair)
+      orders.foreach(dex1.api.place)
+      orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+
+      dex1.api.cancelAllByIdsWithApiKey(bob, orders.map(_.id()).toSet)
+
+      orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Cancelled))
+    }
+
+    // DEX-548
+    "returns a rejected orders if an owner is invalid" in {
+      val orders = mkBobOrders(wavesUsdPair)
+      orders.foreach(dex1.api.place)
+      orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+
+      dex1.api.cancelAllByIdsWithApiKey(alice, orders.map(_.id()).toSet)
+      // here is validation
     }
   }
 

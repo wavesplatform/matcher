@@ -120,17 +120,13 @@ class AddressActor(owner: Address,
 
     case command: Command.CancelOrders =>
       val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
-      if (allActiveOrderIds.isEmpty) {
-        log.trace(s"Got $command, nothing to cancel")
-        sender ! api.BatchCancelCompleted(Map.empty)
-      } else {
-        val toCancelIds = allActiveOrderIds -- command.orderIds
-        val unknownIds  = command.orderIds -- allActiveOrderIds
-        log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknownIds: ${unknownIds.mkString(", ")}")
+      val toCancelIds       = allActiveOrderIds -- command.orderIds
+      val unknownIds        = command.orderIds -- allActiveOrderIds
+      log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknownIds: ${unknownIds.mkString(", ")}")
 
-        val initResponse = unknownIds.map(id => id -> api.OrderCancelRejected(error.OrderNotFound(id))).toMap
-        context.actorOf(BatchOrderCancelActor.props(allActiveOrderIds.toSet, self, sender, batchCancelTimeout, initResponse))
-      }
+      val initResponse = unknownIds.map(id => id -> api.OrderCancelRejected(error.OrderNotFound(id))).toMap
+      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(initResponse)
+      else context.actorOf(BatchOrderCancelActor.props(toCancelIds, self, sender, batchCancelTimeout, initResponse))
 
     case command: Command.CancelNotEnoughCoinsOrders =>
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))

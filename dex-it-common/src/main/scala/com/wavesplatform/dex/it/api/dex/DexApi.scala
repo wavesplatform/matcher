@@ -43,12 +43,12 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
-  def tryCancelWithApiKey(id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
+  def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]]
 
   // TODO Response type in DEX-548
   def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
   def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
-  def tryCancelAllByIdsWithApiKey(owner: PublicKey): F[Either[MatcherError, Unit]]
+  def tryCancelAllByIdsWithApiKey(owner: PublicKey, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]]
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
@@ -208,18 +208,20 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelAllByIdsWithApiKey(owner: PublicKey): F[Either[MatcherError, Unit]] = tryUnit {
+      override def tryCancelAllByIdsWithApiKey(owner: PublicKey, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]] = tryUnit {
         sttp
           .post(uri"$apiUri/orders/cancel")
           .headers(apiKeyHeaders)
           .headers(userPublicKeyHeaders(owner))
+          .body(Json.stringify(Json.toJson(orderIds)))
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelWithApiKey(id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] = tryParseJson {
+      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]] = tryParseJson {
         sttp
           .post(uri"$apiUri/orders/cancel/${id.toString}")
           .headers(apiKeyHeaders)
+          .headers(xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders))
           .contentType("application/json", "UTF-8")
       }
 

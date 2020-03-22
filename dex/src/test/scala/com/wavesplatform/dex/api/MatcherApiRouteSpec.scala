@@ -10,7 +10,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.WithDB
+import com.wavesplatform.dex.db.{OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
@@ -20,7 +20,7 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue}
+import play.api.libs.json.{JsString, JsValue, Json}
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -28,9 +28,13 @@ import scala.util.Random
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
   private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
+  private val apiKey         = "apiKey"
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAsset     = arbitraryAssetGen.sample.get
   private val smartAssetId   = smartAsset.id
+
+  // Will be refactored in DEX-548
+  private val orderToCancel = orderV3Generator.sample.get
 
   private val smartAssetDesc = BriefAssetDescription(
     name = "smart asset",
@@ -75,7 +79,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   routePath("/settings/rates/{assetId}") - {
 
-    val apiKey    = "apiKey"
     val rateCache = RateCache.inMem
 
     val rate        = 0.0055
@@ -283,6 +286,81 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
+  // cancelAllById
+  routePath("/orders/cancel") - {
+    val orderId = orderToCancel.id()
+
+    "X-Api-Key is required" in test { route =>
+      Post(routePath("/orders/cancel"), HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "X-User-Public-Key is required" in test(
+      { route =>
+        Post(
+          routePath("/orders/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        }
+      },
+      apiKey
+    )
+
+    "sunny day" in test(
+      { route =>
+        Post(
+          routePath("/orders/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+        ).withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+  }
+
+  // forceCancelOrder
+  routePath("/orders/cancel/[orderId]") - {
+    val orderId = orderToCancel.id()
+
+    "X-Api-Key is required" in test { route =>
+      Post(routePath(s"/orders/cancel/$orderId")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "X-User-Public-Key is not required" in test(
+      { route =>
+        Post(routePath(s"/orders/cancel/$orderId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+
+    "X-User-Public-Key is specified, but wrong" in test(
+      { route =>
+        Post(routePath(s"/orders/cancel/$orderId"))
+          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        }
+      },
+      apiKey
+    )
+
+    "sunny day" in test(
+      { route =>
+        Post(routePath(s"/orders/cancel/$orderId"))
+          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+  }
+
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val addressActor = TestProbe("address")
@@ -290,11 +368,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
-        case _                                                                   =>
+        case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrders) if address == orderToCancel.sender.toAddress =>
+          sender ! api.BatchCancelCompleted { command.orderIds.map(id => id -> api.OrderCanceled(id)).toMap }
+        case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrder) if address == orderToCancel.sender.toAddress =>
+          sender ! api.OrderCanceled(command.orderId)
+        case _ =>
       }
 
       TestActor.NoAutoPilot
     }
+
+    val odb = OrderDB(settings.orderDb, db)
+    odb.saveOrder(orderToCancel)
 
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(

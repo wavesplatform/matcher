@@ -26,14 +26,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{
-  ForceSaveSnapshots,
-  ForceStartOrderBook,
-  GetMarkets,
-  GetSnapshotOffsets,
-  MarketData,
-  SnapshotOffsetsResponse
-}
+import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
@@ -708,9 +701,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
     def reject = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
     (DBUtils.order(db, orderId), userPublicKey) match {
-      case (None, _)                                               => reject
-      case (Some(order), Some(pk)) if pk.toAddress != order.sender => reject
-      case (Some(order), _)                                        => handleCancelRequest(None, order.sender, Some(orderId), None)
+      case (None, _)                                                         => reject
+      case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
+      case (Some(order), _)                                                  => handleCancelRequest(None, order.sender, Some(orderId), None)
     }
   }
 

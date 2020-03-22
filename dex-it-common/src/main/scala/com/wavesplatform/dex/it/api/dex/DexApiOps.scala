@@ -40,6 +40,8 @@ object DexApiOps {
       explicitGet(self.tryCancelAllByPair(owner, assetPair, timestamp))
     }
 
+    def cancelAllByIdsWithApiKey(owner: PublicKey): F[Unit] = explicitGet(self.tryCancelAllByIdsWithApiKey(owner))
+
     def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
 

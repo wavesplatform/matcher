@@ -60,6 +60,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       }
     }
 
+    "works with an API key too" in test(
+      { route =>
+        Get(routePath(s"/balance/reserved/${Base58.encode(publicKey)}")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldBe StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+
     "returns HTTP 400 when provided a wrong base58-encoded" - {
       "signature" in test { route =>
         mkGet(route)(Base58.encode(publicKey), ts, ";;") ~> check {

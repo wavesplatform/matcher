@@ -517,7 +517,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     handleCancelRequest(None)
   }
 
-  @Path("/orderbook/{address}/cancel")
+  @Path("/orders/{address}/cancel")
   @ApiOperation(
     value = "Cancel active orders by IDs",
     httpMethod = "POST",
@@ -528,13 +528,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = "body",
         value = "Json array with order ids",
         required = true,
         paramType = "body",
-        dataTypeClass = classOf[Set[String]],
-        defaultValue = "[]"
+        dataTypeClass = classOf[Array[String]]
       ),
     )
   )

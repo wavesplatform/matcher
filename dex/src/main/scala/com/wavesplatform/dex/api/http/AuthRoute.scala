@@ -34,10 +34,4 @@ trait AuthRoute { this: ApiRoute =>
           case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
         }
     }
-
-  def withUserPublicKey(implicit trm: ToResponseMarshaller[MatcherResponse]): Directive1[PublicKey] =
-    withUserPublicKeyOpt.flatMap {
-      case None    => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid))
-      case Some(x) => provide(x)
-    }
 }

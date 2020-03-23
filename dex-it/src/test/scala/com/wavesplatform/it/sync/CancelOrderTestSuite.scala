@@ -190,7 +190,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
 
     // DEX-548
-    "returns a rejected orders if an owner is invalid" in {
+    "returns a rejected orders if an owner is invalid" ignore {
       val orders = mkBobOrders(wavesUsdPair)
       orders.foreach(dex1.api.place)
       orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))

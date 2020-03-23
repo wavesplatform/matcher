@@ -7,7 +7,7 @@ class GetSettingsTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
-  override protected def beforeAll(): Unit = {git
+  override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx, IssueBtcTx)
     dex1.start()

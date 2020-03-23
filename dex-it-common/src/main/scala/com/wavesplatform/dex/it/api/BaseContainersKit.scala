@@ -78,8 +78,9 @@ trait BaseContainersKit extends ScorexLogging {
 
   protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
     TryHttpURLConnectionBackend(customizeConnection = conn => {
-      conn.setConnectTimeout(10000)
-      conn.setReadTimeout(10000)
+      // For tests with a high latency
+      conn.setConnectTimeout(30000)
+      conn.setReadTimeout(30000)
 
       conn.setDefaultUseCaches(false)
       conn.setUseCaches(false)

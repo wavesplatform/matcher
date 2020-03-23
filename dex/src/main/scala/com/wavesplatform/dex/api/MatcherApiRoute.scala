@@ -517,10 +517,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     handleCancelRequest(None)
   }
 
-  @Path("/orderbook/cancel")
+  @Path("/orderbook/{address}/cancel")
   @ApiOperation(
-    value = "Cancel all active orders",
+    value = "Cancel active orders by IDs",
     httpMethod = "POST",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     produces = "application/json",
     consumes = "application/json",
     response = classOf[Any]
@@ -529,24 +530,17 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(
         name = "body",
-        value = "Json with data",
+        value = "Json array with order ids",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
-      ),
-      new ApiImplicitParam(
-        name = `X-User-Public-Key`.headerName,
-        value = "User's public key",
-        required = true,
-        dataType = "string",
-        paramType = "header",
-        defaultValue = ""
+        dataTypeClass = classOf[Set[String]],
+        defaultValue = "[]"
       ),
     )
   )
-  def cancelAllById: Route = (path("orders" / "cancel") & post & withAuth & withUserPublicKey) { userPublicKey =>
+  def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth) { address =>
     entity(as[Set[ByteStr]]) { xs =>
-      complete { askAddressActor(userPublicKey.toAddress, AddressActor.Command.CancelOrders(xs)) }
+      complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs)) }
     } ~ complete(StatusCodes.BadRequest)
   }
 

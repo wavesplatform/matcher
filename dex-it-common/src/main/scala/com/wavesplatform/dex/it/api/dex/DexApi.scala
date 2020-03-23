@@ -48,7 +48,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   // TODO Response type in DEX-548
   def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
   def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
-  def tryCancelAllByIdsWithApiKey(owner: PublicKey, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]]
+  def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]]
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
@@ -208,11 +208,10 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelAllByIdsWithApiKey(owner: PublicKey, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]] = tryUnit {
+      override def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]] = tryUnit {
         sttp
-          .post(uri"$apiUri/orders/cancel")
+          .post(uri"$apiUri/orders/$owner/cancel")
           .headers(apiKeyHeaders)
-          .headers(userPublicKeyHeaders(owner))
           .body(Json.stringify(Json.toJson(orderIds)))
           .contentType("application/json", "UTF-8")
       }

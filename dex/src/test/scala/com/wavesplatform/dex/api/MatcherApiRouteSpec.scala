@@ -287,33 +287,24 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   // cancelAllById
-  routePath("/orders/cancel") - {
+  routePath("/orders/{address}/cancel") - {
     val orderId = orderToCancel.id()
 
     "X-Api-Key is required" in test { route =>
-      Post(routePath("/orders/cancel"), HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())) ~> route ~> check {
+      Post(
+        routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+        HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+      ) ~> route ~> check {
         status shouldEqual StatusCodes.Forbidden
       }
     }
 
-    "X-User-Public-Key is required" in test(
-      { route =>
-        Post(
-          routePath("/orders/cancel"),
-          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
-        }
-      },
-      apiKey
-    )
-
     "sunny day" in test(
       { route =>
         Post(
-          routePath("/orders/cancel"),
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
           HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-        ).withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
+        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
           status shouldEqual StatusCodes.OK
         }
       },
@@ -322,7 +313,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   // forceCancelOrder
-  routePath("/orders/cancel/[orderId]") - {
+  routePath("/orders/cancel/{orderId}") - {
     val orderId = orderToCancel.id()
 
     "X-Api-Key is required" in test { route =>

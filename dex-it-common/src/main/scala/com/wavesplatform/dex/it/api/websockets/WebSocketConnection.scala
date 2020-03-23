@@ -5,17 +5,20 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
+import akka.http.scaladsl.model.HttpHeader
+import akka.http.scaladsl.model.ws.{Message, WebSocketRequest, WebSocketUpgradeResponse}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import com.wavesplatform.dex.api.http.`X-Api-Key`
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean)(implicit system: ActorSystem,
-                                                                                                     materializer: Materializer)
+class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean, apiKey: Option[String] = None)(
+    implicit system: ActorSystem,
+    materializer: Materializer)
     extends ScorexLogging {
 
   log.info(s"Connecting to ws://$uri")
@@ -44,13 +47,18 @@ class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, t
       r
     }
 
-  private val (_, closed) = Http().singleWebSocketRequest(WebSocketRequest(s"ws://$uri"), flow)
+  private val (response, closed) = {
+    val apiKeyHeaders = apiKey.fold(List.empty[HttpHeader])(apiKeyStr => List(`X-Api-Key`(apiKeyStr)))
+    Http().singleWebSocketRequest(WebSocketRequest(s"ws://$uri", apiKeyHeaders), flow)
+  }
+
+  def getConnectionResponse: Future[WebSocketUpgradeResponse] = response
 
   def getMessagesBuffer: Seq[Output] = messagesBuffer.iterator().asScala.toSeq
 
   def clearMessagesBuffer(): Unit = messagesBuffer.clear()
 
-  def close(): Unit = closed.success(None)
+  def close(): Unit = if (!isClosed) closed.success(None)
 
   def isClosed: Boolean = closed.isCompleted
 }

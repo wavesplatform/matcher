@@ -231,7 +231,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder)
+      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder, apiKeyHash)
     )
   }
 

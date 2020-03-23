@@ -11,8 +11,9 @@ import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.google.common.primitives.Longs
+import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
-import com.wavesplatform.dex.api.http.ApiRoute
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -30,8 +31,10 @@ import scala.util.{Failure, Success}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
-case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, assetPairBuilder: AssetPairBuilder)(implicit mat: Materializer)
+case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, assetPairBuilder: AssetPairBuilder, apiKeyHash: Option[Array[Byte]])(
+    implicit mat: Materializer)
     extends ApiRoute
+    with AuthRoute
     with ScorexLogging {
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
@@ -44,7 +47,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
 
   private val failureMatcher: PartialFunction[Any, Throwable] = { case akka.actor.Status.Failure(cause) => cause }
 
-  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, Unit] =
+  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, Unit] = {
     Source
       .actorRef[WsAddressState](
         completionMatcher,
@@ -58,6 +61,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
         sourceActor
       }
       .watchTermination()(handleTermination)
+  }
 
   private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, Unit] =
     Source
@@ -74,21 +78,23 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
       }
       .watchTermination()(handleTermination)
 
-  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = parameters(('Timestamp, 'Signature)).tflatMap {
-    case (timestamp, signature) =>
-      Base58
-        .tryDecodeWithLimit(signature)
-        .map { crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey) } match {
-        case Success(true) => pass
-        case _             => complete(InvalidSignature)
-      }
-  }
+  private def signedGet(prefix: String, publicKey: PublicKey, incorrectSignatureAction: Directive0 = complete(InvalidSignature)): Directive0 =
+    parameters(('t, 's)).tflatMap {
+      case (timestamp, signature) =>
+        Base58
+          .tryDecodeWithLimit(signature)
+          .map { crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey) } match {
+          case Success(true) => pass
+          case _             => incorrectSignatureAction
+        }
+    }
 
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
   private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
-    signedGet("as", publicKey) {
-      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, accountUpdatesSource(publicKey)))
+    val directive = optionalHeaderValueByName(`X-Api-Key`.name).flatMap { maybeKey =>
+      if (maybeKey.isDefined) signedGet(balanceStreamPrefix, publicKey, reject) | withAuth else signedGet(balanceStreamPrefix, publicKey)
     }
+    directive { handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, accountUpdatesSource(publicKey))) }
   }
 
   private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
@@ -110,9 +116,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
 
   private def handleTermination(actorRef: ActorRef, r: Future[Done]): Unit =
     r.onComplete {
-      case Success(_) =>
-        log.trace(s"[${actorRef.hashCode()}] WebSocket connection successfully closed")
+      case Success(_) => log.trace(s"[${actorRef.hashCode()}] WebSocket connection successfully closed")
       case Failure(e) =>
         log.trace(s"[${actorRef.hashCode()}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
+}
+
+object MatcherWebSocketRoute {
+  val balanceStreamPrefix: String = "as"
 }

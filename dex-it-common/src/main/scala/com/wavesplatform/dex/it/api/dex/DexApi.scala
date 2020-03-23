@@ -93,6 +93,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryAllSnapshotOffsets: F[Either[MatcherError, Map[AssetPair, Long]]]
   def trySaveSnapshots: F[Either[MatcherError, Unit]]
 
+  def trySettings: F[Either[MatcherError, SettingsResponse]]
+
   // TODO move
 
   def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
@@ -384,6 +386,12 @@ object DexApi {
           case Left(_)  => false
           case Right(x) => pred(x)
         }.map(_.explicitGet())
+
+      override def trySettings() = tryParseJson {
+        sttp
+          .get(uri"$apiUri/settings")
+          .headers(apiKeyHeaders)
+      }
 
       private def appendActiveOnly(uri: Uri, activeOnly: Option[Boolean]): Uri =
         activeOnly.fold(uri)(x => uri.copy(queryFragments = List(QueryFragment.KeyValue("activeOnly", x.toString))))

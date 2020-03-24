@@ -1,22 +1,30 @@
 package com.wavesplatform.it.sync.api
 
+import java.nio.charset.StandardCharsets
+
+import akka.http.scaladsl.model.StatusCodes
 import cats.syntax.option._
+import com.google.common.primitives.Longs
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
+import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
-class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
+class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
 
   private implicit val derivedAddressStateDiff: Diff[WsAddressState] = Derived(Diff.gen[WsAddressState].value.ignore(_.timestamp))
   private implicit val derivedOrderBookDiff: Diff[WsOrderBook]       = Derived(Diff.gen[WsOrderBook].value.ignore(_.timestamp))
@@ -93,10 +101,57 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets {
 
   "MatcherWebSocketRoute" - {
 
+    "should correctly handle connection rejections" in {
+
+      val kp = mkKeyPair("JIo6cTep_u3_6ocToHa")
+
+      val timestamp     = System.currentTimeMillis
+      val signedMessage = "as".getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
+
+      val correctSignature   = com.wavesplatform.dex.domain.crypto.sign(kp, signedMessage).base58
+      val incorrectSignature = "incorrectSignature"
+
+      val incorrectKey = "incorrectKey".some
+      val correctKey   = com.wavesplatform.dex.it.docker.apiKey.some
+      val withoutKey   = Option.empty[String]
+
+      val uriWithoutParams                    = s"${getBaseBalancesStreamUri(dex1)}${kp.publicKey}"
+      def uriWithSignature(signature: String) = s"$uriWithoutParams?t=$timestamp&s=$signature"
+
+      forAll(
+        Table(
+          // format: off
+          ("uri",                                "api-key",    "expected status",             "expected error"),
+          (uriWithSignature(incorrectSignature), incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithSignature(incorrectSignature), withoutKey,   StatusCodes.BadRequest,         RequestInvalidSignature.some),
+          (uriWithSignature(incorrectSignature), correctKey,   StatusCodes.SwitchingProtocols, None),
+          (uriWithSignature(correctSignature),   incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithSignature(correctSignature),   withoutKey,   StatusCodes.SwitchingProtocols, None),
+          (uriWithSignature(correctSignature),   correctKey,   StatusCodes.SwitchingProtocols, None),
+          (uriWithoutParams,                     incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithoutParams,                     withoutKey,   StatusCodes.BadRequest,         RequestInvalidSignature.some),
+          (uriWithoutParams,                     correctKey,   StatusCodes.SwitchingProtocols, None)
+          // format: on
+        )
+      ) { (uri, apiKey, expectedStatus, expectedError) =>
+        val connection = new WebSocketAuthenticatedConnection(uri, apiKey)
+        val response   = Await.result(connection.getConnectionResponse, 1.second).response
+
+        response.status shouldBe expectedStatus
+
+        expectedError.fold() { error =>
+          response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
+          response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
+        }
+
+        connection.close()
+      }
+    }
+
     "should send account updates to authenticated user" - {
 
       "when account is empty" in {
-        val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("JIo6cTep_u3_6ocToHa"), dex1)
+        val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("6ocToH_u3_JIo6cTepa"), dex1)
         assertAddressStateSnapshot(wsac, WsAddressState.empty)
         wsac.close()
       }

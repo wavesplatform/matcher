@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.error
 
+import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCode}
+import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -22,8 +24,10 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
 }
 
 object MatcherError {
+
   implicit final class Ops(val self: MatcherError) extends AnyVal {
-    def toJson = {
+
+    def toJson: JsObject = {
       val obj           = self.message
       val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
       Json
@@ -33,6 +37,13 @@ object MatcherError {
           "template" -> obj.template
         )
         .deepMerge(wrappedParams)
+    }
+
+    def toWsHttpResponse(statusCode: StatusCode): HttpResponse = {
+      HttpResponse(
+        status = statusCode,
+        headers = List[HttpHeader](`X-Error-Message`(self.message.text), `X-Error-Code`(self.code.toString))
+      )
     }
   }
 }

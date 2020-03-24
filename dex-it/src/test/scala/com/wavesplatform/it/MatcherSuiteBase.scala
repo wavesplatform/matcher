@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
 
 import cats.instances.FutureInstances
 import com.wavesplatform.dex.asset.DoubleOps
@@ -70,7 +71,7 @@ trait MatcherSuiteBase
   }
 
   def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
+    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
       case (balance, asset) => {

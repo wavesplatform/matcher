@@ -2,10 +2,11 @@ package com.wavesplatform.dex.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directive0
+import akka.http.scaladsl.server.{Directive0, Directive1}
 import com.wavesplatform.dex.api.{MatcherResponse, SimpleErrorResponse}
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid}
+import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid, UserPublicKeyIsNotValid}
 
 trait AuthRoute { this: ApiRoute =>
 
@@ -23,4 +24,14 @@ trait AuthRoute { this: ApiRoute =>
       }
     }
   }
+
+  def withUserPublicKeyOpt(implicit trm: ToResponseMarshaller[MatcherResponse]): Directive1[Option[PublicKey]] =
+    optionalHeaderValueByType[`X-User-Public-Key`](()).flatMap {
+      case None => provide(None)
+      case Some(rawPublicKey) =>
+        PublicKey.fromBase58String(rawPublicKey.value) match {
+          case Left(_)  => complete(SimpleErrorResponse(StatusCodes.BadRequest, UserPublicKeyIsNotValid))
+          case Right(x) => provide[Option[PublicKey]](Some(PublicKey(x)))
+        }
+    }
 }

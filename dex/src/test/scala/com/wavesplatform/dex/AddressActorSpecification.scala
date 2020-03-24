@@ -216,7 +216,8 @@ class AddressActorSpecification
           },
           _ => OrderBookAggregatedSnapshot.empty,
           false,
-          spendableBalancesActor
+          spendableBalancesActor,
+          getDefaultAssetDescriptions andThen (d => Future successful d.decimals)
         )
       )
     }

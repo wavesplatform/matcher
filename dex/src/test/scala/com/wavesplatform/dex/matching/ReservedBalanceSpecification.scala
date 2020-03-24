@@ -107,7 +107,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         orderBookCache = _ => OrderBookAggregatedSnapshot.empty,
         enableSchedules,
-        spendableBalancesActor
+        spendableBalancesActor,
+        _ => Future.successful(8)
       )
     )
   }
@@ -483,8 +484,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       )
     )
 
-    lazy val spendableBalancesActor =
+    lazy val spendableBalancesActor = {
       system.actorOf(Props(new SpendableBalancesActor((_, assets) => spendableBalances(assets), allAssetsSpendableBalances, addressDir)))
+    }
 
     def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
       Props(
@@ -499,7 +501,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           },
           orderBookCache = orderBookCache,
           enableSchedules,
-          spendableBalancesActor
+          spendableBalancesActor,
+          _ => Future.successful(8)
         )
       )
     }

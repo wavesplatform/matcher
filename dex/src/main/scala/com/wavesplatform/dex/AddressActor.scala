@@ -4,9 +4,13 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
+import cats.instances.future.catsStdInstancesForFuture
+import cats.instances.list.catsStdInstancesForList
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
+import cats.syntax.functor._
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
+import cats.syntax.traverse._
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
@@ -44,6 +48,7 @@ class AddressActor(owner: Address,
                    orderBookCache: AssetPair => OrderBookAggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
+                   getAssetDecimals: Asset => Future[Int],
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
@@ -225,15 +230,39 @@ class AddressActor(owner: Address,
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
-      val snapshot =
-        WsAddressState(
-          balances = mkWsBalances(allAssetsSpendableBalance),
-          orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).toSeq
+      mkWsBalances(allAssetsSpendableBalance).map { balances =>
+        PreparedWsState(
+          state = WsAddressState(
+            balances = balances,
+            orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).toSeq
+          ),
+          isSnapshot = true
         )
+      } pipeTo self
 
-      addressWsMutableState.pendingWsConnections.foreach(_ ! snapshot)
-      if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
-      addressWsMutableState = addressWsMutableState.flushPendingConnections()
+    case PreparedWsState(state, isSnapshot) =>
+      if (isSnapshot) {
+        addressWsMutableState.pendingWsConnections.foreach(_ ! state)
+        if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
+        addressWsMutableState = addressWsMutableState.flushPendingConnections()
+      } else {
+        addressWsMutableState.activeWsConnections.foreach(_ ! state)
+        scheduleNextDiffSending
+        addressWsMutableState = addressWsMutableState.cleanChanges()
+      }
+
+    case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
+      if (addressWsMutableState.hasActiveConnections) {
+        mkWsBalances(spendableBalances).map { balances =>
+          PreparedWsState(
+            WsAddressState(
+              balances = balances,
+              orders = addressWsMutableState.getAllOrderChanges
+            ),
+            isSnapshot = false
+          )
+        } pipeTo self
+      }
 
     case PrepareDiffForWsSubscribers =>
       if (addressWsMutableState.hasActiveConnections) {
@@ -241,21 +270,6 @@ class AddressActor(owner: Address,
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
         } else scheduleNextDiffSending
       }
-
-    case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
-      if (addressWsMutableState.hasActiveConnections) {
-
-        val diff =
-          WsAddressState(
-            balances = mkWsBalances(spendableBalances),
-            orders = addressWsMutableState.getAllOrderChanges
-          )
-
-        addressWsMutableState.activeWsConnections.foreach(_ ! diff)
-        scheduleNextDiffSending
-      }
-
-      addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
       log.info(s"[${wsSource.hashCode()}] Web socket connection closed")
@@ -266,12 +280,15 @@ class AddressActor(owner: Address,
     context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, PrepareDiffForWsSubscribers)
   }
 
-  private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
+  private def mkWsBalances(spendableBalances: Map[Asset, Long]): Future[Map[Asset, WsBalances]] = {
     val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)
-    spendableBalances.keySet.map { asset =>
-      val balanceValue: Map[Asset, Long] => Double = source => denormalizeAmountAndFee(source.getOrElse(asset, 0), efc assetDecimals asset).toDouble
-      asset -> WsBalances(balanceValue(tradableBalance), balanceValue(openVolume))
-    }(collection.breakOut)
+    spendableBalances.keysIterator.toList.traverse(asset => getAssetDecimals(asset) tupleLeft asset).map {
+      _.toMap.map {
+        case (asset, assetDecimals) =>
+          val balanceValue: Map[Asset, Long] => Double = source => denormalizeAmountAndFee(source.getOrElse(asset, 0), assetDecimals).toDouble
+          asset -> WsBalances(balanceValue(tradableBalance), balanceValue(openVolume))
+      }
+    }
   }
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
@@ -339,7 +356,9 @@ class AddressActor(owner: Address,
   }
 
   private def refreshOrderState(remaining: AcceptedOrder, event: OrderEvent): Unit = {
-    val origActiveOrder            = activeOrders.get(remaining.id)
+
+    val origActiveOrder = activeOrders.get(remaining.id)
+
     lazy val origReservableBalance = origActiveOrder.fold(Map.empty[Asset, Long])(_.reservableBalance)
     lazy val openVolumeDiff        = remaining.reservableBalance |-| origReservableBalance
 
@@ -354,6 +373,7 @@ class AddressActor(owner: Address,
     }
 
     log.trace(s"New status of ${remaining.id} is $status")
+
     status match {
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
@@ -384,13 +404,15 @@ class AddressActor(owner: Address,
       }
 
       // Further improvements will be made in DEX-467
-      addressWsMutableState = (status match {
-        case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-        case _: OrderStatus.Cancelled => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-        case _ =>
-          if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-          else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
-      }).putReservedAssets(openVolumeDiff.keySet)
+      addressWsMutableState = (
+        status match {
+          case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+          case _: OrderStatus.Cancelled => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+          case _ =>
+            if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+            else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+        }
+      ).putReservedAssets(openVolumeDiff.keySet)
     }
   }
 
@@ -542,8 +564,9 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case object AddWsSubscription           extends Message
-  case object PrepareDiffForWsSubscribers extends Message
+  case object AddWsSubscription                                          extends Message
+  case class PreparedWsState(state: WsAddressState, isSnapshot: Boolean) extends Message
+  case object PrepareDiffForWsSubscribers                                extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)

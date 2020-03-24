@@ -113,6 +113,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
 
+  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = {
+    getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
+  }
+
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBookAggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
@@ -350,6 +354,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         orderBookCache.getOrDefault(_, OrderBookAggregatedSnapshot.empty),
         startSchedules,
         spendableBalancesActor,
+        asset => getDecimalsFromCache(asset).value.map { _.explicitGet() },
         addressActorSettings
       )
     )
@@ -401,13 +406,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     def loadAllKnownAssets(): Future[Unit] =
       Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
         Future
-          .traverse(assetsToLoad) { asset =>
-            getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
-          }
+          .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
           .map { xs =>
             val notFoundAssets = xs.collect { case (id, Left(_)) => id }
-            if (notFoundAssets.isEmpty) ()
-            else {
+            if (notFoundAssets.nonEmpty) {
               log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
               forceStopApplication(UnsynchronizedNodeError)
             }
@@ -549,8 +551,8 @@ object Matcher extends ScorexLogging {
   }
 
   private def getDecimals(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[(Asset, Int)] =
-    getDescription(assetsCache, assetDesc)(asset).map(x => asset -> x.decimals)(catsStdInstancesForFuture)
+      implicit ec: ExecutionContext): FutureResult[Int] =
+    getDescription(assetsCache, assetDesc)(asset).map(_.decimals)(catsStdInstancesForFuture)
 
   private def getDescription(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
       implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] = asset match {

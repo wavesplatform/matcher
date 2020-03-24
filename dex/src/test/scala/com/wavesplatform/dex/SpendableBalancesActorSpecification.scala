@@ -25,12 +25,13 @@ class SpendableBalancesActorSpecification
     with Matchers
     with MatcherSpecBase {
 
+  implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+
   "SpendableBalancesActor" should {
 
     "handle state queries without excess gRPC calls" in {
 
-      implicit val efc: ErrorFormatterContext = (_: Asset) => 8
-      val testProbe                           = TestProbe()
+      val testProbe = TestProbe()
 
       val alice = KeyPair("alice".getBytes).toAddress
       val bob   = KeyPair("bob".getBytes).toAddress
@@ -66,7 +67,8 @@ class SpendableBalancesActorSpecification
             event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0, 0, event)) } },
             _ => OrderBookAggregatedSnapshot.empty,
             enableSchedules,
-            sba
+            sba,
+            _ => Future.successful(8)
           )
         )
       }

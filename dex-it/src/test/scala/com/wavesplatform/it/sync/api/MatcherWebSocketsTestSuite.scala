@@ -16,6 +16,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -64,7 +65,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
     Thread.sleep(200) // Wait an additional time for extra events
 
-    withClue(s"Order changes are ${expectedOrdersChanges.mkString(", ")}: ") {
+    withClue(s"Order changes are:\n${expectedOrdersChanges.mkString(",\n")}: ") {
       connection.getBalancesChanges.size should be <= balancesChangesCountBorders._2
     }
 
@@ -182,7 +183,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
         assertAddressStateChanges(
           connection = wsac,
-          balancesChangesCountBorders = (2, 4),
+          balancesChangesCountBorders = (2, 5),
           ordersChangesCount = 4,
           expectedBalanceChanges = squashBalanceChanges(
             Seq(
@@ -250,6 +251,35 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
               ),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some)
           )
+        )
+
+        wsac.close()
+      }
+
+      "when user issues asset" in {
+
+        val acc = mkKeyPair("acc")
+        broadcastAndAwait(mkTransfer(alice, acc, 10.waves, Waves))
+        val wsac = mkWebSocketAuthenticatedConnection(acc, dex1)
+
+        assertAddressStateSnapshot(
+          wsac,
+          WsAddressState(Map(Waves -> WsBalances(10, 0)), Seq.empty)
+        )
+
+        val IssueResults(issueTx, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 555.444.waves)
+
+        broadcastAndAwait(issueTx)
+
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (1, 3),
+          ordersChangesCount = 0,
+          expectedBalanceChanges = Map[Asset, WsBalances](
+            issuedAsset -> WsBalances(555.444, 0),
+            Waves       -> WsBalances(9, 0)
+          ),
+          expectedOrdersChanges = Seq.empty
         )
 
         wsac.close()

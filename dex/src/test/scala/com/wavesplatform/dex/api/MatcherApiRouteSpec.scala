@@ -308,6 +308,18 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       }
     }
 
+    "an invalid body" in test(
+      { route =>
+        Post(
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(orderId).toString())
+        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        }
+      },
+      apiKey
+    )
+
     "sunny day" in test(
       { route =>
         Post(

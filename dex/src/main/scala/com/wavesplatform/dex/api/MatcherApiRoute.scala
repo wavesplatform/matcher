@@ -541,7 +541,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth) { address =>
     entity(as[Set[ByteStr]]) { xs =>
       complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs)) }
-    } ~ complete(StatusCodes.BadRequest)
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete")

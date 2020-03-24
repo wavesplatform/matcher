@@ -124,7 +124,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         val order = mkBobOrder
         placeAndAwaitAtDex(order)
 
-        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193)
+        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
         dex1.api.cancelWithApiKey(order)
         dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
       }

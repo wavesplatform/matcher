@@ -82,6 +82,7 @@ trait BaseContainersKit extends ScorexLogging {
       conn.setConnectTimeout(30000)
       conn.setReadTimeout(30000)
 
+      // This block of code to figh caches. It seems this doesn't help on macOS, but works on CI
       conn.setDefaultUseCaches(false)
       conn.setUseCaches(false)
       conn.setRequestProperty("Cache-Control", "no-store")

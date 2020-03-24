@@ -1,19 +1,12 @@
 package com.wavesplatform.it.sync.networking
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItKafkaRequired
-import org.scalatest
 
 @DexItKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {

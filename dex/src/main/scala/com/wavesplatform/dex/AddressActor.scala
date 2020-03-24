@@ -118,6 +118,16 @@ class AddressActor(owner: Address,
         context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, batchCancelTimeout))
       }
 
+    case command: Command.CancelOrders =>
+      val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
+      val toCancelIds       = allActiveOrderIds.intersect(command.orderIds)
+      val unknownIds        = command.orderIds -- allActiveOrderIds
+      log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknown ids: ${unknownIds.mkString(", ")}")
+
+      val initResponse = unknownIds.map(id => id -> api.OrderCancelRejected(error.OrderNotFound(id))).toMap
+      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(initResponse)
+      else context.actorOf(BatchOrderCancelActor.props(toCancelIds, self, sender, batchCancelTimeout, initResponse))
+
     case command: Command.CancelNotEnoughCoinsOrders =>
       val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
       if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
@@ -211,7 +221,7 @@ class AddressActor(owner: Address,
         }
       }
       val isActive = activeOrders.contains(id)
-      log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
+      log.trace(s"Got OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) handleOrderTerminated(ao, OrderStatus.finalStatus(ao, isSystemCancel))
 
     case CancelExpiredOrder(id) =>
@@ -445,6 +455,7 @@ object AddressActor {
     }
 
     case class CancelOrder(orderId: ByteStr)                             extends OneOrderCommand
+    case class CancelOrders(orderIds: Set[ByteStr])                      extends Command
     case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
 
     /**

@@ -1,13 +1,9 @@
 package com.wavesplatform.it.sync
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
@@ -15,7 +11,6 @@ import com.wavesplatform.dex.model.AcceptedOrderType
 import com.wavesplatform.dex.settings.AssetType._
 import com.wavesplatform.dex.settings.FeeMode._
 import com.wavesplatform.it.MatcherSuiteBase
-import org.scalatest
 
 import scala.concurrent.duration.DurationInt
 
@@ -82,22 +77,6 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     val mo = mkOrder(sender, pair, orderType, amount, price, matcherFee = fixedFee)
     dex1.api.placeMarket(mo)
     dex1.api.waitForOrderStatus(mo, OrderStatus.Filled)
-  }
-
-  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
-
-    balances.foreach {
-      case (balance, asset) =>
-        asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
-          assert(
-            wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
-            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
-          )
-        }
-        broadcastAndAwait { mkTransfer(alice, account, balance, asset, fixedFee) }
-    }
-    account
   }
 
   def getFee(feeMode: FeeMode): Long = feeMode match {

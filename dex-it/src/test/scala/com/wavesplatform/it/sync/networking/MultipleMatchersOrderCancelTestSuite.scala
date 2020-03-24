@@ -29,22 +29,6 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
     dex2.start()
   }
 
-  private def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
-
-    balances.foreach {
-      case (balance, asset) =>
-        asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
-          assert(
-            wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
-            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
-          )
-        }
-        broadcastAndAwait { mkTransfer(alice, account, balance, asset, 0.003.waves) }
-    }
-    account
-  }
-
   /**
     *  Assumptions:
     *    1. DEX-1 is a master, DEX-2 is a slave;

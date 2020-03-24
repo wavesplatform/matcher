@@ -1,7 +1,12 @@
 package com.wavesplatform.it
 
+import java.nio.charset.StandardCharsets
+
 import cats.instances.FutureInstances
 import com.wavesplatform.dex.asset.DoubleOps
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
 import com.wavesplatform.dex.it.api.dex.HasDex
@@ -62,5 +67,20 @@ trait MatcherSuiteBase
     log.debug(s"Perform afterAll")
     stopBaseContainers()
     super.afterAll()
+  }
+
+  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-${System.currentTimeMillis}".getBytes(StandardCharsets.UTF_8)))
+
+    balances.foreach {
+      case (balance, asset) => {
+        assert(
+          wavesNode1.api.balance(alice, asset) >= balance,
+          s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
+        )
+        broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
+      }
+    }
+    account
   }
 }

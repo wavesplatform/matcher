@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.Done
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
@@ -20,7 +21,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.{MatcherError, RequestInvalidSignature}
 import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder}
 import io.swagger.annotations.Api
@@ -78,28 +79,40 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
       }
       .watchTermination()(handleTermination)
 
-  private def signedGet(prefix: String, publicKey: PublicKey, incorrectSignatureAction: Directive0 = complete(InvalidSignature)): Directive0 =
-    parameters(('t, 's)).tflatMap {
-      case (timestamp, signature) =>
-        Base58
-          .tryDecodeWithLimit(signature)
-          .map { crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey) } match {
-          case Success(true) => pass
-          case _             => incorrectSignatureAction
-        }
-    }
+  private def createStreamFor(source: Source[TextMessage.Strict, Unit]): Route = {
+    handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, source))
+  }
+
+  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {
+    val invalidSignatureResponse = complete(RequestInvalidSignature toWsHttpResponse StatusCodes.BadRequest)
+
+    val directive: Directive0 =
+      parameters(('t, 's)).tflatMap {
+        case (timestamp, signature) =>
+          Base58
+            .tryDecodeWithLimit(signature)
+            .map {
+              crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey)
+            } match {
+            case Success(true) => pass
+            case _             => invalidSignatureResponse
+          }
+      }
+
+    directive.recover(_ => invalidSignatureResponse)
+  }
 
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
   private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
     val directive = optionalHeaderValueByName(`X-Api-Key`.name).flatMap { maybeKey =>
-      if (maybeKey.isDefined) signedGet(balanceStreamPrefix, publicKey, reject) | withAuth else signedGet(balanceStreamPrefix, publicKey)
+      if (maybeKey.isDefined) withAuth else signedGet(balanceStreamPrefix, publicKey)
     }
-    directive { handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, accountUpdatesSource(publicKey))) }
+    directive { createStreamFor(accountUpdatesSource(publicKey)) }
   }
 
   private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     withAssetPair(p) { pair =>
-      handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.ignore, orderBookUpdatesSource(pair)))
+      createStreamFor(orderBookUpdatesSource(pair))
     }
   }
 

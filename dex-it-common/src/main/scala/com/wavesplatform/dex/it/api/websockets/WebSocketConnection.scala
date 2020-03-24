@@ -21,7 +21,7 @@ class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, t
     materializer: Materializer)
     extends ScorexLogging {
 
-  log.info(s"Connecting to ws://$uri")
+  log.info(s"Connecting to ws://$uri, apiKey = $apiKey")
 
   private val messagesBuffer: ConcurrentLinkedQueue[Output] = new ConcurrentLinkedQueue[Output]()
 

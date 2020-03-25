@@ -12,7 +12,6 @@ import sjsonnew.support.scalajson.unsafe.Parser
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Success}
 
 // Probably, JAR artifact should be downloaded through custom resolver
 object WavesNodeArtifactsPlugin extends AutoPlugin {
@@ -69,12 +68,7 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
                 targetFile
               }
           }
-          r.onComplete {
-            case Success(_) =>
-            case Failure(e) =>
-              log.error(s"Can't download Waves Node artifacts: ${e.getClass.getName}\nMessage: ${Option(e.getMessage).fold("")(identity)}")
-          }
-          Await.ready(r, 10.minutes)
+          Await.result(r, 10.minutes) // Result to fail with an exception if there is an error
         }
       }
     },

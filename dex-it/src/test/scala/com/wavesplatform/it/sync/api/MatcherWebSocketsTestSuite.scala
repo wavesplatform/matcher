@@ -284,6 +284,38 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
         wsac.close()
       }
+
+      "when user burns asset" in {
+
+        val joker = mkKeyPair("joker")
+
+        broadcastAndAwait(
+          mkTransfer(alice, joker, 333.usd, usd),
+          mkTransfer(alice, joker, 1.waves, Waves)
+        )
+
+        val wsac = mkWebSocketAuthenticatedConnection(joker, dex1)
+
+        assertAddressStateSnapshot(
+          wsac,
+          WsAddressState(Map(Waves -> WsBalances(1, 0), usd -> WsBalances(333, 0)), Seq.empty)
+        )
+
+        broadcastAndAwait(mkBurn(joker, usd, 330.usd))
+
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (1, 2),
+          ordersChangesCount = 0,
+          expectedBalanceChanges = Map[Asset, WsBalances](
+            usd   -> WsBalances(3, 0),
+            Waves -> WsBalances(0, 0)
+          ),
+          expectedOrdersChanges = Seq.empty
+        )
+
+        wsac.close()
+      }
     }
 
     "orderbook" - {

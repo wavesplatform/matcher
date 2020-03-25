@@ -98,6 +98,23 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
     }
 
+    "array of orders could not be cancelled with API key if one of them from another owner" in {
+      val acc = createAccountWithBalance(100.waves -> Waves)
+
+      val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, 1.waves, 100)
+      placeAndAwaitAtDex(o)
+
+      val ids = for { i <- 1 to 10 } yield {
+        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
+        placeAndAwaitAtDex(o)
+        o.id.value
+      } ++ o.id.value
+
+      dex1.api.tryCancelAllByIdsWithApiKey(acc, ids.toSet) should failWith(9437193)
+
+      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Accepted))
+    }
+
     "with API key" - {
       "and without X-User-Public-Key" in {
         val order = mkBobOrder

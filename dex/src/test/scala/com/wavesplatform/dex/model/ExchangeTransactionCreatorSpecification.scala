@@ -189,5 +189,23 @@ class ExchangeTransactionCreatorSpecification
       tx.explicitGet().sellMatcherFee shouldBe 0.0006.waves
       tx.explicitGet().buyMatcherFee shouldBe 0.005.waves
     }
+
+    "create transactions with correct buy/sell matcher fees for submitted order v3 " when List(1, 2).foreach { counterVersion =>
+      s"counter order v$counterVersion" in {
+        val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, amount = 88947718687647L, price = 934300L, matcherFee = 300000L, version = 2.toByte))
+        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte))
+
+        val feeSettings          = DynamicSettings.symmetric(300000L)
+        val transactionCreator   = getExchangeTransactionCreator(orderFeeSettings = feeSettings)
+        val (makerFee, takerFee) = Matcher.getMakerTakerFee(feeSettings)(submitted, counter)
+        val oe                   = OrderExecuted(submitted, counter, System.currentTimeMillis(), takerFee, makerFee)
+
+        val tx = transactionCreator.createTransaction(oe)
+
+        tx shouldBe 'right
+        tx.explicitGet().sellMatcherFee shouldBe 0.003.waves
+        tx.explicitGet().buyMatcherFee shouldBe 0L
+      }
+    }
   }
 }

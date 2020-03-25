@@ -326,14 +326,18 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
 
   private def sendBalanceChanges(bufferSize: Int)(recipient: ActorRef): Unit = {
+
+    import WavesBlockchainClient.{combineBalanceChanges, emptyBalanceChanges}
+
     wavesBlockchainAsyncClient.spendableBalanceChanges
       .bufferIntrospective(bufferSize)
+      .map(_ reduceLeftOption combineBalanceChanges getOrElse emptyBalanceChanges)
       .mapEval { xs =>
         Task
-          .traverse(xs.flatMap(_.valuesIterator flatMap (_.keysIterator)))(asset => Task.fromFuture(getDecimalsFromCache(asset).value))
-          .map(_ => xs reduceLeftOption WavesBlockchainClient.combineBalanceChanges)
+          .traverse { xs.valuesIterator.flatMap(_.keysIterator).toList }(asset => Task fromFuture getDecimalsFromCache(asset).value)
+          .map(_ => xs)
       }
-      .foreach { _.foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_)) }(monixScheduler)
+      .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
   }
 
   private val spendableBalancesActor = {

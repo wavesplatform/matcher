@@ -17,6 +17,8 @@ object WavesBlockchainClient {
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
 
+  val emptyBalanceChanges: SpendableBalanceChanges = Map.empty
+
   def combineBalanceChanges(oldChanges: SpendableBalanceChanges, newChanges: SpendableBalanceChanges): SpendableBalanceChanges = {
     if (oldChanges.size >= newChanges.size)
       oldChanges.foldLeft(newChanges) { case (newBalances, (a, oldB)) => newBalances.updated(a, oldB ++ newBalances.getOrElse(a, Map.empty)) } else

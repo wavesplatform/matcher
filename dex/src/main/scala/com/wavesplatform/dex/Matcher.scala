@@ -37,6 +37,7 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
+import monix.eval.Task
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -333,7 +334,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         )
       )
     ) unsafeTap { sba =>
-      wavesBlockchainAsyncClient.spendableBalanceChanges.foreach(sba ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
+      wavesBlockchainAsyncClient.spendableBalanceChanges
+        .mapEval { xs =>
+          Task
+            .traverse(xs.valuesIterator flatMap (_.keysIterator) toList)(asset => Task.fromFuture(getDecimalsFromCache(asset).value))
+            .map(_ => xs)
+        }
+        .foreach(sba ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
     }
   }
 
@@ -354,7 +361,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         orderBookCache.getOrDefault(_, OrderBookAggregatedSnapshot.empty),
         startSchedules,
         spendableBalancesActor,
-        asset => getDecimalsFromCache(asset).value.map { _.explicitGet() },
         addressActorSettings
       )
     )

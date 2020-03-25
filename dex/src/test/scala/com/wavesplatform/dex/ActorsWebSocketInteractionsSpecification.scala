@@ -79,8 +79,7 @@ class ActorsWebSocketInteractionsSpecification
           },
           _ => OrderBookAggregatedSnapshot.empty,
           enableSchedules,
-          spendableBalancesActor,
-          getDefaultAssetDescriptions andThen (d => Future successful d.decimals)
+          spendableBalancesActor
         )
       )
     }

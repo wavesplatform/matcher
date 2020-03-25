@@ -35,8 +35,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
         e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
         _ => OrderBookAggregatedSnapshot.empty,
         enableSchedules,
-        spendableBalanceActor,
-        _ => Future.successful(8)
+        spendableBalanceActor
       )
     )
   }

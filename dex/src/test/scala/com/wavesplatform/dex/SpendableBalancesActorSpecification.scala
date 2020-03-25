@@ -67,8 +67,7 @@ class SpendableBalancesActorSpecification
             event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0, 0, event)) } },
             _ => OrderBookAggregatedSnapshot.empty,
             enableSchedules,
-            sba,
-            _ => Future.successful(8)
+            sba
           )
         )
       }

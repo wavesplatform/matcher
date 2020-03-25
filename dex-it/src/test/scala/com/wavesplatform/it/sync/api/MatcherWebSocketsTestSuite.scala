@@ -267,7 +267,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
           WsAddressState(Map(Waves -> WsBalances(10, 0)), Seq.empty)
         )
 
-        val IssueResults(issueTx, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 555.444.waves)
+        val IssueResults(issueTx, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 555.444.asset8)
 
         broadcastAndAwait(issueTx)
 

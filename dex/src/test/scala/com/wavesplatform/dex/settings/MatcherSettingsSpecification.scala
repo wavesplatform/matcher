@@ -48,7 +48,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
             connectTimeout = 99.seconds
           )
         ),
-        defaultCachesExpiration = 101.millis
+        defaultCachesExpiration = 101.millis,
+        balanceStreamBufferSize = 100
       )
     )
     settings.exchangeTxBaseFee should be(300000)

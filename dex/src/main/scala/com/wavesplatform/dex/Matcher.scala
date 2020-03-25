@@ -27,6 +27,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -324,6 +325,17 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       "addresses"
     )
 
+  private def sendBalanceChanges(bufferSize: Int)(recipient: ActorRef): Unit = {
+    wavesBlockchainAsyncClient.spendableBalanceChanges
+      .bufferIntrospective(bufferSize)
+      .mapEval { xs =>
+        Task
+          .traverse(xs.flatMap(_.valuesIterator flatMap (_.keysIterator)))(asset => Task.fromFuture(getDecimalsFromCache(asset).value))
+          .map(_ => xs reduceLeftOption WavesBlockchainClient.combineBalanceChanges)
+      }
+      .foreach { _.foreach(recipient ! SpendableBalancesActor.Command.UpdateStates(_)) }(monixScheduler)
+  }
+
   private val spendableBalancesActor = {
     actorSystem.actorOf(
       Props(
@@ -333,15 +345,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           addressActors
         )
       )
-    ) unsafeTap { sba =>
-      wavesBlockchainAsyncClient.spendableBalanceChanges
-        .mapEval { xs =>
-          Task
-            .traverse(xs.valuesIterator flatMap (_.keysIterator) toList)(asset => Task.fromFuture(getDecimalsFromCache(asset).value))
-            .map(_ => xs)
-        }
-        .foreach(sba ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
-    }
+    ) unsafeTap sendBalanceChanges(settings.wavesBlockchainClient.balanceStreamBufferSize)
   }
 
   private val addressActorSettings =

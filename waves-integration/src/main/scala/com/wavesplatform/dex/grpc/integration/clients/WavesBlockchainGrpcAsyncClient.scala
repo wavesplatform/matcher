@@ -174,7 +174,8 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
           log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
         }
       }
-      spendableBalanceChangesSubject.onNext(groupByAddress(value))
+
+      if (value.batch.nonEmpty) spendableBalanceChangesSubject.onNext(groupByAddress(value))
     }
 
     override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {

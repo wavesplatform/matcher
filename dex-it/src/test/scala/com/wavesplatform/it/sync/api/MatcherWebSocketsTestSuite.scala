@@ -140,7 +140,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
         response.status shouldBe expectedStatus
 
-        expectedError.fold() { error =>
+        expectedError.foreach { error =>
           response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
           response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
         }

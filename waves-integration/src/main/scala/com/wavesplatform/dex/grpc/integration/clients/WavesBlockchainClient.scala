@@ -13,8 +13,15 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 
 object WavesBlockchainClient {
+
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
+
+  def combineBalanceChanges(oldChanges: SpendableBalanceChanges, newChanges: SpendableBalanceChanges): SpendableBalanceChanges = {
+    if (oldChanges.size >= newChanges.size)
+      oldChanges.foldLeft(newChanges) { case (newBalances, (a, oldB)) => newBalances.updated(a, oldB ++ newBalances.getOrElse(a, Map.empty)) } else
+      newChanges.foldLeft(oldChanges) { case (oldBalances, (a, newB)) => oldBalances.updated(a, oldBalances.getOrElse(a, Map.empty) ++ newB) }
+  }
 }
 
 trait WavesBlockchainClient[F[_]] {

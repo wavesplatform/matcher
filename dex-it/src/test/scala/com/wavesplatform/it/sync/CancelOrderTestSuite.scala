@@ -98,7 +98,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
     }
 
-    "array of orders could not be cancelled with API key if one of them from another owner" ignore {
+    "only owners orders should be cancelled with API key if one of them from another owner" in {
       val acc = createAccountWithBalance(100.waves -> Waves)
 
       val o = mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100)
@@ -108,11 +108,14 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
         placeAndAwaitAtDex(o)
         o.id.value
-      } ++ o.id.value
+      }
 
-      dex1.api.tryCancelAllByIdsWithApiKey(acc, ids.toSet) // should failWith(?) -- now status is HTTP.OK
+      val allIds = ids :+ o.id.value
 
-      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Accepted)) // fail here -- All attempts are out! The last response is: Right(OrderStatusResponse(NotFound,None,None))
+      dex1.api.tryCancelAllByIdsWithApiKey(acc, allIds.toSet)
+
+      dex1.api.waitForOrderStatus(o, OrderStatus.Accepted)
+      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
     }
 
     "with API key" - {

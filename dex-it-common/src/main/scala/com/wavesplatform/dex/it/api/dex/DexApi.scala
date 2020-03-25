@@ -36,6 +36,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryPublicKey: F[Either[MatcherError, PublicKey]]
 
   def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
+  def tryReservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
+
   def tryTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
 
   def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]]
@@ -157,6 +159,13 @@ object DexApi {
           sttp
             .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
             .headers(timestampAndSignatureHeaders(of, timestamp))
+        }
+
+      override def tryReservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
+        tryParseJson {
+          sttp
+            .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
+            .headers(apiKeyHeaders)
         }
 
       override def tryTradableBalance(of: KeyPair,

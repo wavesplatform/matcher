@@ -22,6 +22,10 @@ object DexApiOps {
       explicitGet(self.tryReservedBalance(of, timestamp))
     }
 
+    def reservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
+      explicitGet(self.tryReservedBalanceWithApiKey(of, timestamp))
+    }
+
     def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
       explicitGet(self.tryTradableBalance(of, assetPair, timestamp))
     }

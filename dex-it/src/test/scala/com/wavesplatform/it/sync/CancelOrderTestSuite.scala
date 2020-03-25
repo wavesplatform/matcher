@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.time.GlobalTimer
@@ -81,6 +82,20 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       dex1.api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
         case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled
       }
+    }
+
+    "array of orders could be cancelled with API key" in {
+      val acc = createAccountWithBalance(100.waves -> Waves)
+
+      val ids = for { i <- 1 to 10 } yield {
+        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
+        placeAndAwaitAtDex(o)
+        o.id.value
+      }
+
+      dex1.api.tryCancelAllByIdsWithApiKey(acc, ids.toSet)
+
+      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
     }
 
     "with API key" - {

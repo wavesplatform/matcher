@@ -60,19 +60,24 @@ lazy val `waves-integration-it` = project
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
-    Test / test := Command.process("fullCheck", state.value)
+    Test / test := Def.sequential(
+      root / Compile / cleanAll,
+      Def.task {
+        Command.process("fullCheck", state.value)
+      }
+    ).value
   )
 
 lazy val root = (project in file("."))
   .settings(name := "dex-root")
   .settings(commonOwaspSettings)
   .aggregate(
-    `dex-test-common`,
     dex,
-    `dex-it-common`,
     `dex-it`,
-    `waves-grpc`,
+    `dex-it-common`,
+    `dex-test-common`,
     `waves-ext`,
+    `waves-grpc`,
     `waves-integration`,
     `waves-integration-it`
   )
@@ -147,7 +152,6 @@ Compile / cleanAll := {
 lazy val quickCheckRaw = taskKey[Unit]("Build a project and run unit tests")
 quickCheckRaw := Def
   .sequential(
-    root / Compile / cleanAll,
     root / Test / compile,
     `waves-ext` / Test / test,
     `waves-integration` / Test / test,
@@ -156,7 +160,7 @@ quickCheckRaw := Def
   )
   .value
 
-lazy val fullCheckRaw = taskKey[Unit]("Build a project and run unit tests")
+lazy val fullCheckRaw = taskKey[Unit]("Build a project and run all tests")
 fullCheckRaw := Def
   .sequential(
     quickCheckRaw,

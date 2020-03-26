@@ -8,7 +8,6 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.time.GlobalTimer
@@ -31,6 +30,106 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Order can be canceled" - {
+    "by sender" in {
+      val order = mkBobOrder
+      placeAndAwaitAtDex(order)
+
+      dex1.api.cancel(bob, order)
+      dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+
+      dex1.api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
+        case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled
+      }
+
+      eventually {
+        val orderBook = dex1.api.orderBook(wavesUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+    }
+
+    "array of orders could be cancelled with API key" in {
+      val acc = createAccountWithBalance(100.waves -> Waves)
+
+      val ids = for { i <- 1 to 10 } yield {
+        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
+        placeAndAwaitAtDex(o)
+        o.id.value
+      }
+
+      dex1.api.cancelAllByIdsWithApiKey(acc, ids.toSet)
+
+      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
+
+      eventually {
+        val orderBook = dex1.api.orderBook(wavesUsdPair)
+        orderBook.bids shouldBe empty
+        orderBook.asks shouldBe empty
+      }
+    }
+
+    "only owners orders should be cancelled with API key if one of them from another owner" in {
+      val acc = createAccountWithBalance(100.waves -> Waves)
+
+      val o = mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100)
+      placeAndAwaitAtDex(o)
+
+      val ids = for { i <- 1 to 10 } yield {
+        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
+        placeAndAwaitAtDex(o)
+        o.id()
+      }
+
+      val allIds = ids :+ o.id()
+
+      dex1.api.cancelAllByIdsWithApiKey(acc, allIds.toSet)
+
+      dex1.api.waitForOrderStatus(o, OrderStatus.Accepted)
+      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
+
+      dex1.api.cancel(alice, o)
+    }
+
+    "with API key" - {
+      "and without X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
+
+        dex1.api.cancelWithApiKey(order)
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+        eventually {
+          val orderBook = dex1.api.orderBook(wavesUsdPair)
+          orderBook.bids shouldBe empty
+          orderBook.asks shouldBe empty
+        }
+      }
+
+      "and with a valid X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
+
+        dex1.api.cancelWithApiKey(order, Some(order.senderPublicKey))
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+      }
+
+      "and with an invalid X-User-Public-Key" in {
+        val order = mkBobOrder
+        placeAndAwaitAtDex(order)
+
+        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
+        dex1.api.cancelWithApiKey(order)
+        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+      }
+    }
 
     "After cancelAllOrders (200) all of them should be cancelled" in {
       val totalAccounts    = 20
@@ -70,99 +169,6 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         },
         5.minutes
       )
-    }
-
-    "by sender" in {
-      val order = mkBobOrder
-      placeAndAwaitAtDex(order)
-
-      dex1.api.cancel(bob, order)
-      dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
-
-      dex1.api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
-        case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled
-      }
-    }
-
-    "array of orders could be cancelled with API key" in {
-      val acc = createAccountWithBalance(100.waves -> Waves)
-
-      val ids = for { i <- 1 to 10 } yield {
-        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
-        placeAndAwaitAtDex(o)
-        o.id.value
-      }
-
-      dex1.api.tryCancelAllByIdsWithApiKey(acc, ids.toSet)
-
-      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
-    }
-
-    "only owners orders should be cancelled with API key if one of them from another owner" in {
-      val acc = createAccountWithBalance(100.waves -> Waves)
-
-      val o = mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100)
-      placeAndAwaitAtDex(o)
-
-      val ids = for { i <- 1 to 10 } yield {
-        val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
-        placeAndAwaitAtDex(o)
-        o.id.value
-      }
-
-      val allIds = ids :+ o.id.value
-
-      dex1.api.tryCancelAllByIdsWithApiKey(acc, allIds.toSet)
-
-      dex1.api.waitForOrderStatus(o, OrderStatus.Accepted)
-      ids.map(dex1.api.waitForOrderStatus(wavesUsdPair, _, OrderStatus.Cancelled))
-    }
-
-    "with API key" - {
-      "and without X-User-Public-Key" in {
-        val order = mkBobOrder
-        placeAndAwaitAtDex(order)
-
-        dex1.api.cancelWithApiKey(order)
-        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
-
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
-
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
-
-        eventually {
-          val orderBook = dex1.api.orderBook(wavesUsdPair)
-          orderBook.bids shouldBe empty
-          orderBook.asks shouldBe empty
-        }
-      }
-
-      "and with a valid X-User-Public-Key" in {
-        val order = mkBobOrder
-        placeAndAwaitAtDex(order)
-
-        dex1.api.cancelWithApiKey(order, Some(order.senderPublicKey))
-        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
-
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
-
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
-
-        eventually {
-          val orderBook = dex1.api.orderBook(wavesUsdPair)
-          orderBook.bids shouldBe empty
-          orderBook.asks shouldBe empty
-        }
-      }
-
-      "and with an invalid X-User-Public-Key" in {
-        val order = mkBobOrder
-        placeAndAwaitAtDex(order)
-
-        dex1.api.tryCancelWithApiKey(order.id(), Some(alice.publicKey)) should failWith(9437193) // OrderNotFound
-        dex1.api.cancelWithApiKey(order)
-        dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
-      }
     }
   }
 

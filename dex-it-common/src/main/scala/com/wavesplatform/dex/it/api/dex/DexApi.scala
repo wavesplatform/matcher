@@ -398,7 +398,7 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
-      override def trySettings() = tryParseJson {
+      override def trySettings: F[Either[MatcherError, SettingsResponse]] = tryParseJson {
         sttp
           .get(uri"$apiUri/settings")
           .headers(apiKeyHeaders)

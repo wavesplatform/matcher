@@ -96,6 +96,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.reservedBalance(bob) shouldBe empty
       }
 
+      "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
+        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
+      }
+
       "and should be listed by trader's publiс key via REST" in {
         dex1.api.orderHistory(alice).map(_.id) should contain(order1.id())
       }

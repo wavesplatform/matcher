@@ -60,29 +60,24 @@ lazy val `waves-integration-it` = project
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
-    Test / test := Def
-      .sequential(
-        root / Compile / packageAll,
-        Def.task {
-          val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
-          val dexDocker              = (`dex-it` / Docker / docker).value
-        },
-        `waves-integration-it` / Test / test,
-        `dex-it` / Test / test
-      )
-      .value
+    Test / test := Def.sequential(
+      root / Compile / cleanAll,
+      Def.task {
+        Command.process("fullCheck", state.value)
+      }
+    ).value
   )
 
 lazy val root = (project in file("."))
   .settings(name := "dex-root")
   .settings(commonOwaspSettings)
   .aggregate(
-    `dex-test-common`,
     dex,
-    `dex-it-common`,
     `dex-it`,
-    `waves-grpc`,
+    `dex-it-common`,
+    `dex-test-common`,
     `waves-ext`,
+    `waves-grpc`,
     `waves-integration`,
     `waves-integration-it`
   )
@@ -154,26 +149,43 @@ Compile / cleanAll := {
   clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile, Test))).value
 }
 
-lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := {
-  // try/finally is a hack to run clean before all tasks
-  try {
-    (root / Compile / cleanAll).value
-  } finally {
-    (dex / Test / test).value
-    (`waves-ext` / Test / test).value
-    (`waves-integration` / Test / test).value
-  }
-}
+lazy val quickCheckRaw = taskKey[Unit]("Build a project and run unit tests")
+quickCheckRaw := Def
+  .sequential(
+    root / Test / compile,
+    `waves-ext` / Test / test,
+    `waves-integration` / Test / test,
+    dex / Test / test,
+    root / Compile / packageAll
+  )
+  .value
 
-commands += Command.command("checkPR") { state =>
-  val updatedState =
-    Project
-      .extract(state)
-      .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
-  Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
+lazy val fullCheckRaw = taskKey[Unit]("Build a project and run all tests")
+fullCheckRaw := Def
+  .sequential(
+    quickCheckRaw,
+    Def.task {
+      val wavesIntegrationDocker = (`waves-integration-it` / Docker / docker).value
+      val dexDocker              = (`dex-it` / Docker / docker).value
+    },
+    `waves-integration-it` / Test / test,
+    `dex-it` / Test / test
+  )
+  .value
+
+def mkCheckCommand(name: String, task: TaskKey[Unit]): Command = Command.command(name) { state =>
+  val updatedState = Project
+    .extract(state)
+    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+
+  Project.extract(updatedState).runTask(task, updatedState)
   state
 }
+
+commands ++= List(
+  mkCheckCommand("quickCheck", root / quickCheckRaw),
+  mkCheckCommand("fullCheck", root / fullCheckRaw)
+)
 
 // IDE settings
 ideExcludedDirectories := Seq((root / baseDirectory).value / "_local")

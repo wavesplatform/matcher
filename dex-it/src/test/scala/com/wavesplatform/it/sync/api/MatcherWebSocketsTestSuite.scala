@@ -16,6 +16,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -64,7 +65,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
     Thread.sleep(200) // Wait an additional time for extra events
 
-    withClue(s"Order changes are ${expectedOrdersChanges.mkString(", ")}: ") {
+    withClue(s"Order changes are:\n${expectedOrdersChanges.mkString(",\n")}: ") {
       connection.getBalancesChanges.size should be <= balancesChangesCountBorders._2
     }
 
@@ -139,7 +140,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
         response.status shouldBe expectedStatus
 
-        expectedError.fold() { error =>
+        expectedError.foreach { error =>
           response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
           response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
         }
@@ -182,7 +183,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
         assertAddressStateChanges(
           connection = wsac,
-          balancesChangesCountBorders = (2, 4),
+          balancesChangesCountBorders = (2, 5),
           ordersChangesCount = 4,
           expectedBalanceChanges = squashBalanceChanges(
             Seq(
@@ -250,6 +251,67 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
               ),
             WsOrder(buyOrder.id(), status = OrderStatus.Cancelled.name.some)
           )
+        )
+
+        wsac.close()
+      }
+
+      "when user issues asset" in {
+
+        val acc = mkKeyPair("acc")
+        broadcastAndAwait(mkTransfer(alice, acc, 10.waves, Waves))
+        val wsac = mkWebSocketAuthenticatedConnection(acc, dex1)
+
+        assertAddressStateSnapshot(
+          wsac,
+          WsAddressState(Map(Waves -> WsBalances(10, 0)), Seq.empty)
+        )
+
+        val IssueResults(issueTx, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 555.444.asset8)
+
+        broadcastAndAwait(issueTx)
+
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (1, 3),
+          ordersChangesCount = 0,
+          expectedBalanceChanges = Map[Asset, WsBalances](
+            issuedAsset -> WsBalances(555.444, 0),
+            Waves       -> WsBalances(9, 0)
+          ),
+          expectedOrdersChanges = Seq.empty
+        )
+
+        wsac.close()
+      }
+
+      "when user burns asset" in {
+
+        val joker = mkKeyPair("joker")
+
+        broadcastAndAwait(
+          mkTransfer(alice, joker, 333.usd, usd),
+          mkTransfer(alice, joker, 1.waves, Waves)
+        )
+
+        val wsac = mkWebSocketAuthenticatedConnection(joker, dex1)
+
+        assertAddressStateSnapshot(
+          wsac,
+          WsAddressState(Map(Waves -> WsBalances(1, 0), usd -> WsBalances(333, 0)), Seq.empty)
+        )
+
+        broadcastAndAwait(mkBurn(joker, usd, 330.usd))
+
+        assertAddressStateChanges(
+          connection = wsac,
+          balancesChangesCountBorders = (1, 2),
+          ordersChangesCount = 0,
+          expectedBalanceChanges = Map[Asset, WsBalances](
+            usd   -> WsBalances(3, 0),
+            Waves -> WsBalances(0, 0)
+          ),
+          expectedOrdersChanges = Seq.empty
         )
 
         wsac.close()

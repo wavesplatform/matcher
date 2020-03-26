@@ -42,7 +42,7 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
 
   protected val MatcherAccount: KeyPair = KeyPair(MatcherSeed)
-  protected val senderKeyPair: KeyPair  = KeyPair("seed".getBytes("utf-8"))
+  protected val senderKeyPair: KeyPair  = mkKeyPair("seed")
 
   protected val btc: IssuedAsset = mkAssetId("WBTC")
   protected val usd: IssuedAsset = mkAssetId("WUSD")
@@ -86,6 +86,8 @@ trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with Doub
     val lo = LimitOrder(order)
     lo.spentAmount + (if (order.getSpendAssetId == order.feeAsset) lo.fee else 0)
   }
+
+  protected def mkKeyPair(seed: String): KeyPair = KeyPair(seed getBytes "utf-8")
 
   protected def createOrder(pair: AssetPair,
                             orderType: OrderType,

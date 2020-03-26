@@ -54,7 +54,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
           idleTimeout = 1.minute,
           channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
         ),
-        defaultCachesExpiration = 100.milliseconds
+        defaultCachesExpiration = 100.milliseconds,
+        balanceStreamBufferSize = 100
       ),
       monixScheduler,
       ExecutionContext.fromExecutor(grpcExecutor)

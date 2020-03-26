@@ -29,11 +29,7 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
     copy(activeWsConnections = activeWsConnections ++ pendingWsConnections, pendingWsConnections = Queue.empty)
 
   def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
-    if (activeWsConnections.lengthCompare(1) == 0)
-      copy(activeWsConnections = Queue.empty,
-           changedReservableAssets = Set.empty,
-           changedSpendableAssets = Set.empty,
-           ordersChanges = Map.empty)
+    if (activeWsConnections.lengthCompare(1) == 0) copy(activeWsConnections = Queue.empty).cleanChanges()
     else copy(activeWsConnections = activeWsConnections.filterNot(_ == subscriber))
   }
 

@@ -31,7 +31,7 @@ class ActorsWebSocketInteractionsSpecification
     with ImplicitSender
     with MatcherSpecBase {
 
-  private implicit val efc: ErrorFormatterContext = Map(Waves -> 8, usd -> 2).withDefaultValue(8).apply
+  private implicit val efc: ErrorFormatterContext = (asset: Asset) => getDefaultAssetDescriptions(asset).decimals
 
   private def webSocketTest(
       f: (

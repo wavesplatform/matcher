@@ -27,6 +27,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -37,6 +38,7 @@ import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
+import monix.eval.Task
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -112,6 +114,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val marketStatuses                                     = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
+
+  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = {
+    getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
+  }
 
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBookAggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
@@ -231,7 +237,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder)
+      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder, apiKeyHash)
     )
   }
 
@@ -319,6 +325,21 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       "addresses"
     )
 
+  private def sendBalanceChanges(bufferSize: Int)(recipient: ActorRef): Unit = {
+
+    import WavesBlockchainClient.{combineBalanceChanges, emptyBalanceChanges}
+
+    wavesBlockchainAsyncClient.spendableBalanceChanges
+      .bufferIntrospective(bufferSize)
+      .map(_ reduceLeftOption combineBalanceChanges getOrElse emptyBalanceChanges)
+      .mapEval { xs =>
+        Task
+          .traverse { xs.valuesIterator.flatMap(_.keysIterator).toList }(asset => Task fromFuture getDecimalsFromCache(asset).value)
+          .map(_ => xs)
+      }
+      .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
+  }
+
   private val spendableBalancesActor = {
     actorSystem.actorOf(
       Props(
@@ -328,9 +349,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           addressActors
         )
       )
-    ) unsafeTap { sba =>
-      wavesBlockchainAsyncClient.spendableBalanceChanges.foreach(sba ! SpendableBalancesActor.Command.UpdateStates(_))(monixScheduler)
-    }
+    ) unsafeTap sendBalanceChanges(settings.wavesBlockchainClient.balanceStreamBufferSize)
   }
 
   private val addressActorSettings =
@@ -401,13 +420,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     def loadAllKnownAssets(): Future[Unit] =
       Future(blocking(assetPairsDB.all()).flatMap(_.assets) ++ settings.mentionedAssets).flatMap { assetsToLoad =>
         Future
-          .traverse(assetsToLoad) { asset =>
-            getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset).value.tupleLeft(asset)
-          }
+          .traverse(assetsToLoad)(asset => getDecimalsFromCache(asset).value tupleLeft asset)
           .map { xs =>
             val notFoundAssets = xs.collect { case (id, Left(_)) => id }
-            if (notFoundAssets.isEmpty) ()
-            else {
+            if (notFoundAssets.nonEmpty) {
               log.error(s"Can't load assets: ${notFoundAssets.mkString(", ")}. Try to sync up your node with the network.")
               forceStopApplication(UnsynchronizedNodeError)
             }
@@ -549,8 +565,8 @@ object Matcher extends ScorexLogging {
   }
 
   private def getDecimals(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
-      implicit ec: ExecutionContext): FutureResult[(Asset, Int)] =
-    getDescription(assetsCache, assetDesc)(asset).map(x => asset -> x.decimals)(catsStdInstancesForFuture)
+      implicit ec: ExecutionContext): FutureResult[Int] =
+    getDescription(assetsCache, assetDesc)(asset).map(_.decimals)(catsStdInstancesForFuture)
 
   private def getDescription(assetsCache: AssetsStorage, assetDesc: IssuedAsset => Future[Option[BriefAssetDescription]])(asset: Asset)(
       implicit ec: ExecutionContext): FutureResult[BriefAssetDescription] = asset match {

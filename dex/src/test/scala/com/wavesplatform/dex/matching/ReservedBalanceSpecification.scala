@@ -483,8 +483,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
       )
     )
 
-    lazy val spendableBalancesActor =
+    lazy val spendableBalancesActor = {
       system.actorOf(Props(new SpendableBalancesActor((_, assets) => spendableBalances(assets), allAssetsSpendableBalances, addressDir)))
+    }
 
     def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
       Props(

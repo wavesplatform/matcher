@@ -91,7 +91,8 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          connect-timeout = 99s
          |        }
          |      }
-         |      default-caches-expiration = 101ms
+         |      default-caches-expiration = 101ms,
+         |      balance-stream-buffer-size = 100
          |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s

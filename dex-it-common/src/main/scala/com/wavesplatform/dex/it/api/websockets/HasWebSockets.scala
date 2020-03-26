@@ -26,6 +26,9 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
 
+  protected def getBaseBalancesStreamUri(dex: DexContainer): String   = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/"
+  protected def getBaseOrderBooksStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/orderbook/"
+
   protected val knownWsConnections: ConcurrentHashMap.KeySetView[WebSocketConnection[_], lang.Boolean] =
     ConcurrentHashMap.newKeySet[WebSocketConnection[_]]()
 
@@ -43,13 +46,13 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     val timestamp     = System.currentTimeMillis() + 86400000
     val signedMessage = prefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
-    val wsUri         = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/${client.publicKey}?Timestamp=$timestamp&Signature=$signature"
+    val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp&s=$signature"
 
-    new WebSocketAuthenticatedConnection(wsUri)
+    new WebSocketAuthenticatedConnection(wsUri, None)
   }
 
   protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WebSocketConnection[WsOrderBook] = {
-    val wsUri = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
+    val wsUri = s"${getBaseOrderBooksStreamUri(dex)}${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
     mkWebSocketConnection(wsUri) { msg =>
       Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
     }

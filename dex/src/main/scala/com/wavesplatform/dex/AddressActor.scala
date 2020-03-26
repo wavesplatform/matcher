@@ -63,12 +63,11 @@ class AddressActor(owner: Address,
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
-      import OrderValidator.MaxActiveOrders
       log.debug(s"Got $command")
       val orderId = command.order.id()
 
       if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
-      else if (totalActiveOrders >= MaxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(MaxActiveOrders))
+      else if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -119,6 +118,16 @@ class AddressActor(owner: Address,
         context.actorOf(BatchOrderCancelActor.props(toCancelIds.toSet, self, sender, settings.batchCancelTimeout))
       }
 
+    case command: Command.CancelOrders =>
+      val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
+      val toCancelIds       = allActiveOrderIds.intersect(command.orderIds)
+      val unknownIds        = command.orderIds -- allActiveOrderIds
+      log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknown ids: ${unknownIds.mkString(", ")}")
+
+      val initResponse = unknownIds.map(id => id -> api.OrderCancelRejected(error.OrderNotFound(id))).toMap
+      if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(initResponse)
+      else context.actorOf(BatchOrderCancelActor.props(toCancelIds, self, sender, settings.batchCancelTimeout, initResponse))
+
     case command: Command.CancelNotEnoughCoinsOrders =>
       if (addressWsMutableState.hasActiveConnections) {
         addressWsMutableState = addressWsMutableState.putSpendableAssets(command.newBalance.keySet)
@@ -146,7 +155,7 @@ class AddressActor(owner: Address,
         .sorted
 
       log.trace(s"Collected ${matchingActiveOrders.length} active orders")
-      val orders = if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders)
+      val orders = if (onlyActive) matchingActiveOrders else matchingActiveOrders ++ orderDB.getFinalizedOrders(owner, maybePair)
       sender ! Reply.OrdersStatuses(orders)
 
     case event: Event.StoreFailed =>
@@ -525,6 +534,7 @@ object AddressActor {
     }
 
     case class CancelOrder(orderId: ByteStr)                             extends OneOrderCommand
+    case class CancelOrders(orderIds: Set[ByteStr])                      extends Command
     case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
 
     /**
@@ -555,8 +565,8 @@ object AddressActor {
 
   private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
 
-  final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration)
+  final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration, maxActiveOrders: Int)
   object Settings {
-    val default: Settings = Settings(100.milliseconds, 20.seconds)
+    val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
 }

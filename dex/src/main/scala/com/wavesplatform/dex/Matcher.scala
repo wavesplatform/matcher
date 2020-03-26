@@ -252,7 +252,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private lazy val db                  = openDB(settings.dataDir)
   private lazy val assetPairsDB        = AssetPairsDB(db)
   private lazy val orderBookSnapshotDB = OrderBookSnapshotDB(db)
-  private lazy val orderDB             = OrderDB(settings, db)
+  private lazy val orderDB             = OrderDB(settings.orderDb, db)
 
   lazy val orderBookSnapshotStore: ActorRef = actorSystem.actorOf(
     OrderBookSnapshotStoreActor.props(orderBookSnapshotDB),
@@ -355,7 +355,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val addressActorSettings =
     AddressActor.Settings(
       wsMessagesInterval = settings.webSocketSettings.messagesInterval,
-      batchCancelTimeout = settings.actorResponseTimeout - settings.actorResponseTimeout / 10 // Should be enough
+      batchCancelTimeout = settings.actorResponseTimeout - settings.actorResponseTimeout / 10, // Should be enough
+      maxActiveOrders = 400
     )
 
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {

@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalatest._
@@ -28,6 +29,7 @@ class OrderHistoryBalanceSpecification
     with Matchers
     with MatcherSpecBase
     with BeforeAndAfterEach
+    with DiffMatcherWithImplicits
     with SystemTime {
 
   import OrderHistoryBalanceSpecification._
@@ -35,19 +37,20 @@ class OrderHistoryBalanceSpecification
   private val WctBtc   = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))
 
-  private var oh = new OrderHistoryStub(system, time)
+  private def mkOrderHistory = new OrderHistoryStub(system, time, MaxActiveOrders, MaxFinalizedOrders)
+  private var oh             = mkOrderHistory
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system, time)
+    oh = mkOrderHistory
   }
 
   def openVolume(address: Address, asset: Asset): Long = oh.ref(address).openVolume(asset)
 
-  def activeOrderIds(sender: Address): Seq[ByteStr]                        = oh.ref(sender).activeOrderIds
-  def allOrderIds(sender: Address): Seq[ByteStr]                           = oh.ref(sender).allOrderIds
-  def activeOrderIdsByPair(sender: Address, pair: AssetPair): Seq[ByteStr] = oh.ref(sender).activeOrderIdsByPair(pair)
-  def allOrderIdsByPair(sender: Address, pair: AssetPair): Seq[ByteStr]    = oh.ref(sender).allOrderIdsByPair(pair)
-  def orderStatus(orderId: ByteStr)                                        = oh.ref(orderId).orderStatus(orderId)
+  def activeOrderIds(sender: Address)                        = oh.ref(sender).activeOrderIds
+  def allOrderIds(sender: Address)                           = oh.ref(sender).allOrderIds
+  def activeOrderIdsByPair(sender: Address, pair: AssetPair) = oh.ref(sender).activeOrderIdsByPair(pair)
+  def allOrderIdsByPair(sender: Address, pair: AssetPair)    = oh.ref(sender).allOrderIdsByPair(pair)
+  def orderStatus(orderId: ByteStr)                          = oh.ref(orderId).orderStatus(orderId)
 
   property("New buy order added") {
     val ord = buy(WctBtc, 10000, 0.0007)
@@ -600,16 +603,16 @@ class OrderHistoryBalanceSpecification
 
   property("History with more than max limit") {
     val pk = KeyPair("private".getBytes("utf-8"))
-    val origOrders = (0 until matcherSettings.maxOrdersPerRequest).map { i =>
+    val origOrders = (0 until matcherSettings.orderDb.maxOrders).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, time.getTimestamp()))
+    val canceledOrder = origOrders.last
+    oh.process(OrderCanceled(LimitOrder(canceledOrder), isSystemCancel = false, time.getTimestamp()))
 
     val newOrder = buy(WavesBtc, 100000000, 0.001, Some(pk), Some(300000L), Some(1L))
-
     oh.process(OrderAdded(LimitOrder(newOrder), time.getTimestamp()))
 
     withClue("orders list") {
@@ -617,40 +620,39 @@ class OrderHistoryBalanceSpecification
       val expectedActiveOrders = origOrders.init.reverse :+ newOrder
       activeOrderIds(pk) shouldBe expectedActiveOrders.map(_.id())
 
-      // 'last' is canceled. It should be moved to the end of all orders' list, but it doesn't fit. So we remove it
-      val expectedAllOrders = origOrders.init.reverse :+ newOrder
+      // 'last' is canceled. It should be moved to the end of all orders' list
+      val expectedAllOrders = origOrders.init.reverse :+ newOrder :+ canceledOrder
       val actualAllOrders   = allOrderIds(pk)
-      actualAllOrders should have length matcherSettings.maxOrdersPerRequest
-      actualAllOrders shouldBe expectedAllOrders.map(_.id())
+      actualAllOrders should matchTo(expectedAllOrders.map(_.id()))
     }
   }
 
   property("History with canceled order and more than max limit") {
     val pk = KeyPair("private".getBytes("utf-8"))
-    val origOrders = (0 to matcherSettings.maxOrdersPerRequest).map { i =>
+    val origOrders = (0 to matcherSettings.orderDb.maxOrders).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    oh.process(OrderCanceled(LimitOrder(origOrders.last), isSystemCancel = false, time.getTimestamp()))
+    val canceledOrder = origOrders.last
+    oh.process(OrderCanceled(LimitOrder(canceledOrder), isSystemCancel = false, time.getTimestamp()))
 
     withClue("orders list") {
       // 'last' is canceled, remove it
-      activeOrderIds(pk) shouldBe origOrders.init.reverse.map(_.id())
+      val expectedActiveOrders = origOrders.init.reverse
+      activeOrderIds(pk) shouldBe expectedActiveOrders.map(_.id())
 
-      // 'last' is removed, because it doesn't fit in 'matcherSettings.maxOrdersPerRequest'
-      val expectedAllOrders = origOrders.init.reverse
+      val expectedAllOrders = expectedActiveOrders :+ canceledOrder
       val actualAllOrders   = allOrderIds(pk)
-      actualAllOrders should have length matcherSettings.maxOrdersPerRequest
-      allOrderIds(pk) shouldBe expectedAllOrders.map(_.id())
+      actualAllOrders should matchTo(expectedAllOrders.map(_.id()))
     }
   }
 
   property("History by pair - added orders more than history by pair limit (200 active)") {
     val pk = KeyPair("private".getBytes("utf-8"))
 
-    val orders = (1 to MaxElements).map { i =>
+    val orders = (1 to MaxActiveOrders).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
@@ -671,31 +673,32 @@ class OrderHistoryBalanceSpecification
     }
   }
 
-  property("History by pair - added and canceled orders both more than history by pair limit (200 active, 10 canceled)") {
+  property("History by pair - added and canceled orders both more than history by pair limit (maxActive + maxFinalized + 1)") {
     val pk = KeyPair("private".getBytes("utf-8"))
 
-    val allOrders = (1 to MaxElements + 10).map { i =>
+    val ordersToFinalize = MaxFinalizedOrders + 1
+    val allOrders = (1 to MaxActiveOrders + ordersToFinalize).map { i =>
       val o = buy(WavesBtc, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.processAll(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
     }.toVector
 
-    val (ordersToCancel, activeOrders) = allOrders.splitAt(MaxElements)
+    val (ordersToCancel, activeOrders) = allOrders.splitAt(ordersToFinalize)
     ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), isSystemCancel = false, time.getTimestamp())))
     val expectedActiveOrderIds = activeOrders.map(_.id()).reverse
 
     withClue("common") {
-      val expectedIds = allOrders.takeRight(MaxElements).map(_.id()).reverse
-      val allIds      = allOrderIds(pk)
-      allIds shouldBe expectedIds
-      activeOrderIds(pk) shouldBe expectedActiveOrderIds
+      val expectedAllIds = allOrders.takeRight(MaxTotalOrders).map(_.id()).reverse
+      val allIds         = allOrderIds(pk)
+      allIds should matchTo(expectedAllIds)
+      activeOrderIds(pk) should matchTo(expectedActiveOrderIds)
     }
 
     withClue("pair") {
-      val expectedIds = allOrders.takeRight(MaxElements).map(_.id()).reverse
+      val expectedIds = allOrders.takeRight(MaxTotalOrders).map(_.id()).reverse
       val pair1Ids    = allOrderIdsByPair(pk, WavesBtc)
-      pair1Ids shouldBe expectedIds
-      activeOrderIdsByPair(pk, WavesBtc) shouldBe expectedActiveOrderIds
+      pair1Ids should matchTo(expectedIds)
+      activeOrderIdsByPair(pk, WavesBtc) should matchTo(expectedActiveOrderIds)
     }
   }
 
@@ -704,9 +707,9 @@ class OrderHistoryBalanceSpecification
     val pair1 = WavesBtc
     val pair2 = AssetPair(Waves, mkAssetId("ETH"))
 
-    // 1. Place and cancel active.MaxElements orders
+    // 1. Place and cancel MaxTotalOrders orders
 
-    val pair1Orders = (1 to MaxElements).map { i =>
+    val pair1Orders = (1 to MaxTotalOrders).map { i =>
       val o = buy(pair1, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o), time.getTimestamp()))
       o
@@ -722,11 +725,11 @@ class OrderHistoryBalanceSpecification
       val expectedIds = pair1Orders.map(_.id()).reverse
 
       withClue("common") {
-        allOrderIds(pk) shouldBe expectedIds.take(MaxElements)
+        allOrderIds(pk) should matchTo(expectedIds.take(MaxFinalizedOrders))
       }
 
       withClue("pair1") {
-        allOrderIdsByPair(pk, pair1) shouldBe expectedIds.take(MaxElements)
+        allOrderIdsByPair(pk, pair1) should matchTo(expectedIds.take(MaxFinalizedOrders))
       }
 
       withClue("pair2") {
@@ -752,18 +755,18 @@ class OrderHistoryBalanceSpecification
 
       withClue("common") {
         val allIds      = allOrderIds(pk)
-        val expectedIds = pair2Orders.map(_.id()).reverse ++ pair1Orders.map(_.id()).reverse.take(MaxElements - pair2Orders.size)
-        allIds shouldBe expectedIds
+        val expectedIds = (pair1Orders.map(_.id()) ++ pair2Orders.map(_.id())).reverse.take(MaxFinalizedOrders)
+        allIds should matchTo(expectedIds)
       }
 
       withClue("pair1") {
         val pair1Ids = allOrderIdsByPair(pk, pair1)
-        pair1Ids shouldBe pair1Orders.map(_.id()).reverse.take(MaxElements)
+        pair1Ids should matchTo(pair1Orders.map(_.id()).reverse.take(MaxFinalizedOrders))
       }
 
       withClue("pair2") {
         val pair2Ids = allOrderIdsByPair(pk, pair2)
-        pair2Ids shouldBe pair2Orders.map(_.id()).reverse
+        pair2Ids should matchTo(pair2Orders.map(_.id()).reverse.take(MaxFinalizedOrders))
       }
     }
   }
@@ -888,23 +891,26 @@ class OrderHistoryBalanceSpecification
 }
 
 private object OrderHistoryBalanceSpecification {
-  val MaxElements: Int             = 100
+  val MaxActiveOrders    = 100
+  val MaxFinalizedOrders = 70
+  val MaxTotalOrders     = MaxActiveOrders + MaxFinalizedOrders
+
   implicit val askTimeout: Timeout = 5.seconds
 
   private def askAddressActor[A: ClassTag](ref: ActorRef, msg: Any) =
     Await.result((ref ? msg).mapTo[A], 5.seconds)
 
   private implicit class AddressActorExt(val ref: ActorRef) extends AnyVal {
-    def orderIds(assetPair: Option[AssetPair], activeOnly: Boolean): Seq[Order.Id] =
-      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, activeOnly)).xs.map(_._1)
+    def orderIds(assetPair: Option[AssetPair], activeOnly: Boolean): Vector[Order.Id] =
+      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, activeOnly)).xs.map(_._1).toVector
 
-    def activeOrderIds: Seq[Order.Id] = orderIds(None, true)
+    def activeOrderIds: Vector[Order.Id] = orderIds(None, true)
 
-    def allOrderIds: Seq[Order.Id] = orderIds(None, false)
+    def allOrderIds: Vector[Order.Id] = orderIds(None, false)
 
-    def activeOrderIdsByPair(pair: AssetPair): Seq[Order.Id] = orderIds(Some(pair), true)
+    def activeOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), true)
 
-    def allOrderIdsByPair(pair: AssetPair): Seq[Order.Id] = orderIds(Some(pair), false)
+    def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), false)
 
     def openVolume(asset: Asset): Long =
       askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.getOrElse(asset, 0L)

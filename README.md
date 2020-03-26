@@ -75,7 +75,7 @@ cd waves-dex
 ## 3. Compilation and unit tests
 
 ```
-sbt checkPR
+sbt quickCheck
 ```
 
 ## 4. Running DEX integration tests (optional)

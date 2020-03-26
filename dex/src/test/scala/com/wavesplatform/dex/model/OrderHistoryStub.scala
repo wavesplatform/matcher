@@ -13,7 +13,7 @@ import com.wavesplatform.dex.{AddressActor, AddressDirectory, SpendableBalancesA
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class OrderHistoryStub(system: ActorSystem, time: Time) {
+class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, maxFinalizedOrders: Int) {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
@@ -30,7 +30,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
       new AddressActor(
         address,
         time,
-        new TestOrderDB(100),
+        new TestOrderDB(maxFinalizedOrders),
         _ => Future.successful(false),
         e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
         _ => OrderBookAggregatedSnapshot.empty,

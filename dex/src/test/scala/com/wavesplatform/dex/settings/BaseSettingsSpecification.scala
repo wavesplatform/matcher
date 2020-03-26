@@ -71,6 +71,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      type = "in-mem"
          |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
          |    }
+         |    order-db {
+         |      max-orders = 199
+         |    }
          |    rest-api {
          |      address = 127.1.2.3
          |      port = 6880

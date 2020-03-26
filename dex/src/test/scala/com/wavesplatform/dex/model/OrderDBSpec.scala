@@ -32,7 +32,7 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
     result <- finalizedOrderInfoGen(o)
   } yield result
 
-  private def test(f: OrderDB => Any): Any = f(OrderDB(matcherSettings, db))
+  private def test(f: OrderDB => Any): Any = f(OrderDB(matcherSettings.orderDb, db))
 
   "Default OrderDB implementation" - {
     "stores" - {
@@ -76,7 +76,7 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
       }
     }
 
-    "loads remaining orders when limits are not exceeded" in test { odb =>
+    "loads finalized orders when limits are not exceeded" in test { odb =>
       forAll(finalizedOrderSeqGen(20)) {
         case (sender, pair, orders) =>
           for ((o, i) <- orders) {
@@ -84,29 +84,25 @@ class OrderDBSpec extends AnyFreeSpec with Matchers with WithDB with MatcherSpec
             odb.saveOrderInfo(o.id(), o.sender, i)
           }
 
-          val tuples = odb.loadRemainingOrders(sender, Some(pair), Seq.empty)
+          val tuples = odb.getFinalizedOrders(sender, Some(pair))
           tuples should contain allElementsOf orders.map { case (o, i) => o.id() -> i }
       }
     }
 
-    "does not load more orders when there are too many active orders" in {
-      val odb = OrderDB(matcherSettings.copy(maxOrdersPerRequest = 30), db)
-      val paramGen = for {
-        (sender, pair, finalizedOrders) <- finalizedOrderSeqGen(20)
-        activeOrders                    <- Gen.listOfN(20, orderGenerator(sender, pair))
-      } yield (sender, pair, activeOrders.map(o => o.id() -> o.toInfo(OrderStatus.Accepted)), finalizedOrders)
+    "does not load more orders than limit" in {
+      val settings = matcherSettings.orderDb.copy(maxOrders = 30)
+      val odb      = OrderDB(settings, db)
+      val paramGen = finalizedOrderSeqGen(40)
 
       forAll(paramGen) {
-        case (sender, pair, active, finalized) =>
+        case (sender, pair, finalized) =>
           for ((o, i) <- finalized) {
             odb.saveOrder(o)
             odb.saveOrderInfo(o.id(), o.sender, i)
           }
 
-          val loadedOrders = odb.loadRemainingOrders(sender, Some(pair), active)
-          loadedOrders should contain allElementsOf active
-          loadedOrders.size should be <= matcherSettings.maxOrdersPerRequest
-
+          val loadedOrders = odb.getFinalizedOrders(sender, Some(pair))
+          loadedOrders.size shouldBe settings.maxOrders
       }
     }
   }

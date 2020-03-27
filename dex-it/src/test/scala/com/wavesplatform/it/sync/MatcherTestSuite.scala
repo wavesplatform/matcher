@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
-import com.wavesplatform.dex.db.OrderDB
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -31,6 +31,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val bob2WavesPair                                 = AssetPair(bobAsset2, Waves)
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
+
+  private val maxOrders = 99
+
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  order-db.max-orders = $maxOrders
+       |}""".stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -86,6 +94,11 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       "frozen amount should be listed via matcherBalance REST endpoint" in {
         dex1.api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalance(bob) shouldBe empty
+      }
+
+      "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
+        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -356,7 +369,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     def mkAliceOrder(i: Int, tpe: OrderType) = mkOrder(alice, pair, tpe, 100L + i, Order.PriceConstant)
 
-    val orders = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+    val orders = (1 to (maxOrders + 5)).flatMap { i =>
       List(
         mkAliceOrder(i, OrderType.BUY),
         mkAliceOrder(i, OrderType.SELL)

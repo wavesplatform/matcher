@@ -9,24 +9,24 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
-import com.wavesplatform.dex.settings.MatcherSettings
 import org.iq80.leveldb.DB
 
+/**
+ * Contains only finalized orders
+ */
 trait OrderDB {
   def containsInfo(id: Order.Id): Boolean
   def status(id: Order.Id): OrderStatus.Final
   def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit
   def saveOrder(o: Order): Unit
   def get(id: Order.Id): Option[Order]
-  def loadRemainingOrders(owner: Address,
-                          maybePair: Option[AssetPair],
-                          activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])]
+  def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])]
 }
 
 object OrderDB {
-  val OldestOrderIndexOffset = 100
+  case class Settings(maxOrders: Int)
 
-  def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
+  def apply(settings: Settings, db: DB): OrderDB = new OrderDB with ScorexLogging {
     override def containsInfo(id: Order.Id): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
 
     override def status(id: Order.Id): OrderStatus.Final = db.readOnly { ro =>
@@ -52,8 +52,8 @@ object OrderDB {
 
           val newPairSeqNr = rw.inc(MatcherKeys.finalizedPairSeqNr(sender, oi.assetPair))
           rw.put(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
-          if (newPairSeqNr > OldestOrderIndexOffset) // Indexes start with 1, so if newPairSeqNr=101, we delete 1 (the first)
-            rw.get(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - OldestOrderIndexOffset))
+          if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
+            rw.get(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
               .map(MatcherKeys.order)
               .foreach(x => rw.delete(x))
 
@@ -62,10 +62,8 @@ object OrderDB {
       }
     }
 
-    override def loadRemainingOrders(owner: Address,
-                                     maybePair: Option[AssetPair],
-                                     activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])] = db.readOnly {
-      ro =>
+    override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
+      db.readOnly { ro =>
         val (seqNr, key) = maybePair match {
           case Some(p) =>
             (ro.get(MatcherKeys.finalizedPairSeqNr(owner, p)), MatcherKeys.finalizedPair(owner, p, _: Int))
@@ -73,12 +71,12 @@ object OrderDB {
             (ro.get(MatcherKeys.finalizedCommonSeqNr(owner)), MatcherKeys.finalizedCommon(owner, _: Int))
         }
 
-        activeOrders ++ (for {
-          offset <- 0 until (settings.maxOrdersPerRequest - activeOrders.length)
+        (for {
+          offset <- 0 until math.min(seqNr, settings.maxOrders)
           id     <- db.get(key(seqNr - offset))
           oi     <- db.get(MatcherKeys.orderInfo(id))
         } yield id -> oi).sorted
-    }
+      }
   }
 
   implicit def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }

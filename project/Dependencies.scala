@@ -12,7 +12,7 @@ object Dependencies {
     val scalaCheck         = "1.14.3"
     val scalaTestPlusCheck = "3.1.0.1"
     val scalaMock          = "4.4.0"
-    val diffx              = "0.3.16"
+    val diffx              = "0.3.19"
 
     val cats              = "2.0.0"
     val catsTaglessMacros = "0.11"

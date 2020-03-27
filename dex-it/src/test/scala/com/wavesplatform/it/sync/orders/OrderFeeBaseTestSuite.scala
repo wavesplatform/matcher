@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.orders
 import com.wavesplatform.it.MatcherSuiteBase
 
 class OrderFeeBaseTestSuite extends MatcherSuiteBase {
-
   val percentFee = 14
 
   val price                = 1.2.usd

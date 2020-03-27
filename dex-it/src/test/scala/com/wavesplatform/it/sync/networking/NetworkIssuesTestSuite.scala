@@ -1,12 +1,7 @@
 package com.wavesplatform.it.sync.networking
 
-import java.nio.charset.StandardCharsets
-
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.api.HasToxiProxy

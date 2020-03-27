@@ -1,19 +1,12 @@
 package com.wavesplatform.it.sync.networking
 
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.ThreadLocalRandom
-
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItKafkaRequired
-import org.scalatest
 
 @DexItKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
@@ -27,22 +20,6 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
     dex2.start()
-  }
-
-  private def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
-    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
-
-    balances.foreach {
-      case (balance, asset) =>
-        asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
-          assert(
-            wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
-            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
-          )
-        }
-        broadcastAndAwait { mkTransfer(alice, account, balance, asset, 0.003.waves) }
-    }
-    account
   }
 
   /**

@@ -633,17 +633,17 @@ class OrderValidatorSpecification
               LevelAgg(amount = 30.waves, price = 0.00011810.btc) //  buy whole level,   value = 30 * 0.00011810 = 0.00354300.btc, remain to execute = 100 - 30 = 70
             ).reverse,
             bids = Seq(
-              LevelAgg(amount = 85.waves, price = 0.00011808.btc), // close part of level, value = 33.waves, remain to execute =  33 - 33 =  0
-              LevelAgg(amount = 12.waves, price = 0.00011805.btc), // close whole level,   value = 12.waves, remain to execute =  45 - 12 = 33
-              LevelAgg(amount = 40.waves, price = 0.00011787.btc), // close whole level,   value = 40.waves, remain to execute =  85 - 40 = 45
-              LevelAgg(amount = 15.waves, price = 0.00011782.btc) //  close whole level,   value = 15.waves, remain to execute = 100 - 15 = 85
+              LevelAgg(amount = 85.waves, price = 0.00011808.btc), // close whole level,   value = 85.waves, remain to execute = 100 - 85 = 15
+              LevelAgg(amount = 12.waves, price = 0.00011805.btc), // close whole level,   value = 12.waves, remain to execute =  15 - 12 = 3
+              LevelAgg(amount = 40.waves, price = 0.00011787.btc), // close part of level, value = 3.waves,  remain to execute =   3 -  3 = 0
+              LevelAgg(amount = 15.waves, price = 0.00011782.btc) //  won't be touched
             )
           )
 
         // cost of 100.waves by the current market state = 0.00354300 + 0.00425664 + 0.00271975 + 0.00130262 = 0.01182201.btc
 
-        val validateByTradableBalance: Map[Asset, Long] => Order => Result[AcceptedOrder] = validateMarketOrderByAccountStateAware { orderBook }
-        val validateByPrice: Order => Result[AcceptedOrder]                               = validateByTradableBalance { enoughBalance }
+        val validateByTradableBalance: Map[Asset, Long] => Order => Result[AcceptedOrder] = validateMarketOrderByAccountStateAware(orderBook)
+        val validateByPrice: Order => Result[AcceptedOrder]                               = validateByTradableBalance(enoughBalance)
 
         val buyAmount, sellAmount = 100.waves
         val (buyPrice, sellPrice) = (0.00011850, 0.00011750) // both prices are enough to collapse counter side
@@ -655,43 +655,46 @@ class OrderValidatorSpecification
 
         withClue("SELL: in order to sell 100.waves price should be <= 0.00011787.btc, otherwise sell less\n") {
           validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011787) } shouldBe 'right                           // the highest acceptable price for selling 100.waves
-          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce("InvalidMarketOrderPrice") // too high price (can only sell 12 + 85 = 97.waves)
+          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce("InvalidMarketOrderPrice") // too high price (can only sell 85 + 12 = 97.waves)
         }
 
-        withClue("BUY: fee in received asset, required balance: Waves -> 0, BTC -> 0.01182201\n") {
+        withClue("BUY: fee in received asset, required balance: Waves -> 0, BTC > 0\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = Waves, matcherFee = 0.003.waves)
-          validateByTradableBalance { Map(btc -> 0.01182201.btc) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182200.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000001.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(btc -> 0.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("BUY: fee in spent asset, required balance: Waves -> 0, BTC -> 0.01182201 + 0.00000035 = 0.01182236\n") {
+        withClue("BUY: fee in spent asset, required balance: Waves -> 0, BTC > 0.00000035\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = btc, matcherFee = 0.00000035.btc)
-          validateByTradableBalance { Map(btc -> 0.01182236.btc) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182235.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000036.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(btc -> 0.00000035.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("BUY: fee in third asset, required balance: Waves -> 0, BTC -> 0.01182201, ETH = 0.00649308\n") {
+        withClue("BUY: fee in third asset, required balance: Waves -> 0, BTC > 0, ETH = 0.00649308\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = eth, matcherFee = 0.00649308.eth)
-          validateByTradableBalance { Map(btc -> 0.01182201.btc, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182201.btc, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000001.btc, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(btc -> 0.00000001.btc, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000000.btc, eth -> 0.00649308.eth) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in received asset, required balance: Waves -> 100, BTC -> 0\n") {
+        withClue("SELL: fee in received asset, required balance: Waves -> 0.00000001, BTC -> 0.00000035\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = btc, matcherFee = 0.00000035.btc)
-          validateByTradableBalance { Map(Waves -> 100.00000000.waves) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 99.99999999.waves) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, btc -> 0.00000035.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00000000.waves, btc -> 0.00000035.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, btc -> 0.00000034.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in spent asset, required balance: Waves -> 100.003, BTC -> 0\n") {
+        withClue("SELL: fee in spent asset, required balance: Waves -> 0.00300001, BTC -> 0\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = Waves, matcherFee = 0.003.waves)
-          validateByTradableBalance { Map(Waves -> 100.00300000.waves) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 100.00299999.waves) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00300001.waves) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00300000.waves) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in third asset, required balance: Waves -> 100, BTC -> 0, ETH -> 0.00649308\n") {
+        withClue("SELL: fee in third asset, required balance: Waves -> 0.00000001, BTC -> 0, ETH -> 0.00649308\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = eth, matcherFee = 0.00649308.eth)
-          validateByTradableBalance { Map(Waves -> 100.waves, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 100.waves, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00000000.waves, eth -> 0.00649308.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
         }
       }
 
@@ -966,7 +969,12 @@ class OrderValidatorSpecification
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache, DynamicSettings.symmetric(matcherFee))
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey,
+                                        ba,
+                                        matcherSettings,
+                                        getDefaultAssetDescriptions(_).decimals,
+                                        rateCache,
+                                        DynamicSettings.symmetric(matcherFee))
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,

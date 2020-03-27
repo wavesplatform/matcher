@@ -63,10 +63,31 @@ sealed trait AcceptedOrder {
   protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
 
   def isValid: Boolean = isValid(price)
-  def isValid(counterPrice: Price): Boolean =
-    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
 
-  private def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
+  def isValid(counterPrice: Price): Boolean = {
+
+    if (this.isSellOrder && this.isMarket) {
+      println(s"\n\n")
+      println(s"this: $this")
+      println(s"isValid($counterPrice):")
+      println(s"amount = $amount")
+      println(s"counterPrice = $counterPrice")
+      println(s"minimalAmountOfAmountAssetByPrice(counterPrice) = ${minimalAmountOfAmountAssetByPrice(counterPrice)}")
+      println(s"spentAmount = $spentAmount")
+      println(s"receiveAmount = $receiveAmount")
+      println(s"\n")
+      println(s"amount > 0 = ${amount > 0}")
+      println(s"amount >= minimalAmountOfAmountAssetByPrice(counterPrice) = ${amount >= minimalAmountOfAmountAssetByPrice(counterPrice)}")
+      println(s"amount < Order.MaxAmount = ${amount < Order.MaxAmount}")
+      println(s"spentAmount > 0 = ${spentAmount > 0}")
+      println(s"receiveAmount > 0 = ${receiveAmount > 0}")
+      println(s"\n\n")
+    }
+
+    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
+  }
+
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
 
   protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
@@ -248,6 +269,13 @@ case class SellMarketOrder(amount: Long, fee: Long, order: Order, availableForSp
 
   def partial(amount: Long, fee: Long, availableForSpendings: Long): SellMarketOrder = {
     copy(amount = amount, fee = fee, availableForSpending = availableForSpendings)
+  }
+
+  override def amountOfPriceAsset: Long = (BigDecimal(availableForSpending) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
+
+
+  override def isValid(counterPrice: Price): Boolean = {
+    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount >= 0
   }
 }
 

@@ -45,7 +45,7 @@ object OrderValidator extends ScorexLogging {
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
-  val MinExpiration: Long  = 60 * 1000L
+  val MinExpiration: Long = 60 * 1000L
 
   val exchangeTransactionCreationFee: Long = 30000L
   val ScriptExtraFee                       = 400000L
@@ -199,7 +199,7 @@ object OrderValidator extends ScorexLogging {
             minFeeConverted <- liftAsync { convertFeeByAssetRate(minFee, feeAsset, assetDescriptions(feeAsset).decimals, rateCache) }
             _               <- liftAsync { cond(order.matcherFee >= minFeeConverted, order, error.FeeNotEnough(minFeeConverted, order.matcherFee, feeAsset)) }
           } yield order
-        case _ => liftValueAsync { order }
+        case _ => liftValueAsync(order)
       }
 
       for {
@@ -216,7 +216,7 @@ object OrderValidator extends ScorexLogging {
 
   private[dex] def getValidFeeAssetForSettings(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Set[Asset] =
     orderFeeSettings match {
-      case _: DynamicSettings              => rateCache.getAllRates.keySet
+      case _: DynamicSettings               => rateCache.getAllRates.keySet
       case FixedSettings(defaultAssetId, _) => Set(defaultAssetId)
       case PercentSettings(assetType, _) =>
         Set(
@@ -269,7 +269,7 @@ object OrderValidator extends ScorexLogging {
                                              rateCache: RateCache): Result[Long] = orderFeeSettings match {
     case FixedSettings(_, fixedMinFee) => lift { fixedMinFee }
     case ps: PercentSettings           => lift { getMinValidFeeForPercentFeeSettings(order, ps, order.price) }
-    case ds: DynamicSettings          => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
+    case ds: DynamicSettings           => convertFeeByAssetRate(ds.maxBaseFee, order.feeAsset, assetDecimals(order.feeAsset), rateCache)
   }
 
   private def validateFeeAsset(order: Order, orderFeeSettings: OrderFeeSettings, rateCache: RateCache): Result[Order] = {
@@ -408,7 +408,7 @@ object OrderValidator extends ScorexLogging {
       * that should be covered by tradable balance of the order's owner.
       * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
       */
-    def getMarketOrderValue: Result[Long] = {
+    def validateMarketOrderValue: Result[AcceptedOrder] = {
 
       /** Adds value of level to the current value of the market order */
       def accumulateLevel(level: LevelAgg, moValue: Result[Long], remainToExecute: Long): (Result[Long], Long) = {
@@ -432,11 +432,15 @@ object OrderValidator extends ScorexLogging {
         }
       }
 
-      go(orderBookCache(acceptedOrder.order.assetPair).getCounterSideFor(acceptedOrder), 0L.asRight[MatcherError], acceptedOrder.amount)._1
+      go(
+        levels = orderBookCache(acceptedOrder.order.assetPair).getCounterSideFor(acceptedOrder),
+        currentValue = 0L.asRight[MatcherError],
+        remainToExecute = acceptedOrder.amount
+      )._1.map(_ => acceptedOrder)
     }
 
-    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder, marketOrderValue: Long): Map[Asset, Long] = {
-      Map(marketOrder.spentAsset -> marketOrderValue) |+| Map(marketOrder.feeAsset -> marketOrder.requiredFee)
+    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder): Map[Asset, Long] = {
+      Map(marketOrder.feeAsset -> marketOrder.requiredFee) |+| Map(marketOrder.spentAsset -> 1)
     }
 
     def validateTradableBalance(requiredForOrder: Map[Asset, Long]): Result[AcceptedOrder] = {
@@ -446,8 +450,12 @@ object OrderValidator extends ScorexLogging {
     }
 
     acceptedOrder match {
-      case mo: MarketOrder => getMarketOrderValue.flatMap(volume => validateTradableBalance { getRequiredBalanceForMarketOrder(mo, volume) })
-      case _               => validateTradableBalance(acceptedOrder.requiredBalance)
+      case mo: MarketOrder =>
+        for {
+          _ <- validateMarketOrderValue
+          _ <- validateTradableBalance(getRequiredBalanceForMarketOrder(mo))
+        } yield mo
+      case _ => validateTradableBalance(acceptedOrder.requiredBalance)
     }
   }
 

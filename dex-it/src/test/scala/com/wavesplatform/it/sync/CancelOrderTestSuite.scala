@@ -242,7 +242,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   }
 
   "Auto cancel" - {
-    "wrong auto cancel when match on all coins" in {
+    "wrong cancel when match on all coins" in {
       val accounts       = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
       val oneOrderAmount = 10000
       val orderPrice     = 3000000000000L
@@ -296,6 +296,22 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
             status shouldBe OrderStatus.Filled
           }
       }
+    }
+
+    "wrong cancel when executing a big order by small amount" in {
+      val trader = KeyPair(ByteStr("trader-auto-cancel-big-order".getBytes(StandardCharsets.UTF_8)))
+
+      val amount     = 835.85722414.waves
+      val matcherFee = 0.003.waves
+      broadcastAndAwait(mkTransfer(alice, trader, amount + matcherFee, Waves))
+
+      // Spending all assets
+      val counterOrder = mkOrder(trader, wavesUsdPair, OrderType.SELL, amount, 903200, matcherFee, version = 3)
+      placeAndAwaitAtDex(counterOrder)
+      dex1.api.place(mkOrder(alice, wavesUsdPair, OrderType.BUY, 0.0001.waves, 909700, matcherFee))
+
+      Thread.sleep(5000) // Is there a better way?
+      dex1.api.orderStatus(counterOrder).status shouldBe OrderStatus.PartiallyFilled
     }
   }
 

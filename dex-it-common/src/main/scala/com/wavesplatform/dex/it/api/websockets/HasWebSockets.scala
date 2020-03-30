@@ -19,9 +19,6 @@ import play.api.libs.json.Json
 
 trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
-  private implicit val derivedAddressStateDiff: Diff[WsAddressState] = Derived(Diff.gen[WsAddressState].value.ignore(_.timestamp))
-  private implicit val derivedOrderBookDiff: Diff[WsOrderBook]       = Derived(Diff.gen[WsOrderBook].value.ignore(_.timestamp))
-
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
 

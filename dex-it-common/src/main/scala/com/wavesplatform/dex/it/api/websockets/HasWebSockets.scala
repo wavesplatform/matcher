@@ -8,8 +8,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
-import com.softwaremill.diffx.{Derived, Diff}
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrderBook}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.it.docker.DexContainer
@@ -18,7 +17,6 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.Json
 
 trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
-
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
 

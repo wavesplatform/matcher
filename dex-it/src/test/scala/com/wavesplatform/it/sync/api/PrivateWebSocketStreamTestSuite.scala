@@ -12,13 +12,14 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.IssueTransaction
 
 class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
+  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx, IssueUsdTx)
-    broadcastAndAwait(mkTransfer(alice, bob, 10000.usd, usd, 0.003.waves), mkTransfer(bob, alice, 10.btc, btc, 0.003.waves))
+    broadcastAndAwait(mkTransfer(alice, bob, 10000.usd, usd, 0.003.waves), mkTransfer(bob, alice, 1 0.btc, btc, 0.003.waves))
     dex1.start()
     dex1.api.upsertRate(usd, 1)
   }

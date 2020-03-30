@@ -7,9 +7,8 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 
 trait DiffMatcherWithImplicits {
 
-  private val byteStrDiff: Diff[ByteStr] = getDiff[ByteStr](_.toString == _.toString)
-
-  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(byteStrDiff)
+  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
+  implicit val derivedStringDiff: Derived[Diff[String]]   = Derived(getDiff[String](_ == _)) // TODO we actually don't need this, find way to remove this
 
   def matchTo[A: Diff](left: A): DiffForMatcher[A] = DiffForMatcher(left)
 }

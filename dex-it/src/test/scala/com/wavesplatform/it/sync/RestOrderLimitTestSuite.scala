@@ -17,7 +17,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  max-active-orders = $maxActiveOrders
+       |  address-actor.max-active-orders = $maxActiveOrders
        |  order-db.max-orders = $maxFinalizedOrders
        |}""".stripMargin
   )

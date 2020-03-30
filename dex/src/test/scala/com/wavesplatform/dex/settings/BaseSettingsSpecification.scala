@@ -162,6 +162,11 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    web-sockets {
          |      messages-interval = 100ms
          |    }
+         |    address-actor {
+         |      max-active-orders = 400
+         |      ws-messages-interval = 100ms
+         |      batch-cancel-timeout = 18 seconds
+         |    }
          |  }
          |}""".stripMargin
 

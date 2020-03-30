@@ -352,13 +352,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     ) unsafeTap sendBalanceChanges(settings.wavesBlockchainClient.balanceStreamBufferSize)
   }
 
-  private val addressActorSettings =
-    AddressActor.Settings(
-      wsMessagesInterval = settings.webSocketSettings.messagesInterval,
-      batchCancelTimeout = settings.actorResponseTimeout - settings.actorResponseTimeout / 10, // Should be enough
-      maxActiveOrders = 400
-    )
-
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
     Props(
       new AddressActor(
@@ -370,7 +363,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         orderBookCache.getOrDefault(_, OrderBookAggregatedSnapshot.empty),
         startSchedules,
         spendableBalancesActor,
-        addressActorSettings
+        settings.addressActorSettings
       )
     )
   }

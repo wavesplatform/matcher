@@ -34,6 +34,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       cors = false,
       apiKeyDifferentHost = false
     )
+
     settings.wavesBlockchainClient should matchTo(
       WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
@@ -52,6 +53,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
         balanceStreamBufferSize = 100
       )
     )
+
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
     settings.snapshotsInterval should be(999)
@@ -92,6 +94,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       maxPendingTime = 30.days
     )
     settings.webSocketSettings should matchTo(WebSocketSettings(100.milliseconds))
+    settings.addressActorSettings should matchTo(AddressActorSettings(100.milliseconds, 18.seconds, 400))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

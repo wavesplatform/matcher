@@ -5,8 +5,8 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
+import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.AssetPair._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
@@ -59,7 +59,8 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            exchangeTransactionBroadcast: ExchangeTransactionBroadcastSettings,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
-                           webSocketSettings: WebSocketSettings) {
+                           webSocketSettings: WebSocketSettings,
+                           addressActorSettings: AddressActorSettings) {
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -145,6 +146,7 @@ object MatcherSettings {
     val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
     val orderDb                    = config.as[OrderDB.Settings]("order-db")
     val webSocketSettings          = config.as[WebSocketSettings]("web-sockets")
+    val addressActorSettings       = config.as[AddressActorSettings]("address-actor")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -179,7 +181,8 @@ object MatcherSettings {
       broadcastUntilConfirmed,
       postgresConnection,
       orderHistory,
-      webSocketSettings
+      webSocketSettings,
+      addressActorSettings
     )
   }
 }

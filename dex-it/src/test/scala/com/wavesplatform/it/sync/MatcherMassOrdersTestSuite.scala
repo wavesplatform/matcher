@@ -17,7 +17,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  max-active-orders = $maxActiveOrders
+       |  address-actor.max-active-orders = $maxActiveOrders
        |  order-db.max-orders = $maxFinalizedOrders
        |  price-assets = [ "$UsdId", "WAVES" ]
        |}""".stripMargin
@@ -127,13 +127,13 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     "check order history orders count after fill" in {
       val aliceAllActiveOrders = dex1.api.orderHistory(alice, activeOnly = Some(true))
-      val aliceAllOrders = dex1.api.orderHistory(alice)
-      val expectedAllOrders = maxFinalizedOrders + aliceAllActiveOrders.size
+      val aliceAllOrders       = dex1.api.orderHistory(alice)
+      val expectedAllOrders    = maxFinalizedOrders + aliceAllActiveOrders.size
       aliceAllOrders.size shouldBe expectedAllOrders
 
       val alicePairActiveOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair, activeOnly = Some(true))
-      val alicePairOrders = dex1.api.orderHistoryByPair(alice, wavesUsdPair)
-      val expectedPairOrders = maxFinalizedOrders + alicePairActiveOrders.size
+      val alicePairOrders       = dex1.api.orderHistoryByPair(alice, wavesUsdPair)
+      val expectedPairOrders    = maxFinalizedOrders + alicePairActiveOrders.size
       alicePairOrders.size shouldBe expectedPairOrders
     }
   }

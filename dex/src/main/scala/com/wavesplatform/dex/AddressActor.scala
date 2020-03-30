@@ -27,6 +27,7 @@ import com.wavesplatform.dex.market.{BatchOrderCancelActor, CreateExchangeTransa
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
+import com.wavesplatform.dex.settings.AddressActorSettings
 import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
@@ -44,7 +45,7 @@ class AddressActor(owner: Address,
                    orderBookCache: AssetPair => OrderBookAggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
-                   settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
+                   settings: AddressActorSettings = AddressActorSettings.default)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
 
@@ -564,9 +565,4 @@ object AddressActor {
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)
 
   private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
-
-  final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration, maxActiveOrders: Int)
-  object Settings {
-    val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
-  }
 }

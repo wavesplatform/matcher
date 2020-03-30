@@ -49,7 +49,10 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
+  def requiredFee: Price = {
+    if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
+  }
+
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
 
@@ -318,13 +321,23 @@ object Events {
     lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, counter.price)
 
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
-    def counterExecutedFee: Long     = AcceptedOrder.partialFee(maxCounterFee, counter.order.amount, executedAmount)
+    def counterExecutedFee: Long = {
+      val r = AcceptedOrder.partialFee(maxCounterFee, counter.order.amount, executedAmount)
+      if (r == 0 && counter.amount == 0 && counter.order.version == 3) 1
+      else r
+    }
+
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
     def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
-    def submittedExecutedFee: Long     = AcceptedOrder.partialFee(maxSubmittedFee, submitted.order.amount, executedAmount)
-    def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
+    def submittedExecutedFee: Long = {
+      val r = AcceptedOrder.partialFee(maxSubmittedFee, submitted.order.amount, executedAmount)
+      if (r == 0 && submitted.amount == 0 && submitted.order.version == 3) 1
+      else r
+    }
+
+    def submittedRemainingFee: Long = math.max(submitted.fee - submittedExecutedFee, 0)
 
     def submittedMarketRemaining(submittedMarketOrder: MarketOrder): MarketOrder = {
 

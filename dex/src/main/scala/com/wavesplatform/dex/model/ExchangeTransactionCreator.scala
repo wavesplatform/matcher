@@ -28,6 +28,7 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
     val price       = counter.price
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
 
+    // Move this logic to order book
     def calculateMatcherFee: (Long, Long) = {
 
       import AcceptedOrder.partialFee

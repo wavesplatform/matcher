@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.api
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
-import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
@@ -23,6 +23,8 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     dex1.start()
     dex1.api.upsertRate(usd, 1)
   }
+
+  override def afterEach(): Unit = dex1.api.cancelAll(alice)
 
   "should send account updates to authenticated user" - {
 
@@ -85,7 +87,7 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       dex1.api.placeMarket(smo)
       waitForOrderAtNode(smo)
 
-      eventually { wsc.getAllBalances.size should be >= 3 }
+      eventually { wsc.getAllBalances.distinct.size should be >= 3 }
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 51.003, reserved = 0.0))
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 1.0, reserved = 0.0))
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 55.5, reserved = 0.0))
@@ -108,18 +110,26 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
       eventually { wsc.getAllBalances.size should be >= 1 }
 
-      val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100)
+      val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
 
       placeAndAwaitAtDex(bo1)
-      dex1.api.place(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 100))
+      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.0.usd))
 
-      eventually { wsc.getAllBalances.size should be >= 5 }
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.997, reserved = 0.0))
+      eventually { wsc.getAllBalances.distinct should have size 5 }
+      wsc.getAllBalances.distinct should matchTo(
+        Seq(
+          usd   -> WsBalances(tradable = 10.0, reserved = 0.0),
+          Waves -> WsBalances(tradable = 0.0, reserved = 0.0),
+          usd   -> WsBalances(tradable = 0.0, reserved = 10.0),
+          usd   -> WsBalances(tradable = 0.0, reserved = 0.0),
+          Waves -> WsBalances(tradable = 9.997, reserved = 0.0)
+        )
+      )
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
-          WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Filled(10.waves, 0.003.waves)),
+          WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
+          WsOrder.orderDiff(LimitOrder(bo1), OrderStatus.Filled.name.some, 10.0, 0.003, 1.0)
         )
       )
     }
@@ -132,14 +142,14 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       placeAndAwaitAtDex(bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 100))
 
-      eventually { wsc.getAllBalances.size should be >= 5 }
+      eventually { wsc.getAllBalances.distinct.size should be >= 4 }
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 5.0))
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 4.9985, reserved = 0.0))
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-          WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Filled(5.waves, 0.0015.waves)),
+          WsOrder.orderDiff(LimitOrder(bo1), OrderStatus.PartiallyFilled.name.some, 5.0, 0.0015, 1.0)
         )
       )
     }
@@ -161,28 +171,30 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 8.0, reserved = 0.0))
     }
 
-    "user had issued a new asset after the connection already established" ignore { //TODO: bug
+    "user had issued a new asset after the connection already established" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
-
-      val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
-      broadcastAndAwait(txIssue)
-
-      wsc.getAllBalances should contain(Waves         -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(txIssue.getId -> WsBalances(tradable = 1000.0, reserved = 0.0))
-    }
-
-    "user had issued a new asset before establishing the connection" ignore { //TODO: bug
-      val acc = mkAccountWithBalance(10.waves -> Waves)
-
-      val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
-      broadcastAndAwait(txIssue)
-
       val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
 
       eventually { wsc.getAllBalances.size should be >= 1 }
-      wsc.getAllBalances should contain(Waves         -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(txIssue.getId -> WsBalances(tradable = 1000.0, reserved = 0.0))
+      val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
+      broadcastAndAwait(txIssue)
+
+      eventually { wsc.getAllBalances.size should be >= 2 }
+      wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+      wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
+    }
+
+    "user had issued a new asset before establishing the connection" in {
+      val acc = mkAccountWithBalance(10.waves -> Waves)
+
+      val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
+      broadcastAndAwait(txIssue)
+
+      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+
+      eventually { wsc.getAllBalances.size should be >= 2 }
+      wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+      wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
     }
 
     "user burnt part of the asset amount" in {

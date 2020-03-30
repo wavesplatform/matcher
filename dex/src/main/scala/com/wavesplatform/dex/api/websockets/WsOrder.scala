@@ -26,6 +26,16 @@ case class WsOrder(id: Order.Id,
 
 object WsOrder {
 
+  def orderDiff(ao: AcceptedOrder, status: Option[String], fa: Double, ff: Double, awp: Double): WsOrder = {
+    WsOrder(
+      ao.id,
+      status = status,
+      filledAmount = Some(fa),
+      filledFee = Some(ff),
+      avgWeighedPrice = Some(awp)
+    )
+  }
+
   def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)

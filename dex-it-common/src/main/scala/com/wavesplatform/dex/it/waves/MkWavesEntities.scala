@@ -143,10 +143,6 @@ trait MkWavesEntities {
                              timestamp)
   }
 
-  def mkBurn(issuer: KeyPair, assetId: String, amount: Long, fee: Long = issueFee, timestamp: Long = System.currentTimeMillis): BurnTransactionV2 = {
-    Transactions.makeBurnTx(issuer, AddressScheme.current.chainId, assetId, amount, fee, timestamp)
-  }
-
   def mkIssueExtended(issuer: KeyPair,
                       name: String,
                       quantity: Long,
@@ -221,7 +217,7 @@ trait MkWavesEntities {
       .explicitGet()
   }
 
-  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, ts: Long = System.currentTimeMillis): BurnTransaction = {
+  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, ts: Long = System.currentTimeMillis): BurnTransactionV2 = {
     Transactions.makeBurnTx(sender, AddressScheme.current.chainId, asset, amount, burnFee, ts)
   }
 }

@@ -12,7 +12,6 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.docker.DexContainer
 import mouse.any._
 import org.scalatest.{BeforeAndAfterAll, Suite}

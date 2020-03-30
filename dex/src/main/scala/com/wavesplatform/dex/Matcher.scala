@@ -237,7 +237,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         apiKeyHash,
         settings
       ),
-      MatcherWebSocketRoute(addressActors, matcherActor, pairBuilder, apiKeyHash)
+      MatcherWebSocketRoute(
+        addressActors,
+        matcherActor,
+        pairBuilder,
+        p => Option { orderBooks.get() } flatMap (_ get p),
+        apiKeyHash
+      )
     )
   }
 

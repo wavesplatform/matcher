@@ -9,11 +9,11 @@ import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, RequestInvalidSignature}
+import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, OrderAssetPairReversed, OrderBookStopped, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection, WebSocketConnection}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -38,7 +38,7 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueEthTx)
     broadcastAndAwait(mkTransfer(alice, carol, 100.waves, Waves), mkTransfer(bob, carol, 1.btc, btc))
     dex1.start()
     dex1.api.upsertRate(btc, 0.00011167)
@@ -319,6 +319,28 @@ class MatcherWebSocketsTestSuite extends MatcherSuiteBase with HasWebSockets wit
     }
 
     "orderbook" - {
+      val wavesEthPair = AssetPair(Waves, eth)
+
+      "should correctly return errors" in forAll(
+        Table(
+          // format: off
+          ("pair",       "expected status",      "expected error"),
+          (wavesEthPair, StatusCodes.BadRequest, OrderAssetPairReversed(wavesEthPair)),
+          (ethWavesPair, StatusCodes.NotFound,   OrderBookStopped(ethWavesPair)),
+          // format: on
+        )
+      ) { (assetPair, expectedStatus, expectedError) =>
+        val connection = mkWebSocketOrderBookConnection(assetPair, dex1)
+        val response   = Await.result(connection.getConnectionResponse, 1.second).response
+
+        response.status shouldBe expectedStatus
+
+        response.getHeader(`X-Error-Message`.name).get.value shouldBe expectedError.message.text
+        response.getHeader(`X-Error-Code`.name).get.value shouldBe expectedError.code.toString
+
+        connection.close()
+      }
+
       "should send a full state after connection" in {
         // Force create an order book to pass a validation in the route
         val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)

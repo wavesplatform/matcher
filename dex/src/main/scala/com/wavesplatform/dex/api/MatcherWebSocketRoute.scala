@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.Done
 import akka.actor.ActorRef
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.directives.FutureDirectives
@@ -21,9 +21,9 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.{MatcherError, RequestInvalidSignature}
+import com.wavesplatform.dex.error.RequestInvalidSignature
 import com.wavesplatform.dex.market.MatcherActor
-import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder}
+import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
 
@@ -32,8 +32,11 @@ import scala.util.{Failure, Success}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
-case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, assetPairBuilder: AssetPairBuilder, apiKeyHash: Option[Array[Byte]])(
-    implicit mat: Materializer)
+case class MatcherWebSocketRoute(addressDirectory: ActorRef,
+                                 matcher: ActorRef,
+                                 assetPairBuilder: AssetPairBuilder,
+                                 orderBook: AssetPair => Option[Either[Unit, ActorRef]],
+                                 apiKeyHash: Option[Array[Byte]])(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -110,21 +113,28 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef, matcher: ActorRef, 
     directive { createStreamFor(accountUpdatesSource(publicKey)) }
   }
 
-  private val orderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
+  private val orderBookRoute: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     withAssetPair(p) { pair =>
-      createStreamFor(orderBookUpdatesSource(pair))
+      unavailableOrderBookBarrier(pair) {
+        createStreamFor(orderBookUpdatesSource(pair))
+      }
     }
   }
 
   override def route: Route = pathPrefix("ws") {
-    accountUpdates ~ orderBook
+    accountUpdates ~ orderBookRoute
   }
 
-  private def withAssetPair(p: AssetPair, formatError: MatcherError => ToResponseMarshallable = InfoNotFound.apply): Directive1[AssetPair] = {
+  private def withAssetPair(p: AssetPair): Directive1[AssetPair] = {
     FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
       case Right(_) => provide(p)
-      case Left(e)  => complete { formatError(e) }
+      case Left(e)  => complete { e.toWsHttpResponse(StatusCodes.BadRequest) }
     }
+  }
+
+  private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
+    case Some(x) => if (x.isRight) pass else complete(error.OrderBookBroken(p).toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case None    => complete(error.OrderBookStopped(p).toWsHttpResponse(StatusCodes.NotFound))
   }
 
   private def handleTermination(actorRef: ActorRef, r: Future[Done]): Unit =

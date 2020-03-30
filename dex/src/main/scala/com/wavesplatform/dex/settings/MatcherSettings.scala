@@ -4,6 +4,7 @@ import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
+import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
@@ -60,7 +61,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            postgresConnection: PostgresConnection,
                            orderHistory: Option[OrderHistorySettings],
                            webSocketSettings: WebSocketSettings,
-                           addressActorSettings: AddressActorSettings) {
+                           addressActorSettings: AddressActor.Settings) {
 
   def mentionedAssets: Set[Asset] = {
     priceAssets.toSet ++
@@ -146,7 +147,7 @@ object MatcherSettings {
     val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
     val orderDb                    = config.as[OrderDB.Settings]("order-db")
     val webSocketSettings          = config.as[WebSocketSettings]("web-sockets")
-    val addressActorSettings       = config.as[AddressActorSettings]("address-actor")
+    val addressActorSettings       = config.as[AddressActor.Settings]("address-actor")
 
     MatcherSettings(
       addressSchemeCharacter,

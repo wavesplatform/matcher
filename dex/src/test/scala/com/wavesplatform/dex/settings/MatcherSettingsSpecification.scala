@@ -2,6 +2,7 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
+import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -94,7 +95,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       maxPendingTime = 30.days
     )
     settings.webSocketSettings should matchTo(WebSocketSettings(100.milliseconds))
-    settings.addressActorSettings should matchTo(AddressActorSettings(100.milliseconds, 18.seconds, 400))
+    settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {

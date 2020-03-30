@@ -12,7 +12,6 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.IssueTransaction
 
 class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
-  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 

@@ -5,11 +5,9 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.model.StatusCodes
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
-import com.wavesplatform.dex.error.{ApiKeyIsNotValid, ErrorFormatterContext, RequestInvalidSignature}
+import com.wavesplatform.dex.error.{ApiKeyIsNotValid, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -18,12 +16,6 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class WebSocketConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
-
-  private implicit val derivedAddressStateDiff: Diff[WsAddressState] = Derived(Diff.gen[WsAddressState].value.ignore(_.timestamp))
-  private implicit val derivedOrderBookDiff: Diff[WsOrderBook]       = Derived(Diff.gen[WsOrderBook].value.ignore(_.timestamp))
-
-  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
-
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {

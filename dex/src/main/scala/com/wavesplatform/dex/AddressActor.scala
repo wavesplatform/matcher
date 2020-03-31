@@ -566,7 +566,9 @@ object AddressActor {
   private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
 
   final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration, maxActiveOrders: Int)
+
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
+
 }

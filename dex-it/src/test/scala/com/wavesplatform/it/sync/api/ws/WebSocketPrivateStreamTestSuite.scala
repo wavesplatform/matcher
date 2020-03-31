@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.api
+package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -11,7 +11,7 @@ import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.IssueTransaction
 
-class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
+class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
   private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")

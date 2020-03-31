@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync.api
+package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -6,15 +6,13 @@ import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.immutable.TreeMap
 
-class PublicWebSocketsStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
-  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
+class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
 
   private val carol = mkKeyPair("carol")
 
@@ -61,7 +59,8 @@ class PublicWebSocketsStreamTestSuite extends MatcherSuiteBase with HasWebSocket
           WsOrderBook(
             asks = TreeMap.empty,
             bids = TreeMap.empty,
-            lastTrade = None
+            lastTrade = None,
+            timestamp = buffer0.last.timestamp
           )
         )
 

@@ -18,6 +18,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -415,5 +416,30 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
 
     Order.sign(correctedOrder, sender)
+  }
+
+  def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+
+  def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), timestamp)
+
+  def mkOrderExecuted(submittedLo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
+    mkOrderExecuted(submittedLo, counterLo, submittedLo.order.timestamp)
+
+  def mkOrderExecuted(submittedLo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
+    val executedAmount       = AcceptedOrder.executedAmount(submittedLo, counterLo)
+    val submittedExecutedFee = AcceptedOrder.partialFee(submittedLo.order.matcherFee, submittedLo.order.amount, executedAmount)
+    val counterExecutedFee   = AcceptedOrder.partialFee(counterLo.order.matcherFee, counterLo.order.amount, executedAmount)
+
+    OrderExecuted(submittedLo, counterLo, timestamp, submittedExecutedFee, counterExecutedFee)
+  }
+
+  def makerTakerPartialFee(submitted: AcceptedOrder, counter: LimitOrder): (Long, Long) = {
+    val executedAmount = AcceptedOrder.executedAmount(submitted, counter)
+    (
+      AcceptedOrder.partialFee(counter.matcherFee, counter.order.amount, executedAmount),
+      AcceptedOrder.partialFee(submitted.matcherFee, submitted.order.amount, executedAmount)
+    )
   }
 }

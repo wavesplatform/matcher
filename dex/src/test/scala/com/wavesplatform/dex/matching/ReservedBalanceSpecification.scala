@@ -93,9 +93,9 @@ class ReservedBalanceSpecification
 
   private val ignoreSpendableBalanceChanges: Subject[SpendableBalanceChanges, SpendableBalanceChanges] = Subject.empty[SpendableBalanceChanges]
 
-  private val pair: AssetPair      = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
+  private val pair: AssetPair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
 
-  private def mkOrderHistory = new OrderHistoryStub(system, ntpTime, 100, 70)
+  private def mkOrderHistory       = new OrderHistoryStub(system, ntpTime, 100, 70)
   private var oh: OrderHistoryStub = mkOrderHistory
 
   private val addressDir = system.actorOf(
@@ -522,7 +522,7 @@ class ReservedBalanceSpecification
   }
 
   private def executeMarketOrder(addressDirWithOrderBookCache: ActorRef, marketOrder: MarketOrder, limitOrder: LimitOrder): OrderExecuted = {
-    val executionEvent = OrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp, marketOrder.matcherFee, limitOrder.matcherFee)
+    val executionEvent = mkOrderExecuted(marketOrder, limitOrder, marketOrder.order.timestamp)
 
     addressDirWithOrderBookCache ! OrderAdded(limitOrder, ntpTime.getTimestamp())
     addressDirWithOrderBookCache ! executionEvent

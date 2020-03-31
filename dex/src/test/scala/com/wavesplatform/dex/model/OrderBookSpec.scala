@@ -33,7 +33,7 @@ class OrderBookSpec
 
   implicit class OrderBookOps(ob: OrderBook) {
     def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] =
-      ob.add(ao, ts, (t, m) => m.matcherFee -> t.matcherFee, tickSize)
+      ob.add(ao, ts, makerTakerPartialFee, tickSize)
   }
 
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
@@ -284,12 +284,13 @@ class OrderBookSpec
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
-    ob.allOrders.map(_._2) shouldEqual Seq(
-      SellLimitOrder(
-        restAmount,
-        ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
-        ord3
-      ))
+    ob.allOrders.map(_._2).toList should matchTo(
+      List[LimitOrder](
+        SellLimitOrder(
+          restAmount,
+          ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
+          ord3
+        )))
   }
 
   "partially execute order with small remaining part" in {

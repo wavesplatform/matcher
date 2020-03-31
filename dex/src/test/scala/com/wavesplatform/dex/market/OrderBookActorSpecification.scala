@@ -86,14 +86,7 @@ class OrderBookActorSpecification
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
-        _ =>
-          (t, m) => {
-            val executedAmount = AcceptedOrder.executedAmount(t, m)
-            (
-              AcceptedOrder.partialFee(m.matcherFee, m.order.amount, executedAmount),
-              AcceptedOrder.partialFee(t.matcherFee, t.order.amount, executedAmount)
-            )
-        }
+        _ => makerTakerPartialFee
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
@@ -115,17 +108,7 @@ class OrderBookActorSpecification
       { (obsdb, p) =>
         val ord = buy(p, 10 * Order.PriceConstant, 100)
         val ob  = OrderBook.empty()
-        ob.add(
-          LimitOrder(ord),
-          ord.timestamp,
-          (t, m) => {
-            val executedAmount = AcceptedOrder.executedAmount(t, m)
-            (
-              AcceptedOrder.partialFee(m.matcherFee, m.order.amount, executedAmount),
-              AcceptedOrder.partialFee(t.matcherFee, t.order.amount, executedAmount)
-            )
-          }
-        )
+        ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
         obsdb.update(p, 50, Some(ob.snapshot))
       }
     ) { (pair, _, tp) =>

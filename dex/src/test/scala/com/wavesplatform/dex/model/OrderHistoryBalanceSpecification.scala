@@ -9,7 +9,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.NTPTime
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
@@ -186,7 +186,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     oh.process(exec)
 
     withClue("executed exactly") {
@@ -233,7 +233,7 @@ class OrderHistoryBalanceSpecification
       activeOrderIds(counter.senderPublicKey) shouldBe Seq(counter.id())
     }
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     exec.executedAmount shouldBe 420169L
 
     oh.process(exec)
@@ -289,7 +289,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
 
-    val exec = OrderExecuted(submitted, counter)
+    val exec = mkOrderExecuted(submitted, counter)
     oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), ntpTime.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
@@ -335,13 +335,13 @@ class OrderHistoryBalanceSpecification
     val submitted2 = LimitOrder(sell(WavesBtc, 80000000, 0.0008, matcherFee = Some(300001L)))
 
     oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
-    val exec1 = OrderExecuted(submitted1, counter)
+    val exec1 = mkOrderExecuted(submitted1, counter)
     oh.process(exec1)
 
     orderStatus(counter.order.id()) shouldBe OrderStatus.PartiallyFilled(50000000, 150000)
     orderStatus(submitted1.order.id()) shouldBe OrderStatus.Filled(50000000, 300001)
 
-    val exec2 = OrderExecuted(submitted2, exec1.counterRemaining)
+    val exec2 = mkOrderExecuted(submitted2, exec1.counterRemaining)
     oh.processAll(exec2, OrderAdded(exec2.submittedLimitRemaining(submitted2), ntpTime.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
@@ -371,7 +371,7 @@ class OrderHistoryBalanceSpecification
     val submitted = buy(pair, 146, 0.12739213, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(exec, OrderCanceled(exec.submittedRemaining, isSystemCancel = true, ntpTime.getTimestamp()))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
@@ -395,7 +395,7 @@ class OrderHistoryBalanceSpecification
     val submitted = sell(pair, 5000000, 0.00099908, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     oh.process(exec)
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
@@ -412,11 +412,11 @@ class OrderHistoryBalanceSpecification
     val submitted = LimitOrder(buy(pair, 4373667, 0.003, matcherFee = Some(300000L)))
 
     oh.processAll(OrderAdded(counter1, ntpTime.getTimestamp()), OrderAdded(counter2, ntpTime.getTimestamp()))
-    val exec1 = OrderExecuted(submitted, counter1)
+    val exec1 = mkOrderExecuted(submitted, counter1)
     oh.processAll(
       exec1,
       OrderCanceled(exec1.counterRemaining, isSystemCancel = true, ntpTime.getTimestamp()),
-      OrderExecuted(exec1.submittedLimitRemaining(submitted), counter2)
+      mkOrderExecuted(exec1.submittedLimitRemaining(submitted), counter2)
     )
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.order.senderPublicKey}, submitted.order.id=${submitted.order.id()}") {
@@ -432,7 +432,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(
       exec,
       OrderCanceled(exec.submittedRemaining, isSystemCancel = true, ntpTime.getTimestamp()),
@@ -454,10 +454,10 @@ class OrderHistoryBalanceSpecification
     val submitted = LimitOrder(sell(pair, 350, 210000000L, matcherFee = Some(300000)))
 
     oh.processAll(OrderAdded(counter1, ntpTime.getTimestamp()), OrderAdded(counter2, ntpTime.getTimestamp()))
-    val exec1 = OrderExecuted(submitted, counter1)
+    val exec1 = mkOrderExecuted(submitted, counter1)
     oh.processAll(exec1,
                   OrderAdded(exec1.submittedLimitRemaining(submitted), ntpTime.getTimestamp()),
-                  OrderExecuted(exec1.submittedLimitRemaining(submitted), counter2))
+                  mkOrderExecuted(exec1.submittedLimitRemaining(submitted), counter2))
 
     orderStatus(submitted.order.id()) shouldBe OrderStatus.Filled(350, 299999)
   }
@@ -468,7 +468,7 @@ class OrderHistoryBalanceSpecification
     val submitted = LimitOrder(sell(WavesBtc, 210000000, 0.00079, Some(pk), Some(300000L)))
 
     oh.process(OrderAdded(counter, ntpTime.getTimestamp()))
-    val exec = OrderExecuted(submitted, counter)
+    val exec = mkOrderExecuted(submitted, counter)
     oh.processAll(exec, OrderAdded(exec.submittedLimitRemaining(submitted), ntpTime.getTimestamp()))
 
     withClue(s"counter: ${counter.order.idStr()}") {
@@ -533,7 +533,7 @@ class OrderHistoryBalanceSpecification
     val submitted = buy(WavesBtc, 1000000000, 0.00081, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
-    val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec1 = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(
       exec1,
       OrderCanceled(exec1.counter.partial(exec1.counterRemainingAmount, exec1.counterRemainingFee), isSystemCancel = false, ntpTime.getTimestamp()))
@@ -570,7 +570,7 @@ class OrderHistoryBalanceSpecification
       OrderAdded(ord2, ntpTime.getTimestamp()),
       OrderAdded(ord3, ntpTime.getTimestamp())
     )
-    val exec = OrderExecuted(ord4, ord1)
+    val exec = mkOrderExecuted(ord4, ord1)
     oh.processAll(
       exec,
       OrderAdded(exec.submittedLimitRemaining(ord4), ntpTime.getTimestamp()),
@@ -771,7 +771,7 @@ class OrderHistoryBalanceSpecification
     val counter   = buy(WavesBtc, 100000, 0.0008, matcherFee = Some(2000L))
     val submitted = sell(WavesBtc, 100000, 0.0007, matcherFee = Some(1000L))
 
-    oh.process(OrderExecuted(LimitOrder(submitted), LimitOrder(counter)))
+    oh.process(mkOrderExecutedRaw(submitted, counter))
 
     withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       openVolume(counter.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L
@@ -828,7 +828,7 @@ class OrderHistoryBalanceSpecification
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = mkOrderExecutedRaw(submitted, counter)
     oh.processAll(exec, exec)
 
     withClue("executed exactly") {
@@ -913,10 +913,5 @@ private object OrderHistoryBalanceSpecification {
 
     def orderStatus(orderId: ByteStr): OrderStatus =
       askAddressActor[OrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId))
-  }
-
-  private implicit class OrderExecutedExt(val oe: OrderExecuted.type) extends AnyVal {
-    def apply(submitted: LimitOrder, counter: LimitOrder): OrderExecuted =
-      OrderExecuted(submitted, counter, submitted.order.timestamp, submitted.matcherFee, counter.matcherFee)
   }
 }

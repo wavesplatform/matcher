@@ -46,7 +46,7 @@ class ExchangeTransactionCreatorSpecification
             val submitted = sell(wavesBtcPair, 100000, 0.0007, matcherFee = Some(1000L), version = submittedVersion.toByte)
 
             val tc = getExchangeTransactionCreator()
-            val oe = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
+            val oe = mkOrderExecutedRaw(submitted, counter)
 
             tc.createTransaction(oe).explicitGet() shouldBe a[ExchangeTransactionV2]
           }
@@ -61,7 +61,7 @@ class ExchangeTransactionCreatorSpecification
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
-          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis, buyOrder.matcherFee, sellOrder.matcherFee)
+          val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
           val tx = tc.createTransaction(oe).explicitGet()
 
           tx.buyMatcherFee shouldBe buyOrder.matcherFee
@@ -82,7 +82,7 @@ class ExchangeTransactionCreatorSpecification
       forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
-          val oe = OrderExecuted(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis, buyOrder.matcherFee, sellOrder.matcherFee)
+          val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
           val tx = tc.createTransaction(oe)
 
           tx shouldBe 'right
@@ -123,7 +123,7 @@ class ExchangeTransactionCreatorSpecification
             .zipWithIndex
             .foldLeft[AcceptedOrder](submittedOrder) {
               case (submitted, ((counter, expectedMatcherFee), i)) =>
-                val oe            = OrderExecuted(submitted, counter, System.currentTimeMillis, submitted.matcherFee, counter.matcherFee)
+                val oe            = mkOrderExecuted(submitted, counter)
                 val tx            = tc.createTransaction(oe).explicitGet()
                 val counterAmount = Denormalization.denormalizeAmountAndFee(counter.order.amount, 8)
 

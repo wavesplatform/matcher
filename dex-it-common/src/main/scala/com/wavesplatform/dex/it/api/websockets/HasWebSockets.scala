@@ -68,7 +68,8 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
       WsOrderBook(
         asks = r.asks ++ x.asks,
         bids = r.bids ++ x.bids,
-        lastTrade = r.lastTrade.orElse(x.lastTrade)
+        lastTrade = r.lastTrade.orElse(x.lastTrade),
+        timestamp = xs.toList.last.timestamp
       )
   }
 

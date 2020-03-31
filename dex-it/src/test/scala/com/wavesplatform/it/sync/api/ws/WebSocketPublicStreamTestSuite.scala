@@ -32,14 +32,6 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
     wsc.getMessagesBuffer
   }
 
-  "Connection should be established" in {
-    val wsc = mkWebSocketAuthenticatedConnection(alice, dex1)
-    wsc.close()
-    wsc.getMessagesBuffer.foreach { x =>
-      x.balances should not be empty
-    }
-  }
-
   "MatcherWebSocketRoute" - {
     "orderbook" - {
       "should send a full state after connection" in {
@@ -77,7 +69,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           WsOrderBook(
             asks = TreeMap.empty,
             bids = TreeMap(0.00011403d -> 1.05d),
-            lastTrade = None
+            lastTrade = None,
+            timestamp = buffer1.last.timestamp
           )
         )
 
@@ -94,7 +87,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           WsOrderBook(
             asks = TreeMap(0.00012d    -> 1d),
             bids = TreeMap(0.00011403d -> 1.05d),
-            lastTrade = None
+            lastTrade = None,
+            timestamp = buffer2.last.timestamp
           )
         )
 
@@ -115,7 +109,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               price = 0.00012d,
               amount = 0.5,
               side = OrderType.BUY
-            ).some
+            ).some,
+            timestamp = buffer3.last.timestamp
           )
         )
 
@@ -146,7 +141,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               price = 0.00012d,
               amount = 0.5,
               side = OrderType.BUY
-            ).some
+            ).some,
+            timestamp = buffer4.last.timestamp
           )
         )
 
@@ -172,7 +168,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           WsOrderBook(
             asks = TreeMap.empty,
             bids = TreeMap(0.00012d -> 1d),
-            lastTrade = None
+            lastTrade = None,
+            timestamp = buffer1.last.timestamp
           )
         )
         wsc.clearMessagesBuffer()
@@ -191,7 +188,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               price = 0.00012d,
               amount = 1,
               side = OrderType.SELL
-            ).some
+            ).some,
+            timestamp = buffer2.last.timestamp
           )
         )
         wsc.clearMessagesBuffer()
@@ -205,7 +203,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           WsOrderBook(
             asks = TreeMap(0.00012d -> 0d),
             bids = TreeMap.empty,
-            lastTrade = None
+            lastTrade = None,
+            timestamp = buffer3.last.timestamp
           )
         )
         wsc.clearMessagesBuffer()

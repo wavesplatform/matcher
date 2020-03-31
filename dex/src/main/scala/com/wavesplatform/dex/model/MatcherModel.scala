@@ -85,6 +85,8 @@ sealed trait AcceptedOrder {
 object AcceptedOrder {
 
   def partialFee(matcherFee: Long, totalAmount: Long, partialAmount: Long): Long = {
+    if (partialAmount > totalAmount)
+      throw new IllegalArgumentException(s"partialAmount: $partialAmount should be less or equal to totalAmount: $totalAmount")
     // Should not round! It could lead to forks. See ExchangeTransactionDiff
     (BigInt(matcherFee) * partialAmount / totalAmount).toLong
   }
@@ -311,33 +313,22 @@ object Events {
   sealed trait Event
 
   /**
-    *  In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`
-    * @param maxSubmittedFee limited by base-taker-fee
-    * @param maxCounterFee limited by base-maker-fee
+    * In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`
     */
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, maxSubmittedFee: Long, maxCounterFee: Long) extends Event {
+  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, submittedExecutedFee: Long, counterExecutedFee: Long)
+      extends Event {
 
+    def executedPrice: Long                   = counter.price
     lazy val executedAmount: Long             = AcceptedOrder.executedAmount(submitted, counter)
-    lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, counter.price)
+    lazy val executedAmountOfPriceAsset: Long = MatcherModel.getCost(executedAmount, executedPrice)
 
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
-    def counterExecutedFee: Long = {
-      val r = AcceptedOrder.partialFee(maxCounterFee, counter.order.amount, executedAmount)
-      if (r == 0 && counter.amount == 0 && counter.order.version == 3) 1
-      else r
-    }
-
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
     def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
-    def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
-    def submittedExecutedFee: Long = {
-      val r = AcceptedOrder.partialFee(maxSubmittedFee, submitted.order.amount, executedAmount)
-      if (r == 0 && submitted.amount == 0 && submitted.order.version == 3) 1
-      else r
-    }
-
-    def submittedRemainingFee: Long = math.max(submitted.fee - submittedExecutedFee, 0)
+    def submittedRemainingAmount: Long    = math.max(submitted.amount - executedAmount, 0)
+    def submittedRemainingFee: Long       = math.max(submitted.fee - submittedExecutedFee, 0)
+    def submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder] { submittedLimitRemaining } { submittedMarketRemaining }
 
     def submittedMarketRemaining(submittedMarketOrder: MarketOrder): MarketOrder = {
 
@@ -354,8 +345,6 @@ object Events {
     def submittedLimitRemaining(submittedLimitOrder: LimitOrder): LimitOrder = {
       submittedLimitOrder.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
     }
-
-    def submittedRemaining: AcceptedOrder = submitted.fold[AcceptedOrder] { submittedLimitRemaining } { submittedMarketRemaining }
   }
 
   case class OrderAdded(order: LimitOrder, timestamp: Long) extends Event

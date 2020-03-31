@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
@@ -32,11 +32,9 @@ class ExchangeTransactionCreatorSpecification
     with NoShrink
     with TableDrivenPropertyChecks {
 
-  private def getExchangeTransactionCreator(
-      hasMatcherScript: Boolean = false,
-      hasAssetScripts: Asset => Boolean = _ => false,
-      orderFeeSettings: OrderFeeSettings = DynamicSettings.symmetric(matcherFee)): ExchangeTransactionCreator = {
-    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, orderFeeSettings, hasMatcherScript, hasAssetScripts)
+  private def getExchangeTransactionCreator(hasMatcherScript: Boolean = false,
+                                            hasAssetScripts: Asset => Boolean = _ => false): ExchangeTransactionCreator = {
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherScript, hasAssetScripts)
   }
 
   "ExchangeTransactionCreator" should {
@@ -179,7 +177,7 @@ class ExchangeTransactionCreatorSpecification
       val taker = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.00, 0.005.waves))
 
       val ofs      = DynamicSettings(0.001.waves, 0.005.waves)
-      val tc       = getExchangeTransactionCreator(orderFeeSettings = ofs)
+      val tc       = getExchangeTransactionCreator()
       val (mf, tf) = Matcher.getMakerTakerFee(ofs)(taker, maker)
       val oe       = OrderExecuted(taker, maker, System.currentTimeMillis(), tf, mf)
 
@@ -196,7 +194,7 @@ class ExchangeTransactionCreatorSpecification
         val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte))
 
         val feeSettings          = DynamicSettings.symmetric(300000L)
-        val transactionCreator   = getExchangeTransactionCreator(orderFeeSettings = feeSettings)
+        val transactionCreator   = getExchangeTransactionCreator()
         val (makerFee, takerFee) = Matcher.getMakerTakerFee(feeSettings)(submitted, counter)
         val oe                   = OrderExecuted(submitted, counter, System.currentTimeMillis(), takerFee, makerFee)
 

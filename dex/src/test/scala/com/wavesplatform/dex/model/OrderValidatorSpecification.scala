@@ -939,13 +939,8 @@ class OrderValidatorSpecification
 
   private def exchangeTransactionCreator(blockchain: AsyncBlockchain,
                                          hasMatcherAccountScript: Boolean = false,
-                                         hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) = {
-    new ExchangeTransactionCreator(MatcherAccount,
-                                   matcherSettings.exchangeTxBaseFee,
-                                   DynamicSettings.symmetric(matcherFee),
-                                   hasMatcherAccountScript,
-                                   hasAssetScript)
-  }
+                                         hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) =
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
@@ -966,7 +961,12 @@ class OrderValidatorSpecification
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache, DynamicSettings.symmetric(matcherFee))
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey,
+                                        ba,
+                                        matcherSettings,
+                                        getDefaultAssetDescriptions(_).decimals,
+                                        rateCache,
+                                        DynamicSettings.symmetric(matcherFee))
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,

@@ -52,13 +52,16 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       placeAndAwaitAtDex(bo1)
       placeAndAwaitAtDex(bo2)
 
-      eventually { wsc.getAllOrders.size should be >= 2 }
+      eventually {
+        wsc.getAllBalances.size should be >= 3
+        wsc.getAllOrders.size should be >= 2
+      }
       wsc.getAllBalances.distinct should matchTo(
         Seq(
-          usd   -> WsBalances(tradable = 150.0, reserved = 0.0),
+          usd -> WsBalances(tradable = 150.0, reserved = 0.0),
           Waves -> WsBalances(tradable = 0.0, reserved = 0.0),
-          usd   -> WsBalances(tradable = 50.0, reserved = 100.0),
-          usd   -> WsBalances(tradable = 39.7, reserved = 110.3)
+          usd -> WsBalances(tradable = 50.0, reserved = 100.0),
+          usd -> WsBalances(tradable = 39.7, reserved = 110.3)
         )
       )
       wsc.getAllOrders.distinct should matchTo(
@@ -72,7 +75,9 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       cancelAndAwait(acc, bo1)
 
-      eventually { wsc.getAllBalances.size should be >= 1 }
+      eventually {
+        wsc.getAllBalances.size should be >= 1
+      }
       wsc.getAllBalances should contain(usd -> WsBalances(tradable = 139.7, reserved = 10.3))
       wsc.getAllOrders should contain(WsOrder(bo1.id(), status = OrderStatus.Cancelled.name.some))
 
@@ -99,7 +104,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 51.003, reserved = 0.0))
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 1.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 55.5, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 55.5, reserved = 0.0))
       }
 
       wsc.getAllOrders.distinct should matchTo(
@@ -118,24 +123,30 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "when user order fully filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
       val wsc = mkWsConnection(acc, method)
-      eventually { wsc.getAllBalances.size should be >= 1 }
+      eventually {
+        wsc.getAllBalances.size should be >= 1
+      }
 
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
 
       placeAndAwaitAtDex(bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.0.usd))
 
-      eventually { wsc.getAllBalances.distinct should have size 5 }
+      eventually {
+        wsc.getAllBalances.distinct should have size 5
+      }
       wsc.getAllBalances.distinct should matchTo(
         Seq(
-          usd   -> WsBalances(tradable = 10.0, reserved = 0.0),
+          usd -> WsBalances(tradable = 10.0, reserved = 0.0),
           Waves -> WsBalances(tradable = 0.0, reserved = 0.0),
-          usd   -> WsBalances(tradable = 0.0, reserved = 10.0),
-          usd   -> WsBalances(tradable = 0.0, reserved = 0.0),
+          usd -> WsBalances(tradable = 0.0, reserved = 10.0),
+          usd -> WsBalances(tradable = 0.0, reserved = 0.0),
           Waves -> WsBalances(tradable = 9.997, reserved = 0.0)
         )
       )
-
+      eventually {
+        wsc.getAllOrders.distinct should have size 2
+      }
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
@@ -153,7 +164,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 100))
 
       eventually {
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 5.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 0.0, reserved = 5.0))
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 4.9985, reserved = 0.0))
       }
 
@@ -171,7 +182,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 10.0, reserved = 0.0))
       }
       wsc.clearMessagesBuffer()
 
@@ -179,7 +190,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 8.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 8.0, reserved = 0.0))
       }
     }
 
@@ -187,12 +198,14 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsConnection(acc, method)
 
-      eventually { wsc.getAllBalances.size should be >= 1 }
+      eventually {
+        wsc.getAllBalances.size should be >= 1
+      }
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
       broadcastAndAwait(txIssue)
 
       eventually {
-        wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
       }
     }
@@ -206,7 +219,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val wsc = mkWsConnection(acc, method)
 
       eventually {
-        wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
       }
     }
@@ -215,15 +228,17 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
       val wsc = mkWsConnection(acc, method)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
+      eventually {
+        wsc.getAllBalances.size should be >= 2
+      }
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 20.0, reserved = 0.0))
+      wsc.getAllBalances should contain(usd -> WsBalances(tradable = 20.0, reserved = 0.0))
 
       broadcastAndAwait(mkBurn(acc, usd, 10.usd))
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 10.0, reserved = 0.0))
       }
     }
 
@@ -233,7 +248,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 20.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 20.0, reserved = 0.0))
       }
 
       wsc.clearMessagesBuffer()
@@ -242,8 +257,33 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 0.0, reserved = 0.0))
       }
     }
+  }
+
+  "Second connection should get the actual data" in {
+    val acc = mkAccountWithBalance(500.usd -> usd)
+    val wsc = mkWsAuthenticatedConnection(acc, dex1)
+
+    val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
+    val bo2 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
+
+    placeAndAwaitAtDex(bo1)
+    placeAndAwaitAtDex(bo2)
+
+    eventually { wsc.getAllOrders should have size 2 }
+
+    val wsc1 = mkWsAuthenticatedConnection(acc, dex1)
+
+    eventually { wsc1.getAllBalances should have size 1 }
+    eventually { wsc1.getAllOrders should have size 2 }
+    wsc1.getAllBalances.head should be(wsc.getAllBalances.last)
+    wsc1.getAllOrders.distinct.sortBy(_.timestamp) should matchTo(
+      Seq(
+        WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
+        WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
+      )
+    )
   }
 }

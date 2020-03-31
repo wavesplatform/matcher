@@ -19,7 +19,6 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueBtcTx, IssueUsdTx)
-    broadcastAndAwait(mkTransfer(alice, bob, 10000.usd, usd, 0.003.waves), mkTransfer(bob, alice, 1 0.btc, btc, 0.003.waves))
     dex1.start()
     dex1.api.upsertRate(usd, 1)
   }
@@ -30,9 +29,9 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when account is empty" in {
       val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("Test"), dex1)
+
       wsac.getAllBalances should have size 0
       wsac.getAllOrders should have size 0
-      wsac.close()
     }
 
     "when user place and cancel limit order" in {
@@ -70,9 +69,10 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       cancelAndAwait(acc, bo2)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllOrders should contain(WsOrder(bo2.id(), status = OrderStatus.Cancelled.name.some))
-      wsc.getAllBalances should contain(usd -> WsBalances(tradable = 150.0, reserved = 0.0))
+      eventually {
+        wsc.getAllOrders should contain(WsOrder(bo2.id(), status = OrderStatus.Cancelled.name.some))
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 150.0, reserved = 0.0))
+      }
     }
 
     "when user place and fill market order" in {
@@ -87,10 +87,11 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       dex1.api.placeMarket(smo)
       waitForOrderAtNode(smo)
 
-      eventually { wsc.getAllBalances.distinct.size should be >= 3 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 51.003, reserved = 0.0))
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 1.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 55.5, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 51.003, reserved = 0.0))
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 1.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 55.5, reserved = 0.0))
+      }
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
@@ -142,9 +143,10 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       placeAndAwaitAtDex(bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 100))
 
-      eventually { wsc.getAllBalances.distinct.size should be >= 4 }
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 5.0))
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 4.9985, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 5.0))
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 4.9985, reserved = 0.0))
+      }
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
@@ -158,17 +160,18 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
       val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
-
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
+      }
       wsc.clearMessagesBuffer()
 
       broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 8.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 8.0, reserved = 0.0))
+      }
     }
 
     "user had issued a new asset after the connection already established" in {
@@ -179,9 +182,10 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
       broadcastAndAwait(txIssue)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
+      }
     }
 
     "user had issued a new asset before establishing the connection" in {
@@ -192,9 +196,10 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
+      }
     }
 
     "user burnt part of the asset amount" in {
@@ -207,26 +212,29 @@ class PrivateWebSocketStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       broadcastAndAwait(mkBurn(acc, usd, 10.usd))
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
+      }
     }
 
     "user burnt all of the asset amount" in {
       val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
       val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 20.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 20.0, reserved = 0.0))
+      }
 
       wsc.clearMessagesBuffer()
 
       broadcastAndAwait(mkBurn(acc, usd, 20.usd))
 
-      eventually { wsc.getAllBalances.size should be >= 2 }
-      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
-      wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
+      eventually {
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
+        wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
+      }
     }
   }
 }

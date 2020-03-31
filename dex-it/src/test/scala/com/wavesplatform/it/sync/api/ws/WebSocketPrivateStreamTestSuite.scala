@@ -3,10 +3,12 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.it.api.websockets.HasWebSockets
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsAuthenticatedConnection}
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.IssueTransaction
@@ -25,10 +27,17 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
   override def afterEach(): Unit = dex1.api.cancelAll(alice)
 
-  "should send account updates to authenticated user" - {
+  def mkWsConnection(account: KeyPair, method: String, dex: DexContainer = dex1): WsAuthenticatedConnection = {
+    method match {
+      case "Signature" => mkWsAuthenticatedConnection(account, dex)
+      case _           => mkWsAuthenticatedConnectionViaApiKey(account, dex)
+    }
+  }
+
+  for (method <- Seq("Signature", "Api-Key")) s"should send account updates to authenticated (via $method) user" - {
 
     "when account is empty" in {
-      val wsac = mkWebSocketAuthenticatedConnection(mkKeyPair("Test"), dex1)
+      val wsac = mkWsConnection(mkKeyPair("Test"), method)
 
       wsac.getAllBalances should have size 0
       wsac.getAllOrders should have size 0
@@ -36,7 +45,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when user place and cancel limit order" in {
       val acc = mkAccountWithBalance(150.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
       val bo2 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100, version = 3, feeAsset = usd, matcherFee = 30)
 
@@ -77,7 +86,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when user place and fill market order" in {
       val acc = mkAccountWithBalance(51.003.waves -> Waves)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
       val smo = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 100)
 
       placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 15.waves, 120))
@@ -108,7 +117,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when user order fully filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
       eventually { wsc.getAllBalances.size should be >= 1 }
 
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
@@ -137,7 +146,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when user's order partially filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100)
 
       placeAndAwaitAtDex(bo1)
@@ -158,7 +167,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "when user make a transfer" in {
       val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
@@ -176,7 +185,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "user had issued a new asset after the connection already established" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
 
       eventually { wsc.getAllBalances.size should be >= 1 }
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
@@ -194,7 +203,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
       broadcastAndAwait(txIssue)
 
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
 
       eventually {
         wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
@@ -204,7 +213,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "user burnt part of the asset amount" in {
       val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
 
       eventually { wsc.getAllBalances.size should be >= 2 }
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
@@ -220,7 +229,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "user burnt all of the asset amount" in {
       val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
-      val wsc = mkWebSocketAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsConnection(acc, method)
 
       eventually {
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))

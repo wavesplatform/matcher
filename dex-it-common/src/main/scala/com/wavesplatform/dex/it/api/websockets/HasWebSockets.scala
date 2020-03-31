@@ -3,7 +3,6 @@ package com.wavesplatform.dex.it.api.websockets
 import java.lang
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
@@ -12,6 +11,7 @@ import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.it.docker.DexContainer
+import com.wavesplatform.dex.it.docker.apiKey
 import mouse.any._
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.Json
@@ -23,18 +23,18 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
   protected def getBaseBalancesStreamUri(dex: DexContainer): String   = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/"
   protected def getBaseOrderBooksStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/orderbook/"
 
-  protected val knownWsConnections: ConcurrentHashMap.KeySetView[WebSocketConnection[_], lang.Boolean] =
-    ConcurrentHashMap.newKeySet[WebSocketConnection[_]]()
+  protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection[_], lang.Boolean] =
+    ConcurrentHashMap.newKeySet[WsConnection[_]]()
 
-  protected def addConnection(connection: WebSocketConnection[_]): Unit = knownWsConnections.add(connection)
+  protected def addConnection(connection: WsConnection[_]): Unit = knownWsConnections.add(connection)
 
   protected def mkWebSocketConnection[Output](uri: String,
                                               parseOutput: Message => Output,
-                                              trackOutput: Boolean = true): WebSocketConnection[Output] = {
-    new WebSocketConnection(uri, parseOutput, trackOutput = trackOutput) unsafeTap addConnection
+                                              trackOutput: Boolean = true): WsConnection[Output] = {
+    new WsConnection(uri, parseOutput, trackOutput = trackOutput) unsafeTap addConnection
   }
 
-  protected def mkWebSocketAuthenticatedConnection(client: KeyPair, dex: DexContainer): WebSocketAuthenticatedConnection = {
+  protected def mkWsAuthenticatedConnection(client: KeyPair, dex: DexContainer): WsAuthenticatedConnection = {
 
     val prefix        = "as"
     val timestamp     = System.currentTimeMillis() + 86400000
@@ -42,18 +42,27 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
     val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp&s=$signature"
 
-    new WebSocketAuthenticatedConnection(wsUri, None)
+    new WsAuthenticatedConnection(wsUri, None)
   }
 
-  protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WebSocketConnection[WsOrderBook] = {
+  protected def mkWsAuthenticatedConnectionViaApiKey(client: KeyPair,
+                                                     dex: DexContainer,
+                                                     apiKey: String = apiKey): WsAuthenticatedConnection = {
+    val timestamp = System.currentTimeMillis() + 86400000
+    val wsUri     = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp"
+
+    new WsAuthenticatedConnection(wsUri, Some(apiKey))
+  }
+
+  protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WsConnection[WsOrderBook] = {
     val wsUri = s"${getBaseOrderBooksStreamUri(dex)}${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
     mkWebSocketConnection(wsUri) { msg =>
       Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
     }
   }
 
-  protected def mkWebSocketConnection[Output](uri: String)(parseOutput: Message => Output): WebSocketConnection[Output] = {
-    new WebSocketConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
+  protected def mkWebSocketConnection[Output](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
+    new WsConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
   }
 
   protected def cleanupWebSockets(): Unit = {

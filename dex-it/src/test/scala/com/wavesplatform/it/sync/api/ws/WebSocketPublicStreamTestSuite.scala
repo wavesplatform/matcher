@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
-import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketConnection}
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.immutable.TreeMap
@@ -26,7 +26,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
     dex1.api.upsertRate(btc, 0.00011167)
   }
 
-  private def receiveAtLeastN[T](wsc: WebSocketConnection[T], n: Int): Seq[T] = {
+  private def receiveAtLeastN[T](wsc: WsConnection[T], n: Int): Seq[T] = {
     eventually { wsc.getMessagesBuffer.size should be >= n }
     Thread.sleep(200) // Waiting for additional messages
     wsc.getMessagesBuffer

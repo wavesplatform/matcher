@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
-import com.wavesplatform.dex.it.api.websockets.WebSocketAuthenticatedConnection
+import com.wavesplatform.dex.it.api.websockets.WsAuthenticatedConnection
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.RepeatRequestOptions
 import com.wavesplatform.it.{MatcherSuiteBase, api}

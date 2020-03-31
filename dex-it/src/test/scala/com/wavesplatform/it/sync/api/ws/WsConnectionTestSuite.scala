@@ -8,14 +8,14 @@ import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
 import com.wavesplatform.dex.error.{ApiKeyIsNotValid, RequestInvalidSignature}
-import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WebSocketAuthenticatedConnection}
+import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsAuthenticatedConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class WebSocketConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
+class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
@@ -27,7 +27,7 @@ class WebSocketConnectionTestSuite extends MatcherSuiteBase with HasWebSockets w
   "WS connection should " - {
 
     "be established" in {
-      val wsc = mkWebSocketAuthenticatedConnection(alice, dex1)
+      val wsc = mkWsAuthenticatedConnection(alice, dex1)
       wsc.close()
       wsc.getMessagesBuffer.foreach { x =>
         x.balances should not be empty
@@ -67,7 +67,7 @@ class WebSocketConnectionTestSuite extends MatcherSuiteBase with HasWebSockets w
           // format: on
         )
       ) { (uri, apiKey, expectedStatus, expectedError) =>
-        val connection = new WebSocketAuthenticatedConnection(uri, apiKey)
+        val connection = new WsAuthenticatedConnection(uri, apiKey)
         val response   = Await.result(connection.getConnectionResponse, 1.second).response
 
         response.status shouldBe expectedStatus

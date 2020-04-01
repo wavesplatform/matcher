@@ -5,6 +5,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsAuthenticatedConnection}
@@ -26,6 +27,14 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   }
 
   override def afterEach(): Unit = dex1.api.cancelAll(alice)
+  
+  def placeAndWaitInStream(c: WsAuthenticatedConnection, o: Order): Unit = {
+    val orders = c.getAllOrders
+    placeAndAwaitAtDex(o)
+    eventually {
+      c.getAllOrders should have size orders.size + 1
+    }
+  }
 
   def waitForConnectionEstablished(c: WsAuthenticatedConnection): WsAuthenticatedConnection = {
     eventually {
@@ -58,12 +67,11 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
       val bo2 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100, version = 3, feeAsset = usd, matcherFee = 30)
 
-      placeAndAwaitAtDex(bo1)
-      placeAndAwaitAtDex(bo2)
+      placeAndWaitInStream(wsc, bo1)
+      placeAndWaitInStream(wsc, bo2)
 
       eventually {
         wsc.getAllBalances.size should be >= 3
-        wsc.getAllOrders.size should be >= 2
       }
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 150.0, reserved = 0.0))
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 0.0, reserved = 0.0))
@@ -130,13 +138,13 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val wsc = mkWsConnection(acc, method)
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
 
-      placeAndAwaitAtDex(bo1)
+      placeAndWaitInStream(wsc, bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.0.usd))
 
       eventually {
+        wsc.getAllOrders.distinct should have size 2
         wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.997, reserved = 0.0))
-        wsc.getAllOrders.distinct should have size 2
       }
 
       wsc.getAllOrders.distinct should matchTo(
@@ -152,10 +160,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val wsc = mkWsConnection(acc, method)
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100)
 
-      placeAndAwaitAtDex(bo1)
-      eventually {
-        wsc.getAllOrders should have size 1
-      }
+      placeAndWaitInStream(wsc, bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 100))
 
       eventually {
@@ -192,11 +197,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "user had issued a new asset after the connection already established" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsConnection(acc, method)
-
-      eventually {
-        wsc.getAllBalances.size should be >= 1
-      }
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
+
       broadcastAndAwait(txIssue)
 
       eventually {
@@ -207,8 +209,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     "user had issued a new asset before establishing the connection" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
-
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
+
       broadcastAndAwait(txIssue)
 
       val wsc = mkWsConnection(acc, method)
@@ -223,9 +225,6 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
       val wsc = mkWsConnection(acc, method)
 
-      eventually {
-        wsc.getAllBalances.size should be >= 2
-      }
       wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 10.0, reserved = 0.0))
       wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 20.0, reserved = 0.0))
 
@@ -264,15 +263,12 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
     val bo2 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
 
-    placeAndAwaitAtDex(bo1)
-    placeAndAwaitAtDex(bo2)
-
-    eventually { wsc.getAllOrders should have size 2 }
+    placeAndWaitInStream(wsc, bo1)
+    placeAndWaitInStream(wsc, bo2)
 
     val wsc1 = mkWsAuthenticatedConnection(acc, dex1)
 
     eventually { wsc1.getAllBalances should have size 1 }
-    eventually { wsc1.getAllOrders should have size 2 }
     wsc1.getAllBalances.head should be(wsc.getAllBalances.last)
     wsc1.getAllOrders.distinct.sortBy(_.timestamp) should matchTo(
       Seq(

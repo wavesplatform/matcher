@@ -30,12 +30,10 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
-import com.wavesplatform.dex.model.AcceptedOrder.partialFee
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings}
+import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import mouse.any.anySyntaxMouse
@@ -130,7 +128,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      getMakerTakerFeeByOffset(orderFeeSettingsCache)
+      Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache)
     )
   }
 
@@ -511,8 +509,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
 object Matcher extends ScorexLogging {
 
-  import OrderValidator.multiplyFeeByDouble
-
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   sealed trait Status
@@ -544,63 +540,5 @@ object Matcher extends ScorexLogging {
               }
           }
       }
-  }
-
-  private def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache)(offset: Long)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = {
-    getMakerTakerFee(ofsc getSettingsForOffset offset)(s, c)
-  }
-
-  def getMakerTakerFee(ofs: => OrderFeeSettings)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = {
-    val executedPrice  = c.price
-    val executedAmount = AcceptedOrder.executedAmount(s, c)
-    val (buy, sell)    = Order.splitByType(s.order, c.order)
-
-    def getActualBuySellAmounts(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
-
-      val (buyAmt, sellAmt) = assetType match {
-        case AssetType.AMOUNT    => buy.getReceiveAmount _ -> sell.getSpendAmount _
-        case AssetType.PRICE     => buy.getSpendAmount _   -> sell.getReceiveAmount _
-        case AssetType.RECEIVING => buy.getReceiveAmount _ -> sell.getReceiveAmount _
-        case AssetType.SPENDING  => buy.getSpendAmount _   -> sell.getSpendAmount _
-      }
-
-      buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
-    }
-
-    def isFirstMatch(ao: AcceptedOrder): Boolean = ao.amount == ao.order.amount
-
-    def absoluteFee(totalCounterFee: Long, totalSubmittedFee: Long): (Long, Long) = {
-      val counterExecutedFee   = partialFee(totalCounterFee, c.order.amount, executedAmount)
-      val submittedExecutedFee = partialFee(totalSubmittedFee, s.order.amount, executedAmount)
-
-      (
-        if (isFirstMatch(c) && c.order.version >= 3) counterExecutedFee max 1L else counterExecutedFee,
-        if (isFirstMatch(s) && s.order.version >= 3) submittedExecutedFee max 1L else submittedExecutedFee
-      )
-    }
-
-    ofs match {
-      case PercentSettings(assetType, _) =>
-        val (buyAmountExecuted, sellAmountExecuted) = getActualBuySellAmounts(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyAmountTotal, sellAmountTotal)       = getActualBuySellAmounts(assetType, buy.amount, buy.price, sell.amount, sell.price)
-
-        val buyExecutedFee  = partialFee(buy.matcherFee, buyAmountTotal, buyAmountExecuted)
-        val sellExecutedFee = partialFee(sell.matcherFee, sellAmountTotal, sellAmountExecuted)
-
-        if (c.isBuyOrder) (buyExecutedFee, sellExecutedFee)
-        else (sellExecutedFee, buyExecutedFee)
-
-      case settings: DynamicSettings =>
-        absoluteFee(
-          totalCounterFee = multiplyFeeByDouble(c.matcherFee, settings.makerRatio),
-          totalSubmittedFee = multiplyFeeByDouble(s.matcherFee, settings.takerRatio)
-        )
-
-      case _: FixedSettings =>
-        absoluteFee(
-          totalCounterFee = c.matcherFee,
-          totalSubmittedFee = s.matcherFee
-        )
-    }
   }
 }

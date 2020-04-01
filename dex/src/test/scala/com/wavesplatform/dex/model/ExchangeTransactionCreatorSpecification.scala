@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
-import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -148,7 +148,7 @@ class ExchangeTransactionCreatorSpecification
         *
         * But only for orders with version >= 3, because there is a proportional checks of spent fee for older versions.
         */
-      (1 to 2).foreach { v =>
+      (1 to 3).foreach { v =>
         s"submitted order version is $v" when {
           test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
           test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(0)
@@ -159,16 +159,16 @@ class ExchangeTransactionCreatorSpecification
         }
       }
 
-      (3 to 3).foreach { v =>
-        s"submitted order version is $v" when {
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(1)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(1, 0)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(1, 0)
-          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(1, 4)
-          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
-        }
-      }
+//      (3 to 3).foreach { v =>
+//        s"submitted order version is $v" when {
+//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
+//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(1)
+//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(1, 0)
+//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(1, 0)
+//          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(1, 4)
+//          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
+//        }
+//      }
     }
 
     "create transactions with correct buy/sell matcher fees when order fee settings changes" in {
@@ -178,7 +178,7 @@ class ExchangeTransactionCreatorSpecification
 
       val ofs      = DynamicSettings(0.001.waves, 0.005.waves)
       val tc       = getExchangeTransactionCreator()
-      val (mf, tf) = Matcher.getMakerTakerFee(ofs)(taker, maker)
+      val (mf, tf) = Fee.getMakerTakerFee(ofs)(taker, maker)
       val oe       = OrderExecuted(taker, maker, System.currentTimeMillis(), tf, mf)
 
       val tx = tc.createTransaction(oe)
@@ -195,7 +195,7 @@ class ExchangeTransactionCreatorSpecification
 
         val feeSettings          = DynamicSettings.symmetric(300000L)
         val transactionCreator   = getExchangeTransactionCreator()
-        val (makerFee, takerFee) = Matcher.getMakerTakerFee(feeSettings)(submitted, counter)
+        val (makerFee, takerFee) = Fee.getMakerTakerFee(feeSettings)(submitted, counter)
         val oe                   = OrderExecuted(submitted, counter, System.currentTimeMillis(), takerFee, makerFee)
 
         val tx = transactionCreator.createTransaction(oe)

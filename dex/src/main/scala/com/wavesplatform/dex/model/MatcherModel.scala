@@ -80,6 +80,8 @@ sealed trait AcceptedOrder {
     case lo: LimitOrder  => fl(lo)
     case mo: MarketOrder => fm(mo)
   }
+
+  def isFirstMatch: Boolean = amount == order.amount
 }
 
 object AcceptedOrder {

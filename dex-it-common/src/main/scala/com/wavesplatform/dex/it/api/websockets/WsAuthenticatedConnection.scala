@@ -17,5 +17,4 @@ class WsAuthenticatedConnection(uri: String, apiKey: Option[String])(implicit sy
   def getAllBalances = getMessagesBuffer.flatMap(_.balances).toList
 
   def getAllOrders = getMessagesBuffer.flatMap(_.orders).toList
-
 }

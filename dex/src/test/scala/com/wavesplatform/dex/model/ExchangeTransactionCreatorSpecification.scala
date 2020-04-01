@@ -6,11 +6,8 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.model.Events.OrderExecuted
-import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -80,24 +77,6 @@ class ExchangeTransactionCreatorSpecification
           tx.buyMatcherFee shouldBe oe.submittedExecutedFee
           tx.sellMatcherFee shouldBe oe.counterExecutedFee
       }
-    }
-
-    // TODO: to AddressActor
-    "create transactions with correct buy/sell matcher fees when order fee settings changes" in {
-
-      val maker = LimitOrder(createOrder(wavesUsdPair, SELL, 10.waves, 3.00, 0.003.waves)) // was placed when order-fee was DynamicSettings(0.003.waves, 0.003.waves)
-      val taker = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 3.00, 0.005.waves))
-
-      val ofs      = DynamicSettings(0.001.waves, 0.005.waves)
-      val tc       = getExchangeTransactionCreator()
-      val (mf, tf) = Fee.getMakerTakerFee(ofs)(taker, maker)
-      val oe       = OrderExecuted(taker, maker, System.currentTimeMillis(), tf, mf)
-
-      val tx = tc.createTransaction(oe)
-
-      tx shouldBe 'right
-      tx.explicitGet().sellMatcherFee shouldBe 0.0006.waves
-      tx.explicitGet().buyMatcherFee shouldBe 0.005.waves
     }
   }
 }

@@ -37,7 +37,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       )
   }
 
-  private def receiveAtLeastN[T](wsc: WsConnection[T], n: Int): Seq[T] = {
+  private def receiveAtLeastN[T <: WsMessage](wsc: WsConnection[T], n: Int): Seq[T] = {
     eventually { wsc.getMessagesBuffer.size should be >= n }
     Thread.sleep(200) // Waiting for additional messages
     wsc.getMessagesBuffer

@@ -10,13 +10,16 @@ import akka.http.scaladsl.model.ws.{Message, WebSocketRequest, WebSocketUpgradeR
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.wavesplatform.dex.api.http.`X-Api-Key`
+import com.wavesplatform.dex.api.websockets.WsMessage
+import com.wavesplatform.dex.api.websockets.actors.PingPongHandler
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
-class WsConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean, apiKey: Option[String] = None)(
+class WsConnection[Output <: WsMessage](uri: String, parseOutput: Message => Output, trackOutput: Boolean, apiKey: Option[String] = None)(
     implicit system: ActorSystem,
     materializer: Materializer)
     extends ScorexLogging {
@@ -26,12 +29,11 @@ class WsConnection[Output](uri: String, parseOutput: Message => Output, trackOut
   private val messagesBuffer: ConcurrentLinkedQueue[Output] = new ConcurrentLinkedQueue[Output]()
 
   private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
-    try {
-      val output = parseOutput(x)
-      if (trackOutput) messagesBuffer.add(output)
-      log.info(s"Got message: ${x.asTextMessage.getStrictText}")
-    } catch {
-      case e: Throwable => log.error(s"Can't parse message: $x", e)
+    val rawMsg = x.asTextMessage.getStrictText
+    Try { parseOutput(x) } orElse Try { Json.parse(rawMsg).as[PingPongHandler.Ping] } match {
+      case Success(_: PingPongHandler.Ping) => log.debug(s"Got ping: $rawMsg")
+      case Success(output: Output)          => if (trackOutput) messagesBuffer.add(output); log.info(s"Got message: $rawMsg")
+      case Failure(e)                       => log.error(s"Can't parse message: $x", e)
     }
   }
 
@@ -61,4 +63,6 @@ class WsConnection[Output](uri: String, parseOutput: Message => Output, trackOut
   def close(): Unit = if (!isClosed) closed.success(None)
 
   def isClosed: Boolean = closed.isCompleted
+
+  def getUri: String = uri
 }

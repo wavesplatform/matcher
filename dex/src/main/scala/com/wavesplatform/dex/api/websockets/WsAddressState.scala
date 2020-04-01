@@ -1,13 +1,21 @@
 package com.wavesplatform.dex.api.websockets
 
+import akka.http.scaladsl.model.ws.TextMessage
+import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], timestamp: Long = System.currentTimeMillis)
+case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], timestamp: Long = System.currentTimeMillis) extends WsMessage {
+  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsAddressState.format.writes(this).toString)
+  override val tpe: String                             = "au"
+}
 
 object WsAddressState {
+
+  def unapply(arg: WsAddressState): Option[(Long, String, Map[Asset, WsBalances], Seq[WsOrder])] =
+    (arg.timestamp, arg.tpe, arg.balances, arg.orders).some
 
   val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty)
 
@@ -25,11 +33,14 @@ object WsAddressState {
   )
 
   implicit val format: Format[WsAddressState] = (
-    (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
-      (__ \ "o").formatNullable[Seq[WsOrder]] and
-      (__ \ "_").format[Long]
+    (__ \ "_").format[Long] and
+      (__ \ "@").format[String] and
+      (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
+      (__ \ "o").formatNullable[Seq[WsOrder]]
   )(
-    (maybeBalances, maybeOrders, timestamp) => WsAddressState(maybeBalances.getOrElse(Map.empty), maybeOrders.getOrElse(Seq.empty), timestamp),
-    unlift(WsAddressState.unapply) andThen { case (b, o, t) => (Option(b).filter(_.nonEmpty), Option(o).filter(_.nonEmpty), t) }
+    (timestamp, _, maybeBalances, maybeOrders) => WsAddressState(maybeBalances getOrElse Map.empty, maybeOrders getOrElse Seq.empty, timestamp),
+    unlift(WsAddressState.unapply) andThen {
+      case (timestamp, tpe, balances, orders) => (timestamp, tpe, Option(balances).filter(_.nonEmpty), Option(orders).filter(_.nonEmpty))
+    }
   )
 }

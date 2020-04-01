@@ -217,7 +217,7 @@ trait MkWavesEntities {
       .explicitGet()
   }
 
-  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, ts: Long = System.currentTimeMillis): BurnTransactionV2 = {
+  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, ts: Long = System.currentTimeMillis): BurnTransaction = {
     Transactions.makeBurnTx(sender, AddressScheme.current.chainId, asset, amount, burnFee, ts)
   }
 }

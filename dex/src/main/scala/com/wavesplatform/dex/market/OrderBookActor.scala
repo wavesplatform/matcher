@@ -23,7 +23,6 @@ import mouse.any._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
-import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
@@ -56,7 +55,7 @@ class OrderBookActor(settings: Settings,
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
 
-  private var wsState = OrderBookWsState(wsUpdates, Queue.empty, WsOrderBook.empty)
+  private var wsState = OrderBookWsState(wsUpdates, Map.empty, WsOrderBook.empty)
 
   private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
     val actualRules = DenormalizedMatchingRule.skipOutdated(offset, matchingRules)
@@ -133,11 +132,11 @@ class OrderBookActor(settings: Settings,
         savingSnapshot = Some(globalEventNr)
       }
 
-    case _: AddWsSubscription =>
+    case AddWsSubscription(_, id) =>
       if (!wsState.hasSubscriptions) scheduleNextSendWsUpdates()
-      wsState = wsState.addSubscription(sender)
+      wsState = wsState.addSubscription(sender, id)
       sender ! wsSnapshotOf(orderBook)
-      log.trace(s"[${sender.hashCode()}] WebSocket connected")
+      log.trace(s"[$id] WebSocket connected")
       context.watch(sender)
 
     case SendWsUpdates =>
@@ -145,7 +144,7 @@ class OrderBookActor(settings: Settings,
       if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
 
     case Terminated(ws) =>
-      log.trace(s"[${ws.hashCode()}] WebSocket terminated")
+      log.trace(s"[${wsState.wsConnections(ws)}] WebSocket terminated")
       wsState = wsState.withoutSubscription(ws)
   }
 

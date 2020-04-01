@@ -306,7 +306,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
   }
 
-  protected val orderV3PairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
+  protected val orderV3MirrorPairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
     for {
       senderBuy: KeyPair   <- accountGen
       senderSell: KeyPair  <- accountGen

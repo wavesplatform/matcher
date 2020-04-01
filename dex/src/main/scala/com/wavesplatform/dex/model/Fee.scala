@@ -6,7 +6,6 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.AcceptedOrder.partialFee
 import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByDouble
 import com.wavesplatform.dex.settings.AssetType
-import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
 
 object Fee {
@@ -17,19 +16,6 @@ object Fee {
   def getMakerTakerFee(ofs: => OrderFeeSettings)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = {
     val executedPrice  = c.price
     val executedAmount = AcceptedOrder.executedAmount(s, c)
-    val (buy, sell)    = Order.splitByType(s.order, c.order)
-
-    def getActualBuySellAmounts(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
-
-      val (buyAmt, sellAmt) = assetType match {
-        case AssetType.AMOUNT    => buy.getReceiveAmount _ -> sell.getSpendAmount _
-        case AssetType.PRICE     => buy.getSpendAmount _   -> sell.getReceiveAmount _
-        case AssetType.RECEIVING => buy.getReceiveAmount _ -> sell.getReceiveAmount _
-        case AssetType.SPENDING  => buy.getSpendAmount _   -> sell.getSpendAmount _
-      }
-
-      buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
-    }
 
     def absoluteFee(totalCounterFee: Long, totalSubmittedFee: Long): (Long, Long) = {
       val counterExecutedFee   = partialFee(totalCounterFee, c.order.amount, executedAmount)
@@ -43,8 +29,20 @@ object Fee {
 
     ofs match {
       case PercentSettings(assetType, _) =>
-        val (buyAmountExecuted, sellAmountExecuted) = getActualBuySellAmounts(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyAmountTotal, sellAmountTotal)       = getActualBuySellAmounts(assetType, buy.amount, buy.price, sell.amount, sell.price)
+        val (buy, sell) = Order.splitByType(s.order, c.order)
+
+        val (buyAmt, sellAmt) = assetType match {
+          case AssetType.AMOUNT    => buy.getReceiveAmount _ -> sell.getSpendAmount _
+          case AssetType.PRICE     => buy.getSpendAmount _   -> sell.getReceiveAmount _
+          case AssetType.RECEIVING => buy.getReceiveAmount _ -> sell.getReceiveAmount _
+          case AssetType.SPENDING  => buy.getSpendAmount _   -> sell.getSpendAmount _
+        }
+
+        def buySellFee(buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) =
+          buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
+
+        val (buyAmountExecuted, sellAmountExecuted) = buySellFee(executedAmount, executedPrice, executedAmount, executedPrice)
+        val (buyAmountTotal, sellAmountTotal)       = buySellFee(buy.amount, buy.price, sell.amount, sell.price)
 
         val buyExecutedFee  = partialFee(buy.matcherFee, buyAmountTotal, buyAmountExecuted)
         val sellExecutedFee = partialFee(sell.matcherFee, sellAmountTotal, sellAmountExecuted)

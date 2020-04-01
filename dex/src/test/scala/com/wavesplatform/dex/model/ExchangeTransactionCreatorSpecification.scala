@@ -4,15 +4,15 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import com.wavesplatform.dex.domain.model.Denormalization
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderOps._
-import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -52,125 +52,37 @@ class ExchangeTransactionCreatorSpecification
           }
       }
     }
-  }
 
-  "ExchangeTransactionCreator" should {
-    "calculate fees in exchange transaction which are equal to matcher fees in fully matched orders" in {
-      val preconditions = for { ((_, buyOrder), (_, sellOrder)) <- orderV3PairGenerator } yield (buyOrder, sellOrder)
+    "take fee from order executed event" when {
+      "orders are matched fully" in {
+        val preconditions = for { ((_, buyOrder), (_, sellOrder)) <- orderV3MirrorPairGenerator } yield (buyOrder, sellOrder)
+        test(preconditions)
+      }
 
-      forAll(preconditions) {
+      "orders are matched partially" in {
+        val preconditions = for { ((_, buyOrder), (senderSell, sellOrder)) <- orderV3MirrorPairGenerator } yield {
+          val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)
+          val newSignature               = crypto.sign(senderSell, sellOrderWithUpdatedAmount.bodyBytes())
+          val correctedSellOrder         = sellOrderWithUpdatedAmount.updateProofs(Proofs(Seq(ByteStr(newSignature))))
+
+          (buyOrder, correctedSellOrder)
+        }
+
+        test(preconditions)
+      }
+
+      def test(preconditions: Gen[(Order, Order)]) = forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
           val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
           val tx = tc.createTransaction(oe).explicitGet()
 
-          tx.buyMatcherFee shouldBe buyOrder.matcherFee
-          tx.sellMatcherFee shouldBe sellOrder.matcherFee
+          tx.buyMatcherFee shouldBe oe.submittedExecutedFee
+          tx.sellMatcherFee shouldBe oe.counterExecutedFee
       }
     }
 
-    "create valid exchange transaction when orders are matched partially" in {
-
-      val preconditions = for { ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator } yield {
-        val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)
-        val newSignature               = crypto.sign(senderSell, sellOrderWithUpdatedAmount.bodyBytes())
-        val correctedSellOrder         = sellOrderWithUpdatedAmount.updateProofs(Proofs(Seq(ByteStr(newSignature))))
-
-        (buyOrder, correctedSellOrder)
-      }
-
-      forAll(preconditions) {
-        case (buyOrder, sellOrder) =>
-          val tc = getExchangeTransactionCreator()
-          val oe = mkOrderExecutedRaw(buyOrder, sellOrder)
-          val tx = tc.createTransaction(oe)
-
-          tx shouldBe 'right
-      }
-    }
-
-    "create transactions with correct buyMatcherFee/sellMatcherFee for expensive feeAsset" when {
-
-      val tc = getExchangeTransactionCreator()
-
-      def test(submittedType: OrderType, submittedAmount: Long, submittedFee: Long, orderVersion: Int)(countersAmounts: Long*)(
-          expectedSubmittedMatcherFees: Long*): Unit = {
-
-        require(countersAmounts.length == expectedSubmittedMatcherFees.length)
-
-        val submittedOrder = LimitOrder(
-          createOrder(
-            wavesBtcPair,
-            submittedType,
-            submittedAmount,
-            0.00011131,
-            matcherFee = submittedFee,
-            feeAsset = mkAssetId("Very expensive asset"),
-            version = orderVersion.toByte
-          )
-        )
-
-        val counterOrders = countersAmounts.map { amount =>
-          LimitOrder(createOrder(wavesBtcPair, submittedType.opposite, amount, 0.00011131))
-        }
-
-        val submittedDenormalizedAmount = Denormalization.denormalizeAmountAndFee(submittedOrder.amount, 8)
-        val denormalizedCounterAmounts  = countersAmounts.map(Denormalization.denormalizeAmountAndFee(_, 8))
-
-        s"S: $submittedType $submittedDenormalizedAmount, C: ${denormalizedCounterAmounts.mkString("[", ", ", "]")}" in {
-          counterOrders
-            .zip(expectedSubmittedMatcherFees)
-            .zipWithIndex
-            .foldLeft[AcceptedOrder](submittedOrder) {
-              case (submitted, ((counter, expectedMatcherFee), i)) =>
-                val oe            = mkOrderExecuted(submitted, counter)
-                val tx            = tc.createTransaction(oe).explicitGet()
-                val counterAmount = Denormalization.denormalizeAmountAndFee(counter.order.amount, 8)
-
-                withClue(s"C($i): ${counter.order.orderType} $counterAmount:\n") {
-                  if (submittedType == BUY) tx.buyMatcherFee shouldBe expectedMatcherFee
-                  else tx.sellMatcherFee shouldBe expectedMatcherFee
-                }
-
-                oe.submittedRemaining
-            }
-        }
-      }
-
-      /**
-        * Consider the situation, when matcherFeeAsset is very expensive, that is 1 the smallest part of it
-        * (like 1 satoshi for BTC) costs at least 0.003 Waves. This means that 1 fraction of this asset
-        * is enough to meet matcher's fee requirements (DynamicSettings mode, base fee = 0.003 Waves)
-        *
-        * In case of partial filling of the submitted order (with fee = 1 fraction of the expensive asset)
-        * ExchangeTransactionCreator has to correctly calculate buyMatcherFee/sellMatcherFee. They should have non-zero values
-        * after the first execution.
-        *
-        * But only for orders with version >= 3, because there is a proportional checks of spent fee for older versions.
-        */
-      (1 to 3).foreach { v =>
-        s"submitted order version is $v" when {
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(0)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(0, 0)
-          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(0, 0)
-          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(0, 4)
-          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(0, 2)
-        }
-      }
-
-//      (3 to 3).foreach { v =>
-//        s"submitted order version is $v" when {
-//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(100.waves)(1)
-//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(99.99999999.waves)(1)
-//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(50.waves, 50.waves)(1, 0)
-//          test(BUY, 100.waves, submittedFee = 1, orderVersion = v)(1.waves, 120.waves)(1, 0)
-//          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 500.waves)(1, 4)
-//          test(SELL, 100.waves, submittedFee = 5, orderVersion = v)(2.waves, 50.waves)(1, 2)
-//        }
-//      }
-    }
-
+    // TODO: to AddressActor
     "create transactions with correct buy/sell matcher fees when order fee settings changes" in {
 
       val maker = LimitOrder(createOrder(wavesUsdPair, SELL, 10.waves, 3.00, 0.003.waves)) // was placed when order-fee was DynamicSettings(0.003.waves, 0.003.waves)
@@ -186,24 +98,6 @@ class ExchangeTransactionCreatorSpecification
       tx shouldBe 'right
       tx.explicitGet().sellMatcherFee shouldBe 0.0006.waves
       tx.explicitGet().buyMatcherFee shouldBe 0.005.waves
-    }
-
-    "create transactions with correct buy/sell matcher fees for submitted order v3 " when List(1, 2).foreach { counterVersion =>
-      s"counter order v$counterVersion" in {
-        val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, amount = 88947718687647L, price = 934300L, matcherFee = 300000L, version = 2.toByte))
-        val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte))
-
-        val feeSettings          = DynamicSettings.symmetric(300000L)
-        val transactionCreator   = getExchangeTransactionCreator()
-        val (makerFee, takerFee) = Fee.getMakerTakerFee(feeSettings)(submitted, counter)
-        val oe                   = OrderExecuted(submitted, counter, System.currentTimeMillis(), takerFee, makerFee)
-
-        val tx = transactionCreator.createTransaction(oe)
-
-        tx shouldBe 'right
-        tx.explicitGet().sellMatcherFee shouldBe 0.003.waves
-        tx.explicitGet().buyMatcherFee shouldBe 0L
-      }
     }
   }
 }

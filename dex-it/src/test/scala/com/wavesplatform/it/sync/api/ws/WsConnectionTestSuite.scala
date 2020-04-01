@@ -7,7 +7,9 @@ import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
-import com.wavesplatform.dex.error.{ApiKeyIsNotValid, RequestInvalidSignature}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.error.{ApiKeyIsNotValid, OrderAssetPairReversed, OrderBookStopped, RequestInvalidSignature}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsAuthenticatedConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -34,7 +36,43 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       }
     }
 
-    "correctly handle rejections" in {
+    "stop send updates after closing by user and resend after user open it again" in {
+      val acc = mkAccountWithBalance(10.waves -> Waves)
+      val wsc = mkWsAuthenticatedConnection(acc, dex1)
+
+      eventually { wsc.getAllBalances should have size 1 }
+      wsc.close()
+
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      wsc.getAllBalances should have size 1
+
+      val wsc2 = mkWsAuthenticatedConnection(acc, dex1)
+      eventually { wsc2.getAllBalances should have size 2 }
+    }
+
+    val wavesEthPair = AssetPair(Waves, eth)
+
+    "correctly handle rejections (public stream)" in forAll(
+      Table(
+        // format: off
+        ("pair",       "expected status",      "expected error"),
+        (wavesEthPair, StatusCodes.BadRequest, OrderAssetPairReversed(wavesEthPair)),
+        (ethWavesPair, StatusCodes.NotFound,   OrderBookStopped(ethWavesPair)),
+        // format: on
+      )
+    ) { (assetPair, expectedStatus, expectedError) =>
+      val connection = mkWebSocketOrderBookConnection(assetPair, dex1)
+      val response   = Await.result(connection.getConnectionResponse, 1.second).response
+
+      response.status shouldBe expectedStatus
+
+      response.getHeader(`X-Error-Message`.name).get.value shouldBe expectedError.message.text
+      response.getHeader(`X-Error-Code`.name).get.value shouldBe expectedError.code.toString
+
+      connection.close()
+    }
+
+    "correctly handle rejections (private stream)" in {
 
       val kp = mkKeyPair("JIo6cTep_u3_6ocToHa")
 

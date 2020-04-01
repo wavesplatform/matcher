@@ -42,7 +42,7 @@ object Fee {
           buyAmt(buyAmount, buyPrice).explicitGet() -> sellAmt(sellAmount, sellPrice).explicitGet()
 
         val (buyAmountExecuted, sellAmountExecuted) = buySellFee(executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyAmountTotal, sellAmountTotal)       = buySellFee(buy.amount, buy.price, sell.amount, sell.price)
+        val (buyAmountTotal, sellAmountTotal)       = buySellFee(buy.amount, executedPrice, sell.amount, executedPrice)
 
         val buyExecutedFee  = partialFee(buy.matcherFee, buyAmountTotal, buyAmountExecuted)
         val sellExecutedFee = partialFee(sell.matcherFee, sellAmountTotal, sellAmountExecuted)

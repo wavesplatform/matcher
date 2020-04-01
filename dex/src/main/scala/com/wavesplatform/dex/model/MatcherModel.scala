@@ -49,10 +49,7 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def requiredFee: Price = {
-    if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
-  }
-
+  def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
 
@@ -317,7 +314,7 @@ object Events {
   /**
     * In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`
     */
-  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Long, submittedExecutedFee: Long, counterExecutedFee: Long)
+  case class OrderExecuted(submitted: AcceptedOrder, counter: LimitOrder, timestamp: Price, counterExecutedFee: Price, submittedExecutedFee: Price)
       extends Event {
 
     def executedPrice: Long                   = counter.price

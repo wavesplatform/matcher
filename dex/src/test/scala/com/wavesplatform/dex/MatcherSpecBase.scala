@@ -432,7 +432,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     val submittedExecutedFee = AcceptedOrder.partialFee(submittedLo.order.matcherFee, submittedLo.order.amount, executedAmount)
     val counterExecutedFee   = AcceptedOrder.partialFee(counterLo.order.matcherFee, counterLo.order.amount, executedAmount)
 
-    OrderExecuted(submittedLo, counterLo, timestamp, submittedExecutedFee, counterExecutedFee)
+    OrderExecuted(submittedLo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
   }
 
   def makerTakerPartialFee(submitted: AcceptedOrder, counter: LimitOrder): (Long, Long) = {

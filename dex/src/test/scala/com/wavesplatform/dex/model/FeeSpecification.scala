@@ -22,8 +22,8 @@ class FeeSpecification
     with PropertyChecks
     with NoShrink {
 
-  "Fee.getMakerTakerFee" should {
-    "create transactions with correct buyMatcherFee/sellMatcherFee for expensive feeAsset" when {
+  "Fee.getMakerTakerFee should calculate correct buy/sell matcher fees" when {
+    "expensive feeAsset" when {
 
       def test(submittedType: OrderType, submittedAmount: Long, submittedFee: Long, orderVersion: Int)(countersAmounts: Long*)(
           expectedSubmittedMatcherFees: Long*): Unit = {
@@ -69,7 +69,7 @@ class FeeSpecification
                   else sellMatcherFee shouldBe expectedMatcherFee
                 }
 
-                OrderExecuted(submitted, counter, submitted.order.timestamp, takerFee, makerFee).submittedRemaining
+                OrderExecuted(submitted, counter, submitted.order.timestamp, makerFee, takerFee).submittedRemaining
             }
         }
       }
@@ -108,7 +108,7 @@ class FeeSpecification
       }
     }
 
-    "create transactions with correct buy/sell matcher fees for submitted order v3 " when List(1, 2).foreach { counterVersion =>
+    "submitted order v3 " when List(1, 2).foreach { counterVersion =>
       s"counter order v$counterVersion" in {
         val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, amount = 88947718687647L, price = 934300L, matcherFee = 300000L, version = 2.toByte))
         val submitted = LimitOrder(createOrder(wavesUsdPair, SELL, amount = 50000000L, price = 932500L, matcherFee = 300000L, version = 3.toByte))

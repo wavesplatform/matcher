@@ -142,7 +142,7 @@ class ReservedBalanceSpecification
     addressDir ! OrderAdded(LimitOrder(counter), ntpTime.getTimestamp())
 
     oh.process(OrderAdded(LimitOrder(counter), ntpTime.getTimestamp()))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, submitted.matcherFee, counter.matcherFee)
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp, counter.matcherFee, submitted.matcherFee)
     addressDir ! exec
     exec
   }

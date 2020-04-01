@@ -205,9 +205,14 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val trader = KeyPair(ByteStr("trader-auto-cancel-big-order".getBytes(StandardCharsets.UTF_8)))
       knownAccounts = trader :: knownAccounts
 
-      val amount     = 835.85722414.waves
-      val matcherFee = 0.003.waves
-      broadcastAndAwait(mkTransfer(alice, trader, amount + matcherFee, Waves))
+      val amount             = 835.85722414.waves
+      val matcherFee         = 0.003.waves
+      val traderTotalBalance = amount + matcherFee
+      broadcastAndAwait(mkTransfer(alice, trader, traderTotalBalance, Waves))
+
+      eventually {
+        dex1.api.tradableBalance(trader, wavesUsdPair).getOrElse(Waves, 0L) shouldBe traderTotalBalance
+      }
 
       // Spending all assets
       val counterOrder   = mkOrder(trader, wavesUsdPair, OrderType.SELL, amount, 903200, matcherFee, version = 3)
@@ -238,7 +243,12 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       val sells = accountsAndAssets.map {
         case (account, asset) =>
-          val assetPair = AssetPair(IssuedAsset(asset.getId), Waves)
+          val issuedAsset = IssuedAsset(asset.getId)
+          val assetPair   = AssetPair(issuedAsset, Waves)
+          eventually {
+            dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
+          }
+
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
       }
 
@@ -289,6 +299,11 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     knownAccounts = knownAccounts ++ accounts
 
     broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => new Transfer(account.toAddress, 1000.waves))))
+    accounts.foreach { account =>
+      eventually {
+        dex1.api.tradableBalance(account, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves
+      }
+    }
 
     def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Seq[Order.Id]] = {
       val orders = (1 to numOrders).map { i =>

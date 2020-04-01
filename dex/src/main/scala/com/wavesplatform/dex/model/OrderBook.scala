@@ -287,9 +287,9 @@ object OrderBook {
           } else {
             val (counterExecutedFee, submittedExecutedFee) = getMakerTakerFee(submitted, counter)
 
-            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, submittedExecutedFee, counterExecutedFee)
+            val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)
             val newEvents          = orderExecutedEvent +: prevEvents
-            val lt                 = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
+            val lt                 = Some(LastTrade(orderExecutedEvent.executedPrice, orderExecutedEvent.executedAmount, submitted.order.orderType))
 
             if (orderExecutedEvent.counterRemaining.isValid) { // counter is not filled
 

@@ -161,7 +161,7 @@ class OrderBookSpec
     withClue("matchable orders should be matched without tick size:\n") {
       ob.append(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
       ob.append(submittedBuyOrder, submittedOrderTime) shouldBe Seq(
-        OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
+        OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
       )
 
       ob.getAsks shouldBe empty
@@ -198,7 +198,7 @@ class OrderBookSpec
 
       ob.append(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
       ob.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(
-        OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+        OrderExecuted(submitted, counter, submittedTs, counter.matcherFee, submitted.matcherFee)
       )
 
       ob.getAsks shouldBe empty

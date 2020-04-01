@@ -56,14 +56,10 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances.size should be >= 3
         wsc.getAllOrders.size should be >= 2
       }
-      wsc.getAllBalances.distinct should matchTo(
-        Seq(
-          usd -> WsBalances(tradable = 150.0, reserved = 0.0),
-          Waves -> WsBalances(tradable = 0.0, reserved = 0.0),
-          usd -> WsBalances(tradable = 50.0, reserved = 100.0),
-          usd -> WsBalances(tradable = 39.7, reserved = 110.3)
-        )
-      )
+      wsc.getAllBalances should contain(usd -> WsBalances(tradable = 150.0, reserved = 0.0))
+      wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 0.0, reserved = 0.0))
+      wsc.getAllBalances should contain(usd -> WsBalances(tradable = 39.7, reserved = 110.3))
+
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
@@ -123,30 +119,17 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "when user order fully filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
       val wsc = mkWsConnection(acc, method)
-      eventually {
-        wsc.getAllBalances.size should be >= 1
-      }
-
       val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
 
       placeAndAwaitAtDex(bo1)
       placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.0.usd))
 
       eventually {
-        wsc.getAllBalances.distinct should have size 5
-      }
-      wsc.getAllBalances.distinct should matchTo(
-        Seq(
-          usd -> WsBalances(tradable = 10.0, reserved = 0.0),
-          Waves -> WsBalances(tradable = 0.0, reserved = 0.0),
-          usd -> WsBalances(tradable = 0.0, reserved = 10.0),
-          usd -> WsBalances(tradable = 0.0, reserved = 0.0),
-          Waves -> WsBalances(tradable = 9.997, reserved = 0.0)
-        )
-      )
-      eventually {
+        wsc.getAllBalances should contain(usd -> WsBalances(tradable = 0.0, reserved = 0.0))
+        wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.997, reserved = 0.0))
         wsc.getAllOrders.distinct should have size 2
       }
+
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),

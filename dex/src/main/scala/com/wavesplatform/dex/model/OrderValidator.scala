@@ -408,7 +408,7 @@ object OrderValidator extends ScorexLogging {
       * that should be covered by tradable balance of the order's owner.
       * Returns InvalidMarketOrderPrice error in case of too low price of buy orders or too high price of sell orders
       */
-    def validateMarketOrderValue: Result[AcceptedOrder] = {
+    def getMarketOrderValue: Result[Long] = {
 
       /** Adds value of level to the current value of the market order */
       def accumulateLevel(level: LevelAgg, moValue: Result[Long], remainToExecute: Long): (Result[Long], Long) = {
@@ -436,12 +436,14 @@ object OrderValidator extends ScorexLogging {
         levels = orderBookCache(acceptedOrder.order.assetPair).getCounterSideFor(acceptedOrder),
         currentValue = 0L.asRight[MatcherError],
         remainToExecute = acceptedOrder.amount
-      )._1.map(_ => acceptedOrder)
+      )._1
     }
 
-    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder): Map[Asset, Long] = {
-      Map(marketOrder.feeAsset -> marketOrder.requiredFee) |+| Map(marketOrder.spentAsset -> 1)
-    }
+    // There could be math.min(1L, (BigInt(marketVolume) * percent).longValue())
+    def getMinSpentAsset(marketVolume: Long): Long = 1L
+
+    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder, marketVolume: Long): Map[Asset, Long] =
+      Map(marketOrder.feeAsset -> marketOrder.requiredFee) |+| Map(marketOrder.spentAsset -> getMinSpentAsset(marketVolume))
 
     def validateTradableBalance(requiredForOrder: Map[Asset, Long]): Result[AcceptedOrder] = {
       val availableBalances = acceptedOrder.availableBalanceBySpendableAssets(tradableBalance)
@@ -452,8 +454,8 @@ object OrderValidator extends ScorexLogging {
     acceptedOrder match {
       case mo: MarketOrder =>
         for {
-          _ <- validateMarketOrderValue
-          _ <- validateTradableBalance(getRequiredBalanceForMarketOrder(mo))
+          volume <- getMarketOrderValue
+          _      <- validateTradableBalance(getRequiredBalanceForMarketOrder(mo, volume))
         } yield mo
       case _ => validateTradableBalance(acceptedOrder.requiredBalance)
     }

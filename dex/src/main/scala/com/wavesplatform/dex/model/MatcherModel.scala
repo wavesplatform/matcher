@@ -49,7 +49,7 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def requiredFee: Long
+  def requiredFee: Long = fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
 
@@ -180,7 +180,6 @@ sealed trait SellOrder extends AcceptedOrder {
 sealed trait LimitOrder extends AcceptedOrder {
   def partial(amount: Long, fee: Long): LimitOrder
   def reservableBalance: Map[Asset, Long] = requiredBalance
-  def requiredFee: Long                   = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
 }
 
 object LimitOrder {
@@ -216,8 +215,6 @@ sealed trait MarketOrder extends AcceptedOrder {
     else requiredBalance.updated(order.getSpendAssetId, availableForSpending)
 
   def partial(amount: Long, fee: Long, availableForSpending: Long): MarketOrder
-
-  def requiredFee: Long = fee
 }
 
 object MarketOrder {

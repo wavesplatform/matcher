@@ -56,8 +56,6 @@ class OrderValidatorSpecification
 
   "OrderValidator" should {
 
-    "allow buying WAVES for BTC without balance for order fee (for LimitOrders only)" in asa() { _ shouldBe 'right }
-
     "reject new order" when {
 
       "this order had already been accepted" in asa(orderStatus = _ => true) { _ should produce("OrderDuplicate") }
@@ -947,7 +945,7 @@ class OrderValidatorSpecification
                                    hasAssetScript)
   }
 
-  private def asa[A](p: Portfolio = defaultPortfolio, orderStatus: ByteStr => Boolean = _ => false, o: Order = newBuyOrder)(
+  private def asa[A](p: Portfolio = defaultPortfolio, orderStatus: ByteStr => Boolean, o: Order = newBuyOrder)(
       f: OrderValidator.Result[AcceptedOrder] => A): A =
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBook.AggregatedSnapshot())(LimitOrder(o)))
 

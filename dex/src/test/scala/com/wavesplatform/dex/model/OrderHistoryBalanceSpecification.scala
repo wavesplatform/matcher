@@ -113,8 +113,8 @@ class OrderHistoryBalanceSpecification
       orderStatus(ord.id()) shouldBe OrderStatus.Accepted
     }
 
-    withClue("reserved assets considering amount of received WAVES") {
-      openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 2000L
+    withClue("reserved assets not considering amount of received WAVES") {
+      openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 3000L
       openVolume(ord.senderPublicKey, WavesBtc.priceAsset) shouldBe 8L
     }
 
@@ -133,23 +133,23 @@ class OrderHistoryBalanceSpecification
     activeOrderIds(ord.senderPublicKey) shouldBe Seq(ord.id())
   }
 
-  property("Should not reserve fee, if seller receives more WAVES than total fee in sell order") {
+  property("Should reserve fee, even if seller receives more WAVES than total fee in sell order") {
     val pair = AssetPair(mkAssetId("BTC"), Waves)
     val ord  = sell(pair, 100000, 0.01, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(ord), ntpTime.getTimestamp()))
     orderStatus(ord.id()) shouldBe OrderStatus.Accepted
 
-    openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 1000L
   }
 
-  property("Should not reserve fee, if buyer receives more WAVES than total fee in buy order") {
+  property("Should reserve fee, even if buyer receives more WAVES than total fee in buy order") {
     val ord = buy(WavesBtc, 100000, 0.0007, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(ord), ntpTime.getTimestamp()))
     orderStatus(ord.id()) shouldBe OrderStatus.Accepted
 
-    openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 0L
+    openVolume(ord.senderPublicKey, WavesBtc.amountAsset) shouldBe 1000L
   }
 
   property("Two sell orders added") {

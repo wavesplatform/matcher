@@ -406,9 +406,11 @@ class OrderBookActorSpecification
         tp.expectMsg(OrderBookRecovered(pair, None))
         val now = System.currentTimeMillis()
 
-        val maker1 = sell(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.003.waves.some, ts = now.some) // was placed when order-fee was DynamicSettings(0.003.waves, 0.003.waves)
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.003.waves)
+        val maker1 = sell(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.003.waves.some, ts = now.some)
         orderBook ! wrapLimitOrder(0, maker1)
 
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.005.waves)
         val taker1 = buy(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.005.waves.some, ts = now.some)
         orderBook ! wrapLimitOrder(1, taker1)
         tp.expectMsgType[OrderAdded]

@@ -418,28 +418,25 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     Order.sign(correctedOrder, sender)
   }
 
-  def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
     mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
 
-  def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
     mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), timestamp)
 
-  def mkOrderExecuted(submittedLo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
-    mkOrderExecuted(submittedLo, counterLo, submittedLo.order.timestamp)
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
+    mkOrderExecuted(submittedAo, counterLo, submittedAo.order.timestamp)
 
-  def mkOrderExecuted(submittedLo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
-    val executedAmount       = AcceptedOrder.executedAmount(submittedLo, counterLo)
-    val submittedExecutedFee = AcceptedOrder.partialFee(submittedLo.order.matcherFee, submittedLo.order.amount, executedAmount)
-    val counterExecutedFee   = AcceptedOrder.partialFee(counterLo.order.matcherFee, counterLo.order.amount, executedAmount)
-
-    OrderExecuted(submittedLo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
+    val (counterExecutedFee, submittedExecutedFee) = makerTakerPartialFee(submittedAo, counterLo)
+    OrderExecuted(submittedAo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
   }
 
-  def makerTakerPartialFee(submitted: AcceptedOrder, counter: LimitOrder): (Long, Long) = {
-    val executedAmount = AcceptedOrder.executedAmount(submitted, counter)
+  protected def makerTakerPartialFee(submittedAo: AcceptedOrder, counterLo: LimitOrder): (Long, Long) = {
+    val executedAmount = AcceptedOrder.executedAmount(submittedAo, counterLo)
     (
-      AcceptedOrder.partialFee(counter.matcherFee, counter.order.amount, executedAmount),
-      AcceptedOrder.partialFee(submitted.matcherFee, submitted.order.amount, executedAmount)
+      AcceptedOrder.partialFee(counterLo.matcherFee, counterLo.order.amount, executedAmount),
+      AcceptedOrder.partialFee(submittedAo.matcherFee, submittedAo.order.amount, executedAmount)
     )
   }
 }

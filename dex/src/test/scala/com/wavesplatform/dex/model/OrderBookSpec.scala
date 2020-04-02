@@ -13,7 +13,7 @@ import com.wavesplatform.dex.model.OrderBook.{LastTrade, Level, SideSnapshot, Sn
 import com.wavesplatform.dex.settings.MatchingRule
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTPTime
-import com.wavesplatform.dex.{Matcher, MatcherSpecBase, NoShrink}
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -33,7 +33,7 @@ class OrderBookSpec
 
   implicit class OrderBookOps(ob: OrderBook) {
     def append(ao: AcceptedOrder, ts: Long, tickSize: Long = MatchingRule.DefaultRule.tickSize): Seq[Event] =
-      ob.add(ao, ts, (t, m) => m.matcherFee -> t.matcherFee, tickSize)
+      ob.add(ao, ts, makerTakerPartialFee, tickSize)
   }
 
   val pair: AssetPair = AssetPair(Waves, mkAssetId("BTC"))
@@ -161,7 +161,7 @@ class OrderBookSpec
     withClue("matchable orders should be matched without tick size:\n") {
       ob.append(counterSellOrder, counterOrderTime) shouldBe Seq(OrderAdded(counterSellOrder, counterOrderTime))
       ob.append(submittedBuyOrder, submittedOrderTime) shouldBe Seq(
-        OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, submittedBuyOrder.matcherFee, counterSellOrder.matcherFee)
+        OrderExecuted(submittedBuyOrder, counterSellOrder, submittedOrderTime, counterSellOrder.matcherFee, submittedBuyOrder.matcherFee)
       )
 
       ob.getAsks shouldBe empty
@@ -198,7 +198,7 @@ class OrderBookSpec
 
       ob.append(counter, counterTs) shouldBe Seq(OrderAdded(counter, counterTs))
       ob.append(submitted, submittedTs, tickSize = normalizedTickSize(0.1)) shouldBe Seq(
-        OrderExecuted(submitted, counter, submittedTs, submitted.matcherFee, counter.matcherFee)
+        OrderExecuted(submitted, counter, submittedTs, counter.matcherFee, submitted.matcherFee)
       )
 
       ob.getAsks shouldBe empty
@@ -284,12 +284,13 @@ class OrderBookSpec
 
     val restAmount = ord1.amount + ord2.amount + ord3.amount - ord4.amount
 
-    ob.allOrders.map(_._2) shouldEqual Seq(
-      SellLimitOrder(
-        restAmount,
-        ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
-        ord3
-      ))
+    ob.allOrders.map(_._2).toList should matchTo(
+      List[LimitOrder](
+        SellLimitOrder(
+          restAmount,
+          ord3.matcherFee - AcceptedOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
+          ord3
+        )))
   }
 
   "partially execute order with small remaining part" in {
@@ -457,7 +458,7 @@ class OrderBookSpec
 
       val maker = limit(mAmt, SELL, orderMFee)
       val taker = if (isTMarket) market(tAmt, BUY, normalizedOrderTFee, tFeeAsset) else limit(tAmt, BUY, normalizedOrderTFee, tFeeAsset)
-      val gmtf  = Matcher.getMakerTakerFee(ofs)(_, _)
+      val gmtf  = Fee.getMakerTakerFee(ofs)(_, _)
       val evt   = { ob.add(maker, System.currentTimeMillis, gmtf); ob.add(taker, System.currentTimeMillis, gmtf) }.head
 
       evt shouldBe a[OrderExecuted]

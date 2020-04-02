@@ -18,6 +18,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -305,7 +306,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
   }
 
-  protected val orderV3PairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
+  protected val orderV3MirrorPairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
     for {
       senderBuy: KeyPair   <- accountGen
       senderSell: KeyPair  <- accountGen
@@ -415,5 +416,27 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
 
     Order.sign(correctedOrder, sender)
+  }
+
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), timestamp)
+
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
+    mkOrderExecuted(submittedAo, counterLo, submittedAo.order.timestamp)
+
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
+    val (counterExecutedFee, submittedExecutedFee) = makerTakerPartialFee(submittedAo, counterLo)
+    OrderExecuted(submittedAo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
+  }
+
+  protected def makerTakerPartialFee(submittedAo: AcceptedOrder, counterLo: LimitOrder): (Long, Long) = {
+    val executedAmount = AcceptedOrder.executedAmount(submittedAo, counterLo)
+    (
+      AcceptedOrder.partialFee(counterLo.matcherFee, counterLo.order.amount, executedAmount),
+      AcceptedOrder.partialFee(submittedAo.matcherFee, submittedAo.order.amount, executedAmount)
+    )
   }
 }

@@ -49,7 +49,7 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
+  def requiredFee: Long
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
 
@@ -65,25 +65,6 @@ sealed trait AcceptedOrder {
   def isValid: Boolean = isValid(price)
 
   def isValid(counterPrice: Price): Boolean = {
-
-    if (this.isSellOrder && this.isMarket) {
-      println(s"\n\n")
-      println(s"this: $this")
-      println(s"isValid($counterPrice):")
-      println(s"amount = $amount")
-      println(s"counterPrice = $counterPrice")
-      println(s"minimalAmountOfAmountAssetByPrice(counterPrice) = ${minimalAmountOfAmountAssetByPrice(counterPrice)}")
-      println(s"spentAmount = $spentAmount")
-      println(s"receiveAmount = $receiveAmount")
-      println(s"\n")
-      println(s"amount > 0 = ${amount > 0}")
-      println(s"amount >= minimalAmountOfAmountAssetByPrice(counterPrice) = ${amount >= minimalAmountOfAmountAssetByPrice(counterPrice)}")
-      println(s"amount < Order.MaxAmount = ${amount < Order.MaxAmount}")
-      println(s"spentAmount > 0 = ${spentAmount > 0}")
-      println(s"receiveAmount > 0 = ${receiveAmount > 0}")
-      println(s"\n\n")
-    }
-
     amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
   }
 
@@ -199,6 +180,7 @@ sealed trait SellOrder extends AcceptedOrder {
 sealed trait LimitOrder extends AcceptedOrder {
   def partial(amount: Long, fee: Long): LimitOrder
   def reservableBalance: Map[Asset, Long] = requiredBalance
+  def requiredFee: Long                   = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
 }
 
 object LimitOrder {
@@ -234,6 +216,8 @@ sealed trait MarketOrder extends AcceptedOrder {
     else requiredBalance.updated(order.getSpendAssetId, availableForSpending)
 
   def partial(amount: Long, fee: Long, availableForSpending: Long): MarketOrder
+
+  def requiredFee: Long = fee
 }
 
 object MarketOrder {
@@ -269,13 +253,6 @@ case class SellMarketOrder(amount: Long, fee: Long, order: Order, availableForSp
 
   def partial(amount: Long, fee: Long, availableForSpendings: Long): SellMarketOrder = {
     copy(amount = amount, fee = fee, availableForSpending = availableForSpendings)
-  }
-
-  override def amountOfPriceAsset: Long = (BigDecimal(availableForSpending) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-
-
-  override def isValid(counterPrice: Price): Boolean = {
-    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount >= 0
   }
 }
 

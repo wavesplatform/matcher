@@ -1,13 +1,11 @@
 package com.wavesplatform.it.sync
 
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.time.GlobalTimer
@@ -202,33 +200,25 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   "Auto cancel" - {
     "wrong cancel when executing a big order by small amount" in {
-      val trader = KeyPair(ByteStr("trader-auto-cancel-big-order".getBytes(StandardCharsets.UTF_8)))
+      val amount             = 835.85722414.waves
+      val traderTotalBalance = amount + matcherFee
+      val trader             = createAccountWithBalance(traderTotalBalance -> Waves)
+
       knownAccounts = trader :: knownAccounts
 
-      val amount             = 835.85722414.waves
-      val matcherFee         = 0.003.waves
-      val traderTotalBalance = amount + matcherFee
-      broadcastAndAwait(mkTransfer(alice, trader, traderTotalBalance, Waves))
-
-      eventually {
-        dex1.api.tradableBalance(trader, wavesUsdPair).getOrElse(Waves, 0L) shouldBe traderTotalBalance
-      }
-
       // Spending all assets
-      val counterOrder   = mkOrder(trader, wavesUsdPair, OrderType.SELL, amount, 903200, matcherFee, version = 3)
-      val submittedOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 0.0001.waves, 909700, matcherFee)
+      val counterOrder   = mkOrderDP(trader, wavesUsdPair, OrderType.SELL, amount, 9032)
+      val submittedOrder = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 0.0001.waves, 9097)
 
       placeAndAwaitAtDex(counterOrder)
-      dex1.api.place(submittedOrder)
-
-      wavesNode1.api.waitForHeightArise()
+      placeAndAwaitAtNode(submittedOrder)
 
       dex1.api.orderStatus(counterOrder).status shouldBe OrderStatus.PartiallyFilled
       dex1.api.orderStatus(submittedOrder).status shouldBe OrderStatus.Filled
     }
 
     "wrong cancel when match on all coins" in {
-      val accounts = (1 to 30).map(i => KeyPair(s"auto-cancel-$i".getBytes(StandardCharsets.UTF_8)))
+      val accounts = (1 to 30).map(_ => createAccountWithBalance(issueFee -> Waves))
       knownAccounts = knownAccounts ++ accounts
 
       val oneOrderAmount = 10000
@@ -248,12 +238,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
           eventually {
             dex1.api.tradableBalance(account, assetPair).getOrElse(issuedAsset, 0L) shouldBe oneOrderAmount
           }
-
           mkOrder(account, assetPair, OrderType.SELL, oneOrderAmount, orderPrice)
       }
 
-      sells.foreach(dex1.api.place)
-      sells.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+      sells.foreach(placeAndAwaitAtDex(_))
 
       val buyOrders = for {
         (_, asset) <- accountsAndAssets
@@ -295,15 +283,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     val totalAccounts    = 20
     val ordersPerAccount = 200
 
-    val accounts = (1 to totalAccounts).map(i => KeyPair(ByteStr(s"account-test-$i".getBytes(StandardCharsets.UTF_8)))).toList
+    val accounts = (1 to totalAccounts).map(_ => createAccountWithBalance(1000.waves -> Waves)).toList
     knownAccounts = knownAccounts ++ accounts
 
-    broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(account => new Transfer(account.toAddress, 1000.waves))))
-    accounts.foreach { account =>
-      eventually {
-        dex1.api.tradableBalance(account, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves
-      }
-    }
+    accounts.foreach(dex1.api.tradableBalance(_, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves)
 
     def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Seq[Order.Id]] = {
       val orders = (1 to numOrders).map { i =>
@@ -338,6 +321,6 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     )
   }
 
-  private def mkBobOrder                        = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
+  private def mkBobOrder                        = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 100.waves, 8)
   private def mkBobOrders(assetPair: AssetPair) = (1 to 5).map(i => mkOrder(bob, assetPair, OrderType.SELL, 100.waves + i, 400)).toList
 }

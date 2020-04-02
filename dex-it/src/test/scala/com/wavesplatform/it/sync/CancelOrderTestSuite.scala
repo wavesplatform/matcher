@@ -286,7 +286,11 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     val accounts = (1 to totalAccounts).map(_ => createAccountWithBalance(1000.waves -> Waves)).toList
     knownAccounts = knownAccounts ++ accounts
 
-    accounts.foreach(dex1.api.tradableBalance(_, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves)
+    accounts.foreach { account =>
+      eventually {
+        dex1.api.tradableBalance(account, wavesUsdPair).getOrElse(Waves, 0L) shouldBe 1000.waves
+      }
+    }
 
     def place(account: KeyPair, startPrice: Long, numOrders: Int): Future[Seq[Order.Id]] = {
       val orders = (1 to numOrders).map { i =>

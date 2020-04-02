@@ -122,7 +122,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
-          WsOrder.fromDomain(MarketOrder(smo, 0.waves), status = OrderStatus.Filled(0.waves, 0.waves), 50.0, 0.003, 1.11)
+          WsOrder.fromDomain(MarketOrder(smo, 1.waves), status = OrderStatus.Filled(50.0.waves, 0.003.waves), 50.0, 0.003, 1.11)
         )
       )
     }
@@ -168,6 +168,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
           WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.PartiallyFilled(5.waves, 0.0015.waves), 5.0, 0.0015, 1.0)
         )
       )
+
+      dex1.api.cancelAll(acc)
     }
 
     "when user make a transfer" in {
@@ -262,7 +264,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
     val wsc1 = mkWsAuthenticatedConnection(acc, dex1)
 
-    eventually { wsc1.getAllBalances should have size 1 }
+    eventually { wsc1.getAllBalances.distinct should have size 1 }
     wsc1.getAllBalances.head should be(wsc.getAllBalances.last)
     wsc1.getAllOrders.distinct.sortBy(_.timestamp) should matchTo(
       Seq(

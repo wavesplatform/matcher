@@ -27,7 +27,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   }
 
   override def afterEach(): Unit = dex1.api.cancelAll(alice)
-  
+
   def placeAndWaitInStream(c: WsAuthenticatedConnection, o: Order): Unit = {
     val orders = c.getAllOrders
     placeAndAwaitAtDex(o)
@@ -64,8 +64,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       val acc = mkAccountWithBalance(150.usd -> usd)
       val wsc = mkWsConnection(acc, method)
 
-      val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
-      val bo2 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100, version = 3, feeAsset = usd, matcherFee = 30)
+      val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
+      val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0, feeAsset = usd, matcherFee = 30)
 
       placeAndWaitInStream(wsc, bo1)
       placeAndWaitInStream(wsc, bo2)
@@ -105,11 +105,11 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "when user place and fill market order" in {
       val acc = mkAccountWithBalance(51.003.waves -> Waves)
       val wsc = mkWsConnection(acc, method)
-      val smo = mkOrder(acc, wavesUsdPair, SELL, 50.waves, 100)
+      val smo = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
 
-      placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 15.waves, 120))
-      placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 25.waves, 110))
-      placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 40.waves, 100))
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 15.waves, 1.2))
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 25.waves, 1.1))
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, 40.waves, 1.0))
 
       dex1.api.placeMarket(smo)
       waitForOrderAtNode(smo)
@@ -122,13 +122,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       wsc.getAllOrders.distinct should matchTo(
         Seq(
-          WsOrder
-            .fromDomain(MarketOrder(smo, 0.waves), status = OrderStatus.Filled(0.waves, 0.waves))
-            .copy(
-              filledAmount = 50.0.some,
-              filledFee = 0.003.some,
-              avgWeighedPrice = 1.11.some // (15*120 + 25*110 + 10*100)/50
-            )
+          WsOrder.fromDomain(MarketOrder(smo, 0.waves), status = OrderStatus.Filled(0.waves, 0.waves), 50.0, 0.003, 1.11)
         )
       )
     }
@@ -136,10 +130,10 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "when user order fully filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
       val wsc = mkWsConnection(acc, method)
-      val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 1.0.usd)
+      val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
 
       placeAndWaitInStream(wsc, bo1)
-      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 10.waves, 1.0.usd))
+      placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 1.0))
 
       eventually {
         wsc.getAllOrders.distinct should have size 2
@@ -150,7 +144,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-          WsOrder.orderDiff(LimitOrder(bo1), OrderStatus.Filled.name.some, 10.0, 0.003, 1.0)
+          WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.Filled(0.waves, 0.waves), 10.0, 0.003, 1.0)
         )
       )
     }
@@ -158,10 +152,10 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     "when user's order partially filled with another one" in {
       val acc = mkAccountWithBalance(10.usd -> usd)
       val wsc = mkWsConnection(acc, method)
-      val bo1 = mkOrder(acc, wavesUsdPair, BUY, 10.waves, 100)
+      val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
 
       placeAndWaitInStream(wsc, bo1)
-      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, SELL, 5.waves, 100))
+      placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 5.waves, 1.0))
 
       eventually {
         wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 5.0))
@@ -171,7 +165,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-          WsOrder.orderDiff(LimitOrder(bo1), OrderStatus.PartiallyFilled.name.some, 5.0, 0.0015, 1.0)
+          WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.PartiallyFilled(5.waves, 0.0015.waves), 5.0, 0.0015, 1.0)
         )
       )
     }
@@ -195,8 +189,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     }
 
     "user had issued a new asset after the connection already established" in {
-      val acc = mkAccountWithBalance(10.waves -> Waves)
-      val wsc = mkWsConnection(acc, method)
+      val acc                       = mkAccountWithBalance(10.waves -> Waves)
+      val wsc                       = mkWsConnection(acc, method)
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
 
       broadcastAndAwait(txIssue)
@@ -208,7 +202,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     }
 
     "user had issued a new asset before establishing the connection" in {
-      val acc = mkAccountWithBalance(10.waves -> Waves)
+      val acc                       = mkAccountWithBalance(10.waves -> Waves)
       val txIssue: IssueTransaction = mkIssue(acc, "testAsset", 1000.waves, 8)
 
       broadcastAndAwait(txIssue)
@@ -260,8 +254,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     val acc = mkAccountWithBalance(500.usd -> usd)
     val wsc = mkWsAuthenticatedConnection(acc, dex1)
 
-    val bo1 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
-    val bo2 = mkOrder(acc, wavesUsdPair, BUY, 100.waves, 100)
+    val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
+    val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
 
     placeAndWaitInStream(wsc, bo1)
     placeAndWaitInStream(wsc, bo2)

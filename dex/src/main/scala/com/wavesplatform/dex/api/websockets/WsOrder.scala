@@ -26,16 +26,6 @@ case class WsOrder(id: Order.Id,
 
 object WsOrder {
 
-  def orderDiff(ao: AcceptedOrder, status: Option[String], fa: Double, ff: Double, awp: Double): WsOrder = {
-    WsOrder(
-      ao.id,
-      status = status,
-      filledAmount = Some(fa),
-      filledFee = Some(ff),
-      avgWeighedPrice = Some(awp)
-    )
-  }
-
   def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
@@ -61,6 +51,12 @@ object WsOrder {
       ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
     )
   }
+
+  def fromDomain(ao: AcceptedOrder, status: OrderStatus, fa: Double, ff: Double, awp: Double)(implicit efc: ErrorFormatterContext): WsOrder =
+    (ao.isMarket match {
+      case true => fromDomain(ao, status)
+      case _ =>  WsOrder(ao.id, status = status.name.some)
+    }).copy(ao.id, filledAmount = fa.some, filledFee = ff.some, avgWeighedPrice = awp.some)
 
   val isMarketFormat: Format[Boolean] = Format(
     {

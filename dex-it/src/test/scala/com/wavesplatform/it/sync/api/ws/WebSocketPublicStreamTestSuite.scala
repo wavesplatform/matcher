@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -25,6 +26,18 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
     dex1.start()
     dex1.api.upsertRate(btc, 0.00011167)
   }
+
+  protected def squashOrderBooks(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
+    case (r, x) =>
+      WsOrderBook(
+        asks = r.asks ++ x.asks,
+        bids = r.bids ++ x.bids,
+        lastTrade = r.lastTrade.orElse(x.lastTrade),
+        timestamp = xs.toList.last.timestamp
+      )
+  }
+
+  protected def squashBalanceChanges(xs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = xs.foldLeft(Map.empty[Asset, WsBalances]) { _ ++ _ }
 
   private def receiveAtLeastN[T](wsc: WsConnection[T], n: Int): Seq[T] = {
     eventually { wsc.getMessagesBuffer.size should be >= n }
@@ -150,11 +163,6 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       }
 
       "should send updates" in {
-        val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
-        placeAndAwaitAtDex(firstOrder)
-        dex1.api.cancelAll(carol)
-        dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
-
         val wsc = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
         receiveAtLeastN(wsc, 1)
         wsc.clearMessagesBuffer()

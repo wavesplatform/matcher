@@ -207,7 +207,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       knownAccounts = trader :: knownAccounts
 
       // Spending all assets
-      val counterOrder   = mkOrderDP(trader, wavesUsdPair, OrderType.SELL, amount, 9032)
+      val counterOrder   = mkOrderDP(trader, wavesUsdPair, OrderType.SELL, amount, 9032, version = 3)
       val submittedOrder = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 0.0001.waves, 9097)
 
       placeAndAwaitAtDex(counterOrder)

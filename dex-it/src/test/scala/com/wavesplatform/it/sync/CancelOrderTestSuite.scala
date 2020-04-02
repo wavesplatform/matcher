@@ -204,6 +204,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val traderTotalBalance = amount + matcherFee
       val trader             = createAccountWithBalance(traderTotalBalance -> Waves)
 
+      eventually {
+        dex1.api.tradableBalance(trader, wavesUsdPair).getOrElse(Waves, 0L) shouldBe traderTotalBalance
+      }
+
       knownAccounts = trader :: knownAccounts
 
       // Spending all assets

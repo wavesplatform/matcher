@@ -221,14 +221,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.cancel(alice, order)
     }
 
-    "should should right fee if not enough amount before order execution and fee rounding" in {
+    "should save right fee considering the fee rate" in {
+      val rate = 0.33333333
+      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
+
       val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
 
-      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - (BigDecimal(0.005) * matcherFee).toLong, eth))
+      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 
-      val rate = 0.33333333
       dex1.api.upsertRate(feeAsset, rate)
-      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
       val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()

@@ -49,7 +49,7 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def requiredFee: Price                = if (feeAsset == rcvAsset) (fee - receiveAmount).max(0L) else fee
+  def requiredFee: Long = fee
   def requiredBalance: Map[Asset, Long] = Map(spentAsset -> rawSpentAmount) |+| Map(feeAsset -> requiredFee)
   def reservableBalance: Map[Asset, Long]
 
@@ -63,10 +63,12 @@ sealed trait AcceptedOrder {
   protected def executionAmount(counterPrice: Price): Long = correctedAmountOfAmountAsset(amount, counterPrice)
 
   def isValid: Boolean = isValid(price)
-  def isValid(counterPrice: Price): Boolean =
-    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
 
-  private def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
+  def isValid(counterPrice: Price): Boolean = {
+    amount > 0 && amount >= minimalAmountOfAmountAssetByPrice(counterPrice) && amount < Order.MaxAmount && spentAmount > 0 && receiveAmount > 0
+  }
+
+  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
 
   protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong

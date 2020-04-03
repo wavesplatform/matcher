@@ -77,7 +77,7 @@ trait MatcherSuiteBase
       case (balance, asset) => {
         assert(
           wavesNode1.api.balance(alice, asset) >= balance,
-          s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
+          s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
         )
         broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
       }

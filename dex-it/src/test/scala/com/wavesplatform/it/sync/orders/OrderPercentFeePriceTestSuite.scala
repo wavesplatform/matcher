@@ -32,7 +32,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled " in {
       val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId))
-      val accountSeller = createAccountWithBalance(fullyAmountWaves            -> Waves)
+      val accountSeller = createAccountWithBalance(minimalFee                  -> IssuedAsset(UsdId), fullyAmountWaves -> Waves)
 
       placeAndAwaitAtDex(
         mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
@@ -49,7 +49,7 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
       wavesNode1.api.balance(accountBuyer, Waves) should be(fullyAmountWaves)
       wavesNode1.api.balance(accountBuyer, IssuedAsset(UsdId)) shouldBe 0L
       wavesNode1.api.balance(accountSeller, Waves) should be(0L)
-      wavesNode1.api.balance(accountSeller, IssuedAsset(UsdId)) shouldBe fullyAmountUsd - minimalFee
+      wavesNode1.api.balance(accountSeller, IssuedAsset(UsdId)) shouldBe fullyAmountUsd
 
       dex1.api.reservedBalance(accountBuyer).getOrElse(Waves, 0L) shouldBe 0L
       dex1.api.reservedBalance(accountBuyer).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
@@ -112,6 +112,23 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.reservedBalance(accountBuyer).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
       dex1.api.reservedBalance(accountSeller).getOrElse(Waves, 0L) shouldBe 0L
       dex1.api.reservedBalance(accountSeller).getOrElse(IssuedAsset(UsdId), 0L) shouldBe 0L
+    }
+
+    s"buy order should be rejected user will get tokens for pay fee after order executed when fee asset-type = $assetType" in {
+      dex1.api.tryPlace(
+        mkOrder(
+          createAccountWithBalance(fullyAmountUsd -> usd),
+          wavesUsdPair,
+          BUY,
+          fullyAmountWaves,
+          price,
+          minimalFee,
+          version = version,
+          feeAsset = IssuedAsset(UsdId)
+        )) should failWith(
+        3147270,
+        s"Not enough tradable balance. The order requires at least 22.5 ${UsdId} on balance, but available are 18 ${UsdId}"
+      )
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {

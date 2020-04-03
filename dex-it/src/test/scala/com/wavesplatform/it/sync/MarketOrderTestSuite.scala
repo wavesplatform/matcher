@@ -95,19 +95,18 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     def testFilledMarketOrder(orderType: OrderType, feeMode: FeeMode): Unit = {
       val amount = 100.waves
       val price  = 1.usd
+      val fee    = getFee(feeMode)
 
       var account1: KeyPair = null
       var account2: KeyPair = null
 
-      val fee = getFee(feeMode)
-
       if (orderType == SELL) {
-        account1 = createAccountWithBalance(200.usd         -> usd)
+        account1 = createAccountWithBalance(200.usd         -> usd, fee -> Waves)
         account2 = createAccountWithBalance(200.waves + fee -> Waves)
         placeOrders(account1, wavesUsdPair, BUY, feeMode)(amount -> price)
       } else {
-        account1 = createAccountWithBalance(200.waves -> Waves)
-        account2 = createAccountWithBalance(200.usd   -> usd, fee -> Waves)
+        account1 = createAccountWithBalance(200.waves + fee -> Waves)
+        account2 = createAccountWithBalance(200.usd         -> usd, fee -> Waves)
         placeOrders(account1, wavesUsdPair, SELL, feeMode)(amount -> price)
       }
 
@@ -117,9 +116,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(marketOrder, OrderStatus.Filled).filledAmount shouldBe Some(amount)
       waitForOrderAtNode(marketOrder)
 
-      eventually {
-        wavesNode1.api.balance(account1, Waves) should be(amount - calculateFeeValue(amount, feeMode))
-      }
+      eventually { wavesNode1.api.balance(account1, Waves) shouldBe amount }
       wavesNode1.api.balance(account1, usd) should be(200.usd - price * amount / 1.waves)
 
       wavesNode1.api.balance(account2, Waves) shouldBe amount
@@ -249,8 +246,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketOrderAmount = 72.waves
       val ordersAmount      = 36.waves
 
-      val buyer  = createAccountWithBalance { 100.usd -> usd }
-      val seller = createAccountWithBalance(ordersAmount -> Waves, fixedFee -> Waves)
+      val buyer  = createAccountWithBalance(100.usd      -> usd, 3 * fixedFee -> Waves)
+      val seller = createAccountWithBalance(ordersAmount -> Waves, fixedFee   -> Waves)
 
       placeOrders(buyer, wavesUsdPair, BUY)(
         12.waves -> 0.2.usd,

@@ -92,12 +92,12 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalance(bob) shouldBe empty
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
-        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
       }
 
@@ -269,30 +269,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
         dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
-      }
-
-      "trader can buy waves for assets with order without having waves" in {
-        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
-        wavesNode1.api.balance(alice, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(matcher, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(bob, bobAsset2) shouldBe someAssetAmount
-
-        // Bob wants to sell all own assets for 1 Wave
-        val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        placeAndAwaitAtDex(order8)
-
-        // Bob moves all waves to Alice
-        val transferAmount = bobWavesBalance - minFee
-        broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
-
-        wavesNode1.api.balance(bob, Waves) shouldBe 0
-
-        // Order should stay accepted
-        dex1.api.waitForOrderStatus(order8, OrderStatus.Accepted)
-
-        // Cleanup
-        dex1.api.cancel(bob, order8).status shouldBe "OrderCanceled"
-        broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
       }
 
       "market status" in {

@@ -244,12 +244,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
-      placeAndAwaitAtDex(bobOrder)
-
-      dex1.api.tradableBalance(bob, wctWavesPair)(Waves) shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
-      dex1.api.cancel(bob, bobOrder)
-
-      dex1.api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270) // BalanceNotEnough
+      dex1.api.tryPlace(bobOrder) should failWith(3147270) // BalanceNotEnough
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
     }

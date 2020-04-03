@@ -37,8 +37,6 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       )
   }
 
-  protected def squashBalanceChanges(xs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = xs.foldLeft(Map.empty[Asset, WsBalances]) { _ ++ _ }
-
   private def receiveAtLeastN[T](wsc: WsConnection[T], n: Int): Seq[T] = {
     eventually { wsc.getMessagesBuffer.size should be >= n }
     Thread.sleep(200) // Waiting for additional messages

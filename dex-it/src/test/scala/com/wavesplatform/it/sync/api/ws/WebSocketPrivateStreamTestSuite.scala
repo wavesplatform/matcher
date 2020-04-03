@@ -144,7 +144,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       wsc.getAllOrders.distinct should matchTo(
         Seq(
           WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-          WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.Filled(0.waves, 0.waves), 10.0, 0.003, 1.0)
+          WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.Filled(10.waves, 0.003.waves), 10.0, 0.003, 1.0)
         )
       )
     }

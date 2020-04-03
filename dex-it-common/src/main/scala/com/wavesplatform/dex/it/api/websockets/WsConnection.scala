@@ -16,7 +16,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class WebSocketConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean, apiKey: Option[String] = None)(
+class WsConnection[Output](uri: String, parseOutput: Message => Output, trackOutput: Boolean, apiKey: Option[String] = None)(
     implicit system: ActorSystem,
     materializer: Materializer)
     extends ScorexLogging {

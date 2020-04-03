@@ -6,11 +6,15 @@ import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder
 import com.wavesplatform.dex.domain.asset.Asset
 import play.api.libs.json.Json
 
-class WebSocketAuthenticatedConnection(uri: String, apiKey: Option[String])(implicit system: ActorSystem, materializer: Materializer)
-    extends WebSocketConnection[WsAddressState](uri, msg => Json.parse(msg.asTextMessage.getStrictText).as[WsAddressState], true, apiKey) {
+class WsAuthenticatedConnection(uri: String, apiKey: Option[String])(implicit system: ActorSystem, materializer: Materializer)
+    extends WsConnection[WsAddressState](uri, msg => Json.parse(msg.asTextMessage.getStrictText).as[WsAddressState], true, apiKey) {
 
   def getBalancesChanges: Seq[Map[Asset, WsBalances]] = getMessagesBuffer.map(_.balances).distinct
   def getOrderChanges: Seq[WsOrder]                   = getMessagesBuffer.flatMap(_.orders).distinct
 
   def getSnapshot: WsAddressState = getMessagesBuffer.headOption.getOrElse(WsAddressState.empty)
+
+  def getAllBalances = getMessagesBuffer.flatMap(_.balances).toList
+
+  def getAllOrders = getMessagesBuffer.flatMap(_.orders).toList
 }

@@ -19,6 +19,7 @@ import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import com.wavesplatform.it.api.ApiExtensions
+import org.scalatest
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -70,17 +71,18 @@ trait MatcherSuiteBase
     super.afterAll()
   }
 
-  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
+  def mkAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
     val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
-      case (balance, asset) => {
-        assert(
-          wavesNode1.api.balance(alice, asset) >= balance,
-          s"Bob doesn't have enough balance in ${asset.toString} to make a transfer"
-        )
-        broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
-      }
+      case (balance, asset) =>
+        asset.fold { scalatest.Assertions.succeed } { issuedAsset =>
+          assert(
+            wavesNode1.api.assetBalance(alice, issuedAsset).balance >= balance,
+            s"Alice doesn't have enough balance in ${issuedAsset.toString} to make a transfer"
+          )
+        }
+        broadcastAndAwait { mkTransfer(alice, account, balance, asset, 0.003.waves) }
     }
     account
   }

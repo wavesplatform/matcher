@@ -90,7 +90,7 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
     dex1.restartWithNewSuiteConfig(conf)
 
-    val account = createAccountWithBalance(5.004.waves -> Waves)
+    val account = mkAccountWithBalance(5.004.waves -> Waves)
 
     markup("Place order")
     val order = mkOrder(account, wavesUsdPair, SELL, 5.waves, 5.usd)

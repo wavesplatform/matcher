@@ -49,7 +49,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
 
     "array of orders could be cancelled with API key" in {
-      val acc = createAccountWithBalance(100.waves -> Waves)
+      val acc = mkAccountWithBalance(100.waves -> Waves)
 
       val ids = for { i <- 1 to 10 } yield {
         val o = mkOrder(acc, wavesUsdPair, OrderType.SELL, i.waves, 100 + i)
@@ -69,7 +69,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
 
     "only owners orders should be cancelled with API key if one of them from another owner" in {
-      val acc = createAccountWithBalance(100.waves -> Waves)
+      val acc = mkAccountWithBalance(100.waves -> Waves)
 
       val o = mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100)
       placeAndAwaitAtDex(o)

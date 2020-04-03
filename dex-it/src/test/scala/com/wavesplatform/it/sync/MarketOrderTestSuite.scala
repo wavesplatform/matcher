@@ -100,12 +100,12 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       var account2: KeyPair = null
 
       if (orderType == SELL) {
-        account1 = createAccountWithBalance(200.usd   -> usd)
-        account2 = createAccountWithBalance(200.waves -> Waves)
+        account1 = mkAccountWithBalance(200.usd   -> usd)
+        account2 = mkAccountWithBalance(200.waves -> Waves)
         placeOrders(account1, wavesUsdPair, BUY, feeMode)(amount -> price)
       } else {
-        account1 = createAccountWithBalance(200.waves -> Waves)
-        account2 = createAccountWithBalance(200.usd   -> usd)
+        account1 = mkAccountWithBalance(200.waves -> Waves)
+        account2 = mkAccountWithBalance(200.usd   -> usd)
         placeOrders(account1, wavesUsdPair, SELL, feeMode)(amount -> price)
       }
 
@@ -245,8 +245,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketOrderAmount = 72.waves
       val ordersAmount      = 36.waves
 
-      val buyer  = createAccountWithBalance { 100.usd -> usd }
-      val seller = createAccountWithBalance(ordersAmount -> Waves, fixedFee -> Waves)
+      val buyer  = mkAccountWithBalance { 100.usd -> usd }
+      val seller = mkAccountWithBalance(ordersAmount -> Waves, fixedFee -> Waves)
 
       placeOrders(buyer, wavesUsdPair, BUY)(
         12.waves -> 0.2.usd,
@@ -277,7 +277,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketPrice           = 0.1.usd
       val anotherOrderAmount    = 1.waves
 
-      val account = createAccountWithBalance(
+      val account = mkAccountWithBalance(
         accountBalanceWBefore -> Waves,
         100.usd               -> usd
       )
@@ -306,7 +306,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val marketOrderAmount = 150.waves
       val marketOrderPrice  = 1.usd
       val accountUsdBalance = 100.usd
-      val account           = createAccountWithBalance { accountUsdBalance -> usd }
+      val account           = mkAccountWithBalance { accountUsdBalance -> usd }
 
       placeOrders(alice, wavesUsdPair, SELL)(
         5.waves   -> 0.2.usd,
@@ -350,7 +350,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val price    = 0.1.usd
       val transfer = 100.usd
 
-      val account = createAccountWithBalance { transfer -> usd }
+      val account = mkAccountWithBalance { transfer -> usd }
 
       placeOrders(alice, wavesUsdPair, SELL)(amount -> price)
 
@@ -393,7 +393,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val price    = 1.1.usd
       val transfer = 100.usd
 
-      val account = createAccountWithBalance { transfer -> usd }
+      val account = mkAccountWithBalance { transfer -> usd }
 
       placeOrders(alice, wavesUsdPair, SELL)(amount -> price)
 
@@ -414,7 +414,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val price    = 1.usd
       val transfer = 10.usd
 
-      val account = createAccountWithBalance { transfer -> usd }
+      val account = mkAccountWithBalance { transfer -> usd }
 
       placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3) }
 

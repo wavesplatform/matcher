@@ -247,7 +247,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val oneOrderAmount = 10000
       val orderPrice     = 3000000000000L
 
-      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(x => new Transfer(x.toAddress, issueFee)).toList))
+      broadcastAndAwait(mkMassTransfer(alice, Waves, accounts.map(x => new Transfer(x.toAddress, issueFee + matcherFee)).toList))
 
       val accountsAndAssets = accounts.zipWithIndex.map {
         case (account, i) => account -> mkIssue(account, s"WowSoMuchCoin-$i", quantity = oneOrderAmount, decimals = 2)

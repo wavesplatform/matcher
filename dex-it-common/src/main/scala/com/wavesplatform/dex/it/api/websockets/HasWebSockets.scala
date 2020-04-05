@@ -3,6 +3,7 @@ package com.wavesplatform.dex.it.api.websockets
 import java.lang
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
@@ -16,6 +17,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.Json
 
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
@@ -32,27 +34,30 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
   protected def addConnection(connection: WsConnection[_]): Unit = knownWsConnections.add(connection)
 
-  protected def mkWebSocketConnection[Output <: WsMessage](uri: String,
-                                                           parseOutput: Message => Output,
-                                                           trackOutput: Boolean = true): WsConnection[Output] = {
+  protected def mkWebSocketConnection[Output <: WsMessage: ClassTag](uri: String,
+                                                                     parseOutput: Message => Output,
+                                                                     trackOutput: Boolean = true): WsConnection[Output] = {
     new WsConnection(uri, parseOutput, trackOutput = trackOutput) unsafeTap addConnection
   }
 
-  protected def mkWsAuthenticatedConnection(client: KeyPair, dex: DexContainer): WsAuthenticatedConnection = {
+  protected def mkWsAuthenticatedConnection(client: KeyPair, dex: DexContainer, keepAlive: Boolean = true): WsAuthenticatedConnection = {
 
     val timestamp     = System.currentTimeMillis() + 1.hour.toMillis
     val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
     val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp&s=$signature"
 
-    new WsAuthenticatedConnection(wsUri, None)
+    new WsAuthenticatedConnection(wsUri, None, keepAlive)
   }
 
-  protected def mkWsAuthenticatedConnectionViaApiKey(client: KeyPair, dex: DexContainer, apiKey: String = apiKey): WsAuthenticatedConnection = {
+  protected def mkWsAuthenticatedConnectionViaApiKey(client: KeyPair,
+                                                     dex: DexContainer,
+                                                     apiKey: String = apiKey,
+                                                     keepAlive: Boolean = true): WsAuthenticatedConnection = {
     val timestamp = System.currentTimeMillis() + 1.hour.toMillis
     val wsUri     = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp"
 
-    new WsAuthenticatedConnection(wsUri, Some(apiKey))
+    new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive)
   }
 
   protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WsConnection[WsOrderBook] = {
@@ -62,13 +67,13 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     }
   }
 
-  protected def mkWebSocketConnection[Output <: WsMessage](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
+  protected def mkWebSocketConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
     new WsConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
   }
 
   protected def cleanupWebSockets(): Unit = {
     if (!knownWsConnections.isEmpty) {
-      knownWsConnections.forEach(c => if (!c.isClosed) c.close())
+      knownWsConnections.forEach { _.close() }
       materializer.shutdown()
     }
   }

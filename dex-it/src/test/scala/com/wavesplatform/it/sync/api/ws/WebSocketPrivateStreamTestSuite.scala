@@ -59,6 +59,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       wsac.getAllBalances should have size 1
       wsac.getAllOrders should have size 0
+
+      wsac.close()
     }
 
     "when user place and cancel limit order" in {
@@ -101,6 +103,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllOrders should contain(WsOrder(bo2.id(), status = OrderStatus.Cancelled.name.some))
         wsc.getAllBalances should contain(usd -> WsBalances(tradable = 150.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
 
     "when user place and fill market order" in {
@@ -126,6 +130,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
           WsOrder.fromDomain(MarketOrder(smo, 1.waves), status = OrderStatus.Filled(50.0.waves, 0.003.waves), 50.0, 0.003, 1.11)
         )
       )
+
+      wsc.close()
     }
 
     "when user order fully filled with another one" in {
@@ -148,6 +154,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
           WsOrder.fromDomain(LimitOrder(bo1), status = OrderStatus.Filled(10.waves, 0.003.waves), 10.0, 0.003, 1.0)
         )
       )
+
+      wsc.close()
     }
 
     "when user's order partially filled with another one" in {
@@ -171,6 +179,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
       )
 
       dex1.api.cancelAll(acc)
+      wsc.close()
     }
 
     "when user make a transfer" in {
@@ -189,6 +198,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 8.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
 
     "user had issued a new asset after the connection already established" in {
@@ -202,6 +213,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
 
     "user had issued a new asset before establishing the connection" in {
@@ -216,6 +229,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances should contain(Waves                      -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(IssuedAsset(txIssue.getId) -> WsBalances(tradable = 1000.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
 
     "user burnt part of the asset amount" in {
@@ -231,6 +246,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 10.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
 
     "user burnt all of the asset amount" in {
@@ -250,6 +267,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.getAllBalances should contain(Waves -> WsBalances(tradable = 9.0, reserved = 0.0))
         wsc.getAllBalances should contain(usd   -> WsBalances(tradable = 0.0, reserved = 0.0))
       }
+
+      wsc.close()
     }
   }
 
@@ -273,5 +292,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
       )
     )
+
+    Seq(wsc, wsc1).foreach { _.close() }
   }
 }

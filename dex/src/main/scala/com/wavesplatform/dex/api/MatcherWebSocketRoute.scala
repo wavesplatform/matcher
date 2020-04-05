@@ -113,10 +113,16 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       }
       .watchTermination()(handleTermination)
 
-  private def createStreamFor(source: Source[TextMessage.Strict, Unit]): Route = {
-    // TODO Implement onCompleteMessage and onFailureMessage
-    handleWebSocketMessages(Flow.fromSinkAndSourceCoupled(Sink.actorRef(pingPongHandler, "complete", t => Status.Failure(t)), source))
-  }
+  private def createStreamFor(source: Source[TextMessage.Strict, Unit]): Route = handleWebSocketMessages(
+    Flow.fromSinkAndSourceCoupled(
+      sink = Sink.actorRef(
+        ref = pingPongHandler,
+        onCompleteMessage = (),
+        onFailureMessage = _ => Status.Failure(_)
+      ),
+      source = source
+    )
+  )
 
   private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {
     val invalidSignatureResponse = complete(RequestInvalidSignature toWsHttpResponse StatusCodes.BadRequest)

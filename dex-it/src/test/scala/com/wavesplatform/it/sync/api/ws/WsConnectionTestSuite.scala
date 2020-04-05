@@ -32,9 +32,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
     "be established" in {
       val wsc = mkWsAuthenticatedConnection(alice, dex1)
       wsc.close()
-      wsc.getMessagesBuffer.foreach { x =>
-        x.balances should not be empty
-      }
+      wsc.getMessagesBuffer.foreach { _.balances should not be empty }
     }
 
     "stop send updates after closing by user and resend after user open it again" in {
@@ -78,7 +76,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       val kp = mkKeyPair("JIo6cTep_u3_6ocToHa")
 
       val timestamp     = System.currentTimeMillis
-      val signedMessage = "as".getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
+      val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
 
       val correctSignature   = com.wavesplatform.dex.domain.crypto.sign(kp, signedMessage).base58
       val incorrectSignature = "incorrectSignature"

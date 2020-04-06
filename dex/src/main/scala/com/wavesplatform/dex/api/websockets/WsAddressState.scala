@@ -15,7 +15,7 @@ case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]
 
 object WsAddressState {
 
-  def unapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
+  def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some
 
   val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty, 0)
@@ -41,7 +41,7 @@ object WsAddressState {
       (__ \ "o").formatNullable[Seq[WsOrder]]
   )(
     (_, ts, uid, maybeBalances, maybeOrders) => WsAddressState(maybeBalances getOrElse Map.empty, maybeOrders getOrElse Seq.empty, uid, ts),
-    unlift(WsAddressState.unapply) andThen {
+    unlift(WsAddressState.wsUnapply) andThen {
       case (tpe, ts, uid, bs, os) => (tpe, ts, uid, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty))
     }
   )

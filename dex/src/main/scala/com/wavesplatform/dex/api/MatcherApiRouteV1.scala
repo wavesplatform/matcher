@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -18,6 +19,7 @@ import javax.ws.rs.Path
 @Api(value = "/api v1/")
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              matcherStatus: () => Matcher.Status,
+                             orderBookAskAdapter: OrderBookAskAdapter,
                              apiKeyHash: Option[Array[Byte]],
                              matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
@@ -76,7 +78,13 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete { orderBookSnapshot.get(pair, depth, MatcherModel.Denormalized) }
+        complete {
+          orderBookAskAdapter.getHttpView(
+            pair,
+            MatcherModel.Denormalized,
+            depth.getOrElse(matcherSettings.orderBookSnapshotHttpCache.defaultDepth.getOrElse(1)) // TODO
+          )
+        }
       }
     }
   }

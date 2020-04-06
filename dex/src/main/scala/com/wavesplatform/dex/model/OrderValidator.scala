@@ -11,7 +11,6 @@ import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
-import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto.Verifier
 import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.dex.domain.model.Normalization
@@ -45,7 +44,7 @@ object OrderValidator extends ScorexLogging {
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
-  val MinExpiration: Long  = 60 * 1000L
+  val MinExpiration: Long = 60 * 1000L
 
   val exchangeTransactionCreationFee: Long = 30000L
   val ScriptExtraFee                       = 400000L
@@ -398,7 +397,7 @@ object OrderValidator extends ScorexLogging {
     } yield order
   }
 
-  private def validateBalance(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long, orderBookCache: AssetPair => OrderBookAggregatedSnapshot)(
+  private def validateBalance(acceptedOrder: AcceptedOrder, tradableBalance: Asset => Long, orderBookCache: OrderBookAggregatedSnapshot)(
       implicit efc: ErrorFormatterContext): Result[AcceptedOrder] = {
 
     /**
@@ -430,7 +429,7 @@ object OrderValidator extends ScorexLogging {
         }
       }
 
-      go(orderBookCache(acceptedOrder.order.assetPair).getCounterSideFor(acceptedOrder), 0L.asRight[MatcherError], acceptedOrder.amount)._1
+      go(orderBookCache.getCounterSideFor(acceptedOrder), 0L.asRight[MatcherError], acceptedOrder.amount)._1
     }
 
     def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder, marketOrderValue: Long): Map[Asset, Long] = {
@@ -449,15 +448,12 @@ object OrderValidator extends ScorexLogging {
     }
   }
 
-  def accountStateAware(sender: Address,
-                        tradableBalance: Asset => Long,
-                        orderExists: ByteStr => Boolean,
-                        orderBookCache: AssetPair => OrderBookAggregatedSnapshot)(acceptedOrder: AcceptedOrder)(
-      implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =
+  def accountStateAware(sender: Address, tradableBalance: Asset => Long, orderExists: Boolean, orderBookCache: OrderBookAggregatedSnapshot)(
+      acceptedOrder: AcceptedOrder)(implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =
     for {
       _ <- lift(acceptedOrder)
         .ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)
-        .ensure(error.OrderDuplicate(acceptedOrder.order.id()))(ao => !orderExists(ao.order.id()))
+        .ensure(error.OrderDuplicate(acceptedOrder.order.id()))(_ => !orderExists)
       _ <- validateBalance(acceptedOrder, tradableBalance, orderBookCache)
     } yield acceptedOrder
 

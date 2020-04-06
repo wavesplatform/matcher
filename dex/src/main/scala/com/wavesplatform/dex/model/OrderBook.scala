@@ -24,10 +24,10 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedAsks))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts(orderType, price, updatedAsks))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedBids))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts(orderType, price, updatedBids))
         }
     }
   }

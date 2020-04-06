@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookResult, Side}
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
 
 import scala.collection.immutable.TreeMap
 
@@ -20,6 +20,7 @@ object AggregatedOrderBookActor {
   object Query {
     case class GetHttpView(format: DecimalsFormat, depth: Depth, client: ActorRef[HttpResponse]) extends Query
     case class GetMarketStatus(client: ActorRef[MarketStatus])                                   extends Query
+    case class GetAggregatedSnapshot(client: ActorRef[OrderBookAggregatedSnapshot])              extends Query
   }
 
   sealed trait Command extends Message
@@ -55,6 +56,14 @@ object AggregatedOrderBookActor {
 
         case Query.GetMarketStatus(client) =>
           client ! state.marketStatus
+          Behaviors.same
+
+        case Query.GetAggregatedSnapshot(client) =>
+          // TODO check order
+          client ! OrderBookAggregatedSnapshot(
+            asks = state.asks.map(State.toLevelAgg).toSeq,
+            bids = state.bids.map(State.toLevelAgg).toSeq
+          )
           Behaviors.same
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>

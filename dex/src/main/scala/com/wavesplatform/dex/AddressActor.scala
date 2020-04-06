@@ -11,7 +11,7 @@ import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -207,7 +207,7 @@ class AddressActor(owner: Address,
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
-        log.trace(s"Confirming cancelation for $id")
+        log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
       }
 
@@ -235,13 +235,11 @@ class AddressActor(owner: Address,
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
-      val snapshot =
-        WsAddressState(
-          balances = mkWsBalances(allAssetsSpendableBalance),
-          orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).toSeq
-        )
+      addressWsMutableState.sendSnapshot(
+        balances = mkWsBalances(allAssetsSpendableBalance),
+        orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao)))(collection.breakOut),
+      )
 
-      addressWsMutableState.pendingWsConnections.keys.foreach(_ ! snapshot)
       if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
       addressWsMutableState = addressWsMutableState.flushPendingConnections()
 
@@ -254,21 +252,17 @@ class AddressActor(owner: Address,
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
       if (addressWsMutableState.hasActiveConnections) {
-
-        val diff =
-          WsAddressState(
-            balances = mkWsBalances(spendableBalances),
-            orders = addressWsMutableState.getAllOrderChanges
-          )
-
-        addressWsMutableState.activeWsConnections.keys.foreach(_ ! diff)
+        addressWsMutableState = addressWsMutableState.sendDiffs(
+          balances = mkWsBalances(spendableBalances),
+          orders = addressWsMutableState.getAllOrderChanges
+        )
         scheduleNextDiffSending
       }
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)}] WebSocket terminated")
+      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)._1}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 

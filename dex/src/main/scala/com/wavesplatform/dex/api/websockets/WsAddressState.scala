@@ -7,17 +7,18 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], timestamp: Long = System.currentTimeMillis) extends WsMessage {
+case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], updateId: Long, timestamp: Long = System.currentTimeMillis)
+    extends WsMessage {
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsAddressState.format.writes(this).toString)
   override val tpe: String                             = "au"
 }
 
 object WsAddressState {
 
-  def unapply(arg: WsAddressState): Option[(Long, String, Map[Asset, WsBalances], Seq[WsOrder])] =
-    (arg.timestamp, arg.tpe, arg.balances, arg.orders).some
+  def unapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
+    (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some
 
-  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty)
+  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty, 0)
 
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
     { // TODO use reads for Map[Asset, T]!
@@ -33,14 +34,15 @@ object WsAddressState {
   )
 
   implicit val format: Format[WsAddressState] = (
-    (__ \ "_").format[Long] and
-      (__ \ "@").format[String] and
+    (__ \ "T").format[String] and
+      (__ \ "_").format[Long] and
+      (__ \ "U").format[Long] and
       (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
       (__ \ "o").formatNullable[Seq[WsOrder]]
   )(
-    (timestamp, _, maybeBalances, maybeOrders) => WsAddressState(maybeBalances getOrElse Map.empty, maybeOrders getOrElse Seq.empty, timestamp),
+    (_, ts, uid, maybeBalances, maybeOrders) => WsAddressState(maybeBalances getOrElse Map.empty, maybeOrders getOrElse Seq.empty, uid, ts),
     unlift(WsAddressState.unapply) andThen {
-      case (timestamp, tpe, balances, orders) => (timestamp, tpe, Option(balances).filter(_.nonEmpty), Option(orders).filter(_.nonEmpty))
+      case (tpe, ts, uid, bs, os) => (tpe, ts, uid, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty))
     }
   )
 }

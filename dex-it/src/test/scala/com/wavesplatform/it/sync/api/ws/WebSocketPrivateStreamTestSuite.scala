@@ -257,7 +257,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     val wsc = mkWsAuthenticatedConnection(acc, dex1)
 
     val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
-    val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
+    val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.1)
 
     placeAndWaitInStream(wsc, bo1)
     placeAndWaitInStream(wsc, bo2)

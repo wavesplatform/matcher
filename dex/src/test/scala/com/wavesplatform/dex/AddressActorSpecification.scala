@@ -209,12 +209,11 @@ class AddressActorSpecification
           address,
           time,
           EmptyOrderDB,
-          _ => Future.successful(false),
+          (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          _ => OrderBookAggregatedSnapshot.empty,
           false,
           spendableBalancesActor
         )

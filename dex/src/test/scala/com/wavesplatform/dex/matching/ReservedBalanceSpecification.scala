@@ -103,9 +103,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         address,
         time,
         new TestOrderDB(100),
-        _ => Future.successful(false),
+        (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-        orderBookCache = _ => OrderBookAggregatedSnapshot.empty,
         enableSchedules,
         spendableBalancesActor
       )
@@ -493,12 +492,11 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           owner = address,
           time = time,
           orderDB = new TestOrderDB(100),
-          hasOrderInBlockchain = _ => Future.successful(false),
+          (_, _) => Future.successful(Right(())),
           store = event => {
             testProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
           },
-          orderBookCache = orderBookCache,
           enableSchedules,
           spendableBalancesActor
         )

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.api
 
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -8,6 +10,7 @@ import akka.testkit.{TestActor, TestProbe}
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
@@ -393,6 +396,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val odb = OrderDB(settings.orderDb, db)
     odb.saveOrder(orderToCancel)
 
+    val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map.empty))
+
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(
         settings,
@@ -408,15 +413,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       addressActor = addressActor.ref,
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
       orderBook = _ => None,
-      getMarketStatus = _ => None,
+      orderBookAskAdapter = orderBookAskAdapter,
       getActualTickSize = _ => 0.1,
       orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
-      orderBookSnapshot = new OrderBookSnapshotHttpCache(
-        settings.orderBookSnapshotHttpCache,
-        time,
-        x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x"),
-        _ => None
-      ),
       matcherSettings = settings,
       matcherStatus = () => Matcher.Status.Working,
       db = db,

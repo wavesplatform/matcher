@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot, _}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -72,12 +72,11 @@ class ActorsWebSocketInteractionsSpecification
           address,
           time,
           EmptyOrderDB,
-          _ => Future.successful(false),
+          (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          _ => OrderBookAggregatedSnapshot.empty,
           enableSchedules,
           spendableBalancesActor
         )

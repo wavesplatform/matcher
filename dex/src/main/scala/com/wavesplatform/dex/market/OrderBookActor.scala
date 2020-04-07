@@ -147,6 +147,8 @@ class OrderBookActor(settings: Settings,
       wsState = wsState.flushed()
       if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
 
+    case x: AggregatedOrderBookActor.Message => aggregated.tell(x)
+
     case classic.Terminated(ws) =>
       if (ws == aggregated) log.error("Terminated aggregated actor!")
       else {
@@ -166,6 +168,7 @@ class OrderBookActor(settings: Settings,
       case _                       => false
     }
     if (hasTrades) orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
+    log.info(s"Level changes: $levelChanges")
     aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO
     processEvents(events)
   }
@@ -187,6 +190,7 @@ class OrderBookActor(settings: Settings,
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         wsState = wsState.withLevelChanges(levelChanges)
+        log.info(s"Level changes: $levelChanges")
         aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>

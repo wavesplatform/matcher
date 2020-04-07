@@ -5,13 +5,14 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
 
 import scala.collection.immutable.TreeMap
 
-object AggregatedOrderBookActor {
+object AggregatedOrderBookActor extends ScorexLogging {
   type Depth = Int
 
   sealed trait Message extends Product with Serializable
@@ -59,20 +60,33 @@ object AggregatedOrderBookActor {
           Behaviors.same
 
         case Query.GetAggregatedSnapshot(client) =>
-          // TODO check order
-          client ! OrderBookAggregatedSnapshot(
-            asks = state.asks.map(State.toLevelAgg).toSeq,
-            bids = state.bids.map(State.toLevelAgg).toSeq
+          // if not changed
+          val updatedState = state.copy(
+            asks = state.asks ++ state.pendingChanges.asks, // Monoid.combine
+            bids = state.bids ++ state.pendingChanges.bids,
+            pendingChanges = LevelAmounts.empty
           )
-          Behaviors.same
+
+          // TODO check order of levels
+          val asks1 = updatedState.asks.map(State.toLevelAgg).toSeq
+          val bids1 = updatedState.bids.map(State.toLevelAgg).toSeq
+          log.info(s"asks=$asks1, bids=$bids1")
+          client ! OrderBookAggregatedSnapshot(
+            asks = asks1,
+            bids = bids1
+          )
+
+          default(updatedState)
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
+          val updatedLevelChanged = state.pendingChanges.put(levelChanges) // What if not changed
+          log.info(s"levelChanges: ${state.pendingChanges} +$levelChanges = $updatedLevelChanged")
           default(
             state.copy(
               lastTrade = lastTrade,
               lastUpdate = ts,
               compiledHttpView = Map.empty, // Could be optimized by depth
-              pendingChanges = state.pendingChanges.put(levelChanges)
+              pendingChanges = updatedLevelChanged
             ))
       }
 
@@ -128,8 +142,8 @@ object AggregatedOrderBookActor {
     )
 
     def fromOrderBook(ob: OrderBook): State = State(
-      asks = sum(ob.asks),
-      bids = sum(ob.bids),
+      asks = empty.asks ++ sum(ob.asks), // to preserve an order, TODO
+      bids = empty.bids ++ sum(ob.bids),
       lastTrade = ob.lastTrade,
       lastUpdate = System.currentTimeMillis(), // TODO
       compiledHttpView = Map.empty,

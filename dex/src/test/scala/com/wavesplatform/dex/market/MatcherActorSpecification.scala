@@ -424,8 +424,6 @@ class MatcherActorSpecification
             addressActor,
             snapshotStoreActor,
             assetPair,
-            _ => {},
-            _ => {},
             time,
             new WsOrderBook.Update(8, 8),
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),

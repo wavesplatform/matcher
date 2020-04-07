@@ -35,7 +35,10 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
       wsac.isClosed shouldBe false
 
       Thread.sleep(0.1.second)
-      eventually { wsac.isClosed shouldBe true }
+      eventually {
+        wsac.isClosed shouldBe true
+        wsac.getPingsBuffer.size shouldBe 5
+      }
     }
 
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
@@ -44,11 +47,15 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
         val wsac = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false)
         wsac.isClosed shouldBe false
 
-        Thread.sleep(pingInterval * 3) // in 4 ping-interval will be closed
+        Thread.sleep(pingInterval + pongTimeout - 0.1.second)
         wsac.isClosed shouldBe false
+        wsac.getPingsBuffer should have size 3
 
-        Thread.sleep(pingInterval)
-        eventually { wsac.isClosed shouldBe true }
+        Thread.sleep(0.1.second)
+        eventually {
+          wsac.isClosed shouldBe true
+          wsac.getPingsBuffer.size should (be >= 3 and be <= 4)
+        }
       }
 
       "with sending pong" in {
@@ -57,14 +64,53 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Thread.sleep(pingInterval + 0.1.second)
         wsac.isClosed shouldBe false
+        wsac.getPingsBuffer should have size 1
 
-        wsac.sendPong()
+        wsac.sendPong(wsac.getPingsBuffer.last) // sending pong to keep connection alive
 
-        Thread.sleep(pongTimeout - 0.2.second)
+        Thread.sleep(pingInterval - 0.1.second + pongTimeout - 0.1.second)
         wsac.isClosed shouldBe false
+        wsac.getPingsBuffer should have size 4
+
+        wsac.sendPong(wsac.getPingsBuffer.tail.head) // sending outdated pong will not prolong connection lifetime
 
         Thread.sleep(0.1.second)
-        eventually { wsac.isClosed shouldBe true }
+        eventually {
+          wsac.isClosed shouldBe true
+          wsac.getPingsBuffer.size should (be >= 4 and be <= 5)
+        }
+      }
+    }
+
+    "even if pong is sent from another connection" in {
+      val wsac1 = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false)
+      val wsac2 = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false)
+
+      wsac1.isClosed shouldBe false
+      wsac2.isClosed shouldBe false
+
+      Thread.sleep(pingInterval + 0.1.second)
+
+      wsac1.getPingsBuffer should have size 1
+      wsac2.getPingsBuffer should have size 1
+
+      wsac1.sendPong(wsac2.getPingsBuffer.head) // send correct pong but from another connection
+      wsac1.sendPong(wsac1.getPingsBuffer.head) // send correct pong but from another connection
+
+      Thread.sleep(pongTimeout - 0.2.second)
+
+      wsac1.isClosed shouldBe false
+      wsac2.isClosed shouldBe false
+
+      wsac1.getPingsBuffer should have size 3
+      wsac2.getPingsBuffer should have size 3
+
+      Thread.sleep(0.1.second)
+      eventually {
+        wsac1.isClosed shouldBe true
+        wsac2.isClosed shouldBe true
+        wsac1.getPingsBuffer.size should (be >= 3 and be <= 4)
+        wsac2.getPingsBuffer.size should (be >= 3 and be <= 4)
       }
     }
   }

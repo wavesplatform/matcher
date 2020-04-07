@@ -17,7 +17,7 @@ import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandler
+import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus.{MaxLifetimeExceeded, PongTimeout}
 import com.wavesplatform.dex.domain.account.PublicKey
@@ -32,7 +32,7 @@ import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, 
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Path("/ws")
@@ -48,9 +48,6 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     with ScorexLogging {
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
-  private implicit val executionContext: ExecutionContext         = mat.executionContext
-
-  private val pingPongHandler = mat.system.actorOf(PingPongHandler.props(webSocketSettings.pingPongSettings))
 
   private val completionMatcher: PartialFunction[Any, CompletionStrategy] = {
 
@@ -68,17 +65,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   private val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
 
-  private def startPingConnection(sourceActor: ActorRef, connectionId: UUID): Unit = {
-    pingPongHandler.tell(PingPongHandler.AddConnection(connectionId), sourceActor)
-    mat.system.scheduler
-      .scheduleOnce(
-        webSocketSettings.maxConnectionLifetime,
-        pingPongHandler,
-        PingPongHandler.CloseConnection(MaxLifetimeExceeded(connectionId))
-      )
-  }
-
-  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, Unit] = {
+  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, ConnectionSource] = {
     Source
       .actorRef[WsMessage](
         completionMatcher,
@@ -90,13 +77,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .mapMaterializedValue { sourceActor =>
         val connectionId = UUID.randomUUID()
         addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription(connectionId)), sourceActor)
-        startPingConnection(sourceActor, connectionId)
-        connectionId
+        ConnectionSource(connectionId, sourceActor)
       }
       .watchTermination()(handleTermination)
   }
 
-  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, Unit] =
+  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, ConnectionSource] =
     Source
       .actorRef[WsMessage](
         completionMatcher,
@@ -108,21 +94,29 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .mapMaterializedValue { sourceActor =>
         val connectionId = UUID.randomUUID()
         matcher.tell(MatcherActor.AddWsSubscription(pair, connectionId), sourceActor)
-        startPingConnection(sourceActor, connectionId)
-        connectionId
+        ConnectionSource(connectionId, sourceActor)
       }
       .watchTermination()(handleTermination)
 
-  private def createStreamFor(source: Source[TextMessage.Strict, Unit]): Route = handleWebSocketMessages(
-    Flow.fromSinkAndSourceCoupled(
-      sink = Sink.actorRef(
-        ref = pingPongHandler,
-        onCompleteMessage = (),
-        onFailureMessage = _ => Status.Failure(_)
-      ),
-      source = source
+  private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource]): Route = {
+    val (connectionSource, matSource) = source.preMaterialize()
+    handleWebSocketMessages(
+      Flow.fromSinkAndSourceCoupled(
+        sink = Sink.actorRef(
+          ref = mat.system.actorOf(
+            PingPongHandlerActor.props(
+              settings = webSocketSettings.pingPongSettings,
+              maxConnectionLifetime = webSocketSettings.maxConnectionLifetime, // here because of DEX-691 (additional lifetime restriction)
+              connectionSource = connectionSource
+            )
+          ),
+          onCompleteMessage = (),
+          onFailureMessage = _ => Status.Failure(_)
+        ),
+        source = matSource
+      )
     )
-  )
+  }
 
   private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {
     val invalidSignatureResponse = complete(RequestInvalidSignature toWsHttpResponse StatusCodes.BadRequest)
@@ -175,14 +169,18 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     case None    => complete(error.OrderBookStopped(p).toWsHttpResponse(StatusCodes.NotFound))
   }
 
-  private def handleTermination(id: UUID, r: Future[Done]): Unit = {
+  private def handleTermination(cs: ConnectionSource, r: Future[Done]): ConnectionSource = {
     r.onComplete {
-      case Success(_) => log.trace(s"[$id] WebSocket connection successfully closed")
-      case Failure(e) => log.trace(s"[$id] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
+      case Success(_) => log.trace(s"[${cs.id}] WebSocket connection successfully closed")
+      case Failure(e) => log.trace(s"[${cs.id}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
+    cs
   }
 }
 
 object MatcherWebSocketRoute {
+
   val balanceStreamPrefix: String = "au"
+
+  final case class ConnectionSource(id: UUID, ref: ActorRef)
 }

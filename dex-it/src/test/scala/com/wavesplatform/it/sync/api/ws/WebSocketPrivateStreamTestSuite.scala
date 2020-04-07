@@ -32,9 +32,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   def placeAndWaitInStream(c: WsAuthenticatedConnection, o: Order): Unit = {
     val orders = c.getAllOrders
     placeAndAwaitAtDex(o)
-    eventually {
-      c.getAllOrders should have size orders.size + 1
-    }
+    eventually { c.getAllOrders should have size orders.size + 1 }
   }
 
   def waitForConnectionEstablished(c: WsAuthenticatedConnection): WsAuthenticatedConnection = {
@@ -273,11 +271,13 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   }
 
   "Second connection should get the actual data" in {
+
     val acc = mkAccountWithBalance(500.usd -> usd)
     val wsc = mkWsAuthenticatedConnection(acc, dex1)
+    val now = System.currentTimeMillis()
 
-    val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
-    val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
+    val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now)
+    val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now + 100)
 
     placeAndWaitInStream(wsc, bo1)
     placeAndWaitInStream(wsc, bo2)

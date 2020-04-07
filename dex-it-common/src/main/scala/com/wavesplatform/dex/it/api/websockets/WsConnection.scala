@@ -13,9 +13,9 @@ import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.http.`X-Api-Key`
 import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandler.PingOrPong
+import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor.PingOrPong
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.websockets.WsConnection.SourceProxyActor
+import com.wavesplatform.dex.it.api.websockets.WsConnection.PongHandler
 import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
@@ -35,9 +35,9 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
             |     API Key = $apiKey
             |  Keep alive = $keepAlive""".stripMargin)
 
-  private val sourceProxy = system.actorOf(SourceProxyActor.props(keepAlive))
+  private val pongHandler = system.actorOf(PongHandler props keepAlive)
 
-  private val pongHandler: Source[TextMessage.Strict, ActorRef] = {
+  private val source: Source[TextMessage.Strict, ActorRef] = {
 
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
     val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
@@ -46,25 +46,25 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
       .actorRef[PingOrPong](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { source =>
-        sourceProxy.tell(SourceProxyActor.ProxyRequest, source)
+        pongHandler.tell(PongHandler.AssignSourceRef, source)
         source
       }
   }
 
-  private val messagesBuffer: ConcurrentLinkedQueue[Output] = new ConcurrentLinkedQueue[Output]()
+  private val messagesBuffer: ConcurrentLinkedQueue[Output]  = new ConcurrentLinkedQueue[Output]()
+  private val pingsBuffer: ConcurrentLinkedQueue[PingOrPong] = new ConcurrentLinkedQueue[PingOrPong]()
 
   private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
     val rawMsg = x.asTextMessage.getStrictText
     Try { parseOutput(x) } orElse Try { Json.parse(rawMsg).as[PingOrPong] } match {
-      case Success(p: PingOrPong)  => log.debug(s"Got ping: $rawMsg${if (keepAlive) ", responding..." else ""}"); sourceProxy ! p
+      case Success(p: PingOrPong)  => log.debug(s"Got ping: $rawMsg${if (keepAlive) ", responding" else ""}"); pingsBuffer.add(p); pongHandler ! p
       case Success(output: Output) => if (trackOutput) messagesBuffer.add(output); log.info(s"Got message: $rawMsg")
-      case Success(output)         => log.debug(s"Unexpected WS message: $output")
-      case Failure(e)              => log.error(s"Can't parse message: $x", e)
+      case Failure(e)              => log.error(s"Can't parse message: ${x.asTextMessage.getStrictText}", e)
     }
   }
 
   // maybe this flow can be made in more natural for Akka Streams way, especially pong handling by source
-  private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, pongHandler).watchTermination() {
+  private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
     case (_, f) =>
       f.onComplete {
         case Success(_) => log.info(s"WebSocket connection to ws://$uri successfully closed")
@@ -84,9 +84,12 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
   def getMessagesBuffer: Seq[Output] = messagesBuffer.iterator().asScala.toSeq
   def clearMessagesBuffer(): Unit    = messagesBuffer.clear()
 
-  def sendPong(): Unit = sourceProxy ! SourceProxyActor.ManualPong
+  def getPingsBuffer: Seq[PingOrPong] = pingsBuffer.iterator().asScala.toSeq
+  def clearPingsBuffer(): Unit        = pingsBuffer.clear()
 
-  def close(): Unit     = if (!isClosed) sourceProxy ! SourceProxyActor.CloseConnection
+  def sendPong(pong: PingOrPong): Unit = pongHandler ! PongHandler.ManualPong(pong)
+
+  def close(): Unit     = if (!isClosed) pongHandler ! PongHandler.CloseConnection
   def isClosed: Boolean = closed.isCompleted
 }
 
@@ -96,43 +99,38 @@ object WsConnection {
     * Used as a proxy to the connection's source actor.
     * Main goal is to respond with pongs to matcher's pings to keep connection alive
     */
-  class SourceProxyActor(keepAlive: Boolean) extends Actor with ScorexLogging {
+  class PongHandler(keepAlive: Boolean) extends Actor with ScorexLogging {
 
-    import SourceProxyActor._
+    import PongHandler._
 
-    private def proxying(target: ActorRef, connectionId: Option[UUID]): Receive = {
+    private def awaitPings(sourceRef: ActorRef, connectionId: Option[UUID]): Receive = {
 
-      case PingOrPong(id) => if (connectionId.isEmpty) context.become { proxying(target, id.some) }; if (keepAlive) target ! PingOrPong(id)
+      case p @ PingOrPong(id, _) => if (connectionId.isEmpty) context.become { awaitPings(sourceRef, id.some) }; if (keepAlive) sourceRef ! p
 
       case CloseConnection =>
         connectionId
           .fold { log.debug(s"Closing connection (id wasn't assigned by matcher yet)") } { id =>
             log.debug(s"Closing connection $id")
           }
-        target ! akka.actor.Status.Success(None)
-        context.become(awaitingProxyRequests)
+        sourceRef ! akka.actor.Status.Success(None)
+        context.become(awaitSourceRef)
 
-      case ManualPong =>
-        connectionId
-          .fold { log.debug(s"Can't send pong since ping wasn't received!") } { id =>
-            log.debug(s"Sending pong manually")
-            target ! PingOrPong(id)
-          }
+      case ManualPong(pong) => log.debug(s"Manually sending pong: ${pong.toStrictTextMessage.getStrictText}"); sourceRef ! pong
     }
 
-    private def awaitingProxyRequests: Receive = {
-      case ProxyRequest => context.become { proxying(target = sender, connectionId = None) }
+    private def awaitSourceRef: Receive = {
+      case AssignSourceRef => context.become { awaitPings(sourceRef = sender, connectionId = None) }
     }
 
-    override def receive: Receive = awaitingProxyRequests
+    override def receive: Receive = awaitSourceRef
   }
 
-  object SourceProxyActor {
+  object PongHandler {
 
-    def props(keepAlive: Boolean): Props = Props(new SourceProxyActor(keepAlive))
+    def props(keepAlive: Boolean): Props = Props(new PongHandler(keepAlive))
 
-    final case object ProxyRequest
+    final case object AssignSourceRef
     final case object CloseConnection
-    final case object ManualPong
+    final case class ManualPong(pong: PingOrPong)
   }
 }

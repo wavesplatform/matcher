@@ -108,7 +108,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     import webSocketSettings._
 
     val (connectionSource, matSource) = source.preMaterialize()
-    val sinkSettings                  = SystemMessagesHandlerActor.Settings(pingPongSettings.pingInterval, pingPongSettings.pongTimeout)
+    val sinkSettings                  = SystemMessagesHandlerActor.Settings(systemMessagesSettings.pingInterval, systemMessagesSettings.pongTimeout)
     val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(sinkSettings, maxConnectionLifetime, connectionSource))
     val sinkActor                     = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
 
@@ -121,7 +121,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         .mapAsync[PingOrPong](1) {
           case tm: TextMessage =>
             for {
-              strictMsg <- tm.toStrict(pingPongSettings.pingInterval / 5)
+              strictMsg <- tm.toStrict(systemMessagesSettings.pingInterval / 5)
               pong      <- Json.parse(strictMsg.getStrictText).asOpt[PingOrPong].fold(unexpectedMessage(strictMsg.getStrictText))(Future.successful)
             } yield pong
           case _: BinaryMessage => binaryMessageUnsupported

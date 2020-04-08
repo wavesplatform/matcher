@@ -7,7 +7,7 @@ import scala.concurrent.duration.FiniteDuration
 
 final case class WebSocketSettings(messagesInterval: FiniteDuration,
                                    maxConnectionLifetime: FiniteDuration,
-                                   pingPongSettings: SystemMessagesHandlerActor.Settings)
+                                   systemMessagesSettings: SystemMessagesHandlerActor.Settings)
 
 object WebSocketSettings {
 

@@ -3,6 +3,7 @@ package com.wavesplatform.dex.market
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import cats.kernel.Monoid
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -41,15 +42,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
               Behaviors.same
 
             case _ =>
-              val withChanges =
-                if (state.pendingChanges.isEmpty) state
-                else
-                  state.copy(
-                    asks = state.asks ++ state.pendingChanges.asks,
-                    bids = state.bids ++ state.pendingChanges.bids,
-                    pendingChanges = LevelAmounts.empty
-                  )
-
+              val withChanges      = state.flushed
               val compiledHttpView = compile(withChanges, format, depth)
               client ! compiledHttpView
               default(withChanges.copy(compiledHttpView = state.compiledHttpView.updated(key, compiledHttpView)))
@@ -60,12 +53,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
           Behaviors.same
 
         case Query.GetAggregatedSnapshot(client) =>
-          // if not changed
-          val updatedState = state.copy(
-            asks = state.asks ++ state.pendingChanges.asks, // Monoid.combine
-            bids = state.bids ++ state.pendingChanges.bids,
-            pendingChanges = LevelAmounts.empty
-          )
+          val updatedState = state.flushed
 
           // TODO check order of levels
           val asks1 = updatedState.asks.map(State.toLevelAgg).toSeq
@@ -79,7 +67,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
           default(updatedState)
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
-          val updatedLevelChanged = state.pendingChanges.put(levelChanges) // What if not changed
+          val updatedLevelChanged = Monoid.combine(state.pendingChanges, levelChanges)
           log.info(s"levelChanges: ${state.pendingChanges} +$levelChanges = $updatedLevelChanged")
           default(
             state.copy(
@@ -129,6 +117,24 @@ object AggregatedOrderBookActor extends ScorexLogging {
       bestBid = bids.headOption.map(State.toLevelAgg),
       bestAsk = asks.headOption.map(State.toLevelAgg)
     )
+
+    def flushed: State =
+      if (this.pendingChanges.isEmpty) this
+      else
+        copy(
+          // TODO optimize
+          asks = pendingChanges.asks.foldLeft(asks) {
+            case (r, (price, amount)) =>
+              val updatedAmount = r.getOrElse(price, 0L) + amount
+              if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
+          },
+          bids = pendingChanges.bids.foldLeft(bids) {
+            case (r, (price, amount)) =>
+              val updatedAmount = r.getOrElse(price, 0L) + amount
+              if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
+          },
+          pendingChanges = LevelAmounts.empty
+        )
   }
 
   object State {

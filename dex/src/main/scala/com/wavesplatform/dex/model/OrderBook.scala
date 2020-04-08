@@ -1,5 +1,8 @@
 package com.wavesplatform.dex.model
 
+import cats.instances.list.catsStdInstancesForList
+import cats.kernel.Group
+import cats.syntax.foldable._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -24,17 +27,22 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts(orderType, price, updatedAsks))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts(orderType, price, updatedBids))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
         }
     }
   }
 
   def cancelAll(ts: Long): (OrderBook, List[OrderCanceled], LevelAmounts) = {
-    val canceledOrders = allOrders.map { OrderCanceled(_, isSystemCancel = false, ts) }.toList
-    (OrderBook.empty, canceledOrders, LevelAmounts.empty)
+    val orders         = allOrders.toList
+    val canceledOrders = orders.map { OrderCanceled(_, isSystemCancel = false, ts) }
+    val levelAmounts = orders.foldMap { o =>
+      LevelAmounts.mkDiff(orderIds(o.id)._2, o)
+    }
+
+    (OrderBook.empty, canceledOrders, Group.inverse(levelAmounts))
   }
 
   def add(submitted: AcceptedOrder,

@@ -11,7 +11,6 @@ import com.wavesplatform.dex.model.LevelAmounts.mkDiff
 
 case class LevelAmounts(asks: Map[Price, Amount] = Map.empty, bids: Map[Price, Amount] = Map.empty) {
   def isEmpty: Boolean                                                = asks.isEmpty && bids.isEmpty
-  def put(other: LevelAmounts): LevelAmounts                          = LevelAmounts(asks ++ other.asks, bids ++ other.bids)
   def add(levelPrice: Price, lo: LimitOrder): LevelAmounts            = this |+| mkDiff(levelPrice, lo)
   def subtract(levelPrice: Price, event: OrderExecuted): LevelAmounts = this |-| mkDiff(levelPrice, event)
 }
@@ -29,7 +28,7 @@ object LevelAmounts {
     tpe.askBid(asks(xs), bids(xs))
   }
 
-  private implicit val levelAmountsGroup: Group[LevelAmounts] = new Group[LevelAmounts] {
+  implicit val levelAmountsGroup: Group[LevelAmounts] = new Group[LevelAmounts] {
     override val empty: LevelAmounts = LevelAmounts.empty
     override def combine(x: LevelAmounts, y: LevelAmounts): LevelAmounts = LevelAmounts(
       asks = x.asks |+| y.asks,
@@ -38,7 +37,7 @@ object LevelAmounts {
     override def inverse(x: LevelAmounts): LevelAmounts = LevelAmounts(asks = Group.inverse(x.asks), bids = Group.inverse(x.bids))
   }
 
-  private def mkDiff(levelPrice: Price, lo: LimitOrder): LevelAmounts = LevelAmounts(lo.order.orderType, levelPrice, lo.amount)
-  private def mkDiff(levelPrice: Price, event: OrderExecuted): LevelAmounts =
+  def mkDiff(levelPrice: Price, lo: LimitOrder): LevelAmounts = LevelAmounts(lo.order.orderType, levelPrice, lo.amount)
+  def mkDiff(levelPrice: Price, event: OrderExecuted): LevelAmounts =
     LevelAmounts(event.counter.order.orderType, levelPrice, event.executedAmount)
 }

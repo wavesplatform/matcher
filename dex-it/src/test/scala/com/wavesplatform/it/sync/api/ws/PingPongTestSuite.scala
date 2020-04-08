@@ -91,26 +91,24 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
 
       Thread.sleep(pingInterval + 0.1.second)
 
-      wsac1.getPingsBuffer should have size 1
-      wsac2.getPingsBuffer should have size 1
+      Seq(wsac1, wsac2).foreach { _.getPingsBuffer should have size 1 }
 
       wsac1.sendPong(wsac2.getPingsBuffer.head) // send correct pong but from another connection
-      wsac1.sendPong(wsac1.getPingsBuffer.head) // send correct pong but from another connection
+      wsac2.sendPong(wsac1.getPingsBuffer.head) // send correct pong but from another connection
 
       Thread.sleep(pongTimeout - 0.2.second)
 
-      wsac1.isClosed shouldBe false
-      wsac2.isClosed shouldBe false
-
-      wsac1.getPingsBuffer should have size 3
-      wsac2.getPingsBuffer should have size 3
+      Seq(wsac1, wsac2).foreach { conn =>
+        conn.isClosed shouldBe false
+        conn.getPingsBuffer should have size 3
+      }
 
       Thread.sleep(0.1.second)
       eventually {
-        wsac1.isClosed shouldBe true
-        wsac2.isClosed shouldBe true
-        wsac1.getPingsBuffer.size should (be >= 3 and be <= 4)
-        wsac2.getPingsBuffer.size should (be >= 3 and be <= 4)
+        Seq(wsac1, wsac2).foreach { conn =>
+          conn.isClosed shouldBe true
+          conn.getPingsBuffer.size should (be >= 3 and be <= 4)
+        }
       }
     }
   }

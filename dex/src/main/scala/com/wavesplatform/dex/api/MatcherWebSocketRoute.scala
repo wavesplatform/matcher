@@ -5,9 +5,10 @@ import java.util.UUID
 
 import akka.Done
 import akka.actor.{ActorRef, Status}
+import akka.http.javadsl.model.ws.BinaryMessage
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.TextMessage
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -17,7 +18,8 @@ import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus.{MaxLifetimeExceeded, PongTimeout}
 import com.wavesplatform.dex.domain.account.PublicKey
@@ -31,6 +33,7 @@ import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
+import play.api.libs.json.Json
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -46,6 +49,8 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
+
+  import mat.executionContext
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
@@ -99,23 +104,31 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .watchTermination()(handleTermination)
 
   private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource]): Route = {
+
+    import webSocketSettings._
+
     val (connectionSource, matSource) = source.preMaterialize()
-    handleWebSocketMessages(
-      Flow.fromSinkAndSourceCoupled(
-        sink = Sink.actorRef(
-          ref = mat.system.actorOf(
-            PingPongHandlerActor.props(
-              settings = webSocketSettings.pingPongSettings,
-              maxConnectionLifetime = webSocketSettings.maxConnectionLifetime, // here because of DEX-691 (additional lifetime restriction)
-              connectionSource = connectionSource
-            )
-          ),
-          onCompleteMessage = (),
-          onFailureMessage = _ => Status.Failure(_)
-        ),
-        source = matSource
-      )
-    )
+    val sinkSettings                  = SystemMessagesHandlerActor.Settings(pingPongSettings.pingInterval, pingPongSettings.pongTimeout)
+    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(sinkSettings, maxConnectionLifetime, connectionSource))
+    val sinkActor                     = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
+
+    def failed(msg: String): Future[PingOrPong]            = Future.failed[PingOrPong] { new IllegalArgumentException(msg) }
+    def binaryMessageUnsupported: Future[PingOrPong]       = failed("Binary messages are not supported")
+    def unexpectedMessage(msg: String): Future[PingOrPong] = failed(s"Got unexpected message instead of pong: $msg")
+
+    val sink =
+      Flow[Message]
+        .mapAsync[PingOrPong](1) {
+          case tm: TextMessage =>
+            for {
+              strictMsg <- tm.toStrict(pingPongSettings.pingInterval / 5)
+              pong      <- Json.parse(strictMsg.getStrictText).asOpt[PingOrPong].fold(unexpectedMessage(strictMsg.getStrictText))(Future.successful)
+            } yield pong
+          case _: BinaryMessage => binaryMessageUnsupported
+        }
+        .to(sinkActor)
+
+    handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(sink, matSource) }
   }
 
   private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {

@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -95,7 +95,9 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       interval = 1.day,
       maxPendingTime = 30.days
     )
-    settings.webSocketSettings should matchTo(WebSocketSettings(100.milliseconds, 24.hours, PingPongHandlerActor.Settings(10.seconds, 30.seconds)))
+    settings.webSocketSettings should matchTo(
+      WebSocketSettings(100.milliseconds, 24.hours, SystemMessagesHandlerActor.Settings(10.seconds, 30.seconds))
+    )
     settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
 

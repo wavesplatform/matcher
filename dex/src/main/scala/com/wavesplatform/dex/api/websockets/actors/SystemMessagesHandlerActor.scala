@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.MatcherWebSocketRoute.ConnectionSource
 import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor._
+import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor._
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -16,7 +16,7 @@ import play.api.libs.json._
 
 import scala.concurrent.duration._
 
-class PingPongHandlerActor(settings: Settings, maxConnectionLifetime: FiniteDuration, connectionSource: ConnectionSource)
+class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: FiniteDuration, connectionSource: ConnectionSource)
     extends Actor
     with ScorexLogging {
 
@@ -27,23 +27,22 @@ class PingPongHandlerActor(settings: Settings, maxConnectionLifetime: FiniteDura
 
   private def scheduleOnce(delay: FiniteDuration, message: Any): Cancellable = context.system.scheduler.scheduleOnce(delay, self, message)
 
-  private def awaitPong(expectedPong: PingOrPong, scheduledTimeouts: List[Cancellable], nextPing: Cancellable): Receive = {
+  private def awaitPong(maybeExpectedPong: Option[PingOrPong], pongTimeout: Cancellable, nextPing: Cancellable): Receive = {
 
-    case SendPing => context.become { sendPingAndScheduleNextOne(scheduledTimeouts) }
+    case SendPing =>
+      val (expectedPong, newNextPing) = sendPingAndScheduleNextOne()
+      context.become { awaitPong(expectedPong.some, pongTimeout, newNextPing) }
 
-    case TextMessage.Strict(maybePong) =>
-      Json
-        .parse(maybePong)
-        .asOpt[PingOrPong]
-        .fold { log.trace(s"Got unexpected message instead of pong: $maybePong") } { pong =>
-          if (pong == expectedPong) {
-            scheduledTimeouts.foreach { _.cancel() }
-            context.become { awaitPong(expectedPong, List.empty, nextPing) }
-          } else log.trace(s"Got outdated pong: $maybePong")
-        }
+    case pong: PingOrPong =>
+      maybeExpectedPong.fold { log.trace(s"Got unexpected pong: $pong") } { expectedPong =>
+        if (pong == expectedPong) {
+          pongTimeout.cancel()
+          context.become { awaitPong(none, Cancellable.alreadyCancelled, nextPing) }
+        } else log.trace(s"Got outdated pong: $pong")
+      }
 
     case CloseConnection(terminationStatus) =>
-      closeSourceAndCancelAllTasks(terminationStatus, nextPing :: maxLifetimeExceeded :: firstPing :: scheduledTimeouts)
+      closeSourceAndCancelAllTasks(terminationStatus, List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing))
   }
 
   private def closeSourceAndCancelAllTasks(terminationStatus: TerminationStatus, tasks: List[Cancellable]): Unit = {
@@ -51,29 +50,29 @@ class PingPongHandlerActor(settings: Settings, maxConnectionLifetime: FiniteDura
     connectionSource.ref ! akka.actor.Status.Success(terminationStatus)
   }
 
-  private def sendPingAndScheduleNextOne(scheduledTimeouts: List[Cancellable]): Receive = {
-
+  private def sendPingAndScheduleNextOne(): (PingOrPong, Cancellable) = {
     val ping     = PingOrPong(connectionSource.id)
-    val timeout  = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout(connectionSource.id)))
     val nextPing = scheduleOnce(settings.pingInterval, SendPing)
-
     connectionSource.ref ! ping
-
-    awaitPong(ping, timeout :: scheduledTimeouts, nextPing)
+    ping -> nextPing
   }
 
   override def receive: Receive = {
-    case SendPing                           => context.become { sendPingAndScheduleNextOne(List.empty) }
-    case CloseConnection(terminationStatus) => closeSourceAndCancelAllTasks(terminationStatus, List(firstPing, maxLifetimeExceeded))
+    case SendPing =>
+      val (expectedPong, nextPing) = sendPingAndScheduleNextOne()
+      val pongTimeout: Cancellable = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout(connectionSource.id)))
+      context.become { awaitPong(expectedPong.some, pongTimeout, nextPing) }
+
+    case CloseConnection(terminationStatus) => closeSourceAndCancelAllTasks(terminationStatus, List(maxLifetimeExceeded, firstPing))
   }
 }
 
-object PingPongHandlerActor {
+object SystemMessagesHandlerActor {
 
   final case class Settings(pingInterval: FiniteDuration, pongTimeout: FiniteDuration)
 
   def props(settings: Settings, maxConnectionLifetime: FiniteDuration, connectionSource: ConnectionSource): Props =
-    Props(new PingPongHandlerActor(settings, maxConnectionLifetime, connectionSource))
+    Props(new SystemMessagesHandlerActor(settings, maxConnectionLifetime: FiniteDuration, connectionSource))
 
   final case object SendPing
 

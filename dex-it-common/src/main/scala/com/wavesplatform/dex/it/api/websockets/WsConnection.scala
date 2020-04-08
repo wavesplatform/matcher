@@ -13,7 +13,7 @@ import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.http.`X-Api-Key`
 import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.PingPongHandlerActor.PingOrPong
+import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.websockets.WsConnection.PongHandler
 import play.api.libs.json.Json
@@ -113,7 +113,7 @@ object WsConnection {
             log.debug(s"Closing connection $id")
           }
         sourceRef ! akka.actor.Status.Success(None)
-        context.become(awaitSourceRef)
+        context.stop(self)
 
       case ManualPong(pong) => log.debug(s"Manually sending pong: ${pong.toStrictTextMessage.getStrictText}"); sourceRef ! pong
     }

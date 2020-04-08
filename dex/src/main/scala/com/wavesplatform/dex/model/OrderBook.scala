@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.model
 
 import cats.instances.list.catsStdInstancesForList
-import cats.kernel.Group
+import cats.kernel.{Group, Monoid}
 import cats.syntax.foldable._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
@@ -128,14 +128,18 @@ object OrderBook {
             val submittedRemaining = orderExecutedEvent.submittedRemaining
             val counterRemaining   = orderExecutedEvent.counterRemaining
 
-            val updatedOrderBook = {
+            val (updatedOrderBook, updatedLevelChanges) = {
+              val updatedLevelChanges = levelChanges.subtract(levelPrice, orderExecutedEvent)
+
               val lt = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
               val ob = orderBook.copy(lastTrade = lt)
-              if (counterRemaining.isValid) ob.unsafeUpdateBest(counterRemaining)
-              else ob.unsafeWithoutBest(counter.order.orderType)
+              if (counterRemaining.isValid) (ob.unsafeUpdateBest(counterRemaining), updatedLevelChanges)
+              else
+                (
+                  ob.unsafeWithoutBest(counter.order.orderType),
+                  Monoid.combine(updatedLevelChanges, Group.inverse(LevelAmounts.mkDiff(levelPrice, counterRemaining)))
+                )
             }
-
-            val updatedLevelChanges = levelChanges.subtract(levelPrice, orderExecutedEvent)
 
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
@@ -158,7 +162,7 @@ object OrderBook {
               orderBook = orderBook.unsafeWithoutBest(counter.order.orderType),
               submitted = submitted,
               events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs)),
-              levelChanges = levelChanges
+              levelChanges = Monoid.combine(levelChanges, Group.inverse(LevelAmounts.mkDiff(levelPrice, counter)))
             )
 
         case _ =>

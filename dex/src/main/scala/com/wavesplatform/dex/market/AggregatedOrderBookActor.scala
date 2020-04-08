@@ -42,7 +42,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
               Behaviors.same
 
             case _ =>
-              val withChanges      = state.flushed
+              val withChanges = state.flushed
+              log.info(s"[$assetPair] updatedState.asks:${withChanges.asks}, updatedState.bids:${withChanges.bids}")
               val compiledHttpView = compile(withChanges, format, depth)
               client ! compiledHttpView
               default(withChanges.copy(compiledHttpView = state.compiledHttpView.updated(key, compiledHttpView)))
@@ -50,11 +51,13 @@ object AggregatedOrderBookActor extends ScorexLogging {
 
         case Query.GetMarketStatus(client) =>
           val updatedState = state.flushed
+          log.info(s"[$assetPair] updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
           client ! updatedState.marketStatus
           default(updatedState)
 
         case Query.GetAggregatedSnapshot(client) =>
           val updatedState = state.flushed
+          log.info(s"[$assetPair] updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
           client ! OrderBookAggregatedSnapshot(
             asks = updatedState.asks.map(State.toLevelAgg).toSeq,
             bids = updatedState.bids.map(State.toLevelAgg).toSeq
@@ -64,6 +67,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
           val updatedLevelChanged = Monoid.combine(state.pendingChanges, levelChanges)
+          log.info(s"[$assetPair] pendingChanges:${state.pendingChanges} + levelChanges:$levelChanges = $updatedLevelChanged")
           default(
             state.copy(
               lastTrade = lastTrade,

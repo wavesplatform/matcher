@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.api.websockets
 
+import akka.http.scaladsl.model.ws.TextMessage
+import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.model.{Amount, Price}
@@ -11,11 +13,17 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], timestamp: Long = System.currentTimeMillis) {
-  def nonEmpty: Boolean = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
+case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], timestamp: Long = System.currentTimeMillis) extends WsMessage {
+  def nonEmpty: Boolean                                = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
+  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
+  override val tpe: String                             = "ob"
 }
 
 object WsOrderBook {
+
+  def unapply(arg: WsOrderBook): Option[(Long, String, WsSide, WsSide, Option[WsLastTrade])] =
+    (arg.timestamp, arg.tpe, arg.asks, arg.bids, arg.lastTrade).some
+
   type WsSide = TreeMap[Double, Double]
 
   private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
@@ -28,11 +36,16 @@ object WsOrderBook {
       lastTrade = None
     )
 
-  implicit val wsOrderBookStateFormat: Format[WsOrderBook] =
-    ((__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+  implicit val wsOrderBookStateFormat: Format[WsOrderBook] = (
+    (__ \ "_").format[Long] and
+      (__ \ "@").format[String] and
+      (__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
       (__ \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
-      (__ \ "t").formatNullable[WsLastTrade] and
-      (__ \ "_").format[Long])(WsOrderBook.apply, unlift(WsOrderBook.unapply))
+      (__ \ "t").formatNullable[WsLastTrade]
+  )(
+    (timestamp, _, asks, bids, lastTrade) => WsOrderBook(asks, bids, lastTrade, timestamp),
+    unlift(WsOrderBook.unapply)
+  )
 
   private val priceAmountFormat = Format(
     fjs = Reads.Tuple2R(doubleAsStringFormat, doubleAsStringFormat),

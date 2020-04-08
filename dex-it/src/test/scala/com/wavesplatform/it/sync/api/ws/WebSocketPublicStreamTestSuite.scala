@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -37,7 +36,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       )
   }
 
-  private def receiveAtLeastN[T](wsc: WsConnection[T], n: Int): Seq[T] = {
+  private def receiveAtLeastN[T <: WsMessage](wsc: WsConnection[T], n: Int): Seq[T] = {
     eventually { wsc.getMessagesBuffer.size should be >= n }
     Thread.sleep(200) // Waiting for additional messages
     wsc.getMessagesBuffer
@@ -158,6 +157,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         )
 
         dex1.api.cancelAll(carol)
+        Seq(wsc0, wsc1, wsc2, wsc3, wsc4).foreach { _.close() }
       }
 
       "should send updates" in {
@@ -213,7 +213,9 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             timestamp = buffer3.last.timestamp
           )
         )
+
         wsc.clearMessagesBuffer()
+        wsc.close()
       }
     }
   }

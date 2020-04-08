@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.market
 
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
@@ -180,7 +181,7 @@ class MatcherActor(settings: MatcherSettings,
       val s       = sender()
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
-    case request @ AddWsSubscription(pair) =>
+    case request @ AddWsSubscription(pair, _) =>
       runFor(pair, autoCreate = false) { (sender, ref) =>
         ref.tell(request, sender)
       }
@@ -298,7 +299,7 @@ object MatcherActor {
 
   case class ForceStartOrderBook(assetPair: AssetPair)
   case class OrderBookCreated(assetPair: AssetPair)
-  case class AddWsSubscription(assetPair: AssetPair)
+  case class AddWsSubscription(assetPair: AssetPair, id: UUID)
 
   case object GetMarkets
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
+import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
@@ -227,10 +228,10 @@ class AddressActor(owner: Address,
 
     case Status.Failure(e) => log.error(s"Got $e", e)
 
-    case AddWsSubscription =>
-      log.trace(s"[${sender.hashCode()}] Web socket subscription was requested")
+    case AddWsSubscription(id) =>
+      log.trace(s"[$id] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender, id)
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
@@ -240,7 +241,7 @@ class AddressActor(owner: Address,
           orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).toSeq
         )
 
-      addressWsMutableState.pendingWsConnections.foreach(_ ! snapshot)
+      addressWsMutableState.pendingWsConnections.keys.foreach(_ ! snapshot)
       if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
       addressWsMutableState = addressWsMutableState.flushPendingConnections()
 
@@ -260,14 +261,14 @@ class AddressActor(owner: Address,
             orders = addressWsMutableState.getAllOrderChanges
           )
 
-        addressWsMutableState.activeWsConnections.foreach(_ ! diff)
+        addressWsMutableState.activeWsConnections.keys.foreach(_ ! diff)
         scheduleNextDiffSending
       }
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${wsSource.hashCode()}] Web socket connection closed")
+      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
@@ -557,8 +558,8 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case object AddWsSubscription           extends Message
-  case object PrepareDiffForWsSubscribers extends Message
+  case class AddWsSubscription(connectionId: UUID) extends Message
+  case object PrepareDiffForWsSubscribers          extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)
@@ -570,5 +571,4 @@ object AddressActor {
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
-
 }

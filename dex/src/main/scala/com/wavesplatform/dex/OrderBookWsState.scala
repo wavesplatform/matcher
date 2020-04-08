@@ -1,19 +1,20 @@
 package com.wavesplatform.dex
 
+import java.util.UUID
+
 import akka.actor.ActorRef
 import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
 
-import scala.collection.immutable.Queue
+case class OrderBookWsState(update: WsOrderBook.Update, wsConnections: Map[ActorRef, UUID], changes: WsOrderBook) {
 
-case class OrderBookWsState(update: WsOrderBook.Update, wsConnections: Queue[ActorRef], changes: WsOrderBook) {
-  def addSubscription(x: ActorRef): OrderBookWsState = copy(wsConnections = wsConnections.enqueue(x))
+  def addSubscription(x: ActorRef, id: UUID): OrderBookWsState = copy(wsConnections = wsConnections + (x -> id))
 
   def withoutSubscription(x: ActorRef): OrderBookWsState =
-    if (wsConnections.lengthCompare(1) == 0) copy(wsConnections = Queue.empty, changes = WsOrderBook.empty)
-    else copy(wsConnections = wsConnections.filterNot(_ == x))
+    if (wsConnections.size == 1) copy(wsConnections = Map.empty, changes = WsOrderBook.empty)
+    else copy(wsConnections = wsConnections.filterKeys(_ != x))
 
-  def withoutSubscriptions: OrderBookWsState = copy(wsConnections = Queue.empty)
+  def withoutSubscriptions: OrderBookWsState = copy(wsConnections = Map.empty)
 
   def hasSubscriptions: Boolean = wsConnections.nonEmpty
 
@@ -22,7 +23,7 @@ case class OrderBookWsState(update: WsOrderBook.Update, wsConnections: Queue[Act
     if (hasSubscriptions) copy(changes = update.withLevelChanges(changes, xs)) else this
 
   def flushed(): OrderBookWsState = {
-    if (changes.nonEmpty) wsConnections.foreach(_ ! changes)
+    if (changes.nonEmpty) wsConnections.keys.foreach(_ ! changes)
     copy(changes = WsOrderBook.empty)
   }
 

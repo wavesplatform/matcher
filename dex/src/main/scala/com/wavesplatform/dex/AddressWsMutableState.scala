@@ -1,5 +1,7 @@
 package com.wavesplatform.dex
 
+import java.util.UUID
+
 import akka.actor.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrder
@@ -9,10 +11,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-import scala.collection.immutable.Queue
-
-case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
-                                 pendingWsConnections: Queue[ActorRef],
+case class AddressWsMutableState(activeWsConnections: Map[ActorRef, UUID],
+                                 pendingWsConnections: Map[ActorRef, UUID],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
                                  ordersChanges: Map[Order.Id, WsOrder]) {
@@ -23,14 +23,15 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
   def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
-  def addPendingSubscription(subscriber: ActorRef): AddressWsMutableState = copy(pendingWsConnections = pendingWsConnections enqueue subscriber)
+  def addPendingSubscription(subscriber: ActorRef, id: UUID): AddressWsMutableState =
+    copy(pendingWsConnections = pendingWsConnections + (subscriber -> id))
 
   def flushPendingConnections(): AddressWsMutableState =
-    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections, pendingWsConnections = Queue.empty)
+    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections, pendingWsConnections = Map.empty)
 
   def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
-    if (activeWsConnections.lengthCompare(1) == 0) copy(activeWsConnections = Queue.empty).cleanChanges()
-    else copy(activeWsConnections = activeWsConnections.filterNot(_ == subscriber))
+    if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()
+    else copy(activeWsConnections = activeWsConnections.filterKeys(_ != subscriber))
   }
 
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
@@ -66,5 +67,5 @@ case class AddressWsMutableState(activeWsConnections: Queue[ActorRef],
 }
 
 object AddressWsMutableState {
-  val empty: AddressWsMutableState = AddressWsMutableState(Queue.empty, Queue.empty, Set.empty, Set.empty, Map.empty)
+  val empty: AddressWsMutableState = AddressWsMutableState(Map.empty, Map.empty, Set.empty, Set.empty, Map.empty)
 }

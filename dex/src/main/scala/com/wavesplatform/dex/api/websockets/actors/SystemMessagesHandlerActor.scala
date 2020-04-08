@@ -26,12 +26,14 @@ class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: Fini
   private val firstPing           = scheduleOnce(settings.pingInterval, SendPing)
 
   private def scheduleOnce(delay: FiniteDuration, message: Any): Cancellable = context.system.scheduler.scheduleOnce(delay, self, message)
+  private def schedulePongTimeout(): Cancellable                             = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout(connectionSource.id)))
 
   private def awaitPong(maybeExpectedPong: Option[PingOrPong], pongTimeout: Cancellable, nextPing: Cancellable): Receive = {
 
     case SendPing =>
-      val (expectedPong, newNextPing) = sendPingAndScheduleNextOne()
-      context.become { awaitPong(expectedPong.some, pongTimeout, newNextPing) }
+      val (expectedPong, newNextPing)     = sendPingAndScheduleNextOne()
+      val updatedPongTimeout: Cancellable = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
+      context.become { awaitPong(expectedPong.some, updatedPongTimeout, newNextPing) }
 
     case pong: PingOrPong =>
       maybeExpectedPong.fold { log.trace(s"Got unexpected pong: $pong") } { expectedPong =>
@@ -60,7 +62,7 @@ class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: Fini
   override def receive: Receive = {
     case SendPing =>
       val (expectedPong, nextPing) = sendPingAndScheduleNextOne()
-      val pongTimeout: Cancellable = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout(connectionSource.id)))
+      val pongTimeout: Cancellable = schedulePongTimeout()
       context.become { awaitPong(expectedPong.some, pongTimeout, nextPing) }
 
     case CloseConnection(terminationStatus) => closeSourceAndCancelAllTasks(terminationStatus, List(maxLifetimeExceeded, firstPing))

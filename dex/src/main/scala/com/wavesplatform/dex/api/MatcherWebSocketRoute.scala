@@ -5,10 +5,9 @@ import java.util.UUID
 
 import akka.Done
 import akka.actor.{ActorRef, Status}
-import akka.http.javadsl.model.ws.BinaryMessage
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -61,7 +60,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         case PongTimeout(id)         => log.trace(s"[$id] WebSocket has reached pong timeout, closing...")
         case MaxLifetimeExceeded(id) => log.trace(s"[$id] WebSocket has reached max allowed lifetime, closing...")
       }
-      CompletionStrategy.draining
+      CompletionStrategy.immediately
 
     case Status.Success(s: CompletionStrategy) => s
     case Status.Success(_)                     => CompletionStrategy.draining
@@ -87,7 +86,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .watchTermination()(handleTermination)
   }
 
-  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, ConnectionSource] =
+  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, ConnectionSource] = {
     Source
       .actorRef[WsMessage](
         completionMatcher,
@@ -102,29 +101,29 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         ConnectionSource(connectionId, sourceActor)
       }
       .watchTermination()(handleTermination)
+  }
+
+  private def mkPongFailure(msg: String): Future[PingOrPong]            = Future.failed[PingOrPong] { new IllegalArgumentException(msg) }
+  private lazy val binaryMessageUnsupportedFailure: Future[PingOrPong]  = mkPongFailure("Binary messages are not supported")
+  private def unexpectedMessageFailure(msg: String): Future[PingOrPong] = mkPongFailure(s"Got unexpected message instead of pong: $msg")
 
   private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource]): Route = {
 
     import webSocketSettings._
 
     val (connectionSource, matSource) = source.preMaterialize()
-    val sinkSettings                  = SystemMessagesHandlerActor.Settings(systemMessagesSettings.pingInterval, systemMessagesSettings.pongTimeout)
-    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(sinkSettings, maxConnectionLifetime, connectionSource))
+    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, maxConnectionLifetime, connectionSource))
     val sinkActor                     = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
-
-    def failed(msg: String): Future[PingOrPong]            = Future.failed[PingOrPong] { new IllegalArgumentException(msg) }
-    def binaryMessageUnsupported: Future[PingOrPong]       = failed("Binary messages are not supported")
-    def unexpectedMessage(msg: String): Future[PingOrPong] = failed(s"Got unexpected message instead of pong: $msg")
 
     val sink =
       Flow[Message]
         .mapAsync[PingOrPong](1) {
           case tm: TextMessage =>
             for {
-              strictMsg <- tm.toStrict(systemMessagesSettings.pingInterval / 5)
-              pong      <- Json.parse(strictMsg.getStrictText).asOpt[PingOrPong].fold(unexpectedMessage(strictMsg.getStrictText))(Future.successful)
+              strictText <- tm.toStrict(systemMessagesSettings.pingInterval / 5).map(_.getStrictText)
+              pong       <- Json.parse(strictText).asOpt[PingOrPong].fold { unexpectedMessageFailure(strictText) }(Future.successful)
             } yield pong
-          case _: BinaryMessage => binaryMessageUnsupported
+          case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure
         }
         .to(sinkActor)
 

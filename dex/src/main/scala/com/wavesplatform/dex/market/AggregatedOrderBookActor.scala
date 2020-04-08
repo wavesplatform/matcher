@@ -49,26 +49,21 @@ object AggregatedOrderBookActor extends ScorexLogging {
           }
 
         case Query.GetMarketStatus(client) =>
-          client ! state.marketStatus
-          Behaviors.same
+          val updatedState = state.flushed
+          client ! updatedState.marketStatus
+          default(updatedState)
 
         case Query.GetAggregatedSnapshot(client) =>
           val updatedState = state.flushed
-
-          // TODO check order of levels
-          val asks1 = updatedState.asks.map(State.toLevelAgg).toSeq
-          val bids1 = updatedState.bids.map(State.toLevelAgg).toSeq
-          log.info(s"asks=$asks1, bids=$bids1")
           client ! OrderBookAggregatedSnapshot(
-            asks = asks1,
-            bids = bids1
+            asks = updatedState.asks.map(State.toLevelAgg).toSeq,
+            bids = updatedState.bids.map(State.toLevelAgg).toSeq
           )
 
           default(updatedState)
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
           val updatedLevelChanged = Monoid.combine(state.pendingChanges, levelChanges)
-          log.info(s"levelChanges: ${state.pendingChanges} +$levelChanges = $updatedLevelChanged")
           default(
             state.copy(
               lastTrade = lastTrade,
@@ -92,7 +87,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
         state.lastUpdate,
         assetPair,
         state.bids.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
-        state.bids.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
+        state.asks.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
         assetPairDecimals
       )
 

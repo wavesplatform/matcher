@@ -5,6 +5,7 @@ import java.util.UUID
 
 import akka.Done
 import akka.actor.{ActorRef, Status}
+import akka.http.javadsl.model.ws.BinaryMessage
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}

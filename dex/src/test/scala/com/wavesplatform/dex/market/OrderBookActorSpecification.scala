@@ -39,7 +39,7 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
+  private val md = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
@@ -616,8 +616,8 @@ class OrderBookActorSpecification
   }
 
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
-    val pair = wavesUsdPair // hack
+    val pair       = wavesUsdPair // hack
     val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))))
-    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second)
+    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException("Can't get snapshot"))
   }
 }

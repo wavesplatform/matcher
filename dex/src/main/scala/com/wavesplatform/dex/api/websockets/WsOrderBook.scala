@@ -11,6 +11,7 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
+// move to AggregatedOrderBookActor, because now we have diff, not the whole ob!
 case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], timestamp: Long = System.currentTimeMillis) {
   def nonEmpty: Boolean = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
 }
@@ -83,9 +84,18 @@ object WsOrderBook {
         }.toSeq: _*
       )(ordering)
 
+    // TODO Use AggregatedOrderBookActor!
     def withLevelChanges(orig: WsOrderBook, updated: LevelAmounts): WsOrderBook = orig.copy(
-      asks = orig.asks ++ denormalized(updated.asks),
-      bids = orig.bids ++ denormalized(updated.bids),
+      asks = denormalized(updated.asks).foldLeft(orig.asks) {
+        case (r, (price, amount)) =>
+          val updatedAmount = r.getOrElse(price, 0d) + amount
+          if (updatedAmount == 0d) r - price else r.updated(price, updatedAmount)
+      },
+      bids = denormalized(updated.bids).foldLeft(orig.bids) {
+        case (r, (price, amount)) =>
+          val updatedAmount = r.getOrElse(price, 0d) + amount
+          if (updatedAmount == 0d) r - price else r.updated(price, updatedAmount)
+      },
       timestamp = System.currentTimeMillis
     )
 

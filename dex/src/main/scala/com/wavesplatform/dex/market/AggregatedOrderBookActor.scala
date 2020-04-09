@@ -35,29 +35,31 @@ object AggregatedOrderBookActor extends ScorexLogging {
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
       def default(state: State): Behaviors.Receive[Message] = Behaviors.receiveMessage {
         case Query.GetHttpView(format, depth, client) =>
-          val key = (format, depth)
-          state.compiledHttpView.get(key) match {
-            case Some(r) if state.pendingChanges.isEmpty =>
+          val flushed = state.flushed
+          val key     = (format, depth)
+          // TODO refactor
+          val updatedState = flushed.compiledHttpView.get(key) match {
+            case Some(r) =>
               client ! r
-              Behaviors.same
+              flushed
 
             case _ =>
-              val withChanges = state.flushed
-              log.info(s"[$assetPair] updatedState.asks:${withChanges.asks}, updatedState.bids:${withChanges.bids}")
-              val compiledHttpView = compile(withChanges, format, depth)
+              val compiledHttpView = compile(flushed, format, depth)
               client ! compiledHttpView
-              default(withChanges.copy(compiledHttpView = state.compiledHttpView.updated(key, compiledHttpView)))
+              flushed.copy(compiledHttpView = state.compiledHttpView.updated(key, compiledHttpView))
           }
+          log.info(s"[$assetPair] GetHttpView: updatedState.asks:${flushed.asks}, updatedState.bids:${flushed.bids}")
+          default(updatedState)
 
         case Query.GetMarketStatus(client) =>
           val updatedState = state.flushed
-          log.info(s"[$assetPair] updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
+          log.info(s"[$assetPair] GetMarketStatus: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
           client ! updatedState.marketStatus
           default(updatedState)
 
         case Query.GetAggregatedSnapshot(client) =>
           val updatedState = state.flushed
-          log.info(s"[$assetPair] updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
+          log.info(s"[$assetPair] GetAggregatedSnapshot: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
           client ! OrderBookAggregatedSnapshot(
             asks = updatedState.asks.map(State.toLevelAgg).toSeq,
             bids = updatedState.bids.map(State.toLevelAgg).toSeq
@@ -66,14 +68,13 @@ object AggregatedOrderBookActor extends ScorexLogging {
           default(updatedState)
 
         case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
-          val updatedLevelChanged = Monoid.combine(state.pendingChanges, levelChanges)
-          log.info(s"[$assetPair] pendingChanges:${state.pendingChanges} + levelChanges:$levelChanges = $updatedLevelChanged")
+          val updatedPendingChanges = Monoid.combine(state.pendingChanges, levelChanges)
+          log.info(s"[$assetPair] ApplyChanges: pendingChanges:${state.pendingChanges} + levelChanges:$levelChanges = $updatedPendingChanges")
           default(
             state.copy(
               lastTrade = lastTrade,
               lastUpdate = ts,
-              compiledHttpView = Map.empty, // Could be optimized by depth
-              pendingChanges = updatedLevelChanged
+              pendingChanges = updatedPendingChanges
             ))
       }
 
@@ -121,7 +122,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
       if (this.pendingChanges.isEmpty) this
       else
         copy(
-          // TODO optimize
+          // TODO optimize (save order)
           asks = pendingChanges.asks.foldLeft(asks) {
             case (r, (price, amount)) =>
               val updatedAmount = r.getOrElse(price, 0L) + amount
@@ -132,7 +133,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
               val updatedAmount = r.getOrElse(price, 0L) + amount
               if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
           },
-          pendingChanges = LevelAmounts.empty
+          pendingChanges = LevelAmounts.empty,
+          compiledHttpView = Map.empty // Could be optimized by depth
         )
   }
 

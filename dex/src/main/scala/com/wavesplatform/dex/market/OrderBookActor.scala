@@ -162,13 +162,14 @@ class OrderBookActor(settings: Settings,
   private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
+    log.info(s"Level changes: $levelChanges, before wsState.changes: ${wsState.changes}")
     wsState = wsState.withLevelChanges(levelChanges)
     val hasTrades = events.exists {
       case _: Events.OrderExecuted => true
       case _                       => false
     }
     if (hasTrades) orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
-    log.info(s"Level changes: $levelChanges")
+    log.info(s"after wsState.changes: ${wsState.changes}")
     aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO
     processEvents(events)
   }
@@ -189,8 +190,9 @@ class OrderBookActor(settings: Settings,
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
+        log.info(s"Level changes: $levelChanges, before wsState.changes: ${wsState.changes}")
         wsState = wsState.withLevelChanges(levelChanges)
-        log.info(s"Level changes: $levelChanges")
+        log.info(s"after wsState.changes: ${wsState.changes}")
         aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
@@ -281,7 +283,7 @@ object OrderBookActor {
   )
 
   object MarketStatus {
-    implicit val fmt: Writes[MarketStatus] = { ms =>
+    implicit val marketStatusWrites: OWrites[MarketStatus] = { ms =>
       Json.obj(
         "lastPrice"  -> ms.lastTrade.map(_.price),
         "lastAmount" -> ms.lastTrade.map(_.amount),

@@ -317,7 +317,7 @@ object OrderValidator extends ScorexLogging {
     *   best bid = highest price of buy
     *   best ask = lowest price of sell
     */
-  private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
+  private def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: => Option[MarketStatus])(
       implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
@@ -379,7 +379,7 @@ object OrderValidator extends ScorexLogging {
     Either.cond(isFeeInDeviationBounds, order, error.DeviantOrderMatcherFee(order, deviationSettings))
   }
 
-  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(order: Order)(
+  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: => Option[MarketStatus])(order: Order)(
       implicit efc: ErrorFormatterContext): Result[Order] =
     if (deviationSettings.enabled) {
       for {

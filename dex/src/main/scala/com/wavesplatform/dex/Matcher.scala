@@ -13,7 +13,7 @@ import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService}
+import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
@@ -81,12 +81,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     new AssetPairBuilder(settings, getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_), settings.blacklistedAssets)
   }
 
+  private var hasMatcherAccountScript: Boolean = false
+  private lazy val assetsCache                 = AssetsStorage.cache { AssetsStorage.levelDB(db) }
+
   private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks)
-
-  private var hasMatcherAccountScript: Boolean = false
-
-  private lazy val assetsCache = AssetsStorage.cache { AssetsStorage.levelDB(db) }
+  private val orderBookHttpInfo =
+    new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
   private lazy val transactionCreator = {
     new ExchangeTransactionCreator(
@@ -171,18 +172,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     for {
       _ <- liftAsync { syncValidation(assetsCache.unsafeGetDecimals) }
-      // TODO
-      marketStatus <- if (settings.deviation.enabled) {
-//        orderBooks.get.get(o.assetPair).fold(liftErrorAsync(error.OrderBookUnexpectedState(o.assetPair))) {
-//          case Left(_) => liftErrorAsync(error.OrderBookBroken(o.assetPair))
-//          case Right(ob) =>
-//        }
-        liftFutureAsync(orderBookAskAdapter.getMarketStatus(o.assetPair).map(Option(_)))
-      } else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
-      _ <- if (settings.deviation.enabled) {
-        orderBooks.get().get(o.assetPair)
-        liftValueAsync(marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o))
-      } else successAsync
+      marketStatus <- {
+        if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
+        else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
+      }
+      _ <- if (settings.deviation.enabled) liftValueAsync(marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o)) else successAsync
       _ <- asyncValidation(assetsCache.unsafeGet)
     } yield o
   }
@@ -196,7 +190,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         addressActors,
         matcherQueue.storeEvent,
         p => Option { orderBooks.get() } flatMap (_ get p),
-        orderBookAskAdapter,
+        orderBookHttpInfo,
         getActualTickSize = assetPair => {
           matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
         },
@@ -222,10 +216,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       ),
       MatcherApiRouteV1(
         pairBuilder,
+        orderBookHttpInfo,
         () => status.get(),
-        orderBookAskAdapter,
-        apiKeyHash,
-        settings
+        apiKeyHash
       ),
       MatcherWebSocketRoute(
         addressActors,
@@ -354,13 +347,22 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         address,
         time,
         orderDB, { (ao, tradableBalance) =>
-          for {
-            hasOrderInBlockchain <- wavesBlockchainAsyncClient.forgedOrder(ao.id)
-            orderBookCache       <- orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair)
-          } yield
-            OrderValidator
-              .accountStateAware(ao.order.sender, tradableBalance.withDefaultValue(0L), hasOrderInBlockchain, orderBookCache)(ao)
-              .map(_ => ())
+          val r = for {
+            hasOrderInBlockchain <- liftFutureAsync(wavesBlockchainAsyncClient.forgedOrder(ao.id))
+            orderBookCache       <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
+            r <- EitherT.fromEither {
+              OrderValidator
+                .accountStateAware(
+                  ao.order.sender,
+                  tradableBalance.withDefaultValue(0L),
+                  hasOrderInBlockchain,
+                  orderBookCache.getOrElse(OrderBookAggregatedSnapshot.empty)
+                )(ao)
+                .map(_ => ())
+            }
+          } yield r
+
+          r.value
         },
         matcherQueue.storeEvent,
         startSchedules,

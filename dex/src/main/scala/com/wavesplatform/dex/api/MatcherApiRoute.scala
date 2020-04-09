@@ -12,7 +12,6 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http._
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
@@ -27,7 +26,14 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor.{
+  ForceSaveSnapshots,
+  ForceStartOrderBook,
+  GetMarkets,
+  GetSnapshotOffsets,
+  MarketData,
+  SnapshotOffsetsResponse
+}
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -52,7 +58,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            addressActor: ActorRef,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                           orderBookAskAdapter: OrderBookAskAdapter, // TODO transform fail cases to HttpResponse
+                           orderBookHttpInfo: OrderBookHttpInfo,
                            getActualTickSize: AssetPair => BigDecimal,
                            orderValidator: Order => FutureResult[Order],
                            matcherSettings: MatcherSettings,
@@ -323,13 +329,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete {
-          orderBookAskAdapter.getHttpView(
-            pair,
-            MatcherModel.Normalized,
-            depth.getOrElse(matcherSettings.orderBookSnapshotHttpCache.defaultDepth.getOrElse(1)) // TODO
-          )
-        }
+        complete { orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth) }
       }
     }
   }
@@ -349,10 +349,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
-      complete {
-        // StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair")
-        orderBookAskAdapter.getMarketStatus(pair).map(StatusCodes.OK -> _)
-      }
+      complete { orderBookHttpInfo.getMarketStatus(pair) }
     }
   }
 

@@ -5,8 +5,11 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor._
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
-import com.wavesplatform.dex.actors.OrderBookAskAdapter.props
+import cats.syntax.either._
+import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Depth, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.DecimalsFormat
@@ -16,45 +19,30 @@ import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
 
 class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]])(implicit system: ActorSystem) {
-  def getMarketStatus(assetPair: AssetPair): Future[MarketStatus] = get[Query.GetMarketStatus, MarketStatus](assetPair, Query.GetMarketStatus(_))
+  import system.dispatcher
 
-  def getAggregatedSnapshot(assetPair: AssetPair): Future[OrderBookAggregatedSnapshot] =
+  type Result[T] = Future[Either[MatcherError, Option[T]]]
+
+  def getMarketStatus(assetPair: AssetPair): Result[MarketStatus] = get[Query.GetMarketStatus, MarketStatus](assetPair, Query.GetMarketStatus(_))
+
+  def getAggregatedSnapshot(assetPair: AssetPair): Result[OrderBookAggregatedSnapshot] =
     get[Query.GetAggregatedSnapshot, OrderBookAggregatedSnapshot](assetPair, Query.GetAggregatedSnapshot(_))
 
-  def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Depth): Future[HttpResponse] =
+  def getHttpView(assetPair: AssetPair, format: DecimalsFormat, depth: Depth): Result[HttpResponse] =
     get[Query.GetHttpView, HttpResponse](assetPair, Query.GetHttpView(format, depth, _))
 
-  private def get[M <: Query, R](assetPair: AssetPair, message: ActorRef => M)(implicit ct: ClassTag[R]): Future[R] = {
-    val r   = Promise[R]()
-    val ask = system.actorOf(props[R](r))
+  private val default = Future.successful(Right(None))
+  private def get[M <: Query, R](assetPair: AssetPair, message: ActorRef => M)(implicit ct: ClassTag[R]): Result[R] =
     orderBooks.get().get(assetPair) match {
-      case None => r.failure(new IllegalStateException("None")) // TODO
+      case None => default
       case Some(ob) =>
         ob match {
-          case Left(_)   => r.failure(new IllegalStateException("Left")) // TODO
-          case Right(ob) => ob ! message(ask)
+          case Left(_) => Future.successful(error.OrderBookBroken(assetPair).asLeft)
+          case Right(ob) =>
+            val r      = Promise[R]()
+            val askRef = system.actorOf(AskActor.props[R](r))
+            ob ! message(askRef)
+            r.future.map(_.some.asRight)
         }
     }
-    r.future
-  }
-}
-
-object OrderBookAskAdapter {
-  private def props[T](p: Promise[T])(implicit ct: ClassTag[T]) = Props(new AskActor(p))
-
-  private class AskActor[T](p: Promise[T])(implicit ct: ClassTag[T]) extends Actor {
-    override def receive: Receive = {
-      case x: T if x.getClass == ct.runtimeClass =>
-        p.trySuccess(x)
-        context.stop(self)
-
-      case e: Status.Failure =>
-        p.tryFailure(e.cause)
-        context.stop(self)
-
-      case x =>
-        p.tryFailure(new IllegalArgumentException(s"Expected ${ct.runtimeClass.getName}, but got $x"))
-        context.stop(self)
-    }
-  }
 }

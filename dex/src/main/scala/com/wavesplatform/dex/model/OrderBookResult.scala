@@ -29,6 +29,7 @@ object OrderBookResult {
 
   def toJson(x: OrderBookResult): String = JsonSerializer.serialize(x)
 
+  // TODO Generalize
   class Serializer extends StdSerializer[OrderBookResult](classOf[OrderBookResult]) {
     override def serialize(x: OrderBookResult, j: JsonGenerator, serializerProvider: SerializerProvider): Unit = {
       j.writeStartObject()

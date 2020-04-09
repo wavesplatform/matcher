@@ -12,6 +12,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.ApiMarshallers._
+import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -397,6 +398,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     odb.saveOrder(orderToCancel)
 
     val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map.empty))
+    val orderBookHttpInfo = new OrderBookHttpInfo(
+      settings.orderBookSnapshotHttpCache,
+      orderBookAskAdapter,
+      time,
+      x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
+    )
 
     val route: Route = MatcherApiRoute(
       assetPairBuilder = new AssetPairBuilder(
@@ -413,7 +420,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       addressActor = addressActor.ref,
       storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
       orderBook = _ => None,
-      orderBookAskAdapter = orderBookAskAdapter,
+      orderBookHttpInfo = orderBookHttpInfo,
       getActualTickSize = _ => 0.1,
       orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
       matcherSettings = settings,

@@ -14,6 +14,7 @@ import kamon.Kamon
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
+// TODO: remove
 class OrderBookSnapshotHttpCache(settings: Settings,
                                  time: Time,
                                  assetDecimals: Asset => Option[Int],

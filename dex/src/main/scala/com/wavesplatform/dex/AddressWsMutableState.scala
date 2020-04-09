@@ -64,7 +64,8 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, (UUID, Long)
   }
 
   def sendSnapshot(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): Unit = {
-    pendingWsConnections.keys.foreach(_ ! WsAddressState(balances, orders, 0))
+    val snapshot = WsAddressState(balances, orders, 0)
+    pendingWsConnections.keys.foreach(_ ! snapshot)
   }
 
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): AddressWsMutableState = copy(

@@ -2,6 +2,7 @@ package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 import akka.Done
 import akka.actor.{ActorRef, Status}
@@ -12,6 +13,7 @@ import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
+import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
@@ -23,6 +25,7 @@ import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus.{MaxLifetimeExceeded, PongTimeout}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -35,6 +38,7 @@ import javax.ws.rs.Path
 import play.api.libs.json.Json
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
 @Path("/ws")
@@ -107,12 +111,16 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
   private lazy val binaryMessageUnsupportedFailure: Future[PingOrPong]  = mkPongFailure("Binary messages are not supported")
   private def unexpectedMessageFailure(msg: String): Future[PingOrPong] = mkPongFailure(s"Got unexpected message instead of pong: $msg")
 
-  private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource]): Route = {
+  private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource], expiration: Option[Long] = None): Route = {
 
     import webSocketSettings._
 
+    val connectionLifetime = expiration.fold(maxConnectionLifetime) { exp =>
+      FiniteDuration(exp - System.currentTimeMillis, TimeUnit.MILLISECONDS).min(maxConnectionLifetime)
+    }
+
     val (connectionSource, matSource) = source.preMaterialize()
-    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, maxConnectionLifetime, connectionSource))
+    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, connectionLifetime, connectionSource))
     val sinkActor                     = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
 
     val sink =
@@ -130,19 +138,21 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(sink, matSource) }
   }
 
-  private def signedGet(prefix: String, publicKey: PublicKey): Directive0 = {
+  private def signedGet(prefix: String, publicKey: PublicKey): Directive1[AuthParams] = {
     val invalidSignatureResponse = complete(RequestInvalidSignature toWsHttpResponse StatusCodes.BadRequest)
 
-    val directive: Directive0 =
+    val directive: Directive1[AuthParams] =
       parameters(('t, 's)).tflatMap {
         case (timestamp, signature) =>
           Base58
             .tryDecodeWithLimit(signature)
-            .map {
-              crypto.verify(_, prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(timestamp.toLong), publicKey)
+            .map { decodedSignature =>
+              val ts  = timestamp.toLong
+              val msg = prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(ts)
+              crypto.verify(decodedSignature, msg, publicKey) -> AuthParams(ts, decodedSignature)
             } match {
-            case Success(true) => pass
-            case _             => invalidSignatureResponse
+            case Success((true, authParams)) => provide(authParams)
+            case _                           => invalidSignatureResponse
           }
       }
 
@@ -152,9 +162,11 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
   /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
   private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
     val directive = optionalHeaderValueByName(`X-Api-Key`.name).flatMap { maybeKey =>
-      if (maybeKey.isDefined) withAuth else signedGet(balanceStreamPrefix, publicKey)
+      if (maybeKey.isDefined) withAuth.tmap(_ => none[AuthParams]) else signedGet(balanceStreamPrefix, publicKey).map(_.some)
     }
-    directive { createStreamFor(accountUpdatesSource(publicKey)) }
+    directive { maybeAuthParams =>
+      createStreamFor(accountUpdatesSource(publicKey), maybeAuthParams.map(_.expirationTimestamp))
+    }
   }
 
   private val orderBookRoute: Route = (path("orderbook" / AssetPairPM) & get) { p =>
@@ -195,4 +207,5 @@ object MatcherWebSocketRoute {
   val balanceStreamPrefix: String = "au"
 
   final case class ConnectionSource(id: UUID, ref: ActorRef)
+  final case class AuthParams(expirationTimestamp: Long, signature: ByteStr)
 }

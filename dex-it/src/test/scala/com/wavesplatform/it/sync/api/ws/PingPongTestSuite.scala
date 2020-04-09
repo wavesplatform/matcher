@@ -36,8 +36,8 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
 
       Thread.sleep(0.1.second)
       eventually {
-        wsac.isClosed shouldBe true
         wsac.getPingsBuffer.size shouldBe 5
+        wsac.isClosed shouldBe true
       }
     }
 
@@ -53,8 +53,8 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Thread.sleep(0.1.second)
         eventually {
-          wsac.isClosed shouldBe true
           wsac.getPingsBuffer.size should (be >= 3 and be <= 4)
+          wsac.isClosed shouldBe true
         }
       }
 
@@ -76,8 +76,8 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
 
         Thread.sleep(0.1.second)
         eventually {
-          wsac.isClosed shouldBe true
           wsac.getPingsBuffer.size should (be >= 4 and be <= 5)
+          wsac.isClosed shouldBe true
         }
       }
     }
@@ -99,15 +99,37 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
       Thread.sleep(pongTimeout - 0.2.second)
 
       Seq(wsac1, wsac2).foreach { conn =>
-        conn.isClosed shouldBe false
         conn.getPingsBuffer should have size 3
+        conn.isClosed shouldBe false
       }
 
       Thread.sleep(0.1.second)
       eventually {
         Seq(wsac1, wsac2).foreach { conn =>
-          conn.isClosed shouldBe true
           conn.getPingsBuffer.size should (be >= 3 and be <= 4)
+          conn.isClosed shouldBe true
+        }
+      }
+    }
+
+    "by signed connection lifetime expiration, if it < max-connection-lifetime" in {
+      val wsac = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false, connectionLifetime = 1.5.seconds)
+      wsac.isClosed shouldBe false
+
+      Thread.sleep(1.4.seconds)
+      wsac.isClosed shouldBe false
+
+      Thread.sleep(0.1.second)
+      eventually {
+        wsac.isClosed shouldBe true
+        wsac.getPingsBuffer should have size 1
+      }
+
+      withClue("expiration is less than 0") {
+        val wsac = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false, connectionLifetime = -1.5.hours)
+        eventually {
+          wsac.isClosed shouldBe true
+          wsac.getPingsBuffer shouldBe empty
         }
       }
     }

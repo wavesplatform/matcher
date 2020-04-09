@@ -34,12 +34,6 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
   protected def addConnection(connection: WsConnection[_]): Unit = knownWsConnections.add(connection)
 
-  protected def mkWebSocketConnection[Output <: WsMessage: ClassTag](uri: String,
-                                                                     parseOutput: Message => Output,
-                                                                     trackOutput: Boolean = true): WsConnection[Output] = {
-    new WsConnection(uri, parseOutput, trackOutput = trackOutput) unsafeTap addConnection
-  }
-
   protected def mkWsAuthenticatedConnection(client: KeyPair, dex: DexContainer, keepAlive: Boolean = true): WsAuthenticatedConnection = {
 
     val timestamp     = System.currentTimeMillis() + 1.hour.toMillis
@@ -47,27 +41,25 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
     val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp&s=$signature"
 
-    new WsAuthenticatedConnection(wsUri, None, keepAlive)
+    new WsAuthenticatedConnection(wsUri, None, keepAlive) unsafeTap addConnection
   }
 
   protected def mkWsAuthenticatedConnectionViaApiKey(client: KeyPair,
                                                      dex: DexContainer,
                                                      apiKey: String = apiKey,
                                                      keepAlive: Boolean = true): WsAuthenticatedConnection = {
-    val timestamp = System.currentTimeMillis() + 1.hour.toMillis
-    val wsUri     = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp"
-
-    new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive)
+    val wsUri = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}"
+    new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive) unsafeTap addConnection
   }
 
-  protected def mkWebSocketOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WsConnection[WsOrderBook] = {
+  protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WsConnection[WsOrderBook] = {
     val wsUri = s"${getBaseOrderBooksStreamUri(dex)}${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
-    mkWebSocketConnection(wsUri) { msg =>
+    mkWsConnection(wsUri) { msg =>
       Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
     }
   }
 
-  protected def mkWebSocketConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
+  protected def mkWsConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
     new WsConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
   }
 

@@ -144,7 +144,7 @@ class OrderBookActor(settings: Settings,
       if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
 
     case Terminated(ws) =>
-      log.trace(s"[${wsState.wsConnections(ws)}] WebSocket terminated")
+      log.trace(s"[${wsState.wsConnections(ws)._1}] WebSocket terminated")
       wsState = wsState.withoutSubscription(ws)
   }
 
@@ -201,7 +201,8 @@ class OrderBookActor(settings: Settings,
   private def wsSnapshotOf(ob: OrderBook): WsOrderBook = wsUpdates.from(
     asks = ob.asks.aggregated,
     bids = ob.bids.aggregated,
-    lt = ob.lastTrade
+    lt = ob.lastTrade,
+    updateId = 0
   )
 
   private def scheduleNextSendWsUpdates(): Cancellable = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, SendWsUpdates)

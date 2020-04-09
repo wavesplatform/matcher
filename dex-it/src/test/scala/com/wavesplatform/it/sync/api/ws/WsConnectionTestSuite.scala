@@ -60,7 +60,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
         // format: on
       )
     ) { (assetPair, expectedStatus, expectedError) =>
-      val connection = mkWebSocketOrderBookConnection(assetPair, dex1)
+      val connection = mkWsOrderBookConnection(assetPair, dex1)
       val response   = Await.result(connection.getConnectionResponse, 1.second).response
 
       response.status shouldBe expectedStatus

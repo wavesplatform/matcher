@@ -32,6 +32,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         asks = r.asks ++ x.asks,
         bids = r.bids ++ x.bids,
         lastTrade = r.lastTrade.orElse(x.lastTrade),
+        updateId = x.updateId,
         timestamp = xs.toList.last.timestamp
       )
   }
@@ -52,7 +53,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
 
         markup("No orders")
-        val wsc0    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc0    = mkWsOrderBookConnection(wavesBtcPair, dex1)
         val buffer0 = receiveAtLeastN(wsc0, 1)
         wsc0.close()
 
@@ -62,7 +63,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             asks = TreeMap.empty,
             bids = TreeMap.empty,
             lastTrade = None,
-            timestamp = buffer0.last.timestamp
+            updateId = 0,
+            timestamp = buffer0.last.timestamp,
           )
         )
 
@@ -70,7 +72,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
         markup("One order")
 
-        val wsc1    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc1    = mkWsOrderBookConnection(wavesBtcPair, dex1)
         val buffer1 = receiveAtLeastN(wsc1, 1)
         wsc1.close()
 
@@ -80,6 +82,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             asks = TreeMap.empty,
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
+            updateId = 0,
             timestamp = buffer1.last.timestamp
           )
         )
@@ -88,7 +91,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00012))
 
-        val wsc2    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc2    = mkWsOrderBookConnection(wavesBtcPair, dex1)
         val buffer2 = receiveAtLeastN(wsc2, 1)
         wsc2.close()
 
@@ -98,6 +101,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             asks = TreeMap(0.00012d    -> 1d),
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
+            updateId = 0,
             timestamp = buffer2.last.timestamp
           )
         )
@@ -106,7 +110,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Filled)
 
-        val wsc3    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc3    = mkWsOrderBookConnection(wavesBtcPair, dex1)
         val buffer3 = receiveAtLeastN(wsc3, 1)
         wsc3.close()
 
@@ -120,6 +124,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               amount = 0.5,
               side = OrderType.BUY
             ).some,
+            updateId = 0,
             timestamp = buffer3.last.timestamp
           )
         )
@@ -131,7 +136,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           mkOrderDP(carol, wavesBtcPair, BUY, 0.7.waves, 0.000115)
         ).foreach(placeAndAwaitAtDex(_))
 
-        val wsc4    = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc4    = mkWsOrderBookConnection(wavesBtcPair, dex1)
         val buffer4 = receiveAtLeastN(wsc4, 1)
         wsc4.close()
 
@@ -152,6 +157,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               amount = 0.5,
               side = OrderType.BUY
             ).some,
+            updateId = buffer4.last.updateId,
             timestamp = buffer4.last.timestamp
           )
         )
@@ -161,7 +167,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       }
 
       "should send updates" in {
-        val wsc = mkWebSocketOrderBookConnection(wavesBtcPair, dex1)
+        val wsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
         receiveAtLeastN(wsc, 1)
         wsc.clearMessagesBuffer()
 
@@ -175,6 +181,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             asks = TreeMap.empty,
             bids = TreeMap(0.00012d -> 1d),
             lastTrade = None,
+            updateId = 1,
             timestamp = buffer1.last.timestamp
           )
         )
@@ -195,6 +202,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               amount = 1,
               side = OrderType.SELL
             ).some,
+            updateId = buffer2.last.updateId,
             timestamp = buffer2.last.timestamp
           )
         )
@@ -210,12 +218,38 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             asks = TreeMap(0.00012d -> 0d),
             bids = TreeMap.empty,
             lastTrade = None,
+            updateId = buffer3.last.updateId,
             timestamp = buffer3.last.timestamp
           )
         )
 
         wsc.clearMessagesBuffer()
         wsc.close()
+      }
+
+      "should send correct update ids" in {
+
+        def assertUpdateId(connection: WsConnection[WsOrderBook], expectedUpdateId: Long): Unit = {
+          val buffer = receiveAtLeastN(connection, 1)
+          buffer should have size 1
+          buffer.head.updateId shouldBe expectedUpdateId
+          connection.clearMessagesBuffer()
+        }
+
+        val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
+
+        val wsc1 = mkWsOrderBookConnection(wavesBtcPair, dex1)
+        assertUpdateId(wsc1, 0)
+
+        placeAndAwaitAtDex(order)
+        assertUpdateId(wsc1, 1)
+
+        val wsc2 = mkWsOrderBookConnection(wavesBtcPair, dex1)
+        assertUpdateId(wsc2, 0)
+
+        dex1.api.cancel(carol, order)
+        assertUpdateId(wsc1, 2)
+        assertUpdateId(wsc2, 1)
       }
     }
   }

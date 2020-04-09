@@ -124,6 +124,14 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
         wsac.isClosed shouldBe true
         wsac.getPingsBuffer should have size 1
       }
+
+      withClue("expiration is less than 0") {
+        val wsac = mkWsAuthenticatedConnection(alice, dex1, keepAlive = false, connectionLifetime = -1.5.hours)
+        eventually {
+          wsac.isClosed shouldBe true
+          wsac.getPingsBuffer shouldBe empty
+        }
+      }
     }
   }
 }

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.api.websockets
 
+import akka.http.scaladsl.model.ws.TextMessage
+import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.model.{Amount, Price}
@@ -12,11 +14,18 @@ import play.api.libs.json._
 import scala.collection.immutable.TreeMap
 
 // move to AggregatedOrderBookActor, because now we have diff, not the whole ob!
-case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], timestamp: Long = System.currentTimeMillis) {
-  def nonEmpty: Boolean = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
+case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], updateId: Long, timestamp: Long = System.currentTimeMillis)
+    extends WsMessage {
+  def nonEmpty: Boolean                                = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
+  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
+  override val tpe: String                             = "ob"
 }
 
 object WsOrderBook {
+
+  def wsUnapply(arg: WsOrderBook): Option[(String, Long, Long, WsSide, WsSide, Option[WsLastTrade])] =
+    (arg.tpe, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade).some
+
   type WsSide = TreeMap[Double, Double]
 
   private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
@@ -26,14 +35,21 @@ object WsOrderBook {
     WsOrderBook(
       asks = TreeMap.empty(asksOrdering),
       bids = TreeMap.empty(bidsOrdering),
-      lastTrade = None
+      lastTrade = None,
+      updateId = 0
     )
 
-  implicit val wsOrderBookStateFormat: Format[WsOrderBook] =
-    ((__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
+  implicit val wsOrderBookStateFormat: Format[WsOrderBook] = (
+    (__ \ "T").format[String] and
+      (__ \ "_").format[Long] and
+      (__ \ "U").format[Long] and
+      (__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
       (__ \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
-      (__ \ "t").formatNullable[WsLastTrade] and
-      (__ \ "_").format[Long])(WsOrderBook.apply, unlift(WsOrderBook.unapply))
+      (__ \ "t").formatNullable[WsLastTrade]
+  )(
+    (_, timestamp, uid, asks, bids, lastTrade) => WsOrderBook(asks, bids, lastTrade, uid, timestamp),
+    unlift(WsOrderBook.wsUnapply)
+  )
 
   private val priceAmountFormat = Format(
     fjs = Reads.Tuple2R(doubleAsStringFormat, doubleAsStringFormat),
@@ -67,8 +83,9 @@ object WsOrderBook {
   }
 
   class Update(amountAssetDecimals: Int, priceAssetDecimals: Int) {
-    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade]): WsOrderBook =
-      WsOrderBook(asks = side(asks, asksOrdering), bids = side(bids, bidsOrdering), lastTrade = lt.map(lastTrade))
+
+    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade], updateId: Long): WsOrderBook =
+      WsOrderBook(asks = side(asks, asksOrdering), bids = side(bids, bidsOrdering), lastTrade = lt.map(lastTrade), updateId = updateId)
 
     def lastTrade(x: LastTrade): WsLastTrade = WsLastTrade(
       price = denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble,

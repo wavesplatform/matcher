@@ -1,15 +1,24 @@
 package com.wavesplatform.dex.api.websockets
 
+import akka.http.scaladsl.model.ws.TextMessage
+import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], timestamp: Long = System.currentTimeMillis)
+case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], updateId: Long, timestamp: Long = System.currentTimeMillis)
+    extends WsMessage {
+  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsAddressState.format.writes(this).toString)
+  override val tpe: String                             = "au"
+}
 
 object WsAddressState {
 
-  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty)
+  def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
+    (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some
+
+  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty, 0)
 
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
     { // TODO use reads for Map[Asset, T]!
@@ -25,11 +34,15 @@ object WsAddressState {
   )
 
   implicit val format: Format[WsAddressState] = (
-    (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
-      (__ \ "o").formatNullable[Seq[WsOrder]] and
-      (__ \ "_").format[Long]
+    (__ \ "T").format[String] and
+      (__ \ "_").format[Long] and
+      (__ \ "U").format[Long] and
+      (__ \ "b").formatNullable[Map[Asset, WsBalances]](balancesMapFormat) and
+      (__ \ "o").formatNullable[Seq[WsOrder]]
   )(
-    (maybeBalances, maybeOrders, timestamp) => WsAddressState(maybeBalances.getOrElse(Map.empty), maybeOrders.getOrElse(Seq.empty), timestamp),
-    unlift(WsAddressState.unapply) andThen { case (b, o, t) => (Option(b).filter(_.nonEmpty), Option(o).filter(_.nonEmpty), t) }
+    (_, ts, uid, maybeBalances, maybeOrders) => WsAddressState(maybeBalances getOrElse Map.empty, maybeOrders getOrElse Seq.empty, uid, ts),
+    unlift(WsAddressState.wsUnapply) andThen {
+      case (tpe, ts, uid, bs, os) => (tpe, ts, uid, Option(bs).filter(_.nonEmpty), Option(os).filter(_.nonEmpty))
+    }
   )
 }

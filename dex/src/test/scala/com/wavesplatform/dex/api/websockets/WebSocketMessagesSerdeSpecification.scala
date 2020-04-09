@@ -68,8 +68,9 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     assets         <- Gen.listOfN(balanceChanges, assetGen)
     balances       <- Gen.listOfN(balanceChanges, wsBalancesGen)
     orders         <- Gen.listOfN(orderChanges, wsOrderGen)
+    updateId       <- Gen.choose(0L, Long.MaxValue)
     ts             <- Gen.choose(0L, Long.MaxValue)
-  } yield WsAddressState((assets zip balances).toMap, orders, ts)
+  } yield WsAddressState((assets zip balances).toMap, orders, updateId, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
   private val askPricesMax = 2000L * Order.PriceConstant
@@ -99,8 +100,9 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     asks      <- wsSide(askPricesGen)
     bids      <- wsSide(bidPricesGen)
     lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
+    updateId  <- Gen.choose(0L, Long.MaxValue)
     ts        <- Gen.choose(0L, Long.MaxValue)
-  } yield WsOrderBook(asks, bids, lastTrade, ts)
+  } yield WsOrderBook(asks, bids, lastTrade, updateId, ts)
 
   private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)

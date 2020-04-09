@@ -1,5 +1,6 @@
 package com.wavesplatform.dex
 
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
@@ -43,7 +44,7 @@ class ActorsWebSocketInteractionsSpecification
           (AcceptedOrder, Boolean) => Unit, // cancel
           (AcceptedOrder, LimitOrder) => OrderExecuted, // execute
           Map[Asset, Long] => Unit, // update spendable balances
-          (Map[Asset, WsBalances], Seq[WsOrder]) => Unit // expect balances and orders diff by web socket
+          (Map[Asset, WsBalances], Seq[WsOrder], Long) => Unit // expect balances diff, orders diff and update id by web socket
       ) => Unit
   ): Unit = {
 
@@ -84,7 +85,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def subscribe(): Unit = {
-      addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
+      addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), eventsProbe.ref)
     }
 
     def placeOrder(ao: AcceptedOrder): Unit = {
@@ -122,10 +123,11 @@ class ActorsWebSocketInteractionsSpecification
       spendableBalancesActor ! SpendableBalancesActor.Command.UpdateStates(Map(address.toAddress -> spendableBalanceChanges))
     }
 
-    def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder]): Unit = {
+    def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder], expectedUpdateId: Long): Unit = {
       val wsAddressState = eventsProbe.expectMsgAnyClassOf(3.seconds, classOf[WsAddressState])
       wsAddressState.balances should matchTo(expectedBalances)
       wsAddressState.orders should matchTo(expectedOrders)
+      wsAddressState.updateId should matchTo(expectedUpdateId)
     }
 
     f(
@@ -153,7 +155,8 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0)),
-            Seq.empty
+            Seq.empty,
+            0
           )
 
           val lo = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0, sender = address))
@@ -161,13 +164,15 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(lo)
           expectWsBalancesAndOrders(
             Map(usd -> WsBalances(285, 15)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted))
+            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            1
           )
 
           cancel(lo, false)
           expectWsBalancesAndOrders(
             Map(usd -> WsBalances(300, 0)),
-            Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some))
+            Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
+            2
           )
       }
 
@@ -183,7 +188,8 @@ class ActorsWebSocketInteractionsSpecification
                 Waves -> WsBalances(100, 0),
                 usd   -> WsBalances(300, 0)
               ),
-              Seq.empty
+              Seq.empty,
+              0
             )
           }
 
@@ -194,7 +200,8 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(buyOrder)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(270, 30)),
-              Seq(WsOrder.fromDomain(buyOrder, OrderStatus.Accepted))
+              Seq(WsOrder.fromDomain(buyOrder, OrderStatus.Accepted)),
+              1
             )
           }
 
@@ -202,7 +209,8 @@ class ActorsWebSocketInteractionsSpecification
             updateBalances(Map(Waves -> 100.waves, usd -> 300.usd, eth -> 4.eth))
             expectWsBalancesAndOrders(
               Map(eth -> WsBalances(4, 0)),
-              Seq.empty
+              Seq.empty,
+              2
             )
           }
 
@@ -220,14 +228,16 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.0015.some,
                   avgWeighedPrice = 3.0.some
                 )
-              )
+              ),
+              3
             )
 
             updateBalances(Map(Waves -> 105.waves, usd -> 285.usd, eth -> 4.eth)) // then we receive balance changes from blockchain
 
             expectWsBalancesAndOrders(
               Map(Waves -> WsBalances(105, 0)),
-              Seq.empty
+              Seq.empty,
+              4
             )
           }
 
@@ -240,7 +250,8 @@ class ActorsWebSocketInteractionsSpecification
                   id = buyOrder.id,
                   status = OrderStatus.Cancelled.name.some
                 )
-              )
+              ),
+              5
             )
           }
       }
@@ -257,7 +268,8 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)),
-            Seq.empty
+            Seq.empty,
+            0
           )
 
           var mo = MarketOrder(createOrder(wavesUsdPair, BUY, 50.waves, 3.0, 0.00001703.eth, feeAsset = eth, sender = address), tradableBalance)
@@ -266,7 +278,8 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(mo)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(150, 150), eth -> WsBalances(1.99998297, 0.00001703)),
-              Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted))
+              Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+              1
             )
           }
 
@@ -282,7 +295,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.00000340.some,
                   avgWeighedPrice = 3.0.some
                 )
-              )
+              ),
+              2
             )
           }
 
@@ -298,7 +312,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.00000850.some,
                   avgWeighedPrice = 3.0.some
                 )
-              )
+              ),
+              3
             )
           }
 
@@ -314,7 +329,8 @@ class ActorsWebSocketInteractionsSpecification
                   filledFee = 0.00001020.some,
                   avgWeighedPrice = 3.0.some
                 )
-              )
+              ),
+              4
             )
           }
 
@@ -327,7 +343,8 @@ class ActorsWebSocketInteractionsSpecification
                   id = mo.id,
                   status = OrderStatus.Filled.name.some
                 )
-              )
+              ),
+              5
             )
           }
 
@@ -336,7 +353,8 @@ class ActorsWebSocketInteractionsSpecification
             updateBalances(Map(Waves -> 130.waves, usd -> 210.usd, eth -> 1.99998980.eth))
             expectWsBalancesAndOrders(
               Map(Waves -> WsBalances(130, 0)),
-              Seq.empty
+              Seq.empty,
+              6
             )
           }
       }
@@ -345,34 +363,41 @@ class ActorsWebSocketInteractionsSpecification
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
         updateBalances(tradableBalance)
 
-        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), tp.ref)
+        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), tp.ref)
 
-        def expectWsBalance(tp: TestProbe, expected: Map[Asset, WsBalances]): Unit =
-          tp.expectMsgAnyClassOf(10.second, classOf[WsAddressState]).balances should matchTo(expected)
+        def expectWsBalance(tp: TestProbe, expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
+          val wsAddressState = tp.expectMsgAnyClassOf(10.second, classOf[WsAddressState])
+          wsAddressState.balances should matchTo(expected)
+          wsAddressState.updateId should matchTo(expectedUpdateId)
+        }
 
         val webSubscription     = TestProbe()
         val mobileSubscription  = TestProbe()
         val desktopSubscription = TestProbe()
 
         subscribe(webSubscription)
-        expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)))
+        expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)), 0)
 
         updateBalances { Map(Waves -> 100.waves, usd -> 300.usd, eth -> 5.eth) }
-        expectWsBalance(webSubscription, Map(eth -> WsBalances(5, 0)))
+        expectWsBalance(webSubscription, Map(eth -> WsBalances(5, 0)), 1)
 
         subscribe(mobileSubscription)
-        expectWsBalance(mobileSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(5, 0)))
+        expectWsBalance(mobileSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(5, 0)), 0)
 
         val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
         placeOrder(order)
-        Seq(webSubscription, mobileSubscription).foreach { expectWsBalance(_, Map(usd -> WsBalances(297, 3))) }
+        expectWsBalance(webSubscription, Map(usd    -> WsBalances(297, 3)), 2)
+        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3)), 1)
 
         subscribe(desktopSubscription)
-        expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)))
+        expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)), 0)
 
         cancel(order, true)
-        Seq(webSubscription, mobileSubscription, desktopSubscription).foreach { expectWsBalance(_, Map(usd -> WsBalances(300, 0))) }
+
+        expectWsBalance(webSubscription, Map(usd     -> WsBalances(300, 0)), 3)
+        expectWsBalance(mobileSubscription, Map(usd  -> WsBalances(300, 0)), 2)
+        expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0)), 1)
       }
 
       "so far unsubscribed address made some actions and then subscribes" in webSocketTest {
@@ -388,7 +413,8 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(115, 0), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted))
+            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            0
           )
       }
 
@@ -401,7 +427,8 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(99.997, 0.003), btc -> WsBalances(0, 1)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted))
+            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            0
           )
       }
 
@@ -415,7 +442,8 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), btc -> WsBalances(1, 0)),
-            Seq.empty
+            Seq.empty,
+            0
           )
 
           val now = System.currentTimeMillis()
@@ -432,7 +460,8 @@ class ActorsWebSocketInteractionsSpecification
             Map(Waves -> WsBalances(94.997, 0)),
             Seq(
               WsOrder.fromDomain(oe.submittedRemaining, OrderStatus.Filled(5.waves, 0.003.waves))
-            )
+            ),
+            1
           )
       }
 
@@ -454,17 +483,18 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), usd -> WsBalances(70, 0)),
-            Seq.empty
+            Seq.empty,
+            0
           )
 
           placeOrder(counter1)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15)), Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)))
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15)), Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)), 1)
 
           placeOrder(counter2)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5)), Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)))
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5)), Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)), 2)
 
           placeOrder(counter3)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5)), Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)))
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5)), Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)), 3)
 
           mo = matchOrders(mo, counter1)._1
           expectWsBalancesAndOrders(
@@ -475,7 +505,8 @@ class ActorsWebSocketInteractionsSpecification
                       filledAmount = 5.0.some,
                       filledFee = 0.003.some,
                       avgWeighedPrice = 3.0.some)
-            )
+            ),
+            4
           )
 
           mo = matchOrders(mo, counter2)._1
@@ -487,7 +518,8 @@ class ActorsWebSocketInteractionsSpecification
                       filledAmount = 5.0.some,
                       filledFee = 0.003.some,
                       avgWeighedPrice = 3.1.some)
-            )
+            ),
+            5
           )
 
           val (_, counter3Remaining) = matchOrders(mo, counter3)
@@ -499,7 +531,8 @@ class ActorsWebSocketInteractionsSpecification
                       filledAmount = 2.0.some,
                       filledFee = 0.0012.some,
                       avgWeighedPrice = 3.2.some)
-            )
+            ),
+            6
           )
 
           cancel(counter3Remaining, false)
@@ -507,13 +540,15 @@ class ActorsWebSocketInteractionsSpecification
             Map(usd -> WsBalances(33.1, 0)),
             Seq(
               WsOrder(id = counter3.id, status = OrderStatus.Cancelled.name.some)
-            )
+            ),
+            7
           )
 
           updateBalances(Map(Waves -> 111.9928.waves, usd -> 33.1.usd))
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(111.9928, 0)),
-            Seq.empty
+            Seq.empty,
+            8
           )
       }
 
@@ -534,13 +569,15 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(100, 0), usd -> WsBalances(70, 0)),
-            Seq.empty
+            Seq.empty,
+            0
           )
 
           placeOrder(mo)
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 12.003)),
-            Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted))
+            Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+            1
           )
 
           mo = matchOrders(mo, counter1)
@@ -554,7 +591,8 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.00125.some,
                 avgWeighedPrice = 3.0.some
               )
-            )
+            ),
+            2
           )
 
           mo = matchOrders(mo, counter2)
@@ -566,7 +604,8 @@ class ActorsWebSocketInteractionsSpecification
                       filledAmount = 10.0.some,
                       filledFee = 0.0025.some,
                       avgWeighedPrice = 3.05.some)
-            )
+            ),
+            3
           )
 
           matchOrders(mo, counter3)
@@ -580,13 +619,15 @@ class ActorsWebSocketInteractionsSpecification
                 filledFee = 0.003.some,
                 avgWeighedPrice = 3.07.some
               )
-            )
+            ),
+            4
           )
 
           updateBalances(Map(Waves -> 87.997.waves, usd -> 36.9.usd))
           expectWsBalancesAndOrders(
             Map(usd -> WsBalances(36.9, 0)),
-            Seq.empty
+            Seq.empty,
+            5
           )
       }
     }

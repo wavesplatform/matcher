@@ -18,6 +18,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
+
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
@@ -31,9 +32,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
     "be established" in {
       val wsc = mkWsAuthenticatedConnection(alice, dex1)
       wsc.close()
-      wsc.getMessagesBuffer.foreach { x =>
-        x.balances should not be empty
-      }
+      wsc.getMessagesBuffer.foreach { _.balances should not be empty }
     }
 
     "stop send updates after closing by user and resend after user open it again" in {
@@ -61,7 +60,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
         // format: on
       )
     ) { (assetPair, expectedStatus, expectedError) =>
-      val connection = mkWebSocketOrderBookConnection(assetPair, dex1)
+      val connection = mkWsOrderBookConnection(assetPair, dex1)
       val response   = Await.result(connection.getConnectionResponse, 1.second).response
 
       response.status shouldBe expectedStatus
@@ -77,7 +76,7 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       val kp = mkKeyPair("JIo6cTep_u3_6ocToHa")
 
       val timestamp     = System.currentTimeMillis
-      val signedMessage = "as".getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
+      val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
 
       val correctSignature   = com.wavesplatform.dex.domain.crypto.sign(kp, signedMessage).base58
       val incorrectSignature = "incorrectSignature"

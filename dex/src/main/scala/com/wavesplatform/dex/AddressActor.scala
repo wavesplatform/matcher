@@ -1,6 +1,7 @@
 package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
+import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
@@ -10,7 +11,7 @@ import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -205,7 +206,7 @@ class AddressActor(owner: Address,
       log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
-        log.trace(s"Confirming cancelation for $id")
+        log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
       }
 
@@ -226,20 +227,18 @@ class AddressActor(owner: Address,
 
     case Status.Failure(e) => log.error(s"Got $e", e)
 
-    case AddWsSubscription =>
-      log.trace(s"[${sender.hashCode()}] Web socket subscription was requested")
+    case AddWsSubscription(id) =>
+      log.trace(s"[$id] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender, id)
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
-      val snapshot =
-        WsAddressState(
-          balances = mkWsBalances(allAssetsSpendableBalance),
-          orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).toSeq
-        )
+      addressWsMutableState.sendSnapshot(
+        balances = mkWsBalances(allAssetsSpendableBalance),
+        orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao)))(collection.breakOut),
+      )
 
-      addressWsMutableState.pendingWsConnections.foreach(_ ! snapshot)
       if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
       addressWsMutableState = addressWsMutableState.flushPendingConnections()
 
@@ -252,21 +251,17 @@ class AddressActor(owner: Address,
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
       if (addressWsMutableState.hasActiveConnections) {
-
-        val diff =
-          WsAddressState(
-            balances = mkWsBalances(spendableBalances),
-            orders = addressWsMutableState.getAllOrderChanges
-          )
-
-        addressWsMutableState.activeWsConnections.foreach(_ ! diff)
+        addressWsMutableState = addressWsMutableState.sendDiffs(
+          balances = mkWsBalances(spendableBalances),
+          orders = addressWsMutableState.getAllOrderChanges
+        )
         scheduleNextDiffSending
       }
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${wsSource.hashCode()}] Web socket connection closed")
+      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)._1}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
@@ -572,8 +567,8 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case object AddWsSubscription           extends Message
-  case object PrepareDiffForWsSubscribers extends Message
+  case class AddWsSubscription(connectionId: UUID) extends Message
+  case object PrepareDiffForWsSubscribers          extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)
@@ -585,5 +580,4 @@ object AddressActor {
   object Settings {
     val default: Settings = Settings(100.milliseconds, 20.seconds, 200)
   }
-
 }

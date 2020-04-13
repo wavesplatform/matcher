@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.market
 
-import java.io.EOFException
-
 import akka.actor.typed
 import akka.actor.typed.scaladsl.adapter._
 import akka.{actor => classic}
@@ -211,10 +209,10 @@ class OrderBookActor(settings: Settings,
 
 object OrderBookActor {
 
-  private val reason = new EOFException("Order book was deleted")
-  reason.setStackTrace(Array.empty)
+//  private val reason = new EOFException("Order book was deleted")
+//  reason.setStackTrace(Array.empty)
 
-  private val wsCloseMessage = classic.Status.Failure(reason) // TODO
+//  private val wsCloseMessage = classic.Status.Failure(reason) // TODO
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 

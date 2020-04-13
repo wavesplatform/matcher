@@ -81,23 +81,25 @@ object WsOrderBook {
     override def empty: WsSide               = TreeMap.empty(ordering)
   }
 
-  class Update(amountAssetDecimals: Int, priceAssetDecimals: Int) {
+  def from(amountDecimals: Int,
+           priceDecimals: Int,
+           asks: Iterable[LevelAgg],
+           bids: Iterable[LevelAgg],
+           lt: Option[LastTrade],
+           updateId: Long): WsOrderBook =
+    WsOrderBook(asks = side(amountDecimals, priceDecimals, asks, asksOrdering), bids = side(amountDecimals, priceDecimals, bids, bidsOrdering), lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)), updateId = updateId)
 
-    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade], updateId: Long): WsOrderBook =
-      WsOrderBook(asks = side(asks, asksOrdering), bids = side(bids, bidsOrdering), lastTrade = lt.map(lastTrade), updateId = updateId)
+  def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(
+    price = denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble,
+    amount = denormalizeAmountAndFee(x.amount, amountDecimals).toDouble,
+    side = x.side
+  )
 
-    def lastTrade(x: LastTrade): WsLastTrade = WsLastTrade(
-      price = denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble,
-      amount = denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble,
-      side = x.side
-    )
-
-    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
-      TreeMap(
-        xs.map { x =>
-          denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-            denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
-        }.toSeq: _*
-      )(ordering)
-  }
+  def side(amountDecimals: Int, priceDecimals: Int, xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
+    TreeMap(
+      xs.map { x =>
+        denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble ->
+          denormalizeAmountAndFee(x.amount, amountDecimals).toDouble
+      }.toSeq: _*
+    )(ordering)
 }

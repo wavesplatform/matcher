@@ -37,8 +37,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
 
   def apply(settings: OrderBookActor.Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
     Behaviors.setup { context =>
-      val compile   = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
-      val wsUpdates = new WsOrderBook.Update(amountDecimals, priceDecimals: Int)
+      val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
       def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates)
 
@@ -81,7 +80,9 @@ object AggregatedOrderBookActor extends ScorexLogging {
             case Command.AddWsSubscription(client) =>
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               val ob = state.toOrderBookAggregatedSnapshot
-              client ! wsUpdates.from(
+              client ! WsOrderBook.from(
+                amountDecimals = amountDecimals,
+                priceDecimals = priceDecimals,
                 asks = ob.asks,
                 bids = ob.bids,
                 lt = state.lastTrade,
@@ -177,8 +178,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
       compiledHttpView = Map.empty,
       ws = OrderBookWsState(
         Map.empty,
-        TreeMap.empty(OrderBook.asksOrdering),
-        TreeMap.empty(OrderBook.bidsOrdering),
+        Set.empty,
+        Set.empty,
         lastTrade = None,
         timestamp = System.currentTimeMillis()
       )

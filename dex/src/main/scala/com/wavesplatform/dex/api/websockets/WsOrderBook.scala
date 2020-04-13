@@ -4,10 +4,9 @@ import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.model.Denormalization._
-import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts}
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -100,29 +99,5 @@ object WsOrderBook {
             denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
         }.toSeq: _*
       )(ordering)
-
-    // TODO Use AggregatedOrderBookActor!
-    def withLevelChanges(orig: WsOrderBook, updated: LevelAmounts): WsOrderBook = orig.copy(
-      asks = denormalized(updated.asks).foldLeft(orig.asks) {
-        case (r, (price, amount)) =>
-          val updatedAmount = r.getOrElse(price, 0d) + amount
-          if (updatedAmount == 0d) r - price else r.updated(price, updatedAmount)
-      },
-      bids = denormalized(updated.bids).foldLeft(orig.bids) {
-        case (r, (price, amount)) =>
-          val updatedAmount = r.getOrElse(price, 0d) + amount
-          if (updatedAmount == 0d) r - price else r.updated(price, updatedAmount)
-      },
-      timestamp = System.currentTimeMillis
-    )
-
-    def withLastTrade(orig: WsOrderBook, x: LastTrade): WsOrderBook =
-      orig.copy(lastTrade = Some(lastTrade(x)), timestamp = System.currentTimeMillis)
-
-    private def denormalized(xs: Map[Price, Amount]): Map[Double, Double] = xs.map {
-      case (price, amount) =>
-        denormalizePrice(price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-          denormalizeAmountAndFee(amount, amountAssetDecimals).toDouble
-    }
   }
 }

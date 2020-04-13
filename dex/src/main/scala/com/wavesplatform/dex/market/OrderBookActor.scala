@@ -147,7 +147,12 @@ class OrderBookActor(settings: Settings,
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
     log.info(s"Level changes: $levelChanges")
-    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO submitted millis
+    val hasTrades = events.exists {
+      case _: Events.OrderExecuted => true
+      case _                       => false
+    }
+    val lastTrade = if (hasTrades) orderBook.lastTrade else None
+    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, System.currentTimeMillis()) // TODO submitted millis
     processEvents(events)
   }
 
@@ -168,7 +173,7 @@ class OrderBookActor(settings: Settings,
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         log.info(s"Level changes: $levelChanges")
-        aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, cancelEvent.timestamp)
+        aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")

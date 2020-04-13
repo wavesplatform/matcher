@@ -22,11 +22,11 @@ class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: Fini
 
   import context.dispatcher
 
-  private val maxLifetimeExceeded = scheduleOnce(maxConnectionLifetime, CloseConnection(MaxLifetimeExceeded(connectionSource.id)))
+  private val maxLifetimeExceeded = scheduleOnce(maxConnectionLifetime, CloseConnection(MaxLifetimeExceeded))
   private val firstPing           = scheduleOnce(settings.pingInterval, SendPing)
 
   private def scheduleOnce(delay: FiniteDuration, message: Any): Cancellable = context.system.scheduler.scheduleOnce(delay, self, message)
-  private def schedulePongTimeout(): Cancellable                             = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout(connectionSource.id)))
+  private def schedulePongTimeout(): Cancellable                             = scheduleOnce(settings.pongTimeout, CloseConnection(PongTimeout))
 
   private def awaitPong(maybeExpectedPong: Option[PingOrPong], pongTimeout: Cancellable, nextPing: Cancellable): Receive = {
 
@@ -49,13 +49,20 @@ class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: Fini
 
   private def closeSourceAndCancelAllTasks(terminationStatus: TerminationStatus, tasks: List[Cancellable]): Unit = {
     tasks.foreach { _.cancel() }
-    connectionSource.ref ! akka.actor.Status.Success(terminationStatus)
+    val reasonText = terminationStatus match {
+      case PongTimeout         => "WebSocket has reached pong timeout"
+      case MaxLifetimeExceeded => "WebSocket has reached max allowed lifetime"
+    }
+    log.trace(s"[${connectionSource.name}] $reasonText")
+    connectionSource.close(terminationStatus)
+    context.stop(self)
   }
 
   private def sendPingAndScheduleNextOne(): (PingOrPong, Cancellable) = {
-    val ping     = PingOrPong(connectionSource.id)
+    val nextUuid = UUID.randomUUID()
+    val ping     = PingOrPong(nextUuid)
     val nextPing = scheduleOnce(settings.pingInterval, SendPing)
-    connectionSource.ref ! ping
+    connectionSource.ping(ping)
     ping -> nextPing
   }
 

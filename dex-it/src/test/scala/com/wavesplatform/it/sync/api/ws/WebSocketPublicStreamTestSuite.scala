@@ -31,7 +31,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
       WsOrderBook(
         asks = r.asks ++ x.asks,
         bids = r.bids ++ x.bids,
-        lastTrade = r.lastTrade.orElse(x.lastTrade),
+        lastTrade = x.lastTrade.orElse(r.lastTrade),
         updateId = x.updateId,
         timestamp = xs.toList.last.timestamp
       )

@@ -84,9 +84,7 @@ class ActorsWebSocketInteractionsSpecification
       )
     }
 
-    def subscribe(): Unit = {
-      addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), eventsProbe.ref)
-    }
+    def subscribe(): Unit = addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
@@ -363,7 +361,7 @@ class ActorsWebSocketInteractionsSpecification
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
         updateBalances(tradableBalance)
 
-        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), tp.ref)
+        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), tp.ref)
 
         def expectWsBalance(tp: TestProbe, expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
           val wsAddressState = tp.expectMsgAnyClassOf(10.second, classOf[WsAddressState])

@@ -1,17 +1,17 @@
 package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.Done
-import akka.actor.{ActorRef, Status}
+import akka.actor.{ActorRef, Status, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.typed.scaladsl.ActorSource
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import cats.syntax.option._
 import com.google.common.primitives.Longs
@@ -22,7 +22,6 @@ import com.wavesplatform.dex.api.websockets.WsMessage
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
-import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus.{MaxLifetimeExceeded, PongTimeout}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -58,14 +57,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   private val completionMatcher: PartialFunction[Any, CompletionStrategy] = {
-
-    case Status.Success(terminationStatus: TerminationStatus) =>
-      terminationStatus match {
-        case PongTimeout(id)         => log.trace(s"[$id] WebSocket has reached pong timeout, closing...")
-        case MaxLifetimeExceeded(id) => log.trace(s"[$id] WebSocket has reached max allowed lifetime, closing...")
-      }
-      CompletionStrategy.immediately
-
+    case WsMessage.Complete                    => CompletionStrategy.immediately
     case Status.Success(s: CompletionStrategy) => s
     case Status.Success(_)                     => CompletionStrategy.draining
     case Status.Success                        => CompletionStrategy.draining
@@ -83,26 +75,24 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       )
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
-        val connectionId = UUID.randomUUID()
-        addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription(connectionId)), sourceActor)
-        ConnectionSource(connectionId, sourceActor)
+        addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription), sourceActor)
+        ConnectionSource.AddressUpdates(sourceActor)
       }
       .watchTermination()(handleTermination)
   }
 
   private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, ConnectionSource] = {
-    Source
+    ActorSource
       .actorRef[WsMessage](
-        completionMatcher,
-        failureMatcher,
+        { case WsMessage.Complete => },
+        PartialFunction.empty,
         10,
         OverflowStrategy.fail
       )
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
-        val connectionId = UUID.randomUUID()
-        matcher.tell(MatcherActor.AggregatedOrderBookMessage(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor, connectionId)), sourceActor)
-        ConnectionSource(connectionId, sourceActor)
+        matcher ! MatcherActor.AggregatedOrderBookMessage(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
+        ConnectionSource.OrderBook(sourceActor)
       }
       .watchTermination()(handleTermination)
   }
@@ -195,8 +185,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   private def handleTermination(cs: ConnectionSource, r: Future[Done]): ConnectionSource = {
     r.onComplete {
-      case Success(_) => log.trace(s"[${cs.id}] WebSocket connection successfully closed")
-      case Failure(e) => log.trace(s"[${cs.id}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
+      case Success(_) => log.trace(s"[${cs.name}] WebSocket connection successfully closed")
+      case Failure(e) =>
+        log.trace(s"[${cs.name}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
     cs
   }
@@ -206,6 +197,25 @@ object MatcherWebSocketRoute {
 
   val balanceStreamPrefix: String = "au"
 
-  final case class ConnectionSource(id: UUID, ref: ActorRef)
+  trait ConnectionSource {
+    def name: String
+    def ping(message: PingOrPong): Unit
+    def close(terminationStatus: TerminationStatus): Unit
+  }
+
+  object ConnectionSource {
+    final case class AddressUpdates(ref: ActorRef) extends ConnectionSource {
+      override def name: String                                      = ref.path.name
+      override def ping(message: PingOrPong): Unit                   = ref ! message
+      override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete
+    }
+
+    final case class OrderBook(ref: typed.ActorRef[WsMessage]) extends ConnectionSource {
+      override def name: String                                      = ref.path.name
+      override def ping(message: PingOrPong): Unit                   = ref ! message
+      override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete
+    }
+  }
+
   final case class AuthParams(expirationTimestamp: Long, signature: ByteStr)
 }

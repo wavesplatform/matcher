@@ -1,14 +1,13 @@
 package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
-import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.dex.AddressActor._
+import com.wavesplatform.dex.AddressActor.{AddWsSubscription, _}
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
 import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
@@ -227,10 +226,10 @@ class AddressActor(owner: Address,
 
     case Status.Failure(e) => log.error(s"Got $e", e)
 
-    case AddWsSubscription(id) =>
-      log.trace(s"[$id] WebSocket connected")
+    case AddWsSubscription =>
+      log.trace(s"[${sender.path.name}] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender, id)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
@@ -261,7 +260,7 @@ class AddressActor(owner: Address,
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)._1}] WebSocket terminated")
+      log.info(s"[${wsSource.path.name}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
@@ -567,8 +566,8 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case class AddWsSubscription(connectionId: UUID) extends Message
-  case object PrepareDiffForWsSubscribers          extends Message
+  case object AddWsSubscription           extends Message
+  case object PrepareDiffForWsSubscribers extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)

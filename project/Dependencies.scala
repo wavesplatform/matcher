@@ -80,6 +80,7 @@ object Dependencies {
 
   private val akkaActor            = akkaModule("akka-actor", Version.akka)
   private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
+  private val akkaStreamsTyped     = akkaModule("akka-stream-typed", Version.akka)
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
@@ -155,6 +156,7 @@ object Dependencies {
     Seq(
       akkaActor,
       akkaActorTyped,
+      akkaStreamsTyped,
       akkaHttp,
       akkaModule("akka-stream", Version.akka),
       jacksonModule("core", "core"),
@@ -185,6 +187,7 @@ object Dependencies {
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,
       akkaActorTyped,
+      akkaStreamsTyped,
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,

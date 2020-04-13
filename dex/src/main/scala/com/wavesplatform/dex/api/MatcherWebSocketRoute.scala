@@ -30,7 +30,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.RequestInvalidSignature
-import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
 import io.swagger.annotations.Api
@@ -101,7 +101,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         val connectionId = UUID.randomUUID()
-        matcher.tell(MatcherActor.AddWsSubscription(pair, connectionId), sourceActor)
+        matcher.tell(MatcherActor.AggregatedOrderBookMessage(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor, connectionId)), sourceActor)
         ConnectionSource(connectionId, sourceActor)
       }
       .watchTermination()(handleTermination)

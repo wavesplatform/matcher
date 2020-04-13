@@ -8,11 +8,11 @@ import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
-import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
-import com.wavesplatform.dex.market.MatcherActor.{AddWsSubscription, ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
+import com.wavesplatform.dex.error
+import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
@@ -21,7 +21,6 @@ import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
-import com.wavesplatform.dex.{OrderBookWsState, error}
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory
@@ -35,8 +34,9 @@ class OrderBookActor(settings: Settings,
                      addressActor: classic.ActorRef,
                      snapshotStore: classic.ActorRef,
                      assetPair: AssetPair,
+                     amountDecimals: Int,
+                     priceDecimals: Int,
                      time: Time,
-                     wsUpdates: WsOrderBook.Update,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
@@ -59,8 +59,6 @@ class OrderBookActor(settings: Settings,
   private var orderBook   = OrderBook.empty
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)
-
-  private var wsState = OrderBookWsState(wsUpdates, Map.empty, WsOrderBook.empty)
 
   private def actualizeRules(offset: QueueEventWithMeta.Offset): Unit = {
     val actualRules = DenormalizedMatchingRule.skipOutdated(offset, matchingRules)
@@ -87,8 +85,10 @@ class OrderBookActor(settings: Settings,
 
       lastProcessedOffset foreach actualizeRules
 
-      // TODO
-      aggregated = context.spawn(AggregatedOrderBookActor(assetPair, 8, 8, AggregatedOrderBookActor.State.fromOrderBook(orderBook)), "aggregated")
+      aggregated = context.spawn(
+        AggregatedOrderBookActor(settings, assetPair, amountDecimals, priceDecimals, AggregatedOrderBookActor.State.fromOrderBook(orderBook)),
+        "aggregated"
+      )
       processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
@@ -109,9 +109,9 @@ class OrderBookActor(settings: Settings,
             case QueueEvent.Placed(limitOrder)        => onAddOrder(request, limitOrder)
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
-            case _: QueueEvent.OrderBookDeleted =>
-              wsState.wsConnections.foreach(_ ! wsCloseMessage)
-              wsState = wsState.withoutSubscriptions
+            case _: QueueEvent.OrderBookDeleted       =>
+//              wsState.wsConnections.foreach(_ ! wsCloseMessage)
+//              wsState = wsState.withoutSubscriptions // ???
               process(orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
@@ -135,25 +135,10 @@ class OrderBookActor(settings: Settings,
         savingSnapshot = Some(globalEventNr)
       }
 
-    case AddWsSubscription(_, id) =>
-      if (!wsState.hasSubscriptions) scheduleNextSendWsUpdates()
-      wsState = wsState.addSubscription(sender, id)
-      sender ! wsSnapshotOf(orderBook)
-      log.trace(s"[$id] WebSocket connected")
-      context.watch(sender)
-
-    case SendWsUpdates =>
-      wsState = wsState.flushed()
-      if (wsState.hasSubscriptions) scheduleNextSendWsUpdates()
-
     case x: AggregatedOrderBookActor.Message => aggregated.tell(x)
 
     case classic.Terminated(ws) =>
       if (ws == aggregated) log.error("Terminated aggregated actor!")
-      else {
-        log.trace(s"[${wsState.wsConnections(ws)._1}] WebSocket terminated")
-        wsState = wsState.withoutSubscription(ws)
-      }
   }
 
   override val receive: Receive = recovering
@@ -161,15 +146,8 @@ class OrderBookActor(settings: Settings,
   private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
-    log.info(s"Level changes: $levelChanges, before wsState.changes: ${wsState.changes}")
-    wsState = wsState.withLevelChanges(levelChanges)
-    val hasTrades = events.exists {
-      case _: Events.OrderExecuted => true
-      case _                       => false
-    }
-    if (hasTrades) orderBook.lastTrade.map(wsState.withLastTrade).foreach(wsState = _)
-    log.info(s"after wsState.changes: ${wsState.changes}")
-    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO
+    log.info(s"Level changes: $levelChanges")
+    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, System.currentTimeMillis()) // TODO submitted millis
     processEvents(events)
   }
 
@@ -189,9 +167,7 @@ class OrderBookActor(settings: Settings,
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
-        log.info(s"Level changes: $levelChanges, before wsState.changes: ${wsState.changes}")
-        wsState = wsState.withLevelChanges(levelChanges)
-        log.info(s"after wsState.changes: ${wsState.changes}")
+        log.info(s"Level changes: $levelChanges")
         aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, orderBook.lastTrade, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
@@ -209,16 +185,6 @@ class OrderBookActor(settings: Settings,
     log.warn(s"Restarting actor because of $message", reason)
     super.preRestart(reason, message)
   }
-
-  private def wsSnapshotOf(ob: OrderBook): WsOrderBook = wsUpdates.from(
-    asks = ob.asks.aggregated,
-    bids = ob.bids.aggregated,
-    lt = ob.lastTrade,
-    updateId = 0
-  )
-
-  private def scheduleNextSendWsUpdates(): classic.Cancellable =
-    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, SendWsUpdates)
 
   private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit = {
     val saveSnapshot = (lastSavedSnapshotOffset, lastProcessedOffset).tupled.forall { case (saved, processed) => saved < processed }
@@ -243,7 +209,7 @@ object OrderBookActor {
   private val reason = new EOFException("Order book was deleted")
   reason.setStackTrace(Array.empty)
 
-  private val wsCloseMessage = classic.Status.Failure(reason)
+  private val wsCloseMessage = classic.Status.Failure(reason) // TODO
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 
@@ -252,8 +218,9 @@ object OrderBookActor {
             addressActor: classic.ActorRef,
             snapshotStore: classic.ActorRef,
             assetPair: AssetPair,
+            amountDecimals: Int,
+            priceDecimals: Int,
             time: Time,
-            wsUpdates: WsOrderBook.Update,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
@@ -265,8 +232,9 @@ object OrderBookActor {
         addressActor,
         snapshotStore,
         assetPair,
+        amountDecimals,
+        priceDecimals,
         time,
-        wsUpdates,
         matchingRules,
         updateCurrentMatchingRules,
         normalizeMatchingRule,

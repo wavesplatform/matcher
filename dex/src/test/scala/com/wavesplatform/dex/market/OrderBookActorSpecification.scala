@@ -8,7 +8,6 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -81,8 +80,9 @@ class OrderBookActorSpecification
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
         pair,
+        8,
+        8,
         time,
-        new WsOrderBook.Update(8, 8),
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),

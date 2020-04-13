@@ -14,7 +14,6 @@ import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
-import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
@@ -115,8 +114,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       addressActors,
       orderBookSnapshotStore,
       assetPair,
+      amountDecimals = assetDecimals(assetPair.amountAsset),
+      priceDecimals = assetDecimals(assetPair.priceAsset),
       time,
-      wsUpdates = new WsOrderBook.Update(assetDecimals(assetPair.amountAsset), assetDecimals(assetPair.priceAsset)),
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),

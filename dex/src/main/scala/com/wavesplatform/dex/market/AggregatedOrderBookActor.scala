@@ -1,15 +1,21 @@
 package com.wavesplatform.dex.market
 
+import java.util.UUID
+
+import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import cats.kernel.Monoid
+import com.wavesplatform.dex.OrderBookWsState
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
+import mouse.any.anySyntaxMouse
 
 import scala.collection.immutable.TreeMap
 
@@ -28,55 +34,77 @@ object AggregatedOrderBookActor extends ScorexLogging {
   sealed trait Command extends Message
   object Command {
     case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], ts: Long) extends Command
+    case class AddWsSubscription(client: ActorRef[WsOrderBook], id: UUID)                       extends Command
+    private[AggregatedOrderBookActor] case object SendWsUpdates                                 extends Command
   }
 
-  def apply(assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
-    Behaviors.setup { _ =>
-      val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
-      def default(state: State): Behaviors.Receive[Message] = Behaviors.receiveMessage {
-        case Query.GetHttpView(format, depth, client) =>
-          val flushed = state.flushed
-          val key     = (format, depth)
-          // TODO refactor
-          val updatedState = flushed.compiledHttpView.get(key) match {
-            case Some(r) =>
-              client ! r
-              flushed
+  def apply(settings: OrderBookActor.Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
+    Behaviors.setup { context =>
+      val compile   = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
+      val wsUpdates = new WsOrderBook.Update(amountDecimals, priceDecimals: Int)
 
-            case _ =>
-              val compiledHttpView = compile(flushed, format, depth)
-              client ! compiledHttpView
-              flushed.copy(compiledHttpView = state.compiledHttpView.updated(key, compiledHttpView))
+      def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates)
+
+      def default(state: State): Behavior[Message] =
+        Behaviors
+          .receiveMessage[Message] {
+            case query: Query =>
+              val flushed = state.flushed
+              val updatedState = query match {
+                case Query.GetMarketStatus(client)       => flushed.unsafeTap(client ! _.marketStatus)
+                case Query.GetAggregatedSnapshot(client) => flushed.unsafeTap(client ! _.toOrderBookAggregatedSnapshot)
+                case Query.GetHttpView(format, depth, client) =>
+                  val key = (format, depth)
+                  val (updatedState, httpResponse) = flushed.compiledHttpView.get(key) match {
+                    case Some(r) => (flushed, r)
+                    case _ =>
+                      val r = compile(flushed, format, depth)
+                      (flushed.copy(compiledHttpView = flushed.compiledHttpView.updated(key, r)), r)
+                  }
+                  client ! httpResponse
+                  updatedState
+              }
+              log.info(s"[$assetPair] $query: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
+              default(updatedState)
+
+            case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
+              val updatedPendingChanges = Monoid.combine(state.pendingChanges, levelChanges)
+              log.info(s"[$assetPair] ApplyChanges: pendingChanges:${state.pendingChanges} + levelChanges:$levelChanges = $updatedPendingChanges")
+              default(
+                state.copy(
+                  lastTrade = lastTrade,
+                  lastUpdate = ts,
+                  pendingChanges = updatedPendingChanges,
+                  ws = lastTrade.foldLeft(state.ws.withLevelChanges(wsUpdates, levelChanges))(_.withLastTrade(wsUpdates, _))
+                ))
+
+            case Command.AddWsSubscription(client, id) =>
+              val flushed = state.flushed
+
+              if (!flushed.ws.hasSubscriptions) scheduleNextSendWsUpdates()
+              val ob = flushed.toOrderBookAggregatedSnapshot
+              client ! wsUpdates.from(
+                asks = ob.asks,
+                bids = ob.bids,
+                lt = flushed.lastTrade,
+                updateId = 0L
+              )
+
+              log.trace(s"[$id, name=${client.path.name}] WebSocket connected")
+              context.watch(client)
+              default(flushed.copy(ws = flushed.ws.addSubscription(client, id)))
+
+            case Command.SendWsUpdates =>
+              val flushed = state.copy(ws = state.ws.flushed())
+              if (flushed.ws.hasSubscriptions) scheduleNextSendWsUpdates()
+              default(flushed)
           }
-          log.info(s"[$assetPair] GetHttpView: updatedState.asks:${flushed.asks}, updatedState.bids:${flushed.bids}")
-          default(updatedState)
-
-        case Query.GetMarketStatus(client) =>
-          val updatedState = state.flushed
-          log.info(s"[$assetPair] GetMarketStatus: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
-          client ! updatedState.marketStatus
-          default(updatedState)
-
-        case Query.GetAggregatedSnapshot(client) =>
-          val updatedState = state.flushed
-          log.info(s"[$assetPair] GetAggregatedSnapshot: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
-          client ! OrderBookAggregatedSnapshot(
-            asks = updatedState.asks.map(State.toLevelAgg).toSeq,
-            bids = updatedState.bids.map(State.toLevelAgg).toSeq
-          )
-
-          default(updatedState)
-
-        case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
-          val updatedPendingChanges = Monoid.combine(state.pendingChanges, levelChanges)
-          log.info(s"[$assetPair] ApplyChanges: pendingChanges:${state.pendingChanges} + levelChanges:$levelChanges = $updatedPendingChanges")
-          default(
-            state.copy(
-              lastTrade = lastTrade,
-              lastUpdate = ts,
-              pendingChanges = updatedPendingChanges
-            ))
-      }
+          .receiveSignal {
+            case (context, Terminated(ws)) =>
+              // TODO move to context.log
+              log.trace(s"[${ws.path.name}] WebSocket terminated")
+              default(state.copy(ws = state.ws.withoutSubscription(ws)))
+          }
 
       default(init)
     }
@@ -110,7 +138,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
       lastTrade: Option[LastTrade],
       lastUpdate: Long,
       compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-      pendingChanges: LevelAmounts
+      pendingChanges: LevelAmounts,
+      ws: OrderBookWsState
   ) {
     lazy val marketStatus = MarketStatus(
       lastTrade = lastTrade,
@@ -136,6 +165,11 @@ object AggregatedOrderBookActor extends ScorexLogging {
           pendingChanges = LevelAmounts.empty,
           compiledHttpView = Map.empty // Could be optimized by depth
         )
+
+    def toOrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(
+      asks = asks.map(State.toLevelAgg).toSeq,
+      bids = bids.map(State.toLevelAgg).toSeq
+    )
   }
 
   object State {
@@ -145,7 +179,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
       lastTrade = None,
       lastUpdate = 0,
       compiledHttpView = Map.empty,
-      pendingChanges = LevelAmounts.empty
+      pendingChanges = LevelAmounts.empty,
+      ws = OrderBookWsState(Map.empty, WsOrderBook.empty)
     )
 
     def fromOrderBook(ob: OrderBook): State = State(
@@ -154,7 +189,8 @@ object AggregatedOrderBookActor extends ScorexLogging {
       lastTrade = ob.lastTrade,
       lastUpdate = System.currentTimeMillis(), // TODO
       compiledHttpView = Map.empty,
-      pendingChanges = LevelAmounts.empty
+      pendingChanges = LevelAmounts.empty,
+      ws = empty.ws
     )
 
     // TODO could it be > Long.Max?

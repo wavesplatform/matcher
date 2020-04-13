@@ -264,7 +264,6 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   }
 
   "Second connection should get the actual data" in {
-
     val acc  = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves)
     val wsc1 = mkWsAuthenticatedConnection(acc, dex1)
 
@@ -275,7 +274,10 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now)
     val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now + 100)
 
-    Seq(bo1, bo2).foreach { placeAndAwaitAtDex(_) }
+    Seq(bo1, bo2).foreach { o =>
+      placeAndAwaitAtDex(o)
+      Thread.sleep(100)
+    }
 
     val wsc2 = mkWsAuthenticatedConnection(acc, dex1)
 

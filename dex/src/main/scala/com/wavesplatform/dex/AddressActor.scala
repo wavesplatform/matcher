@@ -245,7 +245,7 @@ class AddressActor(owner: Address,
 
     case PrepareDiffForWsSubscribers =>
       if (addressWsMutableState.hasActiveConnections) {
-        if (addressWsMutableState.hasChangedAssets) {
+        if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
         } else scheduleNextDiffSending
       }
@@ -391,15 +391,16 @@ class AddressActor(owner: Address,
       }
 
       // Further improvements will be made in DEX-467
-      addressWsMutableState = (
-        status match {
-          case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
-          case _: OrderStatus.Cancelled => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-          case _ =>
-            if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
-            else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
-        }
-      ).putReservedAssets(openVolumeDiff.keySet)
+      addressWsMutableState = status match {
+        case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))
+        case _: OrderStatus.Cancelled => addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+        case _ =>
+          if (isSystemCancel) addressWsMutableState.putOrderStatusUpdate(remaining.id, status)
+          else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
+      }
+
+      // We already notified clients about these changes after order passed validation (see def place)
+      if (status != OrderStatus.Accepted) addressWsMutableState = addressWsMutableState.putReservedAssets(openVolumeDiff.keySet)
     }
   }
 

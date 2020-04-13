@@ -39,14 +39,14 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsAuthenticatedConnection(acc, dex1)
 
-      eventually { wsc.getAllBalances should have size 1 }
+      eventually { wsc.getBalancesChanges should have size 1 }
       wsc.close()
 
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
-      wsc.getAllBalances should have size 1
+      wsc.getBalancesChanges should have size 1
 
       val wsc2 = mkWsAuthenticatedConnection(acc, dex1)
-      eventually { wsc2.getAllBalances should have size 2 }
+      eventually { wsc2.getBalancesChanges should have size 1 }
     }
 
     val wavesEthPair = AssetPair(Waves, eth)

@@ -14,9 +14,6 @@ class WsAuthenticatedConnection(uri: String, apiKey: Option[String], keepAlive: 
                                          apiKey = apiKey,
                                          keepAlive = keepAlive) {
 
-  def getBalancesChanges: Seq[Map[Asset, WsBalances]] = getMessagesBuffer.map(_.balances).distinct
-  def getOrderChanges: Seq[WsOrder]                   = getMessagesBuffer.flatMap(_.orders).distinct
-  def getSnapshot: WsAddressState                     = getMessagesBuffer.headOption.getOrElse(WsAddressState.empty)
-  def getAllBalances: List[(Asset, WsBalances)]       = getMessagesBuffer.flatMap(_.balances).toList
-  def getAllOrders: List[WsOrder]                     = getMessagesBuffer.flatMap(_.orders).toList
+  def getBalancesChanges: Seq[Map[Asset, WsBalances]] = getMessagesBuffer.map(_.balances).filter(_.nonEmpty)
+  def getOrderChanges: Seq[WsOrder]                   = getMessagesBuffer.flatMap(_.orders)
 }

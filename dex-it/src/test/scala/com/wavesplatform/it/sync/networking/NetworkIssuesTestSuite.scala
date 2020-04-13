@@ -44,17 +44,17 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy with Has
       val acc = mkAccountWithBalance(100.waves -> Waves)
       val wsc = mkWsAuthenticatedConnection(acc, dex1)
 
-      eventually {  wsc.getAllBalances should have size 1  }
+      eventually { wsc.getBalancesChanges should have size 1 }
 
       wsc.close()
       dex1.disconnectFromNetwork()
 
       broadcastAndAwait(mkTransfer(acc, alice.toAddress, 99.waves, Waves))
-      wavesNode1.api.balance(acc.toAddress, Waves) should be (0.999.waves)
+      wavesNode1.api.balance(acc.toAddress, Waves) should be(0.999.waves)
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith (3147270)
+      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
     }
 
     "user doesn't have a balances snapshot (got by ws connection)" in {
@@ -63,11 +63,11 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy with Has
       dex1.disconnectFromNetwork()
 
       broadcastAndAwait(mkTransfer(acc, alice.toAddress, 99.waves, Waves))
-      wavesNode1.api.balance(acc.toAddress, Waves) should be (0.999.waves)
+      wavesNode1.api.balance(acc.toAddress, Waves) should be(0.999.waves)
 
       dex1.connectToNetwork()
 
-      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith (3147270)
+      dex1.api.tryPlace(mkOrder(acc, wavesUsdPair, SELL, 50.waves, 1.usd)) should failWith(3147270)
     }
   }
 

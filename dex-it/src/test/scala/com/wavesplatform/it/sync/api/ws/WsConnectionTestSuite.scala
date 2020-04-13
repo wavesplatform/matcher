@@ -2,14 +2,15 @@ package com.wavesplatform.it.sync.api.ws
 
 import java.nio.charset.StandardCharsets
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes._
 import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.error.{ApiKeyIsNotValid, OrderAssetPairReversed, OrderBookStopped, RequestInvalidSignature}
+import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsAuthenticatedConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -55,8 +56,8 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       Table(
         // format: off
         ("pair",       "expected status",      "expected error"),
-        (wavesEthPair, StatusCodes.BadRequest, OrderAssetPairReversed(wavesEthPair)),
-        (ethWavesPair, StatusCodes.NotFound,   OrderBookStopped(ethWavesPair)),
+        (wavesEthPair, BadRequest, OrderAssetPairReversed(wavesEthPair)),
+        (ethWavesPair, NotFound,   OrderBookStopped(ethWavesPair)),
         // format: on
       )
     ) { (assetPair, expectedStatus, expectedError) =>
@@ -73,34 +74,56 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
 
     "correctly handle rejections (private stream)" in {
 
+      val ts = System.currentTimeMillis
       val kp = mkKeyPair("JIo6cTep_u3_6ocToHa")
 
-      val timestamp     = System.currentTimeMillis
-      val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ kp.publicKey.arr ++ Longs.toByteArray(timestamp)
+      val pk        = kp.publicKey
+      val a         = pk.toAddress
+      val signedMsg = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ pk.arr ++ Longs.toByteArray(ts)
+      val s         = com.wavesplatform.dex.domain.crypto.sign(kp, signedMsg).base58
 
-      val correctSignature   = com.wavesplatform.dex.domain.crypto.sign(kp, signedMessage).base58
-      val incorrectSignature = "incorrectSignature"
+      val anotherPk = mkKeyPair("6ocToH_u3_JIo6cTepa").publicKey
+      val invalidPk = "0OlI1"
+//      val invalidA  = Address.fromPublicKey(somePk, 'Z'.toByte) // TODO fix in DEX-701
+      val invalidS = "invalidS"
 
       val incorrectKey = "incorrectKey".some
-      val correctKey   = com.wavesplatform.dex.it.docker.apiKey.some
       val withoutKey   = Option.empty[String]
+      val key          = com.wavesplatform.dex.it.docker.apiKey.some
 
-      val uriWithoutParams                    = s"${getBaseBalancesStreamUri(dex1)}${kp.publicKey}"
-      def uriWithSignature(signature: String) = s"$uriWithoutParams?t=$timestamp&s=$signature"
+      val uriWithoutParams                                                  = s"${getBaseBalancesStreamUri(dex1)}$a"
+      def uriWithParams(addr: Address, pubKey: String, sig: String): String = s"${getBaseBalancesStreamUri(dex1)}$addr?p=$pubKey&t=$ts&s=$sig"
+
+      implicit def pk2string(publicKey: PublicKey): String = publicKey.toString
 
       forAll(
         Table(
           // format: off
-          ("uri",                                "api-key",    "expected status",             "expected error"),
-          (uriWithSignature(incorrectSignature), incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
-          (uriWithSignature(incorrectSignature), withoutKey,   StatusCodes.BadRequest,         RequestInvalidSignature.some),
-          (uriWithSignature(incorrectSignature), correctKey,   StatusCodes.SwitchingProtocols, None),
-          (uriWithSignature(correctSignature),   incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
-          (uriWithSignature(correctSignature),   withoutKey,   StatusCodes.SwitchingProtocols, None),
-          (uriWithSignature(correctSignature),   correctKey,   StatusCodes.SwitchingProtocols, None),
-          (uriWithoutParams,                     incorrectKey, StatusCodes.Forbidden,          ApiKeyIsNotValid.some),
-          (uriWithoutParams,                     withoutKey,   StatusCodes.BadRequest,         RequestInvalidSignature.some),
-          (uriWithoutParams,                     correctKey,   StatusCodes.SwitchingProtocols, None)
+          ("uri",                          "api-key",    "expected status",  "expected error"),
+          (uriWithoutParams,               incorrectKey, Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithoutParams,               withoutKey,   BadRequest,         AuthIsRequired.some),
+          (uriWithoutParams,               key,          SwitchingProtocols, None),
+
+          (uriWithParams(a, pk, s),        incorrectKey, Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithParams(a, pk, s),        withoutKey,   SwitchingProtocols, None),
+          (uriWithParams(a, pk, s),        key,          SwitchingProtocols, None),
+
+          // TODO fix in DEX-701
+//          (uriWithParams(invalidA, pk, s), incorrectKey, NotFound,          ???),
+//          (uriWithParams(invalidA, pk, s), withoutKey,   NotFound,          ???),
+//          (uriWithParams(invalidA, pk, s), key,          NotFound,          ???),
+
+          (uriWithParams(a, anotherPk, s), incorrectKey, Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithParams(a, anotherPk, s), withoutKey,   BadRequest,         AddressAndPublicKeyAreIncompatible(a, anotherPk).some),
+          (uriWithParams(a, anotherPk, s), key,          SwitchingProtocols, None),
+
+          (uriWithParams(a, invalidPk, s), incorrectKey, Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithParams(a, invalidPk, s), withoutKey,   BadRequest,         UserPublicKeyIsNotValid.some),
+          (uriWithParams(a, invalidPk, s), key,          SwitchingProtocols, None),
+          
+          (uriWithParams(a, pk, invalidS), incorrectKey, Forbidden,          ApiKeyIsNotValid.some),
+          (uriWithParams(a, pk, invalidS), withoutKey,   BadRequest,         RequestInvalidSignature.some),
+          (uriWithParams(a, pk, invalidS), key,          SwitchingProtocols, None)
           // format: on
         )
       ) { (uri, apiKey, expectedStatus, expectedError) =>

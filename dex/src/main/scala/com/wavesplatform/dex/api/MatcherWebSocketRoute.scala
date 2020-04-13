@@ -7,29 +7,30 @@ import java.util.concurrent.TimeUnit
 import akka.Done
 import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.http.scaladsl.server.{Directive0, Directive1, Route}
+import akka.http.scaladsl.server.{Directive0, Directive1, Route, StandardRoute}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
+import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.MatcherWebSocketRoute._
-import com.wavesplatform.dex.api.PathMatchers.{AssetPairPM, PublicKeyPM}
+import com.wavesplatform.dex.api.PathMatchers.{AddressPM, AssetPairPM}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.WsMessage
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus.{MaxLifetimeExceeded, PongTimeout}
-import com.wavesplatform.dex.domain.account.PublicKey
+import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.RequestInvalidSignature
+import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.market.MatcherActor
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
@@ -73,7 +74,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   private val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
 
-  private def accountUpdatesSource(publicKey: PublicKey): Source[TextMessage.Strict, ConnectionSource] = {
+  private def accountUpdatesSource(address: Address): Source[TextMessage.Strict, ConnectionSource] = {
     Source
       .actorRef[WsMessage](
         completionMatcher,
@@ -84,7 +85,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         val connectionId = UUID.randomUUID()
-        addressDirectory.tell(AddressDirectory.Envelope(publicKey, AddressActor.AddWsSubscription(connectionId)), sourceActor)
+        addressDirectory.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(connectionId)), sourceActor)
         ConnectionSource(connectionId, sourceActor)
       }
       .watchTermination()(handleTermination)
@@ -138,34 +139,41 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(sink, matSource) }
   }
 
-  private def signedGet(prefix: String, publicKey: PublicKey): Directive1[AuthParams] = {
-    val invalidSignatureResponse = complete(RequestInvalidSignature toWsHttpResponse StatusCodes.BadRequest)
+  private def respondWithError(me: MatcherError, sc: StatusCode = StatusCodes.BadRequest): StandardRoute = complete(me toWsHttpResponse sc)
 
+  private def signedGet(prefix: String, address: Address): Directive1[AuthParams] = {
     val directive: Directive1[AuthParams] =
-      parameters(('t, 's)).tflatMap {
-        case (timestamp, signature) =>
-          Base58
-            .tryDecodeWithLimit(signature)
-            .map { decodedSignature =>
+      parameters(('p, 't, 's)).tflatMap {
+        case (base58PublicKey, timestamp, base58Signature) =>
+          (
+            for {
+              publicKey <- PublicKey.fromBase58String(base58PublicKey).leftMap(_ => UserPublicKeyIsNotValid)
+              _         <- Either.cond(publicKey.toAddress == address, (), AddressAndPublicKeyAreIncompatible(address, publicKey))
+              signature <- Either.fromTry { Base58.tryDecodeWithLimit(base58Signature) }.leftMap(_ => RequestInvalidSignature)
+            } yield {
               val ts  = timestamp.toLong
               val msg = prefix.getBytes(StandardCharsets.UTF_8) ++ publicKey.arr ++ Longs.toByteArray(ts)
-              crypto.verify(decodedSignature, msg, publicKey) -> AuthParams(ts, decodedSignature)
-            } match {
-            case Success((true, authParams)) => provide(authParams)
-            case _                           => invalidSignatureResponse
+              crypto.verify(signature, msg, publicKey) -> AuthParams(ts, signature)
+            }
+          ) match {
+            case Right((true, authParams)) => provide(authParams)
+            case Right((false, _))         => respondWithError(RequestInvalidSignature)
+            case Left(matcherError)        => respondWithError(matcherError)
           }
       }
 
-    directive.recover(_ => invalidSignatureResponse)
+    directive.recover { _ =>
+      respondWithError(AuthIsRequired)
+    }
   }
 
-  /** Requires PublicKey, Timestamp and Signature of [prefix `as`, PublicKey, Timestamp] */
-  private def accountUpdates: Route = (path("accountUpdates" / PublicKeyPM) & get) { publicKey =>
+  /** Requires PublicKey, Timestamp and Signature of [prefix `au`, PublicKey, Timestamp] */
+  private def accountUpdates: Route = (path("accountUpdates" / AddressPM) & get) { address =>
     val directive = optionalHeaderValueByName(`X-Api-Key`.name).flatMap { maybeKey =>
-      if (maybeKey.isDefined) withAuth.tmap(_ => none[AuthParams]) else signedGet(balanceStreamPrefix, publicKey).map(_.some)
+      if (maybeKey.isDefined) withAuth.tmap(_ => none[AuthParams]) else signedGet(balanceStreamPrefix, address).map(_.some)
     }
     directive { maybeAuthParams =>
-      createStreamFor(accountUpdatesSource(publicKey), maybeAuthParams.map(_.expirationTimestamp))
+      createStreamFor(accountUpdatesSource(address), maybeAuthParams.map(_.expirationTimestamp))
     }
   }
 

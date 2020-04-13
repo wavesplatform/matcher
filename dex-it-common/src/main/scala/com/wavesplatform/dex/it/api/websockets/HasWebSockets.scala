@@ -42,7 +42,7 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
     val timestamp     = System.currentTimeMillis() + connectionLifetime.toMillis
     val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
     val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
-    val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}?t=$timestamp&s=$signature"
+    val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey.toAddress}?p=${client.publicKey}&t=$timestamp&s=$signature"
 
     new WsAuthenticatedConnection(wsUri, None, keepAlive) unsafeTap addConnection
   }
@@ -51,7 +51,7 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
                                                      dex: DexContainer,
                                                      apiKey: String = apiKey,
                                                      keepAlive: Boolean = true): WsAuthenticatedConnection = {
-    val wsUri = s"${getBaseBalancesStreamUri(dex)}${client.publicKey}"
+    val wsUri = s"${getBaseBalancesStreamUri(dex)}${client.publicKey.toAddress}"
     new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive) unsafeTap addConnection
   }
 

@@ -16,7 +16,7 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
                                  ordersChanges: Map[Order.Id, WsOrder]) {
 
   val hasActiveConnections: Boolean = activeWsConnections.nonEmpty
-  val hasChangedAssets: Boolean     = getAllChangedAssets.nonEmpty
+  val hasChanges: Boolean           = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
 
   def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq

@@ -52,10 +52,11 @@ object WsOrder {
     )
   }
 
-  def fromDomain(ao: AcceptedOrder, status: OrderStatus, fa: Double, ff: Double, awp: Double)(implicit efc: ErrorFormatterContext): WsOrder = {
-    (if (ao.isMarket) fromDomain(ao, status) else WsOrder(ao.id, status = status.name.some))
-      .copy(ao.id, filledAmount = fa.some, filledFee = ff.some, avgWeighedPrice = awp.some)
+  def apply(id: Order.Id, status: String, filledAmount: Double, filledFee: Double, avgWeighedPrice: Double): WsOrder = {
+    WsOrder(id, status = status.some, filledAmount = filledAmount.some, filledFee = filledFee.some, avgWeighedPrice = avgWeighedPrice.some)
   }
+
+  def apply(id: Order.Id, status: String): WsOrder = WsOrder(id, status = status.some)
 
   val isMarketFormat: Format[Boolean] = Format(
     {

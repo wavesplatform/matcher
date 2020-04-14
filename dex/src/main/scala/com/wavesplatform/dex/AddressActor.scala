@@ -161,6 +161,7 @@ class AddressActor(owner: Address,
       pendingCommands.remove(event.orderId).foreach { item =>
         item.client ! CanNotPersist(event.reason)
       }
+      openVolume = openVolume |-| activeOrders(event.orderId).reservableBalance
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")

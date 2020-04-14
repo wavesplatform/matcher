@@ -176,7 +176,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
       }
-      _ <- if (settings.deviation.enabled) liftValueAsync(marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o)) else successAsync
+      _ <- if (settings.deviation.enabled) liftAsync(marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o)) else successAsync
       _ <- asyncValidation(assetsCache.unsafeGet)
     } yield o
   }

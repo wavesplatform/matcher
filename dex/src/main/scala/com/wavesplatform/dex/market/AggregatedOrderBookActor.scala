@@ -131,7 +131,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
     )
   }
 
-  case class State(
+  case class State private(
       asks: TreeMap[Price, Amount],
       bids: TreeMap[Price, Amount],
       lastTrade: Option[LastTrade],

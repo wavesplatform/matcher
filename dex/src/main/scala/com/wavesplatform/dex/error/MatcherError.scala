@@ -469,6 +469,11 @@ case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClas
 
 case object UserPublicKeyIsNotValid extends MatcherError(account, pubKey, broken, e"Provided user public key is not correct")
 
+case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
+    extends MatcherError(auth, pubKey, unexpected, e"Address ${'address -> address} and public key ${'publicKey -> publicKey} are incompatible")
+
+case object AuthIsRequired extends MatcherError(auth, params, notProvided, e"The authentication is required. Please read the documentation")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -500,6 +505,7 @@ object Entity {
   object producer     extends Entity(100)
   object connectivity extends Entity(101)
   object auth         extends Entity(102)
+  object params       extends Entity(103)
 }
 
 sealed abstract class Class(val code: Int)

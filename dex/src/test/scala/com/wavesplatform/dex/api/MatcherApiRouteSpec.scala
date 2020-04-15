@@ -373,6 +373,17 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  routePath("/settings") - {
+    "Public key should be returned" in test(
+      { route =>
+        Get(routePath(s"/settings")) ~> route ~> check {
+          status shouldBe StatusCodes.OK
+          (responseAs[JsValue] \ "matcherPublicKey").as[JsString].value shouldBe matcherKeyPair.publicKey.toString
+        }
+      }
+    )
+  }
+
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val addressActor = TestProbe("address")

@@ -36,7 +36,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryPublicKey: F[Either[MatcherError, PublicKey]]
 
   def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
-  def tryReservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
+  def tryReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Map[Asset, Long]]]
 
   def tryTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
 
@@ -50,7 +50,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   // TODO Response type in DEX-548
   def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
   def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
-  def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]]
+  def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Unit]]
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
@@ -67,7 +67,9 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   /**
     * param @activeOnly Server treats this parameter as true if it wasn't specified
     */
-  def tryOrderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
+  def tryOrderHistoryWithApiKey(owner: Address,
+                                activeOnly: Option[Boolean] = None,
+                                xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
 
   /**
     * param @activeOnly Server treats this parameter as false if it wasn't specified
@@ -161,11 +163,11 @@ object DexApi {
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
-      override def tryReservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
+      override def tryReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
           sttp
             .get(uri"$apiUri/balance/reserved/${Base58.encode(of.publicKey)}")
-            .headers(apiKeyHeaders)
+            .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
       override def tryTradableBalance(of: KeyPair,
@@ -217,21 +219,24 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id]): F[Either[MatcherError, Unit]] = tryUnit {
+      override def tryCancelAllByIdsWithApiKey(owner: Address,
+                                               orderIds: Set[Order.Id],
+                                               xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Unit]] = tryUnit {
         sttp
           .post(uri"$apiUri/orders/$owner/cancel")
-          .headers(apiKeyHeaders)
+          .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
           .body(Json.stringify(Json.toJson(orderIds)))
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]] = tryParseJson {
-        sttp
-          .post(uri"$apiUri/orders/cancel/${id.toString}")
-          .headers(apiKeyHeaders)
-          .headers(xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders))
-          .contentType("application/json", "UTF-8")
-      }
+      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]] =
+        tryParseJson {
+          sttp
+            .post(uri"$apiUri/orders/cancel/${id.toString}")
+            .headers(apiKeyHeaders)
+            .headers(xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders))
+            .contentType("application/json", "UTF-8")
+        }
 
       override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
         tryParseJson {
@@ -254,11 +259,13 @@ object DexApi {
       }
 
       override def tryOrderHistoryWithApiKey(owner: Address,
-                                             activeOnly: Option[Boolean] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]] = tryParseJson {
-        sttp
-          .get(appendActiveOnly(uri"$apiUri/orders/${owner.stringRepr}", activeOnly))
-          .headers(apiKeyHeaders)
-      }
+                                             activeOnly: Option[Boolean] = None,
+                                             xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]] =
+        tryParseJson {
+          sttp
+            .get(appendActiveOnly(uri"$apiUri/orders/${owner.stringRepr}", activeOnly))
+            .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
+        }
 
       override def tryOrderHistoryByPair(owner: KeyPair,
                                          assetPair: AssetPair,
@@ -423,5 +430,9 @@ object DexApi {
 
       private val apiKeyHeaders: Map[String, String]                      = Map("X-API-Key"         -> apiKey)
       private def userPublicKeyHeaders(x: PublicKey): Map[String, String] = Map("X-User-Public-Key" -> x.base58)
+
+      private def apiKeyWithUserPublicKeyHeaders(xUserPublicKey: Option[PublicKey]): Map[String, String] = {
+        apiKeyHeaders ++ xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders)
+      }
     }
 }

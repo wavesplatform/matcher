@@ -82,6 +82,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private val placeTimer = timer.refine("action" -> "place")
 
   private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
+  private val invalidUserPublicKey: StandardRoute                            = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
 
   private val invalidJsonParsingRejectionsHandler =
     server.RejectionHandler
@@ -539,9 +540,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       ),
     )
   )
-  def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth) { address =>
-    entity(as[Set[ByteStr]]) { xs =>
-      complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs)) }
+  def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (address, userPublicKey) =>
+    userPublicKey match {
+      case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+      case _ =>
+        entity(as[Set[ByteStr]]) { xs =>
+          complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs)) }
+        }
     }
   }
 
@@ -723,9 +728,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       ),
     )
   )
-  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
-    parameters('activeOnly.as[Boolean].?) { activeOnly =>
-      loadOrders(address, None, activeOnly.getOrElse(true))
+  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth & withUserPublicKeyOpt) { (address, userPublicKey) =>
+    userPublicKey match {
+      case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+      case _ =>
+        parameters('activeOnly.as[Boolean].?) { activeOnly =>
+          loadOrders(address, None, activeOnly.getOrElse(true))
+        }
     }
   }
 
@@ -772,12 +781,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
-    (signedGet(publicKey) | withAuth) {
-      complete {
-        askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
-          stringifyAssetIds(r.balance)
+    (signedGet(publicKey).tmap(_ => Option.empty[PublicKey]) | (withAuth & withUserPublicKeyOpt)) {
+      case Some(upk) if upk != publicKey => invalidUserPublicKey
+      case _ =>
+        complete {
+          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
+            stringifyAssetIds(r.balance)
+          }
         }
-      }
     }
   }
 

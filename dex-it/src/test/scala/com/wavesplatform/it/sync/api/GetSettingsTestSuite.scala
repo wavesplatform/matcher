@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.api
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.it.config.PredefinedAccounts
 import com.wavesplatform.it.MatcherSuiteBase
 
 class GetSettingsTestSuite extends MatcherSuiteBase {
@@ -16,6 +17,10 @@ class GetSettingsTestSuite extends MatcherSuiteBase {
   "GET /matcher/settings should " - {
     "return correct byte of the node's network" in {
       dex1.api.settings.networkByte shouldBe 'Y'.toByte
+    }
+
+    "return matcher's public key" in {
+      dex1.api.settings.matcherPublicKey should be (matcher.publicKey.toString)
     }
 
     "return correct list of price assets" in {

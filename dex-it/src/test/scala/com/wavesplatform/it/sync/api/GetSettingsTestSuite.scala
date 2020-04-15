@@ -18,6 +18,10 @@ class GetSettingsTestSuite extends MatcherSuiteBase {
       dex1.api.settings.networkByte shouldBe 'Y'.toByte
     }
 
+    "return matcher's public key" in {
+      dex1.api.settings.matcherPublicKey should be ("7KNgQbmQj2E5sxuzDQxiXNGLmdkKKY83DHYFJ6iX93Gf")
+    }
+
     "return correct list of price assets" in {
       dex1.api.settings.priceAssets should contain (UsdId.toString)
       dex1.api.settings.priceAssets should contain (BtcId.toString)

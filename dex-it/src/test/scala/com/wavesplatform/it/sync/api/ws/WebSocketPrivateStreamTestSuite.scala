@@ -85,10 +85,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
         val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0, feeAsset = usd, matcherFee = 0.3.usd)
 
-        Seq(bo1, bo2).foreach { o =>
-          placeAndAwaitAtDex(o)
-          Thread.sleep(100)
-        }
+        Seq(bo1, bo2).foreach { placeAndAwaitAtDex(_) }
 
         assertChanges(wsc)(
           Map(usd -> WsBalances(50, 100)), // TODO after 2.0.x. merge: Map(usd -> WsBalances(50, 100), Waves -> WsBalances(9.997, 0.003))
@@ -275,10 +272,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now)
     val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0, ts = now + 1)
 
-    Seq(bo1, bo2).foreach { o =>
-      placeAndAwaitAtDex(o)
-      Thread.sleep(100)
-    }
+    Seq(bo1, bo2).foreach { placeAndAwaitAtDex(_) }
 
     assertChanges(wsc1)(
       Map(usd -> WsBalances(400, 100)),

@@ -220,10 +220,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         SimpleResponse(
           StatusCodes.OK,
           Json.obj(
-            "priceAssets"   -> matcherSettings.priceAssets,
-            "orderFee"      -> getActualOrderFeeSettings().getJson(matcherAccountFee, rateCache.getJson).value,
-            "orderVersions" -> allowedOrderVersions.toSeq.sorted,
-            "networkByte"   -> matcherSettings.addressSchemeCharacter.toInt
+            "matcherPublicKey" -> matcherPublicKey,
+            "priceAssets"      -> matcherSettings.priceAssets,
+            "orderFee"         -> getActualOrderFeeSettings().getJson(matcherAccountFee, rateCache.getJson).value,
+            "orderVersions"    -> allowedOrderVersions.toSeq.sorted,
+            "networkByte"      -> matcherSettings.addressSchemeCharacter.toInt
           )
         )
       }

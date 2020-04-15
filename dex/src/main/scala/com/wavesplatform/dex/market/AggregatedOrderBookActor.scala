@@ -13,6 +13,7 @@ import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.duration.FiniteDuration
 
 object AggregatedOrderBookActor {
   type Depth = Int
@@ -33,7 +34,9 @@ object AggregatedOrderBookActor {
     private[AggregatedOrderBookActor] case object SendWsUpdates                                 extends Command
   }
 
-  def apply(settings: OrderBookActor.Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
+  case class Settings(wsMessagesInterval: FiniteDuration)
+
+  def apply(settings: Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
     Behaviors.setup { context =>
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 

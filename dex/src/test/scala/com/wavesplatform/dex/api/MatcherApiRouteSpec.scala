@@ -27,6 +27,7 @@ import org.scalatest.concurrent.Eventually
 import play.api.libs.json.{JsString, JsValue, Json}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
@@ -397,7 +398,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val odb = OrderDB(settings.orderDb, db)
     odb.saveOrder(orderToCancel)
 
-    val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map.empty))
+    val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map.empty), 5.seconds)
     val orderBookHttpInfo = new OrderBookHttpInfo(
       settings.orderBookSnapshotHttpCache,
       orderBookAskAdapter,

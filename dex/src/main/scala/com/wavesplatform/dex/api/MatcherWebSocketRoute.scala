@@ -77,7 +77,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         addressDirectory.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), sourceActor)
-        ConnectionSource.AddressUpdates(sourceActor)
+        ConnectionSource.AddressUpdatesSource(sourceActor)
       }
       .watchTermination()(handleTermination)
   }
@@ -93,7 +93,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
-        ConnectionSource.OrderBook(sourceActor)
+        ConnectionSource.OrderBookSource(sourceActor)
       }
       .watchTermination()(handleTermination)
   }
@@ -213,13 +213,13 @@ object MatcherWebSocketRoute {
   }
 
   object ConnectionSource {
-    final case class AddressUpdates(ref: ActorRef) extends ConnectionSource {
+    final case class AddressUpdatesSource(ref: ActorRef) extends ConnectionSource {
       override def name: String                                      = ref.path.name
       override def ping(message: PingOrPong): Unit                   = ref ! message
       override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete
     }
 
-    final case class OrderBook(ref: typed.ActorRef[WsMessage]) extends ConnectionSource {
+    final case class OrderBookSource(ref: typed.ActorRef[WsMessage]) extends ConnectionSource {
       override def name: String                                      = ref.path.name
       override def ping(message: PingOrPong): Unit                   = ref ! message
       override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete

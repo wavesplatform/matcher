@@ -418,7 +418,7 @@ class MatcherActorSpecification
         ob,
         (assetPair, matcher) =>
           OrderBookActor.props(
-            OrderBookActor.Settings(100.millis),
+            OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
             matcher,
             addressActor,
             snapshotStoreActor,

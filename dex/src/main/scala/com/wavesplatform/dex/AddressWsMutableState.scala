@@ -67,7 +67,7 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
   }
 
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): AddressWsMutableState = copy(
-    activeWsConnections = activeWsConnections.map { // dirty but linear
+    activeWsConnections = activeWsConnections.map { // dirty but one pass
       case (conn, updateId) =>
         val newUpdateId = AddressWsMutableState.getNextUpdateId(updateId)
         conn ! WsAddressState(balances, orders, newUpdateId)

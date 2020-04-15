@@ -84,7 +84,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private lazy val assetsCache                 = AssetsStorage.cache { AssetsStorage.levelDB(db) }
 
   private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks)
+  private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
   private val orderBookHttpInfo =
     new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
@@ -109,7 +109,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
     OrderBookActor.props(
-      OrderBookActor.Settings(settings.webSocketSettings.messagesInterval),
+      OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.messagesInterval)),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,

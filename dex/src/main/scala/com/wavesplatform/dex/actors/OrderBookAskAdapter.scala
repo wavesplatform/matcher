@@ -15,12 +15,13 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.DecimalsFormat
 import com.wavesplatform.dex.model.OrderBookAggregatedSnapshot
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
 
 // Will be removed after a migration to typed actors
-// TODO implicit val timeout: Timeout
-class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]])(implicit system: ActorSystem) {
+class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]], askTimeout: FiniteDuration)(
+    implicit system: ActorSystem) {
   import system.dispatcher
 
   type Result[T] = Future[Either[MatcherError, Option[T]]]
@@ -42,7 +43,7 @@ class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit
           case Left(_) => Future.successful(error.OrderBookBroken(assetPair).asLeft)
           case Right(ob) =>
             val r      = Promise[R]()
-            val askRef = system.actorOf(AskActor.props[R](r))
+            val askRef = system.actorOf(AskActor.props[R](r, askTimeout))
             ob ! message(askRef)
             r.future.map(_.some.asRight)
         }

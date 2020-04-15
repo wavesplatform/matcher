@@ -73,6 +73,13 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
     lastTrade = None
   )
 
-  def take(xs: TreeMap[Price, Amount], levels: Set[Price]): TreeMap[Price, Amount] =
-    levels.foldLeft(TreeMap.empty[Price, Amount](xs.ordering))((r, x) => r.updated(x, xs.getOrElse(x, 0L)))
+  def take(xs: TreeMap[Price, Amount], levels: Set[Price]): TreeMap[Price, Amount] = {
+    // 1. Levels will be always smaller, than xs
+    // 2. A level could gone from xs
+    val r = TreeMap.newBuilder[Price, Amount](xs.ordering)
+    levels.foreach { level =>
+      r += level -> xs.getOrElse(level, 0L)
+    }
+    r.result()
+  }
 }

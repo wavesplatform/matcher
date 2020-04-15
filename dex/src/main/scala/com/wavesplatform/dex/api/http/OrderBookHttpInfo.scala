@@ -11,7 +11,6 @@ import com.wavesplatform.dex.model.OrderBookResult
 import com.wavesplatform.dex.time.Time
 import play.api.libs.json.Json
 
-import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderBookAskAdapter, time: Time, assetDecimals: Asset => Option[Int])(
@@ -52,7 +51,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
 }
 
 object OrderBookHttpInfo {
-  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
+  case class Settings(depthRanges: List[Int], defaultDepth: Option[Int]) {
     def nearestBigger(to: Option[Int]): Int =
       to.orElse(defaultDepth)
         .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))

@@ -2,13 +2,18 @@ package com.wavesplatform.dex.actors
 
 import akka.actor.{Actor, Props, Status}
 
-import scala.concurrent.Promise
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Promise, TimeoutException}
 import scala.reflect.ClassTag
 
-// TODO timeout
-class AskActor[T](p: Promise[T])(implicit ct: ClassTag[T]) extends Actor {
-  override def receive: Receive = {
-    case x =>
+// TODO tests
+class AskActor[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[T]) extends Actor {
+  import context.dispatcher
+  private val timeoutCancelable = context.system.scheduler.scheduleOnce(timeout, self, AskActor.timeoutMessage)
+
+  override val receive: Receive = {
+    case x => // Fix in Scala 2.13
+      timeoutCancelable.cancel()
       context.stop(self)
       x match {
         case x: T if x.getClass == ct.runtimeClass => p.trySuccess(x)
@@ -19,5 +24,11 @@ class AskActor[T](p: Promise[T])(implicit ct: ClassTag[T]) extends Actor {
 }
 
 object AskActor {
-  def props[T](p: Promise[T])(implicit ct: ClassTag[T]) = Props(new AskActor(p))
+  private val timeoutMessage = {
+    val reason = new TimeoutException("Typed ask is timed out!")
+    reason.setStackTrace(Array.empty)
+    Status.Failure(reason)
+  }
+
+  def props[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[T]) = Props(new AskActor(p, timeout))
 }

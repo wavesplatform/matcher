@@ -41,7 +41,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     val canceledOrders = orders.map { OrderCanceled(_, isSystemCancel = false, ts) }
     val levelAmounts = orders.foldMap { o =>
       // Order MUST be in orderIds. It's okay to fail here with Map.apply if the implementation is wrong
-      LevelAmounts.mkDiff(orderIds(o.id)._2, o)
+      LevelAmounts.mkDiff(orderIds.getOrElse(o.id, throw new IllegalStateException(s"Order ids doesn't contain the order ${o.id}"))._2, o)
     }
 
     (OrderBook.empty, canceledOrders, Group.inverse(levelAmounts))

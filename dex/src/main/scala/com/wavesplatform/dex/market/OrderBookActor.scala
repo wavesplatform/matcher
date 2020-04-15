@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
 
 class OrderBookActor(settings: Settings,
                      owner: classic.ActorRef,
@@ -45,7 +44,7 @@ class OrderBookActor(settings: Settings,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
-  private var aggregated: typed.ActorRef[AggregatedOrderBookActor.Message] = _
+  private var aggregatedRef: typed.ActorRef[AggregatedOrderBookActor.Message] = _
 
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
@@ -84,11 +83,15 @@ class OrderBookActor(settings: Settings,
 
       lastProcessedOffset foreach actualizeRules
 
-      aggregated = context.spawn(
-        AggregatedOrderBookActor(settings, assetPair, amountDecimals, priceDecimals, AggregatedOrderBookActor.State.fromOrderBook(orderBook)),
+      aggregatedRef = context.spawn(
+        AggregatedOrderBookActor(settings.aggregated,
+                                 assetPair,
+                                 amountDecimals,
+                                 priceDecimals,
+                                 AggregatedOrderBookActor.State.fromOrderBook(orderBook)),
         "aggregated"
       )
-      context.watch(aggregated)
+      context.watch(aggregatedRef)
 
       processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
@@ -141,10 +144,12 @@ class OrderBookActor(settings: Settings,
         savingSnapshot = Some(globalEventNr)
       }
 
-    case x: AggregatedOrderBookActor.Message => aggregated.tell(x)
+    case x: AggregatedOrderBookActor.Message => aggregatedRef.tell(x)
 
-    case classic.Terminated(ws) =>
-      log.error(s"Terminated actor: $ws") // TODO think what we should do here
+    case classic.Terminated(ref) =>
+      log.error(s"Terminated actor: $ref")
+      // If this happens the issue is critical and should not be handled. The order book will be stopped, see MatcherActor
+      if (ref == aggregatedRef) throw new RuntimeException("Aggregated order book was terminated")
   }
 
   private def process(timestamp: Long, result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
@@ -156,7 +161,7 @@ class OrderBookActor(settings: Settings,
       case _                       => false
     }
     val lastTrade = if (hasTrades) orderBook.lastTrade else None
-    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, timestamp)
+    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, timestamp)
     processEvents(events)
   }
 
@@ -177,7 +182,7 @@ class OrderBookActor(settings: Settings,
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         log.info(s"Level changes: $levelChanges")
-        aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
+        aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")
@@ -218,7 +223,7 @@ class OrderBookActor(settings: Settings,
 
 object OrderBookActor {
 
-  case class Settings(wsMessagesInterval: FiniteDuration)
+  case class Settings(aggregated: AggregatedOrderBookActor.Settings)
 
   def props(settings: Settings,
             parent: classic.ActorRef,

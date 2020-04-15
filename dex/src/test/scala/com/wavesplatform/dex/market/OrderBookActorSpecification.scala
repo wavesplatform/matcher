@@ -75,7 +75,7 @@ class OrderBookActorSpecification
 
     val orderBookActor = TestActorRef(
       new OrderBookActor(
-        OrderBookActor.Settings(100.millis),
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
         tp.ref,
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
@@ -617,7 +617,7 @@ class OrderBookActorSpecification
 
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
     val pair       = wavesUsdPair // hack
-    val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))))
+    val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
     Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException("Can't get snapshot"))
   }
 }

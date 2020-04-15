@@ -73,7 +73,6 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookHttpInfo.Settings(
-      cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333),
       defaultDepth = Some(5)
     )

@@ -8,15 +8,13 @@ import com.wavesplatform.dex.OrderBookWsState
 import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
-import mouse.any.anySyntaxMouse
 
 import scala.collection.immutable.TreeMap
 
-object AggregatedOrderBookActor extends ScorexLogging {
+object AggregatedOrderBookActor {
   type Depth = Int
 
   sealed trait Message extends Product with Serializable
@@ -45,37 +43,37 @@ object AggregatedOrderBookActor extends ScorexLogging {
         Behaviors
           .receiveMessage[Message] {
             case query: Query =>
-              val updatedState = query match {
-                case Query.GetMarketStatus(client)       => state.unsafeTap(client ! _.marketStatus)
-                case Query.GetAggregatedSnapshot(client) => state.unsafeTap(client ! _.toOrderBookAggregatedSnapshot)
+              query match {
+                case Query.GetMarketStatus(client) =>
+                  client ! state.marketStatus
+                  Behaviors.same
+
+                case Query.GetAggregatedSnapshot(client) =>
+                  client ! state.toOrderBookAggregatedSnapshot
+                  Behaviors.same
+
                 case Query.GetHttpView(format, depth, client) =>
                   val key = (format, depth)
-                  val (updatedState, httpResponse) = state.compiledHttpView.get(key) match {
-                    case Some(r) => (state, r)
+                  state.compiledHttpView.get(key) match {
+                    case Some(httpResponse) =>
+                      client ! httpResponse
+                      Behaviors.same
+
                     case _ =>
-                      val r = compile(state, format, depth)
-                      (state.copy(compiledHttpView = state.compiledHttpView.updated(key, r)), r)
+                      val httpResponse = compile(state, format, depth)
+                      client ! httpResponse
+                      default {
+                        state.copy(compiledHttpView = state.compiledHttpView.updated(key, httpResponse))
+                      }
                   }
-                  client ! httpResponse
-                  updatedState
               }
-              log.info(s"[$assetPair] $query: updatedState.asks:${updatedState.asks}, updatedState.bids:${updatedState.bids}")
-              default(updatedState)
 
             case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
-              val flushed = state
-                .copy(
-                  lastTrade = lastTrade.orElse(state.lastTrade),
-                  lastUpdate = ts,
-                  ws = lastTrade.foldLeft(state.ws.withLevelChanges(levelChanges))(_ withLastTrade _)
-                )
-                .flushed(levelChanges)
-
-              log.info(
-                s"[$assetPair] ApplyChanges: pendingChanges.asks:${state.asks}, bids:${state.bids} + levelChanges:$levelChanges = flushed.asks:${flushed.asks}, bids:${flushed.bids}, lastTrade:$lastTrade")
-              log.info(
-                s"[$assetPair] updated .ws.changedAsks:${flushed.ws.changedAsks}, .ws.changedBids:${flushed.ws.changedBids}, .ws.lastTrade:${flushed.ws.lastTrade}")
-              default(flushed)
+              default {
+                state
+                  .flushed(levelChanges, lastTrade, ts)
+                  .copy(ws = lastTrade.foldLeft(state.ws.withLevelChanges(levelChanges))(_ withLastTrade _))
+              }
 
             case Command.AddWsSubscription(client) =>
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
@@ -89,21 +87,16 @@ object AggregatedOrderBookActor extends ScorexLogging {
                 updateId = 0L
               )
 
-              log.trace(s"[${client.path.name}] WebSocket connected")
+              context.log.trace(s"[${client.path.name}] WebSocket connected")
               context.watch(client)
               default(state.copy(ws = state.ws.addSubscription(client)))
 
             case Command.SendWsUpdates =>
-              val updated = state.copy(ws = state.ws.flushed(amountDecimals, priceDecimals, state.asks, state.bids))
+              val updated = state.copy(ws = state.ws.flushed(amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
           }
-          .receiveSignal {
-            case (context, Terminated(ws)) =>
-              // TODO move to context.log
-              log.trace(s"[${ws.path.name}] WebSocket terminated")
-              default(state.copy(ws = state.ws.withoutSubscription(ws)))
-          }
+          .receiveSignal { case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws))) }
 
       default(init)
     }
@@ -116,7 +109,7 @@ object AggregatedOrderBookActor extends ScorexLogging {
 
     val entity =
       OrderBookResult(
-        state.lastUpdate,
+        state.lastUpdateTs,
         assetPair,
         state.bids.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
         state.asks.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
@@ -131,41 +124,34 @@ object AggregatedOrderBookActor extends ScorexLogging {
     )
   }
 
-  case class State private(
+  case class State private (
       asks: TreeMap[Price, Amount],
       bids: TreeMap[Price, Amount],
       lastTrade: Option[LastTrade],
-      lastUpdate: Long,
+      lastUpdateTs: Long,
       compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
       ws: OrderBookWsState
   ) {
     lazy val marketStatus = MarketStatus(
       lastTrade = lastTrade,
-      bestBid = bids.headOption.map(State.toLevelAgg),
-      bestAsk = asks.headOption.map(State.toLevelAgg)
+      bestBid = bids.headOption.map(toLevelAgg),
+      bestAsk = asks.headOption.map(toLevelAgg)
     )
 
-    def flushed(pendingChanges: LevelAmounts): State =
+    def flushed(pendingChanges: LevelAmounts, updatedLastTrade: Option[LastTrade], updatedLastUpdateTs: Long): State =
       if (pendingChanges.isEmpty) this
       else
         copy(
-          // TODO optimize (save order)
-          asks = pendingChanges.asks.foldLeft(asks) {
-            case (r, (price, amount)) =>
-              val updatedAmount = r.getOrElse(price, 0L) + amount
-              if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
-          },
-          bids = pendingChanges.bids.foldLeft(bids) {
-            case (r, (price, amount)) =>
-              val updatedAmount = r.getOrElse(price, 0L) + amount
-              if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
-          },
+          asks = sum(asks, pendingChanges.asks),
+          bids = sum(bids, pendingChanges.bids),
+          lastTrade = updatedLastTrade.orElse(lastTrade),
+          lastUpdateTs = updatedLastUpdateTs,
           compiledHttpView = Map.empty // Could be optimized by depth
         )
 
     def toOrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(
-      asks = asks.map(State.toLevelAgg).toSeq,
-      bids = bids.map(State.toLevelAgg).toSeq
+      asks = asks.map(toLevelAgg).toSeq,
+      bids = bids.map(toLevelAgg).toSeq
     )
   }
 
@@ -174,31 +160,31 @@ object AggregatedOrderBookActor extends ScorexLogging {
       asks = TreeMap.empty(OrderBook.asksOrdering),
       bids = TreeMap.empty(OrderBook.bidsOrdering),
       lastTrade = None,
-      lastUpdate = 0,
+      lastUpdateTs = 0,
       compiledHttpView = Map.empty,
-      ws = OrderBookWsState(
-        Map.empty,
-        Set.empty,
-        Set.empty,
-        lastTrade = None,
-        timestamp = System.currentTimeMillis()
-      )
+      ws = OrderBookWsState(Map.empty, Set.empty, Set.empty, lastTrade = None)
     )
 
     def fromOrderBook(ob: OrderBook): State = State(
-      asks = empty.asks ++ sum(ob.asks), // to preserve an order, TODO
+      asks = empty.asks ++ sum(ob.asks), // ++ to preserve an order
       bids = empty.bids ++ sum(ob.bids),
       lastTrade = ob.lastTrade,
-      lastUpdate = System.currentTimeMillis(), // TODO
+      lastUpdateTs = System.currentTimeMillis(), // DEX-642
       compiledHttpView = Map.empty,
       ws = empty.ws
     )
-
-    // TODO could it be > Long.Max?
-    def sum(xs: Side): TreeMap[Price, Amount] = xs.map {
-      case (k, v) => k -> v.view.map(_.amount).sum
-    }
-
-    def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
   }
+
+  def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
+
+  def sum(xs: Side): TreeMap[Price, Amount] = xs.map {
+    case (k, v) => k -> v.view.map(_.amount).sum
+  }
+
+  def sum(orig: TreeMap[Price, Amount], diff: Map[Price, Amount]): TreeMap[Price, Amount] =
+    diff.foldLeft(orig) {
+      case (r, (price, amount)) =>
+        val updatedAmount = r.getOrElse(price, 0L) + amount
+        if (updatedAmount == 0) r - price else r.updated(price, updatedAmount)
+    }
 }

@@ -18,6 +18,8 @@ import com.wavesplatform.dex.model.OrderBookAggregatedSnapshot
 import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
 
+// Will be removed after a migration to typed actors
+// TODO implicit val timeout: Timeout
 class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]])(implicit system: ActorSystem) {
   import system.dispatcher
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex
 
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}

@@ -100,11 +100,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
 
-  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
-
   private val matchingRulesCache    = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
   private val rateCache             = RateCache(db)
+
+  private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
     matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)

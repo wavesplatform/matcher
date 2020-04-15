@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusC
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api
 import com.wavesplatform.dex.api.MatcherResponse.toHttpResponse
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.Depth
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
@@ -12,12 +11,11 @@ import com.wavesplatform.dex.model.OrderBookResult
 import com.wavesplatform.dex.time.Time
 import play.api.libs.json.Json
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-class OrderBookHttpInfo(settings: OrderBookSnapshotHttpCache.Settings,
-                        askAdapter: OrderBookAskAdapter,
-                        time: Time,
-                        assetDecimals: Asset => Option[Int])(implicit ec: ExecutionContext) {
+class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderBookAskAdapter, time: Time, assetDecimals: Asset => Option[Int])(
+    implicit ec: ExecutionContext) {
   private val marketStatusNotFound = toHttpResponse(
     api.SimpleResponse(StatusCodes.NotFound, Json.obj("message" -> "There is no information about this asset pair")))
 
@@ -50,5 +48,14 @@ class OrderBookHttpInfo(settings: OrderBookSnapshotHttpCache.Settings,
   private def assetPairDecimals(assetPair: AssetPair, format: DecimalsFormat): Option[(Depth, Depth)] = format match {
     case Denormalized => assetDecimals(assetPair.amountAsset).zip(assetDecimals(assetPair.priceAsset)).headOption
     case _            => None
+  }
+}
+
+object OrderBookHttpInfo {
+  case class Settings(cacheTimeout: FiniteDuration, depthRanges: List[Int], defaultDepth: Option[Int]) {
+    def nearestBigger(to: Option[Int]): Int =
+      to.orElse(defaultDepth)
+        .flatMap(desiredDepth => depthRanges.find(_ >= desiredDepth))
+        .getOrElse(depthRanges.max)
   }
 }

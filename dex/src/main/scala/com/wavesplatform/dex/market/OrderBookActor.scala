@@ -45,7 +45,6 @@ class OrderBookActor(settings: Settings,
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
 
-  // TODO context watch
   private var aggregated: typed.ActorRef[AggregatedOrderBookActor.Message] = _
 
   private var savingSnapshot          = Option.empty[QueueEventWithMeta.Offset]
@@ -67,7 +66,9 @@ class OrderBookActor(settings: Settings,
     }
   }
 
-  private val recovering: Receive = {
+  override def receive: Receive = recovering
+
+  private def recovering: Receive = {
     case OrderBookSnapshotStoreActor.Response.GetSnapshot(result) =>
       result.foreach { case (_, snapshot) => orderBook = OrderBook(snapshot) }
 
@@ -87,6 +88,8 @@ class OrderBookActor(settings: Settings,
         AggregatedOrderBookActor(settings, assetPair, amountDecimals, priceDecimals, AggregatedOrderBookActor.State.fromOrderBook(orderBook)),
         "aggregated"
       )
+      context.watch(aggregated)
+
       processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
@@ -96,7 +99,7 @@ class OrderBookActor(settings: Settings,
     case x => stash(x)
   }
 
-  private val working: Receive = {
+  private def working: Receive = {
     case request: QueueEventWithMeta =>
       actualizeRules(request.offset)
       lastProcessedOffset match {
@@ -108,9 +111,14 @@ class OrderBookActor(settings: Settings,
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted       =>
-//              wsState.wsConnections.foreach(_ ! wsCloseMessage)
-//              wsState = wsState.withoutSubscriptions // ???
-              process(orderBook.cancelAll(request.timestamp))
+              // DEX-681
+              // private val reason = new EOFException("Order book was deleted")
+              // reason.setStackTrace(Array.empty)
+              // private val wsCloseMessage = classic.Status.Failure(reason)
+              //
+              // wsState.wsConnections.foreach(_ ! wsCloseMessage)
+              // wsState = wsState.withoutSubscriptions
+              process(request.timestamp, orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
               context.stop(self)
@@ -136,21 +144,19 @@ class OrderBookActor(settings: Settings,
     case x: AggregatedOrderBookActor.Message => aggregated.tell(x)
 
     case classic.Terminated(ws) =>
-      if (ws == aggregated) log.error("Terminated aggregated actor!")
+      log.error(s"Terminated actor: $ws") // TODO think what we should do here
   }
 
-  override val receive: Receive = recovering
-
-  private def process(result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
+  private def process(timestamp: Long, result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
-    log.info(s"Level changes: $levelChanges")
+    // TODO We need a better way to do this
     val hasTrades = events.exists {
       case _: Events.OrderExecuted => true
       case _                       => false
     }
     val lastTrade = if (hasTrades) orderBook.lastTrade else None
-    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, System.currentTimeMillis()) // TODO submitted millis
+    aggregated ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, timestamp)
     processEvents(events)
   }
 
@@ -181,7 +187,10 @@ class OrderBookActor(settings: Settings,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, acceptedOrder: AcceptedOrder): Unit = addTimer.measure {
     log.trace(s"Applied $eventWithMeta, trying to match ...")
-    process(orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize))
+    process(
+      eventWithMeta.timestamp,
+      orderBook.add(acceptedOrder, eventWithMeta.timestamp, getMakerTakerFeeByOffset(eventWithMeta.offset), actualRule.tickSize)
+    )
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -208,11 +217,6 @@ class OrderBookActor(settings: Settings,
 }
 
 object OrderBookActor {
-
-//  private val reason = new EOFException("Order book was deleted")
-//  reason.setStackTrace(Array.empty)
-
-//  private val wsCloseMessage = classic.Status.Failure(reason) // TODO
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 

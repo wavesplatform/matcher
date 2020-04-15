@@ -5,7 +5,7 @@ import java.io.File
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.AddressActor
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.AssetPair._
@@ -47,7 +47,7 @@ case class MatcherSettings(addressSchemeCharacter: Char,
                            orderDb: OrderDB.Settings,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
-                           orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
+                           orderBookSnapshotHttpCache: OrderBookHttpInfo.Settings,
                            eventsQueue: EventsQueueSettings,
                            processConsumedTimeout: FiniteDuration,
                            orderFee: Map[Long, OrderFeeSettings],
@@ -132,7 +132,7 @@ object MatcherSettings {
 
     val blacklistedNames           = config.as[List[String]]("blacklisted-names").map(_.r)
     val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+    val orderBookSnapshotHttpCache = config.as[OrderBookHttpInfo.Settings]("order-book-snapshot-http-cache") // TODO
     val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
     val processConsumedTimeout     = config.as[FiniteDuration]("process-consumed-timeout")
     val orderFee                   = config.getValidatedMap[Long, OrderFeeSettings]("order-fee")(validateOffset)

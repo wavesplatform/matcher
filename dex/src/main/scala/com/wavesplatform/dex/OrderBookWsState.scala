@@ -5,15 +5,14 @@ import com.wavesplatform.dex.AddressWsMutableState.getNextUpdateId
 import com.wavesplatform.dex.api.websockets.{WsLastTrade, WsOrderBook}
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, OrderBook}
+import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
 
 import scala.collection.immutable.TreeMap
 
 case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
                             changedAsks: Set[Price],
                             changedBids: Set[Price],
-                            lastTrade: Option[LastTrade],
-                            timestamp: Long = System.currentTimeMillis) {
+                            lastTrade: Option[LastTrade]) {
 
   def addSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState = copy(wsConnections = wsConnections.updated(x, 0L))
 
@@ -35,7 +34,6 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
       copy(
         changedAsks = changedAsks ++ xs.asks.keySet,
         changedBids = changedBids ++ xs.bids.keySet,
-        timestamp = System.currentTimeMillis // TODO
       )
     else this
 
@@ -50,14 +48,18 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
     side = x.side
   )
 
-  def flushed(amountDecimals: Int, priceDecimals: Int, asks: TreeMap[Price, Amount], bids: TreeMap[Price, Amount]): OrderBookWsState = copy(
+  def flushed(amountDecimals: Int,
+              priceDecimals: Int,
+              asks: TreeMap[Price, Amount],
+              bids: TreeMap[Price, Amount],
+              timestamp: Long): OrderBookWsState = copy(
     wsConnections = if (hasChanges) {
       val changes = WsOrderBook(
-        asks = denormalized(amountDecimals, priceDecimals, changedAsks.foldLeft(TreeMap.empty[Price, Amount](OrderBook.asksOrdering))((r, x) => r.updated(x, asks.getOrElse(x, 0L)))),
-        bids = denormalized(amountDecimals, priceDecimals, changedBids.foldLeft(TreeMap.empty[Price, Amount](OrderBook.bidsOrdering))((r, x) => r.updated(x, bids.getOrElse(x, 0L)))),
+        asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks)),
+        bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
         lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),
-        updateId = 0L,
-        timestamp = System.currentTimeMillis() // TODO
+        updateId = 0L, // Will be changed below
+        timestamp = timestamp
       )
       wsConnections.map {
         case (conn, updateId) =>
@@ -68,7 +70,9 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
     } else wsConnections,
     changedAsks = Set.empty,
     changedBids = Set.empty,
-    lastTrade = None,
-    timestamp = System.currentTimeMillis() // TODO
+    lastTrade = None
   )
+
+  def take(xs: TreeMap[Price, Amount], levels: Set[Price]): TreeMap[Price, Amount] =
+    levels.foldLeft(TreeMap.empty[Price, Amount](xs.ordering))((r, x) => r.updated(x, xs.getOrElse(x, 0L)))
 }

@@ -325,7 +325,7 @@ class OrderBookActorSpecification
         bids.size shouldBe 3
 
         val level41 = bids.head
-        level41.price shouldBe buyOrder.price // <---
+        level41.price shouldBe buyOrder.price
         level41.amount shouldBe buyOrder.amount * 4
 
         val level40 = bids(1)

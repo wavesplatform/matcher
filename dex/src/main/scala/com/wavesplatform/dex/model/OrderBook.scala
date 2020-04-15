@@ -1,8 +1,9 @@
 package com.wavesplatform.dex.model
 
 import cats.instances.list.catsStdInstancesForList
-import cats.kernel.{Group, Monoid}
+import cats.kernel.Group
 import cats.syntax.foldable._
+import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -39,6 +40,7 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
     val orders         = allOrders.toList
     val canceledOrders = orders.map { OrderCanceled(_, isSystemCancel = false, ts) }
     val levelAmounts = orders.foldMap { o =>
+      // Order MUST be in orderIds. It's okay to fail here with Map.apply if the implementation is wrong
       LevelAmounts.mkDiff(orderIds(o.id)._2, o)
     }
 
@@ -137,7 +139,7 @@ object OrderBook {
               else
                 (
                   ob.unsafeWithoutBest(counter.order.orderType),
-                  Monoid.combine(updatedLevelChanges, Group.inverse(LevelAmounts.mkDiff(levelPrice, counterRemaining)))
+                  updatedLevelChanges |+| Group.inverse(LevelAmounts.mkDiff(levelPrice, counterRemaining))
                 )
             }
 
@@ -162,7 +164,7 @@ object OrderBook {
               orderBook = orderBook.unsafeWithoutBest(counter.order.orderType),
               submitted = submitted,
               events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs)),
-              levelChanges = Monoid.combine(levelChanges, Group.inverse(LevelAmounts.mkDiff(levelPrice, counter)))
+              levelChanges = levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
             )
 
         case _ =>

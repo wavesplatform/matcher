@@ -92,7 +92,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       )
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
-        matcher ! MatcherActor.AggregatedOrderBookMessage(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
+        matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
         ConnectionSource.OrderBook(sourceActor)
       }
       .watchTermination()(handleTermination)
@@ -205,6 +205,7 @@ object MatcherWebSocketRoute {
 
   val balanceStreamPrefix: String = "au"
 
+  // Will be removed after migration to akka-typed
   trait ConnectionSource {
     def name: String
     def ping(message: PingOrPong): Unit

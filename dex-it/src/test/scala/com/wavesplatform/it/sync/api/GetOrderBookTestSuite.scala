@@ -58,5 +58,5 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     }
   }
 
-  private def clear(x: OrderBookResponse) = x.copy(timestamp = 0L)
+  private def clear(x: OrderBookResponse) = x.copy(timestamp = 0L) // DEX-642
 }

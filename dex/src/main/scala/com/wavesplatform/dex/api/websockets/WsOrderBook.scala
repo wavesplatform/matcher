@@ -12,10 +12,8 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-// move to AggregatedOrderBookActor, because now we have diff, not the whole ob!
 case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], updateId: Long, timestamp: Long = System.currentTimeMillis)
     extends WsMessage {
-  def nonEmpty: Boolean                                = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
   override val tpe: String                             = "ob"
 }
@@ -87,7 +85,12 @@ object WsOrderBook {
            bids: Iterable[LevelAgg],
            lt: Option[LastTrade],
            updateId: Long): WsOrderBook =
-    WsOrderBook(asks = side(amountDecimals, priceDecimals, asks, asksOrdering), bids = side(amountDecimals, priceDecimals, bids, bidsOrdering), lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)), updateId = updateId)
+    WsOrderBook(
+      asks = side(amountDecimals, priceDecimals, asks, asksOrdering),
+      bids = side(amountDecimals, priceDecimals, bids, bidsOrdering),
+      lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)),
+      updateId = updateId
+    )
 
   def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(
     price = denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble,

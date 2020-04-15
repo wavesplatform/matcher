@@ -25,7 +25,7 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
     copy(pendingWsConnections = pendingWsConnections + subscriber)
 
   def flushPendingConnections(): AddressWsMutableState =
-    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.map(_ -> 0L), pendingWsConnections = Set.empty)
+    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.iterator.map(_ -> 0L), pendingWsConnections = Set.empty)
 
   def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
     if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()

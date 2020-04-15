@@ -7,7 +7,7 @@ import akka.pattern.{ask, pipe}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import com.wavesplatform.dex.AddressActor.{AddWsSubscription, _}
+import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
 import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
@@ -260,7 +260,6 @@ class AddressActor(owner: Address,
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${wsSource.path.name}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
@@ -307,41 +306,10 @@ class AddressActor(owner: Address,
                   Event.ValidationFailed(command.order.id(), UnexpectedError)
               } pipeTo self
 
-//              val validationResult = for {
-//                hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
-//                tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
-//                ao = command.toAcceptedOrder(tradableBalance)
-//                r <- accountStateValidator(ao, tradableBalance, hasOrderInBlockchain).value
-//              } yield
-//                r match {
-//                  case Left(error) => Event.ValidationFailed(ao.id, error)
-//                  case Right(_)    => Event.ValidationPassed(ao)
-//                }
-//
-//              validationResult recover {
-//                case ex: WavesNodeConnectionLostException =>
-//                  log.error("Waves Node connection lost", ex)
-//                  Event.ValidationFailed(command.order.id(), WavesNodeConnectionBroken)
-//                case ex =>
-//                  log.error("An unexpected error occurred", ex)
-//                  Event.ValidationFailed(command.order.id(), UnexpectedError)
-//              } pipeTo self
-
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }
       }
   }
-
-//  private def accountStateValidator(acceptedOrder: AcceptedOrder,
-//                                    tradableBalance: Map[Asset, Long],
-//                                    hasOrderInBlockchain: Boolean): FutureResult[AcceptedOrder] = for {
-//    orderBookCache <- Future.failed()
-//  } yield OrderValidator
-//    .accountStateAware(acceptedOrder.order.sender,
-//      tradableBalance.withDefaultValue(0L),
-//      totalActiveOrders,
-//      hasOrder(_, hasOrderInBlockchain),
-//      orderBookCache)(acceptedOrder)
 
   private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
     spendableBalancesActor

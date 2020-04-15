@@ -180,7 +180,7 @@ class MatcherActor(settings: MatcherSettings,
       val s       = sender()
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
-    case AggregatedOrderBookMessage(pair, message) =>
+    case AggregatedOrderBookEnvelope(pair, message) =>
       runFor(pair, autoCreate = false) { (sender, ref) =>
         ref.tell(message, sender)
       }
@@ -298,7 +298,7 @@ object MatcherActor {
 
   case class ForceStartOrderBook(assetPair: AssetPair)
   case class OrderBookCreated(assetPair: AssetPair)
-  case class AggregatedOrderBookMessage(assetPair: AssetPair, message: AggregatedOrderBookActor.Message)
+  case class AggregatedOrderBookEnvelope(assetPair: AssetPair, message: AggregatedOrderBookActor.Message)
 
   case object GetMarkets
 

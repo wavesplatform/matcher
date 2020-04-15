@@ -3,7 +3,7 @@ package com.wavesplatform.dex.settings
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.AddressActor
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -72,7 +72,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.blacklistedAssets shouldBe Set(AssetPair.extractAsset("AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck").get.asInstanceOf[IssuedAsset])
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
-    settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
+    settings.orderBookSnapshotHttpCache shouldBe OrderBookHttpInfo.Settings(
       cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333),
       defaultDepth = Some(5)
@@ -86,7 +86,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
     settings.processConsumedTimeout shouldBe 663.seconds
     settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
-    settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
+    settings.deviation shouldBe DeviationsSettings(enabled = true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]

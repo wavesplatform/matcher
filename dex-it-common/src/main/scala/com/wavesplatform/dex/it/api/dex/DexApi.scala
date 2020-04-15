@@ -286,7 +286,7 @@ object DexApi {
       override def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, OrderBookResponse]] = tryParseJson {
         sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}?depth=$depth")
-          .followRedirects(false)
+          .followRedirects(true)
       }
 
       override def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, OrderBookInfo]] = tryParseJson {

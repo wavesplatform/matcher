@@ -323,7 +323,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
-      withAssetPair(p, redirectToInverse = true) { pair =>
+      withAssetPair(p, redirectToInverse = true, depth.fold("")(d => s"?depth=$d")) { pair =>
         complete { orderBookSnapshot.get(pair, depth) }
       }
     }

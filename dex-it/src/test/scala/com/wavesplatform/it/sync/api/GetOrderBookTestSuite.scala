@@ -72,6 +72,6 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
 
     val orderBook = dex1.api.orderBook(AssetPair(Waves, eth), depth)
     orderBook.asks should have size depth
-    orderBook.asks should have size depth
+    orderBook.bids should have size depth
   }
 }

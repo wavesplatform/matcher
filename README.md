@@ -294,7 +294,7 @@ here:
   If you will provide an account seed, don't specify this option;
 * `--output-directory` - where the `account.dat` file will be stored.
 
-After running this command you will see where your `account.dat` was saved and which settings do you have to add to the Matcher server configuration.
+After running this command you will see where your `account.dat` was saved and which settings do you have to add to the Matcher server configuration (`/usr/share/waves-dex/conf/main.conf`).
 Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
 
 ### 8.2. Generating API key

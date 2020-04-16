@@ -118,8 +118,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    ]
          |    white-list-only = yes
          |    allowed-order-versions = [11, 22]
-         |    order-book-snapshot-http-cache {
-         |      cache-timeout = 11m
+         |    order-book-http {
          |      depth-ranges = [1, 5, 333]
          |      default-depth = 5
          |    }

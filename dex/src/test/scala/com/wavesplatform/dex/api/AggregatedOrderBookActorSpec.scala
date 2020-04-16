@@ -2,33 +2,43 @@ package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.Props
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
+import akka.testkit.TestProbe
+import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.TestParsers
+import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherSpecLike}
+import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalacheck.Gen
+import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class AggregatedOrderBookSpec
+class AggregatedOrderBookActorSpec
     extends AnyFreeSpec
     with Matchers
     with SystemTime
@@ -37,7 +47,11 @@ class AggregatedOrderBookSpec
     with MatcherSpecLike
     with TestParsers
     with OrderBookGen
-    with DiffMatcherWithImplicits {
+    with DiffMatcherWithImplicits
+    with Eventually {
+
+  import system.dispatcher
+
   private val pair = AssetPair(IssuedAsset(ByteStr("issued".getBytes(StandardCharsets.UTF_8))), Waves)
 
   private val maxLevelsInOrderBook = 6
@@ -52,10 +66,73 @@ class AggregatedOrderBookSpec
   private val bidPricesMax = 999L * Order.PriceConstant
   private val bidPricesGen = Gen.choose(bidPricesMin, bidPricesMax)
 
+  private val pricesGen = Gen.choose(bidPricesMin, askPricesMax)
+
   private val orderBookGen =
     flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen).map(Function.tupled(mkOrderBook))
 
+  private val askGen = orderGen(pricesGen, OrderType.SELL)
+  private val bidGen = orderGen(pricesGen, OrderType.BUY)
+
+  private def ordersGen(maxOrdersNumber: Int): Gen[List[AcceptedOrder]] =
+    for {
+      orderSides <- Gen.resize(maxOrdersNumber, Gen.listOf(orderSideGen))
+      orders <- Gen.sequence {
+        orderSides.map { side =>
+          val orderGen = if (side == OrderType.SELL) askGen else bidGen
+          Gen.oneOf(limitOrderGen(orderGen), marketOrderGen(orderGen))
+        }
+      }
+    } yield orders.asScala.toList
+
   "AggregatedOrderBookActor" - {
+    "properties" - {
+      "aggregate(updatedOrderBook) == updatedAggregatedOrderBook" in forAll(orderBookGen, ordersGen(10)) { (initOb, orders) =>
+        val obsdb = OrderBookSnapshotDB.inMem
+        obsdb.update(pair, 0, Some(initOb.snapshot))
+
+        val owner = TestProbe()
+        val orderBookRef = system.actorOf(
+          Props(new OrderBookActor(
+            OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
+            owner.ref,
+            TestProbe().ref,
+            system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
+            pair,
+            8,
+            8,
+            time,
+            NonEmptyList.one(DenormalizedMatchingRule(0L, DenormalizedMatchingRule.DefaultTickSize)),
+            _ => (),
+            raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
+            _ => (t, m) => m.matcherFee -> t.matcherFee
+          )))
+        owner.expectMsgType[OrderBookActor.OrderBookRecovered]
+
+        orders.foreach(orderBookRef ! _)
+
+        orderBookRef ! MatcherActor.SaveSnapshot(100L)
+        owner.expectMsgType[OrderBookActor.OrderBookSnapshotUpdateCompleted]
+
+        val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
+
+        val updatedOrderBook = eventually {
+          val ob = obsdb.get(pair)
+          ob shouldNot be(empty)
+          ob.get._2
+        }
+
+        val actual = Await.result(orderBookAskAdapter.getAggregatedSnapshot(pair), 5.seconds).explicitGet().get
+
+        val expected = OrderBookAggregatedSnapshot(
+          asks = sum(updatedOrderBook.asks),
+          bids = sum(updatedOrderBook.bids)
+        )
+
+        actual should matchTo(expected)
+      }
+    }
+
     "apply" - {
       "should init with provided order book" in forAll(orderBookGen) { orderBook =>
         val ref      = mk(orderBook)
@@ -278,6 +355,11 @@ class AggregatedOrderBookSpec
 
   private def levelAggsFromSide(side: Side): List[LevelAgg] =
     AggregatedOrderBookActor.sum(side).map(AggregatedOrderBookActor.toLevelAgg).toList.sortBy(_.price)(side.ordering)
+
+  private def sum(side: OrderBookSideSnapshot): List[LevelAgg] =
+    side.map {
+      case (price, level) => LevelAgg(amount = level.map(_.amount).sum, price = price)
+    }.toList
 
   private def mk(ob: OrderBook): ActorRef[Message] = system.spawn(
     AggregatedOrderBookActor(

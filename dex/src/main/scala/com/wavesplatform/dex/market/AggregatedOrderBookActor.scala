@@ -90,7 +90,7 @@ object AggregatedOrderBookActor {
                 updateId = 0L
               )
 
-              context.log.trace(s"[${client.path.name}] WebSocket connected")
+              context.log.trace("[{}] WebSocket connected", client.path.name)
               context.watch(client)
               default(state.copy(ws = state.ws.addSubscription(client)))
 

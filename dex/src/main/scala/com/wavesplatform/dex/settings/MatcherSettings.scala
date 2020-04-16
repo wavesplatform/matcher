@@ -130,24 +130,24 @@ object MatcherSettings {
         }
         .toSet
 
-    val blacklistedNames           = config.as[List[String]]("blacklisted-names").map(_.r)
-    val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
-    val orderBookSnapshotHttpCache = config.as[OrderBookHttpInfo.Settings]("order-book-snapshot-http-cache") // TODO
-    val eventsQueue                = config.as[EventsQueueSettings]("events-queue")
-    val processConsumedTimeout     = config.as[FiniteDuration]("process-consumed-timeout")
-    val orderFee                   = config.getValidatedMap[Long, OrderFeeSettings]("order-fee")(validateOffset)
-    val deviation                  = config.as[DeviationsSettings]("max-price-deviations")
-    val orderRestrictions          = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
-    val matchingRules              = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
-    val whiteListOnly              = config.as[Boolean]("white-list-only")
-    val allowedAssetPairs          = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
-    val allowedOrderVersions       = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
-    val broadcastUntilConfirmed    = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
-    val postgresConnection         = config.as[PostgresConnection]("postgres")
-    val orderHistory               = config.as[Option[OrderHistorySettings]]("order-history")
-    val orderDb                    = config.as[OrderDB.Settings]("order-db")
-    val webSocketSettings          = config.as[WebSocketSettings]("web-sockets")
-    val addressActorSettings       = config.as[AddressActor.Settings]("address-actor")
+    val blacklistedNames        = config.as[List[String]]("blacklisted-names").map(_.r)
+    val blacklistedAddresses    = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookHttp           = config.as[OrderBookHttpInfo.Settings]("order-book-http")
+    val eventsQueue             = config.as[EventsQueueSettings]("events-queue")
+    val processConsumedTimeout  = config.as[FiniteDuration]("process-consumed-timeout")
+    val orderFee                = config.getValidatedMap[Long, OrderFeeSettings]("order-fee")(validateOffset)
+    val deviation               = config.as[DeviationsSettings]("max-price-deviations")
+    val orderRestrictions       = config.getValidatedMap[AssetPair, OrderRestrictionsSettings]("order-restrictions")(validateAssetPairKey)
+    val matchingRules           = config.getValidatedMap[AssetPair, NonEmptyList[DenormalizedMatchingRule]]("matching-rules")(validateAssetPairKey)
+    val whiteListOnly           = config.as[Boolean]("white-list-only")
+    val allowedAssetPairs       = config.getValidatedSet[AssetPair]("allowed-asset-pairs")
+    val allowedOrderVersions    = config.as[Set[Int]]("allowed-order-versions").map(_.toByte)
+    val broadcastUntilConfirmed = config.as[ExchangeTransactionBroadcastSettings]("exchange-transaction-broadcast")
+    val postgresConnection      = config.as[PostgresConnection]("postgres")
+    val orderHistory            = config.as[Option[OrderHistorySettings]]("order-history")
+    val orderDb                 = config.as[OrderDB.Settings]("order-db")
+    val webSocketSettings       = config.as[WebSocketSettings]("web-sockets")
+    val addressActorSettings    = config.as[AddressActor.Settings]("address-actor")
 
     MatcherSettings(
       addressSchemeCharacter,
@@ -169,7 +169,7 @@ object MatcherSettings {
       blacklistedNames,
       orderDb,
       blacklistedAddresses,
-      orderBookSnapshotHttpCache,
+      orderBookHttp,
       eventsQueue,
       processConsumedTimeout,
       orderFee,

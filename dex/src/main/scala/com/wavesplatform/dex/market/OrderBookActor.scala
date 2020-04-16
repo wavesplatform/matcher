@@ -155,7 +155,7 @@ class OrderBookActor(settings: Settings,
   private def process(timestamp: Long, result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
     val (updatedOrderBook, events, levelChanges) = result
     orderBook = updatedOrderBook
-    // TODO We need a better way to do this
+    // DEX-712
     val hasTrades = events.exists {
       case _: Events.OrderExecuted => true
       case _                       => false
@@ -181,7 +181,6 @@ class OrderBookActor(settings: Settings,
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
-        log.info(s"Level changes: $levelChanges")
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>

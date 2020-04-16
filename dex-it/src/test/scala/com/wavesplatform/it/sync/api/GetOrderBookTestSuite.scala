@@ -14,8 +14,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  allowed-order-versions = [1, 2, 3]
-         |  order-book-snapshot-http-cache {
-         |    cache-timeout = 5s
+         |  order-book-http {
          |    depth-ranges = [10, 20, 40, 41, 43, 100, 1000]
          |    default-depth = 100
          |  }

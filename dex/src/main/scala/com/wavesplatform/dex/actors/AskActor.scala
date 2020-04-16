@@ -1,12 +1,11 @@
 package com.wavesplatform.dex.actors
 
-import akka.actor.{Actor, Props, Status}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props, Status}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{Promise, TimeoutException}
+import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.reflect.ClassTag
 
-// TODO tests
 class AskActor[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[T]) extends Actor {
   import context.dispatcher
   private val timeoutCancelable = context.system.scheduler.scheduleOnce(timeout, self, AskActor.timeoutMessage)
@@ -31,4 +30,9 @@ object AskActor {
   }
 
   def props[T](p: Promise[T], timeout: FiniteDuration)(implicit ct: ClassTag[T]) = Props(new AskActor(p, timeout))
+  def mk[T](timeout: FiniteDuration)(implicit ct: ClassTag[T], system: ActorSystem): (ActorRef, Future[T]) = {
+    val p   = Promise[T]()
+    val ref = system.actorOf(props(p, timeout))
+    (ref, p.future)
+  }
 }

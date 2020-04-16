@@ -142,15 +142,13 @@ object AggregatedOrderBookActor {
     )
 
     def flushed(pendingChanges: LevelAmounts, updatedLastTrade: Option[LastTrade], updatedLastUpdateTs: Long): State =
-      if (pendingChanges.isEmpty) this
-      else
-        copy(
-          asks = sum(asks, pendingChanges.asks),
-          bids = sum(bids, pendingChanges.bids),
-          lastTrade = updatedLastTrade.orElse(lastTrade),
-          lastUpdateTs = updatedLastUpdateTs,
-          compiledHttpView = Map.empty // Could be optimized by depth
-        )
+      copy(
+        asks = sum(asks, pendingChanges.asks),
+        bids = sum(bids, pendingChanges.bids),
+        lastTrade = updatedLastTrade.orElse(lastTrade),
+        lastUpdateTs = updatedLastUpdateTs,
+        compiledHttpView = Map.empty // Could be optimized by depth
+      )
 
     def toOrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(
       asks = asks.map(toLevelAgg).toSeq,

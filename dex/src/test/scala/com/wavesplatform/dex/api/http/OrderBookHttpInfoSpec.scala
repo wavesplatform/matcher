@@ -5,9 +5,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.JsonSerializer
 import com.wavesplatform.dex.api.http.OrderBookHttpInfoSpec.FakeOrderBookActor
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -24,7 +22,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime with TableDrivenPropertyChecks with MatcherSpecLike {
+class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime with TableDrivenPropertyChecks with MatcherSpecLike with TestParsers {
   private val pair = AssetPair(IssuedAsset(ByteStr("issued".getBytes(StandardCharsets.UTF_8))), Waves)
 
   "OrderBookHttpInfo" - {
@@ -125,13 +123,6 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
       }
     }
   }
-
-  private def orderBookFrom(x: HttpResponse): OrderBookResult = JsonSerializer.deserialize[OrderBookResult](
-    x.entity
-      .asInstanceOf[HttpEntity.Strict]
-      .getData()
-      .decodeString(StandardCharsets.UTF_8)
-  )
 
   override protected def actorSystemName: String = "OrderBookHttpInfoSpec"
 }

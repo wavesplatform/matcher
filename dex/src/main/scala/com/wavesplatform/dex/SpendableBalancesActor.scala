@@ -1,19 +1,23 @@
 package com.wavesplatform.dex
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Status}
 import akka.pattern.pipe
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.group.catsSyntaxGroup
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]],
                              allAssetsSpendableBalances: Address => Future[Map[Asset, Long]],
                              addressDirectory: ActorRef)
-    extends Actor {
+    extends Actor
+    with ScorexLogging {
 
   import context.dispatcher
 
@@ -33,10 +37,17 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       lazy val knownPreparedState = knownAssets.collect { case (a, Some(b)) => a -> b }
 
       if (unknownAssets.isEmpty) sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
-      else
+      else {
+        val requestSender = sender
         spendableBalances(address, unknownAssets.keySet)
           .map(stateFromNode => SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, stateFromNode))
-          .pipeTo(self)(sender)
+          .andThen {
+            case Success(r) => self.tell(r, requestSender)
+            case Failure(ex) =>
+              log.warn("Got exception during spendable balance request", ex)
+              requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
+          }
+      }
 
     case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets, stateFromNode) =>
       if (!fullState.contains(address)) {

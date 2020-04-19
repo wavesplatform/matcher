@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.api
 
+import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.OrderBookResponse
@@ -7,7 +8,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 class GetOrderBookTestSuite extends MatcherSuiteBase {
 
-  val ordersCount = 0
+  private val ordersCount = 0
 
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
@@ -21,6 +22,9 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
          |}""".stripMargin
     )
 
+  // DEX-642
+  private implicit val orderBookResponseDiff: Diff[OrderBookResponse] = Derived[Diff[OrderBookResponse]].ignore(_.timestamp)
+
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
     broadcastAndAwait(IssueUsdTx)
@@ -28,14 +32,14 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
   }
 
   def checkDepth(depth: Int, array: Array[Int] = Array()): Unit = {
-    val orderBook = clear(dex1.api.orderBook(wavesUsdPair, depth))
+    val orderBook = dex1.api.orderBook(wavesUsdPair, depth)
 
     if (depth < ordersCount) {
       orderBook.asks.size shouldBe depth
       orderBook.bids.size shouldBe depth
     }
 
-    array.foreach(depth => clear(dex1.api.orderBook(wavesUsdPair, depth)) should matchTo(orderBook))
+    array.foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) should matchTo(orderBook))
   }
 
   "response order book should contain right count of bids and asks" in {
@@ -51,11 +55,9 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     checkDepth(101, Array(102, 103, 999, 9999))
 
     withClue("check default depth value") {
-      val defaultOrderBook = clear(dex1.api.orderBook(wavesUsdPair))
-      defaultOrderBook should matchTo(clear(dex1.api.orderBook(wavesUsdPair, 100)))
-      Array(44, 45, 60, 98, 99).foreach(depth => clear(dex1.api.orderBook(wavesUsdPair, depth)) shouldBe clear(defaultOrderBook))
+      val defaultOrderBook = dex1.api.orderBook(wavesUsdPair)
+      defaultOrderBook should matchTo(dex1.api.orderBook(wavesUsdPair, 100))
+      Array(44, 45, 60, 98, 99).foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) should matchTo(defaultOrderBook))
     }
   }
-
-  private def clear(x: OrderBookResponse) = x.copy(timestamp = 0L) // DEX-642
 }

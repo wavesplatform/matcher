@@ -30,6 +30,7 @@ import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
@@ -143,7 +144,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     def actualOrderFeeSettings: OrderFeeSettings = orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
 
     /** Does not need additional access to the blockchain via gRPC */
-    def syncValidation(orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
+    def syncValidation(marketStatus: Option[MarketStatus], orderAssetsDecimals: Asset => Int): Either[MatcherError, Order] = {
 
       lazy val actualTickSize = matchingRulesCache
         .getNormalizedRuleForNextOrder(o.assetPair, lastProcessedOffset, orderAssetsDecimals)
@@ -153,6 +154,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         _ <- matcherSettingsAware(matcherPublicKey, blacklistedAddresses, settings, orderAssetsDecimals, rateCache, actualOrderFeeSettings)(o)
         _ <- timeAware(time)(o)
         _ <- tickSizeAware(actualTickSize)(o)
+        _ <- if (settings.deviation.enabled) marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o) else success
       } yield o
     }
 
@@ -171,12 +173,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       )(o)
 
     for {
-      _ <- liftAsync { syncValidation(assetsCache.unsafeGetDecimals) }
       marketStatus <- {
         if (settings.deviation.enabled) EitherT(orderBookAskAdapter.getMarketStatus(o.assetPair))
         else liftValueAsync(Option.empty[OrderBookActor.MarketStatus])
       }
-      _ <- if (settings.deviation.enabled) liftAsync(marketAware(actualOrderFeeSettings, settings.deviation, marketStatus)(o)) else successAsync
+      _ <- liftAsync { syncValidation(marketStatus, assetsCache.unsafeGetDecimals) }
       _ <- asyncValidation(assetsCache.unsafeGet)
     } yield o
   }
@@ -340,29 +341,29 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     ) unsafeTap sendBalanceChanges(settings.wavesBlockchainClient.balanceStreamBufferSize)
   }
 
+  private def validateForAddress(ao: AcceptedOrder, tradableBalance: Map[Asset, Long]): Future[Either[MatcherError, Unit]] = {
+    for {
+      hasOrderInBlockchain <- liftFutureAsync(wavesBlockchainAsyncClient.forgedOrder(ao.id))
+      orderBookCache       <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
+      _ <- EitherT.fromEither {
+        OrderValidator
+          .accountStateAware(
+            ao.order.sender,
+            tradableBalance.withDefaultValue(0L),
+            hasOrderInBlockchain,
+            orderBookCache.getOrElse(OrderBookAggregatedSnapshot.empty)
+          )(ao)
+      }
+    } yield ()
+  }.value
+
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
     Props(
       new AddressActor(
         address,
         time,
-        orderDB, { (ao, tradableBalance) =>
-          val r = for {
-            hasOrderInBlockchain <- liftFutureAsync(wavesBlockchainAsyncClient.forgedOrder(ao.id))
-            orderBookCache       <- EitherT(orderBookAskAdapter.getAggregatedSnapshot(ao.order.assetPair))
-            r <- EitherT.fromEither {
-              OrderValidator
-                .accountStateAware(
-                  ao.order.sender,
-                  tradableBalance.withDefaultValue(0L),
-                  hasOrderInBlockchain,
-                  orderBookCache.getOrElse(OrderBookAggregatedSnapshot.empty)
-                )(ao)
-                .map(_ => ())
-            }
-          } yield r
-
-          r.value
-        },
+        orderDB,
+        validateForAddress,
         matcherQueue.storeEvent,
         startSchedules,
         spendableBalancesActor,

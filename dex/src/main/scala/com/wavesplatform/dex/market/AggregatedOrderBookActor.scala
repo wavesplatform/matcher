@@ -167,8 +167,8 @@ object AggregatedOrderBookActor {
     )
 
     def fromOrderBook(ob: OrderBook): State = State(
-      asks = empty.asks ++ sum(ob.asks), // ++ to preserve an order
-      bids = empty.bids ++ sum(ob.bids),
+      asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order
+      bids = empty.bids ++ aggregateByPrice(ob.bids),
       lastTrade = ob.lastTrade,
       lastUpdateTs = System.currentTimeMillis(), // DEX-642
       compiledHttpView = Map.empty,
@@ -178,7 +178,7 @@ object AggregatedOrderBookActor {
 
   def toLevelAgg(x: (Price, Amount)): LevelAgg = LevelAgg(x._2, x._1)
 
-  def sum(xs: Side): TreeMap[Price, Amount] = xs.map {
+  def aggregateByPrice(xs: Side): TreeMap[Price, Amount] = xs.map {
     case (k, v) => k -> v.view.map(_.amount).sum
   }
 

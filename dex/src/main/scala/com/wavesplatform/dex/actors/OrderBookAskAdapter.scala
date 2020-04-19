@@ -35,7 +35,7 @@ class OrderBookAskAdapter(orderBooks: AtomicReference[Map[AssetPair, Either[Unit
     get[Query.GetHttpView, HttpResponse](assetPair, Query.GetHttpView(format, depth, _))
 
   private val default = Future.successful(Right(None))
-  private def get[M <: Query, R](assetPair: AssetPair, message: ActorRef => M)(implicit ct: ClassTag[R]): Result[R] =
+  private def get[M <: Query, R: ClassTag](assetPair: AssetPair, message: ActorRef => M): Result[R] =
     orderBooks.get().get(assetPair) match {
       case None => default
       case Some(ob) =>

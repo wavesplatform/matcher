@@ -142,7 +142,7 @@ class AggregatedOrderBookActorSpec
       }
     }
 
-    "should return update an updated" - {
+    "should return an updated" - {
       "market status after update" - {
         "once" in {
           val ref       = mk(OrderBook.empty)
@@ -354,7 +354,7 @@ class AggregatedOrderBookActorSpec
   )
 
   private def levelAggsFromSide(side: Side): List[LevelAgg] =
-    AggregatedOrderBookActor.sum(side).map(AggregatedOrderBookActor.toLevelAgg).toList.sortBy(_.price)(side.ordering)
+    AggregatedOrderBookActor.aggregateByPrice(side).map(AggregatedOrderBookActor.toLevelAgg).toList.sortBy(_.price)(side.ordering)
 
   private def sum(side: OrderBookSideSnapshot): List[LevelAgg] =
     side.map {

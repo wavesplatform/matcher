@@ -21,22 +21,23 @@ sealed class MatcherResponse(val statusCode: StatusCode, val content: MatcherRes
 
 object MatcherResponse {
 
-  def toResponseMarshaller: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
-    def content(x: MatcherResponse): JsValue = backwardCompatibleWrapper(
-      x.status,
-      x.statusCode,
-      x.content match {
-        case MatcherResponseContent.Js(r)        => r
-        case MatcherResponseContent.Error(error) => error.toJson
-        case MatcherResponseContent.Multiple(xs) => Json.obj("message" -> Json.arr(xs.map(content)))
-      }
-    )
+  val toResponseMarshaller: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque(toHttpResponse)
+  implicit val matcherResponseWrites: Writes[MatcherResponse]     = Writes(toJson)
 
-    HttpResponse(
-      x.statusCode,
-      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(Json.stringify(content(x))))
-    )
-  }
+  def toHttpResponse(x: MatcherResponse): HttpResponse = HttpResponse(
+    x.statusCode,
+    entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(Json.stringify(toJson(x))))
+  )
+
+  def toJson(x: MatcherResponse): JsValue = backwardCompatibleWrapper(
+    x.status,
+    x.statusCode,
+    x.content match {
+      case MatcherResponseContent.Js(r)        => r
+      case MatcherResponseContent.Error(error) => error.toJson
+      case MatcherResponseContent.Multiple(xs) => Json.obj("message" -> Json.arr(xs.map(toJson)))
+    }
+  )
 
   private def backwardCompatibleWrapper(status: String, code: StatusCode, json: JsObject): JsValue = {
     Json

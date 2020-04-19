@@ -1,6 +1,5 @@
 package com.wavesplatform.dex
 
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
@@ -15,7 +14,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot, _}
+import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -73,21 +72,18 @@ class ActorsWebSocketInteractionsSpecification
           address,
           time,
           EmptyOrderDB,
-          _ => Future.successful(false),
+          (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          _ => OrderBookAggregatedSnapshot.empty,
           enableSchedules,
           spendableBalancesActor
         )
       )
     }
 
-    def subscribe(): Unit = {
-      addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), eventsProbe.ref)
-    }
+    def subscribe(): Unit = addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
@@ -364,7 +360,7 @@ class ActorsWebSocketInteractionsSpecification
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
         updateBalances(tradableBalance)
 
-        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription(UUID.randomUUID)), tp.ref)
+        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), tp.ref)
 
         def expectWsBalance(tp: TestProbe, expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
           val wsAddressState = tp.expectMsgAnyClassOf(10.second, classOf[WsAddressState])

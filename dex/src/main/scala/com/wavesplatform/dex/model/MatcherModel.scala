@@ -378,7 +378,9 @@ object OrderStatus {
 
 object Events {
 
-  sealed trait Event
+  sealed trait Event extends Product with Serializable {
+    def timestamp: Long
+  }
 
   /**
     * In case of dynamic fee settings the following params can be different from the appropriate `acceptedOrder.order.matcherFee`:

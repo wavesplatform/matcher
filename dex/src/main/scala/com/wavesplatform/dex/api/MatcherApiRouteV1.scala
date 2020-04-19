@@ -4,12 +4,11 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, OrderBookHttpInfo}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.model.MatcherModel
-import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.{AssetPairBuilder, Matcher}
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -17,10 +16,9 @@ import javax.ws.rs.Path
 @Path("/api/v1")
 @Api(value = "/api v1/")
 case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
-                             orderBookSnapshot: OrderBookSnapshotHttpCache,
+                             orderBookHttpInfo: OrderBookHttpInfo,
                              matcherStatus: () => Matcher.Status,
-                             apiKeyHash: Option[Array[Byte]],
-                             matcherSettings: MatcherSettings)(implicit val errorContext: ErrorFormatterContext)
+                             apiKeyHash: Option[Array[Byte]])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -77,7 +75,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete { orderBookSnapshot.get(pair, depth, MatcherModel.Denormalized) }
+        complete { orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth) }
       }
     }
   }

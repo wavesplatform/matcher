@@ -4,10 +4,9 @@ import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.model.Denormalization._
-import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts}
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -15,7 +14,6 @@ import scala.collection.immutable.TreeMap
 
 case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], updateId: Long, timestamp: Long = System.currentTimeMillis)
     extends WsMessage {
-  def nonEmpty: Boolean                                = asks.nonEmpty || bids.nonEmpty || lastTrade.nonEmpty
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
   override val tpe: String                             = "ob"
 }
@@ -81,38 +79,30 @@ object WsOrderBook {
     override def empty: WsSide               = TreeMap.empty(ordering)
   }
 
-  class Update(amountAssetDecimals: Int, priceAssetDecimals: Int) {
-
-    def from(asks: Iterable[LevelAgg], bids: Iterable[LevelAgg], lt: Option[LastTrade], updateId: Long): WsOrderBook =
-      WsOrderBook(asks = side(asks, asksOrdering), bids = side(bids, bidsOrdering), lastTrade = lt.map(lastTrade), updateId = updateId)
-
-    def lastTrade(x: LastTrade): WsLastTrade = WsLastTrade(
-      price = denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble,
-      amount = denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble,
-      side = x.side
+  def from(amountDecimals: Int,
+           priceDecimals: Int,
+           asks: Iterable[LevelAgg],
+           bids: Iterable[LevelAgg],
+           lt: Option[LastTrade],
+           updateId: Long): WsOrderBook =
+    WsOrderBook(
+      asks = side(amountDecimals, priceDecimals, asks, asksOrdering),
+      bids = side(amountDecimals, priceDecimals, bids, bidsOrdering),
+      lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)),
+      updateId = updateId
     )
 
-    def side(xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
-      TreeMap(
-        xs.map { x =>
-          denormalizePrice(x.price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-            denormalizeAmountAndFee(x.amount, amountAssetDecimals).toDouble
-        }.toSeq: _*
-      )(ordering)
+  def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(
+    price = denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble,
+    amount = denormalizeAmountAndFee(x.amount, amountDecimals).toDouble,
+    side = x.side
+  )
 
-    def withLevelChanges(orig: WsOrderBook, updated: LevelAmounts): WsOrderBook = orig.copy(
-      asks = orig.asks ++ denormalized(updated.asks),
-      bids = orig.bids ++ denormalized(updated.bids),
-      timestamp = System.currentTimeMillis
-    )
-
-    def withLastTrade(orig: WsOrderBook, x: LastTrade): WsOrderBook =
-      orig.copy(lastTrade = Some(lastTrade(x)), timestamp = System.currentTimeMillis)
-
-    private def denormalized(xs: Map[Price, Amount]): Map[Double, Double] = xs.map {
-      case (price, amount) =>
-        denormalizePrice(price, amountAssetDecimals, priceAssetDecimals).toDouble ->
-          denormalizeAmountAndFee(amount, amountAssetDecimals).toDouble
-    }
-  }
+  def side(amountDecimals: Int, priceDecimals: Int, xs: Iterable[LevelAgg], ordering: Ordering[Double]): WsSide =
+    TreeMap(
+      xs.map { x =>
+        denormalizePrice(x.price, amountDecimals, priceDecimals).toDouble ->
+          denormalizeAmountAndFee(x.amount, amountDecimals).toDouble
+      }.toSeq: _*
+    )(ordering)
 }

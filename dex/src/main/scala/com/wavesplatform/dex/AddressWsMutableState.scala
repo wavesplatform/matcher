@@ -1,7 +1,5 @@
 package com.wavesplatform.dex
 
-import java.util.UUID
-
 import akka.actor.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
@@ -11,8 +9,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-case class AddressWsMutableState(activeWsConnections: Map[ActorRef, (UUID, Long)],
-                                 pendingWsConnections: Map[ActorRef, UUID],
+case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
+                                 pendingWsConnections: Set[ActorRef],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
                                  ordersChanges: Map[Order.Id, WsOrder]) {
@@ -23,11 +21,11 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, (UUID, Long)
   def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
-  def addPendingSubscription(subscriber: ActorRef, id: UUID): AddressWsMutableState =
-    copy(pendingWsConnections = pendingWsConnections + (subscriber -> id))
+  def addPendingSubscription(subscriber: ActorRef): AddressWsMutableState =
+    copy(pendingWsConnections = pendingWsConnections + subscriber)
 
   def flushPendingConnections(): AddressWsMutableState =
-    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.mapValues(_ -> 0L), pendingWsConnections = Map.empty)
+    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.iterator.map(_ -> 0L), pendingWsConnections = Set.empty)
 
   def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
     if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()
@@ -65,15 +63,15 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, (UUID, Long)
 
   def sendSnapshot(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): Unit = {
     val snapshot = WsAddressState(balances, orders, 0)
-    pendingWsConnections.keys.foreach(_ ! snapshot)
+    pendingWsConnections.foreach(_ ! snapshot)
   }
 
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): AddressWsMutableState = copy(
-    activeWsConnections = activeWsConnections.map { // dirty but linear
-      case (conn, (connId, updateId)) =>
+    activeWsConnections = activeWsConnections.map { // dirty but one pass
+      case (conn, updateId) =>
         val newUpdateId = AddressWsMutableState.getNextUpdateId(updateId)
         conn ! WsAddressState(balances, orders, newUpdateId)
-        conn -> (connId -> newUpdateId)
+        conn -> newUpdateId
     }
   )
 
@@ -82,7 +80,7 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, (UUID, Long)
 
 object AddressWsMutableState {
 
-  val empty: AddressWsMutableState = AddressWsMutableState(Map.empty, Map.empty, Set.empty, Set.empty, Map.empty)
+  val empty: AddressWsMutableState = AddressWsMutableState(Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
   val numberMaxSafeInteger         = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1

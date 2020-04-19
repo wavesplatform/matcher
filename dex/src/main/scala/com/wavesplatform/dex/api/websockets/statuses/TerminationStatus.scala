@@ -1,12 +1,7 @@
 package com.wavesplatform.dex.api.websockets.statuses
 
-import java.util.UUID
-
-trait TerminationStatus {
-  val connectionId: UUID
-}
-
+sealed trait TerminationStatus
 object TerminationStatus {
-  final case class PongTimeout(connectionId: UUID)         extends TerminationStatus
-  final case class MaxLifetimeExceeded(connectionId: UUID) extends TerminationStatus
+  case object PongTimeout         extends TerminationStatus
+  case object MaxLifetimeExceeded extends TerminationStatus
 }

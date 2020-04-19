@@ -1,5 +1,9 @@
 package com.wavesplatform.dex.model
 
+import cats.instances.list.catsStdInstancesForList
+import cats.kernel.Group
+import cats.syntax.foldable._
+import cats.syntax.group._
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -24,17 +28,23 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
         val updatedOrderIds = orderIds - orderId
         if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedAsks))
+          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), LevelAmounts.apply(orderType, price, updatedBids))
+          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
         }
     }
   }
 
   def cancelAll(ts: Long): (OrderBook, List[OrderCanceled], LevelAmounts) = {
-    val canceledOrders = allOrders.map { OrderCanceled(_, isSystemCancel = false, ts) }.toList
-    (OrderBook.empty, canceledOrders, LevelAmounts.empty)
+    val orders         = allOrders.toList
+    val canceledOrders = orders.map { OrderCanceled(_, isSystemCancel = false, ts) }
+    val levelAmounts = orders.foldMap { o =>
+      // Order MUST be in orderIds. It's okay to fail here with Map.apply if the implementation is wrong
+      LevelAmounts.mkDiff(orderIds.getOrElse(o.id, throw new IllegalStateException(s"Order ids doesn't contain the order ${o.id}"))._2, o)
+    }
+
+    (OrderBook.empty, canceledOrders, Group.inverse(levelAmounts))
   }
 
   def add(submitted: AcceptedOrder,
@@ -80,10 +90,6 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
       copy(bids = bids.put(levelPrice, lo), orderIds = updatedOrderIds)
     )
   }
-
-  // TODO Remove during optimization
-  private def levelAmountsAt(tpe: OrderType, levelPrice: Price): LevelAmounts =
-    LevelAmounts(tpe, levelPrice, side(tpe))
 }
 
 object OrderBook {
@@ -124,15 +130,18 @@ object OrderBook {
             val submittedRemaining = orderExecutedEvent.submittedRemaining
             val counterRemaining   = orderExecutedEvent.counterRemaining
 
-            val updatedOrderBook = {
+            val (updatedOrderBook, updatedLevelChanges) = {
+              val updatedLevelChanges = levelChanges.subtract(levelPrice, orderExecutedEvent)
+
               val lt = Some(LastTrade(counter.price, orderExecutedEvent.executedAmount, submitted.order.orderType))
               val ob = orderBook.copy(lastTrade = lt)
-              if (counterRemaining.isValid) ob.unsafeUpdateBest(counterRemaining)
-              else ob.unsafeWithoutBest(counter.order.orderType)
+              if (counterRemaining.isValid) (ob.unsafeUpdateBest(counterRemaining), updatedLevelChanges)
+              else
+                (
+                  ob.unsafeWithoutBest(counter.order.orderType),
+                  updatedLevelChanges |+| Group.inverse(LevelAmounts.mkDiff(levelPrice, counterRemaining))
+                )
             }
-
-            // TODO replace by levelChanges.subtract(levelPrice, orderExecutedEvent) during optimization
-            val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(counter.order.orderType, levelPrice))
 
             if (submittedRemaining.isValid) {
               if (counterRemaining.isValid)
@@ -155,16 +164,15 @@ object OrderBook {
               orderBook = orderBook.unsafeWithoutBest(counter.order.orderType),
               submitted = submitted,
               events = events.enqueue(OrderCanceled(counter, isSystemCancel = false, eventTs)),
-              levelChanges = levelChanges
+              levelChanges = levelChanges |-| LevelAmounts.mkDiff(levelPrice, counter)
             )
 
         case _ =>
           submitted match {
             case submitted: LimitOrder =>
-              val levelPrice       = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
-              val updatedOrderBook = orderBook.insert(levelPrice, submitted)
-              // TODO replace by levelChanges.add(levelPrice, submitted) during optimization
-              val updatedLevelChanges = levelChanges.put(updatedOrderBook.levelAmountsAt(submitted.order.orderType, levelPrice))
+              val levelPrice          = correctPriceByTickSize(submitted.price, submitted.order.orderType, tickSize)
+              val updatedOrderBook    = orderBook.insert(levelPrice, submitted)
+              val updatedLevelChanges = levelChanges.add(levelPrice, submitted)
               (updatedOrderBook, events, updatedLevelChanges)
             case submitted: MarketOrder =>
               // Cancel market order in the absence of counters

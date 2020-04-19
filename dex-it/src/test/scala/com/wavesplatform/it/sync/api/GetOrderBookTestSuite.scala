@@ -1,25 +1,29 @@
 package com.wavesplatform.it.sync.api
 
+import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.api.responses.dex.OrderBookResponse
 import com.wavesplatform.it.MatcherSuiteBase
 
 class GetOrderBookTestSuite extends MatcherSuiteBase {
 
-  val ordersCount = 0
+  private val ordersCount = 0
 
   override protected val dexInitialSuiteConfig: Config =
     ConfigFactory.parseString(
       s"""waves.dex {
          |  price-assets = [ "$UsdId", "WAVES" ]
          |  allowed-order-versions = [1, 2, 3]
-         |  order-book-snapshot-http-cache {
-         |    cache-timeout = 5s
+         |  order-book-http {
          |    depth-ranges = [10, 20, 40, 41, 43, 100, 1000]
          |    default-depth = 100
          |  }
          |}""".stripMargin
     )
+
+  // DEX-642
+  private implicit val orderBookResponseDiff: Diff[OrderBookResponse] = Derived[Diff[OrderBookResponse]].ignore(_.timestamp)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -52,8 +56,8 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
 
     withClue("check default depth value") {
       val defaultOrderBook = dex1.api.orderBook(wavesUsdPair)
-      defaultOrderBook shouldBe dex1.api.orderBook(wavesUsdPair, 100)
-      Array(44, 45, 60, 98, 99).foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) shouldBe defaultOrderBook)
+      defaultOrderBook should matchTo(dex1.api.orderBook(wavesUsdPair, 100))
+      Array(44, 45, 60, 98, 99).foreach(depth => dex1.api.orderBook(wavesUsdPair, depth) should matchTo(defaultOrderBook))
     }
   }
 }

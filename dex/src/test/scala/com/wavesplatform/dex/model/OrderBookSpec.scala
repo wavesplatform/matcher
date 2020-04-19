@@ -3,14 +3,13 @@ package com.wavesplatform.dex.model
 import java.nio.charset.StandardCharsets
 
 import cats.instances.long.catsKernelStdGroupForLong
-import cats.kernel.Monoid
+import cats.kernel.{Group, Monoid}
 import cats.syntax.group._
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.domain.model.Price
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
@@ -159,17 +158,16 @@ ${diff.mkString("\n")}
         }
     }
 
-    "updatedOrderBook.level contains result.levelChanges" in forAll(coinsInvariantPropGen) {
+    "result.levelChanges contains diff for updatedOrderBook.level" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val ob       = mkOrderBook(askOrders, bidOrders)
+        val snapshot = ob.aggregatedSnapshot
+
         val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val updatedSnapshot                   = updatedOb.aggregatedSnapshot
 
-        val snapshot = updatedOb.aggregatedSnapshot
-        def getSnapshotLevel(tpe: OrderType, levelPrice: Long): Long =
-          tpe.askBid(snapshot.asks, snapshot.bids).collectFirst { case x: LevelAgg if x.price == levelPrice => x.amount }.getOrElse(0L)
-
-        val filteredAsks = levelChanges.asks.map { case (price, _) => price -> getSnapshotLevel(OrderType.SELL, price) }
-        val filteredBids = levelChanges.bids.map { case (price, _) => price -> getSnapshotLevel(OrderType.BUY, price) }
+        val actualLevelChanges   = filterNonEmpty(levelChanges)
+        val expectedLevelChanges = filterNonEmpty(toLevelAmounts(updatedSnapshot) |-| toLevelAmounts(snapshot))
 
         val clue =
           s"""
@@ -191,58 +189,27 @@ ${formatEvents(events)}
 Level changes:
 ${format(levelChanges)}
 
+Expected level changes:
+${format(expectedLevelChanges)}
+
+Actual level changes:
+${format(actualLevelChanges)}
+
 Aggregated snapshot:
-${updatedOb.aggregatedSnapshot}
+$snapshot
+
+Aggregated updated snapshot:
+$updatedSnapshot
 """
 
         withClue(clue) {
           withClue("asks: ") {
-            filteredAsks should matchTo(levelChanges.asks)
+            expectedLevelChanges.asks should matchTo(actualLevelChanges.asks)
           }
 
           withClue("bids: ") {
-            filteredBids should matchTo(levelChanges.bids)
+            expectedLevelChanges.bids should matchTo(actualLevelChanges.bids)
           }
-        }
-    }
-
-    "result.levelChanges.prices == all(event.executedPrice)" in forAll(coinsInvariantPropGen) {
-      case (askOrders, bidOrders, newOrder) =>
-        val ob                                = mkOrderBook(askOrders, bidOrders)
-        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, _.matcherFee -> _.matcherFee)
-
-        val levelChangesPrices = levelChanges.asks.keySet ++ levelChanges.bids.keySet
-
-        // tickSize == 1
-        val eventPrices = events
-          .collect {
-            case evt: OrderAdded    => evt.order.price
-            case evt: OrderExecuted => evt.counter.price
-            case evt: OrderCanceled => evt.acceptedOrder.price // Ignore market orders, because the are canceled at end
-          }
-          .filter(p => ob.hasPrice(p) || updatedOb.hasPrice(p))
-          .toSet
-
-        val clue =
-          s"""
-Order:
-${format(newOrder)}
-
-Events:
-${formatEvents(events)}
-
-Level changes:
-${format(levelChanges)}
-
-Level changes prices:
-${levelChangesPrices.toVector.sorted.mkString("\n")}
-
-Event prices:
-${eventPrices.toVector.sorted.mkString("\n")}
-"""
-
-        withClue(clue) {
-          levelChangesPrices.toList.sorted should matchTo(eventPrices.toList.sorted)
         }
     }
   }
@@ -273,13 +240,14 @@ ${eventPrices.toVector.sorted.mkString("\n")}
       (events.isEmpty || r) shouldBe true
     }
 
-    "levelChanges.levelAmount == obAfter.levelAmount" in test(removedGen) { (_, _, obAfter, events, levelChanges) =>
-      lazy val r = {
-        val (price, amountFromChanges) = (levelChanges.asks ++ levelChanges.bids).take(1).toList.head
-        val amountFromOb               = obAfter.asks.get(price).orElse(obAfter.bids.get(price)).fold(0L)(_.map(_.amount).sum)
-        amountFromChanges == amountFromOb
-      }
-      (events.isEmpty || r) shouldBe true
+    "result.levelChanges contains diff for updatedOrderBook.level" in test(removedGen) { (obBefore, _, obAfter, events, levelChanges) =>
+      val snapshotBefore = obBefore.aggregatedSnapshot
+      val snapshotAfter  = obAfter.aggregatedSnapshot
+
+      val actualLevelChanges   = filterNonEmpty(levelChanges)
+      val expectedLevelChanges = filterNonEmpty(toLevelAmounts(snapshotAfter) |-| toLevelAmounts(snapshotBefore))
+
+      expectedLevelChanges should matchTo(actualLevelChanges)
     }
 
     def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Assertion): Unit = forAll(gen) {
@@ -309,16 +277,17 @@ $levelChanges
 
   private val cancelAllPropGen = flexibleSidesOrdersGen(maxLevelsInOrderBook, maxOrdersInLevel, askPricesGen, bidPricesGen)
 
-  "cancelAll" in forAll(cancelAllPropGen) {
-    case (askOrders, bidOrders) =>
-      val ob             = mkOrderBook(askOrders, bidOrders)
-      val obBefore       = format(ob)
-      val orderIdsBefore = orderIds(ob)
+  "cancelAll" - {
+    "canceled all orders" in forAll(cancelAllPropGen) {
+      case (askOrders, bidOrders) =>
+        val ob             = mkOrderBook(askOrders, bidOrders)
+        val obBefore       = format(ob)
+        val orderIdsBefore = orderIds(ob)
 
-      val (obAfter, events, _) = ob.cancelAll(ts)
-      val canceledOrders       = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
-      val clue =
-        s"""
+        val (obAfter, events, _) = ob.cancelAll(ts)
+        val canceledOrders       = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+        val clue =
+          s"""
 OrderBook before:
 $obBefore
 
@@ -332,14 +301,25 @@ Canceled orders:
 ${canceledOrders.mkString("\n")}
 """
 
-      val orderIdsAfter = orderIds(obAfter)
-      withClue(clue) {
-        orderIdsAfter shouldBe empty
-        events should have size canceledOrders.size
-        events should have size orderIdsBefore.size
-        canceledOrders should matchTo(orderIdsBefore)
-        orderIdsAfter shouldBe empty
-      }
+        val orderIdsAfter = orderIds(obAfter)
+        withClue(clue) {
+          orderIdsAfter shouldBe empty
+          events should have size canceledOrders.size
+          events should have size orderIdsBefore.size
+          canceledOrders should matchTo(orderIdsBefore)
+          orderIdsAfter shouldBe empty
+        }
+    }
+
+    "result.levelChanges == -obBefore.snapshot" in forAll(cancelAllPropGen) {
+      case (askOrders, bidOrders) =>
+        val ob = mkOrderBook(askOrders, bidOrders)
+
+        val (_, _, levelChanges) = ob.cancelAll(ts)
+        val expectedLevelChanges = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
+
+        expectedLevelChanges should matchTo(levelChanges)
+    }
   }
 
   private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_.order.id()).toSet
@@ -360,6 +340,22 @@ ${canceledOrders.mkString("\n")}
 
   private def spentFee(ao: AcceptedOrder, executedAmount: Long) =
     Map(ao.feeAsset -> AcceptedOrder.partialFee(ao.order.matcherFee, ao.order.amount, executedAmount))
+
+  private def toLevelAmounts(s: OrderBookAggregatedSnapshot): LevelAmounts =
+    new LevelAmounts(
+      asks = s.asks.collect {
+        case x if x.amount != 0 => x.price -> x.amount
+      }.toMap,
+      bids = s.bids.collect {
+        case x if x.amount != 0 => x.price -> x.amount
+      }.toMap
+    )
+
+  private def filterNonEmpty(x: LevelAmounts): LevelAmounts =
+    new LevelAmounts(
+      asks = x.asks.filter(_._2 != 0),
+      bids = x.bids.filter(_._2 != 0),
+    )
 
   private def formatSide(xs: Iterable[(Long, Level)]): String =
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
@@ -393,8 +389,4 @@ ${formatSide(x.bids)}"""
   }
 
   private def format(x: Order): String = s"""Order(${x.idStr()}, ${x.orderType}, a=${x.amount}, p=${x.price}, f=${x.matcherFee} ${x.feeAsset})"""
-
-  private implicit class OrderBookOps(val self: OrderBook) {
-    def hasPrice(x: Price): Boolean = self.asks.contains(x) || self.bids.contains(x)
-  }
 }

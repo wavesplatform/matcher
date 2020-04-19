@@ -1,7 +1,6 @@
 package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
-import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
 import akka.pattern.{ask, pipe}
@@ -40,9 +39,8 @@ import scala.util.{Failure, Success}
 class AddressActor(owner: Address,
                    time: Time,
                    orderDB: OrderDB,
-                   hasOrderInBlockchain: Order.Id => Future[Boolean],
+                   validate: (AcceptedOrder, Map[Asset, Long]) => Future[Either[MatcherError, Unit]],
                    store: StoreEvent,
-                   orderBookCache: AssetPair => OrderBookAggregatedSnapshot,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
@@ -67,8 +65,8 @@ class AddressActor(owner: Address,
       log.debug(s"Got $command")
       val orderId = command.order.id()
 
-      if (pendingCommands.contains(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
-      else if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
+      if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
+      if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -228,10 +226,10 @@ class AddressActor(owner: Address,
 
     case Status.Failure(e) => log.error(s"Got $e", e)
 
-    case AddWsSubscription(id) =>
-      log.trace(s"[$id] WebSocket connected")
+    case AddWsSubscription =>
+      log.trace(s"[${sender.path.name}] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender, id)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
       context.watch(sender)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
@@ -262,7 +260,6 @@ class AddressActor(owner: Address,
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
     case Terminated(wsSource) =>
-      log.info(s"[${addressWsMutableState.activeWsConnections(wsSource)._1}] WebSocket terminated")
       addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
@@ -290,18 +287,15 @@ class AddressActor(owner: Address,
         case Some(nextCommand) =>
           nextCommand.command match {
             case command: Command.PlaceOrder =>
-              val validationResult = {
-                for {
-                  hasOrderInBlockchain <- hasOrderInBlockchain { command.order.id() }
-                  tradableBalance      <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
-                } yield {
-                  val ao = command.toAcceptedOrder(tradableBalance)
-                  accountStateValidator(ao, tradableBalance, hasOrderInBlockchain) match {
-                    case Left(error) => Event.ValidationFailed(ao.id, error)
-                    case Right(_)    => Event.ValidationPassed(ao)
-                  }
+              val validationResult = for {
+                tradableBalance <- getTradableBalance(Set(command.order.getSpendAssetId, command.order.feeAsset))
+                ao = command.toAcceptedOrder(tradableBalance)
+                r <- validate(ao, tradableBalance)
+              } yield
+                r match {
+                  case Left(error) => Event.ValidationFailed(ao.id, error)
+                  case Right(_)    => Event.ValidationPassed(ao)
                 }
-              }
 
               validationResult recover {
                 case ex: WavesNodeConnectionLostException =>
@@ -315,17 +309,6 @@ class AddressActor(owner: Address,
             case x => throw new IllegalStateException(s"Can't process $x, only PlaceOrder is allowed")
           }
       }
-  }
-
-  private def accountStateValidator(acceptedOrder: AcceptedOrder,
-                                    tradableBalance: Map[Asset, Long],
-                                    hasOrderInBlockchain: Boolean): OrderValidator.Result[AcceptedOrder] = {
-    OrderValidator
-      .accountStateAware(acceptedOrder.order.sender,
-                         tradableBalance.withDefaultValue(0L),
-                         totalActiveOrders,
-                         hasOrder(_, hasOrderInBlockchain),
-                         orderBookCache)(acceptedOrder)
   }
 
   private def getTradableBalance(forAssets: Set[Asset])(implicit group: Group[Map[Asset, Long]]): Future[Map[Asset, Long]] = {
@@ -466,8 +449,7 @@ class AddressActor(owner: Address,
         case _                    => throw new IllegalStateException("Impossibru")
       }
 
-  private def hasOrder(id: Order.Id, hasOrderInBlockchain: Boolean): Boolean =
-    activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrderInBlockchain
+  private def hasOrder(id: Order.Id): Boolean = activeOrders.contains(id) || pendingCommands.contains(id) || orderDB.containsInfo(id)
 
   private def totalActiveOrders: Int = activeOrders.size + placementQueue.size
 
@@ -553,8 +535,8 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case class AddWsSubscription(connectionId: UUID) extends Message
-  case object PrepareDiffForWsSubscribers          extends Message
+  case object AddWsSubscription           extends Message
+  case object PrepareDiffForWsSubscribers extends Message
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)

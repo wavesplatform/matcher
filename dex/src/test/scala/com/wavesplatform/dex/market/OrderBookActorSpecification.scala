@@ -1,12 +1,13 @@
 package com.wavesplatform.dex.market
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.api.websockets.WsOrderBook
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -25,6 +26,7 @@ import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -36,13 +38,10 @@ class OrderBookActorSpecification
     with PathMockFactory
     with Eventually {
 
-  private val obc = new ConcurrentHashMap[AssetPair, OrderBookAggregatedSnapshot]
-  private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
+  private val md = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
-
-  private def update(ap: AssetPair)(snapshot: OrderBookAggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => ()) { (pair, actor, probe) =>
@@ -66,7 +65,6 @@ class OrderBookActorSpecification
                                  matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)))(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
-    obc.clear()
     md.clear()
 
     val tp    = TestProbe()
@@ -77,15 +75,14 @@ class OrderBookActorSpecification
 
     val orderBookActor = TestActorRef(
       new OrderBookActor(
-        OrderBookActor.Settings(100.millis),
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
         tp.ref,
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
         pair,
-        update(pair),
-        p => Option(md.get(p)),
+        8,
+        8,
         time,
-        new WsOrderBook.Update(8, 8),
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
@@ -324,7 +321,7 @@ class OrderBookActorSpecification
       }
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 3
 
         val level41 = bids.head
@@ -356,7 +353,7 @@ class OrderBookActorSpecification
       }
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 2
 
         val level41 = bids.head
@@ -387,7 +384,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderAdded]
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 2
         bids.head.price shouldBe buyOrder1.price
         bids.last.price shouldBe 0.0000040 * Order.PriceConstant
@@ -397,7 +394,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderCanceled]
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 1
         bids.head.price shouldBe 0.000004 * Order.PriceConstant
       }
@@ -460,8 +457,9 @@ class OrderBookActorSpecification
         tp.receiveN(0)
 
         eventually {
-          obc.get(wctWavesPair).getCounterSideFor(marketOrder).map(_.amount).sum shouldBe toNormalized(2)
-          obc.get(wctWavesPair).getSideFor(marketOrder) shouldBe empty
+          val ob = getAggregatedSnapshot(orderBook)
+          ob.getCounterSideFor(marketOrder).map(_.amount).sum shouldBe toNormalized(2)
+          ob.getSideFor(marketOrder) shouldBe empty
         }
       }
 
@@ -504,7 +502,7 @@ class OrderBookActorSpecification
 
           oc.acceptedOrder shouldBe marketOrder
           oc.isSystemCancel shouldBe true
-          obc.get(wctWavesPair).asks shouldBe empty
+          getAggregatedSnapshot(orderBook).asks shouldBe empty
 
           tp.receiveN(0)
         }
@@ -526,8 +524,9 @@ class OrderBookActorSpecification
           oc2.isSystemCancel shouldBe true
 
           eventually {
-            obc.get(wctWavesPair).asks shouldBe empty
-            obc.get(wctWavesPair).bids shouldBe empty
+            val ob = getAggregatedSnapshot(orderBook)
+            ob.asks shouldBe empty
+            ob.bids shouldBe empty
           }
 
           tp.receiveN(0)
@@ -600,8 +599,9 @@ class OrderBookActorSpecification
           tp.receiveN(0)
 
           eventually {
-            obc.get(wctWavesPair).getSideFor(marketOrder) shouldBe empty
-            obc.get(wctWavesPair).getCounterSideFor(marketOrder).map(_.amount).sum shouldBe counterOrder.amount - oe.executedAmount
+            val ob = getAggregatedSnapshot(orderBook)
+            ob.getSideFor(marketOrder) shouldBe empty
+            ob.getCounterSideFor(marketOrder).map(_.amount).sum shouldBe counterOrder.amount - oe.executedAmount
           }
         }
 
@@ -613,5 +613,11 @@ class OrderBookActorSpecification
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = ethAsset, isFeeConsideredInExecutionAmount = false) // fee in third asset
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = Waves, isFeeConsideredInExecutionAmount = true)     // fee in spent asset
     }
+  }
+
+  private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
+    val pair       = wavesUsdPair // hack
+    val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
+    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException("Can't get snapshot"))
   }
 }

@@ -27,7 +27,6 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
-import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -52,10 +51,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            addressActor: ActorRef,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-                           getMarketStatus: AssetPair => Option[MarketStatus],
+                           orderBookHttpInfo: OrderBookHttpInfo,
                            getActualTickSize: AssetPair => BigDecimal,
                            orderValidator: Order => FutureResult[Order],
-                           orderBookSnapshot: OrderBookSnapshotHttpCache,
                            matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
                            db: DB,
@@ -324,7 +322,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete { orderBookSnapshot.get(pair, depth) }
+        complete { orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth) }
       }
     }
   }
@@ -344,9 +342,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/status") { pair =>
-      getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "There is no information about this asset pair"))) { ms =>
-        complete(StatusCodes.OK -> ms)
-      }
+      complete { orderBookHttpInfo.getMarketStatus(pair) }
     }
   }
 

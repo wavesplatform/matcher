@@ -60,7 +60,7 @@ class OrderValidatorSpecification
 
     "reject new order" when {
 
-      "this order had already been accepted" in asa(orderStatus = _ => true) { v =>
+      "this order had already been accepted" in asa(hasOrder = true) { v =>
         v should produce("OrderDuplicate")
       }
 
@@ -130,7 +130,7 @@ class OrderValidatorSpecification
       "order exists" in {
 
         val pk = KeyPair(randomBytes())
-        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true, _ => OrderBookAggregatedSnapshot.empty)(_)
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, orderExists = true, OrderBookAggregatedSnapshot.empty)(_)
 
         ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
       }
@@ -948,19 +948,18 @@ class OrderValidatorSpecification
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
-      orderStatus: ByteStr => Boolean = _ => false,
+      hasOrder: Boolean = false,
       o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
   private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(
       b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
     OrderValidator.accountStateAware(
       sender = order.sender.toAddress,
       tradableBalance = b.withDefaultValue(0L).apply,
-      activeOrderCount = 0,
-      orderExists = _ => false,
-      orderBookCache = _ => aggregatedSnapshot
+      orderExists = false,
+      orderBookCache = aggregatedSnapshot
     ) { MarketOrder(order, b.apply _) }
   }
 

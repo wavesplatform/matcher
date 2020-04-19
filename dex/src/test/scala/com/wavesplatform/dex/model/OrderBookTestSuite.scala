@@ -3,6 +3,7 @@ package com.wavesplatform.dex.model
 import java.math.BigInteger
 import java.nio.ByteBuffer
 
+import cats.syntax.semigroup._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -43,7 +44,7 @@ class OrderBookTestSuite
       xs.foldLeft((ob, Queue.empty[Event], LevelAmounts.empty)) {
         case ((ob, events, levelChanges), x) =>
           val (updatedOb, newEvents, updatedLevelChanges) = f(ob, x)
-          (updatedOb, events ++ newEvents, levelChanges.put(updatedLevelChanges))
+          (updatedOb, events ++ newEvents, levelChanges |+| updatedLevelChanges)
       }
 
     def appendAllAccepted(xs: Seq[AcceptedOrder],

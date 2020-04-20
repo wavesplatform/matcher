@@ -18,8 +18,6 @@ object WsAddressState {
   def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some
 
-  val empty: WsAddressState = WsAddressState(Map(Waves -> WsBalances(0, 0)), Seq.empty, 0)
-
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
     { // TODO use reads for Map[Asset, T]!
       case JsObject(ab) => JsSuccess(ab.toMap.map { case (a, b) => AssetPair.extractAsset(a).get -> WsBalances.format.reads(b).get })

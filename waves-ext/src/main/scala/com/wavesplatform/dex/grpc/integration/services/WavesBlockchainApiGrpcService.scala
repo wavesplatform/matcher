@@ -216,8 +216,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       val address              = request.address.toVanillaAddress
       val pessimisticPortfolio = context.blockchain.portfolio(address) |+| context.utx.pessimisticPortfolio(address)
 
+      val pessimisticPortfolioNonZeroBalances = {
+        if (pessimisticPortfolio.balance == 0) pessimisticPortfolio.assets
+        else pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)
+      }
+
       AllAssetsSpendableBalanceResponse(
-        (pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)).map {
+        pessimisticPortfolioNonZeroBalances.map {
           case (a, b) => AllAssetsSpendableBalanceResponse.Record(a.toPB, b)
         }.toSeq
       )

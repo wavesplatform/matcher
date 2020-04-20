@@ -71,7 +71,8 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       "when account is empty" in {
         val wsac = mkWsConnection(mkKeyPair("Test"), method)
-        assertChanges(wsac, squash = false)(Map(Waves -> WsBalances(0, 0)))()
+        eventually { wsac.getMessagesBuffer should have size 1 }
+        assertChanges(wsac, squash = false)()()
         wsac.close()
       }
 

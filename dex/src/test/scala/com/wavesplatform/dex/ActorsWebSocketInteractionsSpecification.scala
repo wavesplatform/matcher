@@ -48,7 +48,7 @@ class ActorsWebSocketInteractionsSpecification
   ): Unit = {
 
     val eventsProbe      = TestProbe()
-    val currentPortfolio = new AtomicReference[Portfolio]()
+    val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
     val address          = KeyPair("test".getBytes)
 
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
@@ -56,7 +56,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
-      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) }
+      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0) }
     }
 
     lazy val addressDir = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
@@ -144,6 +144,12 @@ class ActorsWebSocketInteractionsSpecification
 
   "Actors web socket interaction" should {
     "correctly process web socket requests" when {
+
+      "brand new sender subscribes" in webSocketTest {
+        (_, _, address, subscribeAddress, placeOrder, cancel, _, updateBalances, expectWsBalancesAndOrders) =>
+          subscribeAddress()
+          expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
+      }
 
       "sender places order and then cancel it" in webSocketTest {
         (_, _, address, subscribeAddress, placeOrder, cancel, _, updateBalances, expectWsBalancesAndOrders) =>

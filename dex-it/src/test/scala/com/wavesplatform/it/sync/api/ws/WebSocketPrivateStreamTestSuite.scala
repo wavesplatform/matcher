@@ -77,7 +77,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       "when user places and cancels limit order" in {
 
-        val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves)
+        val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)) }()
@@ -104,10 +104,10 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         wsc.close()
       }
 
-      "when user places market orders and it is filled" in {
+      "when user places market order and it is filled" in {
 
         val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
-        val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves)
+        val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves); Thread.sleep(150)
         val wsc                               = mkWsConnection(acc, method)
         val smo                               = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
         val mo                                = MarketOrder(smo, tradableBalance.apply _)
@@ -127,9 +127,12 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
         assertChanges(wsc)(
           Map(Waves -> WsBalances(1, 50.003)),
-          Map(Waves -> WsBalances(1, 35.0021), usd -> WsBalances(18, 0)),
-          Map(Waves -> WsBalances(1, 10.0006), usd -> WsBalances(45.5, 0)),
-          Map(Waves -> WsBalances(1, 0), usd -> WsBalances(55.5, 0)),
+          Map(Waves -> WsBalances(1, 35.0021)),
+          Map(Waves -> WsBalances(1, 10.0006)),
+          Map(Waves -> WsBalances(1, 0)),
+          Map(usd   -> WsBalances(18, 0)),
+          Map(usd   -> WsBalances(45.5, 0)),
+          Map(usd   -> WsBalances(55.5, 0))
         )(
           WsOrder.fromDomain(mo, status = Accepted),
           WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
@@ -138,11 +141,12 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         )
 
         wsc.close()
+        dex1.api.cancelAll(alice)
       }
 
       "when user's order is fully filled with another one" in {
 
-        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -162,11 +166,12 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         )
 
         wsc.close()
+        dex1.api.cancelAll(acc)
       }
 
       "when user's order is partially filled with another one" in {
 
-        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -194,7 +199,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       "when user make a transfer" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
@@ -206,7 +211,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
       "user issued a new asset after establishing the connection" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves)
+        val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0)) }()
@@ -226,34 +231,45 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
         val acc                                   = mkAccountWithBalance(10.waves -> Waves)
         val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
 
-        broadcastAndAwait(txIssue)
+        broadcastAndAwait(txIssue); Thread.sleep(150)
 
         val wsc = mkWsConnection(acc, method)
-        assertChanges(wsc) { Map(Waves -> WsBalances(9, 0), issuedAsset -> WsBalances(1000, 0)) }()
+        assertChanges(wsc)(
+          Map(Waves       -> WsBalances(9, 0)),
+          Map(issuedAsset -> WsBalances(1000, 0))
+        )()
 
         wsc.close()
       }
 
       "user burnt part of the asset amount" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
         broadcastAndAwait(mkBurn(acc, usd, 10.usd))
-        assertChanges(wsc) { Map(Waves -> WsBalances(9, 0), usd -> WsBalances(10, 0)) }()
+
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(9, 0)),
+          Map(usd   -> WsBalances(10, 0))
+        )()
 
         wsc.close()
       }
 
       "user burnt all of the asset amount" in {
 
-        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd)
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
         val wsc = mkWsConnection(acc, method)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
         broadcastAndAwait(mkBurn(acc, usd, 20.usd))
-        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(9, 0), usd -> WsBalances(0, 0)) }()
+
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(9, 0)),
+          Map(usd   -> WsBalances(0, 0))
+        )()
 
         wsc.close()
       }
@@ -262,7 +278,7 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
 
   "Second connection should get the actual data" in {
 
-    val acc  = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves)
+    val acc  = mkAccountWithBalance(500.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
     val wsc1 = mkWsAuthenticatedConnection(acc, dex1)
 
     assertChanges(wsc1, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(500, 0)) }()
@@ -290,5 +306,6 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
     )
 
     Seq(wsc1, wsc2).foreach { _.close() }
+    dex1.api.cancelAll(acc)
   }
 }

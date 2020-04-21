@@ -11,6 +11,8 @@ import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
 
@@ -250,6 +252,23 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         dex1.api.cancel(carol, order)
         assertUpdateId(wsc1, 2)
         assertUpdateId(wsc2, 1)
+      }
+
+      "should handle many connections simultaneously" in {
+        Await
+          .result(
+            Future.traverse { (1 to 1000).toList }(
+              _ =>
+                Future {
+                  val c = mkWsOrderBookConnection(wavesBtcPair, dex1)
+                  Thread.sleep(200)
+                  c.getMessagesBuffer.head.updateId
+              }
+            ),
+            25.seconds
+          ) forall (_ == 0) shouldBe true
+
+        knownWsConnections.forEach { _.close() }
       }
     }
   }

@@ -20,7 +20,7 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
     message
   )
 
-  override def toString: String = s"${getClass.getCanonicalName}(error=$code)"
+  override def toString: String = s"${getClass.getCanonicalName}(error=$code,message=${message.text})"
 }
 
 object MatcherError {
@@ -173,7 +173,7 @@ case class BalanceNotEnough(required: List[Amount], actual: List[Amount])
       account,
       balance,
       notEnough,
-      e"Not enough tradable balance. The order requires ${'required -> required}, but available are ${'actual -> actual}"
+      e"Not enough tradable balance. The order requires at least ${'required -> required} on balance, but available are ${'actual -> actual}"
     )
 
 object BalanceNotEnough {

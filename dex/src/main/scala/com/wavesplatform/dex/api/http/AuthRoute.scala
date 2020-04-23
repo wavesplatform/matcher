@@ -6,8 +6,7 @@ import akka.http.scaladsl.server.{Directive0, Directive1}
 import com.wavesplatform.dex.api.{MatcherResponse, MatcherWebSocketRoute, SimpleErrorResponse}
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid, MatcherError}
-import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid, UserPublicKeyIsNotValid}
+import com.wavesplatform.dex.error.{ApiKeyIsNotProvided, ApiKeyIsNotValid, MatcherError, UserPublicKeyIsNotValid}
 
 trait AuthRoute { this: ApiRoute =>
 

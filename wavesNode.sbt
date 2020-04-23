@@ -1,3 +1,3 @@
 import WavesNodeArtifactsPlugin.autoImport._
 
-Global / wavesNodeVersion := "1.1.9"
+Global / wavesNodeVersion := "1.1.10"

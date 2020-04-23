@@ -16,6 +16,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder, MarketOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -100,7 +101,8 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def executeOrder(s: AcceptedOrder, c: LimitOrder): OrderExecuted = {
-      val oe = OrderExecuted(s, c, System.currentTimeMillis, s.matcherFee, c.matcherFee)
+      val (counterExecutedFee, submittedExecutedFee) = Fee.getMakerTakerFee(DynamicSettings.symmetric(0.003.waves))(s, c)
+      val oe                                         = OrderExecuted(s, c, System.currentTimeMillis, counterExecutedFee, submittedExecutedFee)
       addressDir ! oe
       oe
     }
@@ -166,14 +168,14 @@ class ActorsWebSocketInteractionsSpecification
 
           placeOrder(lo)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(285, 15)),
+            Map(usd -> WsBalances(285, 15), Waves -> WsBalances(99.997, 0.003)),
             Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
             1
           )
 
           cancel(lo, false)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(300, 0)),
+            Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)),
             Seq(WsOrder(lo.id, status = OrderStatus.Cancelled.name.some)),
             2
           )
@@ -202,7 +204,7 @@ class ActorsWebSocketInteractionsSpecification
           withClue("Sender places order BUY 10 Waves\n") {
             placeOrder(buyOrder)
             expectWsBalancesAndOrders(
-              Map(usd -> WsBalances(270, 30)),
+              Map(usd -> WsBalances(270, 30), Waves -> WsBalances(99.997, 0.003)),
               Seq(WsOrder.fromDomain(buyOrder, OrderStatus.Accepted)),
               1
             )
@@ -222,7 +224,7 @@ class ActorsWebSocketInteractionsSpecification
           withClue("Sender's order was partly filled by SELL 5 Waves. Balance changes are not atomic\n") {
             // first we send decreased balances
             expectWsBalancesAndOrders(
-              Map(usd -> WsBalances(270, 15)),
+              Map(usd -> WsBalances(270, 15), Waves -> WsBalances(99.997, 0.0015)),
               Seq(
                 WsOrder(
                   id = buyOrder.id,
@@ -235,10 +237,10 @@ class ActorsWebSocketInteractionsSpecification
               3
             )
 
-            updateBalances(Map(Waves -> 105.waves, usd -> 285.usd, eth -> 4.eth)) // then we receive balance changes from blockchain
+            updateBalances(Map(Waves -> 104.9985.waves, usd -> 285.usd, eth -> 4.eth)) // then we receive balance changes from blockchain
 
             expectWsBalancesAndOrders(
-              Map(Waves -> WsBalances(105, 0)),
+              Map(Waves -> WsBalances(104.997, 0.0015)),
               Seq.empty,
               4
             )
@@ -247,7 +249,7 @@ class ActorsWebSocketInteractionsSpecification
           withClue("Cancelling remaining of the counter order\n") {
             cancel(oe.counterRemaining, false)
             expectWsBalancesAndOrders(
-              Map(usd -> WsBalances(285, 0)),
+              Map(usd -> WsBalances(285, 0), Waves -> WsBalances(104.9985, 0)),
               Seq(
                 WsOrder(
                   id = buyOrder.id,
@@ -390,17 +392,17 @@ class ActorsWebSocketInteractionsSpecification
         val order = LimitOrder(createOrder(wavesUsdPair, BUY, 1.waves, 3.0, sender = address))
 
         placeOrder(order)
-        expectWsBalance(webSubscription, Map(usd    -> WsBalances(297, 3)), 2)
-        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3)), 1)
+        expectWsBalance(webSubscription, Map(usd    -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 2)
+        expectWsBalance(mobileSubscription, Map(usd -> WsBalances(297, 3), Waves -> WsBalances(99.997, 0.003)), 1)
 
         subscribe(desktopSubscription)
-        expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)), 0)
+        expectWsBalance(desktopSubscription, Map(Waves -> WsBalances(99.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)), 0)
 
         cancel(order, true)
 
-        expectWsBalance(webSubscription, Map(usd     -> WsBalances(300, 0)), 3)
-        expectWsBalance(mobileSubscription, Map(usd  -> WsBalances(300, 0)), 2)
-        expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0)), 1)
+        expectWsBalance(webSubscription, Map(usd     -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 3)
+        expectWsBalance(mobileSubscription, Map(usd  -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 2)
+        expectWsBalance(desktopSubscription, Map(usd -> WsBalances(300, 0), Waves -> WsBalances(100, 0)), 1)
       }
 
       "so far unsubscribed address made some actions and then subscribes" in webSocketTest {
@@ -415,7 +417,7 @@ class ActorsWebSocketInteractionsSpecification
 
           subscribeAddress()
           expectWsBalancesAndOrders(
-            Map(Waves -> WsBalances(115, 0), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
+            Map(Waves -> WsBalances(114.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
             Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
             0
           )
@@ -491,17 +493,23 @@ class ActorsWebSocketInteractionsSpecification
           )
 
           placeOrder(counter1)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15)), Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)), 1)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)),
+                                    Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)),
+                                    1)
 
           placeOrder(counter2)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5)), Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)), 2)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)),
+                                    Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)),
+                                    2)
 
           placeOrder(counter3)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5)), Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)), 3)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)),
+                                    Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)),
+                                    3)
 
           mo = matchOrders(mo, counter1)._1
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(23.5, 31.5)),
+            Map(usd -> WsBalances(23.5, 31.5), Waves -> WsBalances(99.991, 0.006)),
             Seq(
               WsOrder(id = counter1.id,
                       status = OrderStatus.Filled.name.some,
@@ -514,7 +522,7 @@ class ActorsWebSocketInteractionsSpecification
 
           mo = matchOrders(mo, counter2)._1
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(23.5, 16)),
+            Map(usd -> WsBalances(23.5, 16), Waves -> WsBalances(99.991, 0.003)),
             Seq(
               WsOrder(id = counter2.id,
                       status = OrderStatus.Filled.name.some,
@@ -527,7 +535,7 @@ class ActorsWebSocketInteractionsSpecification
 
           val (_, counter3Remaining) = matchOrders(mo, counter3)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(23.5, 9.6)),
+            Map(usd -> WsBalances(23.5, 9.6), Waves -> WsBalances(99.991, 0.0018)),
             Seq(
               WsOrder(id = counter3.id,
                       status = OrderStatus.PartiallyFilled.name.some,
@@ -540,7 +548,7 @@ class ActorsWebSocketInteractionsSpecification
 
           cancel(counter3Remaining, false)
           expectWsBalancesAndOrders(
-            Map(usd -> WsBalances(33.1, 0)),
+            Map(usd -> WsBalances(33.1, 0), Waves -> WsBalances(99.9928, 0)),
             Seq(
               WsOrder(id = counter3.id, status = OrderStatus.Cancelled.name.some)
             ),
@@ -633,6 +641,48 @@ class ActorsWebSocketInteractionsSpecification
             5
           )
       }
+    }
+
+    "correctly process order partially filling" in webSocketTest {
+      (ad, ep, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        updateBalances(Map(usd -> 10.usd, Waves -> 10.waves))
+        subscribeAddress()
+        expectWsBalancesAndOrders(
+          Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)),
+          Seq.empty,
+          0
+        )
+
+        val bo = LimitOrder(createOrder(wavesUsdPair, BUY, 10.waves, 1.0, sender = address))
+
+        placeOrder(bo)
+        expectWsBalancesAndOrders(
+          Map(usd -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
+          Seq(WsOrder.fromDomain(bo, OrderStatus.Accepted)),
+          1
+        )
+
+        val oe = executeOrder(LimitOrder(createOrder(wavesUsdPair, SELL, 5.waves, 1.0)), bo)
+
+        expectWsBalancesAndOrders(
+          Map(usd -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)),
+          Seq(WsOrder(id = bo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)),
+          2
+        )
+
+        updateBalances(Map(Waves -> 14.9985.waves, usd -> 5.usd)) // +4.9985 Waves, since + 5 - 0.0015
+        expectWsBalancesAndOrders(
+          Map(Waves -> WsBalances(14.997, 0.0015)),
+          Seq.empty,
+          3
+        )
+
+        cancel(oe.counterRemaining, false)
+        expectWsBalancesAndOrders(
+          Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)),
+          Seq(WsOrder(id = bo.id, status = OrderStatus.Cancelled.name.some)),
+          4
+        )
     }
   }
 }

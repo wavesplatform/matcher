@@ -45,7 +45,8 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset0, 0.005.waves),
       mkTransfer(alice, bob, defaultAssetQuantity / 2, asset1, 0.009.waves),
-      mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves)
+      mkTransfer(bob, alice, defaultAssetQuantity / 2, asset2, 0.005.waves),
+      mkTransfer(bob, alice, 5, assetWith2Dec, 0.005.waves)
     )
     broadcastAndAwait(mkSetAccountScript(alice, trueScript))
 
@@ -179,6 +180,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         dex1.api.place(bobOrder)
         dex1.api.reservedBalance(bob)(assetWith2Dec) shouldBe 10005L
 
+        //
         val aliceOrder = mkOrder(alice, asset2WithDecWavesPair, BUY, 20000L, 300.waves * 1000000L, 5, feeAsset = assetWith2Dec)
         dex1.api.place(aliceOrder)
         waitForOrderAtNode(bobOrder)

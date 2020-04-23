@@ -6,8 +6,10 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
+import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -21,6 +23,7 @@ import com.wavesplatform.dex.market.OrderBookActor.{Snapshot => _, _}
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
 import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
@@ -62,7 +65,8 @@ class OrderBookActorSpecification
     }
 
   private def obcTestWithPrepare(prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
-                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)))(
+                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
+                                 makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee)(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
     md.clear()
@@ -86,7 +90,7 @@ class OrderBookActorSpecification
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
-        _ => (t, m) => m.matcherFee -> t.matcherFee
+        makerTakerFeeAtOffset
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
@@ -108,7 +112,7 @@ class OrderBookActorSpecification
       { (obsdb, p) =>
         val ord               = buy(p, 10 * Order.PriceConstant, 100)
         val ob                = OrderBook.empty
-        val (updatedOb, _, _) = ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
+        val (updatedOb, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
         obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>
@@ -147,7 +151,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
 
       actor ! RestartActor
-      tp.expectMsg(
+      tp.expectMsgType[OrderAdded] should matchTo(
         OrderAdded(
           SellLimitOrder(
             ord2.amount - ord1.amount,
@@ -397,6 +401,36 @@ class OrderBookActorSpecification
         val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 1
         bids.head.price shouldBe 0.000004 * Order.PriceConstant
+      }
+    }
+
+    "correctly apply new fees when rules are switched" in {
+      val makerTakerFeeAtOffset = Fee.getMakerTakerFeeByOffset(
+        new OrderFeeSettingsCache(
+          Map(
+            0L -> DynamicSettings(0.001.waves, 0.003.waves),
+            1L -> DynamicSettings(0.001.waves, 0.005.waves)
+          )
+        )
+      ) _
+
+      obcTestWithPrepare(prepare = (_, _) => (), makerTakerFeeAtOffset = makerTakerFeeAtOffset) { (pair, orderBook, tp) =>
+        tp.expectMsg(OrderBookRecovered(pair, None))
+        val now = System.currentTimeMillis()
+
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.003.waves)
+        val maker1 = sell(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.003.waves.some, ts = now.some)
+        orderBook ! wrapLimitOrder(0, maker1)
+        tp.expectMsgType[OrderAdded]
+
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.005.waves)
+        val taker1 = buy(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.005.waves.some, ts = now.some)
+        orderBook ! wrapLimitOrder(1, taker1)
+        tp.expectMsgType[OrderAdded]
+
+        val oe = tp.expectMsgType[OrderExecuted]
+        oe.counterExecutedFee shouldBe 0.0006.waves
+        oe.submittedExecutedFee shouldBe 0.005.waves
       }
     }
 

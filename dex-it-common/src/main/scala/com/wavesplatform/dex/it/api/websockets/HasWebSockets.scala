@@ -8,21 +8,27 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsMessage, WsOrder, WsOrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.it.config.PredefinedAssets
 import com.wavesplatform.dex.it.docker.{DexContainer, apiKey}
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import mouse.any._
+import org.scalatest.concurrent.Eventually
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
+trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
 
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
+  implicit protected val efc: ErrorFormatterContext = assetDecimalsMap.apply
 
   protected val authenticatedStreamSignaturePrefix = "au"
 
@@ -64,6 +70,38 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite =>
 
   protected def mkWsConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
     new WsConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
+  }
+
+  protected def assertChanges(c: WsAuthenticatedConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
+
+    def squashBalances(bs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = bs.foldLeft(Map.empty[Asset, WsBalances])(_ ++ _)
+
+    def squashOrders(os: Seq[WsOrder]): Seq[WsOrder] = {
+      os.groupBy(_.id)
+        .mapValues { orderChanges =>
+          orderChanges
+            .foldLeft(orderChanges.head) {
+              case (acc, oc) =>
+                acc.copy(status = oc.status, filledAmount = oc.filledAmount, filledFee = oc.filledFee, avgWeighedPrice = oc.avgWeighedPrice)
+            }
+        }
+        .values
+        .toSeq
+    }
+
+    eventually {
+      if (squash) {
+        //        c.getBalancesChanges.size should be <= expBs.size // TODO Return after DEX-717
+        squashBalances(c.getBalancesChanges) should matchTo { squashBalances(expBs) }
+        //        c.getOrderChanges.size should be <= expOs.size // TODO Return after DEX-717
+        squashOrders(c.getOrderChanges) should matchTo { squashOrders(expOs) }
+      } else {
+        c.getBalancesChanges should matchTo(expBs)
+        c.getOrderChanges should matchTo(expOs)
+      }
+    }
+
+    c.clearMessagesBuffer()
   }
 
   protected def cleanupWebSockets(): Unit = {

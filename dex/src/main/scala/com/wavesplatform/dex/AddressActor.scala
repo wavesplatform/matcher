@@ -121,7 +121,11 @@ class AddressActor(owner: Address,
       val allActiveOrderIds = getActiveLimitOrders(None).map(_.order.id()).toSet
       val toCancelIds       = allActiveOrderIds.intersect(command.orderIds)
       val unknownIds        = command.orderIds -- allActiveOrderIds
-      log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}, unknown ids: ${unknownIds.mkString(", ")}")
+
+      log.debug(
+        s"Got $command, total orders: ${allActiveOrderIds.size}, to cancel (${toCancelIds.size}): ${toCancelIds
+          .mkString(", ")}, unknown ids (${unknownIds.size}): ${unknownIds.mkString(", ")}"
+      )
 
       val initResponse = unknownIds.map(id => id -> api.OrderCancelRejected(error.OrderNotFound(id))).toMap
       if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(initResponse)
@@ -160,6 +164,7 @@ class AddressActor(owner: Address,
     case event: Event.StoreFailed =>
       log.trace(s"Got $event")
       pendingCommands.remove(event.orderId).foreach { _.client ! CanNotPersist(event.reason) }
+      openVolume = openVolume |-| activeOrders(event.orderId).reservableBalance
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")
@@ -315,7 +320,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets.contains)).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {

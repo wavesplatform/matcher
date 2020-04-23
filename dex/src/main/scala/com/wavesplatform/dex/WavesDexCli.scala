@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
 
+import cats.syntax.option._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -19,7 +20,9 @@ object WavesDexCli {
   // base64
   // get account by seed [and nonce]
   def main(rawArgs: Array[String]): Unit = {
+
     val builder = OParser.builder[Args]
+
     val parser = {
       import builder._
       OParser.sequence(
@@ -29,24 +32,24 @@ object WavesDexCli {
           .abbr("as")
           .text("The network byte as char. By default it is the testnet: 'T'")
           .valueName("<one char>")
-          .action((x, s) => s.copy(addressSchemeByte = Some(x))),
+          .action((x, s) => s.copy(addressSchemeByte = x.some)),
         cmd(Command.GenerateAccountSeed.name)
-          .action((_, s) => s.copy(command = Some(Command.GenerateAccountSeed)))
+          .action((_, s) => s.copy(command = Command.GenerateAccountSeed.some))
           .text("Generates an account seed from base seed and nonce")
           .children(
             opt[SeedFormat]("seed-format")
               .abbr("sf")
               .text("The format of seed to enter, 'raw-string' by default")
-              .valueName("<raw-string,base64>")
+              .valueName("<raw-string,base64,base58>")
               .action((x, s) => s.copy(seedFormat = x)),
             opt[Int]("account-nonce")
               .abbr("an")
               .text("The nonce for account, the default value means you entered the account seed")
               .valueName("<number>")
-              .action((x, s) => s.copy(accountNonce = Some(x)))
+              .action((x, s) => s.copy(accountNonce = x.some))
           ),
         cmd(Command.CreateAccountStorage.name)
-          .action((_, s) => s.copy(command = Some(Command.CreateAccountStorage)))
+          .action((_, s) => s.copy(command = Command.CreateAccountStorage.some))
           .text("Creates an encrypted account storage")
           .children(
             opt[File]("output-directory")
@@ -57,16 +60,16 @@ object WavesDexCli {
             opt[SeedFormat]("seed-format")
               .abbr("sf")
               .text("The format of seed to enter, 'raw-string' by default")
-              .valueName("<raw-string,base64>")
+              .valueName("<raw-string,base64,base58>")
               .action((x, s) => s.copy(seedFormat = x)),
             opt[Int]("account-nonce")
               .abbr("an")
               .text("The nonce for account, the default value means you entered the account seed")
               .valueName("<number>")
-              .action((x, s) => s.copy(accountNonce = Some(x)))
+              .action((x, s) => s.copy(accountNonce = x.some))
           ),
         cmd(Command.CreateDocumentation.name)
-          .action((_, s) => s.copy(command = Some(Command.CreateDocumentation)))
+          .action((_, s) => s.copy(command = Command.CreateDocumentation.some))
           .text("Creates a documentation about errors and writes it to the output directory")
           .children(
             opt[File]("output-directory")
@@ -76,7 +79,7 @@ object WavesDexCli {
               .action((x, s) => s.copy(outputDirectory = x))
           ),
         cmd(Command.CreateApiKey.name)
-          .action((_, s) => s.copy(command = Some(Command.CreateApiKey)))
+          .action((_, s) => s.copy(command = Command.CreateApiKey.some))
           .text("Creates a hashed version of api key and prints settings for DEX server to change it")
           .children(
             opt[String]("api-key")
@@ -88,14 +91,13 @@ object WavesDexCli {
       )
     }
 
+    // noinspection ScalaStyle
     OParser.parse(parser, rawArgs, Args()).foreach { args =>
       args.command match {
         case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
         case Some(command) =>
           println(s"Running '${command.name}' command")
-          AddressScheme.current = new AddressScheme {
-            override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte
-          }
+          AddressScheme.current = new AddressScheme { override val chainId: Byte = args.addressSchemeByte.getOrElse('T').toByte }
           command match {
             case Command.GenerateAccountSeed =>
               val seedPromptText = s"Enter the${if (args.accountNonce.isEmpty) " seed of DEX's account" else " base seed"}: "
@@ -131,6 +133,7 @@ object WavesDexCli {
               val rawSeed        = readSeedFromFromStdIn(seedPromptText, args.seedFormat)
               val password       = readSecretFromStdIn("Enter the password for file: ")
               val accountSeed    = args.accountNonce.fold(rawSeed)(AccountStorage.getAccountSeed(rawSeed, _))
+
               AccountStorage.save(
                 accountSeed,
                 AccountStorage.Settings.EncryptedFile(
@@ -156,23 +159,23 @@ object WavesDexCli {
             case Command.CreateDocumentation =>
               val outputBasePath = args.outputDirectory.toPath
               val errorsFile     = outputBasePath.resolve("errors.md").toFile
+
               Files.createDirectories(outputBasePath)
+
               val errors = new PrintWriter(errorsFile)
+
               try {
                 errors.write(MatcherErrorDoc.mkMarkdown)
                 println(s"Saved errors documentation to $errorsFile")
-              } finally {
-                errors.close()
-              }
+              } finally { errors.close() }
 
             case Command.CreateApiKey =>
               val hashedApiKey = Base58.encode(domain.crypto.secureHash(args.apiKey))
-              println(
-                s"""Your API Key: $hashedApiKey
-                   |Don't forget to update your settings:
-                   |
-                   |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
-                   |""".stripMargin)
+              println(s"""Your API Key: $hashedApiKey
+                         |Don't forget to update your settings:
+                         |
+                         |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
+                         |""".stripMargin)
           }
           println("Done")
       }
@@ -184,6 +187,7 @@ object WavesDexCli {
   }
 
   private object Command {
+
     case object GenerateAccountSeed extends Command {
       override def name: String = "create-account-seed"
     }
@@ -203,13 +207,16 @@ object WavesDexCli {
 
   private sealed trait SeedFormat
   private object SeedFormat {
+
     case object RawString extends SeedFormat
     case object Base64    extends SeedFormat
+    case object Base58    extends SeedFormat
 
     implicit val seedFormatRead: scopt.Read[SeedFormat] = scopt.Read.reads {
       case "raw-string" => RawString
       case "base64"     => Base64
-      case x            => throw new IllegalArgumentException(s"Expected 'raw-string' or 'base64', but got '$x'")
+      case "base58"     => Base58
+      case x            => throw new IllegalArgumentException(s"Expected 'raw-string', 'base64' or 'base58', but got '$x'")
     }
   }
 
@@ -221,24 +228,29 @@ object WavesDexCli {
                           outputDirectory: File = defaultFile,
                           apiKey: String = "")
 
+  // noinspection ScalaStyle
   @scala.annotation.tailrec
   private def readSeedFromFromStdIn(prompt: String, format: SeedFormat): ByteStr = {
     val rawSeed = readSecretFromStdIn(prompt)
     format match {
       case SeedFormat.RawString => rawSeed.getBytes(StandardCharsets.UTF_8)
       case SeedFormat.Base64 =>
-        Try(Base64.getDecoder.decode(rawSeed)) match {
+        Try { Base64.getDecoder.decode(rawSeed) } match {
           case Success(r) => r
-          case Failure(_) =>
-            System.err.println("Can't parse the seed in the base64 format, try again")
-            readSeedFromFromStdIn(prompt, format)
+          case Failure(e) => System.err.println(s"Can't parse the seed in the base64 format, try again, ${e}"); readSeedFromFromStdIn(prompt, format)
+        }
+      case SeedFormat.Base58 =>
+        Base58.tryDecodeWithLimit(rawSeed) match {
+          case Success(r) => r
+          case Failure(_) => System.err.println("Can't parse the seed in the base58 format, try again"); readSeedFromFromStdIn(prompt, format)
         }
     }
   }
 
+  // noinspection ScalaStyle
   @scala.annotation.tailrec
   private def readSecretFromStdIn(prompt: String): String = {
-    val r = Option(System.console()) match {
+    val r = Option(System.console) match {
       case Some(console) => new String(console.readPassword(prompt))
       case None =>
         System.out.print(prompt)

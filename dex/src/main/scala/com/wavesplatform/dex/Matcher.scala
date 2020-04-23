@@ -35,7 +35,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import monix.eval.Task
@@ -89,15 +89,12 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private val orderBookHttpInfo =
     new OrderBookHttpInfo(settings.orderBookSnapshotHttpCache, orderBookAskAdapter, time, assetsCache.get(_).map(_.decimals))
 
-  private lazy val transactionCreator = {
-    new ExchangeTransactionCreator(
-      matcherKeyPair,
-      settings.exchangeTxBaseFee,
-      orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset),
-      hasMatcherAccountScript,
-      assetsCache.unsafeGetHasScript
-    )
-  }
+  private lazy val transactionCreator = new ExchangeTransactionCreator(
+    matcherKeyPair,
+    settings.exchangeTxBaseFee,
+    hasMatcherAccountScript,
+    assetsCache.unsafeGetHasScript
+  )
 
   private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
 
@@ -121,7 +118,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      getMakerTakerFeeByOffset(orderFeeSettingsCache)
+      Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache)
     )
   }
 
@@ -546,8 +543,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
 object Matcher extends ScorexLogging {
 
-  import OrderValidator.multiplyFeeByDouble
-
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 
   sealed trait Status
@@ -579,14 +574,5 @@ object Matcher extends ScorexLogging {
               }
           }
       }
-  }
-
-  private def getMakerTakerFeeByOffset(ofsc: OrderFeeSettingsCache)(offset: Long)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = {
-    getMakerTakerFee(ofsc getSettingsForOffset offset)(s, c)
-  }
-
-  def getMakerTakerFee(ofs: => OrderFeeSettings)(s: AcceptedOrder, c: LimitOrder): (Long, Long) = ofs match {
-    case ds: DynamicSettings => multiplyFeeByDouble(c.matcherFee, ds.makerRatio) -> multiplyFeeByDouble(s.matcherFee, ds.takerRatio)
-    case _                   => c.matcherFee                                     -> s.matcherFee
   }
 }

@@ -76,7 +76,7 @@ class HistoryRouterSpecification
   def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, isSystemCancel = false, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
-    OrderExecuted(submitted, counter, time.getTimestamp(), submitted.matcherFee, counter.matcherFee)
+    OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)
   }
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used

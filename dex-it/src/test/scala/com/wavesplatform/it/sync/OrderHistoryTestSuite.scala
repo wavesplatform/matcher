@@ -221,14 +221,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.cancel(alice, order)
     }
 
-    "right fee if not enough amount before order execution and fee rounding" in {
+    "should save right fee considering the fee rate" in {
+      val rate     = 0.33333333
+      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
+
       val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
 
-      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - (BigDecimal(0.005) * matcherFee).toLong, eth))
+      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 
-      val rate = 0.33333333
       dex1.api.upsertRate(feeAsset, rate)
-      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
       val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
@@ -269,13 +270,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
 
-      val mozart  = mkKeyPair("mozart")
-      val salieri = mkKeyPair("salieri")
-
-      broadcastAndAwait(
-        mkTransfer(alice, mozart, 100.waves, Waves),
-        mkTransfer(alice, salieri, 300.usd, usd)
-      )
+      val mozart  = mkAccountWithBalance(100.waves -> Waves)
+      val salieri = mkAccountWithBalance(300.usd   -> usd, 10.waves -> Waves)
 
       Seq(
         30.waves -> 3.2,

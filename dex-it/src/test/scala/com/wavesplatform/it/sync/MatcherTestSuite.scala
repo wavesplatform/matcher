@@ -36,13 +36,15 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
+       |  price-assets = [ "$UsdId", "WAVES" ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
+    wavesNode1.start()
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx)
+    dex1.start()
   }
 
   "Swagger page is available" in {
@@ -92,12 +94,12 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalance(bob) shouldBe empty
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
-        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
       }
 
@@ -271,30 +273,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 
-      "trader can buy waves for assets with order without having waves" in {
-        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
-        wavesNode1.api.balance(alice, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(matcher, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(bob, bobAsset2) shouldBe someAssetAmount
-
-        // Bob wants to sell all own assets for 1 Wave
-        val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        placeAndAwaitAtDex(order8)
-
-        // Bob moves all waves to Alice
-        val transferAmount = bobWavesBalance - minFee
-        broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
-
-        wavesNode1.api.balance(bob, Waves) shouldBe 0
-
-        // Order should stay accepted
-        dex1.api.waitForOrderStatus(order8, OrderStatus.Accepted)
-
-        // Cleanup
-        dex1.api.cancel(bob, order8).status shouldBe "OrderCanceled"
-        broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
-      }
-
       "market status" in {
         val ask       = 5.waves
         val askAmount = 5000000
@@ -396,6 +374,44 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         withClue(assetPair) {
           offset should be <= currentOffset
         }
+    }
+  }
+
+  "Matcher should" - {
+
+    "reject proxy requests if X-User-Public-Key doesn't match query param:" - {
+
+      "/matcher/balance/reserved/[publicKey]" in {
+        dex1.api.tryReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.api.tryReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe 'right
+      }
+
+      "/matcher/orders/[address]/cancel" in {
+
+        val now = System.currentTimeMillis
+
+        val o1 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now)
+        val o2 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now + 100)
+
+        val orderIds = Set(o1.id(), o2.id())
+
+        Seq(o1, o2).foreach(dex1.api.place)
+
+        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(alice.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe 'right
+      }
+
+      "/matcher/orders/[address]" in {
+        dex1.api.tryOrderHistoryWithApiKey(
+          owner = bob,
+          xUserPublicKey = Some(alice.publicKey)
+        ) should failWith(3148801, "Provided user public key is not correct")
+
+        dex1.api.tryOrderHistoryWithApiKey(
+          owner = bob,
+          xUserPublicKey = Some(bob.publicKey)
+        ) shouldBe 'right
+      }
     }
   }
 }

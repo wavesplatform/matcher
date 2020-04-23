@@ -22,8 +22,8 @@ object DexApiOps {
       explicitGet(self.tryReservedBalance(of, timestamp))
     }
 
-    def reservedBalanceWithApiKey(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
-      explicitGet(self.tryReservedBalanceWithApiKey(of, timestamp))
+    def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[Map[Asset, Long]] = {
+      explicitGet(self.tryReservedBalanceWithApiKey(of, xUserPublicKey))
     }
 
     def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
@@ -38,6 +38,7 @@ object DexApiOps {
 
     def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[MatcherStatusResponse] =
       cancelWithApiKey(order.id(), xUserPublicKey)
+
     def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[MatcherStatusResponse] =
       explicitGet(self.tryCancelWithApiKey(id, xUserPublicKey))
 
@@ -46,7 +47,8 @@ object DexApiOps {
       explicitGet(self.tryCancelAllByPair(owner, assetPair, timestamp))
     }
 
-    def cancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id]): F[Unit] = explicitGet(self.tryCancelAllByIdsWithApiKey(owner, orderIds))
+    def cancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey] = None): F[Unit] =
+      explicitGet(self.tryCancelAllByIdsWithApiKey(owner, orderIds, xUserPublicKey))
 
     def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
     def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
@@ -59,8 +61,10 @@ object DexApiOps {
                      timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistory(owner, activeOnly, timestamp))
 
-    def orderHistoryWithApiKey(owner: Address, activeOnly: Option[Boolean] = None): F[List[OrderBookHistoryItem]] =
-      explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly))
+    def orderHistoryWithApiKey(owner: Address,
+                               activeOnly: Option[Boolean] = None,
+                               xUserPublicKey: Option[PublicKey] = None): F[List[OrderBookHistoryItem]] =
+      explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly, xUserPublicKey))
 
     def orderHistoryByPair(owner: KeyPair,
                            assetPair: AssetPair,

@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api.websockets
 
 import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
-import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._

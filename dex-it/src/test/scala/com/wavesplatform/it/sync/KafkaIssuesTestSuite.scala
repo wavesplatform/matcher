@@ -5,14 +5,18 @@ import java.util.concurrent.ThreadLocalRandom
 import com.dimafeng.testcontainers.KafkaContainer
 import com.github.dockerjava.api.model.ContainerNetwork
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.it.api.websockets.HasWebSockets
+import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.JavaConverters._
 
-class KafkaIssuesTestSuite extends MatcherSuiteBase {
+class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
 
   private val kafkaContainerName = "kafka"
   private val kafkaIp            = getIp(12)
@@ -69,16 +73,45 @@ class KafkaIssuesTestSuite extends MatcherSuiteBase {
 
   "Matcher should free reserved balances if order wasn't placed into the queue" in {
 
-    placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0))
+    val initialWavesBalance: Double = denormalizeWavesAmount(wavesNode1.api.balance(alice, Waves)).toDouble
+    val initialUsdBalance: Double   = denormalizeAmountAndFee(wavesNode1.api.balance(alice, usd), 2).toDouble
+
+    val wsac = mkWsAuthenticatedConnection(alice, dex1)
+
+    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance, 0), usd -> WsBalances(initialUsdBalance, 0)) }()
+
+    val sellOrder    = mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0)
+    val bigSellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 30.waves, 3.0)
+
+    placeAndAwaitAtDex(sellOrder)
 
     dex1.api.currentOffset shouldBe 0
-    dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
+    dex1.api.reservedBalance(alice) should matchTo { Map[Asset, Long](Waves -> 10.003.waves) }
+
+    assertChanges(wsac) { Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)) } {
+      WsOrder.fromDomain(LimitOrder(sellOrder), OrderStatus.Accepted)
+    }
 
     disconnectKafkaFromNetwork()
 
-    dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 30.waves, 3.0))
+    dex1.api.tryPlace(bigSellOrder)
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
+    assertChanges(wsac, squash = false)(
+      Map(Waves -> WsBalances(initialWavesBalance - 40.006, 40.006)),
+      Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)),
+    )()
+
     connectKafkaToNetwork()
+
+    placeAndAwaitAtDex(bigSellOrder)
+    dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 40.006.waves))
+
+    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance - 40.006, 40.006)) } {
+      WsOrder.fromDomain(LimitOrder(bigSellOrder), OrderStatus.Accepted)
+    }
+
+    dex1.api.cancelAll(alice)
+    wsac.close()
   }
 }

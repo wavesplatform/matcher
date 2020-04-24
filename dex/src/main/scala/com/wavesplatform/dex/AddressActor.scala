@@ -164,7 +164,10 @@ class AddressActor(owner: Address,
     case event: Event.StoreFailed =>
       log.trace(s"Got $event")
       pendingCommands.remove(event.orderId).foreach { _.client ! CanNotPersist(event.reason) }
-      openVolume = openVolume |-| activeOrders(event.orderId).reservableBalance
+      activeOrders.remove(event.orderId).foreach { ao =>
+        openVolume = openVolume |-| ao.reservableBalance
+        if (addressWsMutableState.hasActiveConnections) addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
+      }
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")

@@ -14,8 +14,6 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
 
-  private implicit val efc: ErrorFormatterContext = assetDecimalsMap.apply
-
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
   override protected def beforeAll(): Unit = {
@@ -32,38 +30,6 @@ class WebSocketPrivateStreamTestSuite extends MatcherSuiteBase with HasWebSocket
   private def mkWsConnection(account: KeyPair, method: AuthMethod): WsAuthenticatedConnection = method match {
     case Signature => mkWsAuthenticatedConnection(account, dex1)
     case ApiKey    => mkWsAuthenticatedConnectionViaApiKey(account, dex1)
-  }
-
-  private def assertChanges(c: WsAuthenticatedConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
-
-    def squashBalances(bs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = bs.foldLeft(Map.empty[Asset, WsBalances])(_ ++ _)
-
-    def squashOrders(os: Seq[WsOrder]): Seq[WsOrder] = {
-      os.groupBy(_.id)
-        .mapValues { orderChanges =>
-          orderChanges
-            .foldLeft(orderChanges.head) {
-              case (acc, oc) =>
-                acc.copy(status = oc.status, filledAmount = oc.filledAmount, filledFee = oc.filledFee, avgWeighedPrice = oc.avgWeighedPrice)
-            }
-        }
-        .values
-        .toSeq
-    }
-
-    eventually {
-      if (squash) {
-//        c.getBalancesChanges.size should be <= expBs.size // TODO Return after DEX-717
-        squashBalances(c.getBalancesChanges) should matchTo { squashBalances(expBs) }
-//        c.getOrderChanges.size should be <= expOs.size // TODO Return after DEX-717
-        squashOrders(c.getOrderChanges) should matchTo { squashOrders(expOs) }
-      } else {
-        c.getBalancesChanges should matchTo(expBs)
-        c.getOrderChanges should matchTo(expOs)
-      }
-    }
-
-    c.clearMessagesBuffer()
   }
 
   Seq(Signature, ApiKey).foreach { method =>

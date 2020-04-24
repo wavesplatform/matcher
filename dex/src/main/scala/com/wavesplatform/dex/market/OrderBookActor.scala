@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.market
 
+import java.io.EOFException
+
 import akka.actor.typed
 import akka.actor.typed.scaladsl.adapter._
 import akka.{actor => classic}
@@ -113,14 +115,10 @@ class OrderBookActor(settings: Settings,
             case QueueEvent.Placed(limitOrder)        => onAddOrder(request, limitOrder)
             case QueueEvent.PlacedMarket(marketOrder) => onAddOrder(request, marketOrder)
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
-            case _: QueueEvent.OrderBookDeleted       =>
-              // DEX-681
-              // private val reason = new EOFException("Order book was deleted")
-              // reason.setStackTrace(Array.empty)
-              // private val wsCloseMessage = classic.Status.Failure(reason)
-              //
-              // wsState.wsConnections.foreach(_ ! wsCloseMessage)
-              // wsState = wsState.withoutSubscriptions
+            case _: QueueEvent.OrderBookDeleted =>
+              log.warn("Order book was deleted, closing all WebSocket connections...")
+              val reason = new EOFException("Order book was deleted") unsafeTap { _.setStackTrace(Array.empty) }
+              aggregatedRef ! AggregatedOrderBookActor.Command.CloseAllWsSubscriptions(reason)
               process(request.timestamp, orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)

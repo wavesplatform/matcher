@@ -64,7 +64,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     case Status.Success                        => CompletionStrategy.draining
   }
 
-  private val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
+  private val failureMatcher: PartialFunction[Any, Throwable] = { case WsMessage.CompleteWithFailure(cause) => cause }
 
   private def accountUpdatesSource(address: Address): Source[TextMessage.Strict, ConnectionSource] = {
     Source
@@ -86,7 +86,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     ActorSource
       .actorRef[WsMessage](
         { case WsMessage.Complete => },
-        PartialFunction.empty,
+        failureMatcher,
         10,
         OverflowStrategy.fail
       )

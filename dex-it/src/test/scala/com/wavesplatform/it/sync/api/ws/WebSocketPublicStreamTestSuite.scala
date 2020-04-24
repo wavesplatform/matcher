@@ -4,10 +4,12 @@ import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
+import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.immutable.TreeMap
@@ -269,6 +271,23 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           ) forall (_ == 0) shouldBe true
 
         knownWsConnections.forEach { _.close() }
+      }
+
+      "should close connections when it is deleted" in {
+
+        val seller                          = mkAccountWithBalance(100.waves -> Waves)
+        val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "cJIoHoxpeH", 1000.asset8)
+        val assetPair                       = AssetPair(asset, Waves)
+
+        broadcastAndAwait(issueTx)
+        dex1.api.place(mkOrderDP(seller, assetPair, SELL, 100.asset8, 5.0))
+
+        val wsc1, wsc2, wsc3 = mkWsOrderBookConnection(assetPair, dex1)
+        Seq(wsc1, wsc2, wsc3).foreach { receiveAtLeastN(_, 1) }
+
+        dex1.api.tryDeleteOrderBook(assetPair)
+
+        eventually { Seq(wsc1, wsc2, wsc3).foreach(_.isClosed shouldBe true) }
       }
     }
   }

@@ -8,9 +8,18 @@ trait WsMessage {
 }
 
 object WsMessage {
+
+  private val unusedStrictTextMessage = TextMessage.Strict("{}")
+  private val unusedTpe               = "unused"
+
   // Will be never propagated to a client
   case object Complete extends WsMessage {
-    override val toStrictTextMessage: TextMessage.Strict = TextMessage.Strict("{}")
-    override val tpe: String                             = "close"
+    override val toStrictTextMessage: TextMessage.Strict = unusedStrictTextMessage
+    override val tpe: String                             = unusedTpe
+  }
+
+  case class CompleteWithFailure(cause: Throwable) extends WsMessage {
+    override val toStrictTextMessage: TextMessage.Strict = unusedStrictTextMessage
+    override val tpe: String                             = unusedTpe
   }
 }

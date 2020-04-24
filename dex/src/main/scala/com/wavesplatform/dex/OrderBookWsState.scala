@@ -20,8 +20,6 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
     if (wsConnections.size == 1) OrderBookWsState(Map.empty, Set.empty, Set.empty, None)
     else copy(wsConnections = wsConnections.filterKeys(_ != x))
 
-  def withoutSubscriptions: OrderBookWsState = copy(wsConnections = Map.empty)
-
   def hasSubscriptions: Boolean = wsConnections.nonEmpty
 
   def hasChanges: Boolean = changedAsks.nonEmpty || changedBids.nonEmpty || lastTrade.nonEmpty

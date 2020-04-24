@@ -153,7 +153,7 @@ class AddressActor(owner: Address,
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
     case Query.GetOrdersStatuses(maybePair, onlyActive) =>
       val matchingActiveOrders = getActiveLimitOrders(maybePair)
-        .map(ao => ao.id -> OrderInfo.v3(ao, activeStatus(ao)))
+        .map(ao => ao.id -> OrderInfo.v4(ao, activeStatus(ao)))
         .toSeq
         .sorted
 

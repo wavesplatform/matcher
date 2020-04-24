@@ -267,26 +267,30 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
   "OrderHistory should" - {
     "correctly save average weighed price" in {
-
       Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
-
-      val mozart  = mkAccountWithBalance(100.waves -> Waves)
-      val salieri = mkAccountWithBalance(300.usd   -> usd, 10.waves -> Waves)
-
-      Seq(
-        30.waves -> 3.2,
-        10.waves -> 2.9,
-        50.waves -> 2.7
-      ).foreach { case (amount, price) => placeAndAwaitAtDex(mkOrderDP(salieri, wavesUsdPair, BUY, amount, price)) }
-
-      placeAndAwaitAtNode(mkOrderDP(mozart, wavesUsdPair, SELL, 95.waves, 2.0), isMarketOrder = true)
 
       def assertAvgWeighedPrice(keyPair: KeyPair, avgWeighedPrices: List[Long]): Unit = {
         dex1.api.orderHistoryByPair(keyPair, wavesUsdPair, Some(false)).map(_.avgWeighedPrice) should matchTo(avgWeighedPrices)
       }
 
-      assertAvgWeighedPrice(mozart, List(288L))
-      assertAvgWeighedPrice(salieri, List(270L, 290L, 320L))
+      // checking market and limit orders because
+      // in case of market sell order avgWeighedPrice retrieved from orderDB,
+      // in case of limit sell order - from active orders
+      Seq(true, false) foreach { isMarketOrder =>
+        val mozart  = mkAccountWithBalance(100.waves -> Waves)
+        val salieri = mkAccountWithBalance(300.usd   -> usd, 10.waves -> Waves)
+
+        Seq(
+          30.waves -> 3.2,
+          10.waves -> 2.9,
+          50.waves -> 2.7
+        ).foreach { case (amount, price) => placeAndAwaitAtDex(mkOrderDP(salieri, wavesUsdPair, BUY, amount, price)) }
+
+        placeAndAwaitAtNode(mkOrderDP(mozart, wavesUsdPair, SELL, 95.waves, 2.0), isMarketOrder = isMarketOrder)
+
+        assertAvgWeighedPrice(mozart, List(288L))
+        assertAvgWeighedPrice(salieri, List(270L, 290L, 320L))
+      }
     }
   }
 

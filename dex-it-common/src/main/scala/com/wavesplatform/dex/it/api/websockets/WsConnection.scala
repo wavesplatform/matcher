@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import akka.Done
@@ -10,7 +9,6 @@ import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest, WebSocketUpgradeResponse}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
-import cats.syntax.option._
 import com.wavesplatform.dex.api.http.`X-Api-Key`
 import com.wavesplatform.dex.api.websockets.WsMessage
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
@@ -103,15 +101,12 @@ object WsConnection {
 
     import PongHandler._
 
-    private def awaitPings(sourceRef: ActorRef, connectionId: Option[UUID]): Receive = {
+    private def awaitPings(sourceRef: ActorRef): Receive = {
 
-      case p @ PingOrPong(id, _) => if (connectionId.isEmpty) context.become { awaitPings(sourceRef, id.some) }; if (keepAlive) sourceRef ! p
+      case p: PingOrPong => if (keepAlive) sourceRef ! p
 
       case CloseConnection =>
-        connectionId
-          .fold { log.debug(s"Closing connection (id wasn't assigned by matcher yet)") } { id =>
-            log.debug(s"Closing connection $id")
-          }
+        log.debug("Closing connection")
         sourceRef ! akka.actor.Status.Success(None)
         context.stop(self)
 
@@ -119,7 +114,7 @@ object WsConnection {
     }
 
     private def awaitSourceRef: Receive = {
-      case AssignSourceRef => context.become { awaitPings(sourceRef = sender, connectionId = None) }
+      case AssignSourceRef => context.become { awaitPings(sourceRef = sender) }
     }
 
     override def receive: Receive = awaitSourceRef

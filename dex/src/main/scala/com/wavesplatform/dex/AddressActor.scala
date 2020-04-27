@@ -2,8 +2,10 @@ package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, Cancellable, Status, typed}
 import akka.pattern.{ask, pipe}
+import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
@@ -237,8 +239,8 @@ class AddressActor(owner: Address,
     case WsCommand.AddWsSubscription(client) =>
       log.trace(s"[${client.path.name}] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(client.ref)
-      context.watch(sender)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(client)
+      context.watch(client)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       addressWsMutableState.sendSnapshot(
@@ -267,7 +269,7 @@ class AddressActor(owner: Address,
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
-    case typed.Terminated(wsSource: typed.ActorRef[WsAddressState]) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
+    case classic.Terminated(wsSource) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
   private def scheduleNextDiffSending: Cancellable = {

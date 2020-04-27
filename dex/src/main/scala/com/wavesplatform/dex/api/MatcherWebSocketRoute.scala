@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.Done
@@ -56,8 +57,8 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
-  private val completionMatcher: PartialFunction[WsMessage, Unit] = { case WsMessage.Complete => }
-  private val failureMatcher: PartialFunction[Any, Throwable]     = PartialFunction.empty
+  private val completionMatcher: PartialFunction[WsMessage, Unit]   = { case WsMessage.Complete => }
+  private val failureMatcher: PartialFunction[WsMessage, Throwable] = PartialFunction.empty
 
   private def accountUpdatesSource(address: Address): Source[TextMessage.Strict, typed.ActorRef[WsMessage]] = {
     ActorSource
@@ -67,6 +68,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         10,
         OverflowStrategy.fail
       )
+      .named(UUID.randomUUID.toString)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         addressDirectory ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(sourceActor))
@@ -83,6 +85,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         10,
         OverflowStrategy.fail
       )
+      .named(UUID.randomUUID.toString)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.WsCommand.AddWsSubscription(sourceActor))

@@ -40,7 +40,7 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         val now         = time.getTimestamp()
 
         (1 to 10).foreach { i =>
-          aggOrderBookRef ! AggregatedOrderBookActor.Command.ApplyChanges(
+          aggOrderBookRef ! AggregatedOrderBookActor.WsCommand.ApplyChanges(
             LevelAmounts(
               asks = Map((middlePrice + i) -> i * 2L),
               bids = Map((middlePrice - i) -> i * 3L)

@@ -21,7 +21,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
-import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
+import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Message, Query, WsCommand}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
@@ -148,7 +148,7 @@ class AggregatedOrderBookActorSpec
           val ref       = mk(OrderBook.empty)
           val lastTrade = LastTrade(500L, 10L, OrderType.BUY)
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty.copy(
               asks = Map(2000L -> 99L)
             ),
@@ -170,7 +170,7 @@ class AggregatedOrderBookActorSpec
           val ref       = mk(OrderBook.empty)
           val lastTrade = LastTrade(500L, 10L, OrderType.BUY)
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty.copy(
               asks = Map(2000L -> 99L)
             ),
@@ -178,13 +178,13 @@ class AggregatedOrderBookActorSpec
             ts = 0L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(lastTrade),
             ts = 1L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty.copy(
               bids = Map(1000L -> 84L)
             ),
@@ -206,7 +206,7 @@ class AggregatedOrderBookActorSpec
       "aggregated snapshot after update" - {
         "once" in {
           val ref = mk(OrderBook.empty)
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2100L -> 1L, 2000L  -> 99L),
               bids = Map(999L  -> 30L, 1000L -> 50L)
@@ -227,7 +227,7 @@ class AggregatedOrderBookActorSpec
         "multiple times" in {
           val ref = mk(OrderBook.empty)
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2100L -> 1L),
               bids = Map.empty
@@ -236,7 +236,7 @@ class AggregatedOrderBookActorSpec
             ts = 0L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2000L -> 99L),
               bids = Map.empty
@@ -245,7 +245,7 @@ class AggregatedOrderBookActorSpec
             ts = 1L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map.empty,
               bids = Map(999L -> 30L, 1000L -> 50L)
@@ -254,7 +254,7 @@ class AggregatedOrderBookActorSpec
             ts = 2L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
             ts = 3L
@@ -273,7 +273,7 @@ class AggregatedOrderBookActorSpec
       "http response after update" - {
         "once" in {
           val ref = mk(OrderBook.empty)
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2100L -> 1L, 2000L  -> 99L),
               bids = Map(999L  -> 30L, 1000L -> 50L)
@@ -297,7 +297,7 @@ class AggregatedOrderBookActorSpec
         "multiple times" in {
           val ref = mk(OrderBook.empty)
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2100L -> 1L),
               bids = Map.empty
@@ -306,7 +306,7 @@ class AggregatedOrderBookActorSpec
             ts = 0L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map(2000L -> 99L),
               bids = Map.empty
@@ -315,7 +315,7 @@ class AggregatedOrderBookActorSpec
             ts = 1L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts(
               asks = Map.empty,
               bids = Map(999L -> 30L, 1000L -> 50L)
@@ -324,7 +324,7 @@ class AggregatedOrderBookActorSpec
             ts = 2L
           )
 
-          ref ! Command.ApplyChanges(
+          ref ! WsCommand.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
             ts = 3L

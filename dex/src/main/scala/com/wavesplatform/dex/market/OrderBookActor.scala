@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.market
 
-import java.io.EOFException
-
 import akka.actor.typed
 import akka.actor.typed.scaladsl.adapter._
 import akka.{actor => classic}
@@ -12,6 +10,7 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.OrderBookStopped
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
@@ -117,8 +116,7 @@ class OrderBookActor(settings: Settings,
             case x: QueueEvent.Canceled               => onCancelOrder(request, x.orderId)
             case _: QueueEvent.OrderBookDeleted =>
               log.warn("Order book was deleted, closing all WebSocket connections...")
-              val reason = new EOFException("Order book was deleted") unsafeTap { _.setStackTrace(Array.empty) }
-              aggregatedRef ! AggregatedOrderBookActor.Command.CloseAllWsSubscriptions(reason)
+              aggregatedRef ! AggregatedOrderBookActor.WsCommand.CloseAllWsSubscriptions(OrderBookStopped(assetPair))
               process(request.timestamp, orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
@@ -159,7 +157,7 @@ class OrderBookActor(settings: Settings,
       case _                       => false
     }
     val lastTrade = if (hasTrades) orderBook.lastTrade else None
-    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, timestamp)
+    aggregatedRef ! AggregatedOrderBookActor.WsCommand.ApplyChanges(levelChanges, lastTrade, timestamp)
     processEvents(events)
   }
 
@@ -179,7 +177,7 @@ class OrderBookActor(settings: Settings,
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
-        aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
+        aggregatedRef ! AggregatedOrderBookActor.WsCommand.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")

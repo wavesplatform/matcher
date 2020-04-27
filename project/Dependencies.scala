@@ -104,12 +104,14 @@ object Dependencies {
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore            = kamonModule("core", Version.kamonCore)
   private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
+
   private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
     // Conflicts with specified gRPC. This is the problem for waves-integration-it.
     // Also, wavesj doesn't use gRPC, so it is safe.
     ExclusionRule(organization = "io.grpc"),
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
+
   private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
@@ -145,6 +147,7 @@ object Dependencies {
   private val testKit: Seq[ModuleID] = Seq(
     akkaModule("akka-testkit", Version.akka),
     akkaModule("akka-http-testkit", Version.akkaHttp),
+    akkaModule("akka-actor-testkit-typed", Version.akka),
     scalaTest,
     scalaCheck,
     scalaTestPlusCheck,

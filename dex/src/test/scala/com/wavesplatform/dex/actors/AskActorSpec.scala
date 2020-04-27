@@ -7,7 +7,6 @@ import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, TimeoutException}
@@ -16,7 +15,6 @@ class AskActorSpec
     extends AnyFreeSpec
     with Matchers
     with SystemTime
-    with TableDrivenPropertyChecks
     with MatcherSpecLike
     with DiffMatcherWithImplicits {
 

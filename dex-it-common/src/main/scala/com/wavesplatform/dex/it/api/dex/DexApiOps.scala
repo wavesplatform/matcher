@@ -58,19 +58,22 @@ object DexApiOps {
 
     def orderHistory(owner: KeyPair,
                      activeOnly: Option[Boolean] = None,
+                     closedOnly: Option[Boolean] = None,
                      timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
-      explicitGet(self.tryOrderHistory(owner, activeOnly, timestamp))
+      explicitGet(self.tryOrderHistory(owner, activeOnly, closedOnly, timestamp))
 
     def orderHistoryWithApiKey(owner: Address,
                                activeOnly: Option[Boolean] = None,
+                               closedOnly: Option[Boolean] = None,
                                xUserPublicKey: Option[PublicKey] = None): F[List[OrderBookHistoryItem]] =
-      explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly, xUserPublicKey))
+      explicitGet(self.tryOrderHistoryWithApiKey(owner, activeOnly, closedOnly, xUserPublicKey))
 
     def orderHistoryByPair(owner: KeyPair,
                            assetPair: AssetPair,
                            activeOnly: Option[Boolean] = None,
+                           closedOnly: Option[Boolean] = None,
                            timestamp: Long = System.currentTimeMillis()): F[List[OrderBookHistoryItem]] =
-      explicitGet(self.tryOrderHistoryByPair(owner, assetPair, activeOnly, timestamp))
+      explicitGet(self.tryOrderHistoryByPair(owner, assetPair, activeOnly, closedOnly, timestamp))
 
     def allOrderBooks: F[MarketDataInfo] = explicitGet(self.tryAllOrderBooks)
 

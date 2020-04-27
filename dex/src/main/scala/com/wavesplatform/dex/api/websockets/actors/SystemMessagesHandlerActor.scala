@@ -1,7 +1,5 @@
 package com.wavesplatform.dex.api.websockets.actors
 
-import java.util.UUID
-
 import akka.actor.{Actor, Cancellable, Props}
 import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
@@ -59,8 +57,7 @@ class SystemMessagesHandlerActor(settings: Settings, maxConnectionLifetime: Fini
   }
 
   private def sendPingAndScheduleNextOne(): (PingOrPong, Cancellable) = {
-    val nextUuid = UUID.randomUUID()
-    val ping     = PingOrPong(nextUuid)
+    val ping     = PingOrPong(System.currentTimeMillis)
     val nextPing = scheduleOnce(settings.pingInterval, SendPing)
     connectionSource.ping(ping)
     ping -> nextPing
@@ -87,22 +84,21 @@ object SystemMessagesHandlerActor {
 
   final case class CloseConnection(terminationStatus: TerminationStatus)
 
-  final case class PingOrPong(connectionId: UUID, timestamp: Long = System.currentTimeMillis) extends WsMessage {
+  final case class PingOrPong(timestamp: Long) extends WsMessage {
     override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(PingOrPong.format.writes(this).toString)
     override val tpe: String                             = "pp"
   }
 
   object PingOrPong {
 
-    def wsUnapply(arg: PingOrPong): Option[(String, UUID, Long)] = (arg.tpe, arg.connectionId, arg.timestamp).some
+    def wsUnapply(arg: PingOrPong): Option[(String, Long)] = (arg.tpe, arg.timestamp).some
 
     implicit val format: Format[PingOrPong] = (
       (__ \ "T").format[String] and
-        (__ \ "_").format[Long] and
-        (__ \ "%").format[String]
+        (__ \ "_").format[Long]
     )(
-      (_, ts, uuid) => PingOrPong(UUID.fromString(uuid), ts),
-      unlift(PingOrPong.wsUnapply) andThen { case (tpe, id, ts) => (tpe, ts, id.toString) }
+      (_, ts) => PingOrPong(ts),
+      unlift(PingOrPong.wsUnapply) andThen { case (tpe, ts) => (tpe, ts) }
     )
   }
 }

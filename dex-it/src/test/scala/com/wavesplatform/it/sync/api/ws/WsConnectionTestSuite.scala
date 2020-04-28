@@ -20,7 +20,9 @@ import scala.concurrent.duration._
 
 class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with TableDrivenPropertyChecks {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId" ]"""
+  )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -50,26 +52,29 @@ class WsConnectionTestSuite extends MatcherSuiteBase with HasWebSockets with Tab
       eventually { wsc2.getBalancesChanges should have size 1 }
     }
 
-    val wavesEthPair = AssetPair(Waves, eth)
+    "correctly handle rejections (public stream)" in {
 
-    "correctly handle rejections (public stream)" in forAll(
-      Table(
-        // format: off
-        ("pair",       "expected status",      "expected error"),
-        (wavesEthPair, BadRequest, OrderAssetPairReversed(wavesEthPair)),
-        (ethWavesPair, NotFound,   OrderBookStopped(ethWavesPair)),
-        // format: on
-      )
-    ) { (assetPair, expectedStatus, expectedError) =>
-      val connection = mkWsOrderBookConnection(assetPair, dex1)
-      val response   = Await.result(connection.getConnectionResponse, 1.second).response
+      val wavesEthPair = AssetPair(Waves, eth)
 
-      response.status shouldBe expectedStatus
+      forAll(
+        Table(
+          // format: off
+          ("pair",       "expected status",      "expected error"),
+          (wavesEthPair, BadRequest, OrderAssetPairReversed(wavesEthPair)),
+          (ethWavesPair, NotFound,   OrderBookStopped(ethWavesPair)),
+          // format: on
+        )
+      ) { (assetPair, expectedStatus, expectedError) =>
+        val connection = mkWsOrderBookConnection(assetPair, dex1)
+        val response   = Await.result(connection.getConnectionResponse, 1.second).response
 
-      response.getHeader(`X-Error-Message`.name).get.value shouldBe expectedError.message.text
-      response.getHeader(`X-Error-Code`.name).get.value shouldBe expectedError.code.toString
+        response.status shouldBe expectedStatus
 
-      connection.close()
+        response.getHeader(`X-Error-Message`.name).get.value shouldBe expectedError.message.text
+        response.getHeader(`X-Error-Code`.name).get.value shouldBe expectedError.code.toString
+
+        connection.close()
+      }
     }
 
     "correctly handle rejections (private stream)" in {

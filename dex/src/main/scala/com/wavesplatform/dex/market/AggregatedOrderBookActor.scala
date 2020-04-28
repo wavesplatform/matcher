@@ -2,12 +2,13 @@ package com.wavesplatform.dex.market
 
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.OrderBookWsState
-import com.wavesplatform.dex.api.websockets.WsOrderBook
+import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
+import com.wavesplatform.dex.error.OrderBookStopped
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
@@ -99,7 +100,16 @@ object AggregatedOrderBookActor {
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
           }
-          .receiveSignal { case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws))) }
+          .receiveSignal {
+            case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws)))
+            case (_, PostStop) =>
+              state.ws.wsConnections.foreach {
+                case (connection, _) =>
+                  context.log.trace(s"[${connection.path.name}] WebSocket connection closed, reason: ${OrderBookStopped(assetPair).message.text}")
+                  connection.unsafeUpcast[WsMessage] ! WsMessage.Complete
+              }
+              default { state.copy(ws = state.ws.copy(wsConnections = Map.empty)) }
+          }
 
       default(init)
     }
@@ -135,7 +145,7 @@ object AggregatedOrderBookActor {
       compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
       ws: OrderBookWsState
   ) {
-    lazy val marketStatus = MarketStatus(
+    lazy val marketStatus: MarketStatus = MarketStatus(
       lastTrade = lastTrade,
       bestBid = bids.headOption.map(toLevelAgg),
       bestAsk = asks.headOption.map(toLevelAgg)
@@ -150,21 +160,22 @@ object AggregatedOrderBookActor {
         compiledHttpView = Map.empty // Could be optimized by depth
       )
 
-    def toOrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(
+    def toOrderBookAggregatedSnapshot: OrderBookAggregatedSnapshot = OrderBookAggregatedSnapshot(
       asks = asks.map(toLevelAgg).toSeq,
       bids = bids.map(toLevelAgg).toSeq
     )
   }
 
   object State {
-    val empty = State(
-      asks = TreeMap.empty(OrderBook.asksOrdering),
-      bids = TreeMap.empty(OrderBook.bidsOrdering),
-      lastTrade = None,
-      lastUpdateTs = 0,
-      compiledHttpView = Map.empty,
-      ws = OrderBookWsState(Map.empty, Set.empty, Set.empty, lastTrade = None)
-    )
+    val empty: State =
+      State(
+        asks = TreeMap.empty(OrderBook.asksOrdering),
+        bids = TreeMap.empty(OrderBook.bidsOrdering),
+        lastTrade = None,
+        lastUpdateTs = 0,
+        compiledHttpView = Map.empty,
+        ws = OrderBookWsState(Map.empty, Set.empty, Set.empty, lastTrade = None)
+      )
 
     def fromOrderBook(ob: OrderBook): State = State(
       asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order

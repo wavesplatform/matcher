@@ -2,15 +2,17 @@ package com.wavesplatform.dex
 
 import java.time.{Instant, Duration => JDuration}
 
-import akka.actor.{Actor, ActorRef, Cancellable, Status, Terminated}
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.{Actor, ActorRef, Cancellable, Status, typed}
 import akka.pattern.{ask, pipe}
+import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -236,11 +238,11 @@ class AddressActor(owner: Address,
 
     case Status.Failure(e) => log.error(s"Got $e", e)
 
-    case AddWsSubscription =>
-      log.trace(s"[${sender.path.name}] WebSocket connected")
+    case WsCommand.AddWsSubscription(client) =>
+      log.trace(s"[${client.path.name}] WebSocket connected")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
-      addressWsMutableState = addressWsMutableState.addPendingSubscription(sender)
-      context.watch(sender)
+      addressWsMutableState = addressWsMutableState.addPendingSubscription(client)
+      context.watch(client)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       addressWsMutableState.sendSnapshot(
@@ -251,7 +253,7 @@ class AddressActor(owner: Address,
       if (!addressWsMutableState.hasActiveConnections) scheduleNextDiffSending
       addressWsMutableState = addressWsMutableState.flushPendingConnections()
 
-    case PrepareDiffForWsSubscribers =>
+    case WsCommand.PrepareDiffForWsSubscribers =>
       if (addressWsMutableState.hasActiveConnections) {
         if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
@@ -269,12 +271,11 @@ class AddressActor(owner: Address,
 
       addressWsMutableState = addressWsMutableState.cleanChanges()
 
-    case Terminated(wsSource) =>
-      addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
+    case classic.Terminated(wsSource) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
   private def scheduleNextDiffSending: Cancellable = {
-    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, PrepareDiffForWsSubscribers)
+    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
   }
 
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
@@ -545,8 +546,11 @@ object AddressActor {
     case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
   }
 
-  case object AddWsSubscription           extends Message
-  case object PrepareDiffForWsSubscribers extends Message
+  sealed trait WsCommand extends Message
+  object WsCommand {
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressState]) extends WsCommand
+    private[AddressActor] case object PrepareDiffForWsSubscribers        extends WsCommand
+  }
 
   private case class CancelExpiredOrder(orderId: ByteStr)
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)

@@ -474,6 +474,10 @@ case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: Publi
 
 case object AuthIsRequired extends MatcherError(auth, params, notProvided, e"The authentication is required. Please read the documentation")
 
+case object WsConnectionPongTimeout extends MatcherError(webSocket, connectivity, timedOut, e"WebSocket has reached pong timeout")
+
+case object WsConnectionMaxLifetimeExceeded extends MatcherError(webSocket, connectivity, limitReached, e"WebSocket has reached max allowed lifetime")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -506,6 +510,7 @@ object Entity {
   object connectivity extends Entity(101)
   object auth         extends Entity(102)
   object params       extends Entity(103)
+  object webSocket    extends Entity(104)
 }
 
 sealed abstract class Class(val code: Int)

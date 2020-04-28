@@ -21,7 +21,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
-import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
+import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Message, Query, Command}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.api
 
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.Done
@@ -12,7 +13,7 @@ import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route, StandardRoute}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.typed.scaladsl.ActorSource
-import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
+import akka.stream.{Materializer, OverflowStrategy}
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Longs
@@ -22,7 +23,6 @@ import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.WsMessage
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
-import com.wavesplatform.dex.api.websockets.statuses.TerminationStatus
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -57,43 +57,39 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
-  private val completionMatcher: PartialFunction[Any, CompletionStrategy] = {
-    case WsMessage.Complete                    => CompletionStrategy.immediately
-    case Status.Success(s: CompletionStrategy) => s
-    case Status.Success(_)                     => CompletionStrategy.draining
-    case Status.Success                        => CompletionStrategy.draining
-  }
+  private val completionMatcher: PartialFunction[WsMessage, Unit]   = { case WsMessage.Complete => }
+  private val failureMatcher: PartialFunction[WsMessage, Throwable] = PartialFunction.empty
 
-  private val failureMatcher: PartialFunction[Any, Throwable] = { case Status.Failure(cause) => cause }
-
-  private def accountUpdatesSource(address: Address): Source[TextMessage.Strict, ConnectionSource] = {
-    Source
+  private def accountUpdatesSource(address: Address): Source[TextMessage.Strict, typed.ActorRef[WsMessage]] = {
+    ActorSource
       .actorRef[WsMessage](
         completionMatcher,
         failureMatcher,
         10,
         OverflowStrategy.fail
       )
+      .named(UUID.randomUUID.toString)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
-        addressDirectory.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), sourceActor)
-        ConnectionSource.AddressUpdatesSource(sourceActor)
+        addressDirectory ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(sourceActor))
+        sourceActor
       }
       .watchTermination()(handleTermination)
   }
 
-  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, ConnectionSource] = {
+  private def orderBookUpdatesSource(pair: AssetPair): Source[TextMessage.Strict, typed.ActorRef[WsMessage]] = {
     ActorSource
       .actorRef[WsMessage](
-        { case WsMessage.Complete => },
-        PartialFunction.empty,
+        completionMatcher,
+        failureMatcher,
         10,
         OverflowStrategy.fail
       )
+      .named(UUID.randomUUID.toString)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
-        ConnectionSource.OrderBookSource(sourceActor)
+        sourceActor
       }
       .watchTermination()(handleTermination)
   }
@@ -102,7 +98,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
   private lazy val binaryMessageUnsupportedFailure: Future[PingOrPong]  = mkPongFailure("Binary messages are not supported")
   private def unexpectedMessageFailure(msg: String): Future[PingOrPong] = mkPongFailure(s"Got unexpected message instead of pong: $msg")
 
-  private def createStreamFor(source: Source[TextMessage.Strict, ConnectionSource], expiration: Option[Long] = None): Route = {
+  private def createStreamFor(source: Source[TextMessage.Strict, typed.ActorRef[WsMessage]], expiration: Option[Long] = None): Route = {
 
     import webSocketSettings._
 
@@ -110,9 +106,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       FiniteDuration(exp - System.currentTimeMillis, TimeUnit.MILLISECONDS).min(maxConnectionLifetime)
     }
 
-    val (connectionSource, matSource) = source.preMaterialize()
-    val systemMessagesHandler         = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, connectionLifetime, connectionSource))
-    val sinkActor                     = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
+    val (sourceActor, matSource) = source.preMaterialize()
+    val systemMessagesHandler    = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, connectionLifetime, sourceActor))
+    val sinkActor                = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
 
     val sink =
       Flow[Message]
@@ -191,40 +187,19 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     case None    => complete(error.OrderBookStopped(p).toWsHttpResponse(StatusCodes.NotFound))
   }
 
-  private def handleTermination(cs: ConnectionSource, r: Future[Done]): ConnectionSource = {
+  private def handleTermination(client: typed.ActorRef[WsMessage], r: Future[Done]): typed.ActorRef[WsMessage] = {
+    val cn = client.path.name
     r.onComplete {
-      case Success(_) => log.trace(s"[${cs.name}] WebSocket connection successfully closed")
-      case Failure(e) =>
-        log.trace(s"[${cs.name}] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
+      case Success(_) => log.trace(s"[$cn] WebSocket connection successfully closed")
+      case Failure(e) => log.trace(s"[$cn] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
-    cs
+    client
   }
 }
 
 object MatcherWebSocketRoute {
 
   val balanceStreamPrefix: String = "au"
-
-  // Will be removed after migration to akka-typed
-  trait ConnectionSource {
-    def name: String
-    def ping(message: PingOrPong): Unit
-    def close(terminationStatus: TerminationStatus): Unit
-  }
-
-  object ConnectionSource {
-    final case class AddressUpdatesSource(ref: ActorRef) extends ConnectionSource {
-      override def name: String                                      = ref.path.name
-      override def ping(message: PingOrPong): Unit                   = ref ! message
-      override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete
-    }
-
-    final case class OrderBookSource(ref: typed.ActorRef[WsMessage]) extends ConnectionSource {
-      override def name: String                                      = ref.path.name
-      override def ping(message: PingOrPong): Unit                   = ref ! message
-      override def close(terminationStatus: TerminationStatus): Unit = ref ! WsMessage.Complete
-    }
-  }
 
   final case class AuthParams(expirationTimestamp: Long, signature: ByteStr)
 }

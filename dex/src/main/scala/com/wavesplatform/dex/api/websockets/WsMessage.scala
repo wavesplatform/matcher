@@ -8,9 +8,10 @@ trait WsMessage {
 }
 
 object WsMessage {
+
   // Will be never propagated to a client
   case object Complete extends WsMessage {
     override val toStrictTextMessage: TextMessage.Strict = TextMessage.Strict("{}")
-    override val tpe: String                             = "close"
+    override val tpe: String                             = "unused"
   }
 }

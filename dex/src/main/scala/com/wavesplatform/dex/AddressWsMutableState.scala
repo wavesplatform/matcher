@@ -1,6 +1,6 @@
 package com.wavesplatform.dex
 
-import akka.actor.ActorRef
+import akka.actor.typed.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -9,8 +9,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
-                                 pendingWsConnections: Set[ActorRef],
+case class AddressWsMutableState(activeWsConnections: Map[ActorRef[WsAddressState], Long],
+                                 pendingWsConnections: Set[ActorRef[WsAddressState]],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
                                  ordersChanges: Map[Order.Id, WsOrder]) {
@@ -21,13 +21,13 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef, Long],
   def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
-  def addPendingSubscription(subscriber: ActorRef): AddressWsMutableState =
+  def addPendingSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState =
     copy(pendingWsConnections = pendingWsConnections + subscriber)
 
   def flushPendingConnections(): AddressWsMutableState =
     copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.iterator.map(_ -> 0L), pendingWsConnections = Set.empty)
 
-  def removeSubscription(subscriber: ActorRef): AddressWsMutableState = {
+  def removeSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState = {
     if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()
     else copy(activeWsConnections = activeWsConnections.filterKeys(_ != subscriber))
   }

@@ -2,10 +2,11 @@ package com.wavesplatform.dex
 
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsOrder}
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsBalances, WsMessage, WsOrder}
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -22,7 +23,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
 
 class ActorsWebSocketInteractionsSpecification
     extends TestKit(ActorSystem("ActorsWebSocketInteractionsSpecification"))
@@ -31,6 +31,8 @@ class ActorsWebSocketInteractionsSpecification
     with BeforeAndAfterAll
     with ImplicitSender
     with MatcherSpecBase {
+
+  private val testKit = ActorTestKit()
 
   private implicit val efc: ErrorFormatterContext = (asset: Asset) => getDefaultAssetDescriptions(asset).decimals
 
@@ -48,7 +50,9 @@ class ActorsWebSocketInteractionsSpecification
       ) => Unit
   ): Unit = {
 
-    val eventsProbe      = TestProbe()
+    val eventsProbe: TestProbe                   = TestProbe()
+    val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
+
     val currentPortfolio = new AtomicReference[Portfolio](Portfolio.empty)
     val address          = KeyPair("test".getBytes)
 
@@ -84,7 +88,7 @@ class ActorsWebSocketInteractionsSpecification
       )
     }
 
-    def subscribe(): Unit = addressDir.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), eventsProbe.ref)
+    def subscribe(): Unit = addressDir ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
 
     def placeOrder(ao: AcceptedOrder): Unit = {
       addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
@@ -123,7 +127,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder], expectedUpdateId: Long): Unit = {
-      val wsAddressState = eventsProbe.expectMsgAnyClassOf(3.seconds, classOf[WsAddressState])
+      val wsAddressState = wsEventsProbe.expectMessageType[WsAddressState]
       wsAddressState.balances should matchTo(expectedBalances)
       wsAddressState.orders should matchTo(expectedOrders)
       wsAddressState.updateId should matchTo(expectedUpdateId)
@@ -368,17 +372,15 @@ class ActorsWebSocketInteractionsSpecification
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
         updateBalances(tradableBalance)
 
-        def subscribe(tp: TestProbe): Unit = ad.tell(AddressDirectory.Envelope(address, AddressActor.AddWsSubscription), tp.ref)
+        def subscribe(tp: TypedTestProbe[WsMessage]): Unit = ad ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(tp.ref))
 
-        def expectWsBalance(tp: TestProbe, expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
-          val wsAddressState = tp.expectMsgAnyClassOf(10.second, classOf[WsAddressState])
+        def expectWsBalance(tp: TypedTestProbe[WsMessage], expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
+          val wsAddressState = tp.expectMessageType[WsAddressState]
           wsAddressState.balances should matchTo(expected)
           wsAddressState.updateId should matchTo(expectedUpdateId)
         }
 
-        val webSubscription     = TestProbe()
-        val mobileSubscription  = TestProbe()
-        val desktopSubscription = TestProbe()
+        val webSubscription, mobileSubscription, desktopSubscription = testKit.createTestProbe[WsMessage]()
 
         subscribe(webSubscription)
         expectWsBalance(webSubscription, Map(Waves -> WsBalances(100, 0), usd -> WsBalances(300, 0), eth -> WsBalances(2, 0)), 0)

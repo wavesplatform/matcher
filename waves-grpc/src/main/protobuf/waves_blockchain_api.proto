@@ -26,13 +26,15 @@ service WavesBlockchainApi {
 
     rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
 
-    rpc SpendableAssetBalance (SpendableAssetBalanceRequest) returns (SpendableAssetBalanceResponse);
-
     rpc SpendableAssetsBalances (SpendableAssetsBalancesRequest) returns (SpendableAssetsBalancesResponse);
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
+    // TODO remove after release 2.1.2
     rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
+
+    // TODO rename to GetBalanceChanges after release 2.1.2
+    rpc GetRealTimeBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesFlattenResponse);
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);
 
@@ -130,15 +132,6 @@ message HasAddressScriptRequest {
     bytes address = 1;
 }
 
-message SpendableAssetBalanceRequest {
-    bytes address = 1;
-    bytes asset_id = 2;
-}
-
-message SpendableAssetBalanceResponse {
-    int64 balance = 1;
-}
-
 message SpendableAssetsBalancesRequest {
     bytes address = 1;
     message Record {
@@ -163,6 +156,14 @@ message ForgedOrderResponse {
     bool is_forged = 1;
 }
 
+// TODO rename to BalanceChangesResponse after release 2.1.2
+message BalanceChangesFlattenResponse {
+    bytes address = 1;
+    bytes asset = 2;
+    int64 balance = 3;
+}
+
+// TODO remove after release 2.1.2
 message BalanceChangesResponse {
     message Record {
         bytes address = 1;

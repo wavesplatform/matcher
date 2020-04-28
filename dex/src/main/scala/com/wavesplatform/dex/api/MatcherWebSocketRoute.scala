@@ -88,7 +88,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .named(UUID.randomUUID.toString)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
-        matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.WsCommand.AddWsSubscription(sourceActor))
+        matcher ! MatcherActor.AggregatedOrderBookEnvelope(pair, AggregatedOrderBookActor.Command.AddWsSubscription(sourceActor))
         sourceActor
       }
       .watchTermination()(handleTermination)

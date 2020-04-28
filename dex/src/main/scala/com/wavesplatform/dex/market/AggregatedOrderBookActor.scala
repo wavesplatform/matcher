@@ -2,13 +2,13 @@ package com.wavesplatform.dex.market
 
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.OrderBookWsState
 import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.error.MatcherError
+import com.wavesplatform.dex.error.OrderBookStopped
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
@@ -28,12 +28,11 @@ object AggregatedOrderBookActor {
     case class GetAggregatedSnapshot(client: ActorRef[OrderBookAggregatedSnapshot])              extends Query
   }
 
-  sealed trait WsCommand extends Message
-  object WsCommand {
-    case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], ts: Long) extends WsCommand
-    case class AddWsSubscription(client: ActorRef[WsOrderBook])                                 extends WsCommand
-    case class CloseAllWsSubscriptions(reason: MatcherError)                                    extends WsCommand
-    private[AggregatedOrderBookActor] case object SendWsUpdates                                 extends WsCommand
+  sealed trait Command extends Message
+  object Command {
+    case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], ts: Long) extends Command
+    case class AddWsSubscription(client: ActorRef[WsOrderBook])                                 extends Command
+    private[AggregatedOrderBookActor] case object SendWsUpdates                                 extends Command
   }
 
   case class Settings(wsMessagesInterval: FiniteDuration)
@@ -42,7 +41,7 @@ object AggregatedOrderBookActor {
     Behaviors.setup { context =>
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
-      def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, WsCommand.SendWsUpdates)
+      def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates)
 
       def default(state: State): Behavior[Message] =
         Behaviors
@@ -73,14 +72,14 @@ object AggregatedOrderBookActor {
                   }
               }
 
-            case WsCommand.ApplyChanges(levelChanges, lastTrade, ts) =>
+            case Command.ApplyChanges(levelChanges, lastTrade, ts) =>
               default {
                 state
                   .flushed(levelChanges, lastTrade, ts)
                   .copy(ws = lastTrade.foldLeft(state.ws.withLevelChanges(levelChanges))(_ withLastTrade _))
               }
 
-            case WsCommand.AddWsSubscription(client) =>
+            case Command.AddWsSubscription(client) =>
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               val ob = state.toOrderBookAggregatedSnapshot
               client ! WsOrderBook.from(
@@ -96,21 +95,21 @@ object AggregatedOrderBookActor {
               context.watch(client)
               default(state.copy(ws = state.ws.addSubscription(client)))
 
-            case WsCommand.SendWsUpdates =>
+            case Command.SendWsUpdates =>
               val updated = state.copy(ws = state.ws.flushed(amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
-
-            case WsCommand.CloseAllWsSubscriptions(reason) =>
+          }
+          .receiveSignal {
+            case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws)))
+            case (_, PostStop) =>
               state.ws.wsConnections.foreach {
                 case (connection, _) =>
-                  context.log.trace(s"[${connection.path.name}] WebSocket connection closed, reason: ${reason.message.text}")
+                  context.log.trace(s"[${connection.path.name}] WebSocket connection closed, reason: ${OrderBookStopped(assetPair).message.text}")
                   connection.unsafeUpcast[WsMessage] ! WsMessage.Complete
               }
               default { state.copy(ws = state.ws.copy(wsConnections = Map.empty)) }
-
           }
-          .receiveSignal { case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws))) }
 
       default(init)
     }

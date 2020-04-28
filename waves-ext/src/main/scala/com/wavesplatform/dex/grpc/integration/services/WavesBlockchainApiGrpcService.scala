@@ -64,12 +64,12 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     context.spendableBalanceChanged
       .map {
         case (address, asset) =>
-          val newAssetBalance     = context.utx.spendableBalance(address, asset)
-          val maybeAddressBalance = Option(allSpendableBalances get address)
-          val needUpdate          = maybeAddressBalance.forall { !_.get(asset).contains(newAssetBalance) }
+          val newAssetBalance = context.utx.spendableBalance(address, asset)
+          val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
+          val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
 
           if (needUpdate) {
-            allSpendableBalances.put(address, maybeAddressBalance.getOrElse(Map.empty) + (asset -> newAssetBalance))
+            allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
             Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
           } else Option.empty[BalanceChangesFlattenResponse]
       }

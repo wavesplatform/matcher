@@ -1,10 +1,13 @@
 package com.wavesplatform.it.sync
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.AddressActor.OrderListType
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.it.MatcherSuiteBase
@@ -290,7 +293,66 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
 
         assertAvgWeighedPrice(mozart, List(288L))
         assertAvgWeighedPrice(salieri, List(270L, 290L, 320L))
+
+        Seq(alice, bob, mozart, salieri).foreach { dex1.api.cancelAll(_) }
       }
+    }
+
+    "return an order history with different filters" in {
+      val carol = mkAccountWithBalance(10.waves -> Waves)
+
+      val order1 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 1.waves, 2.0)
+      dex1.api.place(order1)
+
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 2.0), OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(order1, OrderStatus.Filled)
+
+      val order2 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 2.waves, 3.0)
+      dex1.api.place(order2)
+
+      val all        = List(order2.id(), order1.id())
+      val activeOnly = List(order2.id())
+      val closedOnly = List(order1.id())
+
+      withClue("default: ") {
+        // MatcherApiRoute.getAssetPairAndPublicKeyOrderHistory
+        dex1.api.orderHistoryByPair(carol, wavesUsdPair).map(_.id) should matchTo(all)
+
+        // MatcherApiRoute.getPublicKeyOrderHistory
+        dex1.api.orderHistory(carol).map(_.id) should matchTo(all)
+
+        // MatcherApiRoute.getAllOrderHistory
+        dex1.api.orderHistoryWithApiKey(carol).map(_.id) should matchTo(activeOnly)
+      }
+
+      List(
+        // format: off
+        (true.some,   none,         OrderListType.ActiveOnly),
+        (false.some,  none,         OrderListType.All),
+        (none,        true.some,    OrderListType.ClosedOnly),
+        (none,        false.some,   OrderListType.All),
+        (true.some,   true.some,    OrderListType.Empty),
+        (false.some,  true.some,    OrderListType.ClosedOnly),
+        (true.some,   false.some,   OrderListType.ActiveOnly),
+        (false.some,  false.some,   OrderListType.All),
+        // format: on
+      ).foreach {
+        case (activeOnlyParam, closedOnlyParam, result) =>
+          withClue(s"activeOnly=$activeOnlyParam, closedOnly=$closedOnlyParam, result=$result: ") {
+            val expected = result match {
+              case OrderListType.All        => all
+              case OrderListType.Empty      => List.empty
+              case OrderListType.ActiveOnly => activeOnly
+              case OrderListType.ClosedOnly => closedOnly
+            }
+
+            dex1.api.orderHistoryByPair(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.orderHistory(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.orderHistoryWithApiKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+          }
+      }
+
+      dex1.api.cancelAll(carol)
     }
   }
 

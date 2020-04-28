@@ -62,6 +62,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
     */
   def tryOrderHistory(owner: KeyPair,
                       activeOnly: Option[Boolean] = None,
+                      closedOnly: Option[Boolean] = None,
                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
 
   /**
@@ -69,6 +70,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
     */
   def tryOrderHistoryWithApiKey(owner: Address,
                                 activeOnly: Option[Boolean] = None,
+                                closedOnly: Option[Boolean] = None,
                                 xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]]
 
   /**
@@ -77,6 +79,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderHistoryByPair(owner: KeyPair,
                             assetPair: AssetPair,
                             activeOnly: Option[Boolean] = None,
+                            closedOnly: Option[Boolean] = None,
                             timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]]
 
   def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]]
@@ -252,31 +255,35 @@ object DexApi {
 
       override def tryOrderHistory(owner: KeyPair,
                                    activeOnly: Option[Boolean] = None,
+                                   closedOnly: Option[Boolean] = None,
                                    timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]] = tryParseJson {
         sttp
-          .get(appendActiveOnly(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}", activeOnly))
+          .get(appendFilters(uri"$apiUri/orderbook/${Base58.encode(owner.publicKey)}", activeOnly, closedOnly))
           .headers(timestampAndSignatureHeaders(owner, timestamp))
       }
 
       override def tryOrderHistoryWithApiKey(owner: Address,
                                              activeOnly: Option[Boolean] = None,
+                                             closedOnly: Option[Boolean] = None,
                                              xUserPublicKey: Option[PublicKey] = None): F[Either[MatcherError, List[OrderBookHistoryItem]]] =
         tryParseJson {
           sttp
-            .get(appendActiveOnly(uri"$apiUri/orders/${owner.stringRepr}", activeOnly))
+            .get(appendFilters(uri"$apiUri/orders/${owner.stringRepr}", activeOnly, closedOnly))
             .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
         }
 
       override def tryOrderHistoryByPair(owner: KeyPair,
                                          assetPair: AssetPair,
                                          activeOnly: Option[Boolean] = None,
+                                         closedOnly: Option[Boolean] = None,
                                          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[OrderBookHistoryItem]]] =
         tryParseJson {
           sttp
             .get(
-              appendActiveOnly(
+              appendFilters(
                 uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/publicKey/${Base58.encode(owner.publicKey)}",
-                activeOnly
+                activeOnly,
+                closedOnly
               )
             )
             .headers(timestampAndSignatureHeaders(owner, timestamp))
@@ -420,8 +427,14 @@ object DexApi {
           .headers(apiKeyHeaders)
       }
 
-      private def appendActiveOnly(uri: Uri, activeOnly: Option[Boolean]): Uri =
-        activeOnly.fold(uri)(x => uri.copy(queryFragments = List(QueryFragment.KeyValue("activeOnly", x.toString))))
+      private def appendFilters(uri: Uri, activeOnly: Option[Boolean], closedOnly: Option[Boolean]): Uri = {
+        val activeOnlyQuery = boolQueryFragments("activeOnly", activeOnly)
+        val closedOnlyQuery = boolQueryFragments("closedOnly", closedOnly)
+        uri.copy(queryFragments = activeOnlyQuery ++ closedOnlyQuery)
+      }
+
+      private def boolQueryFragments(name: String, x: Option[Boolean]): List[QueryFragment] =
+        x.fold(List.empty[QueryFragment])(x => List(QueryFragment.KeyValue(name, x.toString)))
 
       private def timestampAndSignatureHeaders(owner: KeyPair, timestamp: Long): Map[String, String] = Map(
         "Timestamp" -> timestamp.toString,

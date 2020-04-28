@@ -10,6 +10,7 @@ import akka.pattern.{AskTimeoutException, ask}
 import akka.stream.Materializer
 import akka.util.Timeout
 import com.google.common.primitives.Longs
+import com.wavesplatform.dex.AddressActor.OrderListType
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.http._
@@ -26,7 +27,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
-import com.wavesplatform.dex.market.MatcherActor.{ForceSaveSnapshots, ForceStartOrderBook, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor._
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -579,27 +580,30 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     } ~ get(complete(StatusCodes.MethodNotAllowed))
   }
 
-  private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, activeOnly)) { reply =>
-      StatusCodes.OK -> reply.xs.map {
-        case (id, oi) =>
-          Json.obj(
-            "id"              -> id.toString,
-            "type"            -> oi.side.toString,
-            "orderType"       -> oi.orderType,
-            "amount"          -> oi.amount,
-            "fee"             -> oi.matcherFee,
-            "price"           -> oi.price,
-            "timestamp"       -> oi.timestamp,
-            "filled"          -> oi.status.filledAmount,
-            "filledFee"       -> oi.status.filledFee,
-            "feeAsset"        -> oi.feeAsset,
-            "status"          -> oi.status.name,
-            "assetPair"       -> oi.assetPair.json,
-            "avgWeighedPrice" -> oi.avgWeighedPrice
-          )
+  private val emptyOrderList = StatusCodes.OK -> JsArray.empty
+  private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
+    if (orderListType == OrderListType.Empty) emptyOrderList
+    else
+      askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) { reply =>
+        StatusCodes.OK -> reply.xs.map {
+          case (id, oi) =>
+            Json.obj(
+              "id"              -> id.toString,
+              "type"            -> oi.side.toString,
+              "orderType"       -> oi.orderType,
+              "amount"          -> oi.amount,
+              "fee"             -> oi.matcherFee,
+              "price"           -> oi.price,
+              "timestamp"       -> oi.timestamp,
+              "filled"          -> oi.status.filledAmount,
+              "filledFee"       -> oi.status.filledFee,
+              "feeAsset"        -> oi.feeAsset,
+              "status"          -> oi.status.name,
+              "assetPair"       -> oi.assetPair.json,
+              "avgWeighedPrice" -> oi.avgWeighedPrice
+            )
+        }
       }
-    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
@@ -632,9 +636,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def getAssetPairAndPublicKeyOrderHistory: Route = (path("orderbook" / AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
     withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-      parameters('activeOnly.as[Boolean].?) { activeOnly =>
+      parameters(('activeOnly.as[Boolean].?, 'closedOnly.as[Boolean].?)) { (activeOnly, closedOnly) =>
         signedGet(publicKey) {
-          loadOrders(publicKey, Some(pair), activeOnly.getOrElse(false))
+          loadOrders(publicKey, Some(pair), getOrderListType(activeOnly, closedOnly, OrderListType.All))
         }
       }
     }
@@ -667,9 +671,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
-    parameters('activeOnly.as[Boolean].?) { activeOnly =>
+    parameters(('activeOnly.as[Boolean].?, 'closedOnly.as[Boolean].?)) { (activeOnly, closedOnly) =>
       signedGet(publicKey) {
-        loadOrders(publicKey, None, activeOnly.getOrElse(false))
+        loadOrders(publicKey, None, getOrderListType(activeOnly, closedOnly, OrderListType.All))
       }
     }
   }
@@ -729,8 +733,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     userPublicKey match {
       case Some(upk) if upk.toAddress != address => invalidUserPublicKey
       case _ =>
-        parameters('activeOnly.as[Boolean].?) { activeOnly =>
-          loadOrders(address, None, activeOnly.getOrElse(true))
+        parameters(('activeOnly.as[Boolean].?, 'closedOnly.as[Boolean].?)) { (activeOnly, closedOnly) =>
+          loadOrders(address, None, getOrderListType(activeOnly, closedOnly, OrderListType.ActiveOnly))
         }
     }
   }
@@ -933,4 +937,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 object MatcherApiRoute {
   private def stringifyAssetIds(balances: Map[Asset, Long]): Map[String, Long] =
     balances.map { case (aid, v) => aid.toString -> v }
+
+  private def getOrderListType(activeOnly: Option[Boolean], closedOnly: Option[Boolean], default: OrderListType): OrderListType =
+    if (activeOnly.isEmpty && closedOnly.isEmpty) default
+    else
+      (activeOnly.getOrElse(false), closedOnly.getOrElse(false)) match {
+        case (true, true)   => OrderListType.Empty
+        case (false, true)  => OrderListType.ClosedOnly
+        case (true, false)  => OrderListType.ActiveOnly
+        case (false, false) => OrderListType.All
+      }
 }

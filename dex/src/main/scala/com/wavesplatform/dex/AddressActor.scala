@@ -151,15 +151,17 @@ class AddressActor(owner: Address,
     case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
-    case Query.GetOrdersStatuses(maybePair, onlyActive) =>
-      val matchingActiveOrders = getActiveLimitOrders(maybePair)
-        .map(ao => ao.id -> OrderInfo.v4(ao, activeStatus(ao)))
-        .toSeq
-        .sorted
+    case Query.GetOrdersStatuses(maybePair, orderListType) =>
+      val matchingActiveOrders =
+        if (orderListType.hasActive)
+          getActiveLimitOrders(maybePair)
+            .map(ao => ao.id -> OrderInfo.v4(ao, activeStatus(ao)))
+            .toSeq
+            .sorted
+        else Seq.empty
 
-      log.trace(s"Collected ${matchingActiveOrders.length} active orders")
-      val orders = if (onlyActive) matchingActiveOrders else matchingActiveOrders ++ orderDB.getFinalizedOrders(owner, maybePair)
-      sender ! Reply.OrdersStatuses(orders)
+      val matchingClosedOrders = if (orderListType.hasClosed) orderDB.getFinalizedOrders(owner, maybePair) else Seq.empty
+      sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
     case event: Event.StoreFailed =>
       log.trace(s"Got $event")
@@ -495,10 +497,10 @@ object AddressActor {
 
   sealed trait Query extends Message
   object Query {
-    case class GetOrderStatus(orderId: ByteStr)                                     extends Query
-    case class GetOrdersStatuses(assetPair: Option[AssetPair], onlyActive: Boolean) extends Query
-    case object GetReservedBalance                                                  extends Query
-    case class GetTradableBalance(forAssets: Set[Asset])                            extends Query
+    case class GetOrderStatus(orderId: ByteStr)                                              extends Query
+    case class GetOrdersStatuses(assetPair: Option[AssetPair], orderListType: OrderListType) extends Query
+    case object GetReservedBalance                                                           extends Query
+    case class GetTradableBalance(forAssets: Set[Asset])                                     extends Query
   }
 
   sealed trait Reply
@@ -550,6 +552,14 @@ object AddressActor {
   private case class PendingCommand(command: OneOrderCommand, client: ActorRef)
 
   private case class InsufficientBalanceOrder(order: Order, insufficientAmount: Long, assetId: Asset)
+
+  sealed abstract class OrderListType(val hasActive: Boolean, val hasClosed: Boolean) extends Product with Serializable
+  object OrderListType {
+    case object All        extends OrderListType(true, true)
+    case object Empty      extends OrderListType(false, false)
+    case object ActiveOnly extends OrderListType(true, false)
+    case object ClosedOnly extends OrderListType(false, true)
+  }
 
   final case class Settings(wsMessagesInterval: FiniteDuration, batchCancelTimeout: FiniteDuration, maxActiveOrders: Int)
 

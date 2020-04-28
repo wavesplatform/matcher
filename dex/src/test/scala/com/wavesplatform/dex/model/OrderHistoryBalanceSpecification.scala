@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
+import com.wavesplatform.dex.AddressActor.OrderListType
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -902,16 +903,16 @@ private object OrderHistoryBalanceSpecification {
     Await.result((ref ? msg).mapTo[A], 5.seconds)
 
   private implicit class AddressActorExt(val ref: ActorRef) extends AnyVal {
-    def orderIds(assetPair: Option[AssetPair], activeOnly: Boolean): Vector[Order.Id] =
-      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, activeOnly)).xs.map(_._1).toVector
+    def orderIds(assetPair: Option[AssetPair], orderListType: OrderListType): Vector[Order.Id] =
+      askAddressActor[AddressActor.Reply.OrdersStatuses](ref, AddressActor.Query.GetOrdersStatuses(assetPair, orderListType)).xs.map(_._1).toVector
 
-    def activeOrderIds: Vector[Order.Id] = orderIds(None, true)
+    def activeOrderIds: Vector[Order.Id] = orderIds(None, OrderListType.ActiveOnly)
 
-    def allOrderIds: Vector[Order.Id] = orderIds(None, false)
+    def allOrderIds: Vector[Order.Id] = orderIds(None, OrderListType.All)
 
-    def activeOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), true)
+    def activeOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), OrderListType.ActiveOnly)
 
-    def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), false)
+    def allOrderIdsByPair(pair: AssetPair): Vector[Order.Id] = orderIds(Some(pair), OrderListType.All)
 
     def openVolume(asset: Asset): Long =
       askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.getOrElse(asset, 0L)

@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.{BalanceChanges, SpendableBalanceChanges}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -48,7 +48,10 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   private val shuttingDown      = new AtomicBoolean(false)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
 
+  // TODO remove after release 2.1.2
   private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges](monixScheduler)
+  // TODO rename to spendableBalanceChangesSubject after release 2.1.2
+  private val realTimeSpendableBalanceChangesSubject = ConcurrentSubject.publish[BalanceChanges](monixScheduler)
 
   private def toVanilla(record: BalanceChangesResponse.Record): (Address, Asset, Long) = {
     (record.address.toVanillaAddress, record.asset.toVanillaAsset, record.balance)
@@ -65,10 +68,18 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
       .mapValues { _.map { case (_, asset, balance) => asset -> balance }.toMap.withDefaultValue(0) }
   }
 
+  // TODO remove after release 2.1.2
   private val balanceChangesObserver = new BalanceChangesObserver
+  // TODO rename to balanceChangesObserver after release 2.1.2
+  private val realTimeBalanceChangesObserver = new RealTimeBalanceChangesObserver
 
+  // TODO remove after release 2.1.2
   /** Performs new gRPC call for receiving of the spendable balance changes stream */
   private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
+
+  // TODO rename to requestBalanceChanges after release 2.1.2
+  /** Performs new gRPC call for receiving of the spendable balance changes real-time stream */
+  private def requestRealTimeBalanceChanges(): Unit = blockchainService.getRealTimeBalanceChanges(Empty(), realTimeBalanceChangesObserver)
 
   private def parse(input: RunScriptResponse): RunScriptResult = input.result match {
     case Result.WrongInput(message)   => throw new IllegalArgumentException(message)
@@ -79,16 +90,17 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     case _: Result.Denied             => RunScriptResult.Denied
   }
 
+  // TODO remove after release 2.1.2
   /** Returns stream of the balance changes as a sequence of batches */
   override lazy val spendableBalanceChanges: Observable[SpendableBalanceChanges] = {
     requestBalanceChanges()
     spendableBalanceChangesSubject
   }
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
-    blockchainService
-      .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
-      .map(_.balance)
+  // TODO rename to spendableBalanceChanges after release 2.1.2
+  override lazy val realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = {
+    requestRealTimeBalanceChanges()
+    realTimeSpendableBalanceChangesSubject
   }
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = handlingErrors {
@@ -162,6 +174,7 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     }
   }
 
+  // TODO remove after release 2.1.2
   private final class BalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesResponse] with AutoCloseable {
     private val isConnectionEstablished: AtomicBoolean         = new AtomicBoolean(true)
     private var requestStream: ClientCallStreamObserver[Empty] = _
@@ -182,6 +195,36 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
       if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", e)
       channel.resetConnectBackoff()
       requestBalanceChanges()
+    }
+
+    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
+
+    override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = this.requestStream = requestStream
+  }
+
+  // TODO rename to BalanceChangesObserver after release 2.1.2
+  private final class RealTimeBalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesFlattenResponse] with AutoCloseable {
+
+    private val isConnectionEstablished: AtomicBoolean         = new AtomicBoolean(true)
+    private var requestStream: ClientCallStreamObserver[Empty] = _
+
+    override def onCompleted(): Unit = log.info("Balance changes stream completed!")
+
+    override def onNext(value: BalanceChangesFlattenResponse): Unit = {
+      if (isConnectionEstablished.compareAndSet(false, true)) {
+        blockchainService.getNodeAddress { Empty() } foreach { response =>
+          log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
+        }
+      }
+
+      val vanillaBalanceChanges = BalanceChanges(value.address.toVanillaAddress, value.asset.toVanillaAsset, value.balance)
+      realTimeSpendableBalanceChangesSubject.onNext(vanillaBalanceChanges)
+    }
+
+    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
+      if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", e)
+      channel.resetConnectBackoff()
+      requestRealTimeBalanceChanges()
     }
 
     override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))

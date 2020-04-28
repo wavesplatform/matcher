@@ -27,7 +27,7 @@ import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
 import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -313,11 +313,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private def sendBalanceChanges(bufferSize: Int)(recipient: ActorRef): Unit = {
 
-    import WavesBlockchainClient.{combineBalanceChanges, emptyBalanceChanges}
+    def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
+      case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
+    }
 
-    wavesBlockchainAsyncClient.spendableBalanceChanges
+    wavesBlockchainAsyncClient.realTimeBalanceChanges
       .bufferIntrospective(bufferSize)
-      .map(_ reduceLeftOption combineBalanceChanges getOrElse emptyBalanceChanges)
+      .map(aggregateChangesByAddress)
       .mapEval { xs =>
         Task
           .traverse { xs.valuesIterator.flatMap(_.keysIterator).toList }(asset => Task fromFuture getDecimalsFromCache(asset).value)

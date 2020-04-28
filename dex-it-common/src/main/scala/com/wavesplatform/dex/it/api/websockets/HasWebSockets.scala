@@ -91,9 +91,9 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Ma
 
     eventually {
       if (squash) {
-        //        c.getBalancesChanges.size should be <= expBs.size // TODO Return after DEX-717
+        c.getBalancesChanges.size should be <= expBs.size
         squashBalances(c.getBalancesChanges) should matchTo { squashBalances(expBs) }
-        //        c.getOrderChanges.size should be <= expOs.size // TODO Return after DEX-717
+        c.getOrderChanges.size should be <= expOs.size
         squashOrders(c.getOrderChanges) should matchTo { squashOrders(expOs) }
       } else {
         c.getBalancesChanges should matchTo(expBs)

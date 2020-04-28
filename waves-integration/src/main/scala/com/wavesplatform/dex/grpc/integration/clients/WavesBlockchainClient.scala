@@ -8,28 +8,24 @@ import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.{BalanceChanges, SpendableBalanceChanges}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import monix.reactive.Observable
 
 object WavesBlockchainClient {
 
+  final case class BalanceChanges(address: Address, asset: Asset, balance: Long)
+
   type SpendableBalance        = Map[Asset, Long]
   type SpendableBalanceChanges = Map[Address, SpendableBalance]
-
-  val emptyBalanceChanges: SpendableBalanceChanges = Map.empty
-
-  def combineBalanceChanges(oldChanges: SpendableBalanceChanges, newChanges: SpendableBalanceChanges): SpendableBalanceChanges = {
-    if (oldChanges.size >= newChanges.size)
-      oldChanges.foldLeft(newChanges) { case (newBalances, (a, oldB)) => newBalances.updated(a, oldB ++ newBalances.getOrElse(a, Map.empty)) } else
-      newChanges.foldLeft(oldChanges) { case (oldBalances, (a, newB)) => oldBalances.updated(a, oldBalances.getOrElse(a, Map.empty) ++ newB) }
-  }
 }
 
 trait WavesBlockchainClient[F[_]] {
 
+  // TODO rename to spendableBalanceChanges after release 2.1.2
+  def realTimeBalanceChanges: Observable[BalanceChanges]
+  // TODO remove after release 2.1.2
   def spendableBalanceChanges: Observable[SpendableBalanceChanges]
-  def spendableBalance(address: Address, asset: Asset): F[Long]
   def spendableBalances(address: Address, assets: Set[Asset]): F[Map[Asset, Long]]
   def allAssetsSpendableBalance(address: Address): F[Map[Asset, Long]]
 

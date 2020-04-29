@@ -165,12 +165,17 @@ class AddressActor(owner: Address,
       val matchingClosedOrders = if (orderListType.hasClosed) orderDB.getFinalizedOrders(owner, maybePair) else Seq.empty
       sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
-    case event: Event.StoreFailed =>
-      log.trace(s"Got $event")
-      pendingCommands.remove(event.orderId).foreach { _.client ! CanNotPersist(event.reason) }
-      activeOrders.remove(event.orderId).foreach { ao =>
-        openVolume = openVolume |-| ao.reservableBalance
-        if (addressWsMutableState.hasActiveConnections) addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
+    case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
+      log.trace(s"Got $storeFailed")
+      pendingCommands.remove(orderId).foreach { _.client ! CanNotPersist(reason) }
+      queueEvent match {
+        case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
+          activeOrders.remove(orderId).foreach { ao =>
+            openVolume = openVolume |-| ao.reservableBalance
+            if (addressWsMutableState.hasActiveConnections)
+              addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
+          }
+        case _ =>
       }
 
     case event: ValidationEvent =>
@@ -455,7 +460,7 @@ class AddressActor(owner: Address,
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
-        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
+        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, event)
         case Success(None)        => log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
@@ -543,7 +548,7 @@ object AddressActor {
     case class ValidationPassed(acceptedOrder: AcceptedOrder) extends ValidationEvent {
       override def orderId: Order.Id = acceptedOrder.id
     }
-    case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
+    case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
   }
 
   sealed trait WsCommand extends Message

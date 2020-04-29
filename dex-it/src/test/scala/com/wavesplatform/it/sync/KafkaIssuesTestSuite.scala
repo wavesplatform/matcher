@@ -86,7 +86,7 @@ class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
     placeAndAwaitAtDex(sellOrder)
 
     dex1.api.currentOffset shouldBe 0
-    dex1.api.reservedBalance(alice) should matchTo { Map[Asset, Long](Waves -> 10.003.waves) }
+    dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac) { Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)) } {
       WsOrder.fromDomain(LimitOrder(sellOrder), OrderStatus.Accepted)
@@ -94,7 +94,9 @@ class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
 
     disconnectKafkaFromNetwork()
 
-    dex1.api.tryPlace(bigSellOrder)
+    dex1.api.tryCancel(alice, sellOrder) shouldBe 'left
+    dex1.api.tryPlace(bigSellOrder) shouldBe 'left
+
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac, squash = false)(
@@ -102,12 +104,25 @@ class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
       Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)),
     )()
 
+    val oh = dex1.api.orderHistory(alice, Some(true))
+    oh should have size 1
+    oh.head.id shouldBe sellOrder.id()
+
     connectKafkaToNetwork()
 
-    placeAndAwaitAtDex(bigSellOrder)
-    dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 40.006.waves))
+    dex1.api.tryCancel(alice, sellOrder) shouldBe 'right
+    dex1.api.orderHistory(alice, Some(true)) should have size 0
+    dex1.api.reservedBalance(alice) shouldBe empty
 
-    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance - 40.006, 40.006)) } {
+    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance, 0)) } {
+      WsOrder(id = sellOrder.id(), status = OrderStatus.Cancelled.name)
+    }
+
+    dex1.api.tryPlace(bigSellOrder) shouldBe 'right
+    dex1.api.orderHistory(alice, Some(true)) should have size 1
+    dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
+
+    assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003)) } {
       WsOrder.fromDomain(LimitOrder(bigSellOrder), OrderStatus.Accepted)
     }
 

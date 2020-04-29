@@ -5,14 +5,15 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import akka.Done
-import akka.actor.{ActorRef, Status, typed}
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive0, Directive1, Route, StandardRoute}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.typed.scaladsl.ActorSource
+import akka.stream.typed.scaladsl.{ActorSource, _}
 import akka.stream.{Materializer, OverflowStrategy}
 import cats.syntax.either._
 import cats.syntax.option._
@@ -20,9 +21,8 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AddressPM, AssetPairPM}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
-import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor
-import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
+import com.wavesplatform.dex.api.websockets.actors.WebSocketHandlerActor
+import com.wavesplatform.dex.api.websockets.{WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -94,9 +94,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .watchTermination()(handleTermination)
   }
 
-  private def mkPongFailure(msg: String): Future[PingOrPong]            = Future.failed[PingOrPong] { new IllegalArgumentException(msg) }
-  private lazy val binaryMessageUnsupportedFailure: Future[PingOrPong]  = mkPongFailure("Binary messages are not supported")
-  private def unexpectedMessageFailure(msg: String): Future[PingOrPong] = mkPongFailure(s"Got unexpected message instead of pong: $msg")
+  private def mkPongFailure(msg: String): Future[Nothing]            = Future.failed { new IllegalArgumentException(msg) }
+  private lazy val binaryMessageUnsupportedFailure: Future[Nothing]  = mkPongFailure("Binary messages are not supported")
+  private def unexpectedMessageFailure(msg: String): Future[Nothing] = mkPongFailure(s"Got unexpected message instead of pong: $msg")
 
   private def createStreamFor(source: Source[TextMessage.Strict, typed.ActorRef[WsMessage]], expiration: Option[Long] = None): Route = {
 
@@ -107,22 +107,81 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     }
 
     val (sourceActor, matSource) = source.preMaterialize()
-    val systemMessagesHandler    = mat.system.actorOf(SystemMessagesHandlerActor.props(systemMessagesSettings, connectionLifetime, sourceActor))
-    val sinkActor                = Sink.actorRef(ref = systemMessagesHandler, onCompleteMessage = (), onFailureMessage = _ => Status.Failure(_))
+    val systemMessagesHandler = mat.system.spawn(
+      behavior = WebSocketHandlerActor(webSocketHandler, connectionLifetime, sourceActor),
+      name = UUID.randomUUID().toString
+    )
 
-    val sink =
-      Flow[Message]
-        .mapAsync[PingOrPong](1) {
-          case tm: TextMessage =>
-            for {
-              strictText <- tm.toStrict(systemMessagesSettings.pingInterval / 5).map(_.getStrictText)
-              pong       <- Json.parse(strictText).asOpt[PingOrPong].fold { unexpectedMessageFailure(strictText) }(Future.successful)
-            } yield pong
-          case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure
-        }
-        .to(sinkActor)
+    val sinkActor = ActorSink.actorRef(
+      ref = systemMessagesHandler,
+      onCompleteMessage = WebSocketHandlerActor.Command.Stop,
+      onFailureMessage = e => {
+        log.error(s"Got error", e)
+        WebSocketHandlerActor.Command.ProcessClientError(e)
+      }
+    )
+
+    val sink = Flow[Message]
+      .mapAsync[WebSocketHandlerActor.Command.ProcessClientMessage](1) {
+        case tm: TextMessage =>
+          for {
+            strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
+            pong <- Json.parse(strictText).asOpt[WsPingOrPong] match {
+              case None    => unexpectedMessageFailure(strictText)
+              case Some(x) => Future.successful(WebSocketHandlerActor.Command.ProcessClientMessage(x))
+            }
+          } yield pong
+        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure
+      }
+      .to(sinkActor)
 
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(sink, matSource) }
+  }
+
+  private def mkStreamFor: Route = {
+
+    import webSocketSettings._
+
+    val client = ActorSource
+      .actorRef[WsMessage](
+        { case WsMessage.Complete => },
+        PartialFunction.empty,
+        10,
+        OverflowStrategy.fail
+      )
+      .map(_.toStrictTextMessage)
+      .mapMaterializedValue { sourceActor =>
+        sourceActor
+      }
+      .watchTermination()(handleTermination)
+
+    val (connectionSource, matClient) = client.preMaterialize()
+    val webSocketHandlerRef = mat.system.spawn(
+      behavior = WebSocketHandlerActor(webSocketHandler, maxConnectionLifetime, connectionSource),
+      name = s"ws-${UUID.randomUUID()}"
+    )
+
+    val server = ActorSink.actorRef(
+      ref = webSocketHandlerRef,
+      onCompleteMessage = WebSocketHandlerActor.Command.Stop,
+      onFailureMessage = WebSocketHandlerActor.Command.ProcessClientError
+    )
+
+    val serverSink = Flow[Message]
+      .mapAsync[WebSocketHandlerActor.Command.ProcessClientMessage](1) {
+        case tm: TextMessage =>
+          for {
+            strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
+            pong <- Json.parse(strictText).asOpt[WsPingOrPong] match {
+              case None    => unexpectedMessageFailure(strictText)
+              case Some(x) => Future.successful(WebSocketHandlerActor.Command.ProcessClientMessage(x))
+            }
+          } yield pong
+        case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure
+      }
+      .to(server)
+
+    handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, matClient) }
   }
 
   private def respondWithError(me: MatcherError, sc: StatusCode = StatusCodes.BadRequest): StandardRoute = complete(me toWsHttpResponse sc)
@@ -171,8 +230,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     }
   }
 
+  private val commonWsRoute: Route = (pathEnd & get) {
+    mkStreamFor
+  }
+
   override def route: Route = pathPrefix("ws") {
-    accountUpdates ~ orderBookRoute
+    commonWsRoute ~ accountUpdates ~ orderBookRoute
   }
 
   private def withAssetPair(p: AssetPair): Directive1[AssetPair] = {

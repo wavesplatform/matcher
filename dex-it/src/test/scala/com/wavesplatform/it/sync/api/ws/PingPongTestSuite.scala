@@ -17,7 +17,7 @@ class PingPongTestSuite extends MatcherSuiteBase with HasWebSockets {
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex.web-sockets {
         |  max-connection-lifetime = $maxConnectionLifetime
-        |  system-messages-settings {
+        |  web-socket-handler {
         |    ping-interval = $pingInterval
         |    pong-timeout = $pongTimeout
         |  }

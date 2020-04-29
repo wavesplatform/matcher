@@ -10,8 +10,7 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest, WebS
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.http.`X-Api-Key`
-import com.wavesplatform.dex.api.websockets.WsMessage
-import com.wavesplatform.dex.api.websockets.actors.SystemMessagesHandlerActor.PingOrPong
+import com.wavesplatform.dex.api.websockets.{WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.websockets.WsConnection.PongHandler
 import play.api.libs.json.Json
@@ -41,7 +40,7 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
     val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
 
     Source
-      .actorRef[PingOrPong](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
+      .actorRef[WsPingOrPong](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { source =>
         pongHandler.tell(PongHandler.AssignSourceRef, source)
@@ -49,15 +48,15 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
       }
   }
 
-  private val messagesBuffer: ConcurrentLinkedQueue[Output]  = new ConcurrentLinkedQueue[Output]()
-  private val pingsBuffer: ConcurrentLinkedQueue[PingOrPong] = new ConcurrentLinkedQueue[PingOrPong]()
+  private val messagesBuffer: ConcurrentLinkedQueue[Output]    = new ConcurrentLinkedQueue[Output]()
+  private val pingsBuffer: ConcurrentLinkedQueue[WsPingOrPong] = new ConcurrentLinkedQueue[WsPingOrPong]()
 
   private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
     val rawMsg = x.asTextMessage.getStrictText
-    Try { parseOutput(x) } orElse Try { Json.parse(rawMsg).as[PingOrPong] } match {
-      case Success(p: PingOrPong)  => log.debug(s"Got ping: $rawMsg${if (keepAlive) ", responding" else ""}"); pingsBuffer.add(p); pongHandler ! p
-      case Success(output: Output) => if (trackOutput) messagesBuffer.add(output); log.info(s"Got message: $rawMsg")
-      case Failure(e)              => log.error(s"Can't parse message: ${x.asTextMessage.getStrictText}", e)
+    Try { parseOutput(x) } orElse Try { Json.parse(rawMsg).as[WsPingOrPong] } match {
+      case Success(p: WsPingOrPong) => log.debug(s"Got ping: $rawMsg${if (keepAlive) ", responding" else ""}"); pingsBuffer.add(p); pongHandler ! p
+      case Success(output: Output)  => if (trackOutput) messagesBuffer.add(output); log.info(s"Got message: $rawMsg")
+      case Failure(e)               => log.error(s"Can't parse message: ${x.asTextMessage.getStrictText}", e)
     }
   }
 
@@ -82,10 +81,10 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
   def getMessagesBuffer: Seq[Output] = messagesBuffer.iterator().asScala.toSeq
   def clearMessagesBuffer(): Unit    = messagesBuffer.clear()
 
-  def getPingsBuffer: Seq[PingOrPong] = pingsBuffer.iterator().asScala.toSeq
-  def clearPingsBuffer(): Unit        = pingsBuffer.clear()
+  def getPingsBuffer: Seq[WsPingOrPong] = pingsBuffer.iterator().asScala.toSeq
+  def clearPingsBuffer(): Unit          = pingsBuffer.clear()
 
-  def sendPong(pong: PingOrPong): Unit = pongHandler ! PongHandler.ManualPong(pong)
+  def sendPong(pong: WsPingOrPong): Unit = pongHandler ! PongHandler.ManualPong(pong)
 
   def close(): Unit     = if (!isClosed) pongHandler ! PongHandler.CloseConnection
   def isClosed: Boolean = closed.isCompleted
@@ -103,7 +102,7 @@ object WsConnection {
 
     private def awaitPings(sourceRef: ActorRef): Receive = {
 
-      case p: PingOrPong => if (keepAlive) sourceRef ! p
+      case p: WsPingOrPong => if (keepAlive) sourceRef ! p
 
       case CloseConnection =>
         log.debug("Closing connection")
@@ -126,6 +125,6 @@ object WsConnection {
 
     final case object AssignSourceRef
     final case object CloseConnection
-    final case class ManualPong(pong: PingOrPong)
+    final case class ManualPong(pong: WsPingOrPong)
   }
 }

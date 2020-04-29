@@ -160,6 +160,10 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    }
          |    web-sockets {
          |      messages-interval = 100ms
+         |      web-socket-handler {
+         |        ping-interval = 11s
+         |        pong-timeout = 31s
+         |      }
          |    }
          |    address-actor {
          |      max-active-orders = 400

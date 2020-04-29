@@ -156,12 +156,18 @@ class AddressActor(owner: Address,
       val orders = if (onlyActive) matchingActiveOrders else matchingActiveOrders ++ orderDB.getFinalizedOrders(owner, maybePair)
       sender ! Reply.OrdersStatuses(orders)
 
-    case event: Event.StoreFailed =>
-      log.trace(s"Got $event")
-      pendingCommands.remove(event.orderId).foreach { item =>
-        item.client ! CanNotPersist(event.reason)
+    case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
+      log.trace(s"Got $storeFailed")
+      pendingCommands.remove(orderId).foreach { item =>
+        item.client ! CanNotPersist(reason)
       }
-      openVolume = openVolume |-| activeOrders(event.orderId).reservableBalance
+      queueEvent match {
+        case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
+          activeOrders.remove(orderId).foreach { ao =>
+            openVolume = openVolume |-| ao.reservableBalance
+          }
+        case _ =>
+      }
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")
@@ -389,7 +395,7 @@ class AddressActor(owner: Address,
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
-        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error)
+        case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, event)
         case Success(None)        => log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
@@ -477,7 +483,7 @@ object AddressActor {
     case class ValidationPassed(acceptedOrder: AcceptedOrder) extends ValidationEvent {
       override def orderId: Order.Id = acceptedOrder.order.id()
     }
-    case class StoreFailed(orderId: Order.Id, reason: MatcherError) extends Event
+    case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
   }
 
   private case class CancelExpiredOrder(orderId: ByteStr)

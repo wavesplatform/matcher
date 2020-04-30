@@ -478,6 +478,14 @@ case object WsConnectionPongTimeout extends MatcherError(webSocket, connectivity
 
 case object WsConnectionMaxLifetimeExceeded extends MatcherError(webSocket, connectivity, limitReached, e"WebSocket has reached max allowed lifetime")
 
+case object CanNotParseJwt extends MatcherError(token, commonEntity, commonClass, e"Can not parse the JWT")
+
+case object CanNotParseJwtPayload extends MatcherError(token, payload, commonClass, e"Can not parse the JWT payload")
+
+case object InvalidTokenSignature extends MatcherError(token, signature, commonClass, e"The token signature is invalid")
+
+case class SubscriptionTokenExpired(tokenExpiration: Long, now: Long) extends MatcherError(token, expiration, commonClass, e"The subscription token expired")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -511,6 +519,8 @@ object Entity {
   object auth         extends Entity(102)
   object params       extends Entity(103)
   object webSocket    extends Entity(104)
+  object token        extends Entity(105)
+  object payload extends Entity(106)
 }
 
 sealed abstract class Class(val code: Int)

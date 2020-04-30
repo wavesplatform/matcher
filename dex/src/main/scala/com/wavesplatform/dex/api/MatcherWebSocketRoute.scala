@@ -22,7 +22,7 @@ import com.wavesplatform.dex.api.MatcherWebSocketRoute._
 import com.wavesplatform.dex.api.PathMatchers.{AddressPM, AssetPairPM}
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, `X-Api-Key`}
 import com.wavesplatform.dex.api.websockets.actors.WebSocketHandlerActor
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -108,7 +108,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
     val (sourceActor, matSource) = source.preMaterialize()
     val systemMessagesHandler = mat.system.spawn(
-      behavior = WebSocketHandlerActor(webSocketHandler, connectionLifetime, sourceActor),
+      behavior = WebSocketHandlerActor(webSocketHandler, connectionLifetime, sourceActor, matcher),
       name = UUID.randomUUID().toString
     )
 
@@ -157,7 +157,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
     val (connectionSource, matClient) = client.preMaterialize()
     val webSocketHandlerRef = mat.system.spawn(
-      behavior = WebSocketHandlerActor(webSocketHandler, maxConnectionLifetime, connectionSource),
+      behavior = WebSocketHandlerActor(webSocketHandler, maxConnectionLifetime, connectionSource, matcher),
       name = s"ws-${UUID.randomUUID()}"
     )
 
@@ -172,9 +172,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         case tm: TextMessage =>
           for {
             strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
-            pong <- Json.parse(strictText).asOpt[WsPingOrPong] match {
-              case None    => unexpectedMessageFailure(strictText)
+            pong <- Json.parse(strictText).asOpt(WsClientMessage.wsClientMessageReads) match {
               case Some(x) => Future.successful(WebSocketHandlerActor.Command.ProcessClientMessage(x))
+              case None    => unexpectedMessageFailure(strictText)
             }
           } yield pong
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure

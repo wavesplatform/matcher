@@ -9,7 +9,7 @@ import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{Format, JsObject, Json}
 
 import scala.annotation.meta.field
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 @ApiModel
 case class AssetPair(@(ApiModelProperty @field)(
@@ -53,6 +53,15 @@ object AssetPair {
     case other           => ByteStr.decodeBase58(other).map(IssuedAsset)
   }
 
+  def extractAssetPair(s: String): Try[AssetPair] = s.split('-') match {
+    case Array(amtAssetStr, prcAssetStr) =>
+      AssetPair.createAssetPair(amtAssetStr, prcAssetStr).recoverWith {
+        case e => Failure(new Exception(s"$s (${e.getMessage})", e))
+      }
+
+    case xs => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.length})"))
+  }
+
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
     for {
       a1 <- extractAsset(amountAsset)
@@ -69,13 +78,8 @@ object AssetPair {
   }
 
   implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source    = cfg.getString(path)
-    val sourceArr = source.split("-")
-    val res = sourceArr match {
-      case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-      case _                               => throw new Exception(s"$source (incorrect assets count, expected 2 but got ${sourceArr.size})")
-    }
-    res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
+    val source = cfg.getString(path)
+    extractAssetPair(source).fold(e => throw e, identity)
   }
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]

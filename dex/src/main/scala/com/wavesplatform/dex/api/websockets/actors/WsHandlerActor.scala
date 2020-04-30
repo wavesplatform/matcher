@@ -13,7 +13,7 @@ import shapeless.{Inl, Inr}
 
 import scala.concurrent.duration._
 
-object WebSocketHandlerActor {
+object WsHandlerActor {
 
   sealed trait Message extends Product with Serializable
 
@@ -23,8 +23,8 @@ object WebSocketHandlerActor {
     case class ProcessClientError(error: Throwable)             extends Command
     case object Stop                                            extends Command
 
-    private[WebSocketHandlerActor] case object SendPing                             extends Command
-    private[WebSocketHandlerActor] case class CloseConnection(reason: MatcherError) extends Command
+    private[WsHandlerActor] case object SendPing                             extends Command
+    private[WsHandlerActor] case class CloseConnection(reason: MatcherError) extends Command
   }
 
   final case class Settings(pingInterval: FiniteDuration, pongTimeout: FiniteDuration)

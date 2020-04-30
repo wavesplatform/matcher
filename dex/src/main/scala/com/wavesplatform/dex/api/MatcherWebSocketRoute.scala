@@ -13,7 +13,7 @@ import akka.stream.typed.scaladsl.{ActorSource, _}
 import akka.stream.{Materializer, OverflowStrategy}
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.websockets.actors.WebSocketHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -66,25 +66,25 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
     val (clientRef, clientSource) = client.preMaterialize()
     val webSocketHandlerRef = mat.system.spawn(
-      behavior = WebSocketHandlerActor(webSocketHandler, maxConnectionLifetime, clientRef, matcher, addressDirectory),
+      behavior = WsHandlerActor(webSocketHandler, maxConnectionLifetime, clientRef, matcher, addressDirectory),
       name = s"handler-$clientId"
     )
 
     val server = ActorSink
       .actorRef(
         ref = webSocketHandlerRef,
-        onCompleteMessage = WebSocketHandlerActor.Command.Stop,
-        onFailureMessage = WebSocketHandlerActor.Command.ProcessClientError
+        onCompleteMessage = WsHandlerActor.Command.Stop,
+        onFailureMessage = WsHandlerActor.Command.ProcessClientError
       )
       .named(s"server-$clientId")
 
     val serverSink = Flow[Message]
-      .mapAsync[WebSocketHandlerActor.Command.ProcessClientMessage](1) {
+      .mapAsync[WsHandlerActor.Command.ProcessClientMessage](1) {
         case tm: TextMessage =>
           for {
             strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
             pong <- Json.parse(strictText).asOpt(WsClientMessage.wsClientMessageReads) match {
-              case Some(x) => Future.successful(WebSocketHandlerActor.Command.ProcessClientMessage(x))
+              case Some(x) => Future.successful(WsHandlerActor.Command.ProcessClientMessage(x))
               case None    => unexpectedMessageFailure(strictText)
             }
           } yield pong

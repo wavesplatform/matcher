@@ -85,6 +85,7 @@ object AggregatedOrderBookActor {
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               val ob = state.toOrderBookAggregatedSnapshot
               client ! WsOrderBook.from(
+                assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
                 asks = ob.asks,
@@ -103,7 +104,7 @@ object AggregatedOrderBookActor {
               default(state.copy(ws = state.ws.withoutSubscription(client)))
 
             case Command.SendWsUpdates =>
-              val updated = state.copy(ws = state.ws.flushed(amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
+              val updated = state.copy(ws = state.ws.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
           }

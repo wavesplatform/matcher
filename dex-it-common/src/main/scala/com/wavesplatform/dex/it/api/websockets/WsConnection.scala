@@ -22,7 +22,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
             |         URI = ws://$uri
             |  Keep alive = $keepAlive""".stripMargin)
 
-  private val wsHandlerRef = system.actorOf(WebSocketHandlerActor props keepAlive)
+  private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
 
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
@@ -32,7 +32,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { source =>
-        wsHandlerRef.tell(WebSocketHandlerActor.AssignSourceRef, source)
+        wsHandlerRef.tell(TestWsHandlerActor.AssignSourceRef, source)
         source
       }
   }
@@ -71,8 +71,8 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
   def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
   def clearMessages(): Unit           = messagesBuffer.clear()
 
-  def send(message: WsClientMessage): Unit = wsHandlerRef ! WebSocketHandlerActor.SendToServer(message)
+  def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
 
-  def close(): Unit     = if (!isClosed) wsHandlerRef ! WebSocketHandlerActor.CloseConnection
+  def close(): Unit     = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
   def isClosed: Boolean = closed.isCompleted
 }

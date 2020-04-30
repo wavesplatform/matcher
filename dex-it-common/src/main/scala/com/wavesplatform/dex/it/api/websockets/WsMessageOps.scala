@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
-import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder, WsOrderBook}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 
 trait WsMessageOps {
@@ -20,5 +20,23 @@ trait WsMessageOps {
                 acc.copy(status = oc.status, filledAmount = oc.filledAmount, filledFee = oc.filledFee, avgWeighedPrice = oc.avgWeighedPrice)
             }
         }
+  }
+
+  implicit class WsOrderBookChangesListOps(val self: List[WsOrderBook]) {
+    def squashed: Map[AssetPair, WsOrderBook] = self.foldLeft(Map.empty[AssetPair, WsOrderBook]) {
+      case (r, x) =>
+        val orig = r.getOrElse(x.assetPair, WsOrderBook.empty(x.assetPair))
+        r.updated(
+          x.assetPair,
+          WsOrderBook(
+            assetPair = x.assetPair,
+            asks = orig.asks ++ x.asks,
+            bids = orig.bids ++ x.bids,
+            lastTrade = orig.lastTrade.orElse(x.lastTrade),
+            updateId = x.updateId,
+            timestamp = x.timestamp
+          )
+        )
+    }
   }
 }

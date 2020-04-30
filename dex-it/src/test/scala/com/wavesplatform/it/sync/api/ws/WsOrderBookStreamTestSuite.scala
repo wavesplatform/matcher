@@ -10,13 +10,13 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.it.WebSocketsSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
+class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
   private val carol = mkKeyPair("carol")
 
@@ -28,18 +28,6 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
     broadcastAndAwait(mkTransfer(alice, carol, 100.waves, Waves), mkTransfer(bob, carol, 1.btc, btc))
     dex1.start()
     dex1.api.upsertRate(btc, 0.00011167)
-  }
-
-  // TODO
-  protected def squashOrderBooks(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
-    case (r, x) =>
-      WsOrderBook(
-        asks = r.asks ++ x.asks,
-        bids = r.bids ++ x.bids,
-        lastTrade = r.lastTrade.orElse(x.lastTrade),
-        updateId = x.updateId,
-        timestamp = xs.toList.last.timestamp
-      )
   }
 
   "MatcherWebSocketRoute" - {
@@ -57,13 +45,14 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
         wsc0.close()
 
         buffer0 should have size 1
-        squashOrderBooks(buffer0) should matchTo(
+        buffer0.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap.empty,
             bids = TreeMap.empty,
             lastTrade = None,
             updateId = 0,
-            timestamp = buffer0.last.timestamp,
+            timestamp = buffer0.last.timestamp
           )
         )
 
@@ -76,8 +65,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
         wsc1.close()
 
         buffer1 should have size 1
-        squashOrderBooks(buffer1) should matchTo(
+        buffer1.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap.empty,
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
@@ -95,8 +85,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
         wsc2.close()
 
         buffer2 should have size 1
-        squashOrderBooks(buffer2) should matchTo(
+        buffer2.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap(0.00012d    -> 1d),
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
@@ -114,8 +105,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
         wsc3.close()
 
         buffer3.size should (be >= 1 and be <= 2)
-        squashOrderBooks(buffer3) should matchTo(
+        buffer3.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap(0.00012d    -> 0.5d),
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = WsLastTrade(
@@ -141,8 +133,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
 
         buffer4.size should (be >= 1 and be <= 2)
         // TODO this test won't check ordering :(
-        squashOrderBooks(buffer4) should matchTo(
+        buffer4.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap(
               0.00012d -> 0.5d,
               0.00013d -> 0.6d,
@@ -175,8 +168,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
 
         val buffer1 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer1 should have size 1
-        squashOrderBooks(buffer1) should matchTo(
+        buffer1.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap.empty,
             bids = TreeMap(0.00012d -> 1d),
             lastTrade = None,
@@ -192,8 +186,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
 
         val buffer2 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer2.size should (be >= 1 and be <= 2)
-        squashOrderBooks(buffer2) should matchTo(
+        buffer2.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap(0.00012d -> 0.5d),
             bids = TreeMap(0.00012d -> 0d),
             lastTrade = WsLastTrade(
@@ -212,8 +207,9 @@ class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
 
         val buffer3 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer3.size shouldBe 1
-        squashOrderBooks(buffer3) should matchTo(
+        buffer3.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = wavesBtcPair,
             asks = TreeMap(0.00012d -> 0d),
             bids = TreeMap.empty,
             lastTrade = None,

@@ -11,13 +11,13 @@ import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.error._
-import com.wavesplatform.it.WebSocketsSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class WsConnectionTestSuite extends WebSocketsSuiteBase with TableDrivenPropertyChecks {
+class WsConnectionTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId" ]"""

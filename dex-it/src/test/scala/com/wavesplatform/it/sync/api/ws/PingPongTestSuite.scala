@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.WebSocketsSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
 
-class PingPongTestSuite extends WebSocketsSuiteBase {
+class PingPongTestSuite extends WsSuiteBase {
 
   private val maxConnectionLifetime = 6.seconds
   private val pingInterval          = 1.second

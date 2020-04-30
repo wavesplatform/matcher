@@ -11,11 +11,11 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
-import com.wavesplatform.it.WebSocketsSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.JavaConverters._
 
-class KafkaIssuesTestSuite extends WebSocketsSuiteBase {
+class KafkaIssuesTestSuite extends WsSuiteBase {
 
   private val kafkaContainerName = "kafka"
   private val kafkaIp            = getIp(12)

@@ -3,6 +3,7 @@ package com.wavesplatform.dex
 import akka.actor.typed.ActorRef
 import com.wavesplatform.dex.AddressWsMutableState.getNextUpdateId
 import com.wavesplatform.dex.api.websockets.{WsLastTrade, WsOrderBook}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts}
@@ -46,13 +47,15 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
     side = x.side
   )
 
-  def flushed(amountDecimals: Int,
+  def flushed(assetPair: AssetPair,
+              amountDecimals: Int,
               priceDecimals: Int,
               asks: TreeMap[Price, Amount],
               bids: TreeMap[Price, Amount],
               timestamp: Long): OrderBookWsState = copy(
     wsConnections = if (hasChanges) {
       val changes = WsOrderBook(
+        assetPair = assetPair,
         asks = denormalized(amountDecimals, priceDecimals, take(asks, changedAsks)),
         bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
         lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),

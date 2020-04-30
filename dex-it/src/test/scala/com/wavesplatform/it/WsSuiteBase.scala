@@ -5,7 +5,7 @@ import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
 
 import scala.reflect.ClassTag
 
-trait WebSocketsSuiteBase extends MatcherSuiteBase with HasWebSockets {
+trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
   final implicit class WsConnectionOps(val self: WsConnection) {
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {

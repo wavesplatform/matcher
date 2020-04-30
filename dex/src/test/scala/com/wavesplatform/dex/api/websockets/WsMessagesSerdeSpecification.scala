@@ -19,7 +19,7 @@ import play.api.libs.json.{Format, Json}
 
 import scala.collection.immutable.TreeMap
 
-class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
+class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
 
   private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
@@ -97,12 +97,13 @@ class WebSocketMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDri
     )
 
   private val wsOrderBookGen: Gen[WsOrderBook] = for {
+    assetPair <- assetPairGen
     asks      <- wsSide(askPricesGen)
     bids      <- wsSide(bidPricesGen)
     lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
     updateId  <- Gen.choose(0L, Long.MaxValue)
     ts        <- Gen.choose(0L, Long.MaxValue)
-  } yield WsOrderBook(asks, bids, lastTrade, updateId, ts)
+  } yield WsOrderBook(assetPair, asks, bids, lastTrade, updateId, ts)
 
   private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)

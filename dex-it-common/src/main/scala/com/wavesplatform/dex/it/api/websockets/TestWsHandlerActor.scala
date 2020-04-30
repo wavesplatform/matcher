@@ -5,12 +5,12 @@ import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 /**
- * Used as a proxy to the connection's source actor.
- * Main goal is to respond with pongs to matcher's pings to keep connection alive
- */
-class WebSocketHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging {
+  * Used as a proxy to the connection's source actor.
+  * Main goal is to respond with pongs to matcher's pings to keep connection alive
+  */
+class TestWsHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging {
 
-  import WebSocketHandlerActor._
+  import TestWsHandlerActor._
 
   private def awaitPings(sourceRef: ActorRef): Receive = {
 
@@ -31,9 +31,9 @@ class WebSocketHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging
   }
 }
 
-object WebSocketHandlerActor {
+object TestWsHandlerActor {
 
-  def props(keepAlive: Boolean): Props = Props(new WebSocketHandlerActor(keepAlive))
+  def props(keepAlive: Boolean): Props = Props(new TestWsHandlerActor(keepAlive))
 
   final case object AssignSourceRef
   final case object CloseConnection

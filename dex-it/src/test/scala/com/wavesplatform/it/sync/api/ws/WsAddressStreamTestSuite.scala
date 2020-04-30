@@ -8,9 +8,9 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
-import com.wavesplatform.it.WebSocketsSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 
-class WebSocketPrivateStreamTestSuite extends WebSocketsSuiteBase {
+class WsAddressStreamTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 

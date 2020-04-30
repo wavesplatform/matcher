@@ -74,13 +74,12 @@ trait MatcherSuiteBase
     val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
 
     balances.foreach {
-      case (balance, asset) => {
+      case (balance, asset) =>
         assert(
           wavesNode1.api.balance(alice, asset) >= balance,
           s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
         )
         broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
-      }
     }
     account
   }

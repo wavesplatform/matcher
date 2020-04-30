@@ -8,6 +8,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
+import com.wavesplatform.dex.{AddressActor, AddressDirectory}
 import shapeless.{Inl, Inr}
 
 import scala.concurrent.duration._
@@ -32,7 +33,8 @@ object WebSocketHandlerActor {
   def apply(settings: Settings,
             maxConnectionLifetime: FiniteDuration,
             clientRef: ActorRef[WsMessage],
-            matcherRef: classic.ActorRef): Behavior[Message] =
+            matcherRef: classic.ActorRef,
+            addressRef: classic.ActorRef): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       context.setLoggerName(s"WebSocketHandlerActor[c=${clientRef.path.name}]")
 
@@ -76,10 +78,24 @@ object WebSocketHandlerActor {
                 }
 
               case subscribe: WsOrderBookSubscribe =>
+                /*
+                private def withAssetPair(p: AssetPair): Directive1[AssetPair] = {
+    FutureDirectives.onSuccess { assetPairBuilder.validateAssetPair(p).value } flatMap {
+      case Right(_) => provide(p)
+      case Left(e)  => complete { e.toWsHttpResponse(StatusCodes.BadRequest) }
+    }
+  }
+
+  private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
+    case Some(x) => if (x.isRight) pass else complete(error.OrderBookBroken(p).toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case None    => complete(error.OrderBookStopped(p).toWsHttpResponse(StatusCodes.NotFound))
+  }
+                 */
                 matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(subscribe.key, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
                 Behaviors.same
 
               case subscribe: WsAddressSubscribe =>
+                addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
                 Behaviors.same
 
               case unsubscribe: WsUnsubscribe =>
@@ -87,6 +103,7 @@ object WebSocketHandlerActor {
                   case Inl(x) =>
                     matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(x, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
                   case Inr(Inl(x)) =>
+                    addressRef ! AddressDirectory.Envelope(x, AddressActor.WsCommand.RemoveWsSubscription(clientRef))
                   case Inr(Inr(_)) =>
                 }
                 Behaviors.same

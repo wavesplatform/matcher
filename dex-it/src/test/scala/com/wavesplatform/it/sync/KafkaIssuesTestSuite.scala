@@ -10,13 +10,12 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
-import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.WebSocketsSuiteBase
 
 import scala.collection.JavaConverters._
 
-class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
+class KafkaIssuesTestSuite extends WebSocketsSuiteBase {
 
   private val kafkaContainerName = "kafka"
   private val kafkaIp            = getIp(12)
@@ -76,7 +75,7 @@ class KafkaIssuesTestSuite extends MatcherSuiteBase with HasWebSockets {
     val initialWavesBalance: Double = denormalizeWavesAmount(wavesNode1.api.balance(alice, Waves)).toDouble
     val initialUsdBalance: Double   = denormalizeAmountAndFee(wavesNode1.api.balance(alice, usd), 2).toDouble
 
-    val wsac = mkWsAuthenticatedConnection(alice, dex1)
+    val wsac = mkWsAddressConnection(alice, dex1)
 
     assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance, 0), usd -> WsBalances(initialUsdBalance, 0)) }()
 

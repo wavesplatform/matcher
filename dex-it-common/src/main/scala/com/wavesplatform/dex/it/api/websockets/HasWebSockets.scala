@@ -5,26 +5,24 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsMessage, WsOrder, WsOrderBook, WsOrderBookSubscribe}
+import com.wavesplatform.dex.api.websockets.{WsAddressSubscribe, WsBalances, WsOrder, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.it.config.PredefinedAssets
-import com.wavesplatform.dex.it.docker.{DexContainer, apiKey}
+import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import mouse.any._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import play.api.libs.json.Json
 
 import scala.concurrent.duration._
-import scala.reflect.ClassTag
 
-trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
+trait HasWebSockets extends BeforeAndAfterAll with WsConnectionOps with WsMessageOps {
+  _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
 
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
@@ -32,77 +30,50 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Ma
 
   protected val authenticatedStreamSignaturePrefix = "au"
 
-  protected def getBaseBalancesStreamUri(dex: DexContainer): String   = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/"
   protected def getWsStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws"
 
-  protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection[_], lang.Boolean] =
-    ConcurrentHashMap.newKeySet[WsConnection[_]]()
+  protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection, lang.Boolean] =
+    ConcurrentHashMap.newKeySet[WsConnection]()
 
-  protected def addConnection(connection: WsConnection[_]): Unit = knownWsConnections.add(connection)
+  protected def addConnection(connection: WsConnection): Unit = knownWsConnections.add(connection)
 
-  protected def mkWsAuthenticatedConnection(client: KeyPair,
-                                            dex: DexContainer,
-                                            keepAlive: Boolean = true,
-                                            connectionLifetime: FiniteDuration = 1.hour): WsAuthenticatedConnection = {
+  protected def mkWsAddressConnection(client: KeyPair,
+                                      dex: DexContainer,
+                                      keepAlive: Boolean = true,
+                                      connectionLifetime: FiniteDuration = 1.hour): WsConnection = {
 
     val timestamp     = System.currentTimeMillis() + connectionLifetime.toMillis
     val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
-    val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage)
-    val wsUri         = s"${getBaseBalancesStreamUri(dex)}${client.publicKey.toAddress}?p=${client.publicKey}&t=$timestamp&s=$signature"
+    val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage) // TODO
 
-    new WsAuthenticatedConnection(wsUri, None, keepAlive) unsafeTap addConnection
+    val connection = mkWsConnection(dex, keepAlive)
+    connection.send(WsAddressSubscribe(client.toAddress, ""))
+    connection
   }
 
-  protected def mkWsAuthenticatedConnectionViaApiKey(client: KeyPair,
-                                                     dex: DexContainer,
-                                                     apiKey: String = apiKey,
-                                                     keepAlive: Boolean = true): WsAuthenticatedConnection = {
-    val wsUri = s"${getBaseBalancesStreamUri(dex)}${client.publicKey.toAddress}"
-    new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive) unsafeTap addConnection
-  }
-
-  protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer, depth: Int = 1): WsConnection[WsOrderBook] = {
-    val connection = mkWsConnection(getWsStreamUri(dex)) { msg =>
-      Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
-    }
+  protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer, depth: Int = 1): WsConnection = {
+    val connection = mkWsConnection(dex)
     connection.send(WsOrderBookSubscribe(assetPair, depth))
     connection
   }
 
-  protected def mkWsConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {
-    new WsConnection(uri, parseOutput, trackOutput = true) unsafeTap addConnection
-  }
+  protected def mkWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
+    new WsConnection(getWsStreamUri(dex), keepAlive) unsafeTap addConnection
 
-  protected def assertChanges(c: WsAuthenticatedConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
-
-    def squashBalances(bs: Seq[Map[Asset, WsBalances]]): Map[Asset, WsBalances] = bs.foldLeft(Map.empty[Asset, WsBalances])(_ ++ _)
-
-    def squashOrders(os: Seq[WsOrder]): Seq[WsOrder] = {
-      os.groupBy(_.id)
-        .mapValues { orderChanges =>
-          orderChanges
-            .foldLeft(orderChanges.head) {
-              case (acc, oc) =>
-                acc.copy(status = oc.status, filledAmount = oc.filledAmount, filledFee = oc.filledFee, avgWeighedPrice = oc.avgWeighedPrice)
-            }
-        }
-        .values
-        .toSeq
-    }
-
+  protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {
       if (squash) {
-        c.getBalancesChanges.size should be <= expBs.size
-        squashBalances(c.getBalancesChanges) should matchTo { squashBalances(expBs) }
-        c.getOrderChanges.size should be <= expOs.size
-        squashOrders(c.getOrderChanges) should matchTo { squashOrders(expOs) }
+        c.balanceChanges.size should be <= expBs.size
+        c.balanceChanges.squashed should matchTo { expBs.toList.squashed }
+        c.orderChanges.size should be <= expOs.size
+        c.orderChanges.squashed should matchTo { expOs.toList.squashed }
       } else {
-        c.getBalancesChanges should matchTo(expBs)
-        c.getOrderChanges should matchTo(expOs)
+        c.balanceChanges should matchTo(expBs)
+        c.orderChanges should matchTo(expOs)
       }
     }
 
-    c.clearMessagesBuffer()
+    c.clearMessages()
   }
 
   protected def cleanupWebSockets(): Unit = {

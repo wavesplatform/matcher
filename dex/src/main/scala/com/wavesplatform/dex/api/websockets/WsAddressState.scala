@@ -7,12 +7,14 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], updateId: Long, timestamp: Long = System.currentTimeMillis)
-    extends WsMessage {
+    extends WsServerMessage {
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsAddressState.format.writes(this).toString)
-  override val tpe: String                             = "au"
+  override val tpe: String                             = WsAddressState.tpe
 }
 
 object WsAddressState {
+
+  val tpe = "au"
 
   def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some

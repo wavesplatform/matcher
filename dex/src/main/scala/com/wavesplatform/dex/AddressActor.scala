@@ -244,10 +244,15 @@ class AddressActor(owner: Address,
     case Status.Failure(e) => log.error(s"Got $e", e)
 
     case WsCommand.AddWsSubscription(client) =>
-      log.trace(s"[${client.path.name}] WebSocket connected")
+      log.trace(s"[c=${client.path.name}] Added WebSocket subscription")
       spendableBalancesActor ! SpendableBalancesActor.Query.GetSnapshot(owner)
       addressWsMutableState = addressWsMutableState.addPendingSubscription(client)
       context.watch(client)
+
+    case WsCommand.RemoveWsSubscription(client) =>
+      log.trace(s"[c=${client.path.name}] Removed WebSocket subscription")
+      addressWsMutableState = addressWsMutableState.removeSubscription(client)
+      context.unwatch(client)
 
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       addressWsMutableState.sendSnapshot(
@@ -553,8 +558,9 @@ object AddressActor {
 
   sealed trait WsCommand extends Message
   object WsCommand {
-    case class AddWsSubscription(client: typed.ActorRef[WsAddressState]) extends WsCommand
-    private[AddressActor] case object PrepareDiffForWsSubscribers        extends WsCommand
+    case class AddWsSubscription(client: typed.ActorRef[WsAddressState])    extends WsCommand
+    case class RemoveWsSubscription(client: typed.ActorRef[WsAddressState]) extends WsCommand
+    private[AddressActor] case object PrepareDiffForWsSubscribers           extends WsCommand
   }
 
   private case class CancelExpiredOrder(orderId: ByteStr)

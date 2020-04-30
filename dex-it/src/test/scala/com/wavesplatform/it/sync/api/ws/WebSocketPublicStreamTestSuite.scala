@@ -8,15 +8,15 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
-import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
+import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.WebSocketsSuiteBase
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
+class WebSocketPublicStreamTestSuite extends WebSocketsSuiteBase {
 
   private val carol = mkKeyPair("carol")
 
@@ -30,6 +30,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
     dex1.api.upsertRate(btc, 0.00011167)
   }
 
+  // TODO
   protected def squashOrderBooks(xs: TraversableOnce[WsOrderBook]): WsOrderBook = xs.foldLeft(WsOrderBook.empty) {
     case (r, x) =>
       WsOrderBook(
@@ -39,12 +40,6 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         updateId = x.updateId,
         timestamp = xs.toList.last.timestamp
       )
-  }
-
-  private def receiveAtLeastN[T <: WsMessage](wsc: WsConnection[T], n: Int): Seq[T] = {
-    eventually { wsc.getMessagesBuffer.size should be >= n }
-    Thread.sleep(200) // Waiting for additional messages
-    wsc.getMessagesBuffer
   }
 
   "MatcherWebSocketRoute" - {
@@ -58,7 +53,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
         markup("No orders")
         val wsc0    = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        val buffer0 = receiveAtLeastN(wsc0, 1)
+        val buffer0 = wsc0.receiveAtLeastN[WsOrderBook](1)
         wsc0.close()
 
         buffer0 should have size 1
@@ -77,7 +72,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         markup("One order")
 
         val wsc1    = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        val buffer1 = receiveAtLeastN(wsc1, 1)
+        val buffer1 = wsc1.receiveAtLeastN[WsOrderBook](1)
         wsc1.close()
 
         buffer1 should have size 1
@@ -96,7 +91,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00012))
 
         val wsc2    = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        val buffer2 = receiveAtLeastN(wsc2, 1)
+        val buffer2 = wsc2.receiveAtLeastN[WsOrderBook](1)
         wsc2.close()
 
         buffer2 should have size 1
@@ -115,7 +110,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Filled)
 
         val wsc3    = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        val buffer3 = receiveAtLeastN(wsc3, 1)
+        val buffer3 = wsc3.receiveAtLeastN[WsOrderBook](1)
         wsc3.close()
 
         buffer3.size should (be >= 1 and be <= 2)
@@ -141,7 +136,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         ).foreach(placeAndAwaitAtDex(_))
 
         val wsc4    = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        val buffer4 = receiveAtLeastN(wsc4, 1)
+        val buffer4 = wsc4.receiveAtLeastN[WsOrderBook](1)
         wsc4.close()
 
         buffer4.size should (be >= 1 and be <= 2)
@@ -172,13 +167,13 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
       "should send updates" in {
         val wsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
-        receiveAtLeastN(wsc, 1)
-        wsc.clearMessagesBuffer()
+        wsc.receiveAtLeastN[WsOrderBook](1)
+        wsc.clearMessages()
 
         markup("A new order")
         placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 1.waves, 0.00012))
 
-        val buffer1 = receiveAtLeastN(wsc, 1)
+        val buffer1 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer1 should have size 1
         squashOrderBooks(buffer1) should matchTo(
           WsOrderBook(
@@ -189,13 +184,13 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             timestamp = buffer1.last.timestamp
           )
         )
-        wsc.clearMessagesBuffer()
+        wsc.clearMessages()
 
         markup("An execution and adding a new order")
         val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
         placeAndAwaitAtDex(order, ApiOrderStatus.PartiallyFilled)
 
-        val buffer2 = receiveAtLeastN(wsc, 1)
+        val buffer2 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer2.size should (be >= 1 and be <= 2)
         squashOrderBooks(buffer2) should matchTo(
           WsOrderBook(
@@ -210,12 +205,12 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             timestamp = buffer2.last.timestamp
           )
         )
-        wsc.clearMessagesBuffer()
+        wsc.clearMessages()
 
         dex1.api.cancelAll(carol)
         dex1.api.waitForOrderStatus(order, ApiOrderStatus.Cancelled)
 
-        val buffer3 = receiveAtLeastN(wsc, 1)
+        val buffer3 = wsc.receiveAtLeastN[WsOrderBook](1)
         buffer3.size shouldBe 1
         squashOrderBooks(buffer3) should matchTo(
           WsOrderBook(
@@ -227,17 +222,17 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
           )
         )
 
-        wsc.clearMessagesBuffer()
+        wsc.clearMessages()
         wsc.close()
       }
 
       "should send correct update ids" in {
 
-        def assertUpdateId(connection: WsConnection[WsOrderBook], expectedUpdateId: Long): Unit = {
-          val buffer = receiveAtLeastN(connection, 1)
+        def assertUpdateId(connection: WsConnection, expectedUpdateId: Long): Unit = {
+          val buffer = connection.receiveAtLeastN[WsOrderBook](1)
           buffer should have size 1
           buffer.head.updateId shouldBe expectedUpdateId
-          connection.clearMessagesBuffer()
+          connection.clearMessages()
         }
 
         val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
@@ -264,7 +259,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
                 Future {
                   val c = mkWsOrderBookConnection(wavesBtcPair, dex1)
                   Thread.sleep(200)
-                  c.getMessagesBuffer.head.updateId
+                  c.receiveAtLeastN[WsOrderBook](1).head.updateId
               }
             ),
             25.seconds
@@ -283,7 +278,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         dex1.api.place(mkOrderDP(seller, assetPair, SELL, 100.asset8, 5.0))
 
         val wsc1, wsc2, wsc3 = mkWsOrderBookConnection(assetPair, dex1)
-        Seq(wsc1, wsc2, wsc3).foreach { receiveAtLeastN(_, 1) }
+        Seq(wsc1, wsc2, wsc3).foreach { _.receiveAtLeastN[WsOrderBook](1) }
 
         dex1.api.tryDeleteOrderBook(assetPair)
 

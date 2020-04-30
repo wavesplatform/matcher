@@ -5,7 +5,7 @@ import cats.syntax.option._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-final case class WsPingOrPong(timestamp: Long) extends WsClientMessage {
+final case class WsPingOrPong(timestamp: Long) extends WsClientMessage with WsServerMessage {
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(Json.toJson(this).toString)
   override val tpe: String                             = WsPingOrPong.tpe
 }

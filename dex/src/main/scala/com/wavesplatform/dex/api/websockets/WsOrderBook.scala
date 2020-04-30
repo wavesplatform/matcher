@@ -13,12 +13,14 @@ import play.api.libs.json._
 import scala.collection.immutable.TreeMap
 
 case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], updateId: Long, timestamp: Long = System.currentTimeMillis)
-    extends WsMessage {
+    extends WsServerMessage {
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
-  override val tpe: String                             = "ob"
+  override val tpe: String                             = WsOrderBook.tpe
 }
 
 object WsOrderBook {
+
+  val tpe = "ob"
 
   def wsUnapply(arg: WsOrderBook): Option[(String, Long, Long, WsSide, WsSide, Option[WsLastTrade])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade).some

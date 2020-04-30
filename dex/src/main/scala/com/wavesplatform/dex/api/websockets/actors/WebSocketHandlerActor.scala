@@ -8,6 +8,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
+import shapeless.{Inl, Inr}
 
 import scala.concurrent.duration._
 
@@ -33,7 +34,7 @@ object WebSocketHandlerActor {
             clientRef: ActorRef[WsMessage],
             matcherRef: classic.ActorRef): Behavior[Message] =
     Behaviors.setup[Message] { context =>
-      context.setLoggerName(s"WebSocketHandlerActor[clientName=${clientRef.path.name}]")
+      context.setLoggerName(s"WebSocketHandlerActor[c=${clientRef.path.name}]")
 
       def scheduleOnce(delay: FiniteDuration, message: Message): Cancellable = context.scheduleOnce(delay, context.self, message)
 
@@ -79,6 +80,15 @@ object WebSocketHandlerActor {
                 Behaviors.same
 
               case subscribe: WsAddressSubscribe =>
+                Behaviors.same
+
+              case unsubscribe: WsUnsubscribe =>
+                unsubscribe.key match {
+                  case Inl(x) =>
+                    matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(x, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
+                  case Inr(Inl(x)) =>
+                  case Inr(Inr(_)) =>
+                }
                 Behaviors.same
             }
 

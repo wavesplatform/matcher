@@ -35,7 +35,7 @@ object WsUnsubscribe {
     tjs = Writes {
       case Inl(x)      => Json.toJson(x)
       case Inr(Inl(x)) => Json.toJson(x)
-      case Inr(Inr(x)) => throw new IllegalArgumentException(s"Impossibru: $x")
+      case Inr(Inr(_)) => throw new IllegalArgumentException("Impossibru: CNil")
     }
   )
 

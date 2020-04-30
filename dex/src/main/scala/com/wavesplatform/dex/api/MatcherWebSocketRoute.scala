@@ -142,6 +142,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
     import webSocketSettings._
 
+    val clientId = UUID.randomUUID().toString
     val client = ActorSource
       .actorRef[WsMessage](
         { case WsMessage.Complete => },
@@ -149,6 +150,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         10,
         OverflowStrategy.fail
       )
+      .named(s"source-$clientId")
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { sourceActor =>
         sourceActor
@@ -158,7 +160,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     val (connectionSource, matClient) = client.preMaterialize()
     val webSocketHandlerRef = mat.system.spawn(
       behavior = WebSocketHandlerActor(webSocketHandler, maxConnectionLifetime, connectionSource, matcher),
-      name = s"ws-${UUID.randomUUID()}"
+      name = s"handler-$clientId"
     )
 
     val server = ActorSink.actorRef(
@@ -179,6 +181,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
           } yield pong
         case bm: BinaryMessage => bm.dataStream.runWith(Sink.ignore); binaryMessageUnsupportedFailure
       }
+      .named(s"sink-$clientId")
       .to(server)
 
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, matClient) }

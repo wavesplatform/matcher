@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest, WebS
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.http.`X-Api-Key`
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.websockets.WsConnection.PongHandler
 import play.api.libs.json.Json
@@ -40,7 +40,7 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
     val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
 
     Source
-      .actorRef[WsPingOrPong](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
+      .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
       .map(_.toStrictTextMessage)
       .mapMaterializedValue { source =>
         pongHandler.tell(PongHandler.AssignSourceRef, source)
@@ -84,7 +84,8 @@ class WsConnection[Output <: WsMessage: ClassTag](uri: String,
   def getPingsBuffer: Seq[WsPingOrPong] = pingsBuffer.iterator().asScala.toSeq
   def clearPingsBuffer(): Unit          = pingsBuffer.clear()
 
-  def sendPong(pong: WsPingOrPong): Unit = pongHandler ! PongHandler.ManualPong(pong)
+  def send(message: WsClientMessage): Unit = pongHandler ! PongHandler.SendToServer(message)
+  def sendPong(pong: WsPingOrPong): Unit   = send(pong)
 
   def close(): Unit     = if (!isClosed) pongHandler ! PongHandler.CloseConnection
   def isClosed: Boolean = closed.isCompleted
@@ -109,7 +110,9 @@ object WsConnection {
         sourceRef ! akka.actor.Status.Success(None)
         context.stop(self)
 
-      case ManualPong(pong) => log.debug(s"Manually sending pong: ${pong.toStrictTextMessage.getStrictText}"); sourceRef ! pong
+      case SendToServer(message) =>
+        log.debug(s"Manually sending: ${message.toStrictTextMessage.getStrictText}")
+        sourceRef ! message
     }
 
     private def awaitSourceRef: Receive = {
@@ -125,6 +128,6 @@ object WsConnection {
 
     final case object AssignSourceRef
     final case object CloseConnection
-    final case class ManualPong(pong: WsPingOrPong)
+    final case class SendToServer(message: WsClientMessage)
   }
 }

@@ -8,7 +8,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsMessage, WsOrder, WsOrderBook}
+import com.wavesplatform.dex.api.websockets.{WsBalances, WsMessage, WsOrder, WsOrderBook, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -33,7 +33,7 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Ma
   protected val authenticatedStreamSignaturePrefix = "au"
 
   protected def getBaseBalancesStreamUri(dex: DexContainer): String   = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/accountUpdates/"
-  protected def getBaseOrderBooksStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/orderbook/"
+  protected def getWsStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws"
 
   protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection[_], lang.Boolean] =
     ConcurrentHashMap.newKeySet[WsConnection[_]]()
@@ -61,11 +61,12 @@ trait HasWebSockets extends BeforeAndAfterAll { _: Suite with Eventually with Ma
     new WsAuthenticatedConnection(wsUri, Some(apiKey), keepAlive) unsafeTap addConnection
   }
 
-  protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer): WsConnection[WsOrderBook] = {
-    val wsUri = s"${getBaseOrderBooksStreamUri(dex)}${assetPair.amountAssetStr}/${assetPair.priceAssetStr}"
-    mkWsConnection(wsUri) { msg =>
+  protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer, depth: Int = 1): WsConnection[WsOrderBook] = {
+    val connection = mkWsConnection(getWsStreamUri(dex)) { msg =>
       Json.parse(msg.asTextMessage.getStrictText).as[WsOrderBook]
     }
+    connection.send(WsOrderBookSubscribe(assetPair, depth))
+    connection
   }
 
   protected def mkWsConnection[Output <: WsMessage: ClassTag](uri: String)(parseOutput: Message => Output): WsConnection[Output] = {

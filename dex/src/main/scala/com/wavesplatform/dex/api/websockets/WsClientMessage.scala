@@ -10,6 +10,7 @@ object WsClientMessage {
       case WsPingOrPong.tpe         => json.validate[WsPingOrPong]
       case WsOrderBookSubscribe.tpe => json.validate[WsOrderBookSubscribe]
       case WsAddressSubscribe.tpe   => json.validate[WsAddressSubscribe]
+      case WsUnsubscribe.tpe        => json.validate[WsUnsubscribe]
       case x                        => JsError(JsPath \ "T", s"An unknown type: $x")
     }
   }

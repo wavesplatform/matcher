@@ -32,6 +32,7 @@ object AggregatedOrderBookActor {
   object Command {
     case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], ts: Long) extends Command
     case class AddWsSubscription(client: ActorRef[WsOrderBook])                                 extends Command
+    case class RemoveWsSubscription(client: ActorRef[WsOrderBook])                              extends Command
     private[AggregatedOrderBookActor] case object SendWsUpdates                                 extends Command
   }
 
@@ -39,6 +40,7 @@ object AggregatedOrderBookActor {
 
   def apply(settings: Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
     Behaviors.setup { context =>
+      context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
       def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates)
@@ -91,9 +93,14 @@ object AggregatedOrderBookActor {
                 updateId = 0L
               )
 
-              context.log.trace("[{}] WebSocket connected", client.path.name)
+              context.log.trace("[c={}] Added WebSocket subscription", client.path.name)
               context.watch(client)
               default(state.copy(ws = state.ws.addSubscription(client)))
+
+            case Command.RemoveWsSubscription(client) =>
+              context.log.trace("[c={}] Removed WebSocket subscription", client.path.name)
+              context.unwatch(client)
+              default(state.copy(ws = state.ws.withoutSubscription(client)))
 
             case Command.SendWsUpdates =>
               val updated = state.copy(ws = state.ws.flushed(amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
@@ -104,9 +111,14 @@ object AggregatedOrderBookActor {
             case (_, Terminated(ws)) => default(state.copy(ws = state.ws.withoutSubscription(ws)))
             case (_, PostStop) =>
               state.ws.wsConnections.foreach {
-                case (connection, _) =>
-                  context.log.trace(s"[${connection.path.name}] WebSocket connection closed, reason: ${OrderBookStopped(assetPair).message.text}")
-                  connection.unsafeUpcast[WsMessage] ! WsMessage.Complete
+                case (client, _) =>
+                  // TODO remove subscription
+                  context.log.trace(
+                    s"[c={}] WebSocket connection closed, reason: {}",
+                    client.path.name.asInstanceOf[Any],
+                    OrderBookStopped(assetPair).message.text.asInstanceOf[Any]
+                  )
+                  client.unsafeUpcast[WsMessage] ! WsMessage.Complete
               }
               default { state.copy(ws = state.ws.copy(wsConnections = Map.empty)) }
           }

@@ -16,7 +16,7 @@ import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
 import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
@@ -37,7 +37,8 @@ class OrderBookActor(settings: Settings,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-                     getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext)
+                     getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+                     restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext)
     extends classic.Actor
     with WorkingStash
     with ScorexLogging {
@@ -84,11 +85,15 @@ class OrderBookActor(settings: Settings,
       lastProcessedOffset foreach actualizeRules
 
       aggregatedRef = context.spawn(
-        AggregatedOrderBookActor(settings.aggregated,
-                                 assetPair,
-                                 amountDecimals,
-                                 priceDecimals,
-                                 AggregatedOrderBookActor.State.fromOrderBook(orderBook)),
+        AggregatedOrderBookActor(
+          settings.aggregated,
+          assetPair,
+          amountDecimals,
+          priceDecimals,
+          restrictions,
+          matchingRules.head.tickSize.toDouble,
+          AggregatedOrderBookActor.State.fromOrderBook(orderBook)
+        ),
         "aggregated"
       )
       context.watch(aggregatedRef)
@@ -229,7 +234,8 @@ object OrderBookActor {
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
-            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long))(implicit ec: ExecutionContext): classic.Props =
+            getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
+            restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext): classic.Props =
     classic.Props(
       new OrderBookActor(
         settings,
@@ -243,7 +249,8 @@ object OrderBookActor {
         matchingRules,
         updateCurrentMatchingRules,
         normalizeMatchingRule,
-        getMakerTakerFeeByOffset
+        getMakerTakerFeeByOffset,
+        restrictions
       )
     )
 

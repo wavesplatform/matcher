@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.Props
+import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.adapter._
@@ -14,6 +15,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.TestParsers
+import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -21,11 +23,11 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
-import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Message, Query, Command}
+import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
-import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalacheck.Gen
@@ -51,6 +53,8 @@ class AggregatedOrderBookActorSpec
     with Eventually {
 
   import system.dispatcher
+
+  private val testKit = ActorTestKit()
 
   private val pair = AssetPair(IssuedAsset(ByteStr("issued".getBytes(StandardCharsets.UTF_8))), Waves)
 
@@ -93,20 +97,24 @@ class AggregatedOrderBookActorSpec
 
         val owner = TestProbe()
         val orderBookRef = system.actorOf(
-          Props(new OrderBookActor(
-            OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
-            owner.ref,
-            TestProbe().ref,
-            system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
-            pair,
-            8,
-            8,
-            time,
-            NonEmptyList.one(DenormalizedMatchingRule(0L, DenormalizedMatchingRule.DefaultTickSize)),
-            _ => (),
-            raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
-            _ => (t, m) => m.matcherFee -> t.matcherFee
-          )))
+          Props(
+            new OrderBookActor(
+              OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
+              owner.ref,
+              TestProbe().ref,
+              system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
+              pair,
+              8,
+              8,
+              time,
+              NonEmptyList.one(DenormalizedMatchingRule(0L, DenormalizedMatchingRule.DefaultTickSize)),
+              _ => (),
+              raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
+              _ => (t, m) => m.matcherFee -> t.matcherFee,
+              None
+            )
+          )
+        )
         owner.expectMsgType[OrderBookActor.OrderBookRecovered]
 
         orders.foreach(orderBookRef ! _)
@@ -342,6 +350,38 @@ class AggregatedOrderBookActorSpec
           actual should matchTo(expected)
         }
       }
+
+      "should return correct restrictions and tick size to new subscribers" in {
+
+        val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
+
+        def checkOrderBookSettingsInSnapshot(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): Unit = {
+          val snapshot = wsEventsProbe.expectMessageType[WsOrderBook]
+          snapshot.updateId shouldBe 0
+          snapshot.asks shouldBe empty
+          snapshot.bids shouldBe empty
+          snapshot.lastTrade shouldBe None
+          snapshot.settings should matchTo { Option(WsOrderBookSettings(maybeRestrictions, Some(tickSize))) }
+        }
+
+        def mkAoba(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): ActorRef[Message] =
+          mk(OrderBook.empty, maybeRestrictions, tickSize)
+
+        withClue("Empty restrictions and default tick size") {
+          val defaultTickSize = DenormalizedMatchingRule.DefaultTickSize.toDouble
+          val aoba            = mkAoba(None, defaultTickSize)
+          aoba ! Command.AddWsSubscription(wsEventsProbe.ref)
+          checkOrderBookSettingsInSnapshot(None, defaultTickSize)
+        }
+
+        withClue("Non -default restrictions and tick size") {
+          val restrictions = Some(OrderRestrictionsSettings(0.1, 0.2, 10, 0.3, 0.15, 100))
+          val tickSize     = 0.25
+          val aoba         = mkAoba(restrictions, tickSize)
+          aoba ! Command.AddWsSubscription(wsEventsProbe.ref)
+          checkOrderBookSettingsInSnapshot(restrictions, tickSize)
+        }
+      }
     }
   }
 
@@ -361,12 +401,16 @@ class AggregatedOrderBookActorSpec
       case (price, level) => LevelAgg(amount = level.map(_.amount).sum, price = price)
     }.toList
 
-  private def mk(ob: OrderBook): ActorRef[Message] = system.spawn(
+  private def mk(ob: OrderBook,
+                 restrictions: Option[OrderRestrictionsSettings] = None,
+                 tickSize: Double = DenormalizedMatchingRule.DefaultTickSize.toDouble): ActorRef[Message] = system.spawn(
     AggregatedOrderBookActor(
       AggregatedOrderBookActor.Settings(100.millis),
       pair,
       8,
       8,
+      restrictions,
+      tickSize,
       AggregatedOrderBookActor.State.fromOrderBook(ob)
     ),
     s"aggregated-${ThreadLocalRandom.current().nextInt()}"

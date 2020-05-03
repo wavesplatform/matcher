@@ -12,6 +12,7 @@ import com.wavesplatform.dex.error.OrderBookStopped
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
+import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration.FiniteDuration
@@ -37,7 +38,13 @@ object AggregatedOrderBookActor {
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 
-  def apply(settings: Settings, assetPair: AssetPair, amountDecimals: Int, priceDecimals: Int, init: State): Behavior[Message] =
+  def apply(settings: Settings,
+            assetPair: AssetPair,
+            amountDecimals: Int,
+            priceDecimals: Int,
+            restrictions: Option[OrderRestrictionsSettings],
+            tickSize: Double,
+            init: State): Behavior[Message] =
     Behaviors.setup { context =>
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
@@ -82,13 +89,16 @@ object AggregatedOrderBookActor {
             case Command.AddWsSubscription(client) =>
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               val ob = state.toOrderBookAggregatedSnapshot
+
               client ! WsOrderBook.from(
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
                 asks = ob.asks,
                 bids = ob.bids,
                 lt = state.lastTrade,
-                updateId = 0L
+                updateId = 0L,
+                restrictions = restrictions,
+                tickSize = tickSize
               )
 
               context.log.trace("[{}] WebSocket connected", client.path.name)

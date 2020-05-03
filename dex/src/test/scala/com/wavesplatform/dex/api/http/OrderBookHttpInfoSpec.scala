@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherSpecLike}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, MatcherModel, OrderBook, OrderBookResult}
+import com.wavesplatform.dex.settings.DenormalizedMatchingRule
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -135,6 +136,8 @@ object OrderBookHttpInfoSpec {
         pair,
         8,
         8,
+        None,
+        DenormalizedMatchingRule.DefaultTickSize.toDouble,
         AggregatedOrderBookActor.State.fromOrderBook(OrderBook.empty)
       ),
       "aggregated"

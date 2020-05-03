@@ -90,7 +90,8 @@ class OrderBookActorSpecification
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
-        makerTakerFeeAtOffset
+        makerTakerFeeAtOffset,
+        None
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)

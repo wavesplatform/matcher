@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
@@ -10,6 +11,7 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.collection.immutable.TreeMap
@@ -18,9 +20,36 @@ import scala.concurrent.{Await, Future}
 
 class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets {
 
-  private val carol = mkKeyPair("carol")
+  private val carol: KeyPair = mkKeyPair("carol")
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+  private val orderBookSettings: Option[WsOrderBookSettings] = WsOrderBookSettings(
+    OrderRestrictionsSettings(
+      stepAmount = 0.00000001,
+      minAmount = 0.0000001,
+      maxAmount = 200000000,
+      stepPrice = 0.00000001,
+      minPrice = 0.0000002,
+      maxPrice = 300000
+    ).some,
+    DenormalizedMatchingRule.DefaultTickSize.toDouble.some
+  ).some
+
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  order-restrictions = {
+       |    "WAVES-$BtcId": {
+       |      step-amount = 0.00000001
+       |      min-amount  = 0.0000001
+       |      max-amount  = 200000000
+       |      step-price  = 0.00000001
+       |      min-price   = 0.0000002
+       |      max-price   = 300000
+       |    }
+       |  }
+       |}
+       """.stripMargin
+  )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -37,7 +66,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
         bids = r.bids ++ x.bids,
         lastTrade = r.lastTrade.orElse(x.lastTrade),
         updateId = x.updateId,
-        timestamp = xs.toList.last.timestamp
+        timestamp = xs.toList.last.timestamp,
+        settings = xs.toList.head.settings
       )
   }
 
@@ -69,6 +99,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             lastTrade = None,
             updateId = 0,
             timestamp = buffer0.last.timestamp,
+            settings = orderBookSettings
           )
         )
 
@@ -87,7 +118,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
             updateId = 0,
-            timestamp = buffer1.last.timestamp
+            timestamp = buffer1.last.timestamp,
+            settings = orderBookSettings
           )
         )
 
@@ -106,7 +138,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             bids = TreeMap(0.00011403d -> 1.05d),
             lastTrade = None,
             updateId = 0,
-            timestamp = buffer2.last.timestamp
+            timestamp = buffer2.last.timestamp,
+            settings = orderBookSettings
           )
         )
 
@@ -129,7 +162,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               side = OrderType.BUY
             ).some,
             updateId = 0,
-            timestamp = buffer3.last.timestamp
+            timestamp = buffer3.last.timestamp,
+            settings = orderBookSettings
           )
         )
 
@@ -162,7 +196,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               side = OrderType.BUY
             ).some,
             updateId = buffer4.last.updateId,
-            timestamp = buffer4.last.timestamp
+            timestamp = buffer4.last.timestamp,
+            settings = orderBookSettings
           )
         )
 
@@ -186,7 +221,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             bids = TreeMap(0.00012d -> 1d),
             lastTrade = None,
             updateId = 1,
-            timestamp = buffer1.last.timestamp
+            timestamp = buffer1.last.timestamp,
+            settings = None
           )
         )
         wsc.clearMessagesBuffer()
@@ -207,7 +243,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
               side = OrderType.SELL
             ).some,
             updateId = buffer2.last.updateId,
-            timestamp = buffer2.last.timestamp
+            timestamp = buffer2.last.timestamp,
+            settings = None
           )
         )
         wsc.clearMessagesBuffer()
@@ -223,7 +260,8 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
             bids = TreeMap.empty,
             lastTrade = None,
             updateId = buffer3.last.updateId,
-            timestamp = buffer3.last.timestamp
+            timestamp = buffer3.last.timestamp,
+            settings = None
           )
         )
 

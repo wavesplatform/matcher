@@ -429,7 +429,8 @@ class MatcherActorSpecification
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},
             _ => MatchingRule.DefaultRule,
-            _ => makerTakerPartialFee
+            _ => makerTakerPartialFee,
+            None
         ),
         assetDescription
       )

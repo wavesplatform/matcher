@@ -9,8 +9,8 @@ import cats.syntax.flatMap._
 import cats.syntax.semigroup.catsSyntaxSemigroup
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.crypto.Verifier
 import com.wavesplatform.dex.domain.feature.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.dex.domain.model.Normalization
@@ -116,15 +116,12 @@ object OrderValidator extends ScorexLogging {
     cond(o.price % BigDecimal(10).pow(insignificantDecimals).toLongExact == 0, ad -> pd, error.PriceLastDecimalsMustBeZero(insignificantDecimals))
   }
 
-  private def validateAmountAndPrice(order: Order, decimalsPair: (Int, Int), orderRestrictions: Map[AssetPair, OrderRestrictionsSettings])(
+  private def validateAmountAndPrice(order: Order, decimalsPair: (Int, Int), orderRestrictions: Option[OrderRestrictionsSettings])(
       implicit ec: ExecutionContext,
       efc: ErrorFormatterContext): FutureResult[Order] = {
 
-    if (!(orderRestrictions contains order.assetPair)) liftValueAsync(order)
-    else {
-
+    orderRestrictions.fold { liftValueAsync(order) } { restrictions =>
       val (amountAssetDecimals, priceAssetDecimals) = decimalsPair
-      val restrictions                              = orderRestrictions(order.assetPair)
 
       def normalizeAmount(amt: Double): Long = normalizeAmountAndFee(amt, amountAssetDecimals)
       def normalizePrice(prc: Double): Long  = Normalization.normalizePrice(prc, amountAssetDecimals, priceAssetDecimals)
@@ -163,7 +160,7 @@ object OrderValidator extends ScorexLogging {
       matcherAddress: Address,
       time: Time,
       orderFeeSettings: OrderFeeSettings,
-      orderRestrictions: Map[AssetPair, OrderRestrictionsSettings],
+      orderRestrictions: Option[OrderRestrictionsSettings],
       assetDescriptions: Asset => BriefAssetDescription,
       rateCache: RateCache,
       hasMatcherAccountScript: Boolean)(order: Order)(implicit ec: ExecutionContext, efc: ErrorFormatterContext): FutureResult[Order] =

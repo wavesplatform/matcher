@@ -57,7 +57,8 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
         bids = denormalized(amountDecimals, priceDecimals, take(bids, changedBids)),
         lastTrade = lastTrade.map(lastTrade(amountDecimals, priceDecimals, _)),
         updateId = 0L, // Will be changed below
-        timestamp = timestamp
+        timestamp = timestamp,
+        settings = None
       )
       wsConnections.map {
         case (conn, updateId) =>

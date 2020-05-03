@@ -36,7 +36,7 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES", "$EthId" ]
        |  order-restrictions = {
        |    "WAVES-$BtcId": {
        |      step-amount = 0.00000001
@@ -47,13 +47,25 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
        |      max-price   = 300000
        |    }
        |  }
+       |  matching-rules = {
+       |    "$EthId-WAVES": [
+       |      {
+       |        start-offset = 0
+       |        tick-size    = 0.0002
+       |      },
+       |      {
+       |        start-offset = 1
+       |        tick-size    = 0.00000001
+       |      }
+       |    ]
+       |  }
        |}
        """.stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueBtcTx, IssueUsdTx)
+    broadcastAndAwait(IssueBtcTx, IssueUsdTx, IssueEthTx)
     broadcastAndAwait(mkTransfer(alice, carol, 100.waves, Waves), mkTransfer(bob, carol, 1.btc, btc))
     dex1.start()
     dex1.api.upsertRate(btc, 0.00011167)
@@ -79,6 +91,46 @@ class WebSocketPublicStreamTestSuite extends MatcherSuiteBase with HasWebSockets
 
   "MatcherWebSocketRoute" - {
     "orderbook" - {
+
+      "should correctly send changed tick-size" in {
+        placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 199))
+
+        val wsc     = mkWsOrderBookConnection(ethWavesPair, dex1)
+        val buffer0 = receiveAtLeastN(wsc, 1)
+
+        buffer0 should have size 1
+        squashOrderBooks(buffer0) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(199d -> 1d),
+            bids = TreeMap.empty,
+            lastTrade = None,
+            updateId = 0,
+            timestamp = buffer0.last.timestamp,
+            settings = WsOrderBookSettings(None, 0.0002.some).some
+          )
+        )
+
+        wsc.clearMessagesBuffer()
+        placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 200))
+
+        val buffer1 = receiveAtLeastN(wsc, 1)
+
+        buffer1.size should (be >= 1 and be <= 2)
+        squashOrderBooks(buffer1) should matchTo(
+          WsOrderBook(
+            asks = TreeMap(200d -> 1d),
+            bids = TreeMap.empty,
+            lastTrade = None,
+            updateId = buffer1.last.updateId,
+            timestamp = buffer1.last.timestamp,
+            settings = WsOrderBookSettings(None, 0.00000001.some).some
+          )
+        )
+
+        dex1.api.cancelAll(alice)
+        wsc.close()
+      }
+
       "should send a full state after connection" in {
         // Force create an order book to pass a validation in the route
         val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)

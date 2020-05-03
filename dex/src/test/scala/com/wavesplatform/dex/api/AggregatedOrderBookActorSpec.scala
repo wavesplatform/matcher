@@ -161,6 +161,7 @@ class AggregatedOrderBookActorSpec
               asks = Map(2000L -> 99L)
             ),
             lastTrade = Some(lastTrade),
+            tickSize = None,
             ts = 0L
           )
 
@@ -183,12 +184,14 @@ class AggregatedOrderBookActorSpec
               asks = Map(2000L -> 99L)
             ),
             lastTrade = Some(LastTrade(499L, 1L, OrderType.BUY)),
+            tickSize = None,
             ts = 0L
           )
 
           ref ! Command.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(lastTrade),
+            tickSize = None,
             ts = 1L
           )
 
@@ -197,6 +200,7 @@ class AggregatedOrderBookActorSpec
               bids = Map(1000L -> 84L)
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 2L
           )
 
@@ -220,6 +224,7 @@ class AggregatedOrderBookActorSpec
               bids = Map(999L  -> 30L, 1000L -> 50L)
             ),
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
+            tickSize = None,
             ts = 0L
           )
 
@@ -241,6 +246,7 @@ class AggregatedOrderBookActorSpec
               bids = Map.empty
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 0L
           )
 
@@ -250,6 +256,7 @@ class AggregatedOrderBookActorSpec
               bids = Map.empty
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 1L
           )
 
@@ -259,12 +266,14 @@ class AggregatedOrderBookActorSpec
               bids = Map(999L -> 30L, 1000L -> 50L)
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 2L
           )
 
           ref ! Command.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
+            tickSize = None,
             ts = 3L
           )
 
@@ -287,6 +296,7 @@ class AggregatedOrderBookActorSpec
               bids = Map(999L  -> 30L, 1000L -> 50L)
             ),
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
+            tickSize = None,
             ts = 1L
           )
 
@@ -311,6 +321,7 @@ class AggregatedOrderBookActorSpec
               bids = Map.empty
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 0L
           )
 
@@ -320,6 +331,7 @@ class AggregatedOrderBookActorSpec
               bids = Map.empty
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 1L
           )
 
@@ -329,12 +341,14 @@ class AggregatedOrderBookActorSpec
               bids = Map(999L -> 30L, 1000L -> 50L)
             ),
             lastTrade = None,
+            tickSize = None,
             ts = 2L
           )
 
           ref ! Command.ApplyChanges(
             levelChanges = LevelAmounts.empty,
             lastTrade = Some(LastTrade(500L, 10L, OrderType.BUY)),
+            tickSize = None,
             ts = 3L
           )
 
@@ -351,7 +365,7 @@ class AggregatedOrderBookActorSpec
         }
       }
 
-      "should return correct restrictions and tick size to new subscribers" in {
+      "should return correct restrictions and tick size to subscribers" in {
 
         val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
 
@@ -374,12 +388,22 @@ class AggregatedOrderBookActorSpec
           checkOrderBookSettingsInSnapshot(None, defaultTickSize)
         }
 
-        withClue("Non -default restrictions and tick size") {
+        withClue("Non-default restrictions and tick size, tick size changed") {
           val restrictions = Some(OrderRestrictionsSettings(0.1, 0.2, 10, 0.3, 0.15, 100))
           val tickSize     = 0.25
           val aoba         = mkAoba(restrictions, tickSize)
+
           aoba ! Command.AddWsSubscription(wsEventsProbe.ref)
           checkOrderBookSettingsInSnapshot(restrictions, tickSize)
+
+          aoba ! Command.ApplyChanges(LevelAmounts.empty, None, tickSize = Some(0.30), ts = 10L)
+          val changes = wsEventsProbe.expectMessageType[WsOrderBook]
+
+          changes.updateId shouldBe 1
+          changes.asks shouldBe empty
+          changes.bids shouldBe empty
+          changes.lastTrade shouldBe None
+          changes.settings should matchTo { Option(WsOrderBookSettings(None, Some(0.30))) }
         }
       }
     }

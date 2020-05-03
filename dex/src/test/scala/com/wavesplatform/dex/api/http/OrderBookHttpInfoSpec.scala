@@ -47,6 +47,7 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
               bids = Map((middlePrice - i) -> i * 3L)
             ),
             lastTrade = Some(LastTrade(middlePrice, 5, OrderType.SELL)),
+            tickSize = None,
             ts = now + i
           )
         }

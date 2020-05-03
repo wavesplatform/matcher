@@ -63,6 +63,10 @@ class OrderBookActor(settings: Settings,
       matchingRules = actualRules
       updateCurrentMatchingRules(matchingRules.head)
       actualRule = normalizeMatchingRule(matchingRules.head)
+      aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(LevelAmounts.empty,
+                                                                    None,
+                                                                    Some(matchingRules.head.tickSize.toDouble),
+                                                                    System.currentTimeMillis)
     }
   }
 
@@ -160,7 +164,7 @@ class OrderBookActor(settings: Settings,
       case _                       => false
     }
     val lastTrade = if (hasTrades) orderBook.lastTrade else None
-    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, timestamp)
+    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, None, timestamp)
     processEvents(events)
   }
 
@@ -180,7 +184,7 @@ class OrderBookActor(settings: Settings,
       case (updatedOrderBook, Some(cancelEvent), levelChanges) =>
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
-        aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, cancelEvent.timestamp)
+        aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)
         processEvents(List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")

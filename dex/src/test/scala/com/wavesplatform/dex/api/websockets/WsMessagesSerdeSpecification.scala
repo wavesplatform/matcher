@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
+import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
@@ -85,6 +86,28 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   private val amountDecimals = 8
   private val priceDecimals  = 2
 
+  private val orderBookSettingsGen: Gen[WsOrderBookSettings] = {
+
+    def getDenormalizedValueInRange(min: Long, max: Long): Gen[Double] = Gen.choose(min, max).map { BigDecimal(_) / Order.PriceConstant toDouble }
+
+    val restrictionsGen =
+      for {
+        stepAmount <- getDenormalizedValueInRange(1, 10)
+        minAmount  <- getDenormalizedValueInRange(1, 10)
+        maxAmount  <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
+        stepPrice  <- getDenormalizedValueInRange(1, 10)
+        minPrice   <- getDenormalizedValueInRange(1, 10)
+        maxPrice   <- getDenormalizedValueInRange(1 * Order.PriceConstant, 10 * Order.PriceConstant)
+      } yield OrderRestrictionsSettings(stepAmount, minAmount, maxAmount, stepPrice, minPrice, maxPrice)
+
+    val tickSizeGen = getDenormalizedValueInRange(10, 50)
+
+    for {
+      restrictions <- Gen.option(restrictionsGen)
+      tickSize     <- Gen.option(tickSizeGen)
+    } yield WsOrderBookSettings(restrictions, tickSize)
+  }
+
   private val lastTradeGen: Gen[WsLastTrade] = for {
     price     <- Gen.chooseNum(1, Long.MaxValue)
     amount    <- Gen.chooseNum(1, Long.MaxValue)
@@ -97,13 +120,14 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     )
 
   private val wsOrderBookGen: Gen[WsOrderBook] = for {
-    assetPair <- assetPairGen
-    asks      <- wsSide(askPricesGen)
-    bids      <- wsSide(bidPricesGen)
-    lastTrade <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
-    updateId  <- Gen.choose(0L, Long.MaxValue)
-    ts        <- Gen.choose(0L, Long.MaxValue)
-  } yield WsOrderBook(assetPair, asks, bids, lastTrade, updateId, ts)
+    assetPair         <- assetPairGen
+    asks              <- wsSide(askPricesGen)
+    bids              <- wsSide(bidPricesGen)
+    lastTrade         <- Gen.oneOf[Option[WsLastTrade]](None, lastTradeGen.map(Option(_)))
+    updateId          <- Gen.choose(0L, Long.MaxValue)
+    ts                <- Gen.choose(0L, Long.MaxValue)
+    orderBookSettings <- Gen.option(orderBookSettingsGen)
+  } yield WsOrderBook(assetPair, asks, bids, lastTrade, updateId, orderBookSettings, ts)
 
   private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)

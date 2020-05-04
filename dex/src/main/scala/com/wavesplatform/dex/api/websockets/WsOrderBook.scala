@@ -7,21 +7,28 @@ import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
+import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBook(asks: WsSide, bids: WsSide, lastTrade: Option[WsLastTrade], updateId: Long, timestamp: Long = System.currentTimeMillis)
+case class WsOrderBook(asks: WsSide,
+                       bids: WsSide,
+                       lastTrade: Option[WsLastTrade],
+                       updateId: Long,
+                       settings: Option[WsOrderBookSettings],
+                       timestamp: Long = System.currentTimeMillis)
     extends WsMessage {
+
   override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
   override val tpe: String                             = "ob"
 }
 
 object WsOrderBook {
 
-  def wsUnapply(arg: WsOrderBook): Option[(String, Long, Long, WsSide, WsSide, Option[WsLastTrade])] =
-    (arg.tpe, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade).some
+  def wsUnapply(arg: WsOrderBook): Option[(String, Long, Long, WsSide, WsSide, Option[WsLastTrade], Option[WsOrderBookSettings])] =
+    (arg.tpe, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade, arg.settings).some
 
   type WsSide = TreeMap[Double, Double]
 
@@ -33,6 +40,7 @@ object WsOrderBook {
       asks = TreeMap.empty(asksOrdering),
       bids = TreeMap.empty(bidsOrdering),
       lastTrade = None,
+      settings = None,
       updateId = 0
     )
 
@@ -42,9 +50,10 @@ object WsOrderBook {
       (__ \ "U").format[Long] and
       (__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
       (__ \ "b").formatMayBeEmpty[WsSide](sideFormat(bidsOrdering), sideMayBeEmpty(bidsOrdering)) and
-      (__ \ "t").formatNullable[WsLastTrade]
+      (__ \ "t").formatNullable[WsLastTrade] and
+      (__ \ "s").formatNullable[WsOrderBookSettings]
   )(
-    (_, timestamp, uid, asks, bids, lastTrade) => WsOrderBook(asks, bids, lastTrade, uid, timestamp),
+    (_, timestamp, uid, asks, bids, lastTrade, settings) => WsOrderBook(asks, bids, lastTrade, uid, settings, timestamp),
     unlift(WsOrderBook.wsUnapply)
   )
 
@@ -84,12 +93,15 @@ object WsOrderBook {
            asks: Iterable[LevelAgg],
            bids: Iterable[LevelAgg],
            lt: Option[LastTrade],
-           updateId: Long): WsOrderBook =
+           updateId: Long,
+           restrictions: Option[OrderRestrictionsSettings],
+           tickSize: Double): WsOrderBook =
     WsOrderBook(
       asks = side(amountDecimals, priceDecimals, asks, asksOrdering),
       bids = side(amountDecimals, priceDecimals, bids, bidsOrdering),
       lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)),
-      updateId = updateId
+      updateId = updateId,
+      settings = WsOrderBookSettings(restrictions, tickSize.some).some
     )
 
   def lastTrade(amountDecimals: Int, priceDecimals: Int, x: LastTrade): WsLastTrade = WsLastTrade(

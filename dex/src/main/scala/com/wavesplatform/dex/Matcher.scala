@@ -118,7 +118,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
       normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
-      Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache)
+      Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
+      settings.orderRestrictions.get(assetPair)
     )
   }
 
@@ -163,7 +164,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         matcherPublicKey.toAddress,
         time,
         actualOrderFeeSettings,
-        settings.orderRestrictions,
+        settings.orderRestrictions.get(o.assetPair),
         orderAssetsDescriptions,
         rateCache,
         hasMatcherAccountScript

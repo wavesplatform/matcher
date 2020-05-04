@@ -69,6 +69,8 @@ object Dependencies {
     val influxDb    = "2.17"
 
     val commonsNet = "3.6"
+
+    val monocle = "2.0.4"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -127,6 +129,11 @@ object Dependencies {
   private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
+
+  private val monocle: Seq[ModuleID] = Seq(
+    "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
+    "com.github.julien-truffaut" %% "monocle-macro" % Version.monocle
+  )
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
@@ -212,7 +219,7 @@ object Dependencies {
       influxDb,
       commonsNet,
       swaggerUi
-    ) ++ testKit ++ quill ++ silencer
+    ) ++ testKit ++ quill ++ silencer ++ monocle
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

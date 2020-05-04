@@ -925,7 +925,7 @@ class OrderValidatorSpecification
         MatcherAccount,
         time,
         DynamicSettings.symmetric(matcherFee),
-        matcherSettings.orderRestrictions,
+        matcherSettings.orderRestrictions.get(order.assetPair),
         assetDescriptions,
         rateCache,
         hasMatcherAccountScript = false
@@ -1036,7 +1036,7 @@ class OrderValidatorSpecification
         MatcherAccount.toAddress,
         time,
         orderFeeSettings,
-        orderRestrictions,
+        orderRestrictions.get(order.assetPair),
         assetDescriptions = assetsDescriptions,
         rateCache,
         matcherAccountScript.nonEmpty

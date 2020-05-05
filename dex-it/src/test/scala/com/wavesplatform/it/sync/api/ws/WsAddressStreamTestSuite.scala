@@ -39,7 +39,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         WsAddressSubscribe(
           fooAddress,
           WsAddressSubscribe.defaultAuthType,
-          mkJwt(mkJwtSignedPayload(barKeyPair))
+          mkJwt(barKeyPair)
         ))
 
       val errors = wsc.receiveAtLeastN[WsError](1)
@@ -69,6 +69,30 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       eventually {
         wsc2.balanceChanges should have size 1
       }
+    }
+
+    "stop send updates after unsubscribe and receive them again after subscribe" in {
+      val acc = mkAccountWithBalance(10.waves -> Waves)
+
+      val wsc = mkWsAddressConnection(acc, dex1)
+      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.clearMessages()
+
+      markup("Unsubscribe")
+      wsc.send(WsUnsubscribe(acc))
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      wsc.receiveNoMessages()
+
+      markup("Subscribe")
+      wsc.send(WsAddressSubscribe(acc, WsAddressSubscribe.defaultAuthType, mkJwt(acc)))
+      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.clearMessages()
+
+      markup("Update")
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      wsc.receiveAtLeastN[WsAddressState](1)
+
+      wsc.close()
     }
 
     "send account updates to authenticated user" - {

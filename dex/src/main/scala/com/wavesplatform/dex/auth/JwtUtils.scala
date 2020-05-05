@@ -3,7 +3,7 @@ package com.wavesplatform.dex.auth
 import java.security
 
 import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
-import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import pdi.jwt.{JwtAlgorithm, JwtJson}
 import play.api.libs.json.{JsObject, Json}
@@ -15,12 +15,12 @@ trait JwtUtils {
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JsObject): String =
     JwtJson.encode(payload, authServiceKeyPair.getPrivate, JwtAlgorithm.RS256)
 
-  def mkJwtSignedPayload(clientKeyPair: KeyPair,
-                         networkByte: Byte = AddressScheme.current.chainId,
-                         lifetime: FiniteDuration = 1.minute): JwtPayload =
-    mkJwtPayload(clientKeyPair, networkByte, lifetime).signed(clientKeyPair)
+  def mkJwtSignedPayload(clientKeyPair: KeyPair, networkByte: Byte = AddressScheme.current.chainId, lifetime: FiniteDuration = 1.hour): JwtPayload =
+    mkJwtNotSignedPayload(clientKeyPair, networkByte, lifetime).signed(clientKeyPair)
 
-  def mkJwtPayload(clientPublicKey: PublicKey, networkByte: Byte = AddressScheme.current.chainId, lifetime: FiniteDuration = 1.minute): JwtPayload = {
+  def mkJwtNotSignedPayload(clientPublicKey: PublicKey,
+                            networkByte: Byte = AddressScheme.current.chainId,
+                            lifetime: FiniteDuration = 1.hour): JwtPayload = {
     val exp = System.currentTimeMillis() / 1000 + lifetime.toSeconds
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),

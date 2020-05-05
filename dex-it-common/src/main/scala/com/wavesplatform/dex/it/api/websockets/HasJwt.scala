@@ -7,6 +7,7 @@ import java.util.Base64
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
+import com.wavesplatform.dex.domain.account.KeyPair
 import play.api.libs.json.Json
 
 trait HasJwt extends JwtUtils {
@@ -24,4 +25,5 @@ trait HasJwt extends JwtUtils {
   )
 
   protected def mkJwt(payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
+  protected def mkJwt(clientKeyPair: KeyPair): String = mkJwt(mkJwtSignedPayload(clientKeyPair))
 }

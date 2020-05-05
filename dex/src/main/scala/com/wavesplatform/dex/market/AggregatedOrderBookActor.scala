@@ -34,7 +34,7 @@ object AggregatedOrderBookActor {
   object Command {
     case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], tickSize: Option[Double], ts: Long) extends Command
     case class AddWsSubscription(client: ActorRef[WsOrderBook])                                                           extends Command
-    case class RemoveWsSubscription(client: ActorRef[WsOrderBook])                              extends Command
+    case class RemoveWsSubscription(client: ActorRef[WsOrderBook])                                                        extends Command
     private[AggregatedOrderBookActor] case object SendWsUpdates                                                           extends Command
   }
 

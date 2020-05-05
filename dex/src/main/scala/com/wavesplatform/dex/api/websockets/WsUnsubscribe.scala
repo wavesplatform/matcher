@@ -18,6 +18,9 @@ object WsUnsubscribe {
 
   val tpe = "u"
 
+  def apply(key: AssetPair): WsUnsubscribe = new WsUnsubscribe(Coproduct[Key](key))
+  def apply(key: Address): WsUnsubscribe   = new WsUnsubscribe(Coproduct[Key](key))
+
   def wsUnapply(arg: WsUnsubscribe): Option[(String, Key)] = (arg.tpe, arg.key).some
 
   private val keyFormat: Format[Key] = Format(
@@ -31,7 +34,7 @@ object WsUnsubscribe {
         .getOrElse(JsError(JsPath, "Can't parse key as address or as asset pair"))
     },
     tjs = Writes {
-      case Inl(x)      => Json.toJson(x)
+      case Inl(x)      => Json.toJson(x)(assetPairKeyAsStringFormat)
       case Inr(Inl(x)) => Json.toJson(x)
       case Inr(Inr(_)) => throw new IllegalArgumentException("Impossibru: CNil")
     }

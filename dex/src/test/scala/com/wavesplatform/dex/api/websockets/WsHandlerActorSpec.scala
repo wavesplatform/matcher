@@ -139,7 +139,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
         )
 
         "invalid signature" in failTest(
-          mkJwt(mkJwtPayload(clientKeyPair)),
+          mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
           WsError(
             timestamp = 0L,
             code = 110103809, // InvalidJwtSignature

@@ -353,6 +353,29 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       assertUpdateId(wsc2, 1)
     }
 
+    "stop send updates after unsubscribe and receive them again after subscribe" in {
+      val wsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
+      wsc.receiveAtLeastN[WsOrderBook](1)
+      wsc.clearMessages()
+
+      markup("Unsubscribe")
+      wsc.send(WsUnsubscribe(wavesBtcPair))
+      val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.waves, 0.00005)
+      placeAndAwaitAtDex(order)
+      wsc.receiveNoMessages()
+
+      markup("Subscribe")
+      wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
+      wsc.receiveAtLeastN[WsOrderBook](1)
+      wsc.clearMessages()
+
+      markup("Update")
+      cancelAndAwait(carol, order)
+      wsc.receiveAtLeastN[WsOrderBook](1)
+
+      wsc.close()
+    }
+
     "handle many connections simultaneously" in {
       Await
         .result(

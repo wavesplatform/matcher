@@ -1,13 +1,12 @@
 package com.wavesplatform.it.sync.api.ws
 
-import java.util.Base64
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
@@ -15,13 +14,9 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex {
-       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-       |  web-sockets.web-socket-handler.jwt-public-key = \"\"\"-----BEGIN PUBLIC KEY-----
-       |${Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded).grouped(64).mkString("\n")}
-       |-----END PUBLIC KEY-----\"\"\"
-       |}""".stripMargin)
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory
+    .parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+    .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -32,9 +27,32 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   override def afterEach(): Unit = dex1.api.cancelAll(alice)
 
-  private def mkWsConnection(account: KeyPair) = mkWsAddressConnection(account, dex1)
+  private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
 
   "Address stream should" - {
+    "correctly handle rejections" in {
+      val fooAddress = mkKeyPair("foo").toAddress
+      val barKeyPair = mkKeyPair("bar")
+
+      val wsc = mkWsConnection(dex1)
+      wsc.send(
+        WsAddressSubscribe(
+          fooAddress,
+          WsAddressSubscribe.defaultAuthType,
+          mkJwt(mkJwtSignedPayload(barKeyPair))
+        ))
+
+      val errors = wsc.receiveAtLeastN[WsError](1)
+      errors.head.copy(timestamp = 0L) should matchTo(
+        WsError(
+          timestamp = 0L,
+          code = 106957828, // AddressAndPublicKeyAreIncompatible
+          message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
+        ))
+
+      wsc.close()
+    }
+
     "stop send updates after closing by user and resend after user open it again" in {
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsAddressConnection(acc, dex1)
@@ -56,7 +74,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     "send account updates to authenticated user" - {
 
       "when account is empty" in {
-        val wsac = mkWsConnection(mkKeyPair("Test"))
+        val wsac = mkWsAddressConnection(mkKeyPair("Test"))
         eventually { wsac.messages should have size 1 }
         assertChanges(wsac, squash = false)()()
         wsac.close()
@@ -65,7 +83,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user places and cancels limit orders" in {
 
         val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)) }()
 
@@ -99,7 +117,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
         val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves); Thread.sleep(150)
-        val wsc                               = mkWsConnection(acc)
+        val wsc                               = mkWsAddressConnection(acc)
         val smo                               = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
         val mo                                = MarketOrder(smo, tradableBalance.apply _)
 
@@ -138,7 +156,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user's order is fully filled with another one" in {
 
         val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
 
@@ -164,7 +182,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user's order is partially filled with another one" in {
 
         val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
 
@@ -194,7 +212,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user make a transfer" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
         broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
@@ -206,7 +224,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user issued a new asset after establishing the connection" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0)) }()
         val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
@@ -227,7 +245,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
         broadcastAndAwait(txIssue); Thread.sleep(150)
 
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
         assertChanges(wsc)(
           Map(Waves       -> WsBalances(9, 0)),
           Map(issuedAsset -> WsBalances(1000, 0))
@@ -239,7 +257,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user burnt part of the asset amount" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
         broadcastAndAwait(mkBurn(acc, usd, 10.usd))
@@ -255,7 +273,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "user burnt all of the asset amount" in {
 
         val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
-        val wsc = mkWsConnection(acc)
+        val wsc = mkWsAddressConnection(acc)
 
         assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
         broadcastAndAwait(mkBurn(acc, usd, 20.usd))
@@ -305,57 +323,4 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     Seq(wsc1, wsc2).foreach { _.close() }
     dex1.api.cancelAll(acc)
   }
-
-//  "correctly handle rejections" in {
-//    val ts = System.currentTimeMillis
-//
-//    val fooKeyPair = mkKeyPair("foo")
-//    val fooAddress = fooKeyPair.toAddress
-//
-//    val barKeyPair = mkKeyPair("bar").publicKey
-//    val barAddress = barKeyPair.toAddress
-//
-//    val invalidAddress = "foo"
-//
-//    forAll(
-//      Table(
-//        // format: off
-//        ("address",                                "jwt", "expected error"),
-//        (uriWithoutParams,                         "",     ApiKeyIsNotValid.some),
-//        (uriWithoutParams,                         "",     AuthIsRequired.some),
-//        (uriWithoutParams,                         "",     None),
-//
-//        (uriWithParams(fooAddress, pk, s),         "",     ApiKeyIsNotValid.some),
-//        (uriWithParams(fooAddress, pk, s),         "",     None),
-//        (uriWithParams(fooAddress, pk, s),         "",     None),
-//
-//        (uriWithParams(fooAddress, barKeyPair, s), "",     ApiKeyIsNotValid.some),
-//        (uriWithParams(fooAddress, barKeyPair, s), "",     AddressAndPublicKeyAreIncompatible(fooAddress, barKeyPair).some),
-//        (uriWithParams(fooAddress, barKeyPair, s), "",     None),
-//
-//        (uriWithParams(fooAddress, invalidPk, s),  "",     ApiKeyIsNotValid.some),
-//        (uriWithParams(fooAddress, invalidPk, s),  "",     UserPublicKeyIsNotValid.some),
-//        (uriWithParams(fooAddress, invalidPk, s),  "",     None),
-//
-//        (uriWithParams(fooAddress, pk, invalidS),  "",     ApiKeyIsNotValid.some),
-//        (uriWithParams(fooAddress, pk, invalidS),  "",     RequestInvalidSignature.some),
-//        (uriWithParams(fooAddress, pk, invalidS),  "",     None)
-//        // format: on
-//      )
-//    ) { (address, expectedError) =>
-//      val connection = mkWsConnection(dex1)
-//      connection.send(WsAddressSubscribe(address, ))
-//
-//      val response = Await.result(connection.getConnectionResponse, 1.second).response
-//
-//      response.status shouldBe expectedStatus
-//
-//      expectedError.foreach { error =>
-//        response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
-//        response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
-//      }
-//
-//      connection.close()
-//    }
-//  }
 }

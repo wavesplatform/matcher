@@ -376,7 +376,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.close()
     }
 
-    "handle many connections simultaneously" in {
+    "handle many connections simultaneously" ignore {
       Await
         .result(
           Future.traverse { (1 to 1000).toList }(
@@ -394,7 +394,6 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
     }
 
     "close connections when it is deleted" in {
-
       val seller                          = mkAccountWithBalance(100.waves -> Waves)
       val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "cJIoHoxpeH", 1000.asset8)
       val assetPair                       = AssetPair(asset, Waves)
@@ -403,11 +402,20 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       dex1.api.place(mkOrderDP(seller, assetPair, SELL, 100.asset8, 5.0))
 
       val wsc1, wsc2, wsc3 = mkWsOrderBookConnection(assetPair, dex1)
-      Seq(wsc1, wsc2, wsc3).foreach { _.receiveAtLeastN[WsOrderBook](1) }
+      val wscs             = List(wsc1, wsc2, wsc3)
+      wscs.foreach { _.receiveAtLeastN[WsOrderBook](1) }
 
       dex1.api.tryDeleteOrderBook(assetPair)
 
-      eventually { Seq(wsc1, wsc2, wsc3).foreach(_.isClosed shouldBe true) }
+      val expectedMessage = WsError(
+        timestamp = 0L,
+        code = 8388624, // OrderBookStopped
+        message = s"The order book for $assetPair is stopped, please contact with the administrator"
+      )
+      wscs.foreach { wsc =>
+        wsc.receiveAtLeastN[WsError](1).head.copy(timestamp = 0L) should matchTo(expectedMessage)
+        wsc.close()
+      }
     }
   }
 }

@@ -29,7 +29,7 @@ import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.time.{SystemTime, Time}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpec
@@ -435,6 +435,7 @@ class AggregatedOrderBookActorSpec
       8,
       restrictions,
       tickSize,
+      Time.zero,
       AggregatedOrderBookActor.State.fromOrderBook(ob)
     ),
     s"aggregated-${ThreadLocalRandom.current().nextInt()}"

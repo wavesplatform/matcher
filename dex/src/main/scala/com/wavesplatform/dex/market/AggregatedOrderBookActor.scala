@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.OrderBookWsState
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsServerMessage}
+import com.wavesplatform.dex.api.websockets.{WsError, WsMessage, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.error.OrderBookStopped
@@ -13,6 +13,7 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
+import com.wavesplatform.dex.time.Time
 import monocle.macros.GenLens
 
 import scala.collection.immutable.TreeMap
@@ -46,6 +47,7 @@ object AggregatedOrderBookActor {
             priceDecimals: Int,
             restrictions: Option[OrderRestrictionsSettings],
             tickSize: Double,
+            time: Time,
             init: State): Behavior[Message] =
     Behaviors.setup { context =>
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
@@ -121,18 +123,17 @@ object AggregatedOrderBookActor {
             case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws) }
             case (_, PostStop) =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
-              val reason = OrderBookStopped(assetPair).message.text
+              val reason = OrderBookStopped(assetPair)
               state.ws.wsConnections.foreach {
                 case (client, _) =>
-                  // TODO remove subscription
                   context.log.trace(
                     s"[c={}] WebSocket connection closed, reason: {}",
                     client.path.name.asInstanceOf[Any],
-                    reason.asInstanceOf[Any]
+                    reason.message.text.asInstanceOf[Any]
                   )
-                  client.unsafeUpcast[WsMessage] ! WsServerMessage.Complete
+                  client.unsafeUpcast[WsMessage] ! WsError.from(reason, time.getTimestamp())
               }
-              default { state.modifyWs(_.copy(wsConnections = Map.empty)) }
+              Behaviors.stopped //default { state.modifyWs(_.copy(wsConnections = Map.empty)) }
           }
 
       default(init)

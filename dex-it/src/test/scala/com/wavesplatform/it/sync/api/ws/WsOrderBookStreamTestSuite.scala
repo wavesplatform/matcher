@@ -376,21 +376,16 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.close()
     }
 
-    "handle many connections simultaneously" ignore {
-      Await
-        .result(
-          Future.traverse { (1 to 1000).toList }(
-            _ =>
-              Future {
-                val c = mkWsOrderBookConnection(wavesBtcPair, dex1)
-                Thread.sleep(200)
-                c.receiveAtLeastN[WsOrderBook](1).head.updateId
-            }
-          ),
-          25.seconds
-        ) forall (_ == 0) shouldBe true
+    "handle many connections simultaneously" in {
+      val wscs = Await.result(
+        Future.traverse((1 to 200).toList)(_ => Future(mkWsConnection(dex1))),
+        25.seconds
+      )
 
-      knownWsConnections.forEach { _.close() }
+      wscs.foreach { wsc =>
+        wsc.isClosed shouldBe false
+        wsc.close()
+      }
     }
 
     "close connections when it is deleted" in {

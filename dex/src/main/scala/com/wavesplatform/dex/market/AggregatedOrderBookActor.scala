@@ -120,13 +120,15 @@ object AggregatedOrderBookActor {
           .receiveSignal {
             case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws) }
             case (_, PostStop) =>
+              context.log.warn("Order book was deleted, closing all WebSocket connections...")
+              val reason = OrderBookStopped(assetPair).message.text
               state.ws.wsConnections.foreach {
                 case (client, _) =>
                   // TODO remove subscription
                   context.log.trace(
                     s"[c={}] WebSocket connection closed, reason: {}",
                     client.path.name.asInstanceOf[Any],
-                    OrderBookStopped(assetPair).message.text.asInstanceOf[Any]
+                    reason.asInstanceOf[Any]
                   )
                   client.unsafeUpcast[WsMessage] ! WsServerMessage.Complete
               }

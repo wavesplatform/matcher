@@ -23,5 +23,11 @@ trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
       Thread.sleep(duration.toMillis)
       self.messages.size shouldBe sizeBefore
     }
+
+    def receiveNoMessagesOf[T <: WsServerMessage: ClassTag](duration: FiniteDuration = 1.second): Unit = {
+      val sizeBefore = self.collectMessages[T].size
+      Thread.sleep(duration.toMillis)
+      self.collectMessages[T].size shouldBe sizeBefore
+    }
   }
 }

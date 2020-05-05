@@ -95,6 +95,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       wsc.close()
     }
 
+    // TODO unsubscribe when token is expired
+
     "send account updates to authenticated user" - {
 
       "when account is empty" in {

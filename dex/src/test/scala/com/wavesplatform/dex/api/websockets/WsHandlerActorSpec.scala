@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.api.websockets
 
 import java.nio.charset.StandardCharsets
-import java.util.Base64
+import java.util.{Base64, UUID}
 
-import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestInbox}
+import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
@@ -17,16 +17,13 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.AggregatedOrderBookActor
 import com.wavesplatform.dex.market.MatcherActor.AggregatedOrderBookEnvelope
-import org.scalatest.concurrent.Eventually
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
-class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually with MatcherSpecBase with HasJwt {
-  override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 5.seconds, interval = 100.millis)
-
+class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
   private val testKit = ActorTestKit()
   implicit val ec     = testKit.system.executionContext
 
@@ -42,7 +39,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
         t.matcherProbe.expectMsg(
           AggregatedOrderBookEnvelope(
             assetPair,
-            AggregatedOrderBookActor.Command.AddWsSubscription(t.clientInbox.ref)
+            AggregatedOrderBookActor.Command.AddWsSubscription(t.clientProbe.ref)
           ))
       }
 
@@ -75,7 +72,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
         t.addressProbe.expectMsg(
           AddressDirectory.Envelope(
             clientKeyPair,
-            AddressActor.WsCommand.AddWsSubscription(t.clientInbox.ref)
+            AddressActor.WsCommand.AddWsSubscription(t.clientProbe.ref)
           ))
       }
 
@@ -172,24 +169,21 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
 
   private def failTest(message: ProcessClientMessage, expectedError: WsError): Unit = test { t =>
     t.wsHandlerRef ! message
-    eventually {
-      t.clientInbox.hasMessages shouldBe true
-      t.clientInbox.receiveMessage()
-    } match {
+    t.clientProbe.receiveMessage() match {
       case actualError: WsError => actualError should matchTo(expectedError)
       case x                    => fail(s"Unexpected message: $x")
     }
   }
 
-  private case class TestInstances(clientInbox: TestInbox[WsMessage],
+  private case class TestInstances(clientProbe: TypedTestProbe[WsMessage],
                                    matcherProbe: TestProbe,
                                    addressProbe: TestProbe,
                                    wsHandlerRef: ActorRef[WsHandlerActor.Message])
 
   private def test(f: TestInstances => Unit): Unit = {
-    val clientInbox  = TestInbox[WsMessage]()
-    val matcherProbe = TestProbe()(testKit.system.toClassic)
-    val addressProbe = TestProbe()(testKit.system.toClassic)
+    val clientInbox  = TypedTestProbe[WsMessage]()(testKit.system)
+    val matcherProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
+    val addressProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
 
     val wsHandlerRef = testKit.spawn(
       WsHandlerActor(

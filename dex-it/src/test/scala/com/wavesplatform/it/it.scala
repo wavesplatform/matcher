@@ -19,10 +19,10 @@ package object it {
     * @return The number of successful commands
     */
   def executeCommands(xs: Seq[MatcherCommand], ignoreErrors: Boolean = true, timeout: FiniteDuration = 3.minutes): Int = {
-    Await.result(Future.sequence(xs.map(executeCommand(_))), timeout).sum
+    Await.result(Future.sequence(xs.map(executeCommand(_, ignoreErrors))), timeout).sum
   }
 
-  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean = true): Future[Int] = x match {
+  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] = x match {
     case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
     case MatcherCommand.Cancel(api, owner, order) =>
       try api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
@@ -42,7 +42,7 @@ package object it {
       tpe            <- Gen.oneOf(types)
       amount         <- Gen.choose(10, 100)
       price          <- Gen.choose(10, 100)
-      orderVersion   <- Gen.oneOf(1: Byte, 2: Byte)
+      orderVersion   <- Gen.choose[Byte](1, 3)
       expirationDiff <- Gen.choose(600000, 6000000)
     } yield {
       val ts = System.currentTimeMillis()

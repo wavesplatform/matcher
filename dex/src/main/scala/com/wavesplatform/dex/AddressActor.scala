@@ -26,7 +26,7 @@ import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalance
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.market.{BatchOrderCancelActor, CreateExchangeTransactionActor}
-import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted, Event => OrderEvent}
+import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCancelFailed, OrderCanceled, OrderExecuted, Event => OrderEvent}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent
 import com.wavesplatform.dex.time.Time
@@ -224,6 +224,12 @@ class AddressActor(owner: Address,
       pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
+      }
+
+    case OrderCancelFailed(id, reason) =>
+      pendingCommands.remove(id).foreach { pc =>
+        log.warn(s"Storing of cancel event for $id failed, reason: ${reason.message.text}")
+        pc.client ! api.OrderCancelRejected(reason)
       }
 
     case CancelExpiredOrder(id) =>

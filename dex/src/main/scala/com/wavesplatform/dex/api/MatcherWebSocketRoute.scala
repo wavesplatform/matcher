@@ -67,7 +67,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
     val (clientRef, clientSource) = client.preMaterialize()
     val webSocketHandlerRef = mat.system.spawn(
-      behavior = WsHandlerActor(webSocketHandler, maxConnectionLifetime, time, assetPairBuilder, clientRef, matcher, addressDirectory),
+      behavior = WsHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory),
       name = s"handler-$clientId"
     )
 

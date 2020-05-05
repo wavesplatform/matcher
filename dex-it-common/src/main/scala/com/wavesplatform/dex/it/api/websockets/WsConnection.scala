@@ -52,7 +52,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
           case _                   =>
         }
 
-      case JsError(e) => log.error(s"Can't parse message: ${x.asTextMessage.getStrictText}, $e")
+      case JsError(e) => log.error(s"Can't parse message: $rawMsg, $e")
     }
   }
 

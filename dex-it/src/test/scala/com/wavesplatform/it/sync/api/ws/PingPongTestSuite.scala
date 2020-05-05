@@ -15,8 +15,8 @@ class PingPongTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex.web-sockets {
-        |  max-connection-lifetime = $maxConnectionLifetime
         |  web-socket-handler {
+        |    max-connection-lifetime = $maxConnectionLifetime
         |    ping-interval = $pingInterval
         |    pong-timeout = $pongTimeout
         |  }
@@ -111,7 +111,8 @@ class PingPongTestSuite extends WsSuiteBase {
       }
     }
 
-    "by signed connection lifetime expiration, if it < max-connection-lifetime" in {
+    // TODO DEX-733
+    "by signed connection lifetime expiration, if it < max-connection-lifetime" ignore {
       val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false, connectionLifetime = 1.5.seconds)
       wsac.isClosed shouldBe false
 

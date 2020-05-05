@@ -17,12 +17,15 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
-  override protected def dexInitialSuiteConfig: Config = {
-    ConfigFactory.parseString(s"""waves.dex {
-                                 |  price-assets = [ "$UsdId", "WAVES" ]
-                                 |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
-                                 |}""".stripMargin)
-  }
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory
+      .parseString(
+        s"""waves.dex {
+           |  price-assets = [ "$UsdId", "WAVES" ]
+           |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+           |}""".stripMargin
+      )
+      .withFallback(jwtPublicKeyConfig)
 
   lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
@@ -43,7 +46,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       val acc = mkAccountWithBalance(100.waves -> Waves)
       val wsc = mkWsAddressConnection(acc, dex1)
 
-      eventually { wsc.balanceChanges should have size 1 }
+      eventually { wsc.addressStateChanges should have size 1 }
 
       wsc.close()
       dex1.disconnectFromNetwork()

@@ -95,7 +95,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       wsc.close()
     }
 
-    // TODO unsubscribe when token is expired
+    // TODO DEX-733 unsubscribe when token is expired. Move a test from PingPongTestSuite
 
     "send account updates to authenticated user" - {
 

@@ -133,7 +133,7 @@ object AggregatedOrderBookActor {
                   )
                   client.unsafeUpcast[WsMessage] ! WsError.from(reason, time.getTimestamp())
               }
-              Behaviors.stopped //default { state.modifyWs(_.copy(wsConnections = Map.empty)) }
+              Behaviors.stopped
           }
 
       default(init)

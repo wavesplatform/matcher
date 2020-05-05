@@ -193,8 +193,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
 
     val wsHandlerRef = testKit.spawn(
       WsHandlerActor(
-        settings = WsHandlerActor.Settings(1.minute, 3.minutes, Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded)),
-        maxConnectionLifetime = 10.minutes,
+        settings = WsHandlerActor.Settings(10.minutes, 1.minute, 3.minutes, Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded)),
         time = zeroTime,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,

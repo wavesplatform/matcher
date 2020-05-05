@@ -32,15 +32,17 @@ class KafkaIssuesTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
-  override protected lazy val dexRunConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex.events-queue {
+  override protected lazy val dexRunConfig: Config = ConfigFactory
+    .parseString(
+      s"""waves.dex.events-queue {
        |  type = kafka
        |  kafka {
        |    servers = "$kafkaIp:9092"
        |    topic = "dex-${ThreadLocalRandom.current.nextInt(0, Int.MaxValue)}"
        |  }
        |}""".stripMargin
-  )
+    )
+    .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

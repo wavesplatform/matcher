@@ -13,8 +13,6 @@ trait WsConnectionOps {
 
     def pings: List[WsPingOrPong] = collectMessages[WsPingOrPong]
 
-    def orderBookChanges: List[WsOrderBook] = collectMessages[WsOrderBook]
-
     def addressStateChanges: List[WsAddressState]    = collectMessages[WsAddressState]
     def balanceChanges: List[Map[Asset, WsBalances]] = addressStateChanges.map(_.balances).filter(_.nonEmpty)
     def orderChanges: List[WsOrder]                  = addressStateChanges.flatMap(_.orders)

@@ -19,7 +19,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
 
   def validate(jwtPublicKey: String, networkByte: Byte): Either[MatcherError, JwtPayload] =
     for {
-      _ <- Either.cond(supportedAuth.contains(authType), (), error.SubscriptionAuthTypeUnsupported(supportedAuth, authType))
+      _ <- Either.cond(supportedAuthTypes.contains(authType), (), error.SubscriptionAuthTypeUnsupported(supportedAuthTypes, authType))
       rawJsonPayload <- JwtJson
         .decodeJson(
           token = jwt,
@@ -42,10 +42,10 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
 
 object WsAddressSubscribe {
 
-  val tpe             = "aus"
-  val defaultAuthType = "jwt"
-  val supportedAuth   = Set(defaultAuthType)
-  val leewayInSeconds = 10
+  val tpe                = "aus"
+  val defaultAuthType    = "jwt"
+  val supportedAuthTypes = Set(defaultAuthType)
+  val leewayInSeconds    = 10
 
   def wsUnapply(arg: WsAddressSubscribe): Option[(String, Address, String, String)] = (arg.tpe, arg.key, arg.authType, arg.jwt).some
 

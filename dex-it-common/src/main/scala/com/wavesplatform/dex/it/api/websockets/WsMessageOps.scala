@@ -34,7 +34,8 @@ trait WsMessageOps {
             bids = orig.bids ++ x.bids,
             lastTrade = orig.lastTrade.orElse(x.lastTrade),
             updateId = x.updateId,
-            timestamp = x.timestamp
+            timestamp = x.timestamp,
+            settings = orig.settings.orElse(x.settings)
           )
         )
     }

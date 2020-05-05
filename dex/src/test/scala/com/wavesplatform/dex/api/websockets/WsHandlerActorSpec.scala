@@ -99,7 +99,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with Eventually w
         )
 
         "expired" in failTest(
-          mkJwt(mkJwtSignedPayload(clientKeyPair, expiration = -1.minute)),
+          mkJwt(mkJwtSignedPayload(clientKeyPair, lifetime = -1.minute)),
           WsError(
             timestamp = 0L,
             code = 110105088, // SubscriptionTokenExpired

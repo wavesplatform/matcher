@@ -78,11 +78,12 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 199))
 
         val wsc     = mkWsOrderBookConnection(ethWavesPair, dex1)
-        val buffer0 = receiveAtLeastN(wsc, 1)
+        val buffer0 = wsc.receiveAtLeastN[WsOrderBook](1)
 
         buffer0 should have size 1
-        squashOrderBooks(buffer0) should matchTo(
+        buffer0.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = ethWavesPair,
             asks = TreeMap(199d -> 1d),
             bids = TreeMap.empty,
             lastTrade = None,
@@ -92,14 +93,15 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
           )
         )
 
-        wsc.clearMessagesBuffer()
+        wsc.clearMessages()
         placeAndAwaitAtDex(mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 200))
 
-        val buffer1 = receiveAtLeastN(wsc, 1)
+        val buffer1 = wsc.receiveAtLeastN[WsOrderBook](1)
 
         buffer1.size should (be >= 1 and be <= 2)
-        squashOrderBooks(buffer1) should matchTo(
+        buffer1.squashed.values.head should matchTo(
           WsOrderBook(
+            assetPair = ethWavesPair,
             asks = TreeMap(200d -> 1d),
             bids = TreeMap.empty,
             lastTrade = None,

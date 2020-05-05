@@ -5,7 +5,6 @@ import java.util.UUID
 import akka.Done
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
-import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Sink}
@@ -41,8 +40,6 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   import mat.executionContext
 
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller // TODO remove ???
-
   private def mkFailure(msg: String): Future[Nothing]                = Future.failed { new IllegalArgumentException(msg) }
   private val binaryMessageUnsupportedFailure: Future[Nothing]       = mkFailure("Binary messages are not supported")
   private def unexpectedMessageFailure(msg: String): Future[Nothing] = mkFailure(s"Got unexpected message instead of pong: $msg")
@@ -77,7 +74,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     val server = ActorSink
       .actorRef(
         ref = webSocketHandlerRef,
-        onCompleteMessage = WsHandlerActor.Command.Stop,
+        onCompleteMessage = WsHandlerActor.Completed,
         onFailureMessage = WsHandlerActor.Command.ProcessClientError
       )
       .named(s"server-$clientId")

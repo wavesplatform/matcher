@@ -115,8 +115,7 @@ object Application {
     if (Option(System.getProperty("waves.dex.root-directory")).isEmpty)
       System.setProperty("waves.dex.root-directory", config.getString("waves.dex.root-directory"))
 
-    val log                = LoggerFacade(LoggerFactory getLogger getClass)
-
+    val log = LoggerFacade(LoggerFactory getLogger getClass)
     log.info("Starting...")
     sys.addShutdownHook { SystemInformationReporter.report(config) }
 

@@ -24,11 +24,12 @@ object WsHandlerActor {
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
     case class ProcessClientError(error: Throwable)             extends Command
-    case object Stop                                            extends Command
 
-    private[WsHandlerActor] case object SendPing                             extends Command
-    private[WsHandlerActor] case class CloseConnection(reason: MatcherError) extends Command
+    case class CloseConnection(reason: MatcherError) extends Command
+    private[WsHandlerActor] case object SendPing     extends Command
   }
+
+  case object Completed extends Message // Could be an event in the future
 
   final case class Settings(pingInterval: FiniteDuration, pongTimeout: FiniteDuration, jwtPublicKey: String)
 
@@ -122,7 +123,8 @@ object WsHandlerActor {
             context.log.debug("Got an error from the client, stopping: {}", command.error)
             Behaviors.stopped
 
-          case Command.Stop =>
+          case Completed =>
+            List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
             context.log.debug("Got a stop request, stopping...")
             Behaviors.stopped
 

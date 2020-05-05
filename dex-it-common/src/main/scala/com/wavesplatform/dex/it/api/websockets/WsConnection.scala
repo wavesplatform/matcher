@@ -31,7 +31,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
     Source
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
-      .map(WsMessage.toStrictTextMessage(_))
+      .map(WsMessage.toStrictTextMessage(_)(WsClientMessage.wsClientMessageWrites))
       .mapMaterializedValue { source =>
         wsHandlerRef.tell(TestWsHandlerActor.AssignSourceRef, source)
         source

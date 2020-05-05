@@ -1,15 +1,10 @@
 package com.wavesplatform.it.sync.api.ws
 
-import java.nio.charset.StandardCharsets
+import java.util.Base64
 
-import com.wavesplatform.dex.error._
-import cats.syntax.option._
-import com.google.common.primitives.Longs
-import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
-import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -20,7 +15,13 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+       |  web-sockets.web-socket-handler.jwt-public-key = \"\"\"-----BEGIN PUBLIC KEY-----
+       |${Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded).grouped(64).mkString("\n")}
+       |-----END PUBLIC KEY-----\"\"\"
+       |}""".stripMargin)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -33,219 +34,239 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
   private def mkWsConnection(account: KeyPair) = mkWsAddressConnection(account, dex1)
 
-  "Private stream should send account updates to authenticated user" - {
+  "Address stream should" - {
+    "stop send updates after closing by user and resend after user open it again" in {
+      val acc = mkAccountWithBalance(10.waves -> Waves)
+      val wsc = mkWsAddressConnection(acc, dex1)
 
-    "when account is empty" in {
-      val wsac = mkWsConnection(mkKeyPair("Test"))
-      eventually { wsac.messages should have size 1 }
-      assertChanges(wsac, squash = false)()()
-      wsac.close()
+      eventually {
+        wsc.balanceChanges should have size 1
+      }
+      wsc.close()
+
+      broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
+      wsc.balanceChanges should have size 1
+
+      val wsc2 = mkWsAddressConnection(acc, dex1)
+      eventually {
+        wsc2.balanceChanges should have size 1
+      }
     }
 
-    "when user places and cancels limit orders" in {
+    "send account updates to authenticated user" - {
 
-      val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+      "when account is empty" in {
+        val wsac = mkWsConnection(mkKeyPair("Test"))
+        eventually { wsac.messages should have size 1 }
+        assertChanges(wsac, squash = false)()()
+        wsac.close()
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)) }()
+      "when user places and cancels limit orders" in {
 
-      val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
-      val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0, feeAsset = usd, matcherFee = 0.3.usd)
+        val acc = mkAccountWithBalance(150.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      Seq(bo1, bo2).foreach { placeAndAwaitAtDex(_) }
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(150.0, 0.0)) }()
 
-      assertChanges(wsc)(
-        Map(usd -> WsBalances(50, 100), Waves -> WsBalances(9.997, 0.003)),
-        Map(usd -> WsBalances(39.70, 110.30))
-      )(
-        WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-        WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
-      )
+        val bo1 = mkOrderDP(acc, wavesUsdPair, BUY, 100.waves, 1.0)
+        val bo2 = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0, feeAsset = usd, matcherFee = 0.3.usd)
 
-      cancelAndAwait(acc, bo1)
-      assertChanges(wsc, squash = false) { Map(usd -> WsBalances(139.70, 10.30), Waves -> WsBalances(10, 0)) }(
-        WsOrder(bo1.id(), OrderStatus.Cancelled.name)
-      )
+        Seq(bo1, bo2).foreach { placeAndAwaitAtDex(_) }
 
-      cancelAndAwait(acc, bo2)
-      assertChanges(wsc, squash = false) { Map(usd -> WsBalances(150, 0)) }(
-        WsOrder(bo2.id(), OrderStatus.Cancelled.name)
-      )
+        assertChanges(wsc)(
+          Map(usd -> WsBalances(50, 100), Waves -> WsBalances(9.997, 0.003)),
+          Map(usd -> WsBalances(39.70, 110.30))
+        )(
+          WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
+          WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
+        )
 
-      wsc.close()
-    }
+        cancelAndAwait(acc, bo1)
+        assertChanges(wsc, squash = false) { Map(usd -> WsBalances(139.70, 10.30), Waves -> WsBalances(10, 0)) }(
+          WsOrder(bo1.id(), OrderStatus.Cancelled.name)
+        )
 
-    "when user places market order and it is filled" in {
+        cancelAndAwait(acc, bo2)
+        assertChanges(wsc, squash = false) { Map(usd -> WsBalances(150, 0)) }(
+          WsOrder(bo2.id(), OrderStatus.Cancelled.name)
+        )
 
-      val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
-      val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves); Thread.sleep(150)
-      val wsc                               = mkWsConnection(acc)
-      val smo                               = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
-      val mo                                = MarketOrder(smo, tradableBalance.apply _)
+        wsc.close()
+      }
 
-      assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(51.003, 0)))()
+      "when user places market order and it is filled" in {
 
-      Seq(
-        15.waves -> 1.2,
-        25.waves -> 1.1,
-        40.waves -> 1.0
-      ).foreach { case (a, p) => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, a, p)) }; Thread.sleep(150)
+        val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
+        val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves); Thread.sleep(150)
+        val wsc                               = mkWsConnection(acc)
+        val smo                               = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
+        val mo                                = MarketOrder(smo, tradableBalance.apply _)
 
-      dex1.api.placeMarket(smo)
-      waitForOrderAtNode(smo)
+        assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(51.003, 0)))()
 
-      import OrderStatus._
+        Seq(
+          15.waves -> 1.2,
+          25.waves -> 1.1,
+          40.waves -> 1.0
+        ).foreach { case (a, p) => placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, BUY, a, p)) }; Thread.sleep(150)
 
-      assertChanges(wsc)(
-        Map(Waves -> WsBalances(1, 50.003)),
-        Map(Waves -> WsBalances(1, 35.0021)),
-        Map(Waves -> WsBalances(1, 10.0006)),
-        Map(Waves -> WsBalances(1, 0)),
-        Map(usd   -> WsBalances(18, 0)),
-        Map(usd   -> WsBalances(45.5, 0)),
-        Map(usd   -> WsBalances(55.5, 0))
-      )(
-        WsOrder.fromDomain(mo, status = Accepted),
-        WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
-        WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
-        WsOrder(mo.id, status = Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
-      )
+        dex1.api.placeMarket(smo)
+        waitForOrderAtNode(smo)
 
-      wsc.close()
-      dex1.api.cancelAll(alice)
-    }
+        import OrderStatus._
 
-    "when user's order is fully filled with another one" in {
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(1, 50.003)),
+          Map(Waves -> WsBalances(1, 35.0021)),
+          Map(Waves -> WsBalances(1, 10.0006)),
+          Map(Waves -> WsBalances(1, 0)),
+          Map(usd   -> WsBalances(18, 0)),
+          Map(usd   -> WsBalances(45.5, 0)),
+          Map(usd   -> WsBalances(55.5, 0))
+        )(
+          WsOrder.fromDomain(mo, status = Accepted),
+          WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
+          WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
+          WsOrder(mo.id, status = Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
+        )
 
-      val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+        dex1.api.cancelAll(alice)
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
+      "when user's order is fully filled with another one" in {
 
-      val bo = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      placeAndAwaitAtDex(bo)
-      placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 1.0))
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
 
-      assertChanges(wsc)(
-        Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
-        Map(Waves -> WsBalances(9.997, 0)),
-        Map(usd   -> WsBalances(0, 0)),
-        Map(Waves -> WsBalances(19.997, 0)) // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
-      )(
-        WsOrder.fromDomain(LimitOrder(bo), OrderStatus.Accepted),
-        WsOrder(bo.id(), status = OrderStatus.Filled.name, filledAmount = 10.0, filledFee = 0.003, avgWeighedPrice = 1.0)
-      )
+        val bo = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
 
-      wsc.close()
-      dex1.api.cancelAll(acc)
-    }
+        placeAndAwaitAtDex(bo)
+        placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 1.0))
 
-    "when user's order is partially filled with another one" in {
+        assertChanges(wsc)(
+          Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
+          Map(Waves -> WsBalances(9.997, 0)),
+          Map(usd   -> WsBalances(0, 0)),
+          Map(Waves -> WsBalances(19.997, 0)) // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
+        )(
+          WsOrder.fromDomain(LimitOrder(bo), OrderStatus.Accepted),
+          WsOrder(bo.id(), status = OrderStatus.Filled.name, filledAmount = 10.0, filledFee = 0.003, avgWeighedPrice = 1.0)
+        )
 
-      val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+        dex1.api.cancelAll(acc)
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
+      "when user's order is partially filled with another one" in {
 
-      val bo         = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
-      val limitOrder = LimitOrder(bo)
+        val acc = mkAccountWithBalance(10.usd -> usd, 10.waves -> Waves); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      placeAndAwaitAtDex(bo)
-      placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 5.waves, 1.0))
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
 
-      assertChanges(wsc)(
-        Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)), // Waves balance on Node = 10
-        Map(usd   -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)), // Waves balance on Node = 10
-        Map(Waves -> WsBalances(14.997, 0.0015)) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
-      )(
-        WsOrder.fromDomain(limitOrder, OrderStatus.Accepted),
-        WsOrder(limitOrder.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)
-      )
+        val bo         = mkOrderDP(acc, wavesUsdPair, BUY, 10.waves, 1.0)
+        val limitOrder = LimitOrder(bo)
 
-      dex1.api.cancelAll(acc)
-      assertChanges(wsc, squash = false) { Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)) }(
-        WsOrder(bo.id(), status = OrderStatus.Cancelled.name)
-      )
+        placeAndAwaitAtDex(bo)
+        placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 5.waves, 1.0))
 
-      wsc.close()
-    }
+        assertChanges(wsc)(
+          Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)), // Waves balance on Node = 10
+          Map(usd   -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)), // Waves balance on Node = 10
+          Map(Waves -> WsBalances(14.997, 0.0015)) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
+        )(
+          WsOrder.fromDomain(limitOrder, OrderStatus.Accepted),
+          WsOrder(limitOrder.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)
+        )
 
-    "when user make a transfer" in {
+        dex1.api.cancelAll(acc)
+        assertChanges(wsc, squash = false) { Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)) }(
+          WsOrder(bo.id(), status = OrderStatus.Cancelled.name)
+        )
 
-      val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
-      broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
-      assertChanges(wsc) { Map(Waves -> WsBalances(9, 0), usd -> WsBalances(8, 0)) }()
+      "when user make a transfer" in {
 
-      wsc.close()
-    }
+        val acc = mkAccountWithBalance(10.waves -> Waves, 10.usd -> usd); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-    "user issued a new asset after establishing the connection" in {
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(10, 0)) }()
+        broadcastAndAwait(mkTransfer(acc, alice.toAddress, 2.usd, usd, feeAmount = 1.waves))
+        assertChanges(wsc) { Map(Waves -> WsBalances(9, 0), usd -> WsBalances(8, 0)) }()
 
-      val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0)) }()
-      val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
-      broadcastAndAwait(txIssue)
+      "user issued a new asset after establishing the connection" in {
 
-      assertChanges(wsc)(
-        Map(Waves       -> WsBalances(9, 0)),
-        Map(issuedAsset -> WsBalances(1000, 0))
-      )()
+        val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      wsc.close()
-    }
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0)) }()
+        val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
+        broadcastAndAwait(txIssue)
 
-    "user issued a new asset before establishing the connection" in {
+        assertChanges(wsc)(
+          Map(Waves       -> WsBalances(9, 0)),
+          Map(issuedAsset -> WsBalances(1000, 0))
+        )()
 
-      val acc                                   = mkAccountWithBalance(10.waves -> Waves)
-      val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
+        wsc.close()
+      }
 
-      broadcastAndAwait(txIssue); Thread.sleep(150)
+      "user issued a new asset before establishing the connection" in {
 
-      val wsc = mkWsConnection(acc)
-      assertChanges(wsc)(
-        Map(Waves       -> WsBalances(9, 0)),
-        Map(issuedAsset -> WsBalances(1000, 0))
-      )()
+        val acc                                   = mkAccountWithBalance(10.waves -> Waves)
+        val IssueResults(txIssue, _, issuedAsset) = mkIssueExtended(acc, "testAsset", 1000.asset8)
 
-      wsc.close()
-    }
+        broadcastAndAwait(txIssue); Thread.sleep(150)
 
-    "user burnt part of the asset amount" in {
+        val wsc = mkWsConnection(acc)
+        assertChanges(wsc)(
+          Map(Waves       -> WsBalances(9, 0)),
+          Map(issuedAsset -> WsBalances(1000, 0))
+        )()
 
-      val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
-      broadcastAndAwait(mkBurn(acc, usd, 10.usd))
+      "user burnt part of the asset amount" in {
 
-      assertChanges(wsc)(
-        Map(Waves -> WsBalances(9, 0)),
-        Map(usd   -> WsBalances(10, 0))
-      )()
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      wsc.close()
-    }
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
+        broadcastAndAwait(mkBurn(acc, usd, 10.usd))
 
-    "user burnt all of the asset amount" in {
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(9, 0)),
+          Map(usd   -> WsBalances(10, 0))
+        )()
 
-      val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
-      val wsc = mkWsConnection(acc)
+        wsc.close()
+      }
 
-      assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
-      broadcastAndAwait(mkBurn(acc, usd, 20.usd))
+      "user burnt all of the asset amount" in {
 
-      assertChanges(wsc)(
-        Map(Waves -> WsBalances(9, 0)),
-        Map(usd   -> WsBalances(0, 0))
-      )()
+        val acc = mkAccountWithBalance(10.waves -> Waves, 20.usd -> usd); Thread.sleep(150)
+        val wsc = mkWsConnection(acc)
 
-      wsc.close()
+        assertChanges(wsc, squash = false) { Map(Waves -> WsBalances(10, 0), usd -> WsBalances(20, 0)) }()
+        broadcastAndAwait(mkBurn(acc, usd, 20.usd))
+
+        assertChanges(wsc)(
+          Map(Waves -> WsBalances(9, 0)),
+          Map(usd   -> WsBalances(0, 0))
+        )()
+
+        wsc.close()
+      }
     }
   }
 
@@ -285,60 +306,56 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     dex1.api.cancelAll(acc)
   }
 
-  "correctly handle rejections" in {
-    val ts = System.currentTimeMillis
-
-    val fooKeyPair = mkKeyPair("foo")
-    val fooAddress = fooKeyPair.toAddress
-
-    val barKeyPair = mkKeyPair("bar").publicKey
-    val barAddress = barKeyPair.toAddress
-
-    val invalidAddress = "foo"
-
-    forAll(
-      Table(
-        // format: off
-        ("address",                                "jwt", "expected error"),
-        (uriWithoutParams,                         "",     ApiKeyIsNotValid.some),
-        (uriWithoutParams,                         "",     AuthIsRequired.some),
-        (uriWithoutParams,                         "",     None),
-
-        (uriWithParams(fooAddress, pk, s),         "",     ApiKeyIsNotValid.some),
-        (uriWithParams(fooAddress, pk, s),         "",     None),
-        (uriWithParams(fooAddress, pk, s),         "",     None),
-
-        (uriWithParams(fooAddress, barKeyPair, s), "",     ApiKeyIsNotValid.some),
-        (uriWithParams(fooAddress, barKeyPair, s), "",     AddressAndPublicKeyAreIncompatible(fooAddress, barKeyPair).some),
-        (uriWithParams(fooAddress, barKeyPair, s), "",     None),
-
-        (uriWithParams(fooAddress, invalidPk, s),  "",     ApiKeyIsNotValid.some),
-        (uriWithParams(fooAddress, invalidPk, s),  "",     UserPublicKeyIsNotValid.some),
-        (uriWithParams(fooAddress, invalidPk, s),  "",     None),
-
-        (uriWithParams(fooAddress, pk, invalidS),  "",     ApiKeyIsNotValid.some),
-        (uriWithParams(fooAddress, pk, invalidS),  "",     RequestInvalidSignature.some),
-        (uriWithParams(fooAddress, pk, invalidS),  "",     None)
-        // format: on
-      )
-    ) { (address, expectedError) =>
-      val connection = mkWsConnection(dex1)
-      connection.send(WsAddressSubscribe(address, ))
-
-      val response = Await.result(connection.getConnectionResponse, 1.second).response
-
-      response.status shouldBe expectedStatus
-
-      expectedError.foreach { error =>
-        response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
-        response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
-      }
-
-      connection.close()
-    }
-  }
-
-  private def mkMockJwt(payload: JwtPayload): String = {
-
-  }
+//  "correctly handle rejections" in {
+//    val ts = System.currentTimeMillis
+//
+//    val fooKeyPair = mkKeyPair("foo")
+//    val fooAddress = fooKeyPair.toAddress
+//
+//    val barKeyPair = mkKeyPair("bar").publicKey
+//    val barAddress = barKeyPair.toAddress
+//
+//    val invalidAddress = "foo"
+//
+//    forAll(
+//      Table(
+//        // format: off
+//        ("address",                                "jwt", "expected error"),
+//        (uriWithoutParams,                         "",     ApiKeyIsNotValid.some),
+//        (uriWithoutParams,                         "",     AuthIsRequired.some),
+//        (uriWithoutParams,                         "",     None),
+//
+//        (uriWithParams(fooAddress, pk, s),         "",     ApiKeyIsNotValid.some),
+//        (uriWithParams(fooAddress, pk, s),         "",     None),
+//        (uriWithParams(fooAddress, pk, s),         "",     None),
+//
+//        (uriWithParams(fooAddress, barKeyPair, s), "",     ApiKeyIsNotValid.some),
+//        (uriWithParams(fooAddress, barKeyPair, s), "",     AddressAndPublicKeyAreIncompatible(fooAddress, barKeyPair).some),
+//        (uriWithParams(fooAddress, barKeyPair, s), "",     None),
+//
+//        (uriWithParams(fooAddress, invalidPk, s),  "",     ApiKeyIsNotValid.some),
+//        (uriWithParams(fooAddress, invalidPk, s),  "",     UserPublicKeyIsNotValid.some),
+//        (uriWithParams(fooAddress, invalidPk, s),  "",     None),
+//
+//        (uriWithParams(fooAddress, pk, invalidS),  "",     ApiKeyIsNotValid.some),
+//        (uriWithParams(fooAddress, pk, invalidS),  "",     RequestInvalidSignature.some),
+//        (uriWithParams(fooAddress, pk, invalidS),  "",     None)
+//        // format: on
+//      )
+//    ) { (address, expectedError) =>
+//      val connection = mkWsConnection(dex1)
+//      connection.send(WsAddressSubscribe(address, ))
+//
+//      val response = Await.result(connection.getConnectionResponse, 1.second).response
+//
+//      response.status shouldBe expectedStatus
+//
+//      expectedError.foreach { error =>
+//        response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
+//        response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
+//      }
+//
+//      connection.close()
+//    }
+//  }
 }

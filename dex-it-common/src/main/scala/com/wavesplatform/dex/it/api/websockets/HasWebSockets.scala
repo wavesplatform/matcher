@@ -1,12 +1,10 @@
 package com.wavesplatform.dex.it.api.websockets
 
 import java.lang
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.websockets.{WsAddressSubscribe, WsBalances, WsOrder, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -21,14 +19,12 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.duration._
 
-trait HasWebSockets extends BeforeAndAfterAll with WsConnectionOps with WsMessageOps {
+trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps with WsMessageOps {
   _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
 
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
   implicit protected val efc: ErrorFormatterContext = assetDecimalsMap.apply
-
-  protected val authenticatedStreamSignaturePrefix = "au"
 
   protected def getWsStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/v0"
 
@@ -41,13 +37,9 @@ trait HasWebSockets extends BeforeAndAfterAll with WsConnectionOps with WsMessag
                                       dex: DexContainer,
                                       keepAlive: Boolean = true,
                                       connectionLifetime: FiniteDuration = 1.hour): WsConnection = {
-
-    val timestamp     = System.currentTimeMillis() + connectionLifetime.toMillis
-    val signedMessage = authenticatedStreamSignaturePrefix.getBytes(StandardCharsets.UTF_8) ++ client.publicKey.arr ++ Longs.toByteArray(timestamp)
-    val signature     = com.wavesplatform.dex.domain.crypto.sign(client, signedMessage) // TODO
-
+    val jwt        = mkJwt(mkJwtSignedPayload(client, lifetime = connectionLifetime))
     val connection = mkWsConnection(dex, keepAlive)
-    connection.send(WsAddressSubscribe(client.toAddress, ""))
+    connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     connection
   }
 

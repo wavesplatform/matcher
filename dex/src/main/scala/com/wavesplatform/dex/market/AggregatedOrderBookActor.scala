@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.OrderBookWsState
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook}
+import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.error.OrderBookStopped
@@ -128,7 +128,7 @@ object AggregatedOrderBookActor {
                     client.path.name.asInstanceOf[Any],
                     OrderBookStopped(assetPair).message.text.asInstanceOf[Any]
                   )
-                  client.unsafeUpcast[WsMessage] ! WsMessage.Complete
+                  client.unsafeUpcast[WsMessage] ! WsServerMessage.Complete
               }
               default { state.modifyWs(_.copy(wsConnections = Map.empty)) }
           }

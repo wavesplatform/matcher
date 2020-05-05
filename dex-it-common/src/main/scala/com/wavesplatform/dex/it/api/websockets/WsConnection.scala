@@ -24,13 +24,14 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
   private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
 
+  // From test to server
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
     val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
 
     Source
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
-      .map(_.toStrictTextMessage)
+      .map(WsMessage.toStrictTextMessage(_))
       .mapMaterializedValue { source =>
         wsHandlerRef.tell(TestWsHandlerActor.AssignSourceRef, source)
         source
@@ -39,6 +40,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
   private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
 
+  // From server to test
   private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
     val rawMsg = x.asTextMessage.getStrictText
     Json.parse(rawMsg).validate[WsServerMessage] match {

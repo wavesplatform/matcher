@@ -30,7 +30,7 @@ trait HasWebSockets extends BeforeAndAfterAll with WsConnectionOps with WsMessag
 
   protected val authenticatedStreamSignaturePrefix = "au"
 
-  protected def getWsStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws"
+  protected def getWsStreamUri(dex: DexContainer): String = s"127.0.0.1:${dex.restApiAddress.getPort}/ws/v0"
 
   protected val knownWsConnections: ConcurrentHashMap.KeySetView[WsConnection, lang.Boolean] =
     ConcurrentHashMap.newKeySet[WsConnection]()

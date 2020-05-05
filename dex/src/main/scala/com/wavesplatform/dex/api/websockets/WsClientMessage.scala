@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.websockets
 
-import play.api.libs.json.{JsError, JsPath, JsResult, Reads}
+import play.api.libs.json._
 
 trait WsClientMessage extends WsMessage
 
@@ -13,5 +13,13 @@ object WsClientMessage {
       case WsUnsubscribe.tpe        => json.validate[WsUnsubscribe]
       case x                        => JsError(JsPath \ "T", s"An unknown type: $x")
     }
+  }
+
+  val wsClientMessageWrites: Writes[WsClientMessage] = Writes {
+    case x: WsPingOrPong         => Json.toJson(x)
+    case x: WsOrderBookSubscribe => Json.toJson(x)
+    case x: WsAddressSubscribe   => Json.toJson(x)
+    case x: WsUnsubscribe        => Json.toJson(x)
+    case x                       => throw new NotImplementedError(x.getClass.getName)
   }
 }

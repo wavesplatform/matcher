@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.api.websockets
 
-import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -22,8 +21,7 @@ case class WsOrderBook(assetPair: AssetPair,
                        settings: Option[WsOrderBookSettings],
                        timestamp: Long = System.currentTimeMillis)
     extends WsServerMessage {
-  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
-  override val tpe: String                             = WsOrderBook.tpe
+  override val tpe: String = WsOrderBook.tpe
 }
 
 object WsOrderBook {

@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.it.api.websockets
 
 import akka.actor.{Actor, ActorRef, Props}
-import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 /**
@@ -22,7 +22,7 @@ class TestWsHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging {
       context.stop(self)
 
     case SendToServer(message) =>
-      log.debug(s"Manually sending: ${message.toStrictTextMessage.getStrictText}")
+      log.debug(s"Manually sending: ${WsMessage.toStrictTextMessage(message).getStrictText}")
       sourceRef ! message
   }
 

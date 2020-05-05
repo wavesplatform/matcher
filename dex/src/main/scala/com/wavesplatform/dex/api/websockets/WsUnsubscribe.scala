@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.api.websockets
 
-import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsUnsubscribe.Key
 import com.wavesplatform.dex.domain.account.Address
@@ -10,8 +9,7 @@ import play.api.libs.json._
 import shapeless.{:+:, CNil, Coproduct, Inl, Inr}
 
 final case class WsUnsubscribe(key: Key) extends WsClientMessage {
-  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(Json.toJson(this).toString)
-  override val tpe: String                             = WsUnsubscribe.tpe
+  override val tpe: String = WsUnsubscribe.tpe
 }
 
 object WsUnsubscribe {

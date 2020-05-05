@@ -1,17 +1,12 @@
 package com.wavesplatform.dex.api.websockets
 
 import akka.http.scaladsl.model.ws.TextMessage
+import play.api.libs.json.{Json, Writes}
 
 trait WsMessage {
-  def toStrictTextMessage: TextMessage.Strict
   def tpe: String
 }
 
 object WsMessage {
-
-  // Will be never propagated to a client
-  case object Complete extends WsMessage {
-    override val toStrictTextMessage: TextMessage.Strict = TextMessage.Strict("{}")
-    override val tpe: String                             = "unused"
-  }
+  def toStrictTextMessage[T <: WsMessage: Writes](x: T): TextMessage.Strict = TextMessage.Strict(Json.toJson(x).toString)
 }

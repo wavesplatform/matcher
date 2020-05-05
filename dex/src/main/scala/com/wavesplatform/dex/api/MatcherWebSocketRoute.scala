@@ -14,10 +14,11 @@ import akka.stream.{Materializer, OverflowStrategy}
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
-import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage}
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.WebSocketSettings
+import com.wavesplatform.dex.time.Time
 import io.swagger.annotations.Api
 import javax.ws.rs.Path
 import play.api.libs.json.Json
@@ -29,6 +30,7 @@ import scala.util.{Failure, Success}
 @Api(value = "/web sockets/")
 case class MatcherWebSocketRoute(addressDirectory: ActorRef,
                                  matcher: ActorRef,
+                                 time: Time,
                                  assetPairBuilder: AssetPairBuilder,
                                  orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                                  apiKeyHash: Option[Array[Byte]],
@@ -49,24 +51,26 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     commonWsRoute
   }
 
-  private val commonWsRoute: Route = (pathEnd & get) {
+  private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
     import webSocketSettings._
 
     val clientId = UUID.randomUUID().toString
+
+    // From server to client
     val client = ActorSource
-      .actorRef[WsMessage](
-        { case WsMessage.Complete => },
+      .actorRef[WsServerMessage](
+        { case WsServerMessage.Complete => },
         PartialFunction.empty,
         10,
         OverflowStrategy.fail
       )
       .named(s"source-$clientId")
-      .map(_.toStrictTextMessage)
-      .watchTermination()(handleTermination)
+      .map(WsMessage.toStrictTextMessage(_)(WsServerMessage.wsServerMessageWrites))
+      .watchTermination()(handleTermination[WsServerMessage])
 
     val (clientRef, clientSource) = client.preMaterialize()
     val webSocketHandlerRef = mat.system.spawn(
-      behavior = WsHandlerActor(webSocketHandler, maxConnectionLifetime, clientRef, matcher, addressDirectory),
+      behavior = WsHandlerActor(webSocketHandler, maxConnectionLifetime, time, assetPairBuilder, clientRef, matcher, addressDirectory),
       name = s"handler-$clientId"
     )
 
@@ -78,12 +82,13 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       )
       .named(s"server-$clientId")
 
+    // From client to server
     val serverSink = Flow[Message]
       .mapAsync[WsHandlerActor.Command.ProcessClientMessage](1) {
         case tm: TextMessage =>
           for {
             strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
-            pong <- Json.parse(strictText).asOpt(WsClientMessage.wsClientMessageReads) match {
+            pong <- Json.parse(strictText).asOpt[WsClientMessage] match {
               case Some(x) => Future.successful(WsHandlerActor.Command.ProcessClientMessage(x))
               case None    => unexpectedMessageFailure(strictText)
             }
@@ -99,7 +104,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, clientSource) }
   }
 
-  private def handleTermination(client: typed.ActorRef[WsMessage], r: Future[Done]): typed.ActorRef[WsMessage] = {
+  private def handleTermination[T](client: typed.ActorRef[T], r: Future[Done]): typed.ActorRef[T] = {
     val cn = client.path.name
     r.onComplete {
       case Success(_) => log.trace(s"[c=$cn] WebSocket connection successfully closed")

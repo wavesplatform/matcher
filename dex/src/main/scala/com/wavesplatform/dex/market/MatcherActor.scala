@@ -181,7 +181,7 @@ class MatcherActor(settings: MatcherSettings,
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
     case AggregatedOrderBookEnvelope(pair, message) =>
-      runFor(pair, autoCreate = false) { (sender, ref) =>
+      runFor(pair) { (sender, ref) =>
         ref.tell(message, sender)
       }
 

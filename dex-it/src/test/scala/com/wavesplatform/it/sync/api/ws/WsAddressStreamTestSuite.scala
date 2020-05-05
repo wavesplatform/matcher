@@ -1,16 +1,24 @@
 package com.wavesplatform.it.sync.api.ws
 
+import java.nio.charset.StandardCharsets
+
+import com.wavesplatform.dex.error._
+import cats.syntax.option._
+import com.google.common.primitives.Longs
+import akka.http.scaladsl.model.StatusCodes._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
+import org.scalatest.prop.TableDrivenPropertyChecks
 
-class WsAddressStreamTestSuite extends WsSuiteBase {
+class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
 
@@ -275,5 +283,62 @@ class WsAddressStreamTestSuite extends WsSuiteBase {
 
     Seq(wsc1, wsc2).foreach { _.close() }
     dex1.api.cancelAll(acc)
+  }
+
+  "correctly handle rejections" in {
+    val ts = System.currentTimeMillis
+
+    val fooKeyPair = mkKeyPair("foo")
+    val fooAddress = fooKeyPair.toAddress
+
+    val barKeyPair = mkKeyPair("bar").publicKey
+    val barAddress = barKeyPair.toAddress
+
+    val invalidAddress = "foo"
+
+    forAll(
+      Table(
+        // format: off
+        ("address",                                "jwt", "expected error"),
+        (uriWithoutParams,                         "",     ApiKeyIsNotValid.some),
+        (uriWithoutParams,                         "",     AuthIsRequired.some),
+        (uriWithoutParams,                         "",     None),
+
+        (uriWithParams(fooAddress, pk, s),         "",     ApiKeyIsNotValid.some),
+        (uriWithParams(fooAddress, pk, s),         "",     None),
+        (uriWithParams(fooAddress, pk, s),         "",     None),
+
+        (uriWithParams(fooAddress, barKeyPair, s), "",     ApiKeyIsNotValid.some),
+        (uriWithParams(fooAddress, barKeyPair, s), "",     AddressAndPublicKeyAreIncompatible(fooAddress, barKeyPair).some),
+        (uriWithParams(fooAddress, barKeyPair, s), "",     None),
+
+        (uriWithParams(fooAddress, invalidPk, s),  "",     ApiKeyIsNotValid.some),
+        (uriWithParams(fooAddress, invalidPk, s),  "",     UserPublicKeyIsNotValid.some),
+        (uriWithParams(fooAddress, invalidPk, s),  "",     None),
+
+        (uriWithParams(fooAddress, pk, invalidS),  "",     ApiKeyIsNotValid.some),
+        (uriWithParams(fooAddress, pk, invalidS),  "",     RequestInvalidSignature.some),
+        (uriWithParams(fooAddress, pk, invalidS),  "",     None)
+        // format: on
+      )
+    ) { (address, expectedError) =>
+      val connection = mkWsConnection(dex1)
+      connection.send(WsAddressSubscribe(address, ))
+
+      val response = Await.result(connection.getConnectionResponse, 1.second).response
+
+      response.status shouldBe expectedStatus
+
+      expectedError.foreach { error =>
+        response.getHeader(`X-Error-Message`.name).get.value shouldBe error.message.text
+        response.getHeader(`X-Error-Code`.name).get.value shouldBe error.code.toString
+      }
+
+      connection.close()
+    }
+  }
+
+  private def mkMockJwt(payload: JwtPayload): String = {
+
   }
 }

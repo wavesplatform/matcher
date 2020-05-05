@@ -163,6 +163,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      web-socket-handler {
          |        ping-interval = 11s
          |        pong-timeout = 31s
+         |        jwt-public-key = \"\"\"foo
+         |bar
+         |baz\"\"\"
          |      }
          |    }
          |    address-actor {

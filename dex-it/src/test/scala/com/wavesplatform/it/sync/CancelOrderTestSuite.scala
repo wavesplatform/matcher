@@ -154,10 +154,10 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
     }
 
     "when order is fully filled" in {
-      val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800)
+      val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 500)
 
       placeAndAwaitAtDex(order)
-      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 800))
+      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 500))
 
       dex1.api.tryCancel(bob, order) should failWith(9437191, s"The order ${order.id()} is filled")
     }

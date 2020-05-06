@@ -9,9 +9,9 @@ import cats.instances.try_._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.collections.Implicits.ListOps
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.fp
 import com.wavesplatform.dex.it.resources.getRawContentFromResource
 import com.wavesplatform.dex.it.sttp.LoggingSttpBackend
@@ -50,19 +50,19 @@ object DexContainer extends ScorexLogging {
             internalIp: String,
             runConfig: Config,
             suiteInitialConfig: Config,
-            localLogsDir: Path)(implicit
-                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                                ec: ExecutionContext): DexContainer = {
+            localLogsDir: Path,
+            tag: String)(implicit
+                         tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                         futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                         ec: ExecutionContext): DexContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = "com.wavesplatform/dex-it:latest",
+      dockerImage = s"com.wavesplatform/dex-it:$tag",
       exposedPorts = Seq(restApiPort),
       env = getEnv(name),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      c.withNetworkAliases("d3x")
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id

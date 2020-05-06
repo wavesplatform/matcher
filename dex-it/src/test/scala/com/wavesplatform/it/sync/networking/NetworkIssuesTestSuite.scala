@@ -15,7 +15,7 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
-  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
+  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config =
     ConfigFactory
@@ -120,7 +120,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
     val conf = ConfigFactory.parseString(s"""waves.dex {
                                  |  price-assets = [ "$UsdId", "WAVES" ]
-                                 |  waves-blockchain-client.grpc.target = "${WavesNodeContainer.netAlias}:${WavesNodeContainer.dexGrpcExtensionPort}"
+                                 |  waves-blockchain-client.grpc.target = "${WavesNodeContainer.wavesNodeNetAlias}:${WavesNodeContainer.dexGrpcExtensionPort}"
                                  |}""".stripMargin)
 
     dex1.restartWithNewSuiteConfig(conf)

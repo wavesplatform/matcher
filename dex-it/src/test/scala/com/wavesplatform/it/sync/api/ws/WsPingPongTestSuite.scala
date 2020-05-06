@@ -1,11 +1,12 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.WsError
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
 
-class PingPongTestSuite extends WsSuiteBase {
+class WsPingPongTestSuite extends WsSuiteBase {
 
   private val maxConnectionLifetime = 6.seconds
   private val pingInterval          = 1.second
@@ -13,8 +14,9 @@ class PingPongTestSuite extends WsSuiteBase {
 
   private implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex.web-sockets {
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory
+    .parseString(
+      s"""waves.dex.web-sockets {
         |  web-socket-handler {
         |    max-connection-lifetime = $maxConnectionLifetime
         |    ping-interval = $pingInterval
@@ -22,7 +24,8 @@ class PingPongTestSuite extends WsSuiteBase {
         |  }
         |}
         |""".stripMargin
-  )
+    )
+    .withFallback(jwtPublicKeyConfig)
 
   "Web socket connection should be closed " - {
 
@@ -35,9 +38,16 @@ class PingPongTestSuite extends WsSuiteBase {
 
       Thread.sleep(0.1.second)
       eventually {
-        wsac.pings.size shouldBe 5
+        wsac.pings.size should be >= 5
         wsac.isClosed shouldBe true
       }
+
+      wsac.collectMessages[WsError].head.copy(timestamp = 0L) should matchTo(
+        WsError(
+          timestamp = 0L,
+          code = 109077767, // WsConnectionMaxLifetimeExceeded
+          message = "WebSocket has reached max allowed lifetime"
+        ))
     }
 
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
@@ -55,6 +65,13 @@ class PingPongTestSuite extends WsSuiteBase {
           wsac.pings.size should (be >= 3 and be <= 4)
           wsac.isClosed shouldBe true
         }
+
+        wsac.collectMessages[WsError].head.copy(timestamp = 0L) should matchTo(
+          WsError(
+            timestamp = 0L,
+            code = 109077772, // WsConnectionPongTimeout
+            message = "WebSocket has reached pong timeout"
+          ))
       }
 
       "with sending pong" in {

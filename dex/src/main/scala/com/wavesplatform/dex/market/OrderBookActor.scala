@@ -127,6 +127,7 @@ class OrderBookActor(settings: Settings,
               process(request.timestamp, orderBook.cancelAll(request.timestamp))
               // We don't delete the snapshot, because it could be required after restart
               // snapshotStore ! OrderBookSnapshotStoreActor.Message.Delete(assetPair)
+              aggregatedRef ! AggregatedOrderBookActor.OrderBookRemoved
               context.stop(self)
           }
       }

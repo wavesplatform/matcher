@@ -8,7 +8,7 @@ import com.wavesplatform.dex.OrderBookWsState
 import com.wavesplatform.dex.api.websockets.{WsError, WsMessage, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.error.OrderBookStopped
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
@@ -38,6 +38,8 @@ object AggregatedOrderBookActor {
     case class RemoveWsSubscription(client: ActorRef[WsOrderBook])                                                        extends Command
     private[AggregatedOrderBookActor] case object SendWsUpdates                                                           extends Command
   }
+
+  case object OrderBookRemoved extends Message // Could be an event in the future
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 
@@ -118,12 +120,10 @@ object AggregatedOrderBookActor {
               val updated = state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
-          }
-          .receiveSignal {
-            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws) }
-            case (_, PostStop) =>
+
+            case OrderBookRemoved =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
-              val reason = OrderBookStopped(assetPair)
+              val reason = error.OrderBookStopped(assetPair)
               state.ws.wsConnections.foreach {
                 case (client, _) =>
                   context.log.trace(
@@ -134,6 +134,9 @@ object AggregatedOrderBookActor {
                   client.unsafeUpcast[WsMessage] ! WsError.from(reason, time.getTimestamp())
               }
               Behaviors.stopped
+          }
+          .receiveSignal {
+            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws) }
           }
 
       default(init)

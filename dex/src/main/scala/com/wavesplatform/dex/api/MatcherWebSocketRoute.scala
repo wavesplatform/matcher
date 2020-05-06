@@ -9,6 +9,7 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.stream.typed.scaladsl.{ActorSource, _}
+import cats.syntax.either._
 import akka.stream.{Materializer, OverflowStrategy}
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
@@ -48,6 +49,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     commonWsRoute
   }
 
+  private val completedSuccessfully: WsHandlerActor.Message = WsHandlerActor.Completed(().asRight)
   private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
     import webSocketSettings._
 
@@ -72,10 +74,10 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
     )
 
     val server = ActorSink
-      .actorRef(
+      .actorRef[WsHandlerActor.Message](
         ref = webSocketHandlerRef,
-        onCompleteMessage = WsHandlerActor.Completed,
-        onFailureMessage = WsHandlerActor.Command.ProcessClientError
+        onCompleteMessage = completedSuccessfully,
+        onFailureMessage = e => WsHandlerActor.Completed(Left(e))
       )
       .named(s"server-$clientId")
 

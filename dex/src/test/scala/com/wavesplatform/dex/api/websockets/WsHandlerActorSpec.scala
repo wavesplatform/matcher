@@ -139,8 +139,8 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
           WsError(
             timestamp = 0L,
-            code = 110103809, // InvalidJwtSignature
-            message = "The token signature is invalid"
+            code = 110103809, // InvalidJwtPayloadSignature
+            message = "The token payload signature is invalid"
           )
         )
 

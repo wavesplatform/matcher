@@ -493,7 +493,7 @@ case object JwtBroken extends MatcherError(token, commonEntity, broken, e"JWT ha
 
 case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT payload has not expected fields")
 
-case object InvalidJwtSignature extends MatcherError(token, signature, broken, e"The token signature is invalid")
+case object InvalidJwtPayloadSignature extends MatcherError(token, signature, broken, e"The token payload signature is invalid")
 
 case object SubscriptionTokenExpired extends MatcherError(token, expiration, commonClass, e"The subscription token expired")
 

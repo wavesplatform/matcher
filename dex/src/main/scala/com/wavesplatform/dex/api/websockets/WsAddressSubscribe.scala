@@ -35,7 +35,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))
       }
-      _ <- Either.cond(crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey), (), error.InvalidJwtSignature)
+      _ <- Either.cond(crypto.verify(payload.signature, ByteStr(payload.toSign), payload.publicKey), (), error.InvalidJwtPayloadSignature)
       _ <- Either.cond(payload.publicKey.toAddress == key, (), error.AddressAndPublicKeyAreIncompatible(key, payload.publicKey))
     } yield payload
 }

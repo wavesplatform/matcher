@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus.Filled
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.dex.util.FutureOps.Implicits
@@ -150,6 +151,15 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(order)
       cancelAndAwait(bob, order)
       dex1.api.tryCancel(bob, order) should failWith(9437194) // OrderCanceled
+    }
+
+    "when order is fully filled" in {
+      val order = mkOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 500)
+
+      placeAndAwaitAtDex(order)
+      placeAndAwaitAtNode(mkOrder(alice, wavesUsdPair, OrderType.BUY, 100.waves, 500))
+
+      dex1.api.tryCancel(bob, order) should failWith(9437191, s"The order ${order.id()} is filled")
     }
 
     "when request sender is not the sender of and order" in {

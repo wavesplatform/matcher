@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.api.dex.DexApi
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.it.docker.DexContainer

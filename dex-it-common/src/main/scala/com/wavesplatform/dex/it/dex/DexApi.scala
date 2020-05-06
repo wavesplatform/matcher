@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.dex
+package com.wavesplatform.dex.it.dex
 
 import java.net.{InetSocketAddress, SocketException}
 import java.util.UUID

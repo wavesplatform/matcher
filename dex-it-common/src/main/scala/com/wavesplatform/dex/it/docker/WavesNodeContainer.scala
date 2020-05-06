@@ -66,13 +66,14 @@ object WavesNodeContainer extends ScorexLogging {
             internalIp: String,
             runConfig: Config,
             suiteInitialConfig: Config,
-            localLogsDir: Path)(implicit
-                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                                ec: ExecutionContext): WavesNodeContainer = {
+            localLogsDir: Path,
+            tag: String)(implicit
+                         tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                         futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                         ec: ExecutionContext): WavesNodeContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = "com.wavesplatform/waves-integration-it:latest",
+      dockerImage = s"com.wavesplatform/waves-integration-it:$tag",
       exposedPorts = List(restApiPort, networkPort, dexGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy

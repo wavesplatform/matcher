@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.dex
+package com.wavesplatform.dex.it.dex
 
 import java.util.Properties
 import java.util.concurrent.ThreadLocalRandom
@@ -35,8 +35,11 @@ trait HasDex { self: BaseContainersKit =>
     }
   }
 
-  protected def createDex(name: String, runConfig: Config = dexRunConfig, suiteInitialConfig: Config = dexInitialSuiteConfig): DexContainer =
-    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir) unsafeTap addKnownContainer
+  protected def createDex(name: String,
+                          runConfig: Config = dexRunConfig,
+                          suiteInitialConfig: Config = dexInitialSuiteConfig,
+                          tag: String = "latest"): DexContainer =
+    DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, tag) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")
 

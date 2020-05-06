@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.dimafeng.testcontainers.KafkaContainer
 import com.github.dockerjava.api.model.ContainerNetwork
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
@@ -10,14 +9,16 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.it.api.HasKafka
+import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.JavaConverters._
 
-class KafkaIssuesTestSuite extends WsSuiteBase {
+class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
 
-  private val kafkaContainerName = "kafka"
+  /*private val kafkaContainerName = "kafka"
   private val kafkaIp            = getIp(12)
 
   private val kafka: KafkaContainer =
@@ -28,11 +29,13 @@ class KafkaIssuesTestSuite extends WsSuiteBase {
         cmd withName kafkaContainerName
         cmd withIpv4Address getIp(12)
       }
-    }
+    }*/
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")
 
-  override protected lazy val dexRunConfig: Config = ConfigFactory
+  override protected lazy val dexRunConfig = dexKafkaConfig()
+
+  /*override protected lazy val dexRunConfig: Config = ConfigFactory
     .parseString(
       s"""waves.dex.events-queue {
        |  type = kafka
@@ -42,7 +45,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase {
        |  }
        |}""".stripMargin
     )
-    .withFallback(jwtPublicKeyConfig)
+    .withFallback(jwtPublicKeyConfig)*/
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()

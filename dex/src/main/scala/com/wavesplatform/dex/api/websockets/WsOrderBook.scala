@@ -48,7 +48,7 @@ object WsOrderBook {
 
   implicit val wsOrderBookStateFormat: Format[WsOrderBook] = (
     (__ \ "T").format[String] and
-      (__ \ "S").format[AssetPair](assetPairKeyAsStringFormat) and
+      (__ \ "S").format[AssetPair](AssetPair.assetPairKeyAsStringFormat) and
       (__ \ "_").format[Long] and
       (__ \ "U").format[Long] and
       (__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and

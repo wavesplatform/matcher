@@ -17,7 +17,7 @@ object WsOrderBookSubscribe {
 
   implicit val wsOrderBookSubscribeFormat: Format[WsOrderBookSubscribe] = (
     (__ \ "T").format[String] and
-      (__ \ "S").format[AssetPair](assetPairKeyAsStringFormat) and
+      (__ \ "S").format[AssetPair](AssetPair.assetPairKeyAsStringFormat) and
       (__ \ "d").format[Int]
   )(
     (_, key, depth) => WsOrderBookSubscribe(key, depth),

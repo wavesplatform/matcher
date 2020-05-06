@@ -109,7 +109,7 @@ object WsHandlerActor {
                 case subscribe: WsAddressSubscribe =>
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
-                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) failed with ${e.message}")
+                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) failed with ${e.message.text}")
                       clientRef ! WsError.from(e, time.getTimestamp())
                     case Right(_) =>
                       context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) is successful")

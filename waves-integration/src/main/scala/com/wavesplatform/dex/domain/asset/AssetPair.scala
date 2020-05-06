@@ -6,7 +6,7 @@ import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{Format, JsObject, Json}
+import play.api.libs.json.{Format, JsError, JsObject, JsPath, JsString, JsSuccess, Json, Reads, Writes}
 
 import scala.annotation.meta.field
 import scala.util.{Failure, Success, Try}
@@ -83,4 +83,14 @@ object AssetPair {
   }
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
+
+  val assetPairKeyAsStringFormat: Format[AssetPair] = Format(
+    fjs = Reads {
+      case JsString(x) => AssetPair.extractAssetPair(x).fold(e => JsError(e.getMessage), JsSuccess(_))
+      case x           => JsError(JsPath, s"Expected a string, but got ${x.toString().take(10)}...")
+    },
+    tjs = Writes { x =>
+      JsString(x.key)
+    }
+  )
 }

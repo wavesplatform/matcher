@@ -2,7 +2,7 @@ package com.wavesplatform.dex.api.websockets.actors
 
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
@@ -23,13 +23,11 @@ object WsHandlerActor {
   sealed trait Command extends Message
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
-    case class ProcessClientError(error: Throwable)             extends Command
-
-    case class CloseConnection(reason: MatcherError) extends Command
-    private[WsHandlerActor] case object SendPing     extends Command
+    case class CloseConnection(reason: MatcherError)            extends Command
+    private[WsHandlerActor] case object SendPing                extends Command
   }
 
-  case object Completed extends Message // Could be an event in the future
+  case class Completed(completionStatus: Either[Throwable, Unit]) extends Message // Could be an event in the future
 
   final case class Settings(maxConnectionLifetime: FiniteDuration, pingInterval: FiniteDuration, pongTimeout: FiniteDuration, jwtPublicKey: String)
 
@@ -41,8 +39,7 @@ object WsHandlerActor {
             addressRef: classic.ActorRef): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       import context.executionContext
-      context.setLoggerName(s"WebSocketHandlerActor[c=${clientRef.path.name}]")
-      context.watch(clientRef)
+      context.setLoggerName(s"WsHandlerActor[c=${clientRef.path.name}]")
 
       def scheduleOnce(delay: FiniteDuration, message: Message): Cancellable = context.scheduleOnce(delay, context.self, message)
 
@@ -58,10 +55,8 @@ object WsHandlerActor {
         ping -> nextPing
       }
 
-      def stop(nextPing: Cancellable, pongTimeout: Cancellable): Behavior[Message] = {
+      def cancelSchedules(nextPing: Cancellable, pongTimeout: Cancellable): Unit =
         List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
-        Behaviors.stopped
-      }
 
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong], pongTimeout: Cancellable, nextPing: Cancellable): Behavior[Message] =
         Behaviors
@@ -130,22 +125,19 @@ object WsHandlerActor {
                   Behaviors.same
               }
 
-            case command: Command.ProcessClientError =>
-              context.log.debug("Got an error from the client, stopping: {}", command.error)
-              Behaviors.stopped
-
-            case Completed =>
-              context.log.debug("Got a stop request, stopping...")
-              stop(nextPing, pongTimeout)
-
             case command: Command.CloseConnection =>
-              context.log.trace("Got a close request, stopping: {}", command.reason.message.text)
+              context.log.trace("Got CloseConnection: {}", command.reason.message.text)
+              clientRef ! WsError.from(command.reason, time.getTimestamp())
               clientRef ! WsServerMessage.Complete
-              stop(nextPing, pongTimeout)
-          }
-          .receiveSignal {
-            case (_, Terminated(ws)) =>
-              context.log.debug("Client actor stopped, stopping...")
+              cancelSchedules(nextPing, pongTimeout)
+              Behaviors.same // Will receive Completed when WsServerMessage.Complete will be delivered
+
+            case Completed(status) =>
+              status match {
+                case Left(e)  => context.log.debug("Got failure Completed. Stopping...", e)
+                case Right(_) => context.log.debug("Got successful Completed. Stopping...")
+              }
+              cancelSchedules(nextPing, pongTimeout)
               Behaviors.stopped
           }
 

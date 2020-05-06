@@ -112,7 +112,7 @@ object AggregatedOrderBookActor {
             case Command.RemoveWsSubscription(client) =>
               context.log.trace("[c={}] Removed WebSocket subscription", client.path.name)
               context.unwatch(client)
-              default(state.copy(ws = state.ws.withoutSubscription(client)))
+              default { state.modifyWs(_ withoutSubscription client) }
 
             case Command.SendWsUpdates =>
               val updated = state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))

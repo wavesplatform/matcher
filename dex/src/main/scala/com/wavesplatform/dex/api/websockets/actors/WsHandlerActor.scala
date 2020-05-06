@@ -58,6 +58,11 @@ object WsHandlerActor {
         ping -> nextPing
       }
 
+      def stop(nextPing: Cancellable, pongTimeout: Cancellable): Behavior[Message] = {
+        List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
+        Behaviors.stopped
+      }
+
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong], pongTimeout: Cancellable, nextPing: Cancellable): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
@@ -104,7 +109,7 @@ object WsHandlerActor {
                 case subscribe: WsAddressSubscribe =>
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
-                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) failed with ${e.code}")
+                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) failed with ${e.message}")
                       clientRef ! WsError.from(e, time.getTimestamp())
                     case Right(_) =>
                       context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) is successful")
@@ -130,15 +135,13 @@ object WsHandlerActor {
               Behaviors.stopped
 
             case Completed =>
-              List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
               context.log.debug("Got a stop request, stopping...")
-              Behaviors.stopped
+              stop(nextPing, pongTimeout)
 
             case command: Command.CloseConnection =>
-              List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
               context.log.trace("Got a close request, stopping: {}", command.reason.message.text)
               clientRef ! WsServerMessage.Complete
-              Behaviors.stopped
+              stop(nextPing, pongTimeout)
           }
           .receiveSignal {
             case (_, Terminated(ws)) =>

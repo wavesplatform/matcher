@@ -2,6 +2,7 @@ package com.wavesplatform.dex.api.websockets
 
 import java.nio.charset.StandardCharsets
 
+import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsAddressSubscribe._
 import com.wavesplatform.dex.domain.account.{Address, PrivateKey, PublicKey}
@@ -30,7 +31,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
         .toEither
         .left
         .map(toMatcherError)
-      payload <- rawJsonPayload.validate[JwtPayload].asEither.left.map(_ => error.JwtPayloadBroken)
+      payload <- rawJsonPayload.validate[JwtPayload].asEither.leftMap(_ => error.JwtPayloadBroken)
       _ <- {
         val given = payload.networkByte.head.toByte
         Either.cond(given == networkByte, (), error.TokenNetworkUnexpected(networkByte, given))

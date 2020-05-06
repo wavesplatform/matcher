@@ -85,11 +85,11 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         case tm: TextMessage =>
           for {
             strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
-            pong <- Json.parse(strictText).asOpt[WsClientMessage] match {
+            clientMessage <- Json.parse(strictText).asOpt[WsClientMessage] match {
               case Some(x) => Future.successful(WsHandlerActor.Command.ProcessClientMessage(x))
               case None    => unexpectedMessageFailure(strictText)
             }
-          } yield pong
+          } yield clientMessage
 
         case bm: BinaryMessage =>
           bm.dataStream.runWith(Sink.ignore)

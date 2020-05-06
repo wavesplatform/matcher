@@ -5,11 +5,11 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 
 trait WsMessageOps {
-  implicit class WsBalancesChangesListOps(val self: List[Map[Asset, WsBalances]]) {
+  implicit class WsBalancesChangesListOps(self: List[Map[Asset, WsBalances]]) {
     def squashed: Map[Asset, WsBalances] = self.foldLeft(Map.empty[Asset, WsBalances])(_ ++ _)
   }
 
-  implicit class WsOrderChangesListOps(val self: List[WsOrder]) {
+  implicit class WsOrderChangesListOps(self: List[WsOrder]) {
     def squashed: Map[Order.Id, WsOrder] =
       self
         .groupBy(_.id)
@@ -22,7 +22,7 @@ trait WsMessageOps {
         }
   }
 
-  implicit class WsOrderBookChangesListOps(val self: List[WsOrderBook]) {
+  implicit class WsOrderBookChangesListOps(self: List[WsOrderBook]) {
     def squashed: Map[AssetPair, WsOrderBook] = self.foldLeft(Map.empty[AssetPair, WsOrderBook]) {
       case (r, x) =>
         val orig = r.getOrElse(x.assetPair, WsOrderBook.empty(x.assetPair))

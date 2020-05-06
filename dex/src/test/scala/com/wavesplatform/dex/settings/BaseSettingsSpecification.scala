@@ -160,6 +160,14 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    }
          |    web-sockets {
          |      messages-interval = 100ms
+         |      web-socket-handler {
+         |        max-connection-lifetime = 20h
+         |        ping-interval = 11s
+         |        pong-timeout = 31s
+         |        jwt-public-key = \"\"\"foo
+         |bar
+         |baz\"\"\"
+         |      }
          |    }
          |    address-actor {
          |      max-active-orders = 400

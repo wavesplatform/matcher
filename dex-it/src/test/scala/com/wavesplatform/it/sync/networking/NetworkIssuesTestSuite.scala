@@ -6,24 +6,26 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
-import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 @NetworkTests
-class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy with HasWebSockets {
+class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
-  override protected def dexInitialSuiteConfig: Config = {
-    ConfigFactory.parseString(s"""waves.dex {
-                                 |  price-assets = [ "$UsdId", "WAVES" ]
-                                 |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
-                                 |}""".stripMargin)
-  }
+  override protected def dexInitialSuiteConfig: Config =
+    ConfigFactory
+      .parseString(
+        s"""waves.dex {
+           |  price-assets = [ "$UsdId", "WAVES" ]
+           |  waves-blockchain-client.grpc.target = "$toxiProxyHostName:${getInnerToxiProxyPort(wavesNodeProxy)}"
+           |}""".stripMargin
+      )
+      .withFallback(jwtPublicKeyConfig)
 
   lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2")
 
@@ -42,9 +44,9 @@ class NetworkIssuesTestSuite extends MatcherSuiteBase with HasToxiProxy with Has
 
     "user has a balances snapshot (got by ws connection)" in {
       val acc = mkAccountWithBalance(100.waves -> Waves)
-      val wsc = mkWsAuthenticatedConnection(acc, dex1)
+      val wsc = mkWsAddressConnection(acc, dex1)
 
-      eventually { wsc.getBalancesChanges should have size 1 }
+      eventually { wsc.addressStateChanges should have size 1 }
 
       wsc.close()
       dex1.disconnectFromNetwork()

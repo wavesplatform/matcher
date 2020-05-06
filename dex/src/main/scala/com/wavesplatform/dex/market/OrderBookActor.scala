@@ -96,6 +96,7 @@ class OrderBookActor(settings: Settings,
           priceDecimals,
           restrictions,
           matchingRules.head.tickSize.toDouble,
+          time,
           AggregatedOrderBookActor.State.fromOrderBook(orderBook)
         ),
         "aggregated"

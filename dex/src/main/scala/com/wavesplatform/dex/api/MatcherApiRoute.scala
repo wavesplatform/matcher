@@ -626,6 +626,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "query",
         defaultValue = "false"
       ),
+      new ApiImplicitParam(
+        name = "closedOnly",
+        value = "Return closed only orders (Filled and Canceled)",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      ),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
       new ApiImplicitParam(name = "Signature",
                            value = "Signature of [Public Key ++ Timestamp] bytes",
@@ -657,6 +665,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(
         name = "activeOnly",
         value = "Return active only orders (Accepted and PartiallyFilled)",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      ),
+      new ApiImplicitParam(
+        name = "closedOnly",
+        value = "Return closed only orders (Filled and Canceled)",
         required = false,
         dataType = "boolean",
         paramType = "query",
@@ -727,6 +743,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         paramType = "query",
         defaultValue = "false"
       ),
+      new ApiImplicitParam(
+        name = "closedOnly",
+        value = "Return closed only orders (Filled and Canceled)",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      )
     )
   )
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth & withUserPublicKeyOpt) { (address, userPublicKey) =>

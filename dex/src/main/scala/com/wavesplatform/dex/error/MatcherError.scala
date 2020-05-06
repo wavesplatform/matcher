@@ -209,6 +209,8 @@ case class OrderVersionUnsupported(version: Byte, requiredFeature: BlockchainFea
     )
 
 case object RequestInvalidSignature extends MatcherError(request, signature, commonClass, e"The request has an invalid signature")
+case class RequestArgumentInvalid(name: String)
+    extends MatcherError(request, commonEntity, commonClass, e"The request argument '${'name -> name}' is invalid")
 
 case class AccountFeatureUnsupported(x: BlockchainFeature)
     extends MatcherError(
@@ -478,6 +480,26 @@ case object WsConnectionPongTimeout extends MatcherError(webSocket, connectivity
 
 case object WsConnectionMaxLifetimeExceeded extends MatcherError(webSocket, connectivity, limitReached, e"WebSocket has reached max allowed lifetime")
 
+case class SubscriptionAuthTypeUnsupported(required: Set[String], given: String)
+    extends MatcherError(auth,
+                         tpe,
+                         unsupported,
+                         e"The subscription authentication type '${'given -> given}' is not supported. Required one of: ${'required -> required}")
+
+case class JwtCommonError(text: String)
+    extends MatcherError(token, commonEntity, commonClass, e"JWT parsing and validation failed: ${'message -> text}")
+
+case object JwtBroken extends MatcherError(token, commonEntity, broken, e"JWT has invalid format")
+
+case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT payload has not expected fields")
+
+case object InvalidJwtPayloadSignature extends MatcherError(token, signature, broken, e"The token payload signature is invalid")
+
+case object SubscriptionTokenExpired extends MatcherError(token, expiration, commonClass, e"The subscription token expired")
+
+case class TokenNetworkUnexpected(required: Byte, given: Byte)
+    extends MatcherError(token, network, unexpected, e"The required network is ${'required -> required}, but given ${'given -> given}")
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -505,12 +527,16 @@ object Entity {
   object expiration  extends Entity(18)
   object marketOrder extends Entity(19)
   object rate        extends Entity(20)
+  object tpe         extends Entity(21)
+  object network     extends Entity(22)
 
   object producer     extends Entity(100)
   object connectivity extends Entity(101)
   object auth         extends Entity(102)
   object params       extends Entity(103)
   object webSocket    extends Entity(104)
+  object token        extends Entity(105)
+  object payload      extends Entity(106)
 }
 
 sealed abstract class Class(val code: Int)

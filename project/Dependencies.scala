@@ -71,6 +71,7 @@ object Dependencies {
 
     val commonsNet = "3.6"
     val nettyCodec = "4.1.33.Final"
+    val jwt        = "4.2.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -80,6 +81,7 @@ object Dependencies {
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID                  = "io.monix"                      %% s"monix-$module"  % Version.monix
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon"                      %% s"kamon-$module"  % version
+  private def jwtModule(module: String): ModuleID                    = "com.pauldijou"                 %% s"jwt-$module"    % Version.jwt
 
   private val akkaActor            = akkaModule("akka-actor", Version.akka)
   private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
@@ -219,7 +221,9 @@ object Dependencies {
       kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
       commonsNet,
-      swaggerUi
+      swaggerUi,
+      jwtModule("core"),
+      jwtModule("play-json")
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit

@@ -1,18 +1,18 @@
 package com.wavesplatform.dex.api.websockets
 
-import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class WsAddressState(balances: Map[Asset, WsBalances], orders: Seq[WsOrder], updateId: Long, timestamp: Long = System.currentTimeMillis)
-    extends WsMessage {
-  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsAddressState.format.writes(this).toString)
-  override val tpe: String                             = "au"
+    extends WsServerMessage {
+  override val tpe: String = WsAddressState.tpe
 }
 
 object WsAddressState {
+
+  val tpe = "au"
 
   def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Map[Asset, WsBalances], Seq[WsOrder])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.balances, arg.orders).some

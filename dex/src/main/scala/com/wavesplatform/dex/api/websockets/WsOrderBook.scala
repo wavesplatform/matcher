@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.api.websockets
 
-import akka.http.scaladsl.model.ws.TextMessage
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization._
 import com.wavesplatform.dex.fp.MayBeEmpty
 import com.wavesplatform.dex.json.Implicits.JsPathOps
@@ -13,30 +13,32 @@ import play.api.libs.json._
 
 import scala.collection.immutable.TreeMap
 
-case class WsOrderBook(asks: WsSide,
+case class WsOrderBook(assetPair: AssetPair,
+                       asks: WsSide,
                        bids: WsSide,
                        lastTrade: Option[WsLastTrade],
                        updateId: Long,
                        settings: Option[WsOrderBookSettings],
                        timestamp: Long = System.currentTimeMillis)
-    extends WsMessage {
-
-  override def toStrictTextMessage: TextMessage.Strict = TextMessage.Strict(WsOrderBook.wsOrderBookStateFormat.writes(this).toString)
-  override val tpe: String                             = "ob"
+    extends WsServerMessage {
+  override val tpe: String = WsOrderBook.tpe
 }
 
 object WsOrderBook {
 
-  def wsUnapply(arg: WsOrderBook): Option[(String, Long, Long, WsSide, WsSide, Option[WsLastTrade], Option[WsOrderBookSettings])] =
-    (arg.tpe, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade, arg.settings).some
+  val tpe = "ob"
+
+  def wsUnapply(arg: WsOrderBook): Option[(String, AssetPair, Long, Long, WsSide, WsSide, Option[WsLastTrade], Option[WsOrderBookSettings])] =
+    (arg.tpe, arg.assetPair, arg.timestamp, arg.updateId, arg.asks, arg.bids, arg.lastTrade, arg.settings).some
 
   type WsSide = TreeMap[Double, Double]
 
   private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
   private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.compare(x, y)
 
-  val empty: WsOrderBook =
+  def empty(assetPair: AssetPair): WsOrderBook =
     WsOrderBook(
+      assetPair = assetPair,
       asks = TreeMap.empty(asksOrdering),
       bids = TreeMap.empty(bidsOrdering),
       lastTrade = None,
@@ -46,6 +48,7 @@ object WsOrderBook {
 
   implicit val wsOrderBookStateFormat: Format[WsOrderBook] = (
     (__ \ "T").format[String] and
+      (__ \ "S").format[AssetPair](AssetPair.assetPairKeyAsStringFormat) and
       (__ \ "_").format[Long] and
       (__ \ "U").format[Long] and
       (__ \ "a").formatMayBeEmpty[WsSide](sideFormat(asksOrdering), sideMayBeEmpty(asksOrdering)) and
@@ -53,7 +56,7 @@ object WsOrderBook {
       (__ \ "t").formatNullable[WsLastTrade] and
       (__ \ "s").formatNullable[WsOrderBookSettings]
   )(
-    (_, timestamp, uid, asks, bids, lastTrade, settings) => WsOrderBook(asks, bids, lastTrade, uid, settings, timestamp),
+    (_, assetPair, timestamp, uid, asks, bids, lastTrade, settings) => WsOrderBook(assetPair, asks, bids, lastTrade, uid, settings, timestamp),
     unlift(WsOrderBook.wsUnapply)
   )
 
@@ -88,7 +91,8 @@ object WsOrderBook {
     override def empty: WsSide               = TreeMap.empty(ordering)
   }
 
-  def from(amountDecimals: Int,
+  def from(assetPair: AssetPair,
+           amountDecimals: Int,
            priceDecimals: Int,
            asks: Iterable[LevelAgg],
            bids: Iterable[LevelAgg],
@@ -97,6 +101,7 @@ object WsOrderBook {
            restrictions: Option[OrderRestrictionsSettings],
            tickSize: Double): WsOrderBook =
     WsOrderBook(
+      assetPair = assetPair,
       asks = side(amountDecimals, priceDecimals, asks, asksOrdering),
       bids = side(amountDecimals, priceDecimals, bids, bidsOrdering),
       lastTrade = lt.map(lastTrade(amountDecimals, priceDecimals, _)),

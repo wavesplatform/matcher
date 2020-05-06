@@ -14,7 +14,7 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherSpecLike}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, MatcherModel, OrderBook, OrderBookResult}
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
-import com.wavesplatform.dex.time.SystemTime
+import com.wavesplatform.dex.time.{SystemTime, Time}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -139,6 +139,7 @@ object OrderBookHttpInfoSpec {
         8,
         None,
         DenormalizedMatchingRule.DefaultTickSize.toDouble,
+        Time.zero,
         AggregatedOrderBookActor.State.fromOrderBook(OrderBook.empty)
       ),
       "aggregated"

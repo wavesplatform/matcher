@@ -5,7 +5,7 @@ object Dependencies {
 
   object Version {
 
-    val akka     = "2.6.1"
+    val akka     = "2.6.5"
     val akkaHttp = "10.1.11"
 
     val scalaTest          = "3.1.0"
@@ -20,6 +20,7 @@ object Dependencies {
     val betterMonadicFor  = "0.3.1"
     val mouse             = "0.24"
     val shapeless         = "2.3.3"
+    val monocle           = "2.0.4"
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
@@ -69,8 +70,7 @@ object Dependencies {
     val influxDb    = "2.17"
 
     val commonsNet = "3.6"
-
-    val monocle = "2.0.4"
+    val nettyCodec = "4.1.33.Final"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -118,6 +118,7 @@ object Dependencies {
   private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
+  private val nettyCodec    = "io.netty" % "netty-codec-http2" % Version.nettyCodec
   private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
   private val swaggerUi     = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
@@ -190,7 +191,7 @@ object Dependencies {
       googleGuava,
       slf4j,
       grpcNetty,
-      "io.netty" % "netty-codec-http2" % "4.1.33.Final"
+      nettyCodec
     )
   )
 

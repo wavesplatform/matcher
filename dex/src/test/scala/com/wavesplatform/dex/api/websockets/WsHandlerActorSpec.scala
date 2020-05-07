@@ -7,6 +7,7 @@ import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestPr
 import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
+import cats.syntax.either._
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessClientMessage
@@ -24,6 +25,7 @@ import play.api.libs.json.Json
 import scala.concurrent.duration._
 
 class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
+
   private val testKit = ActorTestKit()
   implicit val ec     = testKit.system.executionContext
 
@@ -153,6 +155,25 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           )
         )
       }
+    }
+
+    "should close all subscriptions after connection closing" in test { t =>
+      import AddressActor.WsCommand
+      import AggregatedOrderBookActor.Command
+
+      val jwtPayload = mkJwtSignedPayload(clientKeyPair)
+      val clientRef  = t.clientProbe.ref
+
+      t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
+      t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
+
+      t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(clientRef)))
+      t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.AddWsSubscription(clientRef)))
+
+      t.wsHandlerRef ! WsHandlerActor.Completed(().asRight)
+
+      t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.RemoveWsSubscription(clientRef)))
+      t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
     }
   }
 

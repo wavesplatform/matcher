@@ -2,18 +2,17 @@ package com.wavesplatform.dex.market
 
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior, PostStop, Terminated}
+import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import com.wavesplatform.dex.OrderBookWsState
 import com.wavesplatform.dex.api.websockets.{WsError, WsMessage, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
-import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.time.Time
+import com.wavesplatform.dex.{OrderBookWsState, error}
 import monocle.macros.GenLens
 
 import scala.collection.immutable.TreeMap

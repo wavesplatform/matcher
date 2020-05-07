@@ -180,11 +180,13 @@ object BalanceNotEnough {
   def apply(required: Map[Asset, Long], actual: Map[Asset, Long])(implicit efc: ErrorFormatterContext): BalanceNotEnough =
     new BalanceNotEnough(mk(required), mk(actual))
 
-  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] =
+  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] = {
+    import Ordered._
     input
       .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
       .toList
-      .sortBy(x => x.asset.toString)
+      .sortWith((l, r) => l.asset.compatId < r.asset.compatId)
+  }
 }
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)

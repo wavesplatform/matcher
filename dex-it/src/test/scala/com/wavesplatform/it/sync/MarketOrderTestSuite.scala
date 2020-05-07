@@ -384,7 +384,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWith(
         3147270, // BalanceNotEnough
-        s"0.01 ${UsdId.toString} and 0.003 WAVES"
+        s"0.003 WAVES and 0.01 ${UsdId.toString}"
       )
     }
 

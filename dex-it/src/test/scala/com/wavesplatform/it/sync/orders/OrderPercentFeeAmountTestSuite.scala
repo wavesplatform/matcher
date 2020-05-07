@@ -19,7 +19,8 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         price,
         minimalFeeWaves,
         usd
-      )) should failWith(9441540) // UnexpectedFeeAsset
+      )
+    ) should failWith(9441540) // UnexpectedFeeAsset
   }
 
   s"sell order should be rejected is fee Asset not equal WAVES when fee asset-type = $assetType" in {
@@ -32,7 +33,8 @@ class V3OrderPercentFeeAmountTestSuite extends OrderPercentFeeAmountTestSuite(3.
         price,
         minimalFeeWaves,
         usd
-      )) should failWith(9441540) // UnexpectedFeeAsset
+      )
+    ) should failWith(9441540) // UnexpectedFeeAsset
   }
 }
 
@@ -129,10 +131,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           price,
           minimalFeeWaves,
           version = version
-        )) should failWith(
-        3147270,
-        s"Not enough tradable balance. The order requires at least 3.75 WAVES and 18 ${UsdId} on balance, but available are 0 WAVES and 18 ${UsdId}"
-      )
+        )
+      ) should failWithBalanceNotEnough(required = Map(Waves -> 3.75.waves, usd -> 18.usd), available = Map(Waves -> 0.waves, usd -> 18.usd))
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -145,7 +145,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           price,
           tooLowFeeWaves,
           version = version
-        )) should failWith(
+        )
+      ) should failWith(
         9441542, // FeeNotEnough
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )
@@ -159,7 +160,8 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
                 fullyAmountWaves,
                 price,
                 tooLowFeeWaves,
-                version = version)) should failWith(
+                version = version)
+      ) should failWith(
         9441542, // FeeNotEnough
         "Required 2.1 WAVES as fee for this order, but given 2.09 WAVES"
       )

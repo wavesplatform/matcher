@@ -125,10 +125,8 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
           minimalFee,
           version = version,
           feeAsset = IssuedAsset(UsdId)
-        )) should failWith(
-        3147270,
-        s"Not enough tradable balance. The order requires at least 22.5 ${UsdId} on balance, but available are 18 ${UsdId}"
-      )
+        )
+      ) should failWithBalanceNotEnough(required = Map(usd -> 22.5.usd), available = Map(usd -> 18.usd))
     }
 
     s"buy order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {
@@ -143,7 +141,8 @@ class OrderPercentFeePriceTestSuite extends OrderFeeBaseTestSuite {
             tooLowFee,
             version = version,
             feeAsset = IssuedAsset(UsdId)
-          )) should failWith(9441542, s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
+          )
+        ) should failWith(9441542, s"Required 2.52 ${UsdId.toString} as fee for this order, but given 2.51 ${UsdId.toString}")
     }
 
     s"sell order should be rejected if fee less then minimum possible fee when fee asset-type = $assetType" in {

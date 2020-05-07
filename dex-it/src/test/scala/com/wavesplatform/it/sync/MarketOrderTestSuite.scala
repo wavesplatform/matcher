@@ -382,9 +382,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeOrders(alice, wavesUsdPair, SELL)(amount -> price)
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWith(
-        3147270, // BalanceNotEnough
-        s"0.003 WAVES and 0.01 ${UsdId.toString}"
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee)) should failWithBalanceNotEnough(
+        required = Map(Waves -> fixedFee, usd -> 0.01.usd)
       )
     }
 
@@ -403,10 +402,8 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
 
       placeAndAwaitAtDex { mkOrder(bob, wavesUsdPair, SELL, amount, price, fixedFee, feeAsset = btc, version = 3) }
 
-      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWith(
-        3147270,
-        s"0.003 ${BtcId.toString}"
-      )
+      dex1.api.tryPlaceMarket(mkOrder(account, wavesUsdPair, BUY, amount, price, fixedFee, feeAsset = btc)) should failWithBalanceNotEnough(
+        required = Map(btc -> fixedFee, usd -> 0.01.usd))
     }
   }
 
@@ -425,10 +422,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     dex1.api.reservedBalance(carol) should matchTo(Map[Asset, Long](Waves -> 10.waves))
     wavesNode1.api.balance(carol, Waves) shouldBe 10.waves
 
-    dex1.api.tryPlaceMarket(order2) should failWith(
-      3147270,
-      "Not enough tradable balance"
-    )
+    dex1.api.tryPlaceMarket(order2) should failWithBalanceNotEnough()
   }
 
   "Market order should be executed even if sender balance isn't enough to cover order value" in {

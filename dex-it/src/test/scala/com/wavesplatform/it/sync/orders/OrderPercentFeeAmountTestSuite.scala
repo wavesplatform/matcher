@@ -131,7 +131,7 @@ abstract class OrderPercentFeeAmountTestSuite(version: Byte) extends OrderFeeBas
           version = version
         )) should failWith(
         3147270,
-        s"Not enough tradable balance. The order requires at least 18 ${UsdId} and 3.75 WAVES on balance, but available are 18 ${UsdId} and 0 WAVES"
+        s"Not enough tradable balance. The order requires at least 3.75 WAVES and 18 ${UsdId} on balance, but available are 0 WAVES and 18 ${UsdId}"
       )
     }
 

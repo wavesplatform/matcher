@@ -184,7 +184,7 @@ object BalanceNotEnough {
     input
       .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
       .toList
-      .sortBy(x => x.asset.toString)
+      .sortBy(x => x.volume)
 }
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)

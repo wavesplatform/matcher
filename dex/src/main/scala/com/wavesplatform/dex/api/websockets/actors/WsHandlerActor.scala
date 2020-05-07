@@ -6,7 +6,7 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessAssetPairValidationResult
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.AssetPairValidated
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
@@ -16,7 +16,7 @@ import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, 
 import shapeless.{Inl, Inr}
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 object WsHandlerActor {
 
@@ -24,10 +24,11 @@ object WsHandlerActor {
 
   sealed trait Command extends Message
   object Command {
-    case class ProcessClientMessage(wsMessage: WsClientMessage)                                                               extends Command
-    case class ProcessAssetPairValidationResult(assetPair: AssetPair, validationResult: Try[Either[MatcherError, AssetPair]]) extends Command
-    case class CloseConnection(reason: MatcherError)                                                                          extends Command
-    private[WsHandlerActor] case object SendPing                                                                              extends Command
+    case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
+    case class CloseConnection(reason: MatcherError)            extends Command
+
+    private[WsHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Command
+    private[WsHandlerActor] case object SendPing                                extends Command
   }
 
   case class Completed(completionStatus: Either[Throwable, Unit]) extends Message // Could be an event in the future
@@ -41,6 +42,8 @@ object WsHandlerActor {
             matcherRef: classic.ActorRef,
             addressRef: classic.ActorRef): Behavior[Message] =
     Behaviors.setup[Message] { context =>
+      import context.executionContext
+
       context.setLoggerName(s"WsHandlerActor[c=${clientRef.path.name}]")
 
       def scheduleOnce(delay: FiniteDuration, message: Message): Cancellable = context.scheduleOnce(delay, context.self, message)
@@ -68,12 +71,6 @@ object WsHandlerActor {
       def unsubscribeOrderBook(assetPair: AssetPair): Unit = {
         context.log.debug(s"WsUnsubscribe(assetPair=$assetPair)")
         matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.RemoveWsSubscription(clientRef))
-      }
-
-      def unsubscribe(key: WsUnsubscribe.Key): Unit = key match {
-        case Inl(x)      => unsubscribeOrderBook(x)
-        case Inr(Inl(x)) => unsubscribeAddress(x)
-        case Inr(Inr(_)) =>
       }
 
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong],
@@ -111,7 +108,13 @@ object WsHandlerActor {
                   // TODO DEX-700 test for order book that hasn't been created before
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), time.getTimestamp())
                   else
-                    context.pipeToSelf(assetPairBuilder.validateAssetPair(subscribe.key).value) { ProcessAssetPairValidationResult(subscribe.key, _) }
+                    assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {
+                      case Success(Left(e))  => clientRef ! WsError.from(e, time.getTimestamp())
+                      case Success(Right(_)) => context.self ! AssetPairValidated(subscribe.key)
+                      case Failure(e) =>
+                        context.log.warn(s"An error during validation the asset pair ${subscribe.key}", e)
+                        clientRef ! WsError.from(error.WavesNodeConnectionBroken, time.getTimestamp())
+                    }
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
@@ -127,24 +130,20 @@ object WsHandlerActor {
                   }
 
                 case unsubscribeRequest: WsUnsubscribe =>
-                  unsubscribe(unsubscribeRequest.key)
-                  Behaviors.same
+                  unsubscribeRequest.key match {
+                    case Inl(x) =>
+                      unsubscribeOrderBook(x)
+                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions.filterNot(_ == x), addressSubscriptions)
+                    case Inr(Inl(x)) =>
+                      unsubscribeAddress(x)
+                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions.filterNot(_ == x))
+                    case Inr(Inr(_)) => Behaviors.same
+                  }
               }
 
-            case ProcessAssetPairValidationResult(assetPair, validationResult) =>
-              validationResult match {
-                case Success(Left(e)) => clientRef ! WsError.from(e, time.getTimestamp()); Behaviors.same
-                case Success(Right(_)) =>
-                  matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(
-                    assetPair,
-                    AggregatedOrderBookActor.Command.AddWsSubscription(clientRef)
-                  )
-                  awaitPong(maybeExpectedPong, pongTimeout, nextPing, assetPair :: orderBookSubscriptions, addressSubscriptions)
-                case Failure(e) =>
-                  context.log.warn(s"An error during validation the asset pair $assetPair", e)
-                  clientRef ! WsError.from(error.WavesNodeConnectionBroken, time.getTimestamp())
-                  Behaviors.same
-              }
+            case AssetPairValidated(assetPair) =>
+              matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
+              awaitPong(maybeExpectedPong, pongTimeout, nextPing, assetPair :: orderBookSubscriptions, addressSubscriptions)
 
             case command: Command.CloseConnection =>
               context.log.trace("Got CloseConnection: {}", command.reason.message.text)

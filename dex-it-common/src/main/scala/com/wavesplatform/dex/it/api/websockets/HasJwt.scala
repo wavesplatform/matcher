@@ -10,7 +10,10 @@ import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.KeyPair
 import play.api.libs.json.Json
 
+import scala.concurrent.duration.{FiniteDuration, _}
+
 trait HasJwt extends JwtUtils {
+
   protected val authServiceKeyPair: security.KeyPair = {
     val kpg = KeyPairGenerator.getInstance("RSA")
     kpg.initialize(2048)
@@ -25,5 +28,8 @@ trait HasJwt extends JwtUtils {
   )
 
   protected def mkJwt(payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
-  protected def mkJwt(clientKeyPair: KeyPair): String = mkJwt(mkJwtSignedPayload(clientKeyPair))
+
+  protected def mkJwt(clientKeyPair: KeyPair, lifetime: FiniteDuration = 1.hour): String = {
+    mkJwt(mkJwtSignedPayload(clientKeyPair, lifetime = lifetime))
+  }
 }

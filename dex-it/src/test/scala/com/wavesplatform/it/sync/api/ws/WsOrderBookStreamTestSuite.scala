@@ -78,13 +78,13 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val wsc = mkWsConnection(dex1)
       wsc.send(WsOrderBookSubscribe(invalidAssetPair, 1))
 
-      val errors = wsc.receiveAtLeastN[WsError](1)
-      errors.head.copy(timestamp = 0L) should matchTo(
+      wsc.receiveAtLeastN[WsError](1).head should matchTo(
         WsError(
-          timestamp = 0L,
+          timestamp = 0L, // ignored
           code = 9440771, // OrderAssetPairReversed
           message = s"The $invalidAssetPair asset pair should be reversed"
-        ))
+        )
+      )
 
       wsc.close()
     }
@@ -403,10 +403,11 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       dex1.api.tryDeleteOrderBook(assetPair)
 
       val expectedMessage = WsError(
-        timestamp = 0L,
+        timestamp = 0L, // ignored
         code = 8388624, // OrderBookStopped
         message = s"The order book for $assetPair is stopped, please contact with the administrator"
       )
+
       wscs.foreach { wsc =>
         wsc.receiveAtLeastN[WsError](1).head.copy(timestamp = 0L) should matchTo(expectedMessage)
         wsc.close()

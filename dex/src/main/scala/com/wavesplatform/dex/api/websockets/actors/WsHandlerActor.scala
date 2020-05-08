@@ -6,7 +6,7 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.AssetPairValidated
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.{AssetPairValidated, CancelAddressSubscription}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
@@ -26,6 +26,7 @@ object WsHandlerActor {
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
     case class CloseConnection(reason: MatcherError)            extends Command
+    case class CancelAddressSubscription(address: Address)      extends Command
 
     private[WsHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Command
     private[WsHandlerActor] case object SendPing                                extends Command
@@ -77,7 +78,7 @@ object WsHandlerActor {
                     pongTimeout: Cancellable,
                     nextPing: Cancellable,
                     orderBookSubscriptions: List[AssetPair],
-                    addressSubscriptions: List[Address]): Behavior[Message] =
+                    addressSubscriptions: Map[Address, Cancellable]): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
 
@@ -118,32 +119,56 @@ object WsHandlerActor {
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
+                  val address  = subscribe.key
+                  val authType = subscribe.authType
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
-                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) failed with ${e.message.text}")
+                      context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) failed with ${e.message.text}")
                       clientRef ! WsError.from(e, time.getTimestamp())
                       Behaviors.same
-                    case Right(_) =>
-                      context.log.debug(s"WsAddressSubscribe(k=${subscribe.key}, t=${subscribe.authType}) is successful")
-                      addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
-                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, subscribe.key :: addressSubscriptions)
+                    case Right(jwtPayload) =>
+                      val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime).millis
+
+                      addressSubscriptions
+                        .get(subscribe.key)
+                        .fold {
+                          addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime ms")
+                        } { existedExp =>
+                          existedExp.cancel()
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) updated, will expire in $subscriptionLifetime ms")
+                        }
+
+                      val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
+                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions + (address -> expiration))
                   }
 
                 case unsubscribeRequest: WsUnsubscribe =>
                   unsubscribeRequest.key match {
-                    case Inl(x) =>
-                      unsubscribeOrderBook(x)
-                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions.filterNot(_ == x), addressSubscriptions)
-                    case Inr(Inl(x)) =>
-                      unsubscribeAddress(x)
-                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions.filterNot(_ == x))
+                    case Inl(ap) =>
+                      orderBookSubscriptions.find(_ == ap).fold[Behavior[Message]](Behaviors.same) { assetPair =>
+                        unsubscribeOrderBook(assetPair)
+                        awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions.filterNot(_ == assetPair), addressSubscriptions)
+                      }
+
+                    case Inr(Inl(address)) =>
+                      addressSubscriptions.get(address).fold[Behavior[Message]](Behaviors.same) { expiration =>
+                        expiration.cancel()
+                        unsubscribeAddress(address)
+                        awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions - address)
+                      }
                     case Inr(Inr(_)) => Behaviors.same
                   }
               }
 
-            case AssetPairValidated(assetPair) =>
+            case Command.AssetPairValidated(assetPair) =>
               matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
               awaitPong(maybeExpectedPong, pongTimeout, nextPing, assetPair :: orderBookSubscriptions, addressSubscriptions)
+
+            case Command.CancelAddressSubscription(address) =>
+              clientRef ! WsError.from(error.SubscriptionTokenExpired(address), time.correctedTime())
+              unsubscribeAddress(address)
+              awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions - address)
 
             case command: Command.CloseConnection =>
               context.log.trace("Got CloseConnection: {}", command.reason.message.text)
@@ -158,7 +183,7 @@ object WsHandlerActor {
                 case Right(_) => context.log.debug("Got successful Completed. Stopping...")
               }
 
-              addressSubscriptions foreach unsubscribeAddress
+              addressSubscriptions foreach { case (address, expiration) => expiration.cancel(); unsubscribeAddress(address) }
               orderBookSubscriptions foreach unsubscribeOrderBook
 
               cancelSchedules(nextPing, pongTimeout)
@@ -170,7 +195,7 @@ object WsHandlerActor {
         pongTimeout = Cancellable.alreadyCancelled,
         nextPing = Cancellable.alreadyCancelled,
         orderBookSubscriptions = List.empty,
-        addressSubscriptions = List.empty
+        addressSubscriptions = Map.empty
       )
     }
 }

@@ -135,7 +135,7 @@ object AggregatedOrderBookActor {
               Behaviors.stopped
           }
           .receiveSignal {
-            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws) }
+            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws.unsafeUpcast[WsOrderBook]) }
           }
 
       default(init)

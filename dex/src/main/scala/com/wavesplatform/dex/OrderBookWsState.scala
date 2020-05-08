@@ -22,9 +22,9 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
 
   def addSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState = copy(wsConnections = wsConnections.updated(x, 0L))
 
-  def withoutSubscription(x: ActorRef[Nothing]): OrderBookWsState =
+  def withoutSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState =
     if (wsConnections.size == 1) OrderBookWsState(Map.empty, Set.empty, Set.empty, None, None)
-    else copy(wsConnections = wsConnections.filterKeys(_ != x))
+    else copy(wsConnections = wsConnections - x)
 
   def hasSubscriptions: Boolean = wsConnections.nonEmpty
 

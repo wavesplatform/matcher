@@ -79,7 +79,7 @@ class AddressActor(owner: Address,
 
     case command: Command.CancelOrder =>
       import command.orderId
-      log.trace(s"Got $command")
+      log.debug(s"Got $command")
       pendingCommands.get(orderId) match {
         case Some(pc) =>
           sender ! api.OrderCancelRejected(
@@ -112,7 +112,7 @@ class AddressActor(owner: Address,
     case command: Command.CancelAllOrders =>
       val toCancelIds = getActiveLimitOrders(command.pair).map(_.id)
       if (toCancelIds.isEmpty) {
-        log.trace(s"Got $command, nothing to cancel")
+        log.debug(s"Got $command, nothing to cancel")
         sender ! api.BatchCancelCompleted(Map.empty)
       } else {
         log.debug(s"Got $command, to cancel: ${toCancelIds.mkString(", ")}")
@@ -204,7 +204,7 @@ class AddressActor(owner: Address,
 
     case event @ OrderAdded(submitted, _) =>
       import submitted.order
-      log.trace(s"OrderAdded(${order.id()})")
+      log.debug(s"OrderAdded(${order.id()})")
       refreshOrderState(submitted, event)
       pendingCommands.remove(order.id()).foreach { command =>
         log.trace(s"Confirming placement for ${order.id()}")
@@ -212,33 +212,42 @@ class AddressActor(owner: Address,
       }
 
     case event: OrderExecuted =>
-      log.trace(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
+      log.debug(s"OrderExecuted(${event.submittedRemaining.id}, ${event.counterRemaining.id}), amount=${event.executedAmount}")
       List(event.submittedRemaining, event.counterRemaining).filter(_.order.sender.toAddress == owner).foreach(refreshOrderState(_, event))
       context.system.eventStream.publish(CreateExchangeTransactionActor.OrderExecutedObserved(owner, event))
 
     case event @ OrderCanceled(ao, isSystemCancel, _) =>
       val id       = ao.id
       val isActive = activeOrders.contains(id)
-      log.trace(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
+      log.debug(s"OrderCanceled($id, system=$isSystemCancel, isActive=$isActive)")
       if (isActive) refreshOrderState(ao, event)
       pendingCommands.remove(id).foreach { pc =>
         log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
       }
 
-    case OrderCancelFailed(id, reason) =>
-      pendingCommands.remove(id).foreach { pc =>
-        log.warn(s"Storing of cancel event for $id failed, reason: ${reason.message.text}")
-        pc.client ! api.OrderCancelRejected(reason)
+    case command @ OrderCancelFailed(id, reason) =>
+      val prefix = s"Got $command"
+      pendingCommands.remove(id) match {
+        case None => log.debug(s"$prefix is stale")
+        case Some(pc) =>
+          log.trace(s"$prefix, sending a response to a client")
+          pc.client ! api.OrderCancelRejected(reason)
       }
 
-    case CancelExpiredOrder(id) =>
+    case command @ CancelExpiredOrder(id) =>
       expiration.remove(id)
-      activeOrders.get(id).foreach { ao =>
-        if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
-          log.debug(s"Order $id expired, storing cancel event")
-          cancel(ao.order)
-        } else scheduleExpiration(ao.order)
+      val prefix = s"Got $command"
+      activeOrders.get(id) match {
+        case None => log.debug(s"$prefix for a not active order")
+        case Some(ao) =>
+          if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
+            log.debug(s"$prefix, storing cancel event")
+            cancel(ao.order)
+          } else {
+            log.trace(s"$prefix, can't find an active order")
+            scheduleExpiration(ao.order)
+          }
       }
 
     case AddressDirectory.StartSchedules =>
@@ -532,8 +541,7 @@ object AddressActor {
   object Command {
     case class PlaceOrder(order: Order, isMarket: Boolean) extends OneOrderCommand {
       override lazy val toString =
-        s"PlaceOrder(${if (isMarket) "market" else "limit"},id=${order
-          .id()},s=${order.sender.toAddress},${order.assetPair},${order.orderType},p=${order.price},a=${order.amount})"
+        s"PlaceOrder(${if (isMarket) "market" else "limit"},id=${order.id()},js=${order.jsonStr})"
 
       def toAcceptedOrder(tradableBalance: Map[Asset, Long]): AcceptedOrder = if (isMarket) MarketOrder(order, tradableBalance) else LimitOrder(order)
     }

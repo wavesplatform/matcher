@@ -282,9 +282,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     val aliceOrder = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 0.001.waves, 10.0)
     dex1.api.place(aliceOrder)
-    // TODO return after DEX-734
-//    dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
-    dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Cancelled).filledAmount shouldBe Some(0L)
+    dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
 
     withClue("Alice's reserved balance:") {
       dex1.api.reservedBalance(alice) shouldBe empty

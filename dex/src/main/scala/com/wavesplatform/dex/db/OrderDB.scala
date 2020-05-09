@@ -44,8 +44,7 @@ object OrderDB {
 
     override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): Unit = {
       val orderInfoKey = MatcherKeys.orderInfo(id)
-      if (db.has(orderInfoKey)) log.warn(s"Finalized order info already exists for $id")
-      else {
+      if (!db.has(orderInfoKey)) {
         db.readWrite { rw =>
           val newCommonSeqNr = rw.inc(MatcherKeys.finalizedCommonSeqNr(sender))
           rw.put(MatcherKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))

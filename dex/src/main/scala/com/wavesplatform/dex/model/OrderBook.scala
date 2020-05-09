@@ -122,8 +122,8 @@ object OrderBook {
              events: Queue[Event],
              levelChanges: LevelAmounts): (OrderBook, Queue[Event], LevelAmounts) = orderBook.best(submitted.order.orderType.opposite) match {
       case Some((levelPrice, counter)) if overlaps(submitted, levelPrice) =>
-        if (counter.order.isValid(eventTs)) {
-
+        if (!submitted.isValid(counter.price)) (orderBook, events.enqueue(OrderCanceled(submitted, isSystemCancel = true, eventTs)), levelChanges)
+        else if (counter.order.isValid(eventTs)) {
           val (counterExecutedFee, submittedExecutedFee) = getMakerTakerMaxFee(submitted, counter)
 
           val orderExecutedEvent = OrderExecuted(submitted, counter, eventTs, counterExecutedFee, submittedExecutedFee)

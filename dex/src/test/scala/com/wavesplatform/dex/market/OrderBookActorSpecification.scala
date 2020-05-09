@@ -648,6 +648,32 @@ class OrderBookActorSpecification
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = ethAsset, isFeeConsideredInExecutionAmount = false) // fee in third asset
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = Waves, isFeeConsideredInExecutionAmount = true)     // fee in spent asset
     }
+
+    "cancel a submitted order if it couldn't be matched by a price of a counter order" in obcTest { (wctWavesPair, orderBook, tp) =>
+      val counterOrder = rawSell(
+        pair = wctWavesPair,
+        amount = 20000L,
+        price = 90000L,
+        matcherFee = Some(300000L),
+        version = 1.toByte
+      )
+
+      val submittedOrder = rawBuy(
+        pair = wctWavesPair,
+        amount = 1000L,
+        price = 100000L,
+        matcherFee = Some(300000L),
+        version = 3.toByte
+      )
+
+      orderBook ! wrapLimitOrder(counterOrder)
+      tp.expectMsgType[OrderAdded]
+
+      orderBook ! wrapLimitOrder(submittedOrder)
+      tp.expectMsgType[OrderAdded]
+      // The amount=1000 should >= ceil(10^8 / 90000) = 1112
+      tp.expectMsgType[OrderCanceled].isSystemCancel shouldBe true
+    }
   }
 
   private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {

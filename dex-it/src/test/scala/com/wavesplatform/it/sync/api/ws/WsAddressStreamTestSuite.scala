@@ -12,6 +12,8 @@ import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
+import scala.concurrent.duration._
+
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
@@ -30,6 +32,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   private def mkWsAddressConnection(account: KeyPair): WsConnection = mkWsAddressConnection(account, dex1)
 
   "Address stream should" - {
+
     "correctly handle rejections" in {
       val fooAddress = mkKeyPair("foo").toAddress
       val barKeyPair = mkKeyPair("bar")
@@ -40,15 +43,17 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           fooAddress,
           WsAddressSubscribe.defaultAuthType,
           mkJwt(barKeyPair)
-        ))
+        )
+      )
 
       val errors = wsc.receiveAtLeastN[WsError](1)
-      errors.head.copy(timestamp = 0L) should matchTo(
+      errors.head should matchTo(
         WsError(
-          timestamp = 0L,
+          timestamp = 0L, // ignored
           code = 106957828, // AddressAndPublicKeyAreIncompatible
           message = "Address 3Q6LEwEVJVAomd4BjjjSPydZuNN4vDo3fSs and public key 54gGdY9o2vFgzkSMLXQ7iReTJMPo2XiGdaBQSsG5U3un are incompatible"
-        ))
+        )
+      )
 
       wsc.close()
     }
@@ -57,18 +62,14 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val acc = mkAccountWithBalance(10.waves -> Waves)
       val wsc = mkWsAddressConnection(acc, dex1)
 
-      eventually {
-        wsc.balanceChanges should have size 1
-      }
+      eventually { wsc.balanceChanges should have size 1 }
       wsc.close()
 
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
       wsc.balanceChanges should have size 1
 
       val wsc2 = mkWsAddressConnection(acc, dex1)
-      eventually {
-        wsc2.balanceChanges should have size 1
-      }
+      eventually { wsc2.balanceChanges should have size 1 }
     }
 
     "stop send updates after unsubscribe and receive them again after subscribe" in {
@@ -348,5 +349,32 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     Seq(wsc1, wsc2).foreach { _.close() }
     dex1.api.cancelAll(acc)
+  }
+
+  "Subscription should be cancelled after jwt expiration" in {
+
+    val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
+    val wsc = mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)
+
+    wsc.receiveAtLeastN[WsAddressState](1) // snapshot
+    wsc.receiveAtLeastN[WsError](1).head should matchTo(
+      WsError(
+        0, // ignored
+        110105088, // SubscriptionTokenExpired
+        s"The subscription token for address ${acc.toAddress} expired"
+      )
+    )
+
+    wsc.isClosed shouldBe false
+
+    Seq(3.seconds, 1.hour).foreach { subscriptionLifetime =>
+      val jwt = mkJwt(acc, lifetime = subscriptionLifetime)
+      wsc.send(WsAddressSubscribe(acc.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
+    }
+
+    wsc.receiveAtLeastN[WsAddressState](1) // snapshot
+    wsc.receiveNoMessages(3.5.seconds)
+
+    wsc.close()
   }
 }

@@ -16,13 +16,11 @@ class WsPingPongTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(
-      s"""waves.dex.web-sockets {
-        |  web-socket-handler {
+      s"""waves.dex.web-sockets.web-socket-handler {
         |    max-connection-lifetime = $maxConnectionLifetime
         |    ping-interval = $pingInterval
         |    pong-timeout = $pongTimeout
-        |  }
-        |}
+        | }
         |""".stripMargin
     )
     .withFallback(jwtPublicKeyConfig)
@@ -42,12 +40,13 @@ class WsPingPongTestSuite extends WsSuiteBase {
         wsac.isClosed shouldBe true
       }
 
-      wsac.collectMessages[WsError].head.copy(timestamp = 0L) should matchTo(
+      wsac.collectMessages[WsError].head should matchTo(
         WsError(
-          timestamp = 0L,
+          timestamp = 0L, // ignored
           code = 109077767, // WsConnectionMaxLifetimeExceeded
           message = "WebSocket has reached max allowed lifetime"
-        ))
+        )
+      )
     }
 
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
@@ -66,12 +65,13 @@ class WsPingPongTestSuite extends WsSuiteBase {
           wsac.isClosed shouldBe true
         }
 
-        wsac.collectMessages[WsError].head.copy(timestamp = 0L) should matchTo(
+        wsac.collectMessages[WsError].head should matchTo(
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 109077772, // WsConnectionPongTimeout
             message = "WebSocket has reached pong timeout"
-          ))
+          )
+        )
       }
 
       "with sending pong" in {
@@ -124,29 +124,6 @@ class WsPingPongTestSuite extends WsSuiteBase {
         Seq(wsac1, wsac2).foreach { conn =>
           conn.pings.size should (be >= 3 and be <= 4)
           conn.isClosed shouldBe true
-        }
-      }
-    }
-
-    // TODO DEX-733
-    "by signed connection lifetime expiration, if it < max-connection-lifetime" ignore {
-      val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false, connectionLifetime = 1.5.seconds)
-      wsac.isClosed shouldBe false
-
-      Thread.sleep(1.4.seconds)
-      wsac.isClosed shouldBe false
-
-      Thread.sleep(0.1.second)
-      eventually {
-        wsac.isClosed shouldBe true
-        wsac.pings should have size 1
-      }
-
-      withClue("expiration is less than 0") {
-        val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false, connectionLifetime = -1.5.hours)
-        eventually {
-          wsac.isClosed shouldBe true
-          wsac.pings shouldBe empty
         }
       }
     }

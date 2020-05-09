@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsAddressSubscribe, WsOrderBook, WsOrderBookSubscribe, WsUnsubscribe}
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.it.WsSuiteBase
 

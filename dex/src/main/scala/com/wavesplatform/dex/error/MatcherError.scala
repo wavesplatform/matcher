@@ -497,7 +497,8 @@ case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT 
 
 case object InvalidJwtPayloadSignature extends MatcherError(token, signature, broken, e"The token payload signature is invalid")
 
-case object SubscriptionTokenExpired extends MatcherError(token, expiration, commonClass, e"The subscription token expired")
+case class SubscriptionTokenExpired(address: Address)
+    extends MatcherError(token, expiration, commonClass, e"The subscription token for address ${'address -> address} expired")
 
 case class TokenNetworkUnexpected(required: Byte, given: Byte)
     extends MatcherError(token, network, unexpected, e"The required network is ${'required -> required}, but given ${'given -> given}")

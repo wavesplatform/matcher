@@ -30,7 +30,7 @@ final case class WsAddressSubscribe(key: Address, authType: String, jwt: String)
         )
         .toEither
         .left
-        .map(toMatcherError)
+        .map(toMatcherError(_, key))
       payload <- rawJsonPayload.validate[JwtPayload].asEither.leftMap(_ => error.JwtPayloadBroken)
       _ <- {
         val given = payload.networkByte.head.toByte
@@ -86,9 +86,9 @@ object WsAddressSubscribe {
     )(JwtPayload.apply, unlift(JwtPayload.unapply))
   }
 
-  def toMatcherError(e: Throwable): MatcherError = e match {
+  def toMatcherError(e: Throwable, address: Address): MatcherError = e match {
     case _: JwtLengthException     => error.JwtBroken
-    case _: JwtExpirationException => error.SubscriptionTokenExpired
+    case _: JwtExpirationException => error.SubscriptionTokenExpired(address)
     case _                         => error.JwtCommonError(e.getMessage)
   }
 }

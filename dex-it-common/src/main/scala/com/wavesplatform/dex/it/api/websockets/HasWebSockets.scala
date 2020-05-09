@@ -36,8 +36,8 @@ trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps w
   protected def mkWsAddressConnection(client: KeyPair,
                                       dex: DexContainer,
                                       keepAlive: Boolean = true,
-                                      connectionLifetime: FiniteDuration = 1.hour): WsConnection = {
-    val jwt        = mkJwt(mkJwtSignedPayload(client, lifetime = connectionLifetime))
+                                      subscriptionLifetime: FiniteDuration = 1.hour): WsConnection = {
+    val jwt        = mkJwt(client, lifetime = subscriptionLifetime)
     val connection = mkWsConnection(dex, keepAlive)
     connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     connection

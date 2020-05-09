@@ -1,12 +1,16 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.dex.api.websockets.WsServerMessage
+import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.api.websockets.{WsError, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.{HasWebSockets, WsConnection}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag
 
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
+
+  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
+
   final implicit class WsConnectionOps(val self: WsConnection) {
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {
       val r = eventually {

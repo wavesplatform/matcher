@@ -29,7 +29,7 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef[WsAddressStat
 
   def removeSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState = {
     if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()
-    else copy(activeWsConnections = activeWsConnections.filterKeys(_ != subscriber))
+    else copy(activeWsConnections = activeWsConnections - subscriber)
   }
 
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)

@@ -8,6 +8,7 @@ import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
 import cats.syntax.either._
+import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessClientMessage
@@ -27,12 +28,13 @@ import scala.concurrent.duration._
 class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
 
   private val testKit = ActorTestKit()
-  implicit val ec     = testKit.system.executionContext
 
-  private val issuedAsset = IssuedAsset(ByteStr("issuedAsset".getBytes(StandardCharsets.UTF_8)))
-  private val assetPair   = AssetPair(issuedAsset, Waves)
+  private implicit val ec                         = testKit.system.executionContext
+  private implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
 
-  private val clientKeyPair = KeyPair(ByteStr("seed".getBytes(StandardCharsets.UTF_8)))
+  private val issuedAsset   = IssuedAsset(ByteStr("issuedAsset".getBytes(StandardCharsets.UTF_8)))
+  private val assetPair     = AssetPair(issuedAsset, Waves)
+  private val clientKeyPair = mkKeyPair("seed")
 
   "WsHandlerActor" - {
     "WsOrderBookSubscribe" - {
@@ -42,7 +44,8 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           AggregatedOrderBookEnvelope(
             assetPair,
             AggregatedOrderBookActor.Command.AddWsSubscription(t.clientProbe.ref)
-          ))
+          )
+        )
       }
 
       "AssetPairBuilder validation" in {
@@ -50,7 +53,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         failTest(
           WsOrderBookSubscribe(invalidAssetPair, 1),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 9440771, // OrderAssetPairReversed
             message = "The WAVES-T9euE6z4DWHFWxT asset pair should be reversed"
           )
@@ -60,7 +63,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
       "negative depth" in failTest(
         WsOrderBookSubscribe(assetPair, -1),
         WsError(
-          timestamp = 0L,
+          timestamp = 0L, // ignored
           code = 1048576, // RequestArgumentInvalid
           message = "The request argument 'depth' is invalid"
         )
@@ -75,14 +78,15 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           AddressDirectory.Envelope(
             clientKeyPair,
             AddressActor.WsCommand.AddWsSubscription(t.clientProbe.ref)
-          ))
+          )
+        )
       }
 
       "jwt is invalid" - {
         "wrong auth type" in failTest(
           WsAddressSubscribe(clientKeyPair, "password", ""),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 106960131, // SubscriptionAuthTypeUnsupported
             message = "The subscription authentication type 'password' is not supported. Required one of: jwt"
           )
@@ -91,7 +95,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         "broken" in failTest(
           "dGVzdA==",
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 110100481, // JwtBroken
             message = "JWT has invalid format"
           )
@@ -100,16 +104,16 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         "expired" in failTest(
           mkJwt(mkJwtSignedPayload(clientKeyPair, lifetime = -1.minute)),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 110105088, // SubscriptionTokenExpired
-            message = "The subscription token expired"
+            message = s"The subscription token for address ${clientKeyPair.toAddress} expired"
           )
         )
 
         "parsing or validation issues" in failTest(
           "dGVzdA==.dGVzdA==",
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 110100480, // JwtCommonError
             message =
               "JWT parsing and validation failed: Unrecognized token 'test': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: (String)\"test\"; line: 1, column: 9]"
@@ -121,7 +125,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           failTest(
             mkJwt(jwtPayload),
             WsError(
-              timestamp = 0L,
+              timestamp = 0L, // ignored
               code = 110127617, // JwtPayloadBroken
               message = "JWT payload has not expected fields"
             )
@@ -131,7 +135,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         "wrong network" in failTest(
           mkJwt(mkJwtSignedPayload(clientKeyPair, networkByte = 0)),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 110106116, // TokenNetworkUnexpected
             message = "The required network is 84, but given 0"
           )
@@ -140,7 +144,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         "invalid signature" in failTest(
           mkJwt(mkJwtNotSignedPayload(clientKeyPair)),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 110103809, // InvalidJwtPayloadSignature
             message = "The token payload signature is invalid"
           )
@@ -149,11 +153,33 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         "address doesn't fit public key" in failTest(
           WsAddressSubscribe(KeyPair(ByteStr("other-client".getBytes(StandardCharsets.UTF_8))), "jwt", mkJwt(mkJwtSignedPayload(clientKeyPair))),
           WsError(
-            timestamp = 0L,
+            timestamp = 0L, // ignored
             code = 106957828, // AddressAndPublicKeyAreIncompatible
             message = "Address 3N7nTwcKubzsH6X1uWerLoYFGX1pTKSbhUu and public key D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5 are incompatible"
           )
         )
+      }
+
+      "should be cancelled after jwt expiration" in test { t =>
+        val jwtPayload = mkJwtSignedPayload(clientKeyPair, lifetime = 1.second)
+
+        t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
+        val error = t.clientProbe.expectMessageType[WsError]
+
+        error.code shouldBe 110105088 // SubscriptionTokenExpired
+        error.message shouldBe s"The subscription token for address ${clientKeyPair.toAddress} expired"
+      }
+
+      "should be extended after jwt update" in test { t =>
+        def requestSubscriptionWithLifetime(lifetime: FiniteDuration): Unit = {
+          val jwtPayload = mkJwtSignedPayload(clientKeyPair, lifetime = lifetime)
+          t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(clientKeyPair, WsAddressSubscribe.defaultAuthType, mkJwt(jwtPayload)))
+        }
+
+        requestSubscriptionWithLifetime(2.seconds)
+        requestSubscriptionWithLifetime(1.hour)
+
+        t.clientProbe.expectNoMessage(2.1.seconds)
       }
     }
 
@@ -209,7 +235,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
     val wsHandlerRef = testKit.spawn(
       WsHandlerActor(
         settings = WsHandlerActor.Settings(10.minutes, 1.minute, 3.minutes, Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded)),
-        time = zeroTime,
+        time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,
           assetDescription = x => effect.liftValueAsync(BriefAssetDescription(x.toString, 8, hasScript = false)),
@@ -218,7 +244,8 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         clientRef = clientInbox.ref,
         matcherRef = matcherProbe.ref,
         addressRef = addressProbe.ref
-      ))
+      )
+    )
 
     f(TestInstances(clientInbox, matcherProbe, addressProbe, wsHandlerRef))
   }

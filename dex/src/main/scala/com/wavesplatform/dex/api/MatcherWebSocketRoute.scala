@@ -9,14 +9,15 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Sink}
 import akka.stream.typed.scaladsl.{ActorSource, _}
-import cats.syntax.either._
 import akka.stream.{Materializer, OverflowStrategy}
+import cats.syntax.either._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.time.Time
 import io.swagger.annotations.Api
@@ -24,7 +25,7 @@ import javax.ws.rs.Path
 import play.api.libs.json.Json
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
@@ -41,15 +42,10 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   import mat.executionContext
 
-  private def mkFailure(msg: String): Future[Nothing]                = Future.failed { new IllegalArgumentException(msg) }
-  private val binaryMessageUnsupportedFailure: Future[Nothing]       = mkFailure("Binary messages are not supported")
-  private def unexpectedMessageFailure(msg: String): Future[Nothing] = mkFailure(s"Got unexpected message instead of pong: $msg")
-
-  override def route: Route = pathPrefix("ws") {
-    commonWsRoute
-  }
+  override def route: Route = pathPrefix("ws") { commonWsRoute }
 
   private val completedSuccessfully: WsHandlerActor.Message = WsHandlerActor.Completed(().asRight)
+
   private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
     import webSocketSettings._
 
@@ -77,25 +73,28 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       .actorRef[WsHandlerActor.Message](
         ref = webSocketHandlerRef,
         onCompleteMessage = completedSuccessfully,
-        onFailureMessage = e => WsHandlerActor.Completed(Left(e))
+        onFailureMessage = e => WsHandlerActor.Completed(e.asLeft)
       )
       .named(s"server-$clientId")
 
     // From client to server
     val serverSink = Flow[Message]
-      .mapAsync[WsHandlerActor.Command.ProcessClientMessage](1) {
+      .mapAsync[WsHandlerActor.Command](1) {
         case tm: TextMessage =>
-          for {
-            strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
-            clientMessage <- Json.parse(strictText).asOpt[WsClientMessage] match {
-              case Some(x) => Future.successful(WsHandlerActor.Command.ProcessClientMessage(x))
-              case None    => unexpectedMessageFailure(strictText)
-            }
-          } yield clientMessage
+          val parseResult =
+            for {
+              strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
+              clientMessage <- Try { Json.parse(strictText).as[WsClientMessage] } match {
+                case Success(cm)        => Future.successful { WsHandlerActor.Command.ProcessClientMessage(cm) }
+                case Failure(exception) => Future.failed(exception)
+              }
+            } yield clientMessage
+
+          parseResult.recover { case _ => WsHandlerActor.Command.ForwardClientError(InvalidJson(Nil)) }
 
         case bm: BinaryMessage =>
           bm.dataStream.runWith(Sink.ignore)
-          binaryMessageUnsupportedFailure
+          Future.failed { new IllegalArgumentException("Binary messages are not supported") }
       }
       .named(s"sink-$clientId")
       .to(server)

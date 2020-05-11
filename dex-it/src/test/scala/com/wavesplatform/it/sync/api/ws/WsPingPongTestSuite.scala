@@ -1,7 +1,10 @@
 package com.wavesplatform.it.sync.api.ws
 
+import akka.http.scaladsl.model.ws.TextMessage
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsError}
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsError, WsMessage, WsPingOrPong}
+import com.wavesplatform.dex.error.InvalidJson
+import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
@@ -132,21 +135,28 @@ class WsPingPongTestSuite extends WsSuiteBase {
   "Web socket connection should not be closed " - {
 
     "when incorrect message has been sent" in {
-      val m = new WsClientMessage {
-        override def tpe: String = "{}"
+
+      val wsc = new WsConnection(getWsStreamUri(dex1), keepAlive = false) {
+        override def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict = cm match {
+          case WsPingOrPong(timestamp) if timestamp == 0 => TextMessage.Strict(s"broken")
+          case other: WsClientMessage                    => WsMessage.toStrictTextMessage(other)(WsClientMessage.wsClientMessageWrites)
+        }
       }
-      val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false)
 
       Thread.sleep(pingInterval + 0.1.second)
-      wsac.isClosed shouldBe false
-      wsac.pings should have size 1
+      wsc.isClosed shouldBe false
+      wsc.pings should have size 1
 
-      wsac.send(wsac.pings.last)
-      wsac.send(m)
+      wsc.send(wsc.pings.last)
+      wsc.send(wsc.pings.last.copy(timestamp = 0))
 
       Thread.sleep(pingInterval - 0.1.second + pongTimeout - 0.1.second)
-      wsac.pings should have size 4
-      wsac.isClosed shouldBe false
+      wsc.pings should have size 4
+
+      val expectedError = InvalidJson(Nil)
+      wsc.collectMessages[WsError] should matchTo { List(WsError(0L, expectedError.code, expectedError.message.text)) }
+
+      wsc.isClosed shouldBe false
     }
   }
 }

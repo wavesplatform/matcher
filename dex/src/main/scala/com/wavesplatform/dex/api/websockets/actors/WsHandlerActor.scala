@@ -25,6 +25,7 @@ object WsHandlerActor {
   sealed trait Command extends Message
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
+    case class ForwardClientError(error: MatcherError)          extends Command
     case class CloseConnection(reason: MatcherError)            extends Command
     case class CancelAddressSubscription(address: Address)      extends Command
 
@@ -87,6 +88,10 @@ object WsHandlerActor {
               val updatedPongTimeout: Cancellable = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
               awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions)
 
+            case Command.ForwardClientError(matcherError) =>
+              clientRef ! WsError.from(matcherError, time.correctedTime())
+              Behaviors.same
+
             case Command.ProcessClientMessage(wsMessage) =>
               wsMessage match {
                 case pong: WsPingOrPong =>
@@ -133,10 +138,10 @@ object WsHandlerActor {
                         .get(subscribe.key)
                         .fold {
                           addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
-                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime ms")
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
                         } { existedExp =>
                           existedExp.cancel()
-                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) updated, will expire in $subscriptionLifetime ms")
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) updated, will expire in $subscriptionLifetime")
                         }
 
                       val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))

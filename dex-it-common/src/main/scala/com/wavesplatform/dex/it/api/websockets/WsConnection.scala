@@ -24,6 +24,9 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
   private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
 
+  protected def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict =
+    WsMessage.toStrictTextMessage(cm)(WsClientMessage.wsClientMessageWrites)
+
   // From test to server
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
@@ -31,7 +34,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
     Source
       .actorRef[WsClientMessage](completionMatcher, failureMatcher, 10, OverflowStrategy.fail)
-      .map(WsMessage.toStrictTextMessage(_)(WsClientMessage.wsClientMessageWrites))
+      .map(stringifyClientMessage)
       .mapMaterializedValue { source =>
         wsHandlerRef.tell(TestWsHandlerActor.AssignSourceRef, source)
         source
@@ -56,7 +59,6 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
     }
   }
 
-  // maybe this flow can be made in more natural for Akka Streams way, especially pong handling by source
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
     case (_, f) =>
       f.onComplete {

@@ -467,11 +467,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
         val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
 
-        log.info(s"Binding REST API ${settings.restApi.address}:${settings.restApi.port} ...")
+        log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)
       } map { serverBinding =>
         matcherServerBinding = serverBinding
-        log.info(s"REST API bound to ${matcherServerBinding.localAddress}")
+        log.info(s"REST and WebSocket API bound to ${matcherServerBinding.localAddress}")
       }
 
       deadline = settings.startEventsProcessingTimeout.fromNow

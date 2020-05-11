@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.WsError
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsError}
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.concurrent.duration._
@@ -126,6 +126,27 @@ class WsPingPongTestSuite extends WsSuiteBase {
           conn.isClosed shouldBe true
         }
       }
+    }
+  }
+
+  "Web socket connection should not be closed " - {
+
+    "when incorrect message has been sent" in {
+      val m = new WsClientMessage {
+        override def tpe: String = "{}"
+      }
+      val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false)
+
+      Thread.sleep(pingInterval + 0.1.second)
+      wsac.isClosed shouldBe false
+      wsac.pings should have size 1
+
+      wsac.send(wsac.pings.last)
+      wsac.send(m)
+
+      Thread.sleep(pingInterval - 0.1.second + pongTimeout - 0.1.second)
+      wsac.pings should have size 4
+      wsac.isClosed shouldBe false
     }
   }
 }

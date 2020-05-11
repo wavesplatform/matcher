@@ -8,7 +8,6 @@ import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
 import cats.syntax.either._
-import com.softwaremill.diffx.{Derived, Diff}
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessClientMessage
@@ -29,8 +28,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
 
   private val testKit = ActorTestKit()
 
-  private implicit val ec                         = testKit.system.executionContext
-  private implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
+  private implicit val ec = testKit.system.executionContext
 
   private val issuedAsset   = IssuedAsset(ByteStr("issuedAsset".getBytes(StandardCharsets.UTF_8)))
   private val assetPair     = AssetPair(issuedAsset, Waves)

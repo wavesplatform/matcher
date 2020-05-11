@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
+import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.api.websockets.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -38,6 +40,8 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
+
+  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
 
   private val WalletSeed: ByteStr      = ByteStr("Matcher".getBytes("utf-8"))
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))

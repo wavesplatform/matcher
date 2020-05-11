@@ -4,7 +4,7 @@ import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import com.wavesplatform.dex.api.websockets.{WsError, WsMessage, WsOrderBook}
+import com.wavesplatform.dex.api.websockets.{WsError, WsOrderBook, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -130,7 +130,7 @@ object AggregatedOrderBookActor {
                     client.path.name.asInstanceOf[Any],
                     reason.message.text.asInstanceOf[Any]
                   )
-                  client.unsafeUpcast[WsMessage] ! WsError.from(reason, time.getTimestamp())
+                  client.unsafeUpcast[WsServerMessage] ! WsError.from(reason, time.getTimestamp())
               }
               Behaviors.stopped
           }

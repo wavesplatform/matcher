@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.networking
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
@@ -130,6 +131,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, OrderStatus.Accepted)
+    dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo { Map.empty[Asset, Long] }
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

@@ -1,12 +1,13 @@
 package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, Status}
-import akka.pattern.pipe
 import cats.instances.long.catsKernelStdGroupForLong
+import cats.syntax.either._
 import cats.syntax.group.catsSyntaxGroup
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.error.{MatcherError, WavesNodeConnectionBroken}
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 
@@ -44,7 +45,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
           .andThen {
             case Success(r) => self.tell(r, requestSender)
             case Failure(ex) =>
-              log.warn("Got exception during spendable balance request", ex)
+              log.error("Could not receive spendable balance from Waves Node", ex)
               requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
           }
       }
@@ -60,16 +61,23 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       sender ! SpendableBalancesActor.Reply.GetState(result)
 
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
+      val requestSender = sender
       fullState.get(address) match {
-        case Some(state) => sender ! SpendableBalancesActor.Reply.GetSnapshot(state)
-        case None        => allAssetsSpendableBalances(address).map(SpendableBalancesActor.Command.SetState(address, _)).pipeTo(self)(sender)
+        case Some(state) => requestSender ! SpendableBalancesActor.Reply.GetSnapshot(state.asRight)
+        case None =>
+          allAssetsSpendableBalances(address).onComplete {
+            case Success(balance) => self.tell(SpendableBalancesActor.Command.SetState(address, balance), requestSender)
+            case Failure(ex) =>
+              log.error("Could not receive address spendable balance snapshot from Waves Node", ex)
+              requestSender ! SpendableBalancesActor.Reply.GetSnapshot(WavesNodeConnectionBroken.asLeft)
+          }
       }
 
     case SpendableBalancesActor.Command.SetState(address, state) =>
       val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
       fullState += address -> addressState
       incompleteStateChanges -= address
-      sender ! SpendableBalancesActor.Reply.GetSnapshot(addressState)
+      sender ! SpendableBalancesActor.Reply.GetSnapshot(addressState.asRight)
 
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
@@ -107,8 +115,8 @@ object SpendableBalancesActor {
 
   trait Reply
   object Reply {
-    final case class GetState(state: Map[Asset, Long])    extends Reply
-    final case class GetSnapshot(state: Map[Asset, Long]) extends Reply
+    final case class GetState(state: Map[Asset, Long])                          extends Reply
+    final case class GetSnapshot(state: Either[MatcherError, Map[Asset, Long]]) extends Reply
   }
 
   final case class NodeBalanceRequestRoundtrip(address: Address, knownAssets: Set[Asset], stateFromNode: Map[Asset, Long])

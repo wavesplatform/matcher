@@ -9,27 +9,27 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 
-case class AddressWsMutableState(activeWsConnections: Map[ActorRef[WsAddressState], Long],
-                                 pendingWsConnections: Set[ActorRef[WsAddressState]],
+case class AddressWsMutableState(activeSubscription: Map[ActorRef[WsAddressState], Long],
+                                 pendingSubscription: Set[ActorRef[WsAddressState]],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
                                  ordersChanges: Map[Order.Id, WsOrder]) {
 
-  val hasActiveConnections: Boolean = activeWsConnections.nonEmpty
-  val hasChanges: Boolean           = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
+  val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
+  val hasChanges: Boolean             = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty
 
   def getAllChangedAssets: Set[Asset]  = changedSpendableAssets ++ changedReservableAssets
   def getAllOrderChanges: Seq[WsOrder] = ordersChanges.values.toSeq
 
   def addPendingSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState =
-    copy(pendingWsConnections = pendingWsConnections + subscriber)
+    copy(pendingSubscription = pendingSubscription + subscriber)
 
-  def flushPendingConnections(): AddressWsMutableState =
-    copy(activeWsConnections = activeWsConnections ++ pendingWsConnections.iterator.map(_ -> 0L), pendingWsConnections = Set.empty)
+  def flushPendingSubscriptions(): AddressWsMutableState =
+    copy(activeSubscription = activeSubscription ++ pendingSubscription.iterator.map(_ -> 0L), pendingSubscription = Set.empty)
 
   def removeSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState = {
-    if (activeWsConnections.size == 1) copy(activeWsConnections = Map.empty).cleanChanges()
-    else copy(activeWsConnections = activeWsConnections - subscriber)
+    if (activeSubscription.size == 1) copy(activeSubscription = Map.empty).cleanChanges()
+    else copy(activeSubscription = activeSubscription - subscriber)
   }
 
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
@@ -63,11 +63,11 @@ case class AddressWsMutableState(activeWsConnections: Map[ActorRef[WsAddressStat
 
   def sendSnapshot(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): Unit = {
     val snapshot = WsAddressState(balances, orders, 0)
-    pendingWsConnections.foreach(_ ! snapshot)
+    pendingSubscription.foreach(_ ! snapshot)
   }
 
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): AddressWsMutableState = copy(
-    activeWsConnections = activeWsConnections.map { // dirty but one pass
+    activeSubscription = activeSubscription.map { // dirty but one pass
       case (conn, updateId) =>
         val newUpdateId = AddressWsMutableState.getNextUpdateId(updateId)
         conn ! WsAddressState(balances, orders, newUpdateId)

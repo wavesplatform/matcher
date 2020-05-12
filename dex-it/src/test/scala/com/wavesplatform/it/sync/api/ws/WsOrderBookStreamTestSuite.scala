@@ -16,8 +16,6 @@ import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictio
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.immutable.TreeMap
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -378,18 +376,6 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.close()
     }
 
-    "handle many connections simultaneously" in {
-      val wscs = Await.result(
-        Future.traverse((1 to 200).toList)(_ => Future(mkWsConnection(dex1))),
-        25.seconds
-      )
-
-      wscs.foreach { wsc =>
-        wsc.isClosed shouldBe false
-        wsc.close()
-      }
-    }
-
     "close connections when order book is deleted" in {
       val seller                          = mkAccountWithBalance(100.waves -> Waves)
       val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "cJIoHoxpeH", 1000.asset8)
@@ -416,7 +402,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       }
     }
 
-    "close old subscriptions when max subscriptions number limit has reached" in {
+    "close old subscriptions when order book subscriptions limit has been reached" in {
       Seq(
         mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 1.0),
         mkOrderDP(alice, wavesBtcPair, SELL, 1.waves, 0.00011119),

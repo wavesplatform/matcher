@@ -12,7 +12,6 @@ import com.wavesplatform.dex.AddressActor.WsCommand
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessClientMessage
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.SubscriptionsSettings
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -22,6 +21,7 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.AggregatedOrderBookActor
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.Command
 import com.wavesplatform.dex.market.MatcherActor.AggregatedOrderBookEnvelope
+import com.wavesplatform.dex.settings.SubscriptionsSettings
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
@@ -215,8 +215,8 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
       t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
     }
 
-    "should close old subscriptions if total subscriptions number has reached limit" in test { t =>
-      val assetPairs = (1 to subscriptionsSettings.maxOrderBookNumber).map(idx => AssetPair(IssuedAsset(s"ia-$idx".getBytes), Waves)).toList
+    "should close old order book subscriptions if total order book subscriptions number has reached limit" in test { t =>
+      val assetPairs = (1 to subscriptionsSettings.maxOrderBookNumber).map(idx => AssetPair(IssuedAsset(s"ia-$idx".getBytes), Waves))
 
       assetPairs.foreach { assetPair =>
         t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
@@ -234,6 +234,27 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
       }
 
       assetPairs.foldLeft(assetPair) { case (newSubscription, oldSubscription) => checkEviction(newSubscription, oldSubscription); oldSubscription }
+    }
+
+    "should close old address subscriptions if total address subscriptions number has reached limit" in test { t =>
+      val keyPairs = (1 to subscriptionsSettings.maxAddressNumber).map(idx => mkKeyPair(idx.toString))
+
+      def sendSubscriptionRequest(keyPair: KeyPair): Unit = {
+        t.wsHandlerRef ! ProcessClientMessage(WsAddressSubscribe(keyPair, WsAddressSubscribe.defaultAuthType, mkJwt(mkJwtSignedPayload(keyPair))))
+        t.addressProbe.expectMsg(AddressDirectory.Envelope(keyPair, WsCommand.AddWsSubscription(t.clientProbe.ref)))
+      }
+
+      keyPairs.foreach(sendSubscriptionRequest)
+
+      def checkEviction(newSubscription: KeyPair, oldSubscription: KeyPair): Unit = {
+        sendSubscriptionRequest(newSubscription)
+        t.addressProbe.expectMsg(AddressDirectory.Envelope(oldSubscription, WsCommand.RemoveWsSubscription(t.clientProbe.ref)))
+        t.clientProbe.expectMessageType[WsError] should matchTo {
+          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxAddressNumber, oldSubscription.toAddress.toString), time.correctedTime())
+        }
+      }
+
+      keyPairs.foldLeft(clientKeyPair) { case (newSubscription, oldSubscription) => checkEviction(newSubscription, oldSubscription); oldSubscription }
     }
   }
 

@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
@@ -17,7 +18,10 @@ import scala.concurrent.duration._
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(s"""waves.dex.price-assets = [ "$UsdId", "$BtcId", "WAVES" ]""")
+    .parseString(s"""waves.dex {
+         |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+         |  web-sockets.web-socket-handler.subscriptions.max-address-number = 3
+         |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 
   override protected def beforeAll(): Unit = {
@@ -376,5 +380,24 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     wsc.receiveNoMessages(3.5.seconds)
 
     wsc.close()
+  }
+
+  "Connection should close old address subscriptions when address subscriptions limit has been reached" in {
+    val wsc = mkWsConnection(dex1)
+
+    val carol = mkKeyPair("carol")
+    val eve   = mkKeyPair("eve")
+
+    Seq(alice, bob, carol, eve, alice).foreach { keyPair =>
+      wsc.send(WsAddressSubscribe(keyPair, WsAddressSubscribe.defaultAuthType, mkJwt(keyPair)))
+      wsc.receiveAtLeastN[WsAddressState](1)
+    }
+
+    wsc.receiveAtLeastN[WsError](2) should matchTo {
+      List(
+        WsError.from(SubscriptionsLimitReached(3, alice.toAddress.toString), 0L),
+        WsError.from(SubscriptionsLimitReached(3, bob.toAddress.toString), 0L)
+      )
+    }
   }
 }

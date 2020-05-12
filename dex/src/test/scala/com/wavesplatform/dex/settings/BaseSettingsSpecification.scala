@@ -58,11 +58,20 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        |matching-rules = {}
      """.stripMargin
 
+  val correctSubscriptionsSettingsStr: String =
+    s"""
+       |subscriptions {
+       |  max-order-book-number = 20
+       |  max-address-number = 20
+       |}
+       """.stripMargin
+
   def configWithSettings(orderFeeStr: String = correctOrderFeeStr,
                          deviationsStr: String = correctDeviationsStr,
                          allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
                          orderRestrictionsStr: String = correctOrderRestrictionsStr,
-                         matchingRulesStr: String = correctMatchingRulesStr): Config = {
+                         matchingRulesStr: String = correctMatchingRulesStr,
+                         subscriptionsSettings: String = correctSubscriptionsSettingsStr): Config = {
     val configStr =
       s"""waves {
          |  directory = /waves
@@ -167,6 +176,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |        jwt-public-key = \"\"\"foo
          |bar
          |baz\"\"\"
+         |        $subscriptionsSettings
          |      }
          |    }
          |    address-actor {

@@ -9,12 +9,13 @@ import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.{AssetPairValidated, CancelAddressSubscription}
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
+import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
 import shapeless.{Inl, Inr}
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -35,7 +36,14 @@ object WsHandlerActor {
 
   case class Completed(completionStatus: Either[Throwable, Unit]) extends Message // Could be an event in the future
 
-  final case class Settings(maxConnectionLifetime: FiniteDuration, pingInterval: FiniteDuration, pongTimeout: FiniteDuration, jwtPublicKey: String)
+  final case class SubscriptionsSettings(maxOrderBookNumber: Int, maxAddressNumber: Int)
+  object SubscriptionsSettings { val default: SubscriptionsSettings = SubscriptionsSettings(10, 1) }
+
+  final case class Settings(maxConnectionLifetime: FiniteDuration,
+                            pingInterval: FiniteDuration,
+                            pongTimeout: FiniteDuration,
+                            jwtPublicKey: String,
+                            subscriptions: SubscriptionsSettings)
 
   def apply(settings: Settings,
             time: Time,
@@ -78,8 +86,8 @@ object WsHandlerActor {
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong],
                     pongTimeout: Cancellable,
                     nextPing: Cancellable,
-                    orderBookSubscriptions: List[AssetPair],
-                    addressSubscriptions: Map[Address, Cancellable]): Behavior[Message] =
+                    orderBookSubscriptions: Queue[AssetPair],
+                    addressSubscriptions: Map[Address, Cancellable]): Behavior[Message] = {
         Behaviors
           .receiveMessage[Message] {
 
@@ -113,7 +121,7 @@ object WsHandlerActor {
                 case subscribe: WsOrderBookSubscribe =>
                   // TODO DEX-700 test for order book that hasn't been created before
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), time.getTimestamp())
-                  else
+                  else if (!orderBookSubscriptions.contains(subscribe.key)) {
                     assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {
                       case Success(Left(e))  => clientRef ! WsError.from(e, time.getTimestamp())
                       case Success(Right(_)) => context.self ! AssetPairValidated(subscribe.key)
@@ -121,11 +129,13 @@ object WsHandlerActor {
                         context.log.warn(s"An error during validation the asset pair ${subscribe.key}", e)
                         clientRef ! WsError.from(error.WavesNodeConnectionBroken, time.getTimestamp())
                     }
+                  }
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
                   val address  = subscribe.key
                   val authType = subscribe.authType
+
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
                       context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) failed with ${e.message.text}")
@@ -167,8 +177,17 @@ object WsHandlerActor {
               }
 
             case Command.AssetPairValidated(assetPair) =>
+              import settings.subscriptions._
+
               matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
-              awaitPong(maybeExpectedPong, pongTimeout, nextPing, assetPair :: orderBookSubscriptions, addressSubscriptions)
+
+              if (orderBookSubscriptions.lengthCompare(maxOrderBookNumber) == 0) {
+                val (evictedSubscription, remainingSubscriptions) = orderBookSubscriptions.dequeue
+                val newOrderBookSubscriptions                     = remainingSubscriptions enqueue assetPair
+                unsubscribeOrderBook(evictedSubscription)
+                clientRef ! WsError.from(SubscriptionsLimitReached(maxOrderBookNumber, evictedSubscription.toString), time.correctedTime())
+                awaitPong(maybeExpectedPong, pongTimeout, nextPing, newOrderBookSubscriptions, addressSubscriptions)
+              } else awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions enqueue assetPair, addressSubscriptions)
 
             case Command.CancelAddressSubscription(address) =>
               clientRef ! WsError.from(error.SubscriptionTokenExpired(address), time.correctedTime())
@@ -194,12 +213,13 @@ object WsHandlerActor {
               cancelSchedules(nextPing, pongTimeout)
               Behaviors.stopped
           }
+      }
 
       awaitPong(
         maybeExpectedPong = None,
         pongTimeout = Cancellable.alreadyCancelled,
         nextPing = Cancellable.alreadyCancelled,
-        orderBookSubscriptions = List.empty,
+        orderBookSubscriptions = Queue.empty,
         addressSubscriptions = Map.empty
       )
     }

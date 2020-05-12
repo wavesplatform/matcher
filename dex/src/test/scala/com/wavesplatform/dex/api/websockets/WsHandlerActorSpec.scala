@@ -8,15 +8,19 @@ import akka.actor.typed.ActorRef
 import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.TestProbe
 import cats.syntax.either._
+import com.wavesplatform.dex.AddressActor.WsCommand
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.ProcessClientMessage
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.SubscriptionsSettings
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.AggregatedOrderBookActor
+import com.wavesplatform.dex.market.AggregatedOrderBookActor.Command
 import com.wavesplatform.dex.market.MatcherActor.AggregatedOrderBookEnvelope
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -34,8 +38,12 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
   private val assetPair     = AssetPair(issuedAsset, Waves)
   private val clientKeyPair = mkKeyPair("seed")
 
+  private val subscriptionsSettings = SubscriptionsSettings.default
+
   "WsHandlerActor" - {
+
     "WsOrderBookSubscribe" - {
+
       "sunny day" in test { t =>
         t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
         t.matcherProbe.expectMsg(
@@ -66,6 +74,16 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
           message = "The request argument 'depth' is invalid"
         )
       )
+
+      "should not have effect if client requests a lot of subscriptions for the same asset pair" in test { t =>
+        def subscribeAssetPair(): Unit = t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
+
+        subscribeAssetPair()
+        t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(t.clientProbe.ref)))
+
+        (1 to 10) foreach (_ => subscribeAssetPair())
+        t.matcherProbe.expectNoMessage()
+      }
     }
 
     "WsAddressSubscribe" - {
@@ -182,9 +200,6 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
     }
 
     "should close all subscriptions after connection closing" in test { t =>
-      import AddressActor.WsCommand
-      import AggregatedOrderBookActor.Command
-
       val jwtPayload = mkJwtSignedPayload(clientKeyPair)
       val clientRef  = t.clientProbe.ref
 
@@ -198,6 +213,27 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
 
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.RemoveWsSubscription(clientRef)))
       t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
+    }
+
+    "should close old subscriptions if total subscriptions number has reached limit" in test { t =>
+      val assetPairs = (1 to subscriptionsSettings.maxOrderBookNumber).map(idx => AssetPair(IssuedAsset(s"ia-$idx".getBytes), Waves)).toList
+
+      assetPairs.foreach { assetPair =>
+        t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(assetPair, 1))
+        t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(t.clientProbe.ref)))
+      }
+
+      def checkEviction(newSubscription: AssetPair, oldSubscription: AssetPair): Unit = {
+        t.wsHandlerRef ! ProcessClientMessage(WsOrderBookSubscribe(newSubscription, 1))
+        t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(newSubscription, Command.AddWsSubscription(t.clientProbe.ref)))
+
+        t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(oldSubscription, Command.RemoveWsSubscription(t.clientProbe.ref)))
+        t.clientProbe.expectMessageType[WsError] should matchTo {
+          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxOrderBookNumber, oldSubscription.toString), time.correctedTime())
+        }
+      }
+
+      assetPairs.foldLeft(assetPair) { case (newSubscription, oldSubscription) => checkEviction(newSubscription, oldSubscription); oldSubscription }
     }
   }
 
@@ -232,7 +268,11 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
 
     val wsHandlerRef = testKit.spawn(
       WsHandlerActor(
-        settings = WsHandlerActor.Settings(10.minutes, 1.minute, 3.minutes, Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded)),
+        settings = WsHandlerActor.Settings(10.minutes,
+                                           1.minute,
+                                           3.minutes,
+                                           Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
+                                           subscriptionsSettings),
         time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,

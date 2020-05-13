@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -15,8 +16,6 @@ import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictio
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.immutable.TreeMap
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -59,6 +58,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
        |      }
        |    ]
        |  }
+       |  web-sockets.web-socket-handler.subscriptions.max-order-book-number = 3
        |}
        """.stripMargin
   )
@@ -376,19 +376,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.close()
     }
 
-    "handle many connections simultaneously" in {
-      val wscs = Await.result(
-        Future.traverse((1 to 200).toList)(_ => Future(mkWsConnection(dex1))),
-        25.seconds
-      )
-
-      wscs.foreach { wsc =>
-        wsc.isClosed shouldBe false
-        wsc.close()
-      }
-    }
-
-    "close connections when it is deleted" in {
+    "close connections when order book is deleted" in {
       val seller                          = mkAccountWithBalance(100.waves -> Waves)
       val IssueResults(issueTx, _, asset) = mkIssueExtended(seller, "cJIoHoxpeH", 1000.asset8)
       val assetPair                       = AssetPair(asset, Waves)
@@ -409,8 +397,31 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       )
 
       wscs.foreach { wsc =>
-        wsc.receiveAtLeastN[WsError](1).head.copy(timestamp = 0L) should matchTo(expectedMessage)
+        wsc.receiveAtLeastN[WsError](1).head should matchTo(expectedMessage)
         wsc.close()
+      }
+    }
+
+    "close old subscriptions when order book subscriptions limit has been reached" in {
+      Seq(
+        mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 1.0),
+        mkOrderDP(alice, wavesBtcPair, SELL, 1.waves, 0.00011119),
+        mkOrderDP(alice, ethWavesPair, SELL, 1.eth, 195),
+        mkOrderDP(bob, btcUsdPair, SELL, 1.btc, 8698.782732)
+      ) foreach { placeAndAwaitAtDex(_) }
+
+      val wsc = mkWsConnection(dex1)
+
+      Seq(wavesUsdPair, wavesBtcPair, ethWavesPair, btcUsdPair, wavesUsdPair).foreach { assetPair =>
+        wsc.send(WsOrderBookSubscribe(assetPair, 1))
+        wsc.receiveAtLeastN[WsOrderBook](1)
+      }
+
+      wsc.receiveAtLeastN[WsError](2) should matchTo {
+        List(
+          WsError.from(SubscriptionsLimitReached(3, wavesUsdPair.toString), 0L),
+          WsError.from(SubscriptionsLimitReached(3, wavesBtcPair.toString), 0L)
+        )
       }
     }
   }

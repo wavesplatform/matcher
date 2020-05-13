@@ -503,6 +503,14 @@ case class SubscriptionTokenExpired(address: Address)
 case class TokenNetworkUnexpected(required: Byte, given: Byte)
     extends MatcherError(token, network, unexpected, e"The required network is ${'required -> required}, but given ${'given -> given}")
 
+case class SubscriptionsLimitReached(limit: Int, id: String)
+    extends MatcherError(
+      webSocket,
+      subscription,
+      limitReached,
+      e"The limit of ${'limit -> limit} subscriptions of this type was reached. The subscription of ${'id -> id} was stopped"
+    )
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -540,6 +548,7 @@ object Entity {
   object webSocket    extends Entity(104)
   object token        extends Entity(105)
   object payload      extends Entity(106)
+  object subscription extends Entity(107)
 }
 
 sealed abstract class Class(val code: Int)

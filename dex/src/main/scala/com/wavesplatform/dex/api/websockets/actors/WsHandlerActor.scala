@@ -6,15 +6,17 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.{AssetPairValidated, CancelAddressSubscription}
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.CancelAddressSubscription
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
+import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
+import com.wavesplatform.dex.settings.SubscriptionsSettings
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{AddressActor, AddressDirectory, AssetPairBuilder, error}
 import shapeless.{Inl, Inr}
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -27,15 +29,23 @@ object WsHandlerActor {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
     case class ForwardClientError(error: MatcherError)          extends Command
     case class CloseConnection(reason: MatcherError)            extends Command
-    case class CancelAddressSubscription(address: Address)      extends Command
 
-    private[WsHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Command
-    private[WsHandlerActor] case object SendPing                                extends Command
+    private[WsHandlerActor] case class CancelAddressSubscription(address: Address) extends Command
+    private[WsHandlerActor] case object SendPing                                   extends Command
+  }
+
+  sealed trait Event extends Message
+  object Event {
+    private[WsHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Event
   }
 
   case class Completed(completionStatus: Either[Throwable, Unit]) extends Message // Could be an event in the future
 
-  final case class Settings(maxConnectionLifetime: FiniteDuration, pingInterval: FiniteDuration, pongTimeout: FiniteDuration, jwtPublicKey: String)
+  final case class Settings(maxConnectionLifetime: FiniteDuration,
+                            pingInterval: FiniteDuration,
+                            pongTimeout: FiniteDuration,
+                            jwtPublicKey: String,
+                            subscriptions: SubscriptionsSettings)
 
   def apply(settings: Settings,
             time: Time,
@@ -45,6 +55,7 @@ object WsHandlerActor {
             addressRef: classic.ActorRef): Behavior[Message] =
     Behaviors.setup[Message] { context =>
       import context.executionContext
+      import settings.subscriptions._
 
       context.setLoggerName(s"WsHandlerActor[c=${clientRef.path.name}]")
 
@@ -78,8 +89,8 @@ object WsHandlerActor {
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong],
                     pongTimeout: Cancellable,
                     nextPing: Cancellable,
-                    orderBookSubscriptions: List[AssetPair],
-                    addressSubscriptions: Map[Address, Cancellable]): Behavior[Message] =
+                    orderBookSubscriptions: Queue[AssetPair],
+                    addressSubscriptions: Queue[(Address, Cancellable)]): Behavior[Message] = {
         Behaviors
           .receiveMessage[Message] {
 
@@ -113,19 +124,21 @@ object WsHandlerActor {
                 case subscribe: WsOrderBookSubscribe =>
                   // TODO DEX-700 test for order book that hasn't been created before
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), time.getTimestamp())
-                  else
+                  else if (!orderBookSubscriptions.contains(subscribe.key)) {
                     assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {
                       case Success(Left(e))  => clientRef ! WsError.from(e, time.getTimestamp())
-                      case Success(Right(_)) => context.self ! AssetPairValidated(subscribe.key)
+                      case Success(Right(_)) => context.self ! Event.AssetPairValidated(subscribe.key)
                       case Failure(e) =>
                         context.log.warn(s"An error during validation the asset pair ${subscribe.key}", e)
                         clientRef ! WsError.from(error.WavesNodeConnectionBroken, time.getTimestamp())
                     }
+                  }
                   Behaviors.same
 
                 case subscribe: WsAddressSubscribe =>
                   val address  = subscribe.key
                   val authType = subscribe.authType
+
                   subscribe.validate(settings.jwtPublicKey, AddressScheme.current.chainId) match {
                     case Left(e) =>
                       context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) failed with ${e.message.text}")
@@ -133,19 +146,38 @@ object WsHandlerActor {
                       Behaviors.same
                     case Right(jwtPayload) =>
                       val subscriptionLifetime = (jwtPayload.activeTokenExpirationInSeconds * 1000 - time.correctedTime).millis
+                      val expiration           = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
 
                       addressSubscriptions
-                        .get(subscribe.key)
+                        .find(_._1 == subscribe.key)
                         .fold {
+
                           addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
                           context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
-                        } { existedExp =>
-                          existedExp.cancel()
-                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) updated, will expire in $subscriptionLifetime")
-                        }
 
-                      val expiration = scheduleOnce(subscriptionLifetime, CancelAddressSubscription(address))
-                      awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions + (address -> expiration))
+                          if (addressSubscriptions.lengthCompare(maxAddressNumber) == 0) {
+                            // safe since maxAddressNumber > 0
+                            val ((evictedSubscription, evictedExpiration), remainingSubscriptions) = addressSubscriptions.dequeue
+                            val newAddressSubscriptions                                            = remainingSubscriptions enqueue address -> expiration
+                            evictedExpiration.cancel()
+                            unsubscribeAddress(evictedSubscription)
+                            clientRef ! WsError.from(SubscriptionsLimitReached(maxAddressNumber, evictedSubscription.toString), time.correctedTime())
+                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+                          } else
+                            awaitPong(maybeExpectedPong,
+                                      pongTimeout,
+                                      nextPing,
+                                      orderBookSubscriptions,
+                                      addressSubscriptions enqueue address -> expiration)
+                        } {
+                          case (_, existedExpiration) =>
+                            existedExpiration.cancel()
+                            context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) updated, will expire in $subscriptionLifetime")
+                            val newAddressSubscriptions = addressSubscriptions.foldLeft(Queue.empty[(Address, Cancellable)]) {
+                              case (result, (a, e)) => result.enqueue { a -> (if (a == address) expiration else e) }
+                            }
+                            awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
+                        }
                   }
 
                 case unsubscribeRequest: WsUnsubscribe =>
@@ -157,23 +189,34 @@ object WsHandlerActor {
                       }
 
                     case Inr(Inl(address)) =>
-                      addressSubscriptions.get(address).fold[Behavior[Message]](Behaviors.same) { expiration =>
-                        expiration.cancel()
-                        unsubscribeAddress(address)
-                        awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions - address)
+                      addressSubscriptions.find(_._1 == address).fold[Behavior[Message]](Behaviors.same) {
+                        case (_, expiration) =>
+                          expiration.cancel()
+                          unsubscribeAddress(address)
+                          val newAddressSubscriptions = addressSubscriptions.filterNot(_._1 == address)
+                          awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
                       }
                     case Inr(Inr(_)) => Behaviors.same
                   }
               }
 
-            case Command.AssetPairValidated(assetPair) =>
+            case Event.AssetPairValidated(assetPair) =>
               matcherRef ! MatcherActor.AggregatedOrderBookEnvelope(assetPair, AggregatedOrderBookActor.Command.AddWsSubscription(clientRef))
-              awaitPong(maybeExpectedPong, pongTimeout, nextPing, assetPair :: orderBookSubscriptions, addressSubscriptions)
+
+              if (orderBookSubscriptions.lengthCompare(maxOrderBookNumber) == 0) {
+                // safe since maxOrderBookNumber > 0
+                val (evictedSubscription, remainingSubscriptions) = orderBookSubscriptions.dequeue
+                val newOrderBookSubscriptions                     = remainingSubscriptions enqueue assetPair
+                unsubscribeOrderBook(evictedSubscription)
+                clientRef ! WsError.from(SubscriptionsLimitReached(maxOrderBookNumber, evictedSubscription.toString), time.correctedTime())
+                awaitPong(maybeExpectedPong, pongTimeout, nextPing, newOrderBookSubscriptions, addressSubscriptions)
+              } else awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions enqueue assetPair, addressSubscriptions)
 
             case Command.CancelAddressSubscription(address) =>
               clientRef ! WsError.from(error.SubscriptionTokenExpired(address), time.correctedTime())
               unsubscribeAddress(address)
-              awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, addressSubscriptions - address)
+              val newAddressSubscriptions = addressSubscriptions.filterNot(_._1 == address)
+              awaitPong(maybeExpectedPong, pongTimeout, nextPing, orderBookSubscriptions, newAddressSubscriptions)
 
             case command: Command.CloseConnection =>
               context.log.trace("Got CloseConnection: {}", command.reason.message.text)
@@ -194,13 +237,14 @@ object WsHandlerActor {
               cancelSchedules(nextPing, pongTimeout)
               Behaviors.stopped
           }
+      }
 
       awaitPong(
         maybeExpectedPong = None,
         pongTimeout = Cancellable.alreadyCancelled,
         nextPing = Cancellable.alreadyCancelled,
-        orderBookSubscriptions = List.empty,
-        addressSubscriptions = Map.empty
+        orderBookSubscriptions = Queue.empty,
+        addressSubscriptions = Queue.empty
       )
     }
 }

@@ -5,6 +5,9 @@ import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.it.WsSuiteBase
 
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+
 class WsConnectionTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
@@ -46,5 +49,12 @@ class WsConnectionTestSuite extends WsSuiteBase {
     wsc.receiveNoMessagesOf[WsAddressState]()
 
     wsc.close()
+  }
+
+  "Matcher should handle many connections simultaneously" in {
+    Await.result(Future.traverse((1 to 200).toList)(_ => Future(mkWsConnection(dex1))), 25.seconds).foreach { wsc =>
+      wsc.isClosed shouldBe false
+      wsc.close()
+    }
   }
 }

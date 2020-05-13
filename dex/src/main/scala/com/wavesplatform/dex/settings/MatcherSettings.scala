@@ -83,6 +83,9 @@ object MatcherSettings {
   implicit val chosenCase: NameMapper                    = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   implicit val valueReader: ValueReader[MatcherSettings] = (cfg, path) => fromConfig(cfg getConfig path)
 
+  implicit val subscriptionsSettingsReader: ValueReader[SubscriptionsSettings] =
+    com.wavesplatform.dex.settings.SubscriptionsSettings.subscriptionSettingsReader
+
   private def unsafeParseAsset(x: String): Asset = {
     AssetPair.extractAsset(x).getOrElse(throw new IllegalArgumentException(s"Can't parse '$x' as asset"))
   }

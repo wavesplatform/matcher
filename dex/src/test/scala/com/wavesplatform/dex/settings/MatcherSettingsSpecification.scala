@@ -98,7 +98,8 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 bar
 baz"""
     settings.webSocketSettings should matchTo(
-      WebSocketSettings(100.milliseconds, WsHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey))
+      WebSocketSettings(100.milliseconds,
+                        WsHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
     )
     settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
@@ -465,5 +466,21 @@ baz"""
       getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
         "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
     }
+  }
+
+  "Subscriptions settings" should "be validated" in {
+
+    val invalidSubscriptionsSettings =
+      s"""
+         | subscriptions {
+         |   max-order-book-number = 0
+         |   max-address-number = 1
+         | }
+         """.stripMargin
+
+    getSettingByConfig(configWithSettings(subscriptionsSettings = invalidSubscriptionsSettings)) should produce(
+      "Invalid setting web-sockets.web-socket-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
+        "Invalid setting web-sockets.web-socket-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
+    )
   }
 }

@@ -14,5 +14,5 @@ object WsBalances {
     Writes.Tuple2W[Double, Double](doubleAsStringFormat, doubleAsStringFormat).contramap(wsb => wsb.tradable -> wsb.reserved)
   }
 
-  implicit val format: Format[WsBalances] = Format(reads, writes)
+  implicit val wsBalancesFormat: Format[WsBalances] = Format(reads, writes)
 }

@@ -209,7 +209,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(clientRef)))
       t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.AddWsSubscription(clientRef)))
 
-      t.wsHandlerRef ! WsHandlerActor.Completed(().asRight)
+      t.wsHandlerRef ! WsHandlerActor.Event.Completed(().asRight)
 
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.RemoveWsSubscription(clientRef)))
       t.addressProbe.expectMsg(AddressDirectory.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
@@ -229,7 +229,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
 
         t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(oldSubscription, Command.RemoveWsSubscription(t.clientProbe.ref)))
         t.clientProbe.expectMessageType[WsError] should matchTo {
-          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxOrderBookNumber, oldSubscription.toString), time.correctedTime())
+          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxOrderBookNumber, oldSubscription.toString), time.getTimestamp())
         }
       }
 
@@ -250,7 +250,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         sendSubscriptionRequest(newSubscription)
         t.addressProbe.expectMsg(AddressDirectory.Envelope(oldSubscription, WsCommand.RemoveWsSubscription(t.clientProbe.ref)))
         t.clientProbe.expectMessageType[WsError] should matchTo {
-          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxAddressNumber, oldSubscription.toAddress.toString), time.correctedTime())
+          WsError.from(SubscriptionsLimitReached(subscriptionsSettings.maxAddressNumber, oldSubscription.toAddress.toString), time.getTimestamp())
         }
       }
 
@@ -280,12 +280,16 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
   private case class TestInstances(clientProbe: TypedTestProbe[WsMessage],
                                    matcherProbe: TestProbe,
                                    addressProbe: TestProbe,
-                                   wsHandlerRef: ActorRef[WsHandlerActor.Message])
+                                   wsHandlerRef: ActorRef[WsHandlerActor.Message],
+                                   connectionId: String)
 
   private def test(f: TestInstances => Unit): Unit = {
+
     val clientInbox  = TypedTestProbe[WsMessage]()(testKit.system)
     val matcherProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
     val addressProbe = TestProbe(UUID.randomUUID().toString)(testKit.system.toClassic)
+
+    val connectionId = UUID.randomUUID().toString
 
     val wsHandlerRef = testKit.spawn(
       WsHandlerActor(
@@ -302,11 +306,13 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
         ),
         clientRef = clientInbox.ref,
         matcherRef = matcherProbe.ref,
-        addressRef = addressProbe.ref
+        addressRef = addressProbe.ref,
+        connectionId = connectionId
       )
     )
 
-    f(TestInstances(clientInbox, matcherProbe, addressProbe, wsHandlerRef))
+    clientInbox.expectMessageType[WsInitial].connectionId should matchTo(connectionId)
+    f(TestInstances(clientInbox, matcherProbe, addressProbe, wsHandlerRef, connectionId))
   }
 
   override protected def afterAll(): Unit = {

@@ -2,14 +2,14 @@ package com.wavesplatform.dex.api
 
 import java.util.UUID
 
-import akka.Done
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.typed.scaladsl.{ActorSource, _}
 import akka.stream.{Materializer, OverflowStrategy}
+import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
@@ -44,60 +44,63 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   override def route: Route = pathPrefix("ws") { commonWsRoute }
 
-  private val completedSuccessfully: WsHandlerActor.Message = WsHandlerActor.Completed(().asRight)
-
   private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
     import webSocketSettings._
 
     val clientId = UUID.randomUUID().toString
 
     // From server to client
-    val client = ActorSource
-      .actorRef[WsServerMessage](
-        { case WsServerMessage.Complete => },
-        PartialFunction.empty,
-        10,
-        OverflowStrategy.fail
-      )
-      .named(s"source-$clientId")
-      .map(WsMessage.toStrictTextMessage(_)(WsServerMessage.wsServerMessageWrites))
-      .watchTermination()(handleTermination[WsServerMessage])
+    val client: Source[TextMessage.Strict, typed.ActorRef[WsServerMessage]] =
+      ActorSource
+        .actorRef[WsServerMessage](
+          { case WsServerMessage.Complete => },
+          PartialFunction.empty,
+          10,
+          OverflowStrategy.fail
+        )
+        .named(s"source-$clientId")
+        .map(WsMessage.toStrictTextMessage(_)(WsServerMessage.wsServerMessageWrites))
+        .watchTermination()(handleTermination[WsServerMessage])
 
     val (clientRef, clientSource) = client.preMaterialize()
-    val webSocketHandlerRef = mat.system.spawn(
-      behavior = WsHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory),
-      name = s"handler-$clientId"
-    )
 
-    val server = ActorSink
-      .actorRef[WsHandlerActor.Message](
-        ref = webSocketHandlerRef,
-        onCompleteMessage = completedSuccessfully,
-        onFailureMessage = e => WsHandlerActor.Completed(e.asLeft)
+    val webSocketHandlerRef: typed.ActorRef[WsHandlerActor.Message] =
+      mat.system.spawn(
+        behavior = WsHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
+        name = s"handler-$clientId"
       )
-      .named(s"server-$clientId")
+
+    val server: Sink[WsHandlerActor.Message, NotUsed] =
+      ActorSink
+        .actorRef[WsHandlerActor.Message](
+          ref = webSocketHandlerRef,
+          onCompleteMessage = WsHandlerActor.Event.Completed(().asRight),
+          onFailureMessage = e => WsHandlerActor.Event.Completed(e.asLeft)
+        )
+        .named(s"server-$clientId")
 
     // From client to server
-    val serverSink = Flow[Message]
-      .mapAsync[WsHandlerActor.Command](1) {
-        case tm: TextMessage =>
-          val parseResult =
-            for {
-              strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
-              clientMessage <- Try { Json.parse(strictText).as[WsClientMessage] } match {
-                case Success(cm)        => Future.successful { WsHandlerActor.Command.ProcessClientMessage(cm) }
-                case Failure(exception) => Future.failed(exception)
-              }
-            } yield clientMessage
+    val serverSink: Sink[Message, NotUsed] =
+      Flow[Message]
+        .mapAsync[WsHandlerActor.Command](1) {
+          case tm: TextMessage =>
+            val parseResult =
+              for {
+                strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
+                clientMessage <- Try { Json.parse(strictText).as[WsClientMessage] } match {
+                  case Success(cm)        => Future.successful { WsHandlerActor.Command.ProcessClientMessage(cm) }
+                  case Failure(exception) => Future.failed(exception)
+                }
+              } yield clientMessage
 
-          parseResult.recover { case _ => WsHandlerActor.Command.ForwardClientError(InvalidJson(Nil)) }
+            parseResult.recover { case _ => WsHandlerActor.Command.ForwardClientError(InvalidJson(Nil)) }
 
-        case bm: BinaryMessage =>
-          bm.dataStream.runWith(Sink.ignore)
-          Future.failed { new IllegalArgumentException("Binary messages are not supported") }
-      }
-      .named(s"sink-$clientId")
-      .to(server)
+          case bm: BinaryMessage =>
+            bm.dataStream.runWith(Sink.ignore)
+            Future.failed { new IllegalArgumentException("Binary messages are not supported") }
+        }
+        .named(s"sink-$clientId")
+        .to(server)
 
     handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, clientSource) }
   }

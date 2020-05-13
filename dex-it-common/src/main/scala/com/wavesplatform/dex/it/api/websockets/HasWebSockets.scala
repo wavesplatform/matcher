@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import com.wavesplatform.dex.api.websockets.{WsAddressSubscribe, WsBalances, WsOrder, WsOrderBookSubscribe}
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -49,8 +49,13 @@ trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps w
     connection
   }
 
-  protected def mkWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
-    new WsConnection(getWsStreamUri(dex), keepAlive) unsafeTap addConnection
+  protected def mkWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection = {
+    new WsConnection(getWsStreamUri(dex), keepAlive) unsafeTap { wsc =>
+      addConnection(wsc)
+      eventually { wsc.collectMessages[WsInitial] should have size 1 }
+      wsc.clearMessages()
+    }
+  }
 
   protected def assertChanges(c: WsConnection, squash: Boolean = true)(expBs: Map[Asset, WsBalances]*)(expOs: WsOrder*): Unit = {
     eventually {

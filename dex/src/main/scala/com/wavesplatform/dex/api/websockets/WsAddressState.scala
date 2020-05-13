@@ -19,7 +19,7 @@ object WsAddressState {
 
   implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
     { // TODO use reads for Map[Asset, T]!
-      case JsObject(ab) => JsSuccess(ab.toMap.map { case (a, b) => AssetPair.extractAsset(a).get -> WsBalances.format.reads(b).get })
+      case JsObject(ab) => JsSuccess(ab.toMap.map { case (a, b) => AssetPair.extractAsset(a).get -> WsBalances.wsBalancesFormat.reads(b).get })
       case _            => JsError("Cannot parse asset balances map!")
     }, { balances =>
       Json.obj(
@@ -30,7 +30,7 @@ object WsAddressState {
     }
   )
 
-  implicit val format: Format[WsAddressState] = (
+  implicit val wsAddressStateFormat: Format[WsAddressState] = (
     (__ \ "T").format[String] and
       (__ \ "_").format[Long] and
       (__ \ "U").format[Long] and

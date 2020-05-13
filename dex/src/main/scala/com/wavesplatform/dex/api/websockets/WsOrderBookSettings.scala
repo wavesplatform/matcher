@@ -30,7 +30,7 @@ object WsOrderBookSettings {
     }
   )
 
-  implicit val format: Format[WsOrderBookSettings] = (
+  implicit val wsOrderBookSettingsFormat: Format[WsOrderBookSettings] = (
     (__ \ "r").formatNullable[OrderRestrictionsSettings] and
       (__ \ "m" \ "t").formatNullable[Double]
   )(

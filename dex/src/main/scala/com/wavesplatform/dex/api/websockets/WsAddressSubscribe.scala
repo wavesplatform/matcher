@@ -73,7 +73,7 @@ object WsAddressSubscribe {
   }
 
   object JwtPayload {
-    val toSignPrefix = Array[Byte](-1, -1, -1, 1)
+    val toSignPrefix: Array[Byte] = Array[Byte](-1, -1, -1, 1)
 
     implicit val jwtPayloadFormat: OFormat[JwtPayload] = (
       (__ \ "sig").format[ByteStr] and

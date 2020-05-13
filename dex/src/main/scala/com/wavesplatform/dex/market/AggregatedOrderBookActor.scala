@@ -38,7 +38,10 @@ object AggregatedOrderBookActor {
     private[AggregatedOrderBookActor] case object SendWsUpdates                                                           extends Command
   }
 
-  case object OrderBookRemoved extends Message // Could be an event in the future
+  sealed trait Event extends Message
+  object Event {
+    case object OrderBookRemoved extends Event
+  }
 
   case class Settings(wsMessagesInterval: FiniteDuration)
 
@@ -120,7 +123,7 @@ object AggregatedOrderBookActor {
               if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               default(updated)
 
-            case OrderBookRemoved =>
+            case Event.OrderBookRemoved =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
               val reason = error.OrderBookStopped(assetPair)
               state.ws.wsConnections.foreach {

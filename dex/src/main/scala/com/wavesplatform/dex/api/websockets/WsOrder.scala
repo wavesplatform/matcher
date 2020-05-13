@@ -87,7 +87,7 @@ object WsOrder {
     }
   )
 
-  implicit val format: Format[WsOrder] =
+  implicit val wsOrderFormat: Format[WsOrder] =
     (
       (__ \ "i").format[Order.Id] and                               // id
         (__ \ "t").formatNullable[Long] and                         // timestamp

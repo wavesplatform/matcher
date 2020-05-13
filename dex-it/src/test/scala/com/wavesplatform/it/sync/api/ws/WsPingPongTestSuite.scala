@@ -34,10 +34,10 @@ class WsPingPongTestSuite extends WsSuiteBase {
       val wsac = mkWsAddressConnection(alice, dex1)
       wsac.isClosed shouldBe false
 
-      Thread.sleep(maxConnectionLifetime - 0.1.second)
+      Thread.sleep(maxConnectionLifetime - 0.2.second)
       wsac.isClosed shouldBe false
 
-      Thread.sleep(0.1.second)
+      Thread.sleep(0.2.second)
       eventually {
         wsac.pings.size should be >= 5
         wsac.isClosed shouldBe true
@@ -115,14 +115,14 @@ class WsPingPongTestSuite extends WsSuiteBase {
       wsac1.send(wsac2.pings.head) // send correct pong but from another connection
       wsac2.send(wsac1.pings.head) // send correct pong but from another connection
 
-      Thread.sleep(pongTimeout - 0.2.second)
+      Thread.sleep(pongTimeout - 0.3.second)
 
       Seq(wsac1, wsac2).foreach { conn =>
         conn.pings should have size 3
         conn.isClosed shouldBe false
       }
 
-      Thread.sleep(0.1.second)
+      Thread.sleep(0.3.second)
       eventually {
         Seq(wsac1, wsac2).foreach { conn =>
           conn.pings.size should (be >= 3 and be <= 4)

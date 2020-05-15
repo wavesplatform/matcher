@@ -12,6 +12,7 @@ import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.tool.Checker
+import com.wavesplatform.dex.tool.connectors.SuperConnector
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
@@ -203,7 +204,19 @@ object WavesDexCli {
                          |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
                          |""".stripMargin)
 
-            case Command.CheckServer => Checker(args.dexRestApi, args.nodeRestApi, args.version, args.dexConfigPath).checkState()
+            case Command.CheckServer =>
+              println(
+                s"""
+                   |Passed arguments:
+                   |  DEX REST API         : ${args.dexRestApi}
+                   |  WavesNode REST API   : ${args.nodeRestApi}
+                   |  Expected DEX version : ${args.version}
+                   |  DEX config path      : ${args.dexConfigPath}
+                   """.stripMargin
+              )
+
+              val superConnector = SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi)
+              Checker(superConnector).checkState(args.version)
           }
           println("Done")
       }

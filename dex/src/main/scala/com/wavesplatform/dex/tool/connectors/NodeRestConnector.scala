@@ -16,7 +16,6 @@ private[tool] case class NodeRestConnector(target: String, chainId: Byte) extend
     basicRequest.post(uri"$target/transactions/broadcast").body(serializedTx).contentType(MediaType.ApplicationJson).send()
   }
 
-  def txInfo(tx: Transaction): Identity[Response[Either[String, String]]] = {
+  def txInfo(tx: Transaction): Identity[Response[Either[String, String]]] =
     basicRequest.get(uri"$target/transactions/info/${tx.getId.toString}").send()
-  }
 }

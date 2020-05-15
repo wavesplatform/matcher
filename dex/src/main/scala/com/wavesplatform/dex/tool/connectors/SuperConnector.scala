@@ -12,8 +12,8 @@ import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
-case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexGrpc: DexGrpcConnector) {
-  def close(): Unit = Seq(nodeRest, dexRest, dexGrpc).foreach { _.close() }
+case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector) {
+  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc).foreach { _.close() }
 }
 
 // noinspection ScalaStyle
@@ -44,17 +44,17 @@ object SuperConnector {
       Env(chainId, matcherSettings, matcherKeyPair),
       DexRestConnector(dexRestApiUri),
       NodeRestConnector(nodeRestApiUri, chainId),
-      DexGrpcConnector(extensionGrpcApiUri, matcherKeyPair)
+      DexExtensionGrpcConnector(extensionGrpcApiUri, matcherKeyPair)
     ) unsafeTap { _ =>
       println(
         s"""
            |DEX configurations:
-           | Chain ID               : $chainId
-           | Matcher public key     : ${matcherKeyPair.publicKey.toString}
-           | Matcher address        : ${matcherKeyPair.publicKey.toAddress}
-           | DEX REST API           : $dexRestApiUri
-           | Node REST API          : $nodeRestApiUri
-           | DEX extension gRPC API : $extensionGrpcApiUri
+           |  Chain ID               : $chainId
+           |  Matcher public key     : ${matcherKeyPair.publicKey.toString}
+           |  Matcher address        : ${matcherKeyPair.publicKey.toAddress}
+           |  DEX REST API           : $dexRestApiUri
+           |  Node REST API          : $nodeRestApiUri
+           |  DEX extension gRPC API : $extensionGrpcApiUri
        """.stripMargin
       )
     }

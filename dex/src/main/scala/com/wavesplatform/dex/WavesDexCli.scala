@@ -217,6 +217,7 @@ object WavesDexCli {
 
               val superConnector = SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi)
               Checker(superConnector).checkState(args.version)
+              superConnector.close()
           }
           println("Done")
       }

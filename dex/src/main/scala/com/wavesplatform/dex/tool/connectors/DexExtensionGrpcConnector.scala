@@ -20,7 +20,9 @@ import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-private[tool] case class DexGrpcConnector(target: String, matcherKeyPair: KeyPair) extends Connector {
+private[tool] case class DexExtensionGrpcConnector(target: String, matcherKeyPair: KeyPair) extends Connector {
+
+  import DexExtensionGrpcConnector._
 
   LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger].setLevel(Level.OFF)
 
@@ -35,7 +37,7 @@ private[tool] case class DexGrpcConnector(target: String, matcherKeyPair: KeyPai
     case ia: IssuedAsset => grpcAsyncClient.assetDescription(ia).map(maybeDesc => ia -> (maybeDesc.get -> balance))
   }
 
-  def matcherBalance: Map[Asset, (BriefAssetDescription, Long)] = Await.result(
+  def matcherBalance: DetailedBalance = Await.result(
     for {
       balances                <- grpcAsyncClient.allAssetsSpendableBalance(matcherKeyPair.toAddress)
       balancesWithDescription <- balances.toList.traverse { case (a, b) => getDetailedBalance(a, b) }
@@ -44,4 +46,8 @@ private[tool] case class DexGrpcConnector(target: String, matcherKeyPair: KeyPai
   )
 
   override def close(): Unit = grpcAsyncClient.close()
+}
+
+object DexExtensionGrpcConnector {
+  type DetailedBalance = Map[Asset, (BriefAssetDescription, Long)]
 }

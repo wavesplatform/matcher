@@ -227,7 +227,8 @@ object Dependencies {
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,
-      wavesJ
+      wavesJ,
+      betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit

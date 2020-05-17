@@ -94,25 +94,23 @@ object WavesDexCli {
           .action((_, s) => s.copy(command = Command.CheckServer.some))
           .text(s"Checks DEX state")
           .children(
-            opt[String]("dex-rest-api")
-              .abbr("dra")
-              .text("DEX REST API uri (host:port format). Localhost will be used if nothing is specified")
-              .valueName("<raw-string>")
-              .action((x, s) => s.copy(dexRestApi = x)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri (host:port format)")
               .valueName("<raw-string>")
+              .required()
               .action((x, s) => s.copy(nodeRestApi = x)),
             opt[String]("version")
               .abbr("ve")
               .text("DEX expected version")
               .valueName("<raw-string>")
+              .required()
               .action((x, s) => s.copy(version = x)),
             opt[String]("dex-config")
               .abbr("dc")
               .text("DEX config path")
               .valueName("<raw-string>")
+              .required()
               .action((x, s) => s.copy(dexConfigPath = x))
           )
       )
@@ -205,19 +203,24 @@ object WavesDexCli {
                          |""".stripMargin)
 
             case Command.CheckServer =>
-              println(
-                s"""
-                   |Passed arguments:
-                   |  DEX REST API         : ${args.dexRestApi}
-                   |  WavesNode REST API   : ${args.nodeRestApi}
-                   |  Expected DEX version : ${args.version}
-                   |  DEX config path      : ${args.dexConfigPath}
+              (
+                for {
+                  _ <- tool.log(
+                    s"""
+                      |Passed arguments:
+                      |  Waves Node REST API  : ${args.nodeRestApi}
+                      |  Expected DEX version : ${args.version}
+                      |  DEX config path      : ${args.dexConfigPath}
                    """.stripMargin
-              )
-
-              val superConnector = SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi)
-              Checker(superConnector).checkState(args.version)
-              superConnector.close()
+                  )
+                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi)
+                  checkResult    <- Checker(superConnector).checkState(args.version)
+                  _              <- tool.lift { superConnector.close() }
+                } yield checkResult
+              ) match {
+                case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
+                case Left(error)            => println(error)
+              }
           }
           println("Done")
       }
@@ -273,7 +276,6 @@ object WavesDexCli {
                           command: Option[Command] = None,
                           outputDirectory: File = defaultFile,
                           apiKey: String = "",
-                          dexRestApi: String = "",
                           nodeRestApi: String = "",
                           version: String = "",
                           dexConfigPath: String = "")

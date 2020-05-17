@@ -1,47 +1,60 @@
 package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.either._
-import com.wavesplatform.dex.tool.connectors.RestConnector.RepeatRequestOptions._
-import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOr, ErrorOrJsonResponse, RepeatRequestOptions, RequestFunction}
+import cats.syntax.option._
+import com.wavesplatform.dex.tool.ErrorOr
+import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions, RequestFunction}
 import play.api.libs.json.{JsValue, Json}
-import sttp.client.{Empty, HttpURLConnectionBackend, Identity, NothingT, Request, RequestT, SttpBackend, basicRequest}
+import sttp.client._
 
 import scala.annotation.tailrec
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
+import scala.util.Try
 
 trait RestConnector extends Connector {
 
-  implicit val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+  protected val repeatRequestOptions: RepeatRequestOptions
 
-  override def close(): Unit = backend.close()
+  implicit protected val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
 
-  protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse = request(basicRequest).send().body.map(Json.parse)
+  protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse =
+    for {
+      errorOrResponse <- Try { request(basicRequest).send().body }.toEither.leftMap(ex => s"Cannot send request! $ex")
+      response        <- errorOrResponse
+    } yield Json.parse(response)
 
-  @tailrec
-  final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean)(implicit ro: RepeatRequestOptions = default): ErrorOr[A] = {
-    if (ro.attemptsLeft == 0) "All attempts are out!".asLeft
-    else {
-      val response = sendRequest
-      if (test(response)) response
+  def swaggerRequest: ErrorOrJsonResponse = mkResponse { _.get(uri"$target/api-docs/swagger.json") }
+
+  final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean): ErrorOr[A] = {
+
+    @tailrec
+    def go(ro: RepeatRequestOptions, lastResponse: Option[ErrorOr[A]]): ErrorOr[A] = {
+      if (ro.attemptsLeft == 0) s"All attempts are out! ${lastResponse.fold("")(lr => s"Last response: ${lr.fold(identity, _.toString)}")}".asLeft
       else {
-        Thread.sleep(ro.delay.toMillis)
-        repeatRequest(sendRequest)(test)(ro.decreaseAttempts)
+        val response = sendRequest
+        if (test(response)) response
+        else {
+          Thread.sleep(ro.delay.toMillis)
+          go(ro.decreaseAttempts, response.some)
+        }
       }
     }
+
+    go(repeatRequestOptions, None)
   }
+
+  def waitForSwaggerJson: ErrorOrJsonResponse = repeatRequest(swaggerRequest)(_.isRight)
+
+  override def close(): Unit = backend.close()
 }
 
 object RestConnector {
 
-  type ErrorOr[A]          = Either[String, A]
   type ErrorOrJsonResponse = ErrorOr[JsValue]
   type RequestFunction     = RequestT[Empty, Either[String, String], Nothing] => Request[Either[String, String], Nothing]
 
   final case class RepeatRequestOptions(attemptsLeft: Int, delay: FiniteDuration) {
     def decreaseAttempts: RepeatRequestOptions = copy(attemptsLeft = attemptsLeft - 1)
-  }
-
-  object RepeatRequestOptions {
-    val default: RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
+    override def toString: String              = s"max attempts = $attemptsLeft, interval = $delay"
   }
 }

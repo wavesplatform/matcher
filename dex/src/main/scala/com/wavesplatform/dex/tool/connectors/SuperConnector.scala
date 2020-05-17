@@ -2,18 +2,22 @@ package com.wavesplatform.dex.tool.connectors
 
 import java.io.File
 
+import cats.syntax.either._
+import cats.syntax.option._
 import com.typesafe.config.ConfigFactory._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
-import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.settings.MatcherSettings.valueReader
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
+import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
-import mouse.any._
 import net.ceedubs.ficus.Ficus._
+
+import scala.util.Try
 
 case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector)
     extends AutoCloseable {
+
   def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc).foreach { _.close() }
 }
 
@@ -22,42 +26,68 @@ object SuperConnector {
 
   private[tool] final case class Env(chainId: Byte, matcherSettings: MatcherSettings, matcherKeyPair: KeyPair)
 
-  def wrapByLogs[T](begin: String, end: String = "Done")(f: => T): T = { print(begin); val result = f; println(end); result }
+  private val processLeftIndent = 90
 
-  def create(dexConfigPath: String, dexRestApi: String, nodeRestApi: String): SuperConnector = {
+  def create(dexConfigPath: String, nodeRestApi: String): ErrorOr[SuperConnector] = {
 
-    val matcherSettings: MatcherSettings = wrapByLogs("Processing DEX config... ") {
-      loadConfig { parseFile(new File(dexConfigPath)) }.as[MatcherSettings]("waves.dex")
-    }
+    def logProcessing(processing: String): ErrorOr[Unit] = log(s"  $processing... ", processLeftIndent.some)
+    def logDone: ErrorOr[Unit]                           = log("Done\n")
 
-    import matcherSettings._
+    def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
+      Try {
+        val matcherSettings: MatcherSettings = loadConfig { parseFile(new File(dexConfigPath)) }.as[MatcherSettings]("waves.dex")
+        AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
+        matcherSettings
+      }.toEither.leftMap(ex => s"Cannot load matcher settings by path $confPath: $ex")
 
-    AddressScheme.current = new AddressScheme { override val chainId: Byte = matcherSettings.addressSchemeCharacter.toByte }
+    def loadMatcherKeyPair(accountStorage: AccountStorage.Settings): ErrorOr[KeyPair] =
+      AccountStorage.load(accountStorage).bimap(ex => s"Cannot load Matcher account! $ex", _.keyPair)
 
-    val chainId: Byte           = AddressScheme.current.chainId
-    val matcherKeyPair: KeyPair = AccountStorage.load(matcherSettings.accountStorage).map(_.keyPair).explicitGet()
+    for {
+      _ <- log("\nSetting up the Super Connector:\n")
 
-    val extensionGrpcApiUri: String = wavesBlockchainClient.grpc.target
-    val dexRestApiUri: String       = s"http://${if (dexRestApi.nonEmpty) dexRestApi else s"${restApi.address}:${restApi.port}"}"
-    val nodeRestApiUri: String      = s"http://${if (dexRestApi.nonEmpty) nodeRestApi else s"${extensionGrpcApiUri.dropRight(4) + 6869}"}"
+      _               <- logProcessing("Loading Matcher settings")
+      matcherSettings <- loadMatcherSettings(dexConfigPath)
+      _               <- logDone
 
-    SuperConnector(
-      Env(chainId, matcherSettings, matcherKeyPair),
-      DexRestConnector(dexRestApiUri),
-      NodeRestConnector(nodeRestApiUri, chainId),
-      DexExtensionGrpcConnector(extensionGrpcApiUri, matcherKeyPair)
-    ) unsafeTap { _ =>
-      println(
+      _              <- logProcessing("Loading Matcher key pair")
+      matcherKeyPair <- loadMatcherKeyPair(matcherSettings.accountStorage)
+      _              <- logDone
+
+      dexRestApiUri    = s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestConnector = DexRestConnector(dexRestApiUri)
+      _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})")
+      _ <- dexRestConnector.waitForSwaggerJson
+      _ <- logDone
+
+      chainId           = AddressScheme.current.chainId
+      nodeRestApiUri    = if (nodeRestApi.startsWith("https://") || nodeRestApi.startsWith("http://")) nodeRestApi else s"http://$nodeRestApi"
+      nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId)
+      _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})")
+      _ <- nodeRestConnector.waitForSwaggerJson
+      _ <- logDone
+
+      _ <- logProcessing("Setting up connection with DEX Extension gRPC API")
+      extensionGrpcApiUri = matcherSettings.wavesBlockchainClient.grpc.target
+      dexExtensionGrpcConnector <- DexExtensionGrpcConnector.create(extensionGrpcApiUri)
+      _                         <- logDone
+
+      env            = Env(chainId, matcherSettings, matcherKeyPair)
+      superConnector = SuperConnector(env, dexRestConnector, nodeRestConnector, dexExtensionGrpcConnector)
+
+      _ <- log(
         s"""
+           |Supper Connector created!
+           |
            |DEX configurations:
            |  Chain ID               : $chainId
            |  Matcher public key     : ${matcherKeyPair.publicKey.toString}
            |  Matcher address        : ${matcherKeyPair.publicKey.toAddress}
            |  DEX REST API           : $dexRestApiUri
-           |  Node REST API          : $nodeRestApiUri
+           |  Node REST API          : $nodeRestApi
            |  DEX extension gRPC API : $extensionGrpcApiUri
        """.stripMargin
       )
-    }
+    } yield superConnector
   }
 }

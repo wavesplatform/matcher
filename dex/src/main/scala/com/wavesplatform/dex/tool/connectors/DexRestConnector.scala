@@ -5,12 +5,15 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOr, ErrorOrJsonResponse}
+import com.wavesplatform.dex.tool.ErrorOr
+import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions}
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
 import sttp.model.MediaType
 
-private[tool] case class DexRestConnector(target: String) extends RestConnector {
+import scala.concurrent.duration._
+
+case class DexRestConnector(target: String) extends RestConnector {
 
   private val apiUri = s"$target/matcher"
 
@@ -19,8 +22,6 @@ private[tool] case class DexRestConnector(target: String) extends RestConnector 
     val signature     = crypto.sign(owner, cancelRequest.toSign)
     cancelRequest.copy(signature = signature)
   }
-
-  def swaggerRequest: ErrorOrJsonResponse = mkResponse { _.get(uri"$target/api-docs/swagger.json") }
 
   def placeOrder(order: Order): ErrorOrJsonResponse = mkResponse {
     _.post(uri"$apiUri/orderbook").body(order.jsonStr).contentType(MediaType.ApplicationJson)
@@ -44,4 +45,6 @@ private[tool] case class DexRestConnector(target: String) extends RestConnector 
 
   def waitForOrderStatus(order: Order, expectedStatusName: String): ErrorOrJsonResponse =
     repeatRequest { getOrderStatus(order) } { _.map(json => (json \ "status").get.asOpt[String] contains expectedStatusName).getOrElse(false) }
+
+  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
 }

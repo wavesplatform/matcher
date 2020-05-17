@@ -3,6 +3,7 @@ package com.wavesplatform.dex.tool
 import cats.instances.either._
 import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
+import cats.syntax.option._
 import cats.syntax.traverse._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -12,7 +13,6 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV3}
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.tool.connectors.DexExtensionGrpcConnector.DetailedBalance
-import com.wavesplatform.dex.tool.connectors.RestConnector._
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.wavesj.PrivateKeyAccount
 import com.wavesplatform.wavesj.Transactions._
@@ -29,8 +29,11 @@ case class Checker(superConnector: SuperConnector) {
   import Checker._
   import superConnector._
 
-  type CheckResult[A]       = Either[String, A]
+  type CheckResult[A]       = ErrorOr[A]
   type CheckLoggedResult[A] = CheckResult[(A, String)]
+
+  private def logCheck[A](name: String): CheckResult[Unit] = log(s"  $name... ", checkLeftIndent.some)
+  private def logPassed: ErrorOr[Unit]                     = log("Passed\n")
 
   private def denormalize(value: Long, decimals: Int = testAssetDecimals.toInt): Double =
     Denormalization.denormalizeAmountAndFee(value, decimals).toDouble
@@ -43,15 +46,9 @@ case class Checker(superConnector: SuperConnector) {
   private def getAmountAndPriceAssetsInfo(f: AssetInfo, s: AssetInfo): (AssetInfo, AssetInfo) =
     if (f.asset.compatId < s.asset.compatId) s -> f else f -> s
 
-  private def check[A](name: String)(f: => CheckResult[A]): CheckResult[A] = {
-    print(s" $name... " + " " * (checkLeftIndent - name.length)); val res = f; println(res fold (identity, _ => "Passed")); res
-  }
-
-  private def checkVersion(checkName: String)(version: String): CheckResult[Unit] = check(checkName) {
-    dexRest.swaggerRequest.flatMap { response =>
-      val parsedVersion = (response \ "info" \ "version").get.as[String]
-      Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
-    }
+  private def checkVersion(version: String): CheckResult[Unit] = dexRest.swaggerRequest.flatMap { response =>
+    val parsedVersion = (response \ "info" \ "version").get.as[String]
+    Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
   }
 
   private def issueAsset(name: String, description: String, quantity: Long): CheckLoggedResult[AssetInfo] = {
@@ -59,31 +56,29 @@ case class Checker(superConnector: SuperConnector) {
     val tx: IssueTransactionV2     = makeIssueTx(matcher, env.chainId, name, description, quantity, testAssetDecimals, false, null, issueTxFee)
     val asset: IssuedAsset         = IssuedAsset(ByteStr(tx.getId.getBytes))
     for {
-      _ <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast transaction! $ex")
+      _ <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
       _ <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
     } yield AssetInfo(asset, name) -> s"Issued ${denormalize(quantity)} $name"
   }
 
-  private def checkBalance(checkName: String): CheckLoggedResult[DetailedBalance] = check(checkName) {
+  private def checkBalance: CheckLoggedResult[DetailedBalance] = {
 
-    val balance      = dexExtensionGrpc.matcherBalanceSync
+    val balance      = dexExtensionGrpc.matcherBalanceSync(env.matcherKeyPair)
     val wavesBalance = denormalizeWavesBalance(balance.get(Waves).map(_._2) getOrElse 0)
 
     Either.cond(
       balance.get(Waves).exists(_._2 > minMatcherValidBalance),
       balance -> balance.values.map { case (d, b) => s"${denormalize(b)} ${d.name}" }.mkString(", "),
-      s"Matcher Waves balance ($wavesBalance) less than ${denormalizeWavesBalance(minMatcherValidBalance)}) Waves!"
+      s"Matcher Waves balance $wavesBalance is less than ${denormalizeWavesBalance(minMatcherValidBalance)} Waves!"
     )
   }
 
-  private def checkTestAsset(checkName: String)(matcherBalance: DetailedBalance, assetName: String): CheckLoggedResult[AssetInfo] =
-    check(checkName) {
-      matcherBalance
-        .find(_._2._1.name == assetName)
-        .fold { issueAsset(assetName, testAssetDescription, mnogo.coin) } {
-          case (a, (d, b)) => (AssetInfo(a, d.name) -> s"Balance = ${denormalize(b)} ${d.name} (${a.toString})").asRight
-        }
-    }
+  private def checkTestAsset(matcherBalance: DetailedBalance, assetName: String): CheckLoggedResult[AssetInfo] =
+    matcherBalance
+      .find(_._2._1.name == assetName)
+      .fold { issueAsset(assetName, testAssetDescription, mnogo) } {
+        case (a, (d, b)) => (AssetInfo(a, d.name) -> s"Balance = ${denormalize(b)} ${d.name} (${a.toString})").asRight
+      }
 
   private def mkMatcherOrder(assetPair: AssetPair, orderType: OrderType): Order = {
     val timestamp = System.currentTimeMillis
@@ -99,27 +94,25 @@ case class Checker(superConnector: SuperConnector) {
             Waves)
   }
 
-  private def checkPlacement(checkName: String)(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[Order] =
-    check(checkName) {
+  private def checkPlacement(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[Order] = {
 
-      val (amountAssetInfo, priceAssetInfo) = getAmountAndPriceAssetsInfo(firstAssetInfo, secondAssetInfo)
-      val orderType                         = if (Random.nextBoolean) BUY else SELL
-      val order                             = mkMatcherOrder(AssetPair(amountAssetInfo.asset, priceAssetInfo.asset), orderType)
+    val (amountAssetInfo, priceAssetInfo) = getAmountAndPriceAssetsInfo(firstAssetInfo, secondAssetInfo)
+    val orderType                         = if (Random.nextBoolean) BUY else SELL
+    val order                             = mkMatcherOrder(AssetPair(amountAssetInfo.asset, priceAssetInfo.asset), orderType)
 
-      for {
-        _ <- dexRest.placeOrder(order)
-        _ <- dexRest.waitForOrderStatus(order, OrderStatus.Accepted.name)
-      } yield order -> s"Placed order ${printOrder(amountAssetInfo.name, priceAssetInfo.name)(order)}"
-    }
+    for {
+      _ <- dexRest.placeOrder(order)
+      _ <- dexRest.waitForOrderStatus(order, OrderStatus.Accepted.name)
+    } yield order -> s"Placed order ${printOrder(amountAssetInfo.name, priceAssetInfo.name)(order)}"
+  }
 
-  private def checkCancellation(checkName: String)(order: Order): CheckLoggedResult[Order] = check(checkName) {
+  private def checkCancellation(order: Order): CheckLoggedResult[Order] =
     for {
       _ <- dexRest.cancelOrder(order, env.matcherKeyPair)
       _ <- dexRest.waitForOrderStatus(order, OrderStatus.Cancelled.name)
     } yield order -> s"Order with id ${order.id()} cancelled"
-  }
 
-  private def checkMatching(checkName: String)(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckResult[String] = check(checkName) {
+  private def checkExecution(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckResult[String] = {
 
     val (amountAssetInfo, priceAssetInfo) = getAmountAndPriceAssetsInfo(firstAssetInfo, secondAssetInfo)
     val assetPair                         = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
@@ -128,7 +121,7 @@ case class Checker(superConnector: SuperConnector) {
     val submitted   = mkMatcherOrder(assetPair, SELL)
     val submittedId = submitted.id()
 
-    def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
+    def checkFillingAtDex(orderStatus: JsValue): CheckResult[Boolean] = {
       lazy val expectedFilledStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee).json.toString
       (
         for {
@@ -138,11 +131,11 @@ case class Checker(superConnector: SuperConnector) {
       ).toRight[String](s"Check of submitted order filling failed! Expected $expectedFilledStatus, but got ${orderStatus.toString}")
     }
 
-    def awaitSubmittedOrderAtNode: ErrorOr[Seq[JsValue]] =
+    def awaitSubmittedOrderAtNode: CheckResult[Seq[JsValue]] =
       for {
         txs <- dexRest
           .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)
-          .ensure(s"Failed! Cannot find transactions for order id $submittedId")(_.lengthCompare(1) >= 0)
+          .ensure(s"Awaiting of the submitted order at Node failed! Cannot find transactions for order id $submittedId")(_.lengthCompare(1) >= 0)
         _ <- txs.toList.traverse(tx => nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight))
       } yield txs
 
@@ -156,41 +149,54 @@ case class Checker(superConnector: SuperConnector) {
     } yield {
       val printOrder: Order => String = this.printOrder(amountAssetInfo.name, priceAssetInfo.name)(_)
       s"""
-         |    Counter   = ${printOrder(counter)}, status = ${counterStatus.toString}
-         |    Submitted = ${printOrder(submitted)}, status = ${submittedStatus.toString}
+         |    Counter   = ${printOrder(counter)}, json status = ${counterStatus.toString}
+         |    Submitted = ${printOrder(submitted)}, json status = ${submittedStatus.toString}
          |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}""".stripMargin
     }
   }
 
-  def checkState(version: String): Unit = {
-    println(s"Checking")
+  def checkState(version: String): ErrorOr[String] =
+    for {
+      _ <- log("\nChecking\n")
 
-    val checkResult =
-      for {
-        _                              <- checkVersion("1. DEX version")(version)
-        (balance, balanceNotes)        <- checkBalance("2. Matcher balance")
-        (wuJIoInfo, firstAssetNotes)   <- checkTestAsset("3. First test asset")(balance, firstTestAssetName)
-        (mbIJIoInfo, secondAssetNotes) <- checkTestAsset("4. Second test asset")(balance, secondTestAssetName)
-        (order, placementNotes)        <- checkPlacement("5. Order placement")(wuJIoInfo, mbIJIoInfo)
-        (_, cancellationNotes)         <- checkCancellation("6. Order cancellation")(order)
-        matchingNotes                  <- checkMatching("7. Matching")(wuJIoInfo, mbIJIoInfo)
-      } yield {
-        s"""
+      _ <- logCheck("1. DEX version")
+      _ <- checkVersion(version)
+      _ <- logPassed
+
+      _                       <- logCheck("2. Matcher balance")
+      (balance, balanceNotes) <- checkBalance
+      _                       <- logPassed
+
+      _                            <- logCheck("3. First test asset")
+      (wuJIoInfo, firstAssetNotes) <- checkTestAsset(balance, firstTestAssetName)
+      _                            <- logPassed
+
+      _                              <- logCheck("4. Second test asset")
+      (mbIJIoInfo, secondAssetNotes) <- checkTestAsset(balance, secondTestAssetName)
+      _                              <- logPassed
+
+      _                       <- logCheck("5. Order placement")
+      (order, placementNotes) <- checkPlacement(wuJIoInfo, mbIJIoInfo)
+      _                       <- logPassed
+
+      _                      <- logCheck("6. Order cancellation")
+      (_, cancellationNotes) <- checkCancellation(order)
+      _                      <- logPassed
+
+      _              <- logCheck("7. Execution")
+      executionNotes <- checkExecution(wuJIoInfo, mbIJIoInfo)
+      _              <- logPassed
+    } yield {
+      s"""
            |Diagnostic notes:
            |  Matcher balance : $balanceNotes 
            |  First asset     : $firstAssetNotes
            |  Second asset    : $secondAssetNotes
            |  Placement       : $placementNotes 
            |  Cancellation    : $cancellationNotes
-           |  Matching        : $matchingNotes
+           |  Execution       : $executionNotes
        """.stripMargin
-      }
-
-    checkResult match {
-      case Right(notes) => println(s"\n$notes\nCongratulations! All checks passed!")
-      case Left(_)      => println(s"\nChecking failed!")
     }
-  }
 }
 
 object Checker {
@@ -203,15 +209,15 @@ object Checker {
   private val testAssetDescription  = "Asset for the Matcher checking purposes"
   private val testAssetDecimals     = 8.toByte
   private val testAmount, testPrice = 1.coin
-  private val mnogo                 = 100000000L
+  private val mnogo                 = 100000000.coin
 
-  private val checkLeftIndent = 40
+  private val checkLeftIndent = 35
   private val issueTxFee      = 1.waves
   private val matcherOrderFee = 0.003.waves
 
   private val minMatcherValidBalance = 3.waves
 
-  private[tool] implicit class DoubleOps(private val value: Double) {
+  private implicit class DoubleOps(private val value: Double) {
     val coin, waves: Long = Normalization.normalizeAmountAndFee(value, 8)
   }
 }

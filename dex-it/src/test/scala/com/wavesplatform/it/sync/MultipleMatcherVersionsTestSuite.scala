@@ -36,16 +36,13 @@ class MultipleMatcherVersionsTestSuite extends MatcherSuiteBase with HasKafka {
     wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
     broadcastAndAwait(IssueUsdTx)
     dex1.start()
+    dex2.start()
   }
 
-  "test 1" in {
+  "order placed on one DEX is available on another" in {
     val o = mkOrder(alice, wavesUsdPair, BUY, 10.waves, 1.usd)
     placeAndAwaitAtDex(o)
     dex1.api.waitForOrderStatus(o, OrderStatus.Accepted)
-
-    dex1.disconnectFromNetwork()
-
-    dex2.start()
     dex2.api.waitForOrderStatus(o, OrderStatus.Accepted)
   }
 

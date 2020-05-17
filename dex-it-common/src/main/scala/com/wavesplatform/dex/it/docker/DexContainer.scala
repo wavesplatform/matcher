@@ -89,9 +89,10 @@ object DexContainer extends ScorexLogging {
   }
 
   private def getEnv(containerName: String): Map[String, String] = Map(
-    "BRIEF_LOG_PATH"       -> s"$containerLogsPath/container-$containerName.log",
-    "DETAILED_LOG_PATH"    -> s"$containerLogsPath/container-$containerName.detailed.log",
-    "WAVES_DEX_CONFIGPATH" -> s"$baseContainerPath/$containerName.conf",
+    "BRIEF_LOG_PATH"              -> s"$containerLogsPath/container-$containerName.log",
+    "DETAILED_LOG_PATH"           -> s"$containerLogsPath/container-$containerName.detailed.log",
+    "WAVES_DEX_CONFIGPATH"        -> s"$baseContainerPath/$containerName.conf",
+    "WAVES_DEX_DETAILED_LOG_PATH" -> s"$containerLogsPath/container-$containerName.detailed.log", // Backward compatibility for v2.0.3
     "WAVES_DEX_OPTS" ->
       List(
         "-J-Xmx1024M",

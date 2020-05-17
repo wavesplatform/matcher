@@ -12,7 +12,8 @@ import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 
-case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector) {
+case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector)
+    extends AutoCloseable {
   def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc).foreach { _.close() }
 }
 

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.tool.connectors
 
-trait Connector {
+trait Connector extends AutoCloseable {
   val target: String
-  def close(): Unit
 }

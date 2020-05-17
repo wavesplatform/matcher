@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext.Implicits.{global => executionContext}
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Awaitable, Future}
 
 private[tool] case class DexExtensionGrpcConnector(target: String, matcherKeyPair: KeyPair) extends Connector {
 
@@ -32,22 +32,27 @@ private[tool] case class DexExtensionGrpcConnector(target: String, matcherKeyPai
     WavesBlockchainClientBuilder.async(clientSettings, monixScheduler, executionContext)
   }
 
+  private def sync[A](f: Awaitable[A]): A = Await.result(f, requestTimeout)
+
   private def getDetailedBalance(asset: Asset, balance: Long): Future[(Asset, (BriefAssetDescription, Long))] = asset match {
     case Waves           => Future.successful(asset -> (BriefAssetDescription.wavesDescription -> balance))
     case ia: IssuedAsset => grpcAsyncClient.assetDescription(ia).map(maybeDesc => ia -> (maybeDesc.get -> balance))
   }
 
-  def matcherBalance: DetailedBalance = Await.result(
+  def matcherBalanceAsync: Future[DetailedBalance] =
     for {
       balances                <- grpcAsyncClient.allAssetsSpendableBalance(matcherKeyPair.toAddress)
       balancesWithDescription <- balances.toList.traverse { case (a, b) => getDetailedBalance(a, b) }
-    } yield balancesWithDescription.toMap,
-    10.seconds
-  )
+    } yield balancesWithDescription.toMap
+
+  def matcherBalanceSync: DetailedBalance = sync(matcherBalanceAsync)
 
   override def close(): Unit = grpcAsyncClient.close()
 }
 
 object DexExtensionGrpcConnector {
+
+  val requestTimeout: FiniteDuration = 10.seconds
+
   type DetailedBalance = Map[Asset, (BriefAssetDescription, Long)]
 }

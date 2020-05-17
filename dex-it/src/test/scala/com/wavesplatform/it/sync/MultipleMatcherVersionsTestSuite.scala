@@ -16,9 +16,9 @@ class MultipleMatcherVersionsTestSuite extends MatcherSuiteBase with HasKafka {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
 
-  override protected lazy val dexRunConfig = dexKafkaConfig()
+  override protected def kafkaServer: Option[String] = Some(s"$kafkaIp:9092")
 
-  lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2", tag = nodePrevTag: String)
+  lazy val wavesNode2: WavesNodeContainer = createWavesNode("waves-2", tag = nodePrevTag, netAlias = None)
 
   private lazy val dexPrevConfig: Config = ConfigFactory.parseString(s"""waves.dex {
     |  price-assets = [ "$UsdId", "WAVES" ]

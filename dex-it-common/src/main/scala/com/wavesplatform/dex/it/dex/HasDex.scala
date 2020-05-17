@@ -23,8 +23,10 @@ trait HasDex { self: BaseContainersKit =>
 
   protected lazy val dexRunConfig: Config = dexQueueConfig(ThreadLocalRandom.current.nextInt(0, Int.MaxValue))
 
+  protected def kafkaServer: Option[String] = Option { System.getenv("KAFKA_SERVER") }
+
   protected def dexQueueConfig(queueId: Int): Config = {
-    Option { System.getenv("KAFKA_SERVER") }.fold { ConfigFactory.empty() } { kafkaServer =>
+    kafkaServer.fold { ConfigFactory.empty() } { kafkaServer =>
       ConfigFactory.parseString(s"""waves.dex.events-queue {
                                    |  type = kafka
                                    |  kafka {
@@ -63,6 +65,4 @@ trait HasDex { self: BaseContainersKit =>
       adminClient.close()
     }
   }
-
-  protected def kafkaServer: Option[String] = Option(System.getenv("KAFKA_SERVER"))
 }

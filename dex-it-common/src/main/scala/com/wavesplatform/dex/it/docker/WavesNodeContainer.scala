@@ -58,7 +58,7 @@ object WavesNodeContainer extends ScorexLogging {
   private val networkPort: Int  = 6863 // application.conf waves.network.port
   val dexGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
 
-  val netAlias: String = "waves.nodes"
+  val wavesNodeNetAlias: String = "waves.nodes"
 
   def apply(name: String,
             networkName: String,
@@ -67,10 +67,11 @@ object WavesNodeContainer extends ScorexLogging {
             runConfig: Config,
             suiteInitialConfig: Config,
             localLogsDir: Path,
-            tag: String)(implicit
-                         tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                         futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                         ec: ExecutionContext): WavesNodeContainer = {
+            tag: String,
+            netAlias: Option[String] = Some(wavesNodeNetAlias))(implicit
+                                                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                                                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                                                                ec: ExecutionContext): WavesNodeContainer = {
 
     val underlying = GenericContainer(
       dockerImage = s"com.wavesplatform/waves-integration-it:$tag",
@@ -79,7 +80,7 @@ object WavesNodeContainer extends ScorexLogging {
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      c.withNetworkAliases(netAlias)
+      netAlias.foreach(c.withNetworkAliases(_))
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id

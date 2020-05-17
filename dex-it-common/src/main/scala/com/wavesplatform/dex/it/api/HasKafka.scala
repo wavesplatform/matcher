@@ -7,7 +7,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 
 trait HasKafka { self: BaseContainersKit =>
 
-  private val kafkaContainerName = s"$networkName-kafka"
+  protected val kafkaContainerName = s"$networkName-kafka"
 
   protected val kafkaIp = getIp(12)
 

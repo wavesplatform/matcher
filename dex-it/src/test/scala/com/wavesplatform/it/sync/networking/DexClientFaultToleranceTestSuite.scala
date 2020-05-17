@@ -15,7 +15,7 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 @NetworkTests
 class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
+  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {

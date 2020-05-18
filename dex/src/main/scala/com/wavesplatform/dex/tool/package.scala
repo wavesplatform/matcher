@@ -13,4 +13,11 @@ package object tool {
       print(log + " " * (i - log.length))
     }
   }
+
+  def wrapByLogs[A](f: => ErrorOr[A])(begin: String, end: String, indent: Option[Int] = None): ErrorOr[A] =
+    for {
+      _      <- log(begin, indent)
+      result <- f
+      _      <- log(end)
+    } yield result
 }

@@ -32,12 +32,7 @@ case class Checker(superConnector: SuperConnector) {
   type CheckResult[A]       = ErrorOr[A]
   type CheckLoggedResult[A] = CheckResult[(A, String)]
 
-  private def logCheck[A](name: String)(f: => CheckResult[A]): CheckResult[A] =
-    for {
-      _      <- log(s"  $name... ", checkLeftIndent.some)
-      result <- f
-      _      <- log("Passed\n")
-    } yield result
+  private def logCheck[A](name: String)(f: => CheckResult[A]): CheckResult[A] = wrapByLogs(f)(s"  $name... ", "Passed\n", checkLeftIndent.some)
 
   private def denormalize(value: Long, decimals: Int = testAssetDecimals.toInt): Double =
     Denormalization.denormalizeAmountAndFee(value, decimals).toDouble
@@ -173,7 +168,7 @@ case class Checker(superConnector: SuperConnector) {
 
   def checkState(version: String): ErrorOr[String] =
     for {
-      _                                  <- log("\nChecking\n")
+      _                                  <- log("\nChecking:\n")
       _                                  <- logCheck("1. DEX version") { checkVersion(version) }
       (balance, balanceNotes)            <- logCheck("2. Matcher balance") { checkBalance }
       (wuJIoInfo, firstAssetNotes)       <- logCheck("3. First test asset") { checkTestAsset(balance, firstTestAssetName) }

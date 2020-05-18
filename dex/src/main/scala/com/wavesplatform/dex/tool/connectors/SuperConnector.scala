@@ -30,12 +30,7 @@ object SuperConnector {
 
   def create(dexConfigPath: String, nodeRestApi: String): ErrorOr[SuperConnector] = {
 
-    def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] =
-      for {
-        _      <- log(s"  $processing... ", processLeftIndent.some)
-        result <- f
-        _      <- log("Done\n")
-      } yield result
+    def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(f)(s"  $processing... ", "Done\n", processLeftIndent.some)
 
     def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
       Try {

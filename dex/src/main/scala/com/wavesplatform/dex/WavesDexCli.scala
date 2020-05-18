@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.tool.Checker
 import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.util.MatcherStateCheckingFailedError
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
@@ -219,7 +220,7 @@ object WavesDexCli {
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
-                case Left(error)            => println(error)
+                case Left(error)            => println(error); util.forceStopApplication(MatcherStateCheckingFailedError)
               }
           }
           println("Done")

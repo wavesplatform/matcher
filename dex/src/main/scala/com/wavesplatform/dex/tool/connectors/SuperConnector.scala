@@ -30,8 +30,12 @@ object SuperConnector {
 
   def create(dexConfigPath: String, nodeRestApi: String): ErrorOr[SuperConnector] = {
 
-    def logProcessing(processing: String): ErrorOr[Unit] = log(s"  $processing... ", processLeftIndent.some)
-    def logDone: ErrorOr[Unit]                           = log("Done\n")
+    def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] =
+      for {
+        _      <- log(s"  $processing... ", processLeftIndent.some)
+        result <- f
+        _      <- log("Done\n")
+      } yield result
 
     def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
       Try {
@@ -44,40 +48,37 @@ object SuperConnector {
       AccountStorage.load(accountStorage).bimap(ex => s"Cannot load Matcher account! $ex", _.keyPair)
 
     for {
-      _ <- log("\nSetting up the Super Connector:\n")
-
-      _               <- logProcessing("Loading Matcher settings")
-      matcherSettings <- loadMatcherSettings(dexConfigPath)
-      _               <- logDone
-
-      _              <- logProcessing("Loading Matcher key pair")
-      matcherKeyPair <- loadMatcherKeyPair(matcherSettings.accountStorage)
-      _              <- logDone
+      _               <- log("\nSetting up the Super Connector:\n")
+      matcherSettings <- logProcessing("Loading Matcher settings") { loadMatcherSettings(dexConfigPath) }
+      matcherKeyPair  <- logProcessing("Loading Matcher key pair") { loadMatcherKeyPair(matcherSettings.accountStorage) }
 
       dexRestApiUri    = s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
       dexRestConnector = DexRestConnector(dexRestApiUri)
-      _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})")
-      _ <- dexRestConnector.waitForSwaggerJson
-      _ <- logDone
+
+      _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})") {
+        dexRestConnector.waitForSwaggerJson
+      }
 
       chainId           = AddressScheme.current.chainId
       nodeRestApiUri    = if (nodeRestApi.startsWith("https://") || nodeRestApi.startsWith("http://")) nodeRestApi else s"http://$nodeRestApi"
       nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId)
-      _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})")
-      _ <- nodeRestConnector.waitForSwaggerJson
-      _ <- logDone
 
-      _ <- logProcessing("Setting up connection with DEX Extension gRPC API")
+      _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})") {
+        nodeRestConnector.waitForSwaggerJson
+      }
+
       extensionGrpcApiUri = matcherSettings.wavesBlockchainClient.grpc.target
-      dexExtensionGrpcConnector <- DexExtensionGrpcConnector.create(extensionGrpcApiUri)
-      _                         <- logDone
+
+      dexExtensionGrpcConnector <- logProcessing("Setting up connection with DEX Extension gRPC API") {
+        DexExtensionGrpcConnector.create(extensionGrpcApiUri)
+      }
 
       env            = Env(chainId, matcherSettings, matcherKeyPair)
       superConnector = SuperConnector(env, dexRestConnector, nodeRestConnector, dexExtensionGrpcConnector)
 
       _ <- log(
         s"""
-           |Supper Connector created!
+           |Super Connector created!
            |
            |DEX configurations:
            |  Chain ID               : $chainId

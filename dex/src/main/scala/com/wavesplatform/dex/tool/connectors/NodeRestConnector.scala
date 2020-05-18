@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.tool.connectors
 
+import com.wavesplatform.dex.tool.ErrorOr
 import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions}
 import com.wavesplatform.wavesj.Transaction
 import com.wavesplatform.wavesj.json.WavesJsonMapper
@@ -8,9 +9,12 @@ import play.api.libs.json.{JsValue, JsonParserSettings}
 import sttp.client._
 import sttp.model.MediaType
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 case class NodeRestConnector(target: String, chainId: Byte) extends RestConnector {
+
+  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(30, 1.second)
 
   private val mapper: WavesJsonMapper = new WavesJsonMapper(chainId); mapper.registerModule(new PlayJsonModule(JsonParserSettings()))
 
@@ -22,5 +26,11 @@ case class NodeRestConnector(target: String, chainId: Byte) extends RestConnecto
   def getTxInfo(tx: JsValue): ErrorOrJsonResponse     = getTxInfo { (tx \ "id").as[String] }
   def getTxInfo(tx: Transaction): ErrorOrJsonResponse = getTxInfo(tx.getId.toString)
 
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(30, 1.second)
+  def getCurrentHeight: ErrorOr[Long] = mkResponse { _.get(uri"$target/blocks/height") }.map(json => (json \ "height").as[Long])
+
+  @tailrec
+  final def waitForHeightArise(): ErrorOr[Long] = getCurrentHeight match {
+    case Right(origHeight) => repeatRequest(getCurrentHeight) { _.exists(_ > origHeight) }
+    case Left(_)           => waitForHeightArise()
+  }
 }

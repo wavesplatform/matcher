@@ -32,19 +32,23 @@ case class Checker(superConnector: SuperConnector) {
   type CheckResult[A]       = ErrorOr[A]
   type CheckLoggedResult[A] = CheckResult[(A, String)]
 
-  private def logCheck[A](name: String): CheckResult[Unit] = log(s"  $name... ", checkLeftIndent.some)
-  private def logPassed: ErrorOr[Unit]                     = log("Passed\n")
+  private def logCheck[A](name: String)(f: => CheckResult[A]): CheckResult[A] =
+    for {
+      _      <- log(s"  $name... ", checkLeftIndent.some)
+      result <- f
+      _      <- log("Passed\n")
+    } yield result
 
   private def denormalize(value: Long, decimals: Int = testAssetDecimals.toInt): Double =
     Denormalization.denormalizeAmountAndFee(value, decimals).toDouble
 
   private def denormalizeWavesBalance(value: Long): Double = denormalize(value, 8)
 
-  private def printOrder(amountAssetName: String, priceAssetName: String)(order: Order): String =
-    s"${order.orderType} ${denormalize(order.amount)} $amountAssetName @ ${denormalize(order.price)} $priceAssetName, id = ${order.id()}"
+  private def printOrder(assetPairInfo: AssetPairInfo)(order: Order): String =
+    s"${order.orderType} ${denormalize(order.amount)} ${assetPairInfo.amountAssetName} @ ${denormalize(order.price)} ${assetPairInfo.priceAssetName}, id = ${order.id()}"
 
-  private def getAmountAndPriceAssetsInfo(f: AssetInfo, s: AssetInfo): (AssetInfo, AssetInfo) =
-    if (f.asset.compatId < s.asset.compatId) s -> f else f -> s
+  private def getAssetPairInfo(f: AssetInfo, s: AssetInfo): AssetPairInfo =
+    if (f.asset.compatId < s.asset.compatId) AssetPairInfo(s, f) else AssetPairInfo(f, s)
 
   private def checkVersion(version: String): CheckResult[Unit] = dexRest.swaggerRequest.flatMap { response =>
     val parsedVersion = (response \ "info" \ "version").get.as[String]
@@ -56,9 +60,14 @@ case class Checker(superConnector: SuperConnector) {
     val tx: IssueTransactionV2     = makeIssueTx(matcher, env.chainId, name, description, quantity, testAssetDecimals, false, null, issueTxFee)
     val asset: IssuedAsset         = IssuedAsset(ByteStr(tx.getId.getBytes))
     for {
-      _ <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
-      _ <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
-    } yield AssetInfo(asset, name) -> s"Issued ${denormalize(quantity)} $name"
+      _      <- nodeRest.broadcastTx(tx).leftMap(ex => s"Cannot broadcast issue transaction! $ex")
+      _      <- nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight)
+      height <- nodeRest.waitForHeightArise()
+    } yield
+      (
+        AssetInfo(asset, name),
+        s"Issued ${denormalize(quantity)} $name, issue tx id = ${tx.getId.getBase58String}, height = ${height - 1}"
+      )
   }
 
   private def checkBalance: CheckLoggedResult[DetailedBalance] = {
@@ -94,16 +103,26 @@ case class Checker(superConnector: SuperConnector) {
             Waves)
   }
 
-  private def checkPlacement(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[Order] = {
+  private def checkActiveOrders(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckLoggedResult[AssetPairInfo] = {
+    val assetPairInfo = getAssetPairInfo(firstAssetInfo, secondAssetInfo)
+    val assetPair     = assetPairInfo.assetPair
+    for {
+      activeOrders <- dexRest.getActiveOrdersByPair(env.matcherKeyPair, assetPair).map { _.map(j => (j \ "id").as[ByteStr]).toList }
+      _            <- activeOrders.traverse(id => dexRest.cancelOrder(id, assetPair, env.matcherKeyPair))
+      _            <- activeOrders.traverse(id => dexRest.waitForOrderStatus(id, assetPair, OrderStatus.Cancelled.name))
+    } yield {
+      if (activeOrders.isEmpty) (assetPairInfo, s"Matcher didn't have any active orders on a test asset pair ${assetPair.toString}")
+      else (assetPairInfo, s"Matcher had active orders on a test asset pair ${assetPair.toString}: ${activeOrders.mkString(", ")} cancelled")
+    }
+  }
 
-    val (amountAssetInfo, priceAssetInfo) = getAmountAndPriceAssetsInfo(firstAssetInfo, secondAssetInfo)
-    val orderType                         = if (Random.nextBoolean) BUY else SELL
-    val order                             = mkMatcherOrder(AssetPair(amountAssetInfo.asset, priceAssetInfo.asset), orderType)
-
+  private def checkPlacement(assetPairInfo: AssetPairInfo): CheckLoggedResult[Order] = {
+    val orderType = if (Random.nextBoolean) BUY else SELL
+    val order     = mkMatcherOrder(assetPairInfo.assetPair, orderType)
     for {
       _ <- dexRest.placeOrder(order)
       _ <- dexRest.waitForOrderStatus(order, OrderStatus.Accepted.name)
-    } yield order -> s"Placed order ${printOrder(amountAssetInfo.name, priceAssetInfo.name)(order)}"
+    } yield order -> s"Placed order ${printOrder(assetPairInfo)(order)}"
   }
 
   private def checkCancellation(order: Order): CheckLoggedResult[Order] =
@@ -112,13 +131,10 @@ case class Checker(superConnector: SuperConnector) {
       _ <- dexRest.waitForOrderStatus(order, OrderStatus.Cancelled.name)
     } yield order -> s"Order with id ${order.id()} cancelled"
 
-  private def checkExecution(firstAssetInfo: AssetInfo, secondAssetInfo: AssetInfo): CheckResult[String] = {
+  private def checkExecution(assetPairInfo: AssetPairInfo): CheckResult[String] = {
 
-    val (amountAssetInfo, priceAssetInfo) = getAmountAndPriceAssetsInfo(firstAssetInfo, secondAssetInfo)
-    val assetPair                         = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
-
-    val counter     = mkMatcherOrder(assetPair, BUY)
-    val submitted   = mkMatcherOrder(assetPair, SELL)
+    val counter     = mkMatcherOrder(assetPairInfo.assetPair, BUY)
+    val submitted   = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
     def checkFillingAtDex(orderStatus: JsValue): CheckResult[Boolean] = {
@@ -147,7 +163,7 @@ case class Checker(superConnector: SuperConnector) {
       _               <- checkFillingAtDex(submittedStatus)
       txs             <- awaitSubmittedOrderAtNode
     } yield {
-      val printOrder: Order => String = this.printOrder(amountAssetInfo.name, priceAssetInfo.name)(_)
+      val printOrder: Order => String = this.printOrder(assetPairInfo)(_)
       s"""
          |    Counter   = ${printOrder(counter)}, json status = ${counterStatus.toString}
          |    Submitted = ${printOrder(submitted)}, json status = ${submittedStatus.toString}
@@ -157,44 +173,25 @@ case class Checker(superConnector: SuperConnector) {
 
   def checkState(version: String): ErrorOr[String] =
     for {
-      _ <- log("\nChecking\n")
-
-      _ <- logCheck("1. DEX version")
-      _ <- checkVersion(version)
-      _ <- logPassed
-
-      _                       <- logCheck("2. Matcher balance")
-      (balance, balanceNotes) <- checkBalance
-      _                       <- logPassed
-
-      _                            <- logCheck("3. First test asset")
-      (wuJIoInfo, firstAssetNotes) <- checkTestAsset(balance, firstTestAssetName)
-      _                            <- logPassed
-
-      _                              <- logCheck("4. Second test asset")
-      (mbIJIoInfo, secondAssetNotes) <- checkTestAsset(balance, secondTestAssetName)
-      _                              <- logPassed
-
-      _                       <- logCheck("5. Order placement")
-      (order, placementNotes) <- checkPlacement(wuJIoInfo, mbIJIoInfo)
-      _                       <- logPassed
-
-      _                      <- logCheck("6. Order cancellation")
-      (_, cancellationNotes) <- checkCancellation(order)
-      _                      <- logPassed
-
-      _              <- logCheck("7. Execution")
-      executionNotes <- checkExecution(wuJIoInfo, mbIJIoInfo)
-      _              <- logPassed
+      _                                  <- log("\nChecking\n")
+      _                                  <- logCheck("1. DEX version") { checkVersion(version) }
+      (balance, balanceNotes)            <- logCheck("2. Matcher balance") { checkBalance }
+      (wuJIoInfo, firstAssetNotes)       <- logCheck("3. First test asset") { checkTestAsset(balance, firstTestAssetName) }
+      (mbIJIoInfo, secondAssetNotes)     <- logCheck("4. Second test asset") { checkTestAsset(balance, secondTestAssetName) }
+      (assetPairInfo, activeOrdersNotes) <- logCheck("5. Matcher active orders") { checkActiveOrders(wuJIoInfo, mbIJIoInfo) }
+      (order, placementNotes)            <- logCheck("6. Order placement") { checkPlacement(assetPairInfo) }
+      (_, cancellationNotes)             <- logCheck("7. Order cancellation") { checkCancellation(order) }
+      executionNotes                     <- logCheck("8. Execution") { checkExecution(assetPairInfo) }
     } yield {
       s"""
            |Diagnostic notes:
-           |  Matcher balance : $balanceNotes 
-           |  First asset     : $firstAssetNotes
-           |  Second asset    : $secondAssetNotes
-           |  Placement       : $placementNotes 
-           |  Cancellation    : $cancellationNotes
-           |  Execution       : $executionNotes
+           |  Matcher balance       : $balanceNotes 
+           |  First asset           : $firstAssetNotes
+           |  Second asset          : $secondAssetNotes
+           |  Matcher active orders : $activeOrdersNotes
+           |  Placement             : $placementNotes
+           |  Cancellation          : $cancellationNotes
+           |  Execution             : $executionNotes
        """.stripMargin
     }
 }
@@ -202,6 +199,11 @@ case class Checker(superConnector: SuperConnector) {
 object Checker {
 
   private case class AssetInfo(asset: Asset, name: String)
+
+  private case class AssetPairInfo(amountAssetInfo: AssetInfo, priceAssetInfo: AssetInfo) {
+    val assetPair: AssetPair              = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
+    val (amountAssetName, priceAssetName) = amountAssetInfo.name -> priceAssetInfo.name
+  }
 
   private val firstTestAssetName  = "IIIuJIo"
   private val secondTestAssetName = "MbIJIo"

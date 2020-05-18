@@ -1,8 +1,11 @@
 package com.wavesplatform.dex.tool.connectors
 
+import cats.syntax.option._
+import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.CancelOrderRequest
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.tool.ErrorOr
@@ -10,41 +13,60 @@ import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse,
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
 import sttp.model.MediaType
+import sttp.model.Uri.QuerySegment
 
 import scala.concurrent.duration._
 
 case class DexRestConnector(target: String) extends RestConnector {
 
+  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
+
   private val apiUri = s"$target/matcher"
 
-  private def mkCancelRequest(order: Order, owner: KeyPair): CancelOrderRequest = {
-    val cancelRequest = CancelOrderRequest(owner, Some(ByteStr.decodeBase58(order.id().toString).get), None, Array.emptyByteArray)
+  private def mkCancelRequest(orderId: Order.Id, owner: KeyPair): CancelOrderRequest = {
+    val cancelRequest = CancelOrderRequest(owner, orderId.some, None, Array.emptyByteArray)
     val signature     = crypto.sign(owner, cancelRequest.toSign)
     cancelRequest.copy(signature = signature)
   }
+
+  private def cancelOrdersByRequest(cancelRequest: CancelOrderRequest, assetPair: AssetPair): ErrorOrJsonResponse = mkResponse {
+    _.post(uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/cancel")
+      .body(Json.stringify(Json toJson cancelRequest))
+      .contentType(MediaType.ApplicationJson)
+  }
+
+  private def timestampAndSignatureHeaders(owner: KeyPair, timestamp: Long): Map[String, String] = Map(
+    "Timestamp" -> timestamp.toString,
+    "Signature" -> Base58.encode(crypto.sign(owner, owner.publicKey ++ Longs.toByteArray(timestamp)))
+  )
 
   def placeOrder(order: Order): ErrorOrJsonResponse = mkResponse {
     _.post(uri"$apiUri/orderbook").body(order.jsonStr).contentType(MediaType.ApplicationJson)
   }
 
-  def cancelOrder(order: Order, owner: KeyPair): ErrorOrJsonResponse = {
-    val cancelOrderRequest = mkCancelRequest(order, owner)
-    val body               = Json.stringify(Json toJson cancelOrderRequest)
-    mkResponse {
-      _.post(uri"$apiUri/orderbook/${order.assetPair.amountAsset}/${order.assetPair.priceAsset}/cancel")
-        .body(body)
-        .contentType(MediaType.ApplicationJson)
-    }
-  }
+  def cancelOrder(orderId: Order.Id, assetPair: AssetPair, owner: KeyPair): ErrorOrJsonResponse =
+    cancelOrdersByRequest(mkCancelRequest(orderId, owner), assetPair)
 
-  def getOrderStatus(order: Order): ErrorOrJsonResponse = mkResponse {
-    _.get(uri"$apiUri/orderbook/${order.assetPair.amountAsset}/${order.assetPair.priceAsset}/${order.id()}")
+  def cancelOrder(order: Order, owner: KeyPair): ErrorOrJsonResponse = cancelOrder(order.id(), order.assetPair, owner)
+
+  def getOrderStatus(orderId: Order.Id, assetPair: AssetPair): ErrorOrJsonResponse = mkResponse {
+    _.get(uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/$orderId")
   }
 
   def getTxsByOrderId(id: Order.Id): ErrorOr[Seq[JsValue]] = mkResponse { _.get(uri"$apiUri/transactions/$id") } map { _.as[Seq[JsValue]] }
 
-  def waitForOrderStatus(order: Order, expectedStatusName: String): ErrorOrJsonResponse =
-    repeatRequest { getOrderStatus(order) } { _.map(json => (json \ "status").get.asOpt[String] contains expectedStatusName).getOrElse(false) }
+  def waitForOrderStatus(orderId: Order.Id, assetPair: AssetPair, expectedStatusName: String): ErrorOrJsonResponse =
+    repeatRequest { getOrderStatus(orderId, assetPair) } {
+      _.map(json => (json \ "status").get.asOpt[String] contains expectedStatusName).getOrElse(false)
+    }
 
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
+  def waitForOrderStatus(order: Order, expectedStatusName: String): ErrorOrJsonResponse =
+    waitForOrderStatus(order.id(), order.assetPair, expectedStatusName)
+
+  def getActiveOrdersByPair(keyPair: KeyPair, assetPair: AssetPair): ErrorOr[Seq[JsValue]] = {
+    val uri =
+      uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/publicKey/${keyPair.publicKey.toString}"
+        .copy(querySegments = List(QuerySegment.KeyValue("activeOnly", "true")))
+    mkResponse { _.get(uri).headers(timestampAndSignatureHeaders(keyPair, System.currentTimeMillis)) }.map(_.as[Seq[JsValue]])
+  }
 }

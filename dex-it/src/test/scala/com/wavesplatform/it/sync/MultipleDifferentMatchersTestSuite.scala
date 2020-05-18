@@ -1,12 +1,15 @@
 package com.wavesplatform.it.sync
 
+import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.MultipleVersions
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.it.MatcherSuiteBase
+import com.wavesplatform.it.api.MatcherState
 import com.wavesplatform.it.tags.DexMultipleVersions
 
 @DexMultipleVersions
@@ -19,16 +22,40 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
   "Backward compatibility by order book of v2.0.x" - {
     "if (!submitted.order.isValid(eventTs))" in {}
     "can not match" - {
-      "limit" in {}
-      "market" in {
-        //dex2.api.placeMarket(mkOrder(alice, SELL, 0.0002.waves, 900.usd))
+      "limit" in test {
+        val order = mkOrder(bob, SELL, 1.waves, 10.usd)
+        dex2.api.place(order)
+        waitOnBoth(order, OrderStatus.Accepted)
+
+        Vector(order)
+      }
+
+      "market" in test {
+        val order1 = mkOrder(bob, SELL, 1.waves, 11.usd)
+        val order2 = mkOrder(alice, BUY, 3.waves, 12.usd)
+
+        dex2.api.place(order1)
+        dex2.api.placeMarket(order2)
+
+        waitOnBoth(order1, OrderStatus.Filled)
+        waitOnBoth(order2, OrderStatus.Filled)
+
+        Vector(order1)
       }
     }
 
     "can match" - {
       "if (!submitted.isValid(counter.price))" in test {
-        dex2.api.place(mkOrder(alice, SELL, 0.0002.waves, 900.usd))
-        placeAndAwaitAtDex(mkOrder(bob, BUY, 0.00001.waves, 1000.usd), OrderStatus.Cancelled, dex2)
+        val order1 = mkOrder(bob, SELL, 0.0002.waves, 900.usd)
+        val order2 = mkOrder(alice, BUY, 0.00001.waves, 1000.usd)
+
+        dex2.api.place(order1)
+        dex2.api.place(order2)
+
+        waitOnBoth(order1, OrderStatus.Accepted)
+        waitOnBoth(order2, OrderStatus.Cancelled)
+
+        Vector(order1, order2)
       }
 
       "if (!counter.order.isValid(eventTs))" in {}
@@ -59,13 +86,18 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
     kafka.stop()
   }
 
-  private def test(f: => Any): Unit = {
+  private def test(f: => IndexedSeq[Order]): Unit = {
     cancelAll()
-    val stateBefore = ""
-    f
-    val stateAfter = ""
-    stateBefore should matchTo(stateAfter)
+    val orders = f
+    val state1 = state(dex1.api, orders)
+    val state2 = state(dex1.api, orders)
+    state1 should matchTo(state2)
     cancelAll()
+  }
+
+  private def waitOnBoth(order: Order, status: OrderStatus): Unit = {
+    dex1.api.waitForOrderStatus(order, status)
+    dex1.api.waitForOrderStatus(order, status)
   }
 
   private def cancelAll(): Unit = {
@@ -75,5 +107,13 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
 
   private def mkOrder(account: KeyPair, orderSide: OrderType, amount: Long, price: Long): Order =
     mkOrder(account, wavesUsdPair, orderSide, amount, price)
+
+  private def state(dexApi: DexApi[Id], orders: IndexedSeq[Order]): MatcherState = clean(matcherState(List(wavesUsdPair), orders, accounts, dexApi))
+
+  private def clean(state: MatcherState): MatcherState = state.copy(
+    offset = 0L, // doesn't matter in this test
+    // we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
+    snapshots = state.snapshots.map { case (k, _) => k -> 0L }
+  )
 
 }

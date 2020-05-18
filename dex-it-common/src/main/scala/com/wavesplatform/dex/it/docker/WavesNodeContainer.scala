@@ -58,7 +58,7 @@ object WavesNodeContainer extends ScorexLogging {
   private val networkPort: Int  = 6863 // application.conf waves.network.port
   val dexGrpcExtensionPort: Int = 6887 // application.conf waves.dex.grpc.integration.port
 
-  val netAlias: String = "waves.nodes"
+  val wavesNodeNetAlias: String = "waves.nodes"
 
   def apply(name: String,
             networkName: String,
@@ -66,19 +66,21 @@ object WavesNodeContainer extends ScorexLogging {
             internalIp: String,
             runConfig: Config,
             suiteInitialConfig: Config,
-            localLogsDir: Path)(implicit
-                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
-                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
-                                ec: ExecutionContext): WavesNodeContainer = {
+            localLogsDir: Path,
+            tag: String,
+            netAlias: Option[String] = Some(wavesNodeNetAlias))(implicit
+                                                                tryHttpBackend: LoggingSttpBackend[Try, Nothing],
+                                                                futureHttpBackend: LoggingSttpBackend[Future, Nothing],
+                                                                ec: ExecutionContext): WavesNodeContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = "com.wavesplatform/waves-integration-it:latest",
+      dockerImage = s"com.wavesplatform/waves-integration-it:$tag",
       exposedPorts = List(restApiPort, networkPort, dexGrpcExtensionPort),
       env = getEnv(name, internalIp),
       waitStrategy = ignoreWaitStrategy
     ).configure { c =>
       c.withNetwork(network)
-      c.withNetworkAliases(netAlias)
+      netAlias.foreach(c.withNetworkAliases(_))
       c.withFileSystemBind(localLogsDir.toString, containerLogsPath, BindMode.READ_WRITE)
       c.withCreateContainerCmdModifier {
         _.withName(s"$networkName-$name") // network.getName returns random id

@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.api.dex.DexApi
+import com.wavesplatform.dex.it.dex.DexApi
 
 import scala.concurrent.Future
 

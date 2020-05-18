@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.dex
+package com.wavesplatform.dex.it.dex
 
 import cats.Functor
 import cats.syntax.functor._

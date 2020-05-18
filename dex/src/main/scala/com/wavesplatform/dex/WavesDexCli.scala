@@ -11,6 +11,9 @@ import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.tool.Checker
+import com.wavesplatform.dex.tool.connectors.SuperConnector
+import com.wavesplatform.dex.util.MatcherStateCheckingFailedError
 import scopt.{OParser, RenderingMode}
 
 import scala.util.{Failure, Success, Try}
@@ -87,6 +90,29 @@ object WavesDexCli {
               .text("Raw API key, which will be passed to REST API in the X-Api-Key header")
               .required()
               .action((x, s) => s.copy(apiKey = x))
+          ),
+        cmd(Command.CheckServer.name)
+          .action((_, s) => s.copy(command = Command.CheckServer.some))
+          .text(s"Checks DEX state")
+          .children(
+            opt[String]("node-rest-api")
+              .abbr("nra")
+              .text("Waves Node REST API uri (host:port format)")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(nodeRestApi = x)),
+            opt[String]("version")
+              .abbr("ve")
+              .text("DEX expected version")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(version = x)),
+            opt[String]("dex-config")
+              .abbr("dc")
+              .text("DEX config path")
+              .valueName("<raw-string>")
+              .required()
+              .action((x, s) => s.copy(dexConfigPath = x))
           )
       )
     }
@@ -176,6 +202,26 @@ object WavesDexCli {
                          |
                          |waves.dex.rest-api.api-key-hash = "$hashedApiKey"
                          |""".stripMargin)
+
+            case Command.CheckServer =>
+              (
+                for {
+                  _ <- tool.log(
+                    s"""
+                      |Passed arguments:
+                      |  Waves Node REST API  : ${args.nodeRestApi}
+                      |  Expected DEX version : ${args.version}
+                      |  DEX config path      : ${args.dexConfigPath}
+                   """.stripMargin
+                  )
+                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi)
+                  checkResult    <- Checker(superConnector).checkState(args.version)
+                  _              <- tool.lift { superConnector.close() }
+                } yield checkResult
+              ) match {
+                case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
+                case Left(error)            => println(error); util.forceStopApplication(MatcherStateCheckingFailedError)
+              }
           }
           println("Done")
       }
@@ -203,6 +249,10 @@ object WavesDexCli {
     case object CreateApiKey extends Command {
       override def name: String = "create-api-key"
     }
+
+    case object CheckServer extends Command {
+      override def name: String = "check-server"
+    }
   }
 
   private sealed trait SeedFormat
@@ -226,7 +276,10 @@ object WavesDexCli {
                           accountNonce: Option[Int] = None,
                           command: Option[Command] = None,
                           outputDirectory: File = defaultFile,
-                          apiKey: String = "")
+                          apiKey: String = "",
+                          nodeRestApi: String = "",
+                          version: String = "",
+                          dexConfigPath: String = "")
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

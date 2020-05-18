@@ -43,7 +43,8 @@ object Dependencies {
     val postgresql = "42.2.9"
     val quillJdbc  = "3.5.0"
 
-    val sttp = "1.7.2"
+    val sttp       = "1.7.2"
+    val sttpClient = "2.1.1"
 
     val testContainers          = "0.35.2"
     val testContainersPostgres  = "1.12.5"
@@ -132,6 +133,7 @@ object Dependencies {
   private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
+  private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
@@ -223,7 +225,10 @@ object Dependencies {
       commonsNet,
       swaggerUi,
       jwtModule("core"),
-      jwtModule("play-json")
+      jwtModule("play-json"),
+      sttpClient,
+      wavesJ,
+      betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit

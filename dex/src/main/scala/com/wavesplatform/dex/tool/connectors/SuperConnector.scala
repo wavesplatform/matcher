@@ -15,10 +15,14 @@ import net.ceedubs.ficus.Ficus._
 
 import scala.util.Try
 
-case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector)
+case class SuperConnector private (env: Env,
+                                   dexRest: DexRestConnector,
+                                   nodeRest: NodeRestConnector,
+                                   dexExtensionGrpc: DexExtensionGrpcConnector,
+                                   dexWsConnector: DexWsConnector)
     extends AutoCloseable {
 
-  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc).foreach { _.close() }
+  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc, dexWsConnector).foreach { _.close() }
 }
 
 // noinspection ScalaStyle
@@ -47,7 +51,8 @@ object SuperConnector {
       matcherSettings <- logProcessing("Loading Matcher settings") { loadMatcherSettings(dexConfigPath) }
       matcherKeyPair  <- logProcessing("Loading Matcher key pair") { loadMatcherKeyPair(matcherSettings.accountStorage) }
 
-      dexRestApiUri    = s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestApiUri    = s"http://$dexRestIpAndPort"
       dexRestConnector = DexRestConnector(dexRestApiUri)
 
       _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})") {
@@ -68,8 +73,17 @@ object SuperConnector {
         DexExtensionGrpcConnector.create(extensionGrpcApiUri)
       }
 
+      dexWsApiUri = s"ws://$dexRestIpAndPort/ws/v0"
+
+      (dexWsConnector, wsInitial) <- logProcessing("Setting up connection with DEX WS API")(
+        for {
+          wsConnector <- DexWsConnector.create(dexWsApiUri)
+          wsInitial   <- wsConnector.receiveInitialMessage
+        } yield wsConnector -> wsInitial
+      )
+
       env            = Env(chainId, matcherSettings, matcherKeyPair)
-      superConnector = SuperConnector(env, dexRestConnector, nodeRestConnector, dexExtensionGrpcConnector)
+      superConnector = SuperConnector(env, dexRestConnector, nodeRestConnector, dexExtensionGrpcConnector, dexWsConnector)
 
       _ <- log(
         s"""
@@ -80,8 +94,9 @@ object SuperConnector {
            |  Matcher public key     : ${matcherKeyPair.publicKey.toString}
            |  Matcher address        : ${matcherKeyPair.publicKey.toAddress}
            |  DEX REST API           : $dexRestApiUri
-           |  Node REST API          : $nodeRestApi
+           |  Node REST API          : $nodeRestApiUri
            |  DEX extension gRPC API : $extensionGrpcApiUri
+           |  DEX WS API             : $dexWsApiUri, connection ID = ${wsInitial.connectionId}
        """.stripMargin
       )
     } yield superConnector

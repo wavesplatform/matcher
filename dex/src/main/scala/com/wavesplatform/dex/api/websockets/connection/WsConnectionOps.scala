@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.websockets
+package com.wavesplatform.dex.api.websockets.connection
 
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.asset.Asset
@@ -14,4 +14,7 @@ trait WsConnectionOps {
     def balanceChanges: List[Map[Asset, WsBalances]]             = addressStateChanges.map(_.balances).filter(_.nonEmpty)
     def orderChanges: List[WsOrder]                              = addressStateChanges.flatMap(_.orders)
   }
+
 }
+
+object WsConnectionOps extends WsConnectionOps

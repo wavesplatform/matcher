@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.websockets
+package com.wavesplatform.dex.api.websockets.connection
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -19,7 +19,7 @@ import scala.util.{Failure, Success}
 class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
 
   log.info(s"""Connecting to Matcher WS API:
-            |         URI = ws://$uri
+            |         URI = $uri
             |  Keep alive = $keepAlive""".stripMargin)
 
   private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
@@ -62,13 +62,13 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
     case (_, f) =>
       f.onComplete {
-        case Success(_) => log.info(s"WebSocket connection to ws://$uri successfully closed")
-        case Failure(e) => log.error(s"WebSocket connection to ws://$uri closed with an error", e)
+        case Success(_) => log.info(s"WebSocket connection to $uri successfully closed")
+        case Failure(e) => log.error(s"WebSocket connection to $uri closed with an error", e)
       }(materializer.executionContext)
       f
   }
 
-  private val (response, closed) = Http().singleWebSocketRequest(WebSocketRequest(s"ws://$uri"), flow)
+  private val (response, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
   def connectionResponse: Future[WebSocketUpgradeResponse] = response
 

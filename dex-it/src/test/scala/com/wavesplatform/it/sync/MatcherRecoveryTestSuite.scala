@@ -57,7 +57,7 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   "Verify the state" in {
     val stateAfter = state
-    stateBefore shouldBe stateAfter
+    stateBefore should matchTo(stateAfter)
   }
 
   private def state = cleanState(matcherState(assetPairs, orders, Seq(alice)))

@@ -9,6 +9,7 @@ case class MatcherState(offset: QueueEventWithMeta.Offset,
                         snapshots: Map[AssetPair, QueueEventWithMeta.Offset],
                         orderBooks: Map[AssetPair, (OrderBookResponse, MarketStatusResponse)],
                         orderStatuses: Map[String, OrderStatusResponse],
+                        orderTransactionIds: Map[String, Seq[String]],
                         reservedBalances: Map[KeyPair, Map[Asset, Long]],
                         orderHistory: Map[KeyPair, Map[AssetPair, Seq[OrderBookHistoryItem]]]) {
   override def toString: String =
@@ -17,6 +18,7 @@ case class MatcherState(offset: QueueEventWithMeta.Offset,
        |  snapshots=$snapshots,
        |  orderBooks=$orderBooks,
        |  orderStatuses=$orderStatuses,
+       |  orderTransactionIds=$orderTransactionIds,
        |  reservedBalances=$reservedBalances,
        |  orderHistory=$orderHistory
        |)""".stripMargin

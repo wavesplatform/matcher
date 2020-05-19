@@ -31,5 +31,4 @@ trait HasKafka { self: BaseContainersKit =>
       }
     }
 
-  kafka.start()
 }

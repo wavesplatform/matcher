@@ -25,9 +25,12 @@ class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = db.readWrite { rw =>
     log.trace(s"Appending ${tx.id()} to orders [${tx.buyOrder.idStr()}, ${tx.sellOrder.idStr()}]")
-    rw.put(MatcherKeys.exchangeTransaction(tx.id()), Some(tx))
-    appendTxId(rw, tx.buyOrder.id(), tx.id())
-    appendTxId(rw, tx.sellOrder.id(), tx.id())
+    val txKey = MatcherKeys.exchangeTransaction(tx.id())
+    if (!rw.has(txKey)) {
+      rw.put(txKey, Some(tx))
+      appendTxId(rw, tx.buyOrder.id(), tx.id())
+      appendTxId(rw, tx.sellOrder.id(), tx.id())
+    }
   }
 }
 

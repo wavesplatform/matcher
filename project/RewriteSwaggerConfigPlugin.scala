@@ -44,6 +44,7 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
 const ui = SwaggerUIBundle({
     url: "/api-docs/swagger.json",
     dom_id: '#swagger-ui',
+    deepLinking: true,
     presets: [ SwaggerUIBundle.presets.apis ],
     plugins: [ SwaggerUIBundle.plugins.DownloadUrl ],
     layout: "BaseLayout",

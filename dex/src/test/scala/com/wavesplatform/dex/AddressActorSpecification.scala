@@ -229,7 +229,6 @@ class AddressActorSpecification
           eventsProbe.expectMsg(QueueEvent.Placed(lo))
           addressDir ! OrderAdded(lo, System.currentTimeMillis)
         case mo: MarketOrder => eventsProbe.expectMsg(QueueEvent.PlacedMarket(mo))
-
       }
     }
 

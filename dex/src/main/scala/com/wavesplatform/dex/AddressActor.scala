@@ -133,19 +133,17 @@ class AddressActor(owner: Address,
       if (toCancelIds.isEmpty) sender ! api.BatchCancelCompleted(initResponse)
       else context.actorOf(BatchOrderCancelActor.props(toCancelIds, self, sender, settings.batchCancelTimeout, initResponse))
 
-    case command: Command.CancelNotEnoughCoinsOrders =>
+    case msg: Message.BalanceChanged =>
       if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState.putSpendableAssets(command.newBalance.keySet)
+        addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.allChanges.keySet)
       }
 
-      val toCancel = getOrdersToCancel(command.newBalance).filterNot(ao => isCancelling(ao.order.id()))
+      val toCancel = getOrdersToCancel(msg.decreasingChanges).filterNot(ao => isCancelling(ao.order.id()))
 
-      if (toCancel.isEmpty) log.trace(s"Got $command, nothing to cancel")
+      if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
-        val msg = toCancel
-          .map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}")
-          .mkString(", ")
-        log.debug(s"Got $command, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $msg")
+        val msg = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
+        log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $msg")
         toCancel.foreach(x => cancel(x.order))
       }
 
@@ -526,6 +524,10 @@ object AddressActor {
     }
 
   sealed trait Message
+  object Message {
+    // values of map allChanges can be used in future for tracking balances in AddressActor
+    case class BalanceChanged(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]) extends Message
+  }
 
   sealed trait Query extends Message
   object Query {
@@ -555,11 +557,6 @@ object AddressActor {
     case class CancelOrder(orderId: ByteStr)                             extends OneOrderCommand
     case class CancelOrders(orderIds: Set[ByteStr])                      extends Command
     case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-
-    /**
-      * @param newBalance Contains a new amount of changed assets
-      */
-    case class CancelNotEnoughCoinsOrders(newBalance: Map[Asset, Long]) extends Command
   }
 
   sealed trait Event {

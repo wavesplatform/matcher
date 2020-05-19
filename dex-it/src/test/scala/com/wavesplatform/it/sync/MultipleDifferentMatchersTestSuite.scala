@@ -196,19 +196,19 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
     cancelAll()
     val orders = f
     val state1 = state(dex1.api, orders)
-    val state2 = state(dex1.api, orders)
+    val state2 = state(dex2.api, orders)
     state1 should matchTo(state2)
     cancelAll()
   }
 
   private def waitOnBoth(order: Order, status: OrderStatus): Unit = {
     dex1.api.waitForOrderStatus(order, status)
-    dex1.api.waitForOrderStatus(order, status)
+    dex2.api.waitForOrderStatus(order, status)
   }
 
   private def cancelAll(): Unit = {
-    accounts.foreach(dex1.api.cancelAll(_))
-    accounts.foreach(dex1.api.waitForOrderHistory(_, activeOnly = Some(true))(_.isEmpty))
+    accounts.foreach(dex2.api.cancelAll(_))
+    accounts.foreach(dex2.api.waitForOrderHistory(_, activeOnly = Some(true))(_.isEmpty))
   }
 
   private def mkOrder(account: KeyPair, orderSide: OrderType, amount: Long, price: Long): Order =

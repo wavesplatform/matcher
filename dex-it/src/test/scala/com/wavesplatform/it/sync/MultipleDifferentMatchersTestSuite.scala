@@ -9,9 +9,10 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.MultipleVersions
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.dex.DexApi
-import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.MatcherState
 import com.wavesplatform.it.tags.DexMultipleVersions
+import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
+import org.scalacheck.Gen
 
 @DexMultipleVersions
 class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleVersions {
@@ -22,128 +23,146 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
   private val accounts = List(alice, bob)
 
   "Backward compatibility by order book of v2.0.x" - {
-    "if (!submitted.order.isValid(eventTs))" ignore {} // Hard to do
+    "OrderBook logic" - {
+      "if (!submitted.order.isValid(eventTs))" ignore {} // Hard to reproduce
 
-    "can not match" - {
-      "limit" in test {
-        val order1 = mkOrder(bob, SELL, 1.waves, 10.usd)
-        val order2 = mkOrder(alice, BUY, 2.waves, 9.usd)
+      "can not match" - {
+        "limit" in test {
+          val order1 = mkOrder(bob, SELL, 1.waves, 10.usd)
+          val order2 = mkOrder(alice, BUY, 2.waves, 9.usd)
 
-        dex2.api.place(order1)
-        dex2.api.place(order2)
+          dex2.api.place(order1)
+          dex2.api.place(order2)
 
-        waitOnBoth(order1, OrderStatus.Accepted)
-        waitOnBoth(order2, OrderStatus.Accepted)
+          waitOnBoth(order1, OrderStatus.Accepted)
+          waitOnBoth(order2, OrderStatus.Accepted)
 
-        Vector(order1, order2)
+          Vector(order1, order2)
+        }
+
+        "market" in test {
+          val order1 = mkOrder(bob, SELL, 1.waves, 8.usd)
+          val order2 = mkOrder(alice, BUY, 30.waves, 9.usd) // The rest 29 waves can not match
+
+          dex2.api.place(order1)
+          dex2.api.placeMarket(order2)
+
+          waitOnBoth(order1, OrderStatus.Filled)
+          waitOnBoth(order2, OrderStatus.Filled)
+
+          Vector(order1, order2)
+        }
       }
 
-      "market" in test {
-        val order1 = mkOrder(bob, SELL, 1.waves, 8.usd)
-        val order2 = mkOrder(alice, BUY, 30.waves, 9.usd) // The rest 29 waves can not match
+      "can match" - {
+        "if (!submitted.isValid(counter.price))" in test {
+          val order1 = mkOrder(bob, SELL, 0.0002.waves, 900.usd)
+          val order2 = mkOrder(alice, BUY, 0.00001.waves, 1000.usd)
 
-        dex2.api.place(order1)
-        dex2.api.placeMarket(order2)
+          dex2.api.place(order1)
+          dex2.api.place(order2)
 
-        waitOnBoth(order1, OrderStatus.Filled)
-        waitOnBoth(order2, OrderStatus.Filled)
+          waitOnBoth(order1, OrderStatus.Accepted)
+          waitOnBoth(order2, OrderStatus.Cancelled)
 
-        Vector(order1, order2)
-      }
-    }
+          Vector(order1, order2)
+        }
 
-    "can match" - {
-      "if (!submitted.isValid(counter.price))" in test {
-        val order1 = mkOrder(bob, SELL, 0.0002.waves, 900.usd)
-        val order2 = mkOrder(alice, BUY, 0.00001.waves, 1000.usd)
+        "if (!counter.order.isValid(eventTs))" ignore {} // Hard to reproduce
 
-        dex2.api.place(order1)
-        dex2.api.place(order2)
+        "else" - {
+          "if (orderExecutedEvent.counterRemaining.isValid)" - {
+            "submittedRemaining.isValid" - {
+              "limit" ignore {} // Hard to reproduce, DEX-467
 
-        waitOnBoth(order1, OrderStatus.Accepted)
-        waitOnBoth(order2, OrderStatus.Cancelled)
+              "market" in test {
+                val order1 = mkOrder(alice, BUY, 2.waves, 10.usd)
+                val order2 = mkOrder(carol, SELL, 2.waves, 10.usd) // The balance of carol is 1.003 waves. This is to simulate afs = 0
 
-        Vector(order1, order2)
-      }
+                dex2.api.place(order1)
+                dex2.api.placeMarket(order2)
 
-      "if (!counter.order.isValid(eventTs))" ignore {} // Hard to do
+                waitOnBoth(order1, OrderStatus.PartiallyFilled)
+                waitOnBoth(order2, OrderStatus.Filled)
 
-      "else" - {
-        "if (orderExecutedEvent.counterRemaining.isValid)" - {
-          "submittedRemaining.isValid" - {
-            "limit" in {} // TODO, simulate rounding issues?
+                Vector(order2, order1)
+              }
+            }
 
-            "market" in test {
-              val order1 = mkOrder(alice, BUY, 2.waves, 10.usd)
-              val order2 = mkOrder(carol, SELL, 2.waves, 10.usd) // The balance of carol is 1.003 waves. This is to simulate afs = 0
+            "else" - {
+              "limit" in test {
+                val order1 = mkOrder(bob, SELL, 10.waves, 10.usd)
+                val order2 = mkOrder(alice, BUY, 1.waves, 10.usd)
 
-              dex2.api.place(order1)
-              dex2.api.placeMarket(order2)
+                dex2.api.place(order1)
+                dex2.api.place(order2)
 
-              waitOnBoth(order1, OrderStatus.PartiallyFilled)
-              waitOnBoth(order2, OrderStatus.Filled)
+                waitOnBoth(order1, OrderStatus.PartiallyFilled)
+                waitOnBoth(order2, OrderStatus.Filled)
 
-              Vector(order2, order1)
+                Vector(order1, order2)
+              }
+
+              "market" in test {
+                val order1 = mkOrder(bob, SELL, 10.waves, 11.usd)
+                val order2 = mkOrder(alice, BUY, 5.waves, 12.usd)
+
+                dex2.api.place(order1)
+                dex2.api.placeMarket(order2)
+
+                waitOnBoth(order1, OrderStatus.PartiallyFilled)
+                waitOnBoth(order2, OrderStatus.Filled)
+
+                Vector(order1, order2)
+              }
             }
           }
 
           "else" - {
             "limit" in test {
-              val order1 = mkOrder(bob, SELL, 10.waves, 10.usd)
-              val order2 = mkOrder(alice, BUY, 1.waves, 10.usd)
+              val order1 = mkOrder(bob, SELL, 1.waves, 10.usd)
+              val order2 = mkOrder(alice, BUY, 2.waves, 10.usd)
 
               dex2.api.place(order1)
               dex2.api.place(order2)
 
-              waitOnBoth(order1, OrderStatus.PartiallyFilled)
-              waitOnBoth(order2, OrderStatus.Filled)
+              waitOnBoth(order1, OrderStatus.Filled)
+              waitOnBoth(order2, OrderStatus.PartiallyFilled)
 
               Vector(order1, order2)
             }
 
             "market" in test {
               val order1 = mkOrder(bob, SELL, 10.waves, 11.usd)
-              val order2 = mkOrder(alice, BUY, 5.waves, 12.usd)
+              val order2 = mkOrder(alice, BUY, 10.waves, 12.usd)
 
               dex2.api.place(order1)
               dex2.api.placeMarket(order2)
 
-              waitOnBoth(order1, OrderStatus.PartiallyFilled)
+              waitOnBoth(order1, OrderStatus.Filled)
               waitOnBoth(order2, OrderStatus.Filled)
 
               Vector(order1, order2)
             }
           }
         }
-
-        "else" - {
-          "limit" in test {
-            val order1 = mkOrder(bob, SELL, 1.waves, 10.usd)
-            val order2 = mkOrder(alice, BUY, 2.waves, 10.usd)
-
-            dex2.api.place(order1)
-            dex2.api.place(order2)
-
-            waitOnBoth(order1, OrderStatus.Filled)
-            waitOnBoth(order2, OrderStatus.PartiallyFilled)
-
-            Vector(order1, order2)
-          }
-
-          "market" in test {
-            val order1 = mkOrder(bob, SELL, 10.waves, 11.usd)
-            val order2 = mkOrder(alice, BUY, 10.waves, 12.usd)
-
-            dex2.api.place(order1)
-            dex2.api.placeMarket(order2)
-
-            waitOnBoth(order1, OrderStatus.Filled)
-            waitOnBoth(order2, OrderStatus.Filled)
-
-            Vector(order1, order2)
-          }
-        }
       }
+    }
+
+    "random orders" in test {
+      val assetPairs = List(ethWavesPair, wavesUsdPair)
+      val twoAccountsOrdersGen = Gen.oneOf(
+        orderGen(matcher, alice, assetPairs),
+        orderGen(matcher, bob, assetPairs)
+      )
+
+      val orders = Gen.containerOfN[Vector, Order](200, twoAccountsOrdersGen).sample.get
+      orders.foreach(dex2.api.place)
+
+      dex1.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+      dex2.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+
+      orders
     }
   }
 
@@ -153,8 +172,17 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
     wavesNode2.start()
     wavesNode2.api.connect(wavesNode1.networkAddress)
     wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
+    broadcastAndAwait(
+      IssueUsdTx,
+      IssueEthTx,
+      mkTransfer(alice, carol, 1.003.waves, Waves)
+    )
+    wavesNode1.api.waitForHeightArise()
     wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
-    broadcastAndAwait(IssueUsdTx, mkTransfer(alice, carol, 1.003.waves, Waves))
+    broadcastAndAwait(
+      mkTransfer(alice, bob, IssueUsdTx.getQuantity / 2, usd),
+      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth)
+    )
     dex1.start()
     dex2.start()
   }

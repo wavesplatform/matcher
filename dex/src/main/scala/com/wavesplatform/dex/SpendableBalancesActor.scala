@@ -85,38 +85,25 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
         case (address, stateUpdate) =>
-          val updateAndSendChanges = updateStateAndSendChanges(address, stateUpdate) _
-          fullState.get(address) match {
-            case Some(afs) => fullState = updateAndSendChanges(fullState, afs)(true)
-            case None =>
-              incompleteStateChanges.get(address) match {
-                case Some(ais) => incompleteStateChanges = updateAndSendChanges(incompleteStateChanges, ais)(true)
-                case None      => incompleteStateChanges = updateAndSendChanges(incompleteStateChanges, Map.empty)(false)
-              }
-          }
+          val knownBalance      = fullState.get(address) orElse incompleteStateChanges.get(address) getOrElse Map.empty
+          val (all, decreasing) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getAllAndDecreasingChanges(stateUpdate, knownBalance)
+
+          if (fullState contains address) fullState = fullState.updated(address, knownBalance ++ all)
+          else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ all)
+
+          addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(all, decreasing))
       }
 
     // Subtract is called when there is a web socket connection and thus we have `fullState` for this address
     case SpendableBalancesActor.Command.Subtract(address, balance) => fullState = fullState.updated(address, fullState(address) |-| balance)
   }
 
-  private def updateStateAndSendChanges(address: Address, addressStateUpdate: AddressState)(knownState: State, knownAddressState: AddressState)(
-      splitBalance: Boolean): State = {
-
-    val (allCleanChanges, decreasingChanges) =
-      if (splitBalance) getCleanAndDecreasingChanges(addressStateUpdate, knownAddressState) else addressStateUpdate -> addressStateUpdate
-
-    addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(allCleanChanges, decreasingChanges))
-    knownState.updated(address, knownAddressState ++ allCleanChanges)
-  }
-
-  /** Splits balance state update into clean (so far unknown) and decreasing (compared to known balance) changes */
-  private def getCleanAndDecreasingChanges(stateUpdate: AddressState, knownBalance: AddressState): (AddressState, AddressState) =
+  /** Splits balance state update into all clean (unknown so far) and decreasing (compared to known balance) changes */
+  private def getAllAndDecreasingChanges(stateUpdate: AddressState, knownBalance: AddressState): (AddressState, AddressState) =
     stateUpdate.foldLeft { (Map.empty[Asset, Long], Map.empty[Asset, Long]) } {
-      case ((cc, dc), (asset, update)) =>
-        val elem = asset -> update
-        knownBalance.get(asset).fold(cc + elem -> dc) { existedBalance =>
-          if (update != existedBalance) cc + elem -> (if (update < existedBalance) dc + elem else dc) else cc -> dc
+      case ((ac, dc), balanceChanges @ (asset, update)) =>
+        knownBalance.get(asset).fold { (ac + balanceChanges, dc) } { existedBalance =>
+          if (update == existedBalance) (ac, dc) else (ac + balanceChanges, if (update < existedBalance) dc + balanceChanges else dc)
         }
     }
 }

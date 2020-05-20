@@ -4,11 +4,13 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.orderGen
+import com.wavesplatform.it.tags.DexMultipleVersions
 import org.scalacheck.Gen
 import org.testcontainers.containers.BindMode
 
 import scala.concurrent.duration.DurationInt
 
+@DexMultipleVersions
 class DatabaseBackwardCompatTestSuite extends BackwardCompatTestSuite {
   "Database backward compatibility test" in {
     val assetPairs = List(ethWavesPair, wavesUsdPair)

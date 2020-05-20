@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.testkit.{TestKit, TestProbe}
+import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -12,6 +13,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 import com.wavesplatform.dex.queue.QueueEventWithMeta
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -25,6 +27,8 @@ class SpendableBalancesActorSpecification
     with AnyWordSpecLike
     with Matchers
     with MatcherSpecBase {
+
+  implicit val addressDiff: Diff[Address] = DiffMatcherWithImplicits.getDiff[Address](_ == _)
 
   implicit val efc: ErrorFormatterContext = (_: Asset) => 8
 
@@ -120,6 +124,63 @@ class SpendableBalancesActorSpecification
 
       await { askSpendableBalance(alice, Set(Waves, usd)) } should matchTo { Map(Waves -> 100.waves, usd -> 500.usd) }
       a[WavesNodeConnectionLostException] should be thrownBy await { askSpendableBalance(bob, Set(Waves, usd)) }
+    }
+
+    "correctly creates balance changes events" in {
+
+      val aliceBalance = Map(Waves -> 20.waves, usd -> 5.usd)
+
+      def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
+        if (address == alice) aliceBalance filterKeys assets else Map.empty
+      }
+
+      def allAssetsSpendableBalances(address: Address): Future[Map[Asset, Long]] = Future.successful {
+        if (address == alice) aliceBalance else Map.empty
+      }
+
+      val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, testProbe.ref)))
+
+      def updateAndExpectBalanceChanges(update: (Asset, Long)*)(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]): Unit = {
+        sba ! SpendableBalancesActor.Command.UpdateStates { Map(alice -> update.toMap) }
+        val envelope = testProbe.expectMsgType[AddressDirectory.Envelope]
+        envelope.address should matchTo(alice)
+        envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
+          AddressActor.Message.BalanceChanged(allChanges, decreasingChanges)
+        }
+      }
+
+      // initial balance = Map(Waves -> 20.waves, usd -> 5.usd)
+      withClue("Snapshot isn't received, increasing balance by Waves twice") {
+        updateAndExpectBalanceChanges(Waves -> 25.waves)(allChanges = Map(Waves -> 25.waves), decreasingChanges = Map(Waves -> 25.waves))
+        updateAndExpectBalanceChanges(Waves -> 26.waves)(allChanges = Map(Waves -> 26.waves), decreasingChanges = Map.empty)
+      }
+
+      withClue("Snapshot isn't received, decreasing balance by Waves") {
+        updateAndExpectBalanceChanges(Waves -> 23.waves)(allChanges = Map(Waves -> 23.waves), decreasingChanges = Map(Waves -> 23.waves))
+      }
+
+      withClue("Snapshot isn't received, decreasing by USD") {
+        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+      }
+
+      withClue("Snapshot isn't received, increasing by USD") {
+        updateAndExpectBalanceChanges(usd -> 8.usd)(allChanges = Map(usd -> 8.usd), decreasingChanges = Map.empty)
+      }
+
+      withClue("Receiving snapshot") {
+        sba.tell(SpendableBalancesActor.Query.GetSnapshot(alice), testProbe.ref)
+        testProbe.expectMsgType[SpendableBalancesActor.Reply.GetSnapshot].state.getOrElse(Map.empty) should matchTo {
+          Map(Waves -> 23.waves, usd -> 8.usd)
+        }
+      }
+
+      withClue("Snapshot received, increasing balance by Waves") {
+        updateAndExpectBalanceChanges(Waves -> 30.waves)(allChanges = Map(Waves -> 30.waves), decreasingChanges = Map.empty)
+      }
+
+      withClue("Snapshot received, decreasing balance by USD") {
+        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+      }
     }
   }
 }

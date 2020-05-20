@@ -27,9 +27,9 @@ class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) =
     watch(actorOf(addressActorProps(address, startSchedules), address.toString))
   }
 
-  private def forward(address: Address, msg: Any): Unit = {
-    val handler = children.getOrElseUpdate(address, createAddressActor(address))
-    handler.forward(msg)
+  private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
+    case (None, _: AddressActor.Message.BalanceChanged) =>
+    case _                                              => children getOrElseUpdate (address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
@@ -40,7 +40,7 @@ class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) =
       historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 
     case e: Events.OrderExecuted =>
-      import e.{submitted, counter}
+      import e.{counter, submitted}
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
       historyRouter foreach { _ ! SaveEvent(e) }

@@ -22,11 +22,14 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
 
   import context.dispatcher
 
+  type AddressState = Map[Asset, Long]
+  type State        = Map[Address, AddressState]
+
   /** Keeps states of all addresses by all available assets */
-  var fullState: Map[Address, Map[Asset, Long]] = Map.empty
+  var fullState: State = Map.empty
 
   /** Keeps balance changes of addresses for which there is no full state yet (addresses that were not requested for snapshot) */
-  var incompleteStateChanges: Map[Address, Map[Asset, Long]] = Map.empty
+  var incompleteStateChanges: State = Map.empty
 
   def receive: Receive = {
 
@@ -82,20 +85,30 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
         case (address, stateUpdate) =>
-          fullState.get(address) match {
-            case Some(addressFullState) =>
-              val cleanStateUpdate = stateUpdate.filter { case (a, updatedBalance) => addressFullState.get(a).fold(true)(updatedBalance != _) }
-              addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Command.CancelNotEnoughCoinsOrders(cleanStateUpdate))
-              fullState = fullState.updated(address, addressFullState ++ cleanStateUpdate)
-            case None =>
-              addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Command.CancelNotEnoughCoinsOrders(stateUpdate))
-              incompleteStateChanges = incompleteStateChanges.updated(address, incompleteStateChanges.getOrElse(address, Map.empty) ++ stateUpdate)
-          }
+          val knownBalance      = fullState.get(address) orElse incompleteStateChanges.get(address) getOrElse Map.empty
+          val (clean, forAudit) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getCleanAndForAuditChanges(stateUpdate, knownBalance)
+
+          if (fullState contains address) fullState = fullState.updated(address, knownBalance ++ clean)
+          else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ clean)
+
+          addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(clean, forAudit))
       }
 
     // Subtract is called when there is a web socket connection and thus we have `fullState` for this address
     case SpendableBalancesActor.Command.Subtract(address, balance) => fullState = fullState.updated(address, fullState(address) |-| balance)
   }
+
+  /**
+    * Splits balance state update into clean (unknown so far) changes and
+    * changes for audit (decreasing compared to known balance, they can lead to orders cancelling)
+    */
+  private def getCleanAndForAuditChanges(stateUpdate: AddressState, knownBalance: AddressState): (AddressState, AddressState) =
+    stateUpdate.foldLeft { (Map.empty[Asset, Long], Map.empty[Asset, Long]) } {
+      case ((ac, dc), balanceChanges @ (asset, update)) =>
+        knownBalance.get(asset).fold { (ac + balanceChanges, dc + balanceChanges) } { existedBalance =>
+          if (update == existedBalance) (ac, dc) else (ac + balanceChanges, if (update < existedBalance) dc + balanceChanges else dc)
+        }
+    }
 }
 
 object SpendableBalancesActor {

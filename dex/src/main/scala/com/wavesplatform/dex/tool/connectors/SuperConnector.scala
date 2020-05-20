@@ -19,10 +19,10 @@ case class SuperConnector private (env: Env,
                                    dexRest: DexRestConnector,
                                    nodeRest: NodeRestConnector,
                                    dexExtensionGrpc: DexExtensionGrpcConnector,
-                                   dexWsConnector: DexWsConnector)
+                                   dexWs: DexWsConnector)
     extends AutoCloseable {
 
-  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc, dexWsConnector).foreach { _.close() }
+  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc, dexWs).foreach { _.close() }
 }
 
 // noinspection ScalaStyle

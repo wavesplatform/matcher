@@ -5,6 +5,7 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
+import com.wavesplatform.dex.api.websockets.WsOrderBook
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -159,12 +160,20 @@ case class Checker(superConnector: SuperConnector) {
       txs             <- awaitSubmittedOrderAtNode
     } yield {
       val printOrder: Order => String = this.printOrder(assetPairInfo)(_)
-      s"""
+      s"""\n
          |    Counter   = ${printOrder(counter)}, json status = ${counterStatus.toString}
          |    Submitted = ${printOrder(submitted)}, json status = ${submittedStatus.toString}
-         |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}""".stripMargin
+         |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}\n""".stripMargin
     }
   }
+
+  private def checkWsOrderBook(assetPairInfo: AssetPairInfo): CheckResult[String] =
+    dexWs.subscribeForOrderBookUpdates(assetPairInfo.assetPair).map { snapshot =>
+      s"""\n
+         |    Got snapshot for ${assetPairInfo.assetPairName} pair:
+         |    ${WsOrderBook.wsOrderBookStateFormat.writes(snapshot).toString}\n
+         """.stripMargin
+    }
 
   def checkState(version: String): ErrorOr[String] =
     for {
@@ -177,6 +186,7 @@ case class Checker(superConnector: SuperConnector) {
       (order, placementNotes)            <- logCheck("6. Order placement") { checkPlacement(assetPairInfo) }
       (_, cancellationNotes)             <- logCheck("7. Order cancellation") { checkCancellation(order) }
       executionNotes                     <- logCheck("8. Execution") { checkExecution(assetPairInfo) }
+      orderBookWsStreamNotes             <- logCheck("9. Order book WS stream") { checkWsOrderBook(assetPairInfo) }
     } yield {
       s"""
            |Diagnostic notes:
@@ -187,6 +197,7 @@ case class Checker(superConnector: SuperConnector) {
            |  Placement             : $placementNotes
            |  Cancellation          : $cancellationNotes
            |  Execution             : $executionNotes
+           |  Order book WS stream  : $orderBookWsStreamNotes
        """.stripMargin
     }
 }
@@ -198,6 +209,7 @@ object Checker {
   private case class AssetPairInfo(amountAssetInfo: AssetInfo, priceAssetInfo: AssetInfo) {
     val assetPair: AssetPair              = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
     val (amountAssetName, priceAssetName) = amountAssetInfo.name -> priceAssetInfo.name
+    val assetPairName                     = s"$amountAssetName-$priceAssetName"
   }
 
   private val firstTestAssetName  = "IIIuJIo"

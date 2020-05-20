@@ -10,7 +10,7 @@ import com.wavesplatform.it.tags.DexMultipleVersions
 import org.scalacheck.Gen
 
 @DexMultipleVersions
-class OrderBookBackwardCompatTestSuite extends BackwardCompatTestSuite with HasKafka {
+class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasKafka {
   "Backward compatibility by order book of v2.0.x" - {
     "OrderBook logic" - {
       "if (!submitted.order.isValid(eventTs))" ignore {} // Hard to reproduce

@@ -11,7 +11,7 @@ import org.testcontainers.containers.BindMode
 import scala.concurrent.duration.DurationInt
 
 @DexMultipleVersions
-class DatabaseBackwardCompatTestSuite extends BackwardCompatTestSuite {
+class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
   "Database backward compatibility test" in {
     val assetPairs = List(ethWavesPair, wavesUsdPair)
     val twoAccountsOrdersGen = Gen.oneOf(

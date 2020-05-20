@@ -13,7 +13,7 @@ import com.wavesplatform.it.api.MatcherState
 /**
   * Doesn't start DEX in beforeAll
   */
-trait BackwardCompatTestSuite extends MatcherSuiteBase with MultipleVersions {
+trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
 

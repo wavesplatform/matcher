@@ -138,7 +138,7 @@ class AddressActor(owner: Address,
         addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.allChanges.keySet)
       }
 
-      val toCancel = getOrdersToCancel(msg.decreasingChanges).filterNot(ao => isCancelling(ao.order.id()))
+      val toCancel = getOrdersToCancel(msg.changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
 
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
@@ -526,7 +526,7 @@ object AddressActor {
   sealed trait Message
   object Message {
     // values of map allChanges can be used in future for tracking balances in AddressActor
-    case class BalanceChanged(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]) extends Message
+    case class BalanceChanged(allChanges: Map[Asset, Long], changesForAudit: Map[Asset, Long]) extends Message
   }
 
   sealed trait Query extends Message

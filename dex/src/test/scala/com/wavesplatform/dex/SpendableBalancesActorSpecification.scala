@@ -159,6 +159,10 @@ class SpendableBalancesActorSpecification
         updateAndExpectBalanceChanges(Waves -> 23.waves)(allChanges = Map(Waves -> 23.waves), decreasingChanges = Map(Waves -> 23.waves))
       }
 
+      withClue("Snapshot isn't received, decreasing by USD") {
+        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+      }
+
       withClue("Snapshot isn't received, increasing by USD") {
         updateAndExpectBalanceChanges(usd -> 8.usd)(allChanges = Map(usd -> 8.usd), decreasingChanges = Map.empty)
       }

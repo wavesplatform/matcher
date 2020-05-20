@@ -224,6 +224,7 @@ object Dependencies {
       influxDb,
       commonsNet,
       swaggerUi,
+      "javax.xml.bind" % "jaxb-api" % "2.3.1", // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement
       jwtModule("core"),
       jwtModule("play-json"),
       sttpClient,

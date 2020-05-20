@@ -111,4 +111,10 @@ object DexContainer extends ScorexLogging {
         }
         .mkString(" ", " ", " ")
   )
+
+  /**
+    * @param resolve A relate to the base directory path of application
+    * @note Works only with /
+    */
+  def containerPath(resolve: String): String = s"$baseContainerPath/$resolve"
 }

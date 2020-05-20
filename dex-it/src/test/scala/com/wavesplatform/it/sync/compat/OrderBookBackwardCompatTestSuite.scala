@@ -1,27 +1,16 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.compat
 
-import cats.Id
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.MultipleVersions
+import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
-import com.wavesplatform.dex.it.dex.DexApi
-import com.wavesplatform.it.api.MatcherState
+import com.wavesplatform.it.orderGen
 import com.wavesplatform.it.tags.DexMultipleVersions
-import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import org.scalacheck.Gen
 
 @DexMultipleVersions
-class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleVersions {
-
-  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
-
-  private val carol    = mkKeyPair("carol")
-  private val accounts = List(alice, bob)
-
+class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasKafka {
   "Backward compatibility by order book of v2.0.x" - {
     "OrderBook logic" - {
       "if (!submitted.order.isValid(eventTs))" ignore {} // Hard to reproduce
@@ -166,32 +155,6 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
     }
   }
 
-  override protected def beforeAll(): Unit = {
-    kafka.start()
-    wavesNode1.start()
-    wavesNode2.start()
-    wavesNode2.api.connect(wavesNode1.networkAddress)
-    wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
-    broadcastAndAwait(
-      IssueUsdTx,
-      IssueEthTx,
-      mkTransfer(alice, carol, 1.003.waves, Waves)
-    )
-    wavesNode1.api.waitForHeightArise()
-    wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
-    broadcastAndAwait(
-      mkTransfer(alice, bob, IssueUsdTx.getQuantity / 2, usd),
-      mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth)
-    )
-    dex1.start()
-    dex2.start()
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    kafka.stop()
-  }
-
   private def test(f: => IndexedSeq[Order]): Unit = {
     cancelAll()
     val orders = f
@@ -201,25 +164,20 @@ class MultipleDifferentMatchersTestSuite extends MatcherSuiteBase with MultipleV
     cancelAll()
   }
 
-  private def waitOnBoth(order: Order, status: OrderStatus): Unit = {
-    dex1.api.waitForOrderStatus(order, status)
-    dex2.api.waitForOrderStatus(order, status)
-  }
-
-  private def cancelAll(): Unit = {
-    accounts.foreach(dex2.api.cancelAll(_))
-    accounts.foreach(dex2.api.waitForOrderHistory(_, activeOnly = Some(true))(_.isEmpty))
-  }
-
   private def mkOrder(account: KeyPair, orderSide: OrderType, amount: Long, price: Long): Order =
     mkOrder(account, wavesUsdPair, orderSide, amount, price)
 
-  private def state(dexApi: DexApi[Id], orders: IndexedSeq[Order]): MatcherState = clean(matcherState(List(wavesUsdPair), orders, accounts, dexApi))
+  override protected def kafkaServer: Option[String] = Some(s"$kafkaIp:9092")
 
-  private def clean(state: MatcherState): MatcherState = state.copy(
-    offset = 0L, // doesn't matter in this test
-    // we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
-    snapshots = state.snapshots.map { case (k, _) => k -> 0L }
-  )
+  override protected def beforeAll(): Unit = {
+    kafka.start()
+    super.beforeAll()
+    dex1.start()
+    dex2.start()
+  }
 
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    kafka.stop()
+  }
 }

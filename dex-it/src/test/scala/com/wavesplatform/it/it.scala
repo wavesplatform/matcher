@@ -36,7 +36,8 @@ package object it {
   def orderGen(matcher: PublicKey,
                trader: KeyPair,
                assetPairs: Seq[AssetPair],
-               types: Seq[OrderType] = Seq(OrderType.BUY, OrderType.SELL)): Gen[Order] =
+               types: Seq[OrderType] = Seq(OrderType.BUY, OrderType.SELL)): Gen[Order] = {
+    val ts = System.currentTimeMillis()
     for {
       assetPair      <- Gen.oneOf(assetPairs)
       tpe            <- Gen.oneOf(types)
@@ -45,7 +46,6 @@ package object it {
       orderVersion   <- Gen.choose[Byte](1, 3)
       expirationDiff <- Gen.choose(600000, 6000000)
     } yield {
-      val ts = System.currentTimeMillis()
       if (tpe == OrderType.BUY)
         Order.buy(
           trader,
@@ -53,7 +53,7 @@ package object it {
           assetPair,
           amount,
           price * Order.PriceConstant,
-          System.currentTimeMillis(),
+          ts,
           ts + expirationDiff,
           matcherFee,
           orderVersion
@@ -65,12 +65,13 @@ package object it {
           assetPair,
           amount,
           price * Order.PriceConstant,
-          System.currentTimeMillis(),
+          ts,
           ts + expirationDiff,
           matcherFee,
           orderVersion
         )
     }
+  }
 
   def choose[T](xs: IndexedSeq[T]): T = xs(Random.nextInt(xs.size))
 }

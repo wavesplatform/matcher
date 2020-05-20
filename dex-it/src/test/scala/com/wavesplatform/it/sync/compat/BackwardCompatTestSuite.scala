@@ -9,7 +9,12 @@ import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.MatcherState
+import com.wavesplatform.it.tags.DexMultipleVersions
 
+/**
+  * Doesn't start DEX in beforeAll
+  */
+@DexMultipleVersions
 trait BackwardCompatTestSuite extends MatcherSuiteBase with MultipleVersions {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
@@ -18,7 +23,6 @@ trait BackwardCompatTestSuite extends MatcherSuiteBase with MultipleVersions {
   protected val accounts = List(alice, bob)
 
   override protected def beforeAll(): Unit = {
-    kafka.start()
     wavesNode1.start()
     wavesNode2.start()
     wavesNode2.api.connect(wavesNode1.networkAddress)
@@ -34,13 +38,6 @@ trait BackwardCompatTestSuite extends MatcherSuiteBase with MultipleVersions {
       mkTransfer(alice, bob, IssueUsdTx.getQuantity / 2, usd),
       mkTransfer(alice, bob, IssueEthTx.getQuantity / 2, eth)
     )
-    dex1.start()
-    dex2.start()
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    kafka.stop()
   }
 
   protected def waitOnBoth(order: Order, status: OrderStatus): Unit = {

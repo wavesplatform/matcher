@@ -76,7 +76,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def printDebugMessage(text: String): Unit = {
     try {
-      if (dockerClient.inspectContainerCmd(underlying.containerId).exec().getState.getRunning) {
+      if (Option(underlying.containerId).exists(dockerClient.inspectContainerCmd(_).exec().getState.getRunning)) {
 
         val escaped = text.replace('\'', '\"')
 

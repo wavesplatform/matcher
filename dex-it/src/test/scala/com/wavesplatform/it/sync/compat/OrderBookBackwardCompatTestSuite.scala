@@ -3,14 +3,12 @@ package com.wavesplatform.it.sync.compat
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.orderGen
-import com.wavesplatform.it.tags.DexMultipleVersions
 import org.scalacheck.Gen
 
-@DexMultipleVersions
-class OrderBookBackwardCompatTestSuite extends BackwardCompatTestSuite {
-
+class OrderBookBackwardCompatTestSuite extends BackwardCompatTestSuite with HasKafka {
   "Backward compatibility by order book of v2.0.x" - {
     "OrderBook logic" - {
       "if (!submitted.order.isValid(eventTs))" ignore {} // Hard to reproduce
@@ -167,4 +165,17 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatTestSuite {
   private def mkOrder(account: KeyPair, orderSide: OrderType, amount: Long, price: Long): Order =
     mkOrder(account, wavesUsdPair, orderSide, amount, price)
 
+  override protected def kafkaServer: Option[String] = Some(s"$kafkaIp:9092")
+
+  override protected def beforeAll(): Unit = {
+    kafka.start()
+    super.beforeAll()
+    dex1.start()
+    dex2.start()
+  }
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    kafka.stop()
+  }
 }

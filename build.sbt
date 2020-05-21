@@ -39,6 +39,14 @@ lazy val `dex-it` = project
     `dex-it-common`
   )
 
+lazy val `dex-load` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    dex,
+    `waves-integration-it`,
+    `dex-it-common`
+  )
+
 lazy val `waves-grpc` = project.settings(commonOwaspSettings)
 
 lazy val `waves-ext` = project
@@ -76,6 +84,7 @@ lazy val root = (project in file("."))
   .aggregate(
     dex,
     `dex-it`,
+    `dex-load`,
     `dex-it-common`,
     `dex-jmh`,
     `dex-test-common`,

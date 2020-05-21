@@ -97,7 +97,7 @@ object WavesDexCli {
           .children(
             opt[String]("node-rest-api")
               .abbr("nra")
-              .text("Waves Node REST API uri (host:port format)")
+              .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
               .required()
               .action((x, s) => s.copy(nodeRestApi = x)),
@@ -112,7 +112,17 @@ object WavesDexCli {
               .text("DEX config path")
               .valueName("<raw-string>")
               .required()
-              .action((x, s) => s.copy(dexConfigPath = x))
+              .action((x, s) => s.copy(dexConfigPath = x)),
+            opt[String]("auth-rest-api")
+              .abbr("ara")
+              .text("Auth Service REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
+              .valueName("<raw-string>")
+              .action((x, s) => s.copy(authServiceRestApi = x.some)),
+            opt[String]("account-seed")
+              .abbr("as")
+              .text("Seed for checking account updates")
+              .valueName("<raw-string>")
+              .action((x, s) => s.copy(accountSeed = x.some))
           )
       )
     }
@@ -209,13 +219,15 @@ object WavesDexCli {
                   _ <- tool.log(
                     s"""
                       |Passed arguments:
-                      |  Waves Node REST API  : ${args.nodeRestApi}
-                      |  Expected DEX version : ${args.version}
-                      |  DEX config path      : ${args.dexConfigPath}
+                      |  Waves Node REST API   : ${args.nodeRestApi}
+                      |  Expected DEX version  : ${args.version}
+                      |  DEX config path       : ${args.dexConfigPath}
+                      |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
+                      |  Account seed          : ${args.accountSeed.getOrElse("")}
                    """.stripMargin
                   )
-                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi)
-                  checkResult    <- Checker(superConnector).checkState(args.version)
+                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi, args.authServiceRestApi)
+                  checkResult    <- Checker(superConnector).checkState(args.version, args.accountSeed)
                   _              <- tool.lift { superConnector.close() }
                 } yield checkResult
               ) match {
@@ -279,7 +291,9 @@ object WavesDexCli {
                           apiKey: String = "",
                           nodeRestApi: String = "",
                           version: String = "",
-                          dexConfigPath: String = "")
+                          dexConfigPath: String = "",
+                          authServiceRestApi: Option[String] = None,
+                          accountSeed: Option[String] = None)
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

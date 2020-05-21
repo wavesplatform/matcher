@@ -44,7 +44,7 @@ case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: W
 
   def matcherBalanceSync(address: Address): DetailedBalance = sync { matcherBalanceAsync(address) }
 
-  override def close(): Unit = grpcAsyncClient.close()
+  override def close(): Unit = Await.result(grpcAsyncClient.close(), 3.seconds)
 }
 
 object DexExtensionGrpcConnector {

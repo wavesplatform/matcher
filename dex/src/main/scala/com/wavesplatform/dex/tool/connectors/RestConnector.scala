@@ -5,6 +5,7 @@ import com.wavesplatform.dex.tool.ErrorOr
 import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RequestFunction}
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
+import sttp.model.Uri
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -12,6 +13,9 @@ import scala.util.Try
 trait RestConnector extends Connector {
 
   implicit protected val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+
+  protected val targetUri        = uri"$target"
+  protected val hostPortUri: Uri = uri"${targetUri.scheme}://${targetUri.host}:${targetUri.port.get}"
 
   protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse =
     for {
@@ -34,5 +38,9 @@ object RestConnector {
   final case class RepeatRequestOptions(attemptsLeft: Int, delay: FiniteDuration) {
     def decreaseAttempts: RepeatRequestOptions = copy(attemptsLeft = attemptsLeft - 1)
     override def toString: String              = s"max attempts = $attemptsLeft, interval = $delay"
+  }
+
+  object RepeatRequestOptions {
+    val default: RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
   }
 }

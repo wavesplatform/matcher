@@ -10,7 +10,8 @@ import scala.annotation.tailrec
 trait Connector extends AutoCloseable {
 
   protected val target: String
-  protected val repeatRequestOptions: RepeatRequestOptions
+
+  val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions.default
 
   final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean): ErrorOr[A] = {
 

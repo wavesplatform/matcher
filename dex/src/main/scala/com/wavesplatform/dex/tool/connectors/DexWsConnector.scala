@@ -3,18 +3,20 @@ package com.wavesplatform.dex.tool.connectors
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.syntax.either._
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.api.websockets.connection.WsConnectionOps._
-import com.wavesplatform.dex.api.websockets.{WsInitial, WsOrderBook, WsOrderBookSubscribe, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.tool._
+import com.wavesplatform.dex.tool.connectors.AuthServiceRestConnector.AuthCredentials
 import com.wavesplatform.dex.tool.connectors.RestConnector.RepeatRequestOptions
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.Try
 
-case class DexWsConnector private (target: String, wsc: WsConnection) extends Connector {
+case class DexWsConnector private (target: String, wsc: WsConnection)(implicit system: ActorSystem, materializer: Materializer) extends Connector {
 
   import DexWsConnector._
 
@@ -40,21 +42,33 @@ case class DexWsConnector private (target: String, wsc: WsConnection) extends Co
       snapshot <- receiveAtLeastN[WsOrderBook](1).bimap(ex => s"Cannot get order book snapshot! $ex", _.head)
     } yield snapshot
 
+  def subscribeForAccountUpdates(credentials: AuthCredentials): ErrorOr[WsAddressState] =
+    for {
+      _        <- lift { wsc.send(WsAddressSubscribe(credentials.keyPair, WsAddressSubscribe.defaultAuthType, credentials.token)) }
+      snapshot <- receiveAtLeastN[WsAddressState](1).bimap(ex => s"Cannot get account snapshot! $ex", _.head)
+    } yield snapshot
+
   def clearMessages(): ErrorOr[Unit] = lift { wsc.clearMessages() }
 
-  override def close(): Unit = wsc.close()
+  override def close(): Unit = {
+    wsc.close()
+    Await.result(wsc.closed.zip(system.terminate()), 3.seconds)
+    materializer.shutdown()
+  }
 }
 
 object DexWsConnector {
 
-  implicit private val system: ActorSystem        = ActorSystem()
-  implicit private val materializer: Materializer = Materializer.matFromSystem(system)
-
   private val defaultDepth                       = 10
   private val awaitingAdditionalMessagesPeriodMs = 200
 
-  def create(target: String): ErrorOr[DexWsConnector] =
+  def create(target: String): ErrorOr[DexWsConnector] = {
+
+    implicit val system: ActorSystem        = ActorSystem()
+    implicit val materializer: Materializer = Materializer.matFromSystem(system)
+
     Try { new WsConnection(target, true) }.toEither
       .leftMap(ex => s"Web Socket connection cannot be established! $ex")
       .map(wsc => DexWsConnector(target, wsc))
+  }
 }

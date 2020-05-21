@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest, WebSocketUpgradeResponse}
+import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.websockets._
@@ -68,9 +68,7 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       f
   }
 
-  private val (response, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
-
-  def connectionResponse: Future[WebSocketUpgradeResponse] = response
+  val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
   def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
   def clearMessages(): Unit           = messagesBuffer.clear()

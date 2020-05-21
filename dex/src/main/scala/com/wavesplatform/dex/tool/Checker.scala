@@ -5,7 +5,7 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
-import com.wavesplatform.dex.api.websockets.WsOrderBook
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -175,7 +175,19 @@ case class Checker(superConnector: SuperConnector) {
          """.stripMargin
     }
 
-  def checkState(version: String): ErrorOr[String] =
+  private def checkWsAccountUpdates(maybeSeed: Option[String]): CheckResult[String] = {
+    authServiceRest.fold { lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided") } { as =>
+      for {
+        credentials <- as.getAuthCredentials(maybeSeed)
+        snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
+      } yield s"""\n
+           |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address:
+           |    ${WsAddressState.wsAddressStateFormat.writes(snapshot).toString}\n
+         """.stripMargin
+    }
+  }
+
+  def checkState(version: String, maybeAccountSeed: Option[String]): ErrorOr[String] =
     for {
       _                                  <- log("\nChecking:\n")
       _                                  <- logCheck("1. DEX version") { checkVersion(version) }
@@ -187,17 +199,19 @@ case class Checker(superConnector: SuperConnector) {
       (_, cancellationNotes)             <- logCheck("7. Order cancellation") { checkCancellation(order) }
       executionNotes                     <- logCheck("8. Execution") { checkExecution(assetPairInfo) }
       orderBookWsStreamNotes             <- logCheck("9. Order book WS stream") { checkWsOrderBook(assetPairInfo) }
+      accountUpdatesWsStreamNotes        <- logCheck("10. Account updates WS stream") { checkWsAccountUpdates(maybeAccountSeed) }
     } yield {
       s"""
            |Diagnostic notes:
-           |  Matcher balance       : $balanceNotes 
-           |  First asset           : $firstAssetNotes
-           |  Second asset          : $secondAssetNotes
-           |  Matcher active orders : $activeOrdersNotes
-           |  Placement             : $placementNotes
-           |  Cancellation          : $cancellationNotes
-           |  Execution             : $executionNotes
-           |  Order book WS stream  : $orderBookWsStreamNotes
+           |  Matcher balance           : $balanceNotes 
+           |  First asset               : $firstAssetNotes
+           |  Second asset              : $secondAssetNotes
+           |  Matcher active orders     : $activeOrdersNotes
+           |  Placement                 : $placementNotes
+           |  Cancellation              : $cancellationNotes
+           |  Execution                 : $executionNotes
+           |  Order book WS stream      : $orderBookWsStreamNotes
+           |  Account updates WS stream : $accountUpdatesWsStreamNotes
        """.stripMargin
     }
 }

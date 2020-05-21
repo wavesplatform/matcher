@@ -115,7 +115,7 @@ object WavesDexCli {
               .action((x, s) => s.copy(dexConfigPath = x)),
             opt[String]("auth-rest-api")
               .abbr("ara")
-              .text("Auth Service REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
+              .text("Auth Service REST API uri. Format: scheme://host:port/path/to/token (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
               .action((x, s) => s.copy(authServiceRestApi = x.some)),
             opt[String]("account-seed")

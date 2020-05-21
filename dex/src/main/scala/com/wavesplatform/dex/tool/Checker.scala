@@ -181,7 +181,7 @@ case class Checker(superConnector: SuperConnector) {
         credentials <- as.getAuthCredentials(maybeSeed)
         snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
       } yield s"""\n
-           |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address:
+           |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address${maybeSeed.fold(" (key pair randomly generated)")(_ => "")}:
            |    ${WsAddressState.wsAddressStateFormat.writes(snapshot).toString}\n
          """.stripMargin
     }

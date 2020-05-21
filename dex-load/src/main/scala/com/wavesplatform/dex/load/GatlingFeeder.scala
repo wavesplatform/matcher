@@ -3,19 +3,18 @@ package com.wavesplatform.dex.load
 import java.io.File
 import java.security
 import java.security.KeyPairGenerator
-import java.io.BufferedWriter
 
 import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
+import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.wavesj.PrivateKeyAccount
 import play.api.libs.json.Json
-import com.wavesplatform.dex.auth.JwtUtils
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import scala.util.Random
 import scala.io.Source
+import scala.util.Random
 
 object GatlingFeeder {
 

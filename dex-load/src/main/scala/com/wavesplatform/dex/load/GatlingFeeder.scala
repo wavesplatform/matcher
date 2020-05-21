@@ -60,8 +60,8 @@ object GatlingFeeder {
     val o = s"${f.getAbsolutePath}/data-${System.currentTimeMillis()}.csv"
     var l = new ListBuffer[String]()
     for (i <- 0 to c) {
-      val account = PrivateKeyAccount.fromSeed(s"$s$i", 0, 'D'.toByte)
-      l += s"""${account.getAddress()};${mkAusString(account)};${mkObsStrings(p, obs)}\n"""
+      val a = PrivateKeyAccount.fromSeed(s"$s$i", 0, AddressScheme.current.chainId)
+      l += s"""${a.getAddress()};${mkAusString(a)};${mkObsStrings(p, obs)}\n"""
     }
     scala.tools.nsc.io.File(o).appendAll(l.mkString(""))
     println(s"Results has been saved to $o")

@@ -1,15 +1,18 @@
 package com.wavesplatform.dex.load
 
+import java.io.File
 import java.security
 import java.security.KeyPairGenerator
+import java.io.BufferedWriter
 
 import com.wavesplatform.dex.api.websockets.WsAddressSubscribe.JwtPayload
-import com.wavesplatform.dex.domain.account.{PrivateKey, PublicKey}
+import com.wavesplatform.dex.domain.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.wavesj.PrivateKeyAccount
 import play.api.libs.json.Json
 import com.wavesplatform.dex.auth.JwtUtils
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
 import scala.io.Source
@@ -27,7 +30,7 @@ object GatlingFeeder {
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
       publicKey = PublicKey(a.getPublicKey()),
-      networkByte = "D",
+      networkByte = AddressScheme.current.chainId.toString,
       clientId = "test",
       firstTokenExpirationInSeconds = exp,
       activeTokenExpirationInSeconds = exp,
@@ -54,12 +57,14 @@ object GatlingFeeder {
     * @param s   -- seed without nonce
     * @param obs -- count connections to order book stream
     */
-  def mkFile(f: String, c: Int, p: String = "pairs.txt", s: String = "loadtest-", obs: Int = 10): Unit = {
+  def mkFile(f: File, c: Int = 1000, p: String = "pairs.txt", s: String = "loadtest-", obs: Int = 10): Unit = {
+    val o = s"${f.getAbsolutePath}/data-${System.currentTimeMillis()}.csv"
+    var l = new ListBuffer[String]()
     for (i <- 0 to c) {
       val account = PrivateKeyAccount.fromSeed(s"$s$i", 0, 'D'.toByte)
-      val str = s"""${account.getAddress()};${mkAusString(account)};${mkObsStrings(p, obs)}\n"""
-
-      scala.tools.nsc.io.File(f).appendAll(str)
+      l += s"""${account.getAddress()};${mkAusString(account)};${mkObsStrings(p, obs)}\n"""
     }
+    scala.tools.nsc.io.File(o).appendAll(l.mkString(""))
+    println(s"Results has been saved to $o")
   }
 }

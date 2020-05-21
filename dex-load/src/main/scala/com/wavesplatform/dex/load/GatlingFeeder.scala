@@ -22,17 +22,17 @@ object GatlingFeeder {
     kpg.generateKeyPair()
   }
 
-  private def mkJwtSignedPayload(acc: PrivateKeyAccount): JwtPayload = {
+  private def mkJwtSignedPayload(a: PrivateKeyAccount): JwtPayload = {
     val exp = System.currentTimeMillis() / 1000 + 24.hour._1
     JwtPayload(
       signature = ByteStr(Array.emptyByteArray),
-      publicKey = PublicKey(acc.getPublicKey()),
+      publicKey = PublicKey(a.getPublicKey()),
       networkByte = "D",
       clientId = "test",
       firstTokenExpirationInSeconds = exp,
       activeTokenExpirationInSeconds = exp,
       scope = List("general")
-    ).signed(PrivateKey(acc.getPrivateKey()))
+    ).signed(PrivateKey(a.getPrivateKey()))
   }
 
   private def mkJwt(a: PrivateKeyAccount): String = JwtUtils.mkJwt(authServiceKeyPair, Json.toJsObject(mkJwtSignedPayload(a)))

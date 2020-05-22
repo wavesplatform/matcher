@@ -55,6 +55,10 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
 
+  def tryOrderStatusInfoByIdWithApiKey(owner: Address,
+                                       orderId: Order.Id,
+                                       xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, OrderBookHistoryItem]]
+
   def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]]
 
   /**
@@ -236,8 +240,7 @@ object DexApi {
         tryParseJson {
           sttp
             .post(uri"$apiUri/orders/cancel/${id.toString}")
-            .headers(apiKeyHeaders)
-            .headers(xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders))
+            .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
             .contentType("application/json", "UTF-8")
         }
 
@@ -248,6 +251,14 @@ object DexApi {
             .readTimeout(3.minutes) // TODO find way to decrease timeout!
             .followRedirects(false)
         }
+      }
+
+      override def tryOrderStatusInfoByIdWithApiKey(owner: Address,
+                                                    orderId: Order.Id,
+                                                    xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, OrderBookHistoryItem]] = tryParseJson {
+        sttp
+          .get(uri"$apiUri/orders/$owner/${orderId.toString}")
+          .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
       }
 
       override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =

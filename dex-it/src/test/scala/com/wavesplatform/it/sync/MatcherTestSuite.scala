@@ -6,6 +6,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.AcceptedOrderType
@@ -379,14 +380,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Matcher should" - {
 
-    "reject proxy requests if X-User-Public-Key doesn't match query param:" - {
+    "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
 
-      "/matcher/balance/reserved/[publicKey]" in {
+      "/matcher/balance/reserved/{publicKey}" in {
         dex1.api.tryReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
         dex1.api.tryReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe 'right
       }
 
-      "/matcher/orders/[address]/cancel" in {
+      "/matcher/orders/{address}/cancel" in {
 
         val now = System.currentTimeMillis
 
@@ -401,7 +402,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe 'right
       }
 
-      "/matcher/orders/[address]" in {
+      "/matcher/orders/{address}" in {
         dex1.api.tryOrderHistoryWithApiKey(
           owner = bob,
           xUserPublicKey = Some(alice.publicKey)
@@ -411,6 +412,51 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           owner = bob,
           xUserPublicKey = Some(bob.publicKey)
         ) shouldBe 'right
+      }
+
+      "/matcher/orders/{address}/{orderId}" in {
+
+        val ts = System.currentTimeMillis()
+
+        val order          = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 4000.0, ts = ts)
+        val notPlacedOrder = mkOrderDP(bob, wavesUsdPair, BUY, 2.waves, 0.004)
+        val notFoundError  = OrderNotFound(notPlacedOrder.id())
+
+        placeAndAwaitAtDex(order)
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = order.id(),
+          xUserPublicKey = Some(alice.publicKey)
+        ) should failWith(3148801, "Provided user public key is not correct")
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = notPlacedOrder.id(),
+          xUserPublicKey = Some(bob.publicKey)
+        ) should failWith(notFoundError.code, notFoundError.message.text)
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = order.id(),
+          xUserPublicKey = Some(bob.publicKey)
+        ) shouldBe Right(
+          OrderBookHistoryItem(
+            id = order.id(),
+            `type` = SELL.toString,
+            orderType = AcceptedOrderType.Limit,
+            amount = 1.waves,
+            filled = 0,
+            price = 4000.usd,
+            fee = 0.003.waves,
+            filledFee = 0,
+            feeAsset = Waves,
+            timestamp = ts,
+            status = OrderStatus.Accepted,
+            assetPair = order.assetPair,
+            avgWeighedPrice = 0
+          )
+        )
       }
     }
   }

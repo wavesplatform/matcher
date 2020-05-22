@@ -9,6 +9,7 @@ import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
+import cats.syntax.option._
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
@@ -151,6 +152,16 @@ class AddressActor(owner: Address,
     case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
+
+    case Query.GetOrderStatusInfo(orderId) =>
+      val maybeStatusInfo: Option[OrderInfo[OrderStatus]] =
+        activeOrders.get(orderId).map(ao => OrderInfo.v4(ao, activeStatus(ao))) orElse
+          orderDB.get(orderId).flatMap { order =>
+            orderDB.getFinalizedOrders(order.sender, order.assetPair.some).find { case (id, _) => id == orderId }.map(_._2)
+          }
+
+      sender ! Reply.OrdersStatusInfo(maybeStatusInfo)
+
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =
         if (orderListType.hasActive)
@@ -532,6 +543,7 @@ object AddressActor {
   sealed trait Query extends Message
   object Query {
     case class GetOrderStatus(orderId: ByteStr)                                              extends Query
+    case class GetOrderStatusInfo(orderId: ByteStr)                                          extends Query
     case class GetOrdersStatuses(assetPair: Option[AssetPair], orderListType: OrderListType) extends Query
     case object GetReservedBalance                                                           extends Query
     case class GetTradableBalance(forAssets: Set[Asset])                                     extends Query
@@ -539,8 +551,9 @@ object AddressActor {
 
   sealed trait Reply
   object Reply {
-    case class OrdersStatuses(xs: Seq[(ByteStr, OrderInfo[OrderStatus])]) extends Reply
-    case class Balance(balance: Map[Asset, Long])                         extends Reply
+    case class OrdersStatuses(xs: Seq[(ByteStr, OrderInfo[OrderStatus])])             extends Reply
+    case class Balance(balance: Map[Asset, Long])                                     extends Reply
+    case class OrdersStatusInfo(maybeOrderStatusInfo: Option[OrderInfo[OrderStatus]]) extends Reply
   }
 
   sealed trait Command         extends Message

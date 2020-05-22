@@ -108,7 +108,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         handleExceptions(gRPCExceptionsHandler) {
           handleRejections(invalidJsonParsingRejectionsHandler) {
             getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~ getOrderStatusInfoByIdWithApiKey ~
+              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~ getOrderStatusInfoByIdWithApiKey ~ getOrderStatusInfoByIdWithSignature ~
               historyDelete ~ cancel ~ cancelAll ~ cancelAllById ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
               upsertRate ~ deleteRate ~ saveSnapshots
           }
@@ -762,6 +762,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
+  private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
+    askMapAddressActor[AddressActor.Reply.OrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(id)) {
+      _.maybeOrderStatusInfo match {
+        case Some(oi) => StatusCodes.OK -> mkOrderInfoJson(id, oi)
+        case None     => InfoNotFound(error.OrderNotFound(id))
+      }
+    }
+  }
+
   @Path("/orders/{address}/{orderId}")
   @ApiOperation(
     value = "Order Status Info by address and ID without signature",
@@ -788,16 +797,32 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     (address, orderId, userPublicKey) =>
       userPublicKey match {
         case Some(upk) if upk.toAddress != address => invalidUserPublicKey
-        case _ =>
-          complete {
-            askMapAddressActor[AddressActor.Reply.OrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(orderId)) {
-              _.maybeOrderStatusInfo match {
-                case Some(oi) => StatusCodes.OK -> mkOrderInfoJson(orderId, oi)
-                case None     => InfoNotFound(error.OrderNotFound(orderId))
-              }
-            }
-          }
+        case _                                     => getOrderStatusInfo(orderId, address)
       }
+  }
+
+  @Path("/orders/{publicKey}/{orderId}")
+  @ApiOperation(
+    value = "Order Status Info by public key and ID",
+    notes = "Get Status Info of the specified order for a given public key",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    response = classOf[Any]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "publicKey", value = "Public Key", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
+      new ApiImplicitParam(name = "Signature",
+                           value = "Signature of [Public Key ++ Timestamp] bytes",
+                           required = true,
+                           dataType = "string",
+                           paramType = "header")
+    )
+  )
+  def getOrderStatusInfoByIdWithSignature: Route = (path("orders" / PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
+    signedGet(publicKey) { getOrderStatusInfo(orderId, publicKey.toAddress) }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")

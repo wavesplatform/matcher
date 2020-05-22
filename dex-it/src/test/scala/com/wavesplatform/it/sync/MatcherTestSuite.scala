@@ -37,14 +37,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
     s"""waves.dex {
-       |  price-assets = [ "$UsdId", "WAVES" ]
+       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
        |  order-db.max-orders = $maxOrders
        |}""".stripMargin
   )
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx)
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx)
     dex1.start()
   }
 
@@ -457,7 +457,40 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
             avgWeighedPrice = 0
           )
         )
+
+        dex1.api.cancelAll(bob)
       }
+    }
+
+    "correctly handle order status info requests (by signature)" in {
+
+      val ts    = System.currentTimeMillis
+      val order = mkOrderDP(alice, wavesBtcPair, SELL, 1.waves, 500, ts = ts)
+
+      val notPlacedOrder = mkOrderDP(alice, wavesBtcPair, BUY, 1.waves, 500)
+      val notFoundError  = OrderNotFound(notPlacedOrder.id())
+
+      placeAndAwaitAtDex(order)
+
+      dex1.api.tryOrderStatusInfoByIdWithSignature(alice, order.id()) shouldBe Right(
+        OrderBookHistoryItem(
+          id = order.id(),
+          `type` = SELL.toString,
+          orderType = AcceptedOrderType.Limit,
+          amount = 1.waves,
+          filled = 0,
+          price = 500.btc,
+          fee = 0.003.waves,
+          filledFee = 0,
+          feeAsset = Waves,
+          timestamp = ts,
+          status = OrderStatus.Accepted,
+          assetPair = order.assetPair,
+          avgWeighedPrice = 0
+        )
+      )
+
+      dex1.api.tryOrderStatusInfoByIdWithSignature(alice, notPlacedOrder.id()) should failWith(notFoundError.code, notFoundError.message.text)
     }
   }
 }

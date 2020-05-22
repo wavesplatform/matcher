@@ -41,7 +41,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val smartAssetId   = smartAsset.id
 
   // Will be refactored in DEX-548
-  private val orderToCancel = orderV3Generator.sample.get
+  private val (orderToCancel, sender) = orderGenerator.sample.get
 
   private val smartAssetDesc = BriefAssetDescription(
     name = "smart asset",
@@ -411,7 +411,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       apiKey
     )
 
-    "sunny day" in test(
+    "sunny day (order exists)" in test(
       { route =>
         Get(routePath(s"/orders/$address/$orderId"))
           .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
@@ -433,6 +433,35 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  routePath("/orders/{publicKey}/{orderId}") - {
+
+    val testOrder = orderToCancel
+    val publicKey = sender.publicKey
+    val orderId   = testOrder.id()
+
+    "sunny day" in test { route =>
+      val ts        = System.currentTimeMillis()
+      val signature = Base58.encode(crypto.sign(sender, publicKey ++ Longs.toByteArray(ts)))
+      Get(routePath(s"/orders/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", ts.toString),
+          RawHeader("Signature", signature)
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+    }
+
+    "invalid signature" in test { route =>
+      Get(routePath(s"/orders/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", System.currentTimeMillis.toString),
+          RawHeader("Signature", "invalidSignature")
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.BadRequest
+      }
+    }
+  }
+
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val addressActor = TestProbe("address")
@@ -444,7 +473,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           sender ! api.BatchCancelCompleted { command.orderIds.map(id => id -> api.OrderCanceled(id)).toMap }
         case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrder) if address == orderToCancel.sender.toAddress =>
           sender ! api.OrderCanceled(command.orderId)
-        case AddressDirectory.Envelope(address, command: AddressActor.Query.GetOrderStatusInfo) if address == orderToCancel.sender.toAddress =>
+        case AddressDirectory.Envelope(address, _: AddressActor.Query.GetOrderStatusInfo) if address == orderToCancel.sender.toAddress =>
           val ao = LimitOrder(orderToCancel)
           sender ! AddressActor.Reply.OrdersStatusInfo(OrderInfo.v4(ao, OrderStatus.Accepted).some)
         case _ =>

@@ -59,6 +59,10 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
                                        orderId: Order.Id,
                                        xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, OrderBookHistoryItem]]
 
+  def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
+                                          orderId: Order.Id,
+                                          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, OrderBookHistoryItem]]
+
   def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]]
 
   /**
@@ -260,6 +264,15 @@ object DexApi {
           .get(uri"$apiUri/orders/$owner/${orderId.toString}")
           .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
       }
+
+      override def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
+                                                       orderId: Order.Id,
+                                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, OrderBookHistoryItem]] =
+        tryParseJson {
+          sttp
+            .get(uri"$apiUri/orders/${owner.publicKey}/${orderId.toString}")
+            .headers(timestampAndSignatureHeaders(owner, timestamp))
+        }
 
       override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =
         tryParseJson(sttp.get(uri"$apiUri/transactions/$id"))

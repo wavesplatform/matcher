@@ -9,7 +9,6 @@ import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
 import cats.syntax.group.{catsSyntaxGroup, catsSyntaxSemigroup}
-import cats.syntax.option._
 import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
@@ -154,13 +153,11 @@ class AddressActor(owner: Address,
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
 
     case Query.GetOrderStatusInfo(orderId) =>
-      val maybeStatusInfo: Option[OrderInfo[OrderStatus]] =
-        activeOrders.get(orderId).map(ao => OrderInfo.v4(ao, activeStatus(ao))) orElse
-          orderDB.get(orderId).flatMap { order =>
-            orderDB.getFinalizedOrders(order.sender, order.assetPair.some).find { case (id, _) => id == orderId }.map(_._2)
-          }
-
-      sender ! Reply.OrdersStatusInfo(maybeStatusInfo)
+      sender ! Reply.OrdersStatusInfo(
+        activeOrders
+          .get(orderId)
+          .map(ao => OrderInfo.v4(ao, activeStatus(ao))) orElse orderDB.getOrderInfo(orderId)
+      )
 
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =

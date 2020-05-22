@@ -54,7 +54,7 @@ object GatlingFeeder {
     * @param c   -- count of accounts
     * @param p   -- filename with asset pairs
     * @param s   -- seed without nonce
-    * @param obs -- count connections to order book stream
+    * @param obs -- count of connections to order book stream
     */
   def mkFile(f: File, c: Int = 1000, p: String = "pairs.txt", s: String = "loadtest-", obs: Int = 10): Unit = {
     val o = s"${f.getAbsolutePath}/data-${System.currentTimeMillis()}.csv"

@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.api.ws
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -10,7 +11,6 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
-import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.WsSuiteBase

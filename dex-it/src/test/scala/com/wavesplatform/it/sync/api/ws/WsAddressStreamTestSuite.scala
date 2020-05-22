@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.api.websockets.{WsOrder, _}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
-import com.wavesplatform.dex.it.api.websockets.WsConnection
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase

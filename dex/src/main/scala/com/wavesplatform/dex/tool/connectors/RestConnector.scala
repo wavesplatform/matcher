@@ -1,21 +1,21 @@
 package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.either._
-import cats.syntax.option._
 import com.wavesplatform.dex.tool.ErrorOr
-import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions, RequestFunction}
+import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RequestFunction}
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
+import sttp.model.Uri
 
-import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.util.Try
 
 trait RestConnector extends Connector {
 
-  protected val repeatRequestOptions: RepeatRequestOptions
-
   implicit protected val backend: SttpBackend[Identity, Nothing, NothingT] = HttpURLConnectionBackend()
+
+  protected val targetUri        = uri"$target"
+  protected val hostPortUri: Uri = uri"${targetUri.scheme}://${targetUri.host}:${targetUri.port.get}"
 
   protected def mkResponse(request: RequestFunction): ErrorOrJsonResponse =
     for {
@@ -24,24 +24,6 @@ trait RestConnector extends Connector {
     } yield Json.parse(response)
 
   def swaggerRequest: ErrorOrJsonResponse = mkResponse { _.get(uri"$target/api-docs/swagger.json") }
-
-  final def repeatRequest[A](sendRequest: => ErrorOr[A])(test: ErrorOr[A] => Boolean): ErrorOr[A] = {
-
-    @tailrec
-    def go(ro: RepeatRequestOptions, lastResponse: Option[ErrorOr[A]]): ErrorOr[A] = {
-      if (ro.attemptsLeft == 0) s"All attempts are out! ${lastResponse.fold("")(lr => s"Last response: ${lr.fold(identity, _.toString)}")}".asLeft
-      else {
-        val response = sendRequest
-        if (test(response)) response
-        else {
-          Thread.sleep(ro.delay.toMillis)
-          go(ro.decreaseAttempts, response.some)
-        }
-      }
-    }
-
-    go(repeatRequestOptions, None)
-  }
 
   def waitForSwaggerJson: ErrorOrJsonResponse = repeatRequest(swaggerRequest)(_.isRight)
 
@@ -56,5 +38,9 @@ object RestConnector {
   final case class RepeatRequestOptions(attemptsLeft: Int, delay: FiniteDuration) {
     def decreaseAttempts: RepeatRequestOptions = copy(attemptsLeft = attemptsLeft - 1)
     override def toString: String              = s"max attempts = $attemptsLeft, interval = $delay"
+  }
+
+  object RepeatRequestOptions {
+    val default: RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
   }
 }

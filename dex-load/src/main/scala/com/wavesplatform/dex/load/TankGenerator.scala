@@ -1,15 +1,14 @@
 package com.wavesplatform.dex.load
 
-import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.AddressScheme
-import com.wavesplatform.wavesj.{Node, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{ByteString, Node, PrivateKeyAccount, Transactions}
 
 import scala.util.Random
 
 class Environment(conf: Config) {
   val node        = new Node(conf.getString("node"), AddressScheme.current.chainId)
-  val networkByte = conf.getString("schema").toByte
+  val networkByte = conf.getString("networkByte").charAt(0).toByte
   val issuer      = PrivateKeyAccount.fromSeed(conf.getString("bank"), 0, networkByte)
 }
 

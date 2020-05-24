@@ -1,25 +1,34 @@
 package com.wavesplatform.dex.load
 
-import com.wavesplatform.dex.load.ws.WsClient
+import java.io.File
 
+import com.wavesplatform.dex.load.ws.WsApiClient
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.io.Source
-import scala.util.Random
-
 
 object GatlingChecker {
 
-  def check(f: String): Unit = {
-    val l = Random.shuffle(Source.fromFile(f).getLines.toList)
+  def check(apiUri: String, feederFile: File, stop: Future[Unit]): Unit = {
+    val source  = Source.fromFile(feederFile)
+    var clients = List.empty[WsApiClient]
+    try {
+      source.getLines().foreach { addressLine =>
+        val fields = addressLine.split(';')
 
-    for(i <-  0 to 10) {
-      val data =  l(i).split(";") //TODO: shit-code only for example usage
+        val addr = fields(0)
+        val aus  = fields(1)
+        val obs  = fields.drop(2)
 
-      val addr = data(0)
-      val aus = data(1)
-      val obs1 = data(2)
-      val obs2 = data(3)
-
-      new WsClient(addr, aus, obs1, obs2).run()
+        val newClient = new WsApiClient(apiUri, addr, aus, obs)
+        clients = newClient :: clients
+        newClient.run()
+        Await.result(stop, Duration.Inf)
+      }
+    } finally {
+      source.close()
+      clients.foreach(_.close())
     }
   }
 }

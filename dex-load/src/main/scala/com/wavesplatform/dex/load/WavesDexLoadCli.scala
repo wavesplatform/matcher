@@ -61,6 +61,16 @@ object WavesDexLoadCli {
               .text("The URI to the WebSocket API, e.g.: wss://localhost/ws/v0")
               .required()
               .action((x, s) => s.copy(apiUri = x))
+          ),
+        cmd(Command.CreateRequests.name)
+          .action((_, s) => s.copy(command = Command.CreateRequests.some))
+          .text("Creates file with requests for yandex-tank")
+          .children(
+            opt[String]("environment-settings")
+              .abbr("es")
+              .text("The file with environment settings")
+              .required()
+              .action((x, s) => s.copy(apiUri = x))
           )
       )
     }
@@ -74,6 +84,8 @@ object WavesDexLoadCli {
             override val chainId: Byte = args.addressSchemeByte.toByte
           }
           command match {
+            case Command.CreateRequests =>
+              TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings)
             case Command.CreateFeederFile =>
               GatlingFeeder.mkFile(args.accountsNumber, args.seedPrefix, args.pairsFile.get, args.orderBookNumberPerAccount, args.feederFile)
             case Command.Check =>
@@ -100,6 +112,9 @@ object WavesDexLoadCli {
       override def name: String = "check"
     }
 
+    case object CreateRequests extends Command {
+      override def name: String = "create-requests"
+    }
   }
 
   private val defaultFeederFile = new File("feeder.csv")
@@ -112,6 +127,7 @@ object WavesDexLoadCli {
                           accountsNumber: Int = 1000,
                           seedPrefix: String = "loadtest-",
                           orderBookNumberPerAccount: Int = 10,
+                          environmentSettings: String = "devnet.conf",
                           apiUri: String = "")
 
   private def waitForInput(): (Boolean, Future[Unit]) = {

@@ -60,6 +60,5 @@ object DexExtensionGrpcConnector {
       val clientSettings = WavesBlockchainClientSettings(grpcSettings, 100.milliseconds, 100)
       WavesBlockchainClientBuilder.async(clientSettings, monixScheduler, executionContext)
     }.toEither
-      .leftMap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex")
-      .map(client => DexExtensionGrpcConnector(target, client))
+      .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 }

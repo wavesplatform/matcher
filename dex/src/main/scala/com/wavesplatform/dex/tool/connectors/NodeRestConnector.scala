@@ -19,14 +19,14 @@ case class NodeRestConnector(target: String, chainId: Byte) extends RestConnecto
   private val mapper: WavesJsonMapper = new WavesJsonMapper(chainId); mapper.registerModule(new PlayJsonModule(JsonParserSettings()))
 
   def broadcastTx(tx: Transaction): ErrorOrJsonResponse = mkResponse {
-    _.post(uri"$target/transactions/broadcast").body(mapper writeValueAsString tx).contentType(MediaType.ApplicationJson)
+    _.post(uri"$targetUri/transactions/broadcast").body(mapper writeValueAsString tx).contentType(MediaType.ApplicationJson)
   }
 
-  def getTxInfo(txId: String): ErrorOrJsonResponse    = mkResponse { _.get(uri"$target/transactions/info/$txId") }
+  def getTxInfo(txId: String): ErrorOrJsonResponse    = mkResponse { _.get(uri"$targetUri/transactions/info/$txId") }
   def getTxInfo(tx: JsValue): ErrorOrJsonResponse     = getTxInfo { (tx \ "id").as[String] }
   def getTxInfo(tx: Transaction): ErrorOrJsonResponse = getTxInfo(tx.getId.toString)
 
-  def getCurrentHeight: ErrorOr[Long] = mkResponse { _.get(uri"$target/blocks/height") }.map(json => (json \ "height").as[Long])
+  def getCurrentHeight: ErrorOr[Long] = mkResponse { _.get(uri"$targetUri/blocks/height") }.map(json => (json \ "height").as[Long])
 
   @tailrec
   final def waitForHeightArise(): ErrorOr[Long] = getCurrentHeight match {

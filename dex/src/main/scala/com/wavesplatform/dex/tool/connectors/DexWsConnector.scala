@@ -68,7 +68,6 @@ object DexWsConnector {
     implicit val materializer: Materializer = Materializer.matFromSystem(system)
 
     Try { new WsConnection(target, true) }.toEither
-      .leftMap(ex => s"Web Socket connection cannot be established! $ex")
-      .map(wsc => DexWsConnector(target, wsc))
+      .bimap(ex => s"Web Socket connection cannot be established! $ex", wsc => DexWsConnector(target, wsc))
   }
 }

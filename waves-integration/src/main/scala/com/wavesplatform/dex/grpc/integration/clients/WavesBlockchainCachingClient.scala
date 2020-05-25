@@ -28,6 +28,9 @@ class WavesBlockchainCachingClient(underlying: WavesBlockchainClient[Future], de
   private val featuresCache          = new FeaturesCache(underlying.isFeatureActivated, invalidationPredicate = !_) // we don't keep knowledge about unactivated features
   private val assetDescriptionsCache = new AssetDescriptionsCache(underlying.assetDescription, cacheExpiration)
 
+  // TODO remove after release 2.1.3
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = underlying.spendableBalance(address, asset)
+
   override def spendableBalanceChanges: Observable[SpendableBalanceChanges]                      = underlying.spendableBalanceChanges
   override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges]          = underlying.realTimeBalanceChanges
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = underlying.spendableBalances(address, assets)

@@ -26,6 +26,9 @@ service WavesBlockchainApi {
 
     rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
 
+    // TODO remove after release 2.1.3
+    rpc SpendableAssetBalance (SpendableAssetBalanceRequest) returns (SpendableAssetBalanceResponse);
+
     rpc SpendableAssetsBalances (SpendableAssetsBalancesRequest) returns (SpendableAssetsBalancesResponse);
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
@@ -130,6 +133,17 @@ message RunAddressScriptRequest {
 
 message HasAddressScriptRequest {
     bytes address = 1;
+}
+
+// TODO remove after release 2.1.3
+message SpendableAssetBalanceRequest {
+    bytes address = 1;
+    bytes asset_id = 2;
+}
+
+// TODO remove after release 2.1.3
+message SpendableAssetBalanceResponse {
+    int64 balance = 1;
 }
 
 message SpendableAssetsBalancesRequest {

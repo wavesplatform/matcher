@@ -97,6 +97,13 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     spendableBalanceChangesSubject
   }
 
+  // TODO remove after release 2.1.3
+  override def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
+    blockchainService
+      .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
+      .map(_.balance)
+  }
+
   // TODO rename to spendableBalanceChanges after release 2.1.2
   override lazy val realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = {
     requestRealTimeBalanceChanges()

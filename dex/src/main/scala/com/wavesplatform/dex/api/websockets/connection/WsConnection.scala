@@ -14,6 +14,7 @@ import play.api.libs.json.{JsError, JsSuccess, Json}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
@@ -21,6 +22,8 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
   log.info(s"""Connecting to Matcher WS API:
             |         URI = $uri
             |  Keep alive = $keepAlive""".stripMargin)
+
+  import materializer.executionContext
 
   private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
 
@@ -69,6 +72,10 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
   }
 
   val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+
+  val connectionOpenedTs: Long                   = System.currentTimeMillis
+  val connectionClosedTs: Future[Long]           = closed.map(_ => System.currentTimeMillis)
+  val connectionLifetime: Future[FiniteDuration] = connectionClosedTs.map(cc => FiniteDuration(cc - connectionOpenedTs, MILLISECONDS))
 
   def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
   def clearMessages(): Unit           = messagesBuffer.clear()

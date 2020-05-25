@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 
 case class NodeRestConnector(target: String, chainId: Byte, timeBetweenBlocks: FiniteDuration) extends RestConnector {
 
-  override implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions(10, timeBetweenBlocks)
+  override implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions((timeBetweenBlocks * 1.5).toSeconds.toInt, 1.second)
 
   private val mapper: WavesJsonMapper = new WavesJsonMapper(chainId); mapper.registerModule(new PlayJsonModule(JsonParserSettings()))
 

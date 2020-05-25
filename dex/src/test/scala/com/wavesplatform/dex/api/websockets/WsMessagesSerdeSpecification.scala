@@ -1,11 +1,14 @@
 package com.wavesplatform.dex.api.websockets
 
 import java.math.BigInteger
+import java.nio.charset.StandardCharsets
 
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
+import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -64,6 +67,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   }
 
   private val wsAddressStateGen = for {
+    account        <- Gen.alphaNumStr.map(x => KeyPair(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
     balanceChanges <- Gen.choose(0, 5)
     orderChanges   <- Gen.const(5 - balanceChanges)
     assets         <- Gen.listOfN(balanceChanges, assetGen)
@@ -71,7 +75,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     orders         <- Gen.listOfN(orderChanges, wsOrderGen)
     updateId       <- Gen.choose(0L, Long.MaxValue)
     ts             <- Gen.choose(0L, Long.MaxValue)
-  } yield WsAddressState((assets zip balances).toMap, orders, updateId, ts)
+  } yield WsAddressState(account.toAddress, (assets zip balances).toMap, orders, updateId, ts)
 
   private val askPricesMin = 1000L * Order.PriceConstant
   private val askPricesMax = 2000L * Order.PriceConstant

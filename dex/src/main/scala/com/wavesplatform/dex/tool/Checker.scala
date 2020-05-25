@@ -46,8 +46,8 @@ case class Checker(superConnector: SuperConnector) {
   private def getAssetPairInfo(f: AssetInfo, s: AssetInfo): AssetPairInfo =
     if (f.asset.compatId < s.asset.compatId) AssetPairInfo(s, f) else AssetPairInfo(f, s)
 
-  private def checkVersion(version: String): CheckResult[Unit] = dexRest.swaggerRequest.flatMap { response =>
-    val parsedVersion = (response \ "info" \ "version").get.as[String]
+  private def checkVersion(version: String): CheckResult[Unit] = dexRest.getMatcherSettings.flatMap { response =>
+    val parsedVersion = (response \ "matcherVersion").get.as[String]
     Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
   }
 

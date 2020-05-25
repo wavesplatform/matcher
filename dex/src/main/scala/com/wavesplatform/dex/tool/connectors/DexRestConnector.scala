@@ -65,4 +65,6 @@ case class DexRestConnector(target: String) extends RestConnector {
         .copy(querySegments = List(QuerySegment.KeyValue("activeOnly", "true")))
     mkResponse { _.get(uri).headers(timestampAndSignatureHeaders(keyPair, System.currentTimeMillis)) }.map(_.as[Seq[JsValue]])
   }
+
+  def getMatcherSettings: ErrorOr[JsValue] = mkResponse { _.get(uri"$apiUri/settings") }
 }

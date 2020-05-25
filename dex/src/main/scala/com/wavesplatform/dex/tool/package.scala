@@ -1,5 +1,7 @@
 package com.wavesplatform.dex
 
+import java.io.{PrintWriter, StringWriter}
+
 import cats.syntax.either._
 
 package object tool {
@@ -22,4 +24,13 @@ package object tool {
       result <- f
       _      <- log(end)
     } yield result
+
+  implicit class ThrowableOps(private val t: Throwable) extends AnyVal {
+
+    def getWithStackTrace: String = {
+      val sw = new StringWriter
+      t.printStackTrace(new PrintWriter(sw))
+      s"$t, ${sw.toString}"
+    }
+  }
 }

@@ -35,16 +35,17 @@ object SuperConnector {
 
   private[tool] final case class Env(chainId: Byte, matcherSettings: MatcherSettings, matcherKeyPair: KeyPair)
 
-  private val processLeftIndent = 90
+  private val processLeftIndent = 110
 
   def create(dexConfigPath: String,
              nodeRestApi: String,
              authServiceRestApi: Option[String],
              timeBetweenBlocks: FiniteDuration): ErrorOr[SuperConnector] = {
 
-    def prependScheme(uri: String, webSocket: Boolean = false): String = {
-      val (plain, secure) = if (webSocket) "ws://" -> "wss://" else "http://" -> "https://"
-      if (uri.startsWith(secure) || uri.startsWith(plain)) uri else plain + uri
+    def prependScheme(uri: String): String = {
+      val uriWithoutSlash = if (uri.last == '/') uri.init else uri
+      val (plain, secure) = "http://" -> "https://"
+      if (uri.startsWith(secure) || uri.startsWith(plain)) uriWithoutSlash else plain + uriWithoutSlash
     }
 
     def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(f)(s"  $processing... ", "Done\n", processLeftIndent.some)
@@ -86,7 +87,7 @@ object SuperConnector {
         DexExtensionGrpcConnector.create(extensionGrpcApiUri)
       }
 
-      dexWsApiUri = prependScheme(dexRestIpAndPort, webSocket = true) + "/ws/v0"
+      dexWsApiUri = s"${if (nodeRestApiUri startsWith "http://") "ws://" else "wss://"}$dexRestIpAndPort/ws/v0"
 
       (dexWsConnector, wsInitial) <- logProcessing("Setting up connection with DEX WS API")(
         for {
@@ -95,11 +96,11 @@ object SuperConnector {
         } yield wsConnector -> wsInitial
       )
 
-      mayBeAuthServiceRestApiUri = authServiceRestApi map { prependScheme(_) }
+      mayBeAuthServiceRestApiUri = authServiceRestApi map prependScheme
       mayBeAuthServiceConnector  = mayBeAuthServiceRestApiUri map { AuthServiceRestConnector(_, chainId) }
 
       _ <- logProcessing("Setting up connection with Auth Service REST API") {
-        mayBeAuthServiceConnector.fold(success) { _.loginPageRequest }
+        mayBeAuthServiceConnector.fold(success)(_.loginPageRequest)
       }
 
       env = Env(chainId, matcherSettings, matcherKeyPair)

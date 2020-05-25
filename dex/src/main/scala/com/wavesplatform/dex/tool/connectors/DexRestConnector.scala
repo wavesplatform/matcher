@@ -9,17 +9,13 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.tool.ErrorOr
-import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions}
+import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
 import sttp.model.MediaType
 import sttp.model.Uri.QuerySegment
 
-import scala.concurrent.duration._
-
 case class DexRestConnector(target: String) extends RestConnector {
-
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
 
   private val apiUri = s"$target/matcher"
 

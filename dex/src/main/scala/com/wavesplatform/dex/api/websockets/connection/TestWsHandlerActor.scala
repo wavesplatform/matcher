@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.it.api.websockets
+package com.wavesplatform.dex.api.websockets.connection
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsPingOrPong}

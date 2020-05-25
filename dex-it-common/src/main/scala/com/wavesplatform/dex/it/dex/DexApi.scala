@@ -55,6 +55,14 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
 
+  def tryOrderStatusInfoByIdWithApiKey(owner: Address,
+                                       orderId: Order.Id,
+                                       xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, OrderBookHistoryItem]]
+
+  def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
+                                          orderId: Order.Id,
+                                          timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, OrderBookHistoryItem]]
+
   def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]]
 
   /**
@@ -236,8 +244,7 @@ object DexApi {
         tryParseJson {
           sttp
             .post(uri"$apiUri/orders/cancel/${id.toString}")
-            .headers(apiKeyHeaders)
-            .headers(xUserPublicKey.fold(Map.empty[String, String])(userPublicKeyHeaders))
+            .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
             .contentType("application/json", "UTF-8")
         }
 
@@ -249,6 +256,23 @@ object DexApi {
             .followRedirects(false)
         }
       }
+
+      override def tryOrderStatusInfoByIdWithApiKey(owner: Address,
+                                                    orderId: Order.Id,
+                                                    xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, OrderBookHistoryItem]] = tryParseJson {
+        sttp
+          .get(uri"$apiUri/orders/$owner/${orderId.toString}")
+          .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
+      }
+
+      override def tryOrderStatusInfoByIdWithSignature(owner: KeyPair,
+                                                       orderId: Order.Id,
+                                                       timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, OrderBookHistoryItem]] =
+        tryParseJson {
+          sttp
+            .get(uri"$apiUri/orders/${owner.publicKey}/${orderId.toString}")
+            .headers(timestampAndSignatureHeaders(owner, timestamp))
+        }
 
       override def tryTransactionsByOrder(id: Order.Id): F[Either[MatcherError, List[ExchangeTransaction]]] =
         tryParseJson(sttp.get(uri"$apiUri/transactions/$id"))

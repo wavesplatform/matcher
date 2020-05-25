@@ -15,10 +15,18 @@ import net.ceedubs.ficus.Ficus._
 
 import scala.util.Try
 
-case class SuperConnector private (env: Env, dexRest: DexRestConnector, nodeRest: NodeRestConnector, dexExtensionGrpc: DexExtensionGrpcConnector)
+case class SuperConnector private (env: Env,
+                                   dexRest: DexRestConnector,
+                                   nodeRest: NodeRestConnector,
+                                   dexExtensionGrpc: DexExtensionGrpcConnector,
+                                   dexWs: DexWsConnector,
+                                   authServiceRest: Option[AuthServiceRestConnector])
     extends AutoCloseable {
 
-  def close(): Unit = Seq(nodeRest, dexRest, dexExtensionGrpc).foreach { _.close() }
+  def close(): Unit = {
+    Seq(dexRest, nodeRest, dexExtensionGrpc, dexWs).foreach { _.close() }
+    authServiceRest.foreach { _.close() }
+  }
 }
 
 // noinspection ScalaStyle
@@ -28,7 +36,12 @@ object SuperConnector {
 
   private val processLeftIndent = 90
 
-  def create(dexConfigPath: String, nodeRestApi: String): ErrorOr[SuperConnector] = {
+  def create(dexConfigPath: String, nodeRestApi: String, authServiceRestApi: Option[String]): ErrorOr[SuperConnector] = {
+
+    def prependScheme(uri: String, webSocket: Boolean = false): String = {
+      val (plain, secure) = if (webSocket) "ws://" -> "wss://" else "http://" -> "https://"
+      if (uri.startsWith(secure) || uri.startsWith(plain)) uri else plain + uri
+    }
 
     def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(f)(s"  $processing... ", "Done\n", processLeftIndent.some)
 
@@ -47,7 +60,8 @@ object SuperConnector {
       matcherSettings <- logProcessing("Loading Matcher settings") { loadMatcherSettings(dexConfigPath) }
       matcherKeyPair  <- logProcessing("Loading Matcher key pair") { loadMatcherKeyPair(matcherSettings.accountStorage) }
 
-      dexRestApiUri    = s"http://${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestIpAndPort = s"${matcherSettings.restApi.address}:${matcherSettings.restApi.port}"
+      dexRestApiUri    = prependScheme(dexRestIpAndPort)
       dexRestConnector = DexRestConnector(dexRestApiUri)
 
       _ <- logProcessing(s"Setting up connection with DEX REST API (${dexRestConnector.repeatRequestOptions})") {
@@ -55,7 +69,7 @@ object SuperConnector {
       }
 
       chainId           = AddressScheme.current.chainId
-      nodeRestApiUri    = if (nodeRestApi.startsWith("https://") || nodeRestApi.startsWith("http://")) nodeRestApi else s"http://$nodeRestApi"
+      nodeRestApiUri    = prependScheme(nodeRestApi)
       nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId)
 
       _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})") {
@@ -68,20 +82,45 @@ object SuperConnector {
         DexExtensionGrpcConnector.create(extensionGrpcApiUri)
       }
 
-      env            = Env(chainId, matcherSettings, matcherKeyPair)
-      superConnector = SuperConnector(env, dexRestConnector, nodeRestConnector, dexExtensionGrpcConnector)
+      dexWsApiUri = prependScheme(dexRestIpAndPort, webSocket = true) + "/ws/v0"
+
+      (dexWsConnector, wsInitial) <- logProcessing("Setting up connection with DEX WS API")(
+        for {
+          wsConnector <- DexWsConnector.create(dexWsApiUri)
+          wsInitial   <- wsConnector.receiveInitialMessage
+        } yield wsConnector -> wsInitial
+      )
+
+      mayBeAuthServiceRestApiUri = authServiceRestApi map { prependScheme(_) }
+      mayBeAuthServiceConnector  = mayBeAuthServiceRestApiUri map { AuthServiceRestConnector(_, chainId) }
+
+      _ <- logProcessing("Setting up connection with Auth Service REST API") {
+        mayBeAuthServiceConnector.fold(success) { _.loginPageRequest }
+      }
+
+      env = Env(chainId, matcherSettings, matcherKeyPair)
+      superConnector = SuperConnector(
+        env,
+        dexRestConnector,
+        nodeRestConnector,
+        dexExtensionGrpcConnector,
+        dexWsConnector,
+        mayBeAuthServiceConnector
+      )
 
       _ <- log(
         s"""
            |Super Connector created!
            |
            |DEX configurations:
-           |  Chain ID               : $chainId
+           |  Chain ID               : $chainId (${chainId.toChar})
            |  Matcher public key     : ${matcherKeyPair.publicKey.toString}
            |  Matcher address        : ${matcherKeyPair.publicKey.toAddress}
            |  DEX REST API           : $dexRestApiUri
-           |  Node REST API          : $nodeRestApi
+           |  Node REST API          : $nodeRestApiUri
            |  DEX extension gRPC API : $extensionGrpcApiUri
+           |  DEX WS API             : $dexWsApiUri, connection ID = ${wsInitial.connectionId}
+           |  Auth Service REST API  : ${mayBeAuthServiceRestApiUri.getOrElse("Target wasn't provided, account updates check will not be performed!")}
        """.stripMargin
       )
     } yield superConnector

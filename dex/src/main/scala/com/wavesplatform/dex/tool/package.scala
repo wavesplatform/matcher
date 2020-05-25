@@ -8,6 +8,8 @@ package object tool {
 
   def lift[A](a: A): ErrorOr[A] = a.asRight
 
+  val success: ErrorOr[Unit] = lift { () }
+
   def log(log: String, indent: Option[Int] = None): ErrorOr[Unit] = lift {
     indent.fold { print(log) } { i =>
       print(log + " " * (i - log.length))

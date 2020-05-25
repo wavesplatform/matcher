@@ -1,7 +1,8 @@
 package com.wavesplatform.dex.tool.connectors
 
 import com.wavesplatform.dex.tool.ErrorOr
-import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RepeatRequestOptions}
+import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
+import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import com.wavesplatform.wavesj.Transaction
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import play.api.libs.json.jackson.PlayJsonModule
@@ -12,9 +13,9 @@ import sttp.model.MediaType
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 
-case class NodeRestConnector(target: String, chainId: Byte) extends RestConnector {
+case class NodeRestConnector(target: String, chainId: Byte, timeBetweenBlocks: FiniteDuration) extends RestConnector {
 
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(30, 1.second)
+  override implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions(10, timeBetweenBlocks)
 
   private val mapper: WavesJsonMapper = new WavesJsonMapper(chainId); mapper.registerModule(new PlayJsonModule(JsonParserSettings()))
 

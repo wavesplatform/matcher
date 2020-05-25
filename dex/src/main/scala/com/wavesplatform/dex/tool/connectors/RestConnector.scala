@@ -7,7 +7,6 @@ import play.api.libs.json.{JsValue, Json}
 import sttp.client._
 import sttp.model.Uri
 
-import scala.concurrent.duration._
 import scala.util.Try
 
 trait RestConnector extends Connector {
@@ -35,12 +34,4 @@ object RestConnector {
   type ErrorOrJsonResponse = ErrorOr[JsValue]
   type RequestFunction     = RequestT[Empty, Either[String, String], Nothing] => Request[Either[String, String], Nothing]
 
-  final case class RepeatRequestOptions(attemptsLeft: Int, delay: FiniteDuration) {
-    def decreaseAttempts: RepeatRequestOptions = copy(attemptsLeft = attemptsLeft - 1)
-    override def toString: String              = s"max attempts = $attemptsLeft, interval = $delay"
-  }
-
-  object RepeatRequestOptions {
-    val default: RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
-  }
 }

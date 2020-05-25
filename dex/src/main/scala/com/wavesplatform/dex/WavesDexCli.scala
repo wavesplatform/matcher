@@ -16,6 +16,7 @@ import com.wavesplatform.dex.tool.connectors.SuperConnector
 import com.wavesplatform.dex.util.MatcherStateCheckingFailedError
 import scopt.{OParser, RenderingMode}
 
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object WavesDexCli {
@@ -122,7 +123,12 @@ object WavesDexCli {
               .abbr("as")
               .text("Seed for checking account updates")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(accountSeed = x.some))
+              .action((x, s) => s.copy(accountSeed = x.some)),
+            opt[String]("time-between-blocks")
+              .abbr("tbb")
+              .text("Time between blocks in the network, 1 minute will be picked if none was specified")
+              .valueName("<finite duration>")
+              .action((x, s) => s.copy(timeBetweenBlocks = FiniteDuration(Duration(x).toMillis, MILLISECONDS)))
           )
       )
     }
@@ -224,9 +230,10 @@ object WavesDexCli {
                       |  DEX config path       : ${args.dexConfigPath}
                       |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
                       |  Account seed          : ${args.accountSeed.getOrElse("")}
+                      |  Time between blocks   : ${args.timeBetweenBlocks}
                    """.stripMargin
                   )
-                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi, args.authServiceRestApi)
+                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi, args.authServiceRestApi, args.timeBetweenBlocks)
                   checkResult    <- Checker(superConnector).checkState(args.version, args.accountSeed)
                   _              <- tool.lift { superConnector.close() }
                 } yield checkResult
@@ -293,7 +300,8 @@ object WavesDexCli {
                           version: String = "",
                           dexConfigPath: String = "",
                           authServiceRestApi: Option[String] = None,
-                          accountSeed: Option[String] = None)
+                          accountSeed: Option[String] = None,
+                          timeBetweenBlocks: FiniteDuration = 1.minute)
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

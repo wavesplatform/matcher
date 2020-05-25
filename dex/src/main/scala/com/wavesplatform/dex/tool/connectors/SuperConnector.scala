@@ -13,6 +13,7 @@ import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
 import net.ceedubs.ficus.Ficus._
 
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
 case class SuperConnector private (env: Env,
@@ -36,7 +37,10 @@ object SuperConnector {
 
   private val processLeftIndent = 90
 
-  def create(dexConfigPath: String, nodeRestApi: String, authServiceRestApi: Option[String]): ErrorOr[SuperConnector] = {
+  def create(dexConfigPath: String,
+             nodeRestApi: String,
+             authServiceRestApi: Option[String],
+             timeBetweenBlocks: FiniteDuration): ErrorOr[SuperConnector] = {
 
     def prependScheme(uri: String, webSocket: Boolean = false): String = {
       val (plain, secure) = if (webSocket) "ws://" -> "wss://" else "http://" -> "https://"
@@ -70,7 +74,7 @@ object SuperConnector {
 
       chainId           = AddressScheme.current.chainId
       nodeRestApiUri    = prependScheme(nodeRestApi)
-      nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId)
+      nodeRestConnector = NodeRestConnector(nodeRestApiUri, chainId, timeBetweenBlocks)
 
       _ <- logProcessing(s"Setting up connection with Node REST API (${nodeRestConnector.repeatRequestOptions})") {
         nodeRestConnector.waitForSwaggerJson

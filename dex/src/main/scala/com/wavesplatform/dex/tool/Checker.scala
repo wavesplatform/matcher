@@ -146,7 +146,7 @@ case class Checker(superConnector: SuperConnector) {
     def awaitSubmittedOrderAtNode: CheckResult[Seq[JsValue]] =
       for {
         txs <- dexRest
-          .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)
+          .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)(nodeRest.repeatRequestOptions)
           .ensure(s"Awaiting of the submitted order at Node failed! Cannot find transactions for order id $submittedId")(_.lengthCompare(1) >= 0)
         _ <- txs.toList.traverse(tx => nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight))
       } yield txs

@@ -11,6 +11,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 trait JwtUtils {
+
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JsObject): String =
     JwtJson.encode(payload, authServiceKeyPair.getPrivate, JwtAlgorithm.RS256)

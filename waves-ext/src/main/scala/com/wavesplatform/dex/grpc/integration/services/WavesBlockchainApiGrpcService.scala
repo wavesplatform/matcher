@@ -197,6 +197,13 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     RunScriptResponse(r)
   }
 
+  // TODO remove after release 2.1.3
+  override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
+    val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
+    val assetId = request.assetId.toVanillaAsset
+    SpendableAssetBalanceResponse(context.utx.spendableBalance(addr, assetId))
+  }
+
   override def spendableAssetsBalances(request: SpendableAssetsBalancesRequest): Future[SpendableAssetsBalancesResponse] = Future {
 
     val address = Address.fromBytes(request.address.toVanilla).explicitGetErr()

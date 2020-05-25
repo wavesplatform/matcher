@@ -3,6 +3,8 @@ package com.wavesplatform.dex.db
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
 class TestOrderDB(maxFinalizedOrders: Int) extends OrderDB {
@@ -32,4 +34,6 @@ class TestOrderDB(maxFinalizedOrders: Int) extends OrderDB {
       info <- orderInfo.get(id)
     } yield id -> info)
       .sortBy { case (_, oi) => -oi.timestamp }
+
+  override def getOrderInfo(id: Id): Option[FinalOrderInfo] = orderInfo.get(id)
 }

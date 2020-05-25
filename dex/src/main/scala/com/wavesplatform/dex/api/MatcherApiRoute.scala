@@ -108,7 +108,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         handleExceptions(gRPCExceptionsHandler) {
           handleRejections(invalidJsonParsingRejectionsHandler) {
             getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
+              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~ getOrderStatusInfoByIdWithApiKey ~ getOrderStatusInfoByIdWithSignature ~
               historyDelete ~ cancel ~ cancelAll ~ cancelAllById ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
               upsertRate ~ deleteRate ~ saveSnapshots
           }
@@ -580,31 +580,30 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     } ~ get(complete(StatusCodes.MethodNotAllowed))
   }
 
-  private val emptyOrderList = StatusCodes.OK -> JsArray.empty
   private def loadOrders(address: Address, pair: Option[AssetPair], orderListType: OrderListType): Route = complete {
-    if (orderListType == OrderListType.Empty) emptyOrderList
+    if (orderListType == OrderListType.Empty) StatusCodes.OK -> JsArray.empty
     else
       askMapAddressActor[AddressActor.Reply.OrdersStatuses](address, AddressActor.Query.GetOrdersStatuses(pair, orderListType)) { reply =>
-        StatusCodes.OK -> reply.xs.map {
-          case (id, oi) =>
-            Json.obj(
-              "id"              -> id.toString,
-              "type"            -> oi.side.toString,
-              "orderType"       -> oi.orderType,
-              "amount"          -> oi.amount,
-              "fee"             -> oi.matcherFee,
-              "price"           -> oi.price,
-              "timestamp"       -> oi.timestamp,
-              "filled"          -> oi.status.filledAmount,
-              "filledFee"       -> oi.status.filledFee,
-              "feeAsset"        -> oi.feeAsset,
-              "status"          -> oi.status.name,
-              "assetPair"       -> oi.assetPair.json,
-              "avgWeighedPrice" -> oi.avgWeighedPrice
-            )
-        }
+        StatusCodes.OK -> reply.xs.map { case (id, oi) => mkOrderInfoJson(id, oi) }
       }
   }
+
+  private def mkOrderInfoJson(id: Order.Id, oi: OrderInfo[OrderStatus]): JsObject =
+    Json.obj(
+      "id"              -> id.toString,
+      "type"            -> oi.side.toString,
+      "orderType"       -> oi.orderType,
+      "amount"          -> oi.amount,
+      "fee"             -> oi.matcherFee,
+      "price"           -> oi.price,
+      "timestamp"       -> oi.timestamp,
+      "filled"          -> oi.status.filledAmount,
+      "filledFee"       -> oi.status.filledFee,
+      "feeAsset"        -> oi.feeAsset,
+      "status"          -> oi.status.name,
+      "assetPair"       -> oi.assetPair.json,
+      "avgWeighedPrice" -> oi.avgWeighedPrice
+    )
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
   @ApiOperation(
@@ -761,6 +760,69 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           loadOrders(address, None, getOrderListType(activeOnly, closedOnly, OrderListType.ActiveOnly))
         }
     }
+  }
+
+  private def getOrderStatusInfo(id: Order.Id, address: Address): StandardRoute = complete {
+    askMapAddressActor[AddressActor.Reply.OrdersStatusInfo](address, AddressActor.Query.GetOrderStatusInfo(id)) {
+      _.maybeOrderStatusInfo match {
+        case Some(oi) => StatusCodes.OK -> mkOrderInfoJson(id, oi)
+        case None     => InfoNotFound(error.OrderNotFound(id))
+      }
+    }
+  }
+
+  @Path("/orders/{address}/{orderId}")
+  @ApiOperation(
+    value = "Order Status Info by address and ID without signature",
+    notes = "Get Status Info of the specified order for a given address without signature",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    response = classOf[Any]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = `X-User-Public-Key`.headerName,
+        value = "User's public key",
+        required = false,
+        dataType = "string",
+        paramType = "header",
+        defaultValue = ""
+      )
+    )
+  )
+  def getOrderStatusInfoByIdWithApiKey: Route = (path("orders" / AddressPM / ByteStrPM) & get & withAuth & withUserPublicKeyOpt) {
+    (address, orderId, userPublicKey) =>
+      userPublicKey match {
+        case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+        case _                                     => getOrderStatusInfo(orderId, address)
+      }
+  }
+
+  @Path("/orders/{publicKey}/{orderId}")
+  @ApiOperation(
+    value = "Order Status Info by public key and ID",
+    notes = "Get Status Info of the specified order for a given public key",
+    httpMethod = "GET",
+    authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
+    response = classOf[Any]
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "publicKey", value = "Public Key", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
+      new ApiImplicitParam(name = "Signature",
+                           value = "Signature of [Public Key ++ Timestamp] bytes",
+                           required = true,
+                           dataType = "string",
+                           paramType = "header")
+    )
+  )
+  def getOrderStatusInfoByIdWithSignature: Route = (path("orders" / PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
+    signedGet(publicKey) { getOrderStatusInfo(orderId, publicKey.toAddress) }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")

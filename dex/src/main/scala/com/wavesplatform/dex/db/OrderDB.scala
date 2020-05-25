@@ -6,14 +6,15 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 import org.iq80.leveldb.DB
 
 /**
- * Contains only finalized orders
- */
+  * Contains only finalized orders
+  */
 trait OrderDB {
   def containsInfo(id: Order.Id): Boolean
   def status(id: Order.Id): OrderStatus.Final
@@ -21,6 +22,7 @@ trait OrderDB {
   def saveOrder(o: Order): Unit
   def get(id: Order.Id): Option[Order]
   def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])]
+  def getOrderInfo(id: Order.Id): Option[FinalOrderInfo]
 }
 
 object OrderDB {
@@ -76,6 +78,8 @@ object OrderDB {
           oi     <- db.get(MatcherKeys.orderInfo(id))
         } yield id -> oi).sorted
       }
+
+    override def getOrderInfo(id: Id): Option[FinalOrderInfo] = db.readOnly(_.get(MatcherKeys.orderInfo(id)))
   }
 
   implicit def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }

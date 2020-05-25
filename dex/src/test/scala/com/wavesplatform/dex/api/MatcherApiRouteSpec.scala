@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
+import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex._
@@ -20,6 +21,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import org.scalamock.scalatest.PathMockFactory
@@ -39,7 +41,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val smartAssetId   = smartAsset.id
 
   // Will be refactored in DEX-548
-  private val orderToCancel = orderV3Generator.sample.get
+  private val (orderToCancel, sender) = orderGenerator.sample.get
 
   private val smartAssetDesc = BriefAssetDescription(
     name = "smart asset",
@@ -378,6 +380,48 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  routePath("/orders/{address}/{orderId}") - {
+
+    val testOrder = orderToCancel
+    val address   = testOrder.sender.toAddress
+    val orderId   = testOrder.id()
+
+    "X-API-Key is required" in test { route =>
+      Get(routePath(s"/orders/$address/$orderId")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "X-User-Public-Key is not required" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+
+    "X-User-Public-Key is specified, but wrong" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId"))
+          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        }
+      },
+      apiKey
+    )
+
+    "sunny day (order exists)" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId"))
+          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
+      },
+      apiKey
+    )
+  }
+
   routePath("/settings") - {
     "Public key should be returned" in test(
       { route =>
@@ -387,6 +431,35 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         }
       }
     )
+  }
+
+  routePath("/orders/{publicKey}/{orderId}") - {
+
+    val testOrder = orderToCancel
+    val publicKey = sender.publicKey
+    val orderId   = testOrder.id()
+
+    "sunny day" in test { route =>
+      val ts        = System.currentTimeMillis()
+      val signature = Base58.encode(crypto.sign(sender, publicKey ++ Longs.toByteArray(ts)))
+      Get(routePath(s"/orders/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", ts.toString),
+          RawHeader("Signature", signature)
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+    }
+
+    "invalid signature" in test { route =>
+      Get(routePath(s"/orders/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", System.currentTimeMillis.toString),
+          RawHeader("Signature", "invalidSignature")
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.BadRequest
+      }
+    }
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
@@ -400,6 +473,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           sender ! api.BatchCancelCompleted { command.orderIds.map(id => id -> api.OrderCanceled(id)).toMap }
         case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrder) if address == orderToCancel.sender.toAddress =>
           sender ! api.OrderCanceled(command.orderId)
+        case AddressDirectory.Envelope(address, _: AddressActor.Query.GetOrderStatusInfo) if address == orderToCancel.sender.toAddress =>
+          val ao = LimitOrder(orderToCancel)
+          sender ! AddressActor.Reply.OrdersStatusInfo(OrderInfo.v4(ao, OrderStatus.Accepted).some)
         case _ =>
       }
 

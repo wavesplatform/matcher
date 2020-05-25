@@ -5,6 +5,7 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -159,14 +160,34 @@ case class Checker(superConnector: SuperConnector) {
       txs             <- awaitSubmittedOrderAtNode
     } yield {
       val printOrder: Order => String = this.printOrder(assetPairInfo)(_)
-      s"""
+      s"""\n
          |    Counter   = ${printOrder(counter)}, json status = ${counterStatus.toString}
          |    Submitted = ${printOrder(submitted)}, json status = ${submittedStatus.toString}
-         |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}""".stripMargin
+         |    Tx ids    = ${txs.map(tx => (tx \ "id").as[String]).mkString(", ")}\n""".stripMargin
     }
   }
 
-  def checkState(version: String): ErrorOr[String] =
+  private def checkWsOrderBook(assetPairInfo: AssetPairInfo): CheckResult[String] =
+    dexWs.subscribeForOrderBookUpdates(assetPairInfo.assetPair).map { snapshot =>
+      s"""\n
+         |    Got snapshot for ${assetPairInfo.assetPairName} pair:
+         |    ${WsOrderBook.wsOrderBookStateFormat.writes(snapshot).toString}\n
+         """.stripMargin
+    }
+
+  private def checkWsAccountUpdates(maybeSeed: Option[String]): CheckResult[String] = {
+    authServiceRest.fold { lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided") } { as =>
+      for {
+        credentials <- as.getAuthCredentials(maybeSeed)
+        snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
+      } yield s"""\n
+           |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address${maybeSeed.fold(" (key pair randomly generated)")(_ => "")}:
+           |    ${WsAddressState.wsAddressStateFormat.writes(snapshot).toString}\n
+         """.stripMargin
+    }
+  }
+
+  def checkState(version: String, maybeAccountSeed: Option[String]): ErrorOr[String] =
     for {
       _                                  <- log("\nChecking:\n")
       _                                  <- logCheck("1. DEX version") { checkVersion(version) }
@@ -177,16 +198,20 @@ case class Checker(superConnector: SuperConnector) {
       (order, placementNotes)            <- logCheck("6. Order placement") { checkPlacement(assetPairInfo) }
       (_, cancellationNotes)             <- logCheck("7. Order cancellation") { checkCancellation(order) }
       executionNotes                     <- logCheck("8. Execution") { checkExecution(assetPairInfo) }
+      orderBookWsStreamNotes             <- logCheck("9. Order book WS stream") { checkWsOrderBook(assetPairInfo) }
+      accountUpdatesWsStreamNotes        <- logCheck("10. Account updates WS stream") { checkWsAccountUpdates(maybeAccountSeed) }
     } yield {
       s"""
            |Diagnostic notes:
-           |  Matcher balance       : $balanceNotes 
-           |  First asset           : $firstAssetNotes
-           |  Second asset          : $secondAssetNotes
-           |  Matcher active orders : $activeOrdersNotes
-           |  Placement             : $placementNotes
-           |  Cancellation          : $cancellationNotes
-           |  Execution             : $executionNotes
+           |  Matcher balance           : $balanceNotes 
+           |  First asset               : $firstAssetNotes
+           |  Second asset              : $secondAssetNotes
+           |  Matcher active orders     : $activeOrdersNotes
+           |  Placement                 : $placementNotes
+           |  Cancellation              : $cancellationNotes
+           |  Execution                 : $executionNotes
+           |  Order book WS stream      : $orderBookWsStreamNotes
+           |  Account updates WS stream : $accountUpdatesWsStreamNotes
        """.stripMargin
     }
 }
@@ -198,6 +223,7 @@ object Checker {
   private case class AssetPairInfo(amountAssetInfo: AssetInfo, priceAssetInfo: AssetInfo) {
     val assetPair: AssetPair              = AssetPair(amountAssetInfo.asset, priceAssetInfo.asset)
     val (amountAssetName, priceAssetName) = amountAssetInfo.name -> priceAssetInfo.name
+    val assetPairName                     = s"$amountAssetName-$priceAssetName"
   }
 
   private val firstTestAssetName  = "IIIuJIo"

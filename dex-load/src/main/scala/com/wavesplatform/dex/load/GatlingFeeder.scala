@@ -55,8 +55,7 @@ object GatlingFeeder {
     val o      = s"${feederFile.getAbsolutePath}/data-${System.currentTimeMillis()}.csv"
     val output = new PrintWriter(o, "UTF_8")
     try {
-      val accountIdxs = Random.shuffle((0 until accountsNumber).toVector)
-      accountIdxs.foreach { i =>
+      (0 until accountsNumber).foreach { i =>
         val pk = PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, AddressScheme.current.chainId)
         output.println(s"""${pk.getAddress};${mkAusString(pk)};${mkObsStrings(pairsFile, orderBookNumberPerAccount)}""")
       }

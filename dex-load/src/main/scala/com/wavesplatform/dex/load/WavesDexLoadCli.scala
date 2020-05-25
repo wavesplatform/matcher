@@ -8,7 +8,8 @@ import com.wavesplatform.dex.Version
 import com.wavesplatform.dex.domain.account.AddressScheme
 import scopt.{OParser, RenderingMode}
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future, Promise}
 
 object WavesDexLoadCli {
   def main(rawArgs: Array[String]): Unit = {
@@ -60,7 +61,12 @@ object WavesDexLoadCli {
               .abbr("au")
               .text("The URI to the WebSocket API, e.g.: wss://localhost/ws/v0")
               .required()
-              .action((x, s) => s.copy(apiUri = x))
+              .action((x, s) => s.copy(apiUri = x)),
+            opt[Int]("accounts-number")
+              .abbr("an")
+              .text("The number of checked accounts")
+              .required()
+              .action((x, s) => s.copy(accountsNumber = x))
           ),
         cmd(Command.CreateRequests.name)
           .action((_, s) => s.copy(command = Command.CreateRequests.some))
@@ -90,7 +96,14 @@ object WavesDexLoadCli {
               GatlingFeeder.mkFile(args.accountsNumber, args.seedPrefix, args.pairsFile.get, args.orderBookNumberPerAccount, args.feederFile)
             case Command.Check =>
               val (inputConnected, stop) = waitForInput()
-              if (inputConnected) GatlingChecker.check(args.apiUri, args.inputData, stop)
+              if (inputConnected) {
+                // TODO replace account by address
+                val clients = WsAccumulateChanges.createClients(args.apiUri, args.inputData, args.accountsNumber)
+                clients.foreach(_.run())
+                Await.result(stop, Duration.Inf)
+                val addressData = clients.map(_.collectedAddressState)
+                clients.foreach(_.close())
+              }
               else println("End of input. Try terminal")
           }
           println("Done")

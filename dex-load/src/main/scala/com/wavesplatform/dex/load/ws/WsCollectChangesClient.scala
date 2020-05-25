@@ -10,12 +10,12 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-class WsApiClient(apiUri: String, address: String, aus: String, obs: Seq[String]) extends AutoCloseable {
+class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: Seq[String]) extends AutoCloseable {
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
-  private var accountUpdates   = WsAddressState(Map.empty, Seq.empty, 0L)
-  private val orderBookUpdates = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
+  @volatile private var accountUpdates = WsAddressState(Map.empty, Seq.empty, 0L)
+  private val orderBookUpdates         = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
 
   private val protocolHandler = new WebsocketHandler[String]() {
     def receive: PartialFunction[String, Unit] = {
@@ -92,6 +92,9 @@ class WsApiClient(apiUri: String, address: String, aus: String, obs: Seq[String]
     socket ! aus
     obs.foreach(socket ! _)
   }
+
+  def collectedAddressState: WsAddressState = accountUpdates
+  def collectedOrderBooks: Map[AssetPair, WsOrderBook] = orderBookUpdates.toMap
 
   override def close(): Unit = client.shutdownSync()
 }

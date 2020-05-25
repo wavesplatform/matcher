@@ -60,7 +60,7 @@ class AddressActor(owner: Address,
   private var openVolume   = Map.empty[Asset, Long]
   private val expiration   = MutableMap.empty[ByteStr, Cancellable]
 
-  private var addressWsMutableState = AddressWsMutableState.empty
+  private var addressWsMutableState = AddressWsMutableState.empty(owner)
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>

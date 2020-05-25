@@ -105,8 +105,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     "send account updates to authenticated user" - {
 
       "when account is empty" in {
-        val wsac = mkWsAddressConnection(mkKeyPair("Test"))
-        eventually { wsac.messages should have size 1 }
+        val account      = mkKeyPair("Test")
+        val wsac         = mkWsAddressConnection(account)
+        val addressState = wsac.receiveAtLeastN[WsAddressState](1).head
+        addressState.address shouldBe account.toAddress
         assertChanges(wsac, squash = false)()()
         wsac.close()
       }

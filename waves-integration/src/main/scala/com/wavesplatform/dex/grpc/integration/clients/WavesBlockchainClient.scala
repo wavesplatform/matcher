@@ -24,8 +24,13 @@ trait WavesBlockchainClient[F[_]] {
 
   // TODO rename to spendableBalanceChanges after release 2.1.2
   def realTimeBalanceChanges: Observable[BalanceChanges]
+
   // TODO remove after release 2.1.2
   def spendableBalanceChanges: Observable[SpendableBalanceChanges]
+
+  // TODO remove after release 2.1.3
+  def spendableBalance(address: Address, asset: Asset): F[Long]
+
   def spendableBalances(address: Address, assets: Set[Asset]): F[Map[Asset, Long]]
   def allAssetsSpendableBalance(address: Address): F[Map[Asset, Long]]
 

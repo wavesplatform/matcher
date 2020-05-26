@@ -1,18 +1,20 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
 import java.time.Duration
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 
 import mouse.any.anySyntaxMouse
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.collection.JavaConverters._
 import scala.concurrent._
 
-class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
+class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers with BeforeAndAfterAll {
 
-  implicit val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+  private val executor: ExecutorService                          = Executors.newCachedThreadPool
+  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private class BlockchainCacheTest(loader: String => Future[String], expiration: Option[Duration], invalidationPredicate: String => Boolean)
       extends BlockchainCache[String, String](loader, expiration, invalidationPredicate)
@@ -21,6 +23,11 @@ class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
                           expiration: Option[Duration] = None,
                           invalidationPredicate: String => Boolean = _ => false): BlockchainCacheTest = {
     new BlockchainCacheTest(loader, expiration, invalidationPredicate)
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    executor.shutdownNow()
   }
 
   private val andThenAwaitTimeout = 300

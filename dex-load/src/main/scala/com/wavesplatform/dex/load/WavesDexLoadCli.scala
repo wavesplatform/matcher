@@ -1,18 +1,25 @@
 package com.wavesplatform.dex.load
 
 import java.io.{EOFException, File}
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.Scanner
+import java.util.concurrent.Executors
 
+import akka.actor.ActorSystem
 import cats.syntax.option._
 import com.wavesplatform.dex.Version
 import com.wavesplatform.dex.domain.account.AddressScheme
 import scopt.{OParser, RenderingMode}
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 object WavesDexLoadCli {
   def main(rawArgs: Array[String]): Unit = {
+    val executor        = Executors.newCachedThreadPool()
+    implicit val global = ExecutionContext.fromExecutor(executor)
+
     val builder = OParser.builder[Args]
 
     val parser = {
@@ -51,17 +58,22 @@ object WavesDexLoadCli {
               .abbr("obnpa")
               .text("The number of subscribed order book per account. Must be less than number of asset pairs in pairs-file")
               .required()
-              .action((x, s) => s.copy(orderBookNumberPerAccount = x))
+              .action((x, s) => s.copy(orderBookNumberPerAccount = x)),
+            opt[File]("auth-services-private-key-file")
+              .abbr("aspkf")
+              .text("The path to file with Auth Services' private key. The public key should be in the DEX's config")
+              .required()
+              .action((x, s) => s.copy(authServicesPrivateKeyFile = x))
         ),
         cmd(Command.Check.name)
           .action((_, s) => s.copy(command = Command.Check.some))
-          .text("Creates files for Gatling check")
+          .text("Runs multiple WebSocket consumers and then checks that all data was received")
           .children(
-            opt[String]("api-uri")
-              .abbr("au")
-              .text("The URI to the WebSocket API, e.g.: wss://localhost/ws/v0")
+            opt[String]("dex-rest-api")
+              .abbr("dra")
+              .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .required()
-              .action((x, s) => s.copy(apiUri = x)),
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[Int]("accounts-number")
               .abbr("an")
               .text("The number of checked accounts")
@@ -76,39 +88,78 @@ object WavesDexLoadCli {
               .abbr("es")
               .text("The file with environment settings")
               .required()
-              .action((x, s) => s.copy(apiUri = x))
+              .action((x, s) => s.copy(dexRestApi = x))
           )
       )
     }
 
-    OParser.parse(parser, rawArgs, Args()).foreach { args =>
-      args.command match {
-        case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
-        case Some(command) =>
-          println(s"Running '${command.name}' command")
-          AddressScheme.current = new AddressScheme {
-            override val chainId: Byte = args.addressSchemeByte.toByte
-          }
-          command match {
-            case Command.CreateRequests =>
-              TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings)
-            case Command.CreateFeederFile =>
-              GatlingFeeder.mkFile(args.accountsNumber, args.seedPrefix, args.pairsFile.get, args.orderBookNumberPerAccount, args.feederFile)
-            case Command.Check =>
-              val (inputConnected, stop) = waitForInput()
-              if (inputConnected) {
-                // TODO replace account by address
-                val clients = WsAccumulateChanges.createClients(args.apiUri, args.inputData, args.accountsNumber)
-                clients.foreach(_.run())
-                Await.result(stop, Duration.Inf)
-                val addressData = clients.map(_.collectedAddressState)
-                clients.foreach(_.close())
-              }
-              else println("End of input. Try terminal")
-          }
-          println("Done")
+    try {
+      OParser.parse(parser, rawArgs, Args()).foreach { args =>
+        args.command match {
+          case None => println(OParser.usage(parser, RenderingMode.TwoColumns))
+          case Some(command) =>
+            println(s"Running '${command.name}' command")
+            AddressScheme.current = new AddressScheme {
+              override val chainId: Byte = args.addressSchemeByte.toByte
+            }
+            println(s"Chain id: ${args.addressSchemeByte}")
+            command match {
+              case Command.CreateRequests =>
+                TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings)
+
+              case Command.CreateFeederFile =>
+                val authPrivateKey = new String(Files.readAllBytes(args.authServicesPrivateKeyFile.toPath), StandardCharsets.UTF_8)
+                GatlingFeeder.mkFile(
+                  accountsNumber = args.accountsNumber,
+                  seedPrefix = args.seedPrefix,
+                  authKp = GatlingFeeder.authServiceKeyPair(authPrivateKey),
+                  pairsFile = args.pairsFile.get,
+                  orderBookNumberPerAccount = args.orderBookNumberPerAccount,
+                  feederFile = args.feederFile
+                )
+
+              case Command.Check =>
+                implicit val system = ActorSystem()
+//                val stop            = waitForInput()
+
+                val wsApiUri = s"${prependScheme(args.dexRestApi, webSocket = true)}/ws/v0"
+                println(s"Connecting to $wsApiUri...")
+
+                val clients = WsAccumulateChanges.createClients(wsApiUri, args.feederFile, args.accountsNumber)
+                try {
+                  println("Stage 1. Running clients...")
+                  Await.result(Future.traverse(clients)(_.run()), 30.seconds)
+
+                  Thread.sleep(10000)
+//                  Await.result(stop, Duration.Inf)
+
+                  println("Stage 1. Getting collected data...")
+                  val watchedAddresses  = clients.map(_.collectedAddressState)
+                  val watchedOrderBooks = clients.map(_.collectedOrderBooks)
+
+                  println("Stage 1. Stopping clients...")
+                  clients.foreach(_.close())
+
+                  println("Stage 2. Running clients...")
+                  Await.result(Future.traverse(clients)(_.run()), 30.seconds)
+
+                  println("Stage 2. Getting collected data...")
+                  val finalAddresses  = clients.map(_.collectedAddressState)
+                  val finalOrderBooks = clients.map(_.collectedOrderBooks)
+
+                  println("Stage 3. Stopping clients...")
+                  clients.foreach(_.close())
+
+                  println("Running checks...")
+                } finally {
+                  clients.foreach(_.close())
+                  system.terminate()
+                }
+            }
+            println("Done")
+        }
       }
-    }
+    } finally executor.shutdownNow()
   }
 
   private sealed trait Command {
@@ -134,37 +185,39 @@ object WavesDexLoadCli {
 
   private case class Args(addressSchemeByte: Char = 'T',
                           command: Option[Command] = None,
+                          authServicesPrivateKeyFile: File = defaultFeederFile,
                           feederFile: File = defaultFeederFile,
-                          inputData: File = defaultFeederFile,
                           pairsFile: Option[File] = None,
                           accountsNumber: Int = 1000,
                           seedPrefix: String = "loadtest-",
                           orderBookNumberPerAccount: Int = 10,
                           environmentSettings: String = "devnet.conf",
-                          apiUri: String = "")
+                          dexRestApi: String = "")
 
-  private def waitForInput(): (Boolean, Future[Unit]) = {
+  private def waitForInput()(implicit ec: ExecutionContext): Future[Unit] = {
     val expectedInput = "stop"
 
     val scanner = new Scanner(System.in)
-    val p       = Promise[Unit]()
 
-    @scala.annotation.tailrec
-    def loop(): Boolean = {
-      println(s"Enter '$expectedInput' (without quotes) to stop: ")
-      val hasNext = scanner.hasNextLine
-      if (hasNext) {
-        if (scanner.nextLine() == expectedInput) {
-          p.success(())
-          true
-        } else loop()
-      } else {
-        p.failure(new EOFException())
-        false
+    def loop(): Future[Unit] =
+      Future {
+        println(s"Enter '$expectedInput' (without quotes) to stop: ")
+        scanner.hasNextLine
+      }.flatMap { hasNext =>
+        if (hasNext) {
+          if (scanner.nextLine() == expectedInput) Future.successful(()) else loop()
+        } else {
+          println("End of input")
+          Future.failed[Unit](new EOFException())
+        }
       }
-    }
 
-    (loop(), p.future)
+    loop()
+  }
+
+  def prependScheme(uri: String, webSocket: Boolean = false): String = {
+    val (plain, secure) = if (webSocket) "ws://" -> "wss://" else "http://" -> "https://"
+    if (uri.startsWith(secure) || uri.startsWith(plain)) uri else plain + uri
   }
 
 }

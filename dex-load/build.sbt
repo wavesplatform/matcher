@@ -1,1 +1,1 @@
-libraryDependencies += "com.github.andyglow" %% "websocket-scala-client" % "0.2.4"
+run / fork := true

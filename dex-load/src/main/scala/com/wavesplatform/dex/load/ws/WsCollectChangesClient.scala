@@ -1,47 +1,44 @@
 package com.wavesplatform.dex.load.ws
 
-import com.github.andyglow.websocket._
-import com.github.andyglow.websocket.util.Uri
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrder, WsOrderBook}
+import akka.actor.ActorSystem
+import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade, WebSocketUpgradeResponse}
+import cats.syntax.option._
+import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import org.slf4j.LoggerFactory
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json.Json
 
 import scala.collection.mutable
-import scala.reflect.ClassTag
+import scala.concurrent.Future
+import scala.util.Success
 
-class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: Seq[String]) extends AutoCloseable {
+class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: Seq[String])(implicit system: ActorSystem) extends AutoCloseable {
+  import system.dispatcher
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
-  @volatile private var accountUpdates = WsAddressState(Map.empty, Seq.empty, 0L)
-  private val orderBookUpdates         = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
+  private val emptyWsAddresState: WsAddressState = WsAddressState(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
+  @volatile private var accountUpdates           = emptyWsAddresState
+  private val orderBookUpdates                   = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
 
-  private val protocolHandler = new WebsocketHandler[String]() {
-    def receive: PartialFunction[String, Unit] = {
-      case raw =>
-        val json = unsafeDowncast[JsObject](Json.parse(raw))
-        (json \ "T").as[String] match {
-          case "pp" => sender() ! raw
-          case "au" => accountUpdates = merge(accountUpdates, json.as[WsAddressState])
-          case "ob" =>
-            val diff = json.as[WsOrderBook]
-            val updatedOb = orderBookUpdates.get(diff.assetPair) match {
-              case Some(origOb) => merge(origOb, diff)
-              case None         => diff
-            }
-            orderBookUpdates.put(diff.assetPair, updatedOb)
-        }
-    }
-
-    override def onFailure: PartialFunction[Throwable, Unit] = {
-      case e: Throwable => log.error("Got error", e)
-    }
-
-    override def onClose: Unit => Unit = _ => log.info("Closed")
+  private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
+    case x: WsPingOrPong      => x.some
+    case x: WsInitial         => log.info(s"Connection id: ${x.connectionId}"); none
+    case x: WsError           => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
+    case diff: WsAddressState => accountUpdates = merge(accountUpdates, diff); none
+    case diff: WsOrderBook =>
+      val updatedOb = orderBookUpdates.get(diff.assetPair) match {
+        case Some(origOb) => merge(origOb, diff)
+        case None         => diff
+      }
+      orderBookUpdates.put(diff.assetPair, updatedOb)
+      none
   }
 
   private def merge(orig: WsAddressState, diff: WsAddressState): WsAddressState = WsAddressState(
+    address = diff.address,
     balances = orig.balances ++ diff.balances,
     orders = diff.orders.foldLeft(orig.orders) {
       case (r, x) =>
@@ -80,21 +77,25 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     timestamp = diff.timestamp
   )
 
-  private def unsafeDowncast[T <: JsValue](x: JsValue)(implicit ct: ClassTag[T]): T = x match {
-    case x: T => x
-    case _    => throw new RuntimeException(s"Expected an ${ct.runtimeClass.getName}, but got: $x")
+  private var client            = none[WsConnection]
+  private val subscribeMessages = Json.parse(aus).as[WsAddressSubscribe] :: obs.map(Json.parse(_).as[WsOrderBookSubscribe]).toList
+
+  def run(): Future[Unit] = {
+    close()
+    val newClient = new WsConnection(apiUri, receive)
+    client = newClient.some
+    newClient.connectionResponse.map {
+      case _: ValidUpgrade           => subscribeMessages.foreach(newClient.send)
+      case x: InvalidUpgradeResponse => throw new RuntimeException(s"Can't connect to WebSockets on $apiUri: ${x.response.status} ${x.cause}")
+    }
   }
 
-  private val client = WebsocketClient(Uri(apiUri), protocolHandler)
-  private val socket = client.open()
-
-  def run(): Unit = {
-    socket ! aus
-    obs.foreach(socket ! _)
-  }
-
-  def collectedAddressState: WsAddressState = accountUpdates
+  def collectedAddressState: WsAddressState            = accountUpdates
   def collectedOrderBooks: Map[AssetPair, WsOrderBook] = orderBookUpdates.toMap
 
-  override def close(): Unit = client.shutdownSync()
+  override def close(): Unit = {
+    client.foreach(_.close())
+    accountUpdates = emptyWsAddresState
+    orderBookUpdates.clear()
+  }
 }

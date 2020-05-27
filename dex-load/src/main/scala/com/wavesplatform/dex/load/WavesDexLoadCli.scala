@@ -96,7 +96,17 @@ object WavesDexLoadCli extends ScoptImplicits {
               .abbr("es")
               .text("The file with environment settings")
               .required()
-              .action((x, s) => s.copy(dexRestApi = x))
+              .action((x, s) => s.copy(dexRestApi = x)),
+            opt[Int]("requests-type")
+              .abbr("rt")
+              .text("The type of requests (1. Places 2. Places & Cancels 3. Matching 4. Order History 5. All of types)")
+              .required()
+              .action((x, s) => s.copy(requestsType = x)),
+            opt[Int]("requests-count")
+              .abbr("rc")
+              .text("The count of needed requests")
+              .required()
+              .action((x, s) => s.copy(requestsCount = x)),
           )
       )
     }
@@ -110,12 +120,12 @@ object WavesDexLoadCli extends ScoptImplicits {
             AddressScheme.current = new AddressScheme {
               override val chainId: Byte = args.addressSchemeByte.toByte
             }
-            println(s"Chain id: ${args.addressSchemeByte}")
             command match {
               case Command.CreateRequests =>
-                TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings)
+                TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings, args.requestsType, args.requestsCount)
 
               case Command.CreateFeederFile =>
+                println(s"Chain id: ${args.addressSchemeByte}")
                 val authPrivateKey = new String(Files.readAllBytes(args.authServicesPrivateKeyFile.toPath), StandardCharsets.UTF_8)
                 GatlingFeeder.mkFile(
                   accountsNumber = args.accountsNumber,
@@ -127,6 +137,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                 )
 
               case Command.Check =>
+                println(s"Chain id: ${args.addressSchemeByte}")
                 implicit val system = ActorSystem()
 
                 val wsApiUri = s"${prependScheme(args.dexRestApi, webSocket = true)}/ws/v0"
@@ -209,6 +220,8 @@ object WavesDexLoadCli extends ScoptImplicits {
                           seedPrefix: String = "loadtest-",
                           orderBookNumberPerAccount: Int = 10,
                           environmentSettings: String = "devnet.conf",
+                          requestsType: Int = 1,
+                          requestsCount: Int = 30000,
                           dexRestApi: String = "",
                           collectTime: FiniteDuration = 5.seconds,
                           wsResponseWaitTime: FiniteDuration = 5.seconds)

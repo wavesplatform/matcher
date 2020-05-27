@@ -1,9 +1,12 @@
 package com.wavesplatform.dex.load
 
+import java.io.{File, PrintWriter}
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order
+import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
 
 import scala.collection.mutable
@@ -42,10 +45,11 @@ object TankGenerator extends ScorexLogging {
   }
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String], env: Environment): Unit = {
+    val amountPerUser = env.assetQuantity / 2 / accounts.size
     accounts
       .flatMap { acc =>
         Transactions.makeTransferTx(env.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
-          Transactions.makeTransferTx(env.issuer, acc.getAddress, 100000, ass, 300000, "WAVES", "")
+          Transactions.makeTransferTx(env.issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
         }
       }
       .flatMap(env.node.send(_))
@@ -53,19 +57,20 @@ object TankGenerator extends ScorexLogging {
 
   private def mkOrders(env: Environment, accounts: List[PrivateKeyAccount], pairs: List[AssetPair]): List[Order] = {
     val orders: mutable.HashSet[Order] = mutable.HashSet()
+    val safeAmount                     = env.assetQuantity / 2 / accounts.size / 400
 
-    orders += Transactions.makeOrder(
-      PrivateKeyAccount.fromSeed("sds", 0, env.networkByte),
-      env.matcherPublicKey,
-      com.wavesplatform.wavesj.matcher.Order.Type.BUY,
-      pairs(0),
-      1002332,
-      100500,
-      System.currentTimeMillis + 1005000,
-      300000
-    )
+    accounts.foreach(acc => {
+      (0 until 399).foreach(i => {
+        val amount    = Random.nextInt(safeAmount.toInt)
+        val price     = Random.nextInt(safeAmount.toInt)
+        val pair      = pairs(Random.nextInt(pairs.size))
+        val orderType = if (i < 200) Type.BUY else Type.SELL
 
-    orders.toList
+        orders += mkOrder(env, acc, orderType, amount, price, pair)
+      })
+    })
+
+    Random.shuffle(orders.toList)
   }
 
   private def mkPlaces(seedPrefix: String, env: Environment): Unit = {
@@ -82,7 +87,14 @@ object TankGenerator extends ScorexLogging {
 
     val orders = mkOrders(env, accounts, pairs)
 
-    print(postRequest(env, orders(0), "/orderbook/place", "place"))
+    val requestsFile = new File("results.txt")
+    val output       = new PrintWriter(requestsFile, "utf-8")
+    try {
+      orders.foreach(o => {
+        output.println(mkPost(env, o, "/matcher/orderbook", "PLACE"))
+      })
+    } finally output.close()
+    println(s"Results have been saved to $requestsFile")
   }
 
   private def mkCancels(seedPrefix: String, env: Environment): Unit = {

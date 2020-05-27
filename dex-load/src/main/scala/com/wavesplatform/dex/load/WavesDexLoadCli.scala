@@ -1,21 +1,25 @@
 package com.wavesplatform.dex.load
 
-import java.io.{EOFException, File}
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.Scanner
 import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
+import cats.syntax.either._
 import cats.syntax.option._
+import com.softwaremill.diffx._
 import com.wavesplatform.dex.Version
+import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.domain.account.AddressScheme
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import scopt.{OParser, RenderingMode}
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-object WavesDexLoadCli {
+object WavesDexLoadCli extends ScoptImplicits {
   def main(rawArgs: Array[String]): Unit = {
     val executor        = Executors.newCachedThreadPool()
     implicit val global = ExecutionContext.fromExecutor(executor)
@@ -78,7 +82,11 @@ object WavesDexLoadCli {
               .abbr("an")
               .text("The number of checked accounts")
               .required()
-              .action((x, s) => s.copy(accountsNumber = x))
+              .action((x, s) => s.copy(accountsNumber = x)),
+            opt[FiniteDuration]("collect-time")
+              .abbr("ct")
+              .text("The time to collect the data")
+              .action((x, s) => s.copy(collectTime = x))
           ),
         cmd(Command.CreateRequests.name)
           .action((_, s) => s.copy(command = Command.CreateRequests.some))
@@ -120,7 +128,6 @@ object WavesDexLoadCli {
 
               case Command.Check =>
                 implicit val system = ActorSystem()
-//                val stop            = waitForInput()
 
                 val wsApiUri = s"${prependScheme(args.dexRestApi, webSocket = true)}/ws/v0"
                 println(s"Connecting to $wsApiUri...")
@@ -130,27 +137,37 @@ object WavesDexLoadCli {
                   println("Stage 1. Running clients...")
                   Await.result(Future.traverse(clients)(_.run()), 30.seconds)
 
-                  Thread.sleep(10000)
-//                  Await.result(stop, Duration.Inf)
+                  Thread.sleep(args.collectTime.toMillis)
 
                   println("Stage 1. Getting collected data...")
-                  val watchedAddresses  = clients.map(_.collectedAddressState)
-                  val watchedOrderBooks = clients.map(_.collectedOrderBooks)
+
+                  val watchedAddresses  = getOrExit(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
+                  val watchedOrderBooks = getOrExit(checkUniq(switch(clients.map(_.collectedOrderBooks))))
 
                   println("Stage 1. Stopping clients...")
                   clients.foreach(_.close())
 
                   println("Stage 2. Running clients...")
                   Await.result(Future.traverse(clients)(_.run()), 30.seconds)
+                  Thread.sleep(args.wsResponseWaitTime.toMillis)
 
                   println("Stage 2. Getting collected data...")
-                  val finalAddresses  = clients.map(_.collectedAddressState)
-                  val finalOrderBooks = clients.map(_.collectedOrderBooks)
+                  val finalAddresses  = getOrExit(checkUniq(clients.map(_.collectedAddressState).groupBy(_.address)))
+                  val finalOrderBooks = getOrExit(checkUniq(switch(clients.map(_.collectedOrderBooks))))
 
                   println("Stage 3. Stopping clients...")
                   clients.foreach(_.close())
 
                   println("Running checks...")
+                  val addressesCompareResult = compare(watchedAddresses, finalAddresses)
+                  if (addressesCompareResult.isIdentical) println("Addresses are same")
+                  else println(s"Found issues:\n${addressesCompareResult.show}")
+
+                  val orderBooksCompareResult = compare(watchedOrderBooks, finalOrderBooks)
+                  if (orderBooksCompareResult.isIdentical) println("Order books are same")
+                  else println(s"Found issues:\n${orderBooksCompareResult.show}")
+
+                  println("All is ok")
                 } finally {
                   clients.foreach(_.close())
                   system.terminate()
@@ -192,32 +209,45 @@ object WavesDexLoadCli {
                           seedPrefix: String = "loadtest-",
                           orderBookNumberPerAccount: Int = 10,
                           environmentSettings: String = "devnet.conf",
-                          dexRestApi: String = "")
+                          dexRestApi: String = "",
+                          collectTime: FiniteDuration = 5.seconds,
+                          wsResponseWaitTime: FiniteDuration = 5.seconds)
 
-  private def waitForInput()(implicit ec: ExecutionContext): Future[Unit] = {
-    val expectedInput = "stop"
-
-    val scanner = new Scanner(System.in)
-
-    def loop(): Future[Unit] =
-      Future {
-        println(s"Enter '$expectedInput' (without quotes) to stop: ")
-        scanner.hasNextLine
-      }.flatMap { hasNext =>
-        if (hasNext) {
-          if (scanner.nextLine() == expectedInput) Future.successful(()) else loop()
-        } else {
-          println("End of input")
-          Future.failed[Unit](new EOFException())
-        }
-      }
-
-    loop()
-  }
-
-  def prependScheme(uri: String, webSocket: Boolean = false): String = {
+  private def prependScheme(uri: String, webSocket: Boolean = false): String = {
     val (plain, secure) = if (webSocket) "ws://" -> "wss://" else "http://" -> "https://"
     if (uri.startsWith(secure) || uri.startsWith(plain)) uri else plain + uri
   }
 
+  private def getOrExit[K, V](from: Either[Map[K, Seq[DiffResult]], Map[K, V]]): Map[K, V] = from match {
+    case Right(x) => x
+    case Left(xs) =>
+      xs.foreach { case (k, issues) => println(s"Found issues in $k:\n${issues.map(_.show).mkString("\n")}") }
+      sys.exit(1)
+  }
+
+  private def checkUniq[K, V: Diff](xs: Map[K, Seq[V]]): Either[Map[K, Seq[DiffResult]], Map[K, V]] = {
+    val notIdentical = xs
+      .filter(_._2.length > 1)
+      .map {
+        case (k, group) =>
+          val first        = group.head
+          val notIdentical = group.tail.map(compare(first, _)).filterNot(_.isIdentical)
+          k -> notIdentical
+      }
+      .filter(_._2.nonEmpty)
+    if (notIdentical.isEmpty) xs.collect { case (k, xs) if xs.nonEmpty => k -> xs.head }.asRight
+    else notIdentical.asLeft
+  }
+
+  private def switch[K, V](xs: Seq[Map[K, V]]): Map[K, Seq[V]] = xs.foldLeft(Map.empty[K, List[V]]) {
+    case (r, x) => x.foldLeft(r) { case (r, (k, v)) => r.updated(k, v :: r.getOrElse(k, List.empty)) }
+  }
+
+  private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
+  private implicit val wsAddressStateDiff: Diff[WsAddressState]   = Derived[Diff[WsAddressState]].ignore(_.timestamp).ignore(_.updateId)
+  private implicit val wsOrderBookDiff: Diff[WsOrderBook]         = Derived[Diff[WsOrderBook]].ignore(_.timestamp).ignore(_.updateId)
+
+  private def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
+    if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
+  }
 }

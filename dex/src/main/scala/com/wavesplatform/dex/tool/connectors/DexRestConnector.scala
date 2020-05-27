@@ -17,7 +17,7 @@ import sttp.model.Uri.QuerySegment
 
 case class DexRestConnector(target: String) extends RestConnector {
 
-  private val apiUri = s"$target/matcher"
+  private val apiUri = s"$targetUri/matcher"
 
   private def mkCancelRequest(orderId: Order.Id, owner: KeyPair): CancelOrderRequest = {
     val cancelRequest = CancelOrderRequest(owner, orderId.some, None, Array.emptyByteArray)
@@ -65,4 +65,6 @@ case class DexRestConnector(target: String) extends RestConnector {
         .copy(querySegments = List(QuerySegment.KeyValue("activeOnly", "true")))
     mkResponse { _.get(uri).headers(timestampAndSignatureHeaders(keyPair, System.currentTimeMillis)) }.map(_.as[Seq[JsValue]])
   }
+
+  def getMatcherSettings: ErrorOr[JsValue] = mkResponse { _.get(uri"$apiUri/settings") }
 }

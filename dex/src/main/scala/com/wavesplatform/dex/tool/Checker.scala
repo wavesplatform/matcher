@@ -46,8 +46,8 @@ case class Checker(superConnector: SuperConnector) {
   private def getAssetPairInfo(f: AssetInfo, s: AssetInfo): AssetPairInfo =
     if (f.asset.compatId < s.asset.compatId) AssetPairInfo(s, f) else AssetPairInfo(f, s)
 
-  private def checkVersion(version: String): CheckResult[Unit] = dexRest.swaggerRequest.flatMap { response =>
-    val parsedVersion = (response \ "info" \ "version").get.as[String]
+  private def checkVersion(version: String): CheckResult[Unit] = dexRest.getMatcherSettings.flatMap { response =>
+    val parsedVersion = (response \ "matcherVersion").get.as[String]
     Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
   }
 
@@ -146,7 +146,7 @@ case class Checker(superConnector: SuperConnector) {
     def awaitSubmittedOrderAtNode: CheckResult[Seq[JsValue]] =
       for {
         txs <- dexRest
-          .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)
+          .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)(nodeRest.repeatRequestOptions)
           .ensure(s"Awaiting of the submitted order at Node failed! Cannot find transactions for order id $submittedId")(_.lengthCompare(1) >= 0)
         _ <- txs.toList.traverse(tx => nodeRest.repeatRequest(nodeRest getTxInfo tx)(_.isRight))
       } yield txs

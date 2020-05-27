@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{Asset, AssetPair, PrivateKeyAccount, Transactions}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -18,29 +18,20 @@ object TankGenerator extends ScorexLogging {
   }
 
   private def mkAssets(env: Environment, count: Int = 10): List[String] = {
-    (for { _ <- 1 to count } yield {
-      val tx =
-        Transactions.makeIssueTx(
-          env.issuer,
-          env.networkByte,
-          Random.nextInt(100000).toString,
-          Random.nextInt(100000).toString,
-          env.assetQuantity,
-          8, //TODO: random from 2 to 16
-          false,
-          null,
-          env.issueFee
-        )
-      log.info(tx.toString)
-      env.node.send(tx)
-      tx.getId.toString
-    }).toList
+    (for { _ <- 1 to count } yield mkAsset(env)).toList
   }
 
   private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
     val pairs: mutable.HashSet[AssetPair] = mutable.HashSet()
 
-    while (pairs.size <= count) pairs += new AssetPair(assets(Random.nextInt(assets.size - 1)), assets(assets.size - 1))
+    while (pairs.size <= count) {
+      val aa = assets(Random.nextInt(assets.size - 1))
+      val pa = assets(Random.nextInt(assets.size - 1))
+      val p1 = new AssetPair(aa, pa)
+      val p2 = new AssetPair(pa, aa)
+      if (!pairs.contains(p1) && !pairs.contains(p2) && aa != pa)
+        pairs += (if (aa > pa) p1 else p2)
+    }
     pairs.toList
   }
 
@@ -94,6 +85,7 @@ object TankGenerator extends ScorexLogging {
         output.println(mkPost(env, o, "/matcher/orderbook", "PLACE"))
       })
     } finally output.close()
+    println(s"Generated orders count: ${orders.size}")
     println(s"Results have been saved to $requestsFile")
   }
 

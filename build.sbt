@@ -43,8 +43,8 @@ lazy val `dex-load` = project
   .settings(commonOwaspSettings)
   .dependsOn(
     dex,
-    `waves-integration-it`,
-    `dex-it-common`
+    `waves-integration-it`, // ?
+    `dex-it-common` // ?
   )
 
 lazy val `waves-grpc` = project.settings(commonOwaspSettings)

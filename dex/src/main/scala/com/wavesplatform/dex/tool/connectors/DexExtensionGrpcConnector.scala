@@ -14,7 +14,6 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.tool.ErrorOr
-import com.wavesplatform.dex.tool.connectors.RestConnector.RepeatRequestOptions
 import monix.execution.Scheduler.Implicits.{global => monixScheduler}
 import org.slf4j.LoggerFactory
 
@@ -24,8 +23,6 @@ import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.Try
 
 case class DexExtensionGrpcConnector private (target: String, grpcAsyncClient: WavesBlockchainClient[Future]) extends Connector {
-
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(10, 1.second)
 
   import DexExtensionGrpcConnector._
 
@@ -60,6 +57,5 @@ object DexExtensionGrpcConnector {
       val clientSettings = WavesBlockchainClientSettings(grpcSettings, 100.milliseconds, 100)
       WavesBlockchainClientBuilder.async(clientSettings, monixScheduler, executionContext)
     }.toEither
-      .leftMap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex")
-      .map(client => DexExtensionGrpcConnector(target, client))
+      .bimap(ex => s"Cannot establish gRPC connection to DEX Extension! $ex", client => DexExtensionGrpcConnector(target, client))
 }

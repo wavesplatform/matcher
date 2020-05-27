@@ -26,8 +26,9 @@ abstract class BlockchainCache[K <: AnyRef, V <: AnyRef](loader: K => Future[V],
       .build {
         new CacheLoader[K, Future[V]] {
           override def load(key: K): Future[V] = loader(key) andThen {
-            case Success(value) if invalidationPredicate(value) => cache.invalidate(key)
-            case Failure(exception)                             => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
+            case Success(value) if invalidationPredicate(value) =>
+              cache.invalidate(key) // value may persist for a little longer than expected due to the fact that all the threads in the EC may be busy
+            case Failure(exception) => log.error(s"Error while value loading occurred: ", exception); cache.invalidate(key)
           }
         }
       }

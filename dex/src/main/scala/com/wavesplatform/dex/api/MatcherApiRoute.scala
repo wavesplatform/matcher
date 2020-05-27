@@ -221,6 +221,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           StatusCodes.OK,
           Json.obj(
             "matcherPublicKey" -> matcherPublicKey,
+            "matcherVersion"   -> Version.VersionString,
             "priceAssets"      -> matcherSettings.priceAssets,
             "orderFee"         -> getActualOrderFeeSettings().getJson(matcherAccountFee, rateCache.getJson).value,
             "orderVersions"    -> allowedOrderVersions.toSeq.sorted,

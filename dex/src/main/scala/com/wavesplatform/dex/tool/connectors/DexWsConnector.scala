@@ -9,7 +9,7 @@ import com.wavesplatform.dex.api.websockets.connection.WsConnectionOps._
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.AuthServiceRestConnector.AuthCredentials
-import com.wavesplatform.dex.tool.connectors.RestConnector.RepeatRequestOptions
+import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -20,7 +20,7 @@ case class DexWsConnector private (target: String, wsc: WsConnection)(implicit s
 
   import DexWsConnector._
 
-  override val repeatRequestOptions: RestConnector.RepeatRequestOptions = RepeatRequestOptions(30, 100.millis)
+  override implicit val repeatRequestOptions: RepeatRequestOptions = RepeatRequestOptions(30, 100.millis)
 
   private def repeat[A](f: => A)(test: A => Boolean): ErrorOr[A] = repeatRequest { lift(f) } { _.exists(test) }
 
@@ -68,7 +68,6 @@ object DexWsConnector {
     implicit val materializer: Materializer = Materializer.matFromSystem(system)
 
     Try { new WsConnection(target, true) }.toEither
-      .leftMap(ex => s"Web Socket connection cannot be established! $ex")
-      .map(wsc => DexWsConnector(target, wsc))
+      .bimap(ex => s"Web Socket connection cannot be established! $ex", wsc => DexWsConnector(target, wsc))
   }
 }

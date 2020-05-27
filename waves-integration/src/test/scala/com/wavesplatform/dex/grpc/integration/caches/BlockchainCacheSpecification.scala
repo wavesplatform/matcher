@@ -1,16 +1,20 @@
 package com.wavesplatform.dex.grpc.integration.caches
 
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 
 import mouse.any.anySyntaxMouse
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.collection.JavaConverters._
+import scala.concurrent._
 
-class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
+class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers with BeforeAndAfterAll {
+
+  private val executor: ExecutorService                          = Executors.newCachedThreadPool
+  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private class BlockchainCacheTest(loader: String => Future[String], expiration: Option[Duration], invalidationPredicate: String => Boolean)
       extends BlockchainCache[String, String](loader, expiration, invalidationPredicate)
@@ -19,6 +23,11 @@ class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
                           expiration: Option[Duration] = None,
                           invalidationPredicate: String => Boolean = _ => false): BlockchainCacheTest = {
     new BlockchainCacheTest(loader, expiration, invalidationPredicate)
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    executor.shutdownNow()
   }
 
   private val andThenAwaitTimeout = 300
@@ -64,22 +73,20 @@ class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers {
       val goodKey = "111"
       val badKey  = "222"
 
-      val keyAccessMap = new ConcurrentHashMap[String, Int] unsafeTap (m => { m.put(goodKey, 0); m.put(badKey, 0) })
+      val keyAccessMap = new ConcurrentHashMap[String, Int](Map(goodKey -> 0, badKey -> 0).asJava)
 
       val cache = createCache(
-        key => { Future.successful(key) unsafeTap (_ => keyAccessMap.computeIfPresent(key, (_, prev) => prev + 1)) },
-        invalidationPredicate = result => result startsWith "2"
+        key => { keyAccessMap.computeIfPresent(key, (_, prev) => prev + 1); Future.successful(key) },
+        invalidationPredicate = _.startsWith("2")
       )
 
-      val badKeyAccessCount = 10
-
       Await.result(
-        (1 to badKeyAccessCount).foldLeft { Future.successful("") } { (prev, _) =>
+        (1 to 10).foldLeft { Future.successful("") } { (prev, _) =>
           for {
             _ <- prev
             _ <- cache get goodKey
             r <- cache get badKey
-          } yield { Thread.sleep(andThenAwaitTimeout); r }
+          } yield blocking { Thread.sleep(andThenAwaitTimeout); r }
         },
         scala.concurrent.duration.Duration.Inf
       )

@@ -19,7 +19,7 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
   def loginPageRequest: ErrorOr[Unit] = {
     val uri = uri"$hostPortUri/swagger-ui.html"
     for {
-      errorOrResponse <- Try { basicRequest.get(uri).send().body }.toEither.leftMap(ex => s"Cannot load swagger UI! ${ex.getMessage}")
+      errorOrResponse <- Try { basicRequest.get(uri).send().body }.toEither.leftMap(ex => s"Cannot load swagger UI! ${ex.getWithStackTrace}")
       _               <- errorOrResponse
     } yield ()
   }

@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.tool.connectors
 
-import com.wavesplatform.dex.tool.ErrorOr
+import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import com.wavesplatform.wavesj.Transaction

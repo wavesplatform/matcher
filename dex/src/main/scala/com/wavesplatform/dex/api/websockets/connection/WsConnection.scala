@@ -5,17 +5,17 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import play.api.libs.json.{JsError, JsSuccess, Json}
+import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
 
@@ -47,19 +47,22 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
   private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
 
   // From server to test
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
-    val rawMsg = x.asTextMessage.getStrictText
-    Json.parse(rawMsg).validate[WsServerMessage] match {
-      case JsSuccess(value, _) =>
-        log.debug(s"Got $value")
-        messagesBuffer.add(value)
-        value match {
-          case value: WsPingOrPong => wsHandlerRef ! value
-          case _                   =>
+  private val sink: Sink[Message, Future[Done]] = Sink.foreach {
+    case tm: TextMessage =>
+      for {
+        strictText <- tm.toStrict(1.second).map(_.getStrictText)
+        clientMessage <- {
+          log.trace(s"Got $strictText")
+          Try { Json.parse(strictText).as[WsServerMessage] } match {
+            case Failure(exception) => Future.failed(exception)
+            case Success(x)         => Future.successful(x)
+          }
         }
+      } yield clientMessage
 
-      case JsError(e) => log.error(s"Can't parse message: $rawMsg, $e")
-    }
+    case bm: BinaryMessage =>
+      bm.dataStream.runWith(Sink.ignore)
+      Future.failed { new IllegalArgumentException("Binary messages are not supported") }
   }
 
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {

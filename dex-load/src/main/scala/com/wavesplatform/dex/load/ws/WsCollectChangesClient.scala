@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.load.ws
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade, WebSocketUpgradeResponse}
+import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.account.Address
@@ -12,9 +12,8 @@ import play.api.libs.json.Json
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.util.Success
 
-class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: Seq[String])(implicit system: ActorSystem) extends AutoCloseable {
+class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: Seq[String])(implicit system: ActorSystem) {
   import system.dispatcher
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
@@ -93,9 +92,12 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
   def collectedAddressState: WsAddressState            = accountUpdates
   def collectedOrderBooks: Map[AssetPair, WsOrderBook] = orderBookUpdates.toMap
 
-  override def close(): Unit = {
-    client.foreach(_.close())
-    accountUpdates = emptyWsAddresState
-    orderBookUpdates.clear()
-  }
+  def close(): Future[Unit] =
+    client
+      .fold(Future.successful(()))(_.close().map(_ => ()))
+      .andThen {
+        case _ =>
+          accountUpdates = emptyWsAddresState
+          orderBookUpdates.clear()
+      }
 }

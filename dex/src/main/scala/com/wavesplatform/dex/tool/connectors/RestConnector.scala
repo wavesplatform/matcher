@@ -1,8 +1,9 @@
 package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.either._
+import com.wavesplatform.dex.cli.ErrorOr
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.tool.connectors.RestConnector.{ErrorOrJsonResponse, RequestFunction}
-import com.wavesplatform.dex.tool.{ErrorOr, ThrowableOps}
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._
 import sttp.model.Uri

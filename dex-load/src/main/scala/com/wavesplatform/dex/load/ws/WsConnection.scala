@@ -3,19 +3,21 @@ package com.wavesplatform.dex.load.ws
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{Message, TextMessage, WebSocketRequest}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.websockets.connection.TestWsHandlerActor
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import play.api.libs.json.{JsError, JsSuccess, Json}
+import play.api.libs.json.Json
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success, Try}
 
 class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessage])(implicit system: ActorSystem) extends ScorexLogging {
 
+  import system.dispatcher
   private implicit val materializer = Materializer(system)
   private val wsHandlerRef          = system.actorOf(TestWsHandlerActor.props(keepAlive = true))
 
@@ -39,14 +41,22 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
   }
 
   // To client
-  private val sink: Sink[Message, Future[Done]] = Sink.foreach { x =>
-    val rawMsg = x.asTextMessage.getStrictText
-    Json.parse(rawMsg).validate[WsServerMessage] match {
-      case JsError(e) => log.error(s"Can't parse message: $rawMsg, $e")
-      case JsSuccess(value, _) =>
-        log.trace(s"Got $value")
-        receive(value).foreach(wsHandlerRef ! _)
-    }
+  private val sink: Sink[Message, Future[Done]] = Sink.foreach {
+    case tm: TextMessage => // TODO move to tests
+      for {
+        strictText <- tm.toStrict(1.second).map(_.getStrictText)
+        clientMessage <- {
+          log.trace(s"Got $strictText")
+          Try { Json.parse(strictText).as[WsServerMessage] } match {
+            case Failure(exception) => Future.failed(exception)
+            case Success(x)         => Future.successful { receive(x).foreach(wsHandlerRef ! _) }
+          }
+        }
+      } yield clientMessage
+
+    case bm: BinaryMessage =>
+      bm.dataStream.runWith(Sink.ignore)
+      Future.failed { new IllegalArgumentException("Binary messages are not supported") }
   }
 
   private val flow: Flow[Message, TextMessage.Strict, Future[Done]] = Flow.fromSinkAndSourceCoupled(sink, source).watchTermination() {
@@ -61,6 +71,10 @@ class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessa
   val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
   def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
-  def close(): Unit                        = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
-  def isClosed: Boolean                    = closed.isCompleted
+
+  def isClosed: Boolean = closed.isCompleted
+  def close(): Future[Done] = {
+    if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
+    closed
+  }
 }

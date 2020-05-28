@@ -63,10 +63,15 @@ class OrderBookActor(settings: Settings,
       matchingRules = actualRules
       updateCurrentMatchingRules(matchingRules.head)
       actualRule = normalizeMatchingRule(matchingRules.head)
-      aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(LevelAmounts.empty,
-                                                                    None,
-                                                                    Some(matchingRules.head.tickSize.toDouble),
-                                                                    System.currentTimeMillis)
+      // Could be unset during the start
+      Option(aggregatedRef).foreach {
+        _ ! AggregatedOrderBookActor.Command.ApplyChanges(
+          LevelAmounts.empty,
+          None,
+          Some(matchingRules.head.tickSize.toDouble),
+          System.currentTimeMillis
+        )
+      }
     }
   }
 

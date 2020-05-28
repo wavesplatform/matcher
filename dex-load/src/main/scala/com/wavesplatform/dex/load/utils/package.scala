@@ -18,8 +18,9 @@ package object utils extends ScorexLogging {
   )
 
   def waitForHeightArise(env: Environment): Unit = {
-    val h = env.node.getHeight
-    while (env.node.getHeight < h + 1) Thread.sleep(5000)
+    val toHeight = env.node.getHeight + 1
+    log.info(s"Waiting for the next ($toHeight) block...")
+    while (env.node.getHeight < toHeight) Thread.sleep(5000)
   }
 
   def mkAsset(env: Environment): String = {

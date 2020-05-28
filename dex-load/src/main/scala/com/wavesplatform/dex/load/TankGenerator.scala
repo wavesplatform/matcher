@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.load
 
-import java.io.{File, PrintWriter}
+import java.io.{File, IOException, PrintWriter}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
-import com.wavesplatform.wavesj.matcher.Order
+import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -24,6 +24,7 @@ object TankGenerator extends ScorexLogging {
     println(s"Generating $count assets... ")
     val assets = (for { _ <- 1 to count } yield mkAsset(env)).toList
     println("Assets have been successfully issued")
+    waitForHeightArise(env)
     assets
   }
 
@@ -90,6 +91,17 @@ object TankGenerator extends ScorexLogging {
 
   private def mkCancels(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
     println("Making requests for cancelling...")
+    val accounts                              = mkAccounts(seedPrefix, env, requestsCount / 400)
+    val cancels: mutable.HashSet[CancelOrder] = mutable.HashSet()
+    accounts.foreach(a => {
+      env.matcher
+        .getOrders(a)
+        .forEach(o => {
+          cancels += Transactions.makeOrderCancel(a, o.getAssetPair, o.getId.getBase58String)
+        })
+    })
+
+    svRequests(env, cancels = cancels.toList)
   }
 
   private def mkMatching(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
@@ -111,9 +123,9 @@ object TankGenerator extends ScorexLogging {
     println("mkAllTypes")
   }
 
-  private def svRequests(env: Environment, orders: List[Order] = List.empty): Unit = {
+  private def svRequests(env: Environment, orders: List[Order] = List.empty, cancels: List[CancelOrder] = List.empty): Unit = {
     println("All data has been generated. Now it will be saved...")
-    val requestsFile = new File("results.txt")
+    val requestsFile = new File(s"requests-${System.currentTimeMillis}.txt")
     val output       = new PrintWriter(requestsFile, "utf-8")
     try {
       orders.foreach(o => {
@@ -121,10 +133,11 @@ object TankGenerator extends ScorexLogging {
       })
     } finally output.close()
     println(s"Generated orders count: ${orders.length}")
+    println(s"Generated cancels count: ${cancels.length}")
     println(s"Results have been saved to $requestsFile")
   }
 
-  def mkRequests(seedPrefix: String, environment: String, requestsType: Int = 1, requestsCount: Int = 20000): Unit = {
+  def mkRequests(seedPrefix: String, environment: String, requestsType: Int = 2, requestsCount: Int = 20000): Unit = {
     val env = new Environment(ConfigFactory.parseResources(environment))
 
     requestsType match {

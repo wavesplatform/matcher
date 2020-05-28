@@ -1,7 +1,9 @@
 package com.wavesplatform.dex.load
 
 import com.google.common.net.HttpHeaders
+import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
@@ -10,7 +12,8 @@ import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transact
 import scala.util.Random
 
 package object utils {
-  val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
+  implicit val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
+  implicit val backend  = HttpURLConnectionBackend()
 
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT       -> "application/json",
@@ -18,10 +21,20 @@ package object utils {
     HttpHeaders.CONTENT_TYPE -> "application/json"
   )
 
-  def mkOrderHistoryHEaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
+  def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,
     "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
   )
+
+  def getOrderBook(account: PrivateKeyAccount): String = {
+    sttp
+      .get(uri"${settings.matcherUrl}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
+      .headers(mkOrderHistoryHeaders(account))
+      .send()
+      .body
+      .right
+      .get
+  }
 
   def waitForHeightArise(): Unit = {
     val toHeight = settings.node.getHeight + 1

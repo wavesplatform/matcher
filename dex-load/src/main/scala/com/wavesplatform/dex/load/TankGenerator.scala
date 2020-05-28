@@ -3,14 +3,13 @@ package com.wavesplatform.dex.load
 import java.io.{File, PrintWriter}
 
 import com.softwaremill.sttp.{MonadError => _, _}
-import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
 import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
+import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
-import scala.collection.mutable
 import scala.util.Random
 
 object TankGenerator extends ScorexLogging {
@@ -85,30 +84,27 @@ object TankGenerator extends ScorexLogging {
 
   private def mkCancels(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for cancelling...")
-    val accounts                              = mkAccounts(seedPrefix, requestsCount / 400)
-    val cancels: mutable.HashSet[CancelOrder] = mutable.HashSet()
-    implicit val backend                      = HttpURLConnectionBackend()
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400)
 
-    accounts.foreach(a => {
-
-      println(
-        sttp
-          .get(uri"${settings.matcherUrl}/matcher/orderbook/${Base58.encode(a.getPublicKey)}")
-          .headers(mkOrderHistoryHEaders(a))
-          .send()
-          .body
-          .right
-          .get
-      )
-
-      settings.matcher
-        .getOrders(a)
-        .forEach(o => {
-          cancels += Transactions.makeOrderCancel(a, o.getAssetPair, o.getId.getBase58String)
+    val cancels = accounts.map(a => {
+      Json
+        .parse(getOrderBook(a))
+        .as[List[JsValue]]
+        .map(o => {
+          val id = (o \ "id").as[String]
+          val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
+            case JsSuccess(name, _) => name
+            case _: JsError         => "WAVES"
+          }
+          val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
+            case JsSuccess(name, _) => name
+            case _: JsError         => "WAVES"
+          }
+          Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id)
         })
     })
 
-    svRequests(cancels = cancels.toList)
+    svRequests(cancels = cancels.flatten)
   }
 
   private def mkMatching(seedPrefix: String, requestsCount: Int): Unit = {
@@ -137,6 +133,9 @@ object TankGenerator extends ScorexLogging {
     try {
       orders.foreach(o => {
         output.println(mkPost(o, "/matcher/orderbook", "PLACE"))
+      })
+      cancels.foreach(c => {
+        output.println(mkPost(c, s"/matcher/orderbook/${c.getAssetPair.getAmountAsset}/${c.getAssetPair.getPriceAsset}/cancel", "CANCEL"))
       })
     } finally output.close()
     println(s"Generated orders count: ${orders.length}")

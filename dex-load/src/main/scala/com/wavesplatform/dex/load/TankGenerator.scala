@@ -13,33 +13,33 @@ import scala.collection.mutable
 import scala.util.Random
 
 object TankGenerator extends ScorexLogging {
-  private def mkAccounts(seedPrefix: String, env: Environment, count: Int): List[PrivateKeyAccount] = {
+  private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
-    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, env.networkByte)).toList
+    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.networkByte)).toList
     println("Done")
     accounts
   }
 
-  private def mkAssets(env: Environment, count: Int = 9): List[String] = {
+  private def mkAssets(count: Int = 9): List[String] = {
     println(s"Generating $count assets... ")
-    val assets = (1 to count).map(_ => mkAsset(env)).toList
-    waitForHeightArise(env)
+    val assets = (1 to count).map(_ => mkAsset).toList
+    waitForHeightArise()
     println("Assets have been successfully issued")
     assets
   }
 
-  private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String], env: Environment): Unit = {
+  private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
-    val amountPerUser = env.assetQuantity / 2 / accounts.length
+    val amountPerUser = settings.assetQuantity / 2 / accounts.length
     accounts
       .flatMap { acc =>
-        Transactions.makeTransferTx(env.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
-          Transactions.makeTransferTx(env.issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
+        Transactions.makeTransferTx(settings.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
+          Transactions.makeTransferTx(settings.issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
         }
       }
-      .flatMap(env.node.send(_))
+      .flatMap(settings.node.send(_))
 
-    waitForHeightArise(env)
+    waitForHeightArise()
     println("Done")
   }
 
@@ -56,13 +56,12 @@ object TankGenerator extends ScorexLogging {
     randomAssetPairs.take(count).toList
   }
 
-  private def mkOrders(env: Environment, accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Order] = {
+  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Order] = {
     print(s"Creating orders... ")
-    val safeAmount = env.assetQuantity / 2 / accounts.length / 400
+    val safeAmount = settings.assetQuantity / 2 / accounts.length / 400
 
     val orders = accounts.map(
-      mkOrder(env,
-              _,
+      mkOrder(_,
               if (math.random < 0.5) Type.BUY else Type.SELL,
               Random.nextInt(safeAmount.toInt),
               Random.nextInt(safeAmount.toInt),
@@ -72,45 +71,45 @@ object TankGenerator extends ScorexLogging {
     Random.shuffle(orders)
   }
 
-  private def mkPlaces(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
+  private def mkPlaces(seedPrefix: String, requestsCount: Int): Unit = {
     print("Making requests for placing...")
-    val accounts = mkAccounts(seedPrefix, env, requestsCount / 400)
-    val assets   = mkAssets(env)
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400)
+    val assets   = mkAssets()
     val pairs    = mkAssetPairs(assets)
-    val orders   = mkOrders(env, accounts, pairs, false)
+    val orders   = mkOrders(accounts, pairs, false)
 
-    distributeAssets(accounts, assets, env)
-    svRequests(env, orders)
+    distributeAssets(accounts, assets)
+    svRequests(orders)
   }
 
-  private def mkCancels(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
+  private def mkCancels(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for cancelling...")
-    val accounts                              = mkAccounts(seedPrefix, env, requestsCount / 400)
+    val accounts                              = mkAccounts(seedPrefix, requestsCount / 400)
     val cancels: mutable.HashSet[CancelOrder] = mutable.HashSet()
 
     accounts.foreach(a => {
-      env.matcher
+      settings.matcher
         .getOrders(a)
         .forEach(o => {
           cancels += Transactions.makeOrderCancel(a, o.getAssetPair, o.getId.getBase58String)
         })
     })
 
-    svRequests(env, cancels = cancels.toList)
+    svRequests(cancels = cancels.toList)
   }
 
-  private def mkMatching(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
+  private def mkMatching(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for matching...")
-    val accounts = mkAccounts(seedPrefix, env, requestsCount / 400)
-    val assets   = mkAssets(env)
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400)
+    val assets   = mkAssets()
     val pairs    = mkAssetPairs(assets)
-    val orders   = mkOrders(env, accounts, pairs)
+    val orders   = mkOrders(accounts, pairs)
 
-    distributeAssets(accounts, assets, env)
-    svRequests(env, orders)
+    distributeAssets(accounts, assets)
+    svRequests(orders)
   }
 
-  private def mkOrderHistory(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
+  private def mkOrderHistory(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for getting order history...")
   }
 
@@ -118,13 +117,13 @@ object TankGenerator extends ScorexLogging {
     println("mkAllTypes")
   }
 
-  private def svRequests(env: Environment, orders: List[Order] = List.empty, cancels: List[CancelOrder] = List.empty): Unit = {
+  private def svRequests(orders: List[Order] = List.empty, cancels: List[CancelOrder] = List.empty): Unit = {
     println("All data has been generated. Now it will be saved...")
     val requestsFile = new File(s"requests-${System.currentTimeMillis}.txt")
     val output       = new PrintWriter(requestsFile, "utf-8")
     try {
       orders.foreach(o => {
-        output.println(mkPost(env, o, "/matcher/orderbook", "PLACE"))
+        output.println(mkPost(o, "/matcher/orderbook", "PLACE"))
       })
     } finally output.close()
     println(s"Generated orders count: ${orders.length}")
@@ -133,13 +132,13 @@ object TankGenerator extends ScorexLogging {
   }
 
   def mkRequests(seedPrefix: String, environment: String, requestsType: Int = 2, requestsCount: Int = 20000): Unit = {
-    val env = new Environment(ConfigFactory.parseResources(environment))
+    val env = new LoadTestSettings(ConfigFactory.parseResources(environment))
 
     requestsType match {
-      case 1 => mkPlaces(seedPrefix, env, requestsCount)
-      case 2 => mkCancels(seedPrefix, env, requestsCount)
-      case 3 => mkMatching(seedPrefix, env, requestsCount)
-      case 4 => mkOrderHistory(seedPrefix, env, requestsCount)
+      case 1 => mkPlaces(seedPrefix, requestsCount)
+      case 2 => mkCancels(seedPrefix, requestsCount)
+      case 3 => mkMatching(seedPrefix, requestsCount)
+      case 4 => mkOrderHistory(seedPrefix, requestsCount)
       case 5 => mkAllTypes()
       case _ =>
         println("Wrong number of task ")

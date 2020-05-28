@@ -3,7 +3,7 @@ package com.wavesplatform.dex.load
 import com.typesafe.config.Config
 import com.wavesplatform.wavesj.{Node, PrivateKeyAccount}
 
-class Environment(conf: Config) {
+final class LoadTestSettings(conf: Config) {
   val root = "waves.dex.load"
 
   val networkByte      = conf.getString(s"$root.network-byte").charAt(0).toByte
@@ -18,5 +18,4 @@ class Environment(conf: Config) {
 
   val assetQuantity = conf.getLong(s"$root.assets.quantity")
   val issueFee      = conf.getLong(s"$root.assets.issue-fee")
-
 }

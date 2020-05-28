@@ -4,7 +4,8 @@ import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.model.LevelAgg
 
 // TODO refactor balances retrieving
 class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
@@ -483,7 +484,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val bobOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, matcherFee = 1L, feeAsset = usd)
     dex1.api.place(bobOrder)
 
-    dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelResponse(1.waves, 300))
+    dex1.api.orderBook(wavesUsdPair).asks shouldBe List(LevelAgg(1.waves, 300))
     dex1.api.reservedBalance(bob) shouldBe Map(usd -> 1L, Waves -> 1.waves)
     dex1.api.cancel(bob, bobOrder)
 
@@ -496,7 +497,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
     val aliceOrderId = mkOrder(alice, wavesUsdPair, OrderType.BUY, 1.waves, 300, matcherFee = 1L, feeAsset = usd)
     dex1.api.place(aliceOrderId)
 
-    dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelResponse(1.waves, 300))
+    dex1.api.orderBook(wavesUsdPair).bids shouldBe List(LevelAgg(1.waves, 300))
     dex1.api.reservedBalance(alice) shouldBe Map(usd -> 301)
 
     dex1.api.place(mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 300, 1L, feeAsset = usd))

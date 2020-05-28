@@ -49,7 +49,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
       dex1.api.orderHistoryByPair(bob, wavesUsdPair).collectFirst {
-        case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled
+        case o if o.id == order.id() => o.status shouldEqual OrderStatus.Cancelled.name
       }
 
       eventually {
@@ -111,9 +111,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         dex1.api.cancelWithApiKey(order)
         dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled.name
 
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled.name
 
         eventually {
           val orderBook = dex1.api.orderBook(wavesUsdPair)
@@ -128,9 +128,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         dex1.api.cancelWithApiKey(order, Some(order.senderPublicKey))
         dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
 
-        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistory(bob).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled.name
 
-        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled
+        dex1.api.orderHistoryByPair(bob, wavesUsdPair).find(_.id == order.id()).get.status shouldBe OrderStatus.Cancelled.name
       }
 
       "and with an invalid X-User-Public-Key" in {

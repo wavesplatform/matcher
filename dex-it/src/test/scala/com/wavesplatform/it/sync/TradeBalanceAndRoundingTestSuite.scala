@@ -295,7 +295,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       .find(_.id == aliceOrder.id())
       .getOrElse(throw new IllegalStateException(s"Alice should have the ${aliceOrder.id()} order"))
 
-    order.status shouldBe OrderStatus.Cancelled
+    order.status shouldBe OrderStatus.Cancelled.name
     dex1.api.cancel(bob, bobOrder)
   }
 

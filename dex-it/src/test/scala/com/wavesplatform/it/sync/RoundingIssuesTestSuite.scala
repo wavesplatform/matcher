@@ -3,7 +3,8 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.model.LevelAgg
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 
@@ -34,10 +35,11 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
 
-    val exchangeTx = wavesNode1.api.transactionInfo(tx.head.getId).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.getId}'")) match {
-      case r: ExchangeTransaction => r
-      case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
-    }
+    val exchangeTx =
+      wavesNode1.api.transactionInfo(tx.head.getId).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.getId}'")) match {
+        case r: ExchangeTransaction => r
+        case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
+      }
 
     exchangeTx.getPrice shouldBe counter.price
     exchangeTx.getAmount shouldBe filledAmount
@@ -86,7 +88,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     withClue("orderBook check") {
       val ob = dex1.api.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(LevelAgg(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 }

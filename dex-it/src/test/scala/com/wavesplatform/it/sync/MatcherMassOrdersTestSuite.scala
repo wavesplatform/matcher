@@ -105,8 +105,9 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     "Filled and Cancelled orders should be after Partial And Accepted" in {
       val lastIdxOfActiveOrder =
-        dex1.api.orderHistory(alice).lastIndexWhere(o => o.status == OrderStatus.Accepted || o.status == OrderStatus.PartiallyFilled)
-      val firstIdxOfClosedOrder = dex1.api.orderHistory(alice).indexWhere(o => o.status == OrderStatus.Filled || o.status == OrderStatus.Cancelled)
+        dex1.api.orderHistory(alice).lastIndexWhere(o => o.status == OrderStatus.Accepted.name || o.status == OrderStatus.PartiallyFilled.name)
+      val firstIdxOfClosedOrder =
+        dex1.api.orderHistory(alice).indexWhere(o => o.status == OrderStatus.Filled.name || o.status == OrderStatus.Cancelled.name)
       lastIdxOfActiveOrder should be < firstIdxOfClosedOrder
     }
 
@@ -114,14 +115,14 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       val activeAndPartialOrders =
         dex1.api
           .orderHistory(alice)
-          .filter(o => o.status == OrderStatus.Accepted || o.status == OrderStatus.PartiallyFilled)
+          .filter(o => o.status == OrderStatus.Accepted.name || o.status == OrderStatus.PartiallyFilled.name)
           .map(_.timestamp)
       activeAndPartialOrders.reverse shouldBe sorted
     }
 
     "Filled and Cancelled orders should be sorted by timestamp." in {
       val filledAndCancelledOrders =
-        dex1.api.orderHistory(alice).filter(o => o.status == OrderStatus.Filled || o.status == OrderStatus.Cancelled).map(_.timestamp)
+        dex1.api.orderHistory(alice).filter(o => o.status === OrderStatus.Filled.name || o.status == OrderStatus.Cancelled.name).map(_.timestamp)
       filledAndCancelledOrders.reverse shouldBe sorted
     }
 

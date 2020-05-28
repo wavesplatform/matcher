@@ -83,11 +83,6 @@ object TankGenerator extends ScorexLogging {
     svRequests(orders)
   }
 
-  private def timestampAndSignatureHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
-    "Timestamp" -> timestamp.toString,
-    "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
-  )
-
   private def mkCancels(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for cancelling...")
     val accounts                              = mkAccounts(seedPrefix, requestsCount / 400)
@@ -99,7 +94,7 @@ object TankGenerator extends ScorexLogging {
       println(
         sttp
           .get(uri"${settings.matcherUrl}/matcher/orderbook/${Base58.encode(a.getPublicKey)}")
-          .headers(timestampAndSignatureHeaders(a))
+          .headers(mkOrderHistoryHEaders(a))
           .send()
           .body
           .right

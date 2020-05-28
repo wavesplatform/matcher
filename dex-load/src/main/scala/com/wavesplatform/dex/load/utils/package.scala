@@ -18,6 +18,11 @@ package object utils {
     HttpHeaders.CONTENT_TYPE -> "application/json"
   )
 
+  def mkOrderHistoryHEaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
+    "Timestamp" -> timestamp.toString,
+    "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
+  )
+
   def waitForHeightArise(): Unit = {
     val toHeight = settings.node.getHeight + 1
     println(s"\tWaiting for the next ($toHeight) block...")

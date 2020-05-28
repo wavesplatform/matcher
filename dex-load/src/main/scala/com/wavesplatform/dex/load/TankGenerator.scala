@@ -2,19 +2,13 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
-import com.google.common.primitives.Longs
-import com.typesafe.config.ConfigFactory
+import com.softwaremill.sttp.{MonadError => _, _}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
 import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
-import com.softwaremill.sttp.Uri.QueryFragment
-import com.softwaremill.sttp.playJson._
-import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
-import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.crypto
 
 import scala.collection.mutable
 import scala.util.Random

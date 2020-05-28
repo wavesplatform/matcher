@@ -2,7 +2,6 @@ package com.wavesplatform.dex.load
 
 import com.google.common.net.HttpHeaders
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.load.TankGenerator.log
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type

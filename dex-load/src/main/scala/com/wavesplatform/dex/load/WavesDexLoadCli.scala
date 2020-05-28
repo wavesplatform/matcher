@@ -10,6 +10,7 @@ import cats.instances.future._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.{Id, catsInstancesForId}
+import com.github.ghik.silencer.silent
 import com.softwaremill.diffx._
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
 import com.wavesplatform.dex.cli.ScoptImplicits
@@ -306,9 +307,11 @@ object WavesDexLoadCli extends ScoptImplicits {
     case (r, x) => x.foldLeft(r) { case (r, (k, v)) => r.updated(k, v :: r.getOrElse(k, List.empty)) }
   }
 
-  private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
-  private implicit val wsAddressStateDiff: Diff[WsAddressState]   = Derived[Diff[WsAddressState]].ignore(_.timestamp).ignore(_.updateId)
-  private implicit val wsOrderBookDiff: Diff[WsOrderBook]         = Derived[Diff[WsOrderBook]].ignore(_.timestamp).ignore(_.updateId)
+  // The compiler is lie! This is used in WsOrder.id
+  @silent("never used") private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
+
+  private implicit val wsAddressStateDiff: Diff[WsAddressState] = Derived[Diff[WsAddressState]].ignore(_.timestamp).ignore(_.updateId)
+  private implicit val wsOrderBookDiff: Diff[WsOrderBook]       = Derived[Diff[WsOrderBook]].ignore(_.timestamp).ignore(_.updateId)
 
   private def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
     if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)

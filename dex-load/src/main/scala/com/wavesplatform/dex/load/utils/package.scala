@@ -1,7 +1,6 @@
 package com.wavesplatform.dex.load
 
 import com.google.common.net.HttpHeaders
-import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
@@ -9,7 +8,7 @@ import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transact
 
 import scala.util.Random
 
-package object utils extends ScorexLogging {
+package object utils {
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT       -> "application/json",
     HttpHeaders.CONNECTION   -> "close",
@@ -18,7 +17,7 @@ package object utils extends ScorexLogging {
 
   def waitForHeightArise(env: Environment): Unit = {
     val toHeight = env.node.getHeight + 1
-    log.info(s"Waiting for the next ($toHeight) block...")
+    println(s"\tWaiting for the next ($toHeight) block...")
     while (env.node.getHeight < toHeight) Thread.sleep(5000)
   }
 
@@ -27,15 +26,15 @@ package object utils extends ScorexLogging {
       Transactions.makeIssueTx(
         env.issuer,
         env.networkByte,
-        Random.nextInt(100000).toString,
-        Random.nextInt(100000).toString,
+        Random.nextInt(10000000).toString,
+        Random.nextInt(10000000).toString,
         env.assetQuantity,
         8, //TODO: random from 2 to 16
         false,
         null,
         env.issueFee
       )
-    log.info(s"Sending Issue TX: ${mkJson(env, tx)}")
+    println(s"\tSending Issue TX: ${mkJson(env, tx)}")
     env.node.send(tx)
     tx.getId.toString
   }

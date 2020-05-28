@@ -1,13 +1,13 @@
 package com.wavesplatform.dex.load
 
-import java.io.{File, IOException, PrintWriter}
+import java.io.{File, PrintWriter}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
-import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
+import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
 
 import scala.collection.mutable
 import scala.util.Random
@@ -22,14 +22,14 @@ object TankGenerator extends ScorexLogging {
 
   private def mkAssets(env: Environment, count: Int = 9): List[String] = {
     println(s"Generating $count assets... ")
-    val assets = (for { _ <- 1 to count } yield mkAsset(env)).toList
-    println("Assets have been successfully issued")
+    val assets = (1 to count).map(_ => mkAsset(env)).toList
     waitForHeightArise(env)
+    println("Assets have been successfully issued")
     assets
   }
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String], env: Environment): Unit = {
-    print(s"Distributing assets to accounts... ")
+    println(s"Distributing assets to accounts... ")
     val amountPerUser = env.assetQuantity / 2 / accounts.length
     accounts
       .flatMap { acc =>
@@ -45,37 +45,31 @@ object TankGenerator extends ScorexLogging {
 
   private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
     print(s"Creating $count asset pairs... ")
-    val pairs: mutable.HashSet[AssetPair] = mutable.HashSet()
 
-    while (pairs.size <= count) {
-      val aa = assets(Random.nextInt(assets.length - 1))
-      val pa = assets(Random.nextInt(assets.length - 1))
-      val p1 = new AssetPair(aa, pa)
-      val p2 = new AssetPair(pa, aa)
-      if (!pairs.contains(p1) && !pairs.contains(p2) && aa != pa)
-        pairs += (if (aa > pa) p1 else p2)
-    }
+    val randomAssetPairs = Random
+      .shuffle(assets)
+      .combinations(2)
+      .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
+      .map(Function.tupled(new AssetPair(_, _)))
+
     println("Done")
-    pairs.toList
+    randomAssetPairs.take(count).toList
   }
 
   private def mkOrders(env: Environment, accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Order] = {
     print(s"Creating orders... ")
-    val orders: mutable.HashSet[Order] = mutable.HashSet()
-    val safeAmount                     = env.assetQuantity / 2 / accounts.length / 400
+    val safeAmount = env.assetQuantity / 2 / accounts.length / 400
 
-    accounts.foreach(acc => {
-      (0 until 399).foreach(i => {
-        val amount    = Random.nextInt(safeAmount.toInt)
-        val price     = Random.nextInt(safeAmount.toInt)
-        val pair      = pairs(Random.nextInt(pairs.length))
-        val orderType = if (i < 200 || matching) Type.BUY else Type.SELL
+    val orders = accounts.map(
+      mkOrder(env,
+              _,
+              if (math.random < 0.5) Type.BUY else Type.SELL,
+              Random.nextInt(safeAmount.toInt),
+              Random.nextInt(safeAmount.toInt),
+              pairs(Random.nextInt(pairs.length))))
 
-        orders += mkOrder(env, acc, orderType, amount, price, pair)
-      })
-    })
     println("Done")
-    Random.shuffle(orders.toList)
+    Random.shuffle(orders)
   }
 
   private def mkPlaces(seedPrefix: String, env: Environment, requestsCount: Int): Unit = {
@@ -93,6 +87,7 @@ object TankGenerator extends ScorexLogging {
     println("Making requests for cancelling...")
     val accounts                              = mkAccounts(seedPrefix, env, requestsCount / 400)
     val cancels: mutable.HashSet[CancelOrder] = mutable.HashSet()
+
     accounts.foreach(a => {
       env.matcher
         .getOrders(a)
@@ -145,7 +140,7 @@ object TankGenerator extends ScorexLogging {
       case 2 => mkCancels(seedPrefix, env, requestsCount)
       case 3 => mkMatching(seedPrefix, env, requestsCount)
       case 4 => mkOrderHistory(seedPrefix, env, requestsCount)
-      case 5 => mkAllTypes
+      case 5 => mkAllTypes()
       case _ =>
         println("Wrong number of task ")
     }

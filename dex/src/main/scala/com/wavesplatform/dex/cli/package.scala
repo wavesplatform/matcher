@@ -3,7 +3,7 @@ package com.wavesplatform.dex
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.{Applicative, Id, Monad}
+import cats.{Applicative, Monad}
 
 package object cli {
   type ErrorOr[A] = Either[String, A]

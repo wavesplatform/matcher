@@ -13,9 +13,9 @@ import scala.collection.mutable
 import scala.util.Random
 
 object TankGenerator extends ScorexLogging {
-  private def mkAccounts(seedPrefix: String, env: Environment, count: Int = 1000) = {
+  private def mkAccounts(seedPrefix: String, env: Environment, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
-    val accounts = (for { i <- 1 to count } yield { PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, env.networkByte) }).toList
+    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, env.networkByte)).toList
     println("Done")
     accounts
   }

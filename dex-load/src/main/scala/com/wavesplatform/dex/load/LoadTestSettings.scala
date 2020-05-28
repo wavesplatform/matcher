@@ -8,6 +8,7 @@ final class LoadTestSettings(conf: Config) {
 
   val networkByte      = conf.getString(s"$root.network-byte").charAt(0).toByte
   val matcherPublicKey = conf.getString(s"$root.matcher-public-key")
+  val matcherUrl = conf.getString(s"$root.hosts.matcher")
   val issuer           = PrivateKeyAccount.fromSeed(conf.getString(s"$root.rich-account"), 0, networkByte)
 
   val node     = new Node(conf.getString(s"$root.hosts.node"), networkByte)

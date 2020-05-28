@@ -2,12 +2,19 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
 import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
+import com.softwaremill.sttp.Uri.QueryFragment
+import com.softwaremill.sttp.playJson._
+import com.softwaremill.sttp.{SttpBackend, MonadError => _, _}
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.crypto
 
 import scala.collection.mutable
 import scala.util.Random
@@ -82,12 +89,29 @@ object TankGenerator extends ScorexLogging {
     svRequests(orders)
   }
 
+  private def timestampAndSignatureHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
+    "Timestamp" -> timestamp.toString,
+    "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
+  )
+
   private def mkCancels(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for cancelling...")
     val accounts                              = mkAccounts(seedPrefix, requestsCount / 400)
     val cancels: mutable.HashSet[CancelOrder] = mutable.HashSet()
+    implicit val backend                      = HttpURLConnectionBackend()
 
     accounts.foreach(a => {
+
+      println(
+        sttp
+          .get(uri"${settings.matcherUrl}/matcher/orderbook/${Base58.encode(a.getPublicKey)}")
+          .headers(timestampAndSignatureHeaders(a))
+          .send()
+          .body
+          .right
+          .get
+      )
+
       settings.matcher
         .getOrders(a)
         .forEach(o => {

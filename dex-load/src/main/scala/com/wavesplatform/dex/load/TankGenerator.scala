@@ -131,9 +131,7 @@ object TankGenerator extends ScorexLogging {
     println(s"Results have been saved to $requestsFile")
   }
 
-  def mkRequests(seedPrefix: String, environment: String, requestsType: Int = 2, requestsCount: Int = 20000): Unit = {
-    val env = new LoadTestSettings(ConfigFactory.parseResources(environment))
-
+  def mkRequests(seedPrefix: String, requestsType: Int = 2, requestsCount: Int = 20000): Unit = {
     requestsType match {
       case 1 => mkPlaces(seedPrefix, requestsCount)
       case 2 => mkCancels(seedPrefix, requestsCount)

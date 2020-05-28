@@ -10,7 +10,7 @@ import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transact
 import scala.util.Random
 
 package object utils {
-  val settings = new LoadTestSettings(ConfigFactory.parseResources(System.getenv("config")))
+  val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
 
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT       -> "application/json",

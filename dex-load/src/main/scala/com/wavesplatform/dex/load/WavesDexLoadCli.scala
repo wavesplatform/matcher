@@ -103,11 +103,6 @@ object WavesDexLoadCli extends ScoptImplicits {
           .action((_, s) => s.copy(command = Command.CreateRequests.some))
           .text("Creates file with requests for yandex-tank")
           .children(
-            opt[String]("environment-settings")
-              .abbr("es")
-              .text("The file with environment settings")
-              .required()
-              .action((x, s) => s.copy(dexRestApi = x)),
             opt[Int]("requests-type")
               .abbr("rt")
               .text("The type of requests (1. Places 2. Places & Cancels 3. Matching 4. Order History 5. All of types)")
@@ -133,7 +128,7 @@ object WavesDexLoadCli extends ScoptImplicits {
             }
             command match {
               case Command.CreateRequests =>
-                TankGenerator.mkRequests(args.seedPrefix, args.environmentSettings, args.requestsType, args.requestsCount)
+                TankGenerator.mkRequests(args.seedPrefix, args.requestsType, args.requestsCount)
 
               case Command.CreateFeederFile =>
                 println(s"Chain id: ${args.addressSchemeByte}")
@@ -268,7 +263,6 @@ object WavesDexLoadCli extends ScoptImplicits {
                           accountsNumber: Int = 1000,
                           seedPrefix: String = "loadtest-",
                           orderBookNumberPerAccount: Int = 10,
-                          environmentSettings: String = "devnet.conf",
                           requestsType: Int = 1,
                           requestsCount: Int = 30000,
                           dexRestApi: String = "",

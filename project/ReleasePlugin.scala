@@ -24,7 +24,7 @@ object ReleasePlugin extends AutoPlugin {
     inConfig(Compile)(
       Seq(
         releaseDirectory := ((Compile / target).value / "release").toPath,
-        artifactExtensions := List("deb", "tgz"),
+        artifactExtensions := List("deb", "zip"),
         release := Def
           .sequential(
             Compile / cleanAll,

@@ -1,8 +1,10 @@
 package com.wavesplatform.dex.api
 
+import com.github.ghik.silencer.silent
 import com.wavesplatform.dex.error.MatcherError
 import play.api.libs.json.{Format, JsObject, Json}
 
+@silent("deprecated")
 case class ApiError(
     error: Int,
     message: String,

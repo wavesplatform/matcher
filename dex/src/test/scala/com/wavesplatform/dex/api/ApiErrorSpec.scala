@@ -16,8 +16,8 @@ class ApiErrorSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
   "params" : {
     "id" : "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"
   },
-  "success" : false,
-  "status" : "OrderRejected"
+  "status" : "OrderRejected",
+  "success" : false
 }"""
 
   private val message: ApiError = ApiError(

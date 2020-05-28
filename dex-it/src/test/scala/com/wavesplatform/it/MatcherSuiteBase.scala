@@ -1,12 +1,18 @@
 package com.wavesplatform.it
 
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.ThreadLocalRandom
+
 import cats.instances.FutureInstances
 import com.wavesplatform.dex.asset.DoubleOps
+import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.BaseContainersKit
-import com.wavesplatform.dex.it.api.dex.HasDex
 import com.wavesplatform.dex.it.api.node.HasWavesNode
 import com.wavesplatform.dex.it.config.{GenesisConfig, PredefinedAccounts, PredefinedAssets}
+import com.wavesplatform.dex.it.dex.HasDex
 import com.wavesplatform.dex.it.matchers.ItMatchers
 import com.wavesplatform.dex.it.test.InformativeTestStart
 import com.wavesplatform.dex.it.waves.{MkWavesEntities, ToWavesJConversions}
@@ -62,5 +68,19 @@ trait MatcherSuiteBase
     log.debug(s"Perform afterAll")
     stopBaseContainers()
     super.afterAll()
+  }
+
+  def createAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
+    val account = KeyPair(ByteStr(s"account-test-${ThreadLocalRandom.current().nextInt()}".getBytes(StandardCharsets.UTF_8)))
+
+    balances.foreach {
+      case (balance, asset) =>
+        assert(
+          wavesNode1.api.balance(alice, asset) >= balance,
+          s"Alice doesn't have enough balance in ${asset.toString} to make a transfer"
+        )
+        broadcastAndAwait(mkTransfer(alice, account.toAddress, balance, asset))
+    }
+    account
   }
 }

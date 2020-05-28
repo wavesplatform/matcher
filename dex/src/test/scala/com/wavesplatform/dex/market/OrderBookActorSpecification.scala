@@ -1,11 +1,15 @@
 package com.wavesplatform.dex.market
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.ActorRef
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
+import cats.syntax.option._
 import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
+import com.wavesplatform.dex.caches.OrderFeeSettingsCache
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -15,33 +19,32 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.market.MatcherActor.SaveSnapshot
-import com.wavesplatform.dex.market.OrderBookActor._
+import com.wavesplatform.dex.market.OrderBookActor.{Snapshot => _, _}
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
+import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification
     extends MatcherSpec("OrderBookActor")
-    with NTPTime
+    with SystemTime
     with ImplicitSender
     with MatcherSpecBase
     with PathMockFactory
     with Eventually {
 
-  private val obc = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
-  private val md  = new ConcurrentHashMap[AssetPair, MarketStatus]
+  private val md = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private val wctAsset = IssuedAsset(ByteStr(Array.fill(32)(1)))
   private val ethAsset = IssuedAsset(ByteStr("ETH".getBytes))
-
-  private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit =
     obcTestWithPrepare((_, _) => ()) { (pair, actor, probe) =>
@@ -62,10 +65,10 @@ class OrderBookActorSpecification
     }
 
   private def obcTestWithPrepare(prepare: (OrderBookSnapshotDB, AssetPair) => Unit,
-                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)))(
+                                 matchingRules: NonEmptyList[DenormalizedMatchingRule] = NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
+                                 makerTakerFeeAtOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long) = _ => makerTakerPartialFee)(
       f: (AssetPair, TestActorRef[OrderBookActor with RestartableActor], TestProbe) => Unit): Unit = {
 
-    obc.clear()
     md.clear()
 
     val tp    = TestProbe()
@@ -76,17 +79,19 @@ class OrderBookActorSpecification
 
     val orderBookActor = TestActorRef(
       new OrderBookActor(
+        OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
         tp.ref,
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
         pair,
-        update(pair),
-        p => Option(md.get(p)),
-        ntpTime,
+        8,
+        8,
+        time,
         matchingRules,
         _ => (),
         raw => MatchingRule(raw.startOffset, (raw.tickSize * BigDecimal(10).pow(8)).toLongExact),
-        _ => (t, m) => m.matcherFee -> t.matcherFee
+        makerTakerFeeAtOffset,
+        None
       ) with RestartableActor)
 
     f(pair, orderBookActor, tp)
@@ -99,17 +104,17 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBook.Snapshot.empty))
+      obsdb.update(p, 50, Some(OrderBookSnapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
-        val ord = buy(p, 10 * Order.PriceConstant, 100)
-        val ob  = OrderBook.empty()
-        ob.add(LimitOrder(ord), ord.timestamp, (t, m) => m.matcherFee -> t.matcherFee)
-        obsdb.update(p, 50, Some(ob.snapshot))
+        val ord               = buy(p, 10 * Order.PriceConstant, 100)
+        val ob                = OrderBook.empty
+        val (updatedOb, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
+        obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>
       tp.expectMsgType[OrderAdded]
@@ -137,21 +142,26 @@ class OrderBookActorSpecification
       val ord2 = sell(pair, 15 * Order.PriceConstant, 100)
 
       actor ! wrapLimitOrder(ord1)
-      actor ! wrapLimitOrder(ord2)
+      tp.expectMsgType[OrderAdded]
 
-      tp.receiveN(3)
+      actor ! wrapLimitOrder(ord2)
+      tp.expectMsgType[OrderAdded]
+      tp.expectMsgType[OrderExecuted]
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
 
       actor ! RestartActor
-      tp.expectMsg(
-        OrderAdded(SellLimitOrder(
-                     ord2.amount - ord1.amount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+      tp.expectMsgType[OrderAdded] should matchTo(
+        OrderAdded(
+          SellLimitOrder(
+            ord2.amount - ord1.amount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord1.amount),
+            ord2,
+            (BigInt(10) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -164,7 +174,7 @@ class OrderBookActorSpecification
       actor ! wrapLimitOrder(ord1)
       actor ! wrapLimitOrder(ord2)
       actor ! wrapLimitOrder(ord3)
-      tp.receiveN(4)
+      tp.receiveN(5)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
@@ -172,12 +182,15 @@ class OrderBookActorSpecification
 
       val restAmount = ord1.amount + ord2.amount - ord3.amount
       tp.expectMsg(
-        OrderAdded(BuyLimitOrder(
-                     restAmount,
-                     ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-                     ord2
-                   ),
-                   ord2.timestamp)
+        OrderAdded(
+          BuyLimitOrder(
+            restAmount,
+            ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
+            ord2,
+            (BigInt(2) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
+          ),
+          ord2.timestamp
+        )
       )
       tp.expectMsgType[OrderBookRecovered]
     }
@@ -192,7 +205,7 @@ class OrderBookActorSpecification
       actor ! wrapLimitOrder(ord2)
       actor ! wrapLimitOrder(ord3)
       actor ! wrapLimitOrder(ord4)
-      tp.receiveN(6)
+      tp.receiveN(7)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
@@ -204,10 +217,12 @@ class OrderBookActorSpecification
           SellLimitOrder(
             restAmount,
             ord2.matcherFee - AcceptedOrder.partialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
-            ord2
+            ord2,
+            (BigInt(4) * Order.PriceConstant * 100 * Order.PriceConstant).bigInteger
           ),
           ord2.timestamp
-        ))
+        )
+      )
       tp.expectMsgType[OrderBookRecovered]
     }
 
@@ -311,7 +326,7 @@ class OrderBookActorSpecification
       }
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 3
 
         val level41 = bids.head
@@ -343,7 +358,7 @@ class OrderBookActorSpecification
       }
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 2
 
         val level41 = bids.head
@@ -374,7 +389,7 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderAdded]
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 2
         bids.head.price shouldBe buyOrder1.price
         bids.last.price shouldBe 0.0000040 * Order.PriceConstant
@@ -384,9 +399,39 @@ class OrderBookActorSpecification
       tp.expectMsgType[OrderCanceled]
 
       eventually {
-        val bids = obc.get(pair).bids
+        val bids = getAggregatedSnapshot(orderBook).bids
         bids.size shouldBe 1
         bids.head.price shouldBe 0.000004 * Order.PriceConstant
+      }
+    }
+
+    "correctly apply new fees when rules are switched" in {
+      val makerTakerFeeAtOffset = Fee.getMakerTakerFeeByOffset(
+        new OrderFeeSettingsCache(
+          Map(
+            0L -> DynamicSettings(0.001.waves, 0.003.waves),
+            1L -> DynamicSettings(0.001.waves, 0.005.waves)
+          )
+        )
+      ) _
+
+      obcTestWithPrepare(prepare = (_, _) => (), makerTakerFeeAtOffset = makerTakerFeeAtOffset) { (pair, orderBook, tp) =>
+        tp.expectMsg(OrderBookRecovered(pair, None))
+        val now = System.currentTimeMillis()
+
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.003.waves)
+        val maker1 = sell(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.003.waves.some, ts = now.some)
+        orderBook ! wrapLimitOrder(0, maker1)
+        tp.expectMsgType[OrderAdded]
+
+        // place when order fee settings is DynamicSettings(0.001.waves, 0.005.waves)
+        val taker1 = buy(wavesUsdPair, 10.waves, 3.00, matcherFee = 0.005.waves.some, ts = now.some)
+        orderBook ! wrapLimitOrder(1, taker1)
+        tp.expectMsgType[OrderAdded]
+
+        val oe = tp.expectMsgType[OrderExecuted]
+        oe.counterExecutedFee shouldBe 0.0006.waves
+        oe.submittedExecutedFee shouldBe 0.005.waves
       }
     }
 
@@ -426,7 +471,7 @@ class OrderBookActorSpecification
         }
 
         orderBook ! wrapMarketOrder(marketOrder)
-
+        tp.expectMsgType[OrderAdded]
         val oe1 = tp.expectMsgType[OrderExecuted]
         oe1.submitted shouldBe marketOrder
         oe1.counter shouldBe LimitOrder(counterOrder1)
@@ -447,8 +492,9 @@ class OrderBookActorSpecification
         tp.receiveN(0)
 
         eventually {
-          obc.get(wctWavesPair).getCounterSideFor(marketOrder).map(_.amount).sum shouldBe toNormalized(2)
-          obc.get(wctWavesPair).getSideFor(marketOrder) shouldBe empty
+          val ob = getAggregatedSnapshot(orderBook)
+          ob.getCounterSideFor(marketOrder).map(_.amount).sum shouldBe toNormalized(2)
+          ob.getSideFor(marketOrder) shouldBe empty
         }
       }
 
@@ -486,11 +532,12 @@ class OrderBookActorSpecification
 
         withClue("Stop condition - no counter orders:") {
           orderBook ! wrapMarketOrder(marketOrder)
+          tp.expectMsgType[OrderAdded]
           val oc = tp.expectMsgType[OrderCanceled]
 
           oc.acceptedOrder shouldBe marketOrder
           oc.isSystemCancel shouldBe true
-          obc.get(wctWavesPair).asks shouldBe empty
+          getAggregatedSnapshot(orderBook).asks shouldBe empty
 
           tp.receiveN(0)
         }
@@ -500,7 +547,7 @@ class OrderBookActorSpecification
           tp.expectMsgType[OrderAdded]
 
           orderBook ! wrapMarketOrder(marketOrder)
-
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
@@ -512,8 +559,9 @@ class OrderBookActorSpecification
           oc2.isSystemCancel shouldBe true
 
           eventually {
-            obc.get(wctWavesPair).asks shouldBe empty
-            obc.get(wctWavesPair).bids shouldBe empty
+            val ob = getAggregatedSnapshot(orderBook)
+            ob.asks shouldBe empty
+            ob.bids shouldBe empty
           }
 
           tp.receiveN(0)
@@ -560,6 +608,7 @@ class OrderBookActorSpecification
 
           orderBook ! wrapMarketOrder(marketOrder)
 
+          tp.expectMsgType[OrderAdded]
           val oe = tp.expectMsgType[OrderExecuted]
           oe.submitted shouldBe marketOrder
           oe.counter shouldBe LimitOrder(counterOrder)
@@ -585,8 +634,9 @@ class OrderBookActorSpecification
           tp.receiveN(0)
 
           eventually {
-            obc.get(wctWavesPair).getSideFor(marketOrder) shouldBe empty
-            obc.get(wctWavesPair).getCounterSideFor(marketOrder).map(_.amount).sum shouldBe counterOrder.amount - oe.executedAmount
+            val ob = getAggregatedSnapshot(orderBook)
+            ob.getSideFor(marketOrder) shouldBe empty
+            ob.getCounterSideFor(marketOrder).map(_.amount).sum shouldBe counterOrder.amount - oe.executedAmount
           }
         }
 
@@ -598,5 +648,37 @@ class OrderBookActorSpecification
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = ethAsset, isFeeConsideredInExecutionAmount = false) // fee in third asset
       afsIsNotEnoughTest(marketOrderType = OrderType.BUY, feeAsset = Waves, isFeeConsideredInExecutionAmount = true)     // fee in spent asset
     }
+
+    "cancel a submitted order if it couldn't be matched by a price of a counter order" in obcTest { (wctWavesPair, orderBook, tp) =>
+      val counterOrder = rawSell(
+        pair = wctWavesPair,
+        amount = 20000L,
+        price = 90000L,
+        matcherFee = Some(300000L),
+        version = 1.toByte
+      )
+
+      val submittedOrder = rawBuy(
+        pair = wctWavesPair,
+        amount = 1000L,
+        price = 100000L,
+        matcherFee = Some(300000L),
+        version = 3.toByte
+      )
+
+      orderBook ! wrapLimitOrder(counterOrder)
+      tp.expectMsgType[OrderAdded]
+
+      orderBook ! wrapLimitOrder(submittedOrder)
+      tp.expectMsgType[OrderAdded]
+      // The amount=1000 should >= ceil(10^8 / 90000) = 1112
+      tp.expectMsgType[OrderCanceled].isSystemCancel shouldBe true
+    }
+  }
+
+  private def getAggregatedSnapshot(orderBookRef: ActorRef): OrderBookAggregatedSnapshot = {
+    val pair       = wavesUsdPair // hack
+    val askAdapter = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(orderBookRef))), 5.seconds)
+    Await.result(askAdapter.getAggregatedSnapshot(pair), 1.second).toOption.flatten.getOrElse(throw new IllegalStateException("Can't get snapshot"))
   }
 }

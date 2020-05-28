@@ -1,17 +1,17 @@
 package com.wavesplatform.dex.it.api
 
-import java.lang
 import java.net.InetAddress
 import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 import com.github.dockerjava.api.command.CreateNetworkCmd
 import com.github.dockerjava.api.model.Network.Ipam
 import com.google.common.primitives.Ints.toByteArray
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.softwaremill.sttp.{HttpURLConnectionBackend, TryHttpURLConnectionBackend}
+import com.softwaremill.sttp.TryHttpURLConnectionBackend
 import com.softwaremill.sttp.asynchttpclient.future.AsyncHttpClientFutureBackend
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.docker.BaseContainer
@@ -55,10 +55,10 @@ trait BaseContainersKit extends ScorexLogging {
     else throw new IllegalArgumentException(s"Can't parse number from '$name'. Know 'dex-' and 'waves-' only")
   }
 
-  protected val knownContainers: ConcurrentHashMap.KeySetView[BaseContainer, lang.Boolean] = ConcurrentHashMap.newKeySet[BaseContainer]()
+  // There is a List to remove containers in a reversed order
+  protected val knownContainers = new AtomicReference[List[BaseContainer]](List.empty)
 
-  protected def addKnownContainer(container: BaseContainer): Unit = knownContainers.add(container)
-  protected def forgetContainer(container: BaseContainer): Unit   = knownContainers.remove(container)
+  protected def addKnownContainer(container: BaseContainer): Unit = knownContainers.updateAndGet(container :: _)
 
   protected implicit val ec: ExecutionContext = ExecutionContext.fromExecutor {
     Executors.newFixedThreadPool(10, new ThreadFactoryBuilder().setNameFormat(s"${getClass.getSimpleName}-%d").setDaemon(true).build)
@@ -76,7 +76,23 @@ trait BaseContainersKit extends ScorexLogging {
     )
   )
 
-  protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](TryHttpURLConnectionBackend())
+  protected implicit val tryHttpBackend: LoggingSttpBackend[Try, Nothing] = new LoggingSttpBackend[Try, Nothing](
+    TryHttpURLConnectionBackend(customizeConnection = conn => {
+      // For tests with a high latency
+      conn.setConnectTimeout(30000)
+      conn.setReadTimeout(30000)
+
+      // This block of code to figh caches. It seems this doesn't help on macOS, but works on CI
+      conn.setDefaultUseCaches(false)
+      conn.setUseCaches(false)
+      conn.setRequestProperty("Cache-Control", "no-store")
+      conn.setRequestProperty("Pragma", "no-cache")
+      conn.setRequestProperty("If-Modified-Since", "Sat, 1 Jan 2000 00:00:00 GMT")
+      conn.setRequestProperty("Expired", "0")
+
+      if (conn.getRequestMethod == "POST" && conn.getDoOutput) conn.setChunkedStreamingMode(0)
+    })
+  )
 
   /** A location for logs from containers on local machine */
   protected lazy val localLogsDir: Path = {
@@ -94,6 +110,6 @@ trait BaseContainersKit extends ScorexLogging {
     log.debug("Stopping containers")
     futureHttpBackend.close()
     tryHttpBackend.close()
-    knownContainers.forEach(_.stopWithoutRemove()) // Graceful shutdown to save logs
+    knownContainers.getAndUpdate(_ => List.empty).foreach(_.stopWithoutRemove()) // Graceful shutdown to save logs
   }
 }

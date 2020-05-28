@@ -33,18 +33,18 @@ object OrderType {
   }
 
   implicit val orderTypeFormat: Format[OrderType] = Format(
-    Reads {
-      case JsString(x) =>
-        x match {
-          case "buy"  => JsSuccess(BUY)
-          case "sell" => JsSuccess(SELL)
-          case _      => JsError(s"Unknown order type: $x")
-        }
-      case x => JsError(s"Can't parse '$x' as OrderType")
-    },
-    Writes {
-      case BUY  => JsString("buy")
-      case SELL => JsString("sell")
+    {
+      case JsString(BUY.`toString`)  => JsSuccess(BUY)
+      case JsString(SELL.`toString`) => JsSuccess(SELL)
+      case x                         => JsError(JsPath, s"Can't read OrderType from ${x.getClass.getName}")
+    }, {
+      case BUY  => JsString(BUY.`toString`)
+      case SELL => JsString(SELL.`toString`)
     }
   )
+
+  final implicit class OrderTypeOps(val self: OrderType) extends AnyVal {
+    def askBid[T](ifAsk: => T, ifBid: => T): T = if (self == OrderType.SELL) ifAsk else ifBid
+    def opposite: OrderType                    = askBid(OrderType.BUY, OrderType.SELL)
+  }
 }

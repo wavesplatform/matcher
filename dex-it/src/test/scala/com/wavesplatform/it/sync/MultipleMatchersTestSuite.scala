@@ -3,10 +3,11 @@ package com.wavesplatform.it.sync
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.dex.DexApi
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
@@ -56,6 +57,14 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
     dex1.start()
     dex2.start()
+  }
+
+  "Dex 2 should continue getting the balance changes if Dex 1 has been disconnected from network" in {
+    val acc = mkAccountWithBalance(10.waves -> Waves)
+    dex1.disconnectFromNetwork()
+    broadcastAndAwait(mkTransfer(acc, alice.toAddress, 4.waves, Waves, 0.05.waves))
+    dex2.api.tradableBalance(acc, ethWavesPair)(Waves) shouldBe 5.95.waves
+    dex1.connectToNetwork()
   }
 
   "Place, fill and cancel a lot of orders" in {

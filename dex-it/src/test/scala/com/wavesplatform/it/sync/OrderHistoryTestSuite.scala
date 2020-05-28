@@ -1,11 +1,14 @@
 package com.wavesplatform.it.sync
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.AddressActor.OrderListType
 import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Normalization
+import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.it.MatcherSuiteBase
@@ -222,14 +225,15 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       dex1.api.cancel(alice, order)
     }
 
-    "should should right fee if not enough amount before order execution and fee rounding" in {
+    "should save right fee considering the fee rate" in {
+      val rate     = 0.33333333
+      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
+
       val ethBalance = dex1.api.tradableBalance(alice, ethUsdPair)(eth)
 
-      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - (BigDecimal(0.005) * matcherFee).toLong, eth))
+      broadcastAndAwait(mkTransfer(alice, bob, ethBalance - orderFee, eth))
 
-      val rate = 0.33333333
       dex1.api.upsertRate(feeAsset, rate)
-      val orderFee = (BigDecimal(rate) * matcherFee).setScale(0, CEILING).toLong
 
       val aliceOrder   = mkOrder(alice, ethUsdPair, BUY, 1.eth, 0.5.price, orderFee, feeAsset = feeAsset)
       val aliceOrderId = aliceOrder.id()
@@ -262,6 +266,94 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
         item.filledFee shouldBe matcherFee
         item.feeAsset shouldBe feeAsset
       }
+    }
+  }
+
+  "OrderHistory should" - {
+    "correctly save average weighed price" in {
+      Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+
+      def assertAvgWeighedPrice(keyPair: KeyPair, avgWeighedPrices: List[Long]): Unit = {
+        dex1.api.orderHistoryByPair(keyPair, wavesUsdPair, Some(false)).map(_.avgWeighedPrice) should matchTo(avgWeighedPrices)
+      }
+
+      // checking market and limit orders because
+      // in case of market sell order avgWeighedPrice retrieved from orderDB,
+      // in case of limit sell order - from active orders
+      Seq(true, false) foreach { isMarketOrder =>
+        val mozart  = mkAccountWithBalance(100.waves -> Waves)
+        val salieri = mkAccountWithBalance(300.usd   -> usd, 10.waves -> Waves)
+
+        Seq(
+          30.waves -> 3.2,
+          10.waves -> 2.9,
+          50.waves -> 2.7
+        ).foreach { case (amount, price) => placeAndAwaitAtDex(mkOrderDP(salieri, wavesUsdPair, BUY, amount, price)) }
+
+        placeAndAwaitAtNode(mkOrderDP(mozart, wavesUsdPair, SELL, 95.waves, 2.0), isMarketOrder = isMarketOrder)
+
+        assertAvgWeighedPrice(mozart, List(288L))
+        assertAvgWeighedPrice(salieri, List(270L, 290L, 320L))
+
+        Seq(alice, bob, mozart, salieri).foreach { dex1.api.cancelAll(_) }
+      }
+    }
+
+    "return an order history with different filters" in {
+      val carol = mkAccountWithBalance(10.waves -> Waves)
+
+      val order1 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 1.waves, 2.0)
+      dex1.api.place(order1)
+
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 2.0), OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(order1, OrderStatus.Filled)
+
+      val order2 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 2.waves, 3.0)
+      dex1.api.place(order2)
+
+      val all        = List(order2.id(), order1.id())
+      val activeOnly = List(order2.id())
+      val closedOnly = List(order1.id())
+
+      withClue("default: ") {
+        // MatcherApiRoute.getAssetPairAndPublicKeyOrderHistory
+        dex1.api.orderHistoryByPair(carol, wavesUsdPair).map(_.id) should matchTo(all)
+
+        // MatcherApiRoute.getPublicKeyOrderHistory
+        dex1.api.orderHistory(carol).map(_.id) should matchTo(all)
+
+        // MatcherApiRoute.getAllOrderHistory
+        dex1.api.orderHistoryWithApiKey(carol).map(_.id) should matchTo(activeOnly)
+      }
+
+      List(
+        // format: off
+        (true.some,   none,         OrderListType.ActiveOnly),
+        (false.some,  none,         OrderListType.All),
+        (none,        true.some,    OrderListType.ClosedOnly),
+        (none,        false.some,   OrderListType.All),
+        (true.some,   true.some,    OrderListType.Empty),
+        (false.some,  true.some,    OrderListType.ClosedOnly),
+        (true.some,   false.some,   OrderListType.ActiveOnly),
+        (false.some,  false.some,   OrderListType.All),
+        // format: on
+      ).foreach {
+        case (activeOnlyParam, closedOnlyParam, result) =>
+          withClue(s"activeOnly=$activeOnlyParam, closedOnly=$closedOnlyParam, result=$result: ") {
+            val expected = result match {
+              case OrderListType.All        => all
+              case OrderListType.Empty      => List.empty
+              case OrderListType.ActiveOnly => activeOnly
+              case OrderListType.ClosedOnly => closedOnly
+            }
+
+            dex1.api.orderHistoryByPair(carol, wavesUsdPair, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.orderHistory(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+            dex1.api.orderHistoryWithApiKey(carol, activeOnlyParam, closedOnlyParam).map(_.id) should matchTo(expected)
+          }
+      }
+
+      dex1.api.cancelAll(carol)
     }
   }
 

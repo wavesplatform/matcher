@@ -5,14 +5,14 @@ object Dependencies {
 
   object Version {
 
-    val akka     = "2.6.1"
+    val akka     = "2.6.5"
     val akkaHttp = "10.1.11"
 
     val scalaTest          = "3.1.0"
     val scalaCheck         = "1.14.3"
     val scalaTestPlusCheck = "3.1.0.1"
     val scalaMock          = "4.4.0"
-    val diffx              = "0.3.16"
+    val diffx              = "0.3.19"
 
     val cats              = "2.0.0"
     val catsTaglessMacros = "0.11"
@@ -20,14 +20,16 @@ object Dependencies {
     val betterMonadicFor  = "0.3.1"
     val mouse             = "0.24"
     val shapeless         = "2.3.3"
+    val monocle           = "2.0.4"
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
     val ficus          = "1.4.7"
 
-    val logback = "1.2.3"
-    val slf4j   = "1.7.30"
-    val janino  = "3.1.0"
+    val logback            = "1.2.3"
+    val slf4j              = "1.7.30"
+    val janino             = "3.1.0"
+    val logbackJsonEncoder = "6.3"
 
     val silencer = "1.4.4"
 
@@ -41,12 +43,13 @@ object Dependencies {
     val postgresql = "42.2.9"
     val quillJdbc  = "3.5.0"
 
-    val sttp = "1.7.2"
+    val sttp       = "1.7.2"
+    val sttpClient = "2.1.1"
 
-    val testContainers         = "0.34.3"
-    val testContainersPostgres = "1.12.4"
-
-    val toxiProxy = "1.12.4"
+    val testContainers          = "0.35.2"
+    val testContainersPostgres  = "1.12.5"
+    val testContainersKafka     = "1.13.0"
+    val testContainersToxiProxy = "1.12.5"
 
     val jackson  = "2.10.0"
     val playJson = "2.8.1"
@@ -63,10 +66,13 @@ object Dependencies {
 
     val supertagged = "1.4"
 
-    val levelDb  = "0.12"
-    val influxDb = "2.17"
+    val javaLevelDb = "0.12"
+    val jniLevelDb  = "1.18.3"
+    val influxDb    = "2.17"
 
     val commonsNet = "3.6"
+    val nettyCodec = "4.1.33.Final"
+    val jwt        = "4.2.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -76,8 +82,11 @@ object Dependencies {
   private def jacksonModule(group: String, module: String): ModuleID = s"com.fasterxml.jackson.$group" % s"jackson-$module" % Version.jackson
   private def monixModule(module: String): ModuleID                  = "io.monix"                      %% s"monix-$module"  % Version.monix
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon"                      %% s"kamon-$module"  % version
+  private def jwtModule(module: String): ModuleID                    = "com.pauldijou"                 %% s"jwt-$module"    % Version.jwt
 
   private val akkaActor            = akkaModule("akka-actor", Version.akka)
+  private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
+  private val akkaStreamsTyped     = akkaModule("akka-stream-typed", Version.akka)
   private val akkaHttp             = akkaModule("akka-http", Version.akkaHttp)
   private val scalaTest            = "org.scalatest" %% "scalatest" % Version.scalaTest
   private val scalaCheck           = "org.scalacheck" %% "scalacheck" % Version.scalaCheck
@@ -94,21 +103,25 @@ object Dependencies {
   private val scopt                = "com.github.scopt" %% "scopt" % Version.scopt
   private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
+  private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
   private val slf4j                = "org.slf4j" % "slf4j-api" % Version.slf4j
   private val julToSlf4j           = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore            = kamonModule("core", Version.kamonCore)
   private val wavesProtobufSchemas = ("com.wavesplatform" % "protobuf-schemas" % Version.wavesProtobufSchemas classifier "proto") % "protobuf" // for teamcity
+
   private val wavesJ = "com.wavesplatform" % "wavesj" % Version.wavesJ excludeAll (
     // Conflicts with specified gRPC. This is the problem for waves-integration-it.
     // Also, wavesj doesn't use gRPC, so it is safe.
     ExclusionRule(organization = "io.grpc"),
     ExclusionRule("com.wavesplatform", "protobuf-schemas")
   )
-  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.toxiProxy
+
+  private val toxiProxy     = "org.testcontainers" % "toxiproxy" % Version.testContainersToxiProxy
   private val googleGuava   = "com.google.guava" % "guava" % Version.googleGuava
   private val kafka         = "org.apache.kafka" % "kafka-clients" % Version.kafka
   private val grpcNetty     = "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion
+  private val nettyCodec    = "io.netty" % "netty-codec-http2" % Version.nettyCodec
   private val swagger       = "com.github.swagger-akka-http" %% "swagger-akka-http" % Version.swagger
   private val swaggerUi     = "org.webjars" % "swagger-ui" % Version.swaggerUi
   private val playJson      = "com.typesafe.play" %% "play-json" % Version.playJson
@@ -116,9 +129,16 @@ object Dependencies {
   private val grpcScalaPb   = "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
   private val monixReactive = monixModule("reactive")
   private val supertagged   = "org.rudogma" %% "supertagged" % Version.supertagged
-  private val levelDb       = "org.iq80.leveldb" % "leveldb" % Version.levelDb
+  private val javaLevelDb   = "org.iq80.leveldb" % "leveldb" % Version.javaLevelDb
+  private val jniLevelDb    = "org.ethereum" % "leveldbjni-all" % Version.jniLevelDb
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
+  private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+
+  private val monocle: Seq[ModuleID] = Seq(
+    "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
+    "com.github.julien-truffaut" %% "monocle-macro" % Version.monocle
+  )
 
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
@@ -132,16 +152,19 @@ object Dependencies {
 
   private val testContainers: Seq[ModuleID] = Seq(
     "com.dimafeng"       %% "testcontainers-scala" % Version.testContainers,
-    "org.testcontainers" % "postgresql"            % Version.testContainersPostgres
+    "org.testcontainers" % "postgresql"            % Version.testContainersPostgres,
+    "org.testcontainers" % "kafka"                 % Version.testContainersKafka
   )
 
   private val testKit: Seq[ModuleID] = Seq(
     akkaModule("akka-testkit", Version.akka),
     akkaModule("akka-http-testkit", Version.akkaHttp),
+    akkaModule("akka-actor-testkit-typed", Version.akka),
     scalaTest,
     scalaCheck,
     scalaTestPlusCheck,
-    scalaMock
+    scalaMock,
+    javaLevelDb
   ) map (_ % Test)
 
   private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
@@ -149,6 +172,8 @@ object Dependencies {
   val globalEnforcedVersions = Def.setting(
     Seq(
       akkaActor,
+      akkaActorTyped,
+      akkaStreamsTyped,
       akkaHttp,
       akkaModule("akka-stream", Version.akka),
       jacksonModule("core", "core"),
@@ -170,7 +195,7 @@ object Dependencies {
       googleGuava,
       slf4j,
       grpcNetty,
-      "io.netty" % "netty-codec-http2" % "4.1.33.Final"
+      nettyCodec
     )
   )
 
@@ -178,10 +203,13 @@ object Dependencies {
 
     lazy val dex: Seq[ModuleID] = Seq(
       akkaActor,
+      akkaActorTyped,
+      akkaStreamsTyped,
       akkaHttp,
       akkaModule("akka-slf4j", Version.akka),
       julToSlf4j,
       logback,
+      logbackJsonEncoder % Runtime,
       kindProjector,
       catsTaglessMacros,
       shapeless,
@@ -189,14 +217,20 @@ object Dependencies {
       scopt,
       kafka,
       janino,
-      levelDb,
+      jniLevelDb,
       kamonCore,
       kamonModule("influxdb", Version.kamonInfluxDb),
       kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
       commonsNet,
-      swaggerUi
-    ) ++ testKit ++ quill ++ silencer
+      swaggerUi,
+      "javax.xml.bind" % "jaxb-api" % "2.3.1", // Required for Swagger UI in JRE 11 because of javax/xml/bind/annotation/XmlRootElement
+      jwtModule("core"),
+      jwtModule("play-json"),
+      sttpClient,
+      wavesJ,
+      betterMonadicFor
+    ) ++ testKit ++ quill ++ silencer ++ monocle
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

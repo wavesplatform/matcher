@@ -28,26 +28,29 @@ class ApiOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMat
   "assetPair" : {
     "amountAsset" : "6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7",
     "priceAsset" : "8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc"
-  }
+  },
+  "avgWeighedPrice" : 0
 }"""
 
-  private val historyItem = ApiOrderBookHistoryItem(
-    id = ByteStr.decodeBase58("7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN").get,
-    `type` = OrderType.BUY,
-    orderType = AcceptedOrderType.Limit,
-    amount = 7757865201004347L,
-    filled = 0L,
-    price = 489L,
-    fee = 6345852410462127L,
-    filledFee = 0L,
-    feeAsset = Waves,
-    timestamp = 1578074613225L,
-    status = OrderStatus.Accepted.name,
-    assetPair = AssetPair(
-      IssuedAsset(ByteStr.decodeBase58("6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7").get),
-      IssuedAsset(ByteStr.decodeBase58("8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc").get)
+  private val historyItem =
+    ApiOrderBookHistoryItem(
+      id = ByteStr.decodeBase58("7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN").get,
+      `type` = OrderType.BUY,
+      orderType = AcceptedOrderType.Limit,
+      amount = 7757865201004347L,
+      filled = 0L,
+      price = 489L,
+      fee = 6345852410462127L,
+      filledFee = 0L,
+      feeAsset = Waves,
+      timestamp = 1578074613225L,
+      status = OrderStatus.Accepted.name,
+      assetPair = AssetPair(
+        IssuedAsset(ByteStr.decodeBase58("6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7").get),
+        IssuedAsset(ByteStr.decodeBase58("8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc").get)
+      ),
+      avgWeighedPrice = 0L
     )
-  )
 
   "backward JSON compatibility" - {
     "serialization" in {

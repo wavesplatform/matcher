@@ -244,12 +244,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       broadcastAndAwait(leaseTx)
 
       val bobOrder = mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice)
-      placeAndAwaitAtDex(bobOrder)
-
-      dex1.api.tradableBalance(bob, wctWavesPair)(Waves) shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
-      dex1.api.cancel(bob, bobOrder)
-
-      dex1.api.tryPlace(mkOrder(bob, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice)) should failWith(3147270) // BalanceNotEnough
+      dex1.api.tryPlace(bobOrder) should failWith(3147270) // BalanceNotEnough
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
     }
@@ -278,13 +273,15 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Submitted order Canceled during match" in {
-    val bobOrder = mkOrder(matcher, wavesUsdPair, OrderType.SELL, 10000000L, 10L)
+  "submitted order is canceled during match" in {
+
+    Seq(alice, bob).foreach { dex1.api.cancelAll(_) }
+
+    val bobOrder = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 0.1.waves, 0.1)
     placeAndAwaitAtDex(bobOrder)
 
-    val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000L, 1000L)
+    val aliceOrder = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 0.001.waves, 10.0)
     dex1.api.place(aliceOrder)
-
     dex1.api.waitForOrder(aliceOrder)(_ == OrderStatusResponse(OrderStatus.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
 
     withClue("Alice's reserved balance:") {
@@ -299,7 +296,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       .getOrElse(throw new IllegalStateException(s"Alice should have the ${aliceOrder.id()} order"))
 
     order.status shouldBe OrderStatus.Cancelled
-    dex1.api.cancel(matcher, bobOrder)
+    dex1.api.cancel(bob, bobOrder)
   }
 
   private def correctAmount(a: Long, price: Long): Long = {

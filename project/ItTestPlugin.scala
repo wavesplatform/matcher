@@ -26,13 +26,14 @@ object ItTestPlugin extends AutoPlugin {
         // Example: SCALATEST_EXCLUDE_TAGS="package1.Tag1 package2.Tag2 package3.Tag3"
         testOptions += {
           val excludeTags = sys.env.get("SCALATEST_EXCLUDE_TAGS").fold(Seq.empty[String])(Seq("-l", _))
+          val includeTags = sys.env.get("SCALATEST_INCLUDE_TAGS").fold(Seq.empty[String])(Seq("-n", _))
           /* http://www.scalatest.org/user_guide/using_the_runner
            * f - select the file reporter with output directory
            * F - show full stack traces
            * W - without color
            * D - show all durations
            */
-          val args = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags
+          val args = Seq("-fFWD", (logDirectory.value / "summary.log").toString) ++ excludeTags ++ includeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution in Test := true,

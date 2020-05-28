@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api
 
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -13,6 +14,8 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
 
   private val json =
     """{
+  "matcherPublicKey" : "2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY",
+  "matcherVersion" : "2.1.3.3",
   "priceAssets" : [ null, "4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8" ],
   "orderFee" : {
     "fixed" : {
@@ -20,18 +23,24 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
       "minFee" : 300000
     }
   },
-  "orderVersions" : [ 1, 2, 3 ]
+  "orderVersions" : [ 1, 2, 3 ],
+  "networkByte" : 83
 }"""
 
   private val issuedAsset = IssuedAsset(Base58.decode("4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8"))
-  private val matcherPublicSettings = ApiMatcherPublicSettings(
-    priceAssets = Seq(Waves, issuedAsset),
-    orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Fixed(
-      assetId = issuedAsset,
-      minFee = 300000
-    ),
-    orderVersions = Seq(1, 2, 3)
-  )
+
+  private val matcherPublicSettings =
+    ApiMatcherPublicSettings(
+      matcherPublicKey = PublicKey.fromBase58String("2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY").right.get,
+      matcherVersion = "2.1.3.3",
+      priceAssets = Seq(Waves, issuedAsset),
+      orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Fixed(
+        assetId = issuedAsset,
+        minFee = 300000
+      ),
+      orderVersions = Seq(1, 2, 3),
+      networkByte = 83
+    )
 
   "backward JSON compatibility" - {
     "serialization" in {

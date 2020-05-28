@@ -6,7 +6,7 @@ case class QueueEventWithMeta(offset: QueueEventWithMeta.Offset, timestamp: Long
   override def toString: String = {
     val eventStr = event match {
       case QueueEvent.Placed(lo)              => s"Placed(${lo.order.idStr()})"
-      case QueueEvent.PlacedMarket(mo)        => s"PlacedMarket(${mo.order.idStr()}, ${mo.order.assetPair.key})"
+      case QueueEvent.PlacedMarket(mo)        => s"PlacedMarket(${mo.order.idStr()}, k=${mo.order.assetPair.key}, afs=${mo.availableForSpending})"
       case QueueEvent.Canceled(assetPair, id) => s"Canceled($id, ${assetPair.key})"
       case QueueEvent.OrderBookDeleted(p)     => s"OrderBookDeleted(${p.key})"
     }

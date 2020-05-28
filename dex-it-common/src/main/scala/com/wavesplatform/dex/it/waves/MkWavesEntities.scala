@@ -1,11 +1,13 @@
 package com.wavesplatform.dex.it.waves
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
@@ -26,6 +28,8 @@ trait MkWavesEntities {
   private val emptyAttachments: java.lang.String = null
 
   private def orderVersion: Byte = { ThreadLocalRandom.current.nextInt(3) + 1 }.toByte
+
+  def mkKeyPair(seed: String): KeyPair = KeyPair(crypto secureHash seed.getBytes(StandardCharsets.UTF_8))
 
   /**
     * @param feeAsset If specified IssuedAsset, the version will be automatically set to 3
@@ -211,6 +215,10 @@ trait MkWavesEntities {
         timestamp = ts
       )
       .explicitGet()
+  }
+
+  def mkBurn(sender: KeyPair, asset: Asset, amount: Long, fee: Long = burnFee, ts: Long = System.currentTimeMillis): BurnTransaction = {
+    Transactions.makeBurnTx(sender, AddressScheme.current.chainId, asset, amount, burnFee, ts)
   }
 }
 

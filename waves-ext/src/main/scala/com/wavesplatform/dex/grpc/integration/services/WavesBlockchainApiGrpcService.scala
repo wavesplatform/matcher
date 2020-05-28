@@ -1,6 +1,10 @@
 package com.wavesplatform.dex.grpc.integration.services
 
+import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.syntax.either._
+import cats.syntax.monoid._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
@@ -15,21 +19,92 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.stub.StreamObserver
-import monix.execution.Scheduler
+import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
+import io.grpc.{Status, StatusRuntimeException}
+import monix.eval.{Coeval, Task}
+import monix.execution.{CancelableFuture, Scheduler}
 import shapeless.Coproduct
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
+// TODO remove balanceChangesBatchLingerMs parameter after release 2.1.2
 class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBatchLingerMs: FiniteDuration)(implicit sc: Scheduler)
     extends WavesBlockchainApiGrpc.WavesBlockchainApi
     with ScorexLogging {
+
+  private val allSpendableBalances = new ConcurrentHashMap[Address, Map[Asset, Long]]()
+
+  // A clean logic requires more actions, see DEX-606
+  // TODO remove after release 2.1.2
+  private val balanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesResponse]](2)
+  // TODO rename to balanceChangesSubscribers after release 2.1.2
+  private val realTimeBalanceChangesSubscribers = ConcurrentHashMap.newKeySet[StreamObserver[BalanceChangesFlattenResponse]](2)
+
+  private val cleanupTask: Task[Unit] = Task {
+    log.info("Closing balance changes stream...")
+    // https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+    val shutdownError = new StatusRuntimeException(Status.UNAVAILABLE) // Because it should try to connect to other DEX Extension
+
+    // TODO remove after release 2.1.2
+    balanceChangesSubscribers.forEach { _.onError(shutdownError) }
+    balanceChangesSubscribers.clear()
+
+    realTimeBalanceChangesSubscribers.forEach { _.onError(shutdownError) }
+    realTimeBalanceChangesSubscribers.clear()
+  }
+
+  private val realTimeBalanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+    context.spendableBalanceChanged
+      .map {
+        case (address, asset) =>
+          val newAssetBalance = context.utx.spendableBalance(address, asset)
+          val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
+          val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
+
+          if (needUpdate) {
+            allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
+            Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
+          } else Option.empty[BalanceChangesFlattenResponse]
+      }
+      .collect { case Some(response) => response }
+      .doOnSubscriptionCancel(cleanupTask)
+      .doOnComplete(cleanupTask)
+      .foreach { x =>
+        realTimeBalanceChangesSubscribers.forEach { subscriber =>
+          try subscriber.onNext(x)
+          catch { case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e) }
+        }
+      }
+  }
+
+  // TODO remove after release 2.1.2
+  private val balanceChanges: Coeval[CancelableFuture[Unit]] = Coeval.evalOnce {
+    context.spendableBalanceChanged
+      .bufferTimed(balanceChangesBatchLingerMs)
+      .map { changesBuffer =>
+        val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+        vanillaBatch.map { case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
+      }
+      .filter(_.nonEmpty)
+      .map(BalanceChangesResponse.apply)
+      .doOnSubscriptionCancel(cleanupTask)
+      .doOnComplete(cleanupTask)
+      .foreach { x =>
+        balanceChangesSubscribers.forEach { subscriber =>
+          try subscriber.onNext(x)
+          catch {
+            case e: Throwable => log.warn(s"Can't send balance changes to $subscriber", e)
+          }
+        }
+      }
+  }
 
   override def getStatuses(request: TransactionsByIdRequest): Future[TransactionsStatusesResponse] = Future {
     val statuses = request.transactionIds.map { txId =>
@@ -50,7 +125,8 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       .fold[Either[ValidationError, SignedExchangeTransaction]](GenericError("The signed transaction must be specified").asLeft)(_.asRight)
       .flatMap { _.toVanilla }
       .flatMap { tx =>
-        context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
+        if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
+        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }
@@ -121,10 +197,26 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     RunScriptResponse(r)
   }
 
+  // TODO remove after release 2.1.3
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
     val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
     val assetId = request.assetId.toVanillaAsset
     SpendableAssetBalanceResponse(context.utx.spendableBalance(addr, assetId))
+  }
+
+  override def spendableAssetsBalances(request: SpendableAssetsBalancesRequest): Future[SpendableAssetsBalancesResponse] = Future {
+
+    val address = Address.fromBytes(request.address.toVanilla).explicitGetErr()
+
+    val assetsBalances =
+      request.assetIds.map { requestedAssetRecord =>
+        SpendableAssetsBalancesResponse.Record(
+          requestedAssetRecord.assetId,
+          context.utx.spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
+        )
+      }
+
+    SpendableAssetsBalancesResponse(assetsBalances)
   }
 
   override def forgedOrder(request: ForgedOrderRequest): Future[ForgedOrderResponse] = Future {
@@ -132,13 +224,26 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     ForgedOrderResponse(isForged = seen)
   }
 
-  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit = {
-    context.spendableBalanceChanged.bufferTimed(balanceChangesBatchLingerMs).foreach { changesBuffer =>
-      val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
-      val pbBatch      = vanillaBatch.map { case (address, asset, balance)  => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
-      if (pbBatch.nonEmpty) responseObserver.onNext(BalanceChangesResponse(pbBatch))
+  // TODO remove after release 2.1.2
+  override def getBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesResponse]): Unit =
+    if (!balanceChanges().isCompleted) {
+      responseObserver match {
+        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => balanceChangesSubscribers remove x)
+        case x                              => log.warn(s"Can't register cancel handler for $x")
+      }
+
+      balanceChangesSubscribers.add(responseObserver)
     }
-  }
+
+  // TODO rename to getBalanceChanges after release 2.1.2
+  override def getRealTimeBalanceChanges(request: Empty, responseObserver: StreamObserver[BalanceChangesFlattenResponse]): Unit =
+    if (!realTimeBalanceChanges().isCompleted) {
+      responseObserver match {
+        case x: ServerCallStreamObserver[_] => x.setOnCancelHandler(() => realTimeBalanceChangesSubscribers remove x)
+        case x                              => log.warn(s"Can't register cancel handler for $x")
+      }
+      realTimeBalanceChangesSubscribers.add(responseObserver)
+    }
 
   private def parseScriptResult(raw: => Either[String, Terms.EVALUATED]): RunScriptResponse.Result = {
     import RunScriptResponse.Result
@@ -152,5 +257,29 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
         log.trace(error.formatStackTrace(e))
         Result.Exception(Exception(e.getClass.getCanonicalName, Option(e.getMessage).getOrElse("No message")))
     }
+  }
+
+  override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
+    import com.wavesplatform.state.Portfolio.monoid
+    Future {
+
+      val address              = request.address.toVanillaAddress
+      val pessimisticPortfolio = context.blockchain.portfolio(address) |+| context.utx.pessimisticPortfolio(address)
+
+      val pessimisticPortfolioNonZeroBalances = {
+        if (pessimisticPortfolio.balance == 0) pessimisticPortfolio.assets
+        else pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)
+      }
+
+      AllAssetsSpendableBalanceResponse(
+        pessimisticPortfolioNonZeroBalances.map {
+          case (a, b) => AllAssetsSpendableBalanceResponse.Record(a.toPB, b)
+        }.toSeq
+      )
+    }
+  }
+
+  override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
+    NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
 }

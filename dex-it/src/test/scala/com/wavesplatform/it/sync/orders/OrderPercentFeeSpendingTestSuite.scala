@@ -32,8 +32,8 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
 
   s"V$version orders (fee asset type: $assetType) & fees processing" - {
     s"users should pay correct fee when fee asset-type = $assetType and order fully filled " in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
-      val accountSeller = createAccountWithBalance(fullyAmountWaves + minimalFeeWaves -> Waves)
+      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
+      val accountSeller = mkAccountWithBalance(fullyAmountWaves + minimalFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
         mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
@@ -51,8 +51,8 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"users should pay correct fee when fee asset-type = $assetType and order partially filled" in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee            -> IssuedAsset(UsdId))
-      val accountSeller = createAccountWithBalance(partiallyAmountWaves + minimalFeeWaves -> Waves)
+      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee            -> IssuedAsset(UsdId))
+      val accountSeller = mkAccountWithBalance(partiallyAmountWaves + minimalFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
         mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
@@ -73,8 +73,8 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
     }
 
     s"order should be processed if amount less then fee when fee asset-type = $assetType" in {
-      val accountBuyer  = createAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
-      val accountSeller = createAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves)
+      val accountBuyer  = mkAccountWithBalance(fullyAmountUsd + minimalFee        -> IssuedAsset(UsdId))
+      val accountSeller = mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves)
 
       placeAndAwaitAtDex(
         mkOrder(accountBuyer, wavesUsdPair, BUY, fullyAmountWaves, price, matcherFee = minimalFee, version = version, feeAsset = IssuedAsset(UsdId)))
@@ -95,7 +95,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
       dex1.api
         .tryPlace(
           mkOrder(
-            createAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId)),
+            mkAccountWithBalance(fullyAmountUsd + minimalFee -> IssuedAsset(UsdId)),
             wavesUsdPair,
             BUY,
             fullyAmountWaves,
@@ -111,7 +111,7 @@ class OrderPercentFeeSpendingTestSuite extends OrderFeeBaseTestSuite {
       dex1.api
         .tryPlace(
           mkOrder(
-            createAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves),
+            mkAccountWithBalance(fullyAmountWaves + tooHighFeeWaves -> Waves),
             wavesUsdPair,
             SELL,
             fullyAmountWaves,

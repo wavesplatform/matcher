@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.networking
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
@@ -14,7 +15,7 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 @NetworkTests
 class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProxy {
 
-  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.netAlias, WavesNodeContainer.dexGrpcExtensionPort)
+  private val wavesNodeProxy: ContainerProxy = mkToxiProxy(WavesNodeContainer.wavesNodeNetAlias, WavesNodeContainer.dexGrpcExtensionPort)
 
   override protected def dexInitialSuiteConfig: Config = {
     ConfigFactory.parseString(s"""waves.dex {
@@ -78,6 +79,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode2.api.connect(wavesNode1.networkAddress)
     wavesNode2.api.waitForConnectedPeer(wavesNode1.networkAddress)
 
+    wavesNode2.api.waitForHeight(wavesNode1.api.currentHeight)
     wavesNode2.api.waitForTransaction(IssueUsdTx)
 
     markup(s"Stop node 1 and perform USD transfer from Alice to Bob")
@@ -102,7 +104,6 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     markup(s"Stop node 2 and perform USD transfer from Bob to Alice")
     wavesNode2.stopWithoutRemove()
-    forgetContainer(wavesNode2)
 
     broadcastAndAwait(wavesNode1.api, bob2AliceTransferTx)
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)
@@ -121,10 +122,16 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
       "Waves Node is unavailable, please retry later or contact with the administrator"
     )
 
+    dex1.api.tryTradableBalance(mkKeyPair("random"), wavesUsdPair) should failWith(
+      105906177,
+      "Waves Node is unavailable, please retry later or contact with the administrator"
+    )
+
     wavesNode1.connectToNetwork()
 
     dex1.api.waitForOrderPlacement(order)
     dex1.api.waitForOrderStatus(order, OrderStatus.Accepted)
+    dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo { Map.empty[Asset, Long] }
   }
 
   private def usdBalancesShouldBe(wavesNodeApi: NodeApi[Id], expectedAliceBalance: Long, expectedBobBalance: Long): Unit = {

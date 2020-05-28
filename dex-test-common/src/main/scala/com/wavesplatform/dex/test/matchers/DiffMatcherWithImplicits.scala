@@ -1,21 +1,41 @@
 package com.wavesplatform.dex.test.matchers
 
-import com.softwaremill.diffx.scalatest.DiffMatcher
-import com.softwaremill.diffx.{Derived, Diff, DiffResultValue, FieldPath, Identical}
+import com.softwaremill.diffx.{Derived, Diff, DiffResultDifferent, DiffResultValue, FieldPath, Identical}
+import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits.{DiffForMatcher, getDiff}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
-trait DiffMatcherWithImplicits extends DiffMatcher {
+trait DiffMatcherWithImplicits {
 
   // https://github.com/softwaremill/diffx/issues/69
   // Sometimes it is useful, sometimes not.
-//  import com.softwaremill.diffx.Diff._
-//  implicit val multilineStringsDiff: Diff[String] =
-//    diffForIterable[String, List](diffForOption(implicitly[Derived[Diff[String]]]))
-//      .contramap[String](_.split("\n").toList)
+  //  import com.softwaremill.diffx.Diff._
+  //  implicit val multilineStringsDiff: Diff[String] =
+  //    diffForIterable[String, List](diffForOption(implicitly[Derived[Diff[String]]]))
+  //      .contramap[String](_.split("\n").toList)
 
-  private val byteStrDiff: Diff[ByteStr] = (left: ByteStr, right: ByteStr, _: List[FieldPath]) => {
-    if (left.toString == right.toString) Identical(left) else DiffResultValue(left, right)
+  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]]     = Derived(getDiff[ByteStr](_.toString == _.toString))
+  implicit val derivedPublicKeyDiff: Derived[Diff[PublicKey]] = Derived(derivedByteStrDiff.contramap[PublicKey](_.arr))
+
+  // TODO we actually don't need this, find way to remove this
+  implicit val derivedStringDiff: Derived[Diff[String]] = Derived(getDiff[String](_ == _))
+
+  def matchTo[A: Diff](left: A): DiffForMatcher[A] = DiffForMatcher(left)
+}
+
+object DiffMatcherWithImplicits {
+
+  case class DiffForMatcher[A: Diff](right: A) extends Matcher[A] {
+    override def apply(left: A): MatchResult = Diff[A].apply(left, right) match {
+      case c: DiffResultDifferent =>
+        val diff = c.show.split('\n').mkString(Console.RESET, s"${Console.RESET}\n${Console.RESET}", Console.RESET)
+        MatchResult(matches = false, s"Matching error:\n$diff", "")
+      case _ => MatchResult(matches = true, "", "")
+    }
   }
 
-  implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(byteStrDiff)
+  def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
+    if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)
+  }
 }

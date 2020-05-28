@@ -12,7 +12,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr
-import com.wavesplatform.dex.common.json._
 import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.node._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions}

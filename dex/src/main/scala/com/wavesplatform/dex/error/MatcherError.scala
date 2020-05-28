@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.error
 
+import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCode}
+import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -18,10 +20,11 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
     message
   )
 
-  override def toString: String = s"${getClass.getCanonicalName}(error=$code)"
+  override def toString: String = s"${getClass.getCanonicalName}(error=$code,message=${message.text})"
 }
 
 object MatcherError {
+
   implicit val matcherErrorWrites: OWrites[MatcherError] = OWrites { x =>
     val obj           = x.message
     val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
@@ -32,6 +35,15 @@ object MatcherError {
         "template" -> obj.template
       )
       .deepMerge(wrappedParams)
+  }
+
+  implicit final class Ops(val self: MatcherError) extends AnyVal {
+    def toWsHttpResponse(statusCode: StatusCode): HttpResponse = {
+      HttpResponse(
+        status = statusCode,
+        headers = List[HttpHeader](`X-Error-Message`(self.message.text), `X-Error-Code`(self.code.toString))
+      )
+    }
   }
 }
 
@@ -160,18 +172,20 @@ case class BalanceNotEnough(required: List[Amount], actual: List[Amount])
       account,
       balance,
       notEnough,
-      e"Not enough tradable balance. The order requires ${'required -> required}, but available are ${'actual -> actual}"
+      e"Not enough tradable balance. The order requires at least ${'required -> required} on balance, but available are ${'actual -> actual}"
     )
 
 object BalanceNotEnough {
   def apply(required: Map[Asset, Long], actual: Map[Asset, Long])(implicit efc: ErrorFormatterContext): BalanceNotEnough =
     new BalanceNotEnough(mk(required), mk(actual))
 
-  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] =
+  private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] = {
+    import Ordered._
     input
       .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
       .toList
-      .sortBy(x => x.asset.toString)
+      .sortWith((l, r) => l.asset.compatId < r.asset.compatId)
+  }
 }
 
 case class ActiveOrdersLimitReached(maxActiveOrders: Long)
@@ -196,6 +210,8 @@ case class OrderVersionUnsupported(version: Byte, requiredFeature: BlockchainFea
     )
 
 case object RequestInvalidSignature extends MatcherError(request, signature, commonClass, e"The request has an invalid signature")
+case class RequestArgumentInvalid(name: String)
+    extends MatcherError(request, commonEntity, commonClass, e"The request argument '${'name -> name}' is invalid")
 
 case class AccountFeatureUnsupported(x: BlockchainFeature)
     extends MatcherError(
@@ -454,6 +470,46 @@ case object ApiKeyIsNotProvided
 
 case object ApiKeyIsNotValid extends MatcherError(auth, commonEntity, commonClass, e"Provided API key is not correct")
 
+case object UserPublicKeyIsNotValid extends MatcherError(account, pubKey, broken, e"Provided user public key is not correct")
+
+case class AddressAndPublicKeyAreIncompatible(address: Address, publicKey: PublicKey)
+    extends MatcherError(auth, pubKey, unexpected, e"Address ${'address -> address} and public key ${'publicKey -> publicKey} are incompatible")
+
+case object AuthIsRequired extends MatcherError(auth, params, notProvided, e"The authentication is required. Please read the documentation")
+
+case object WsConnectionPongTimeout extends MatcherError(webSocket, connectivity, timedOut, e"WebSocket has reached pong timeout")
+
+case object WsConnectionMaxLifetimeExceeded extends MatcherError(webSocket, connectivity, limitReached, e"WebSocket has reached max allowed lifetime")
+
+case class SubscriptionAuthTypeUnsupported(required: Set[String], given: String)
+    extends MatcherError(auth,
+                         tpe,
+                         unsupported,
+                         e"The subscription authentication type '${'given -> given}' is not supported. Required one of: ${'required -> required}")
+
+case class JwtCommonError(text: String)
+    extends MatcherError(token, commonEntity, commonClass, e"JWT parsing and validation failed: ${'message -> text}")
+
+case object JwtBroken extends MatcherError(token, commonEntity, broken, e"JWT has invalid format")
+
+case object JwtPayloadBroken extends MatcherError(token, payload, broken, e"JWT payload has not expected fields")
+
+case object InvalidJwtPayloadSignature extends MatcherError(token, signature, broken, e"The token payload signature is invalid")
+
+case class SubscriptionTokenExpired(address: Address)
+    extends MatcherError(token, expiration, commonClass, e"The subscription token for address ${'address -> address} expired")
+
+case class TokenNetworkUnexpected(required: Byte, given: Byte)
+    extends MatcherError(token, network, unexpected, e"The required network is ${'required -> required}, but given ${'given -> given}")
+
+case class SubscriptionsLimitReached(limit: Int, id: String)
+    extends MatcherError(
+      webSocket,
+      subscription,
+      limitReached,
+      e"The limit of ${'limit -> limit} subscriptions of this type was reached. The subscription of ${'id -> id} was stopped"
+    )
+
 sealed abstract class Entity(val code: Int)
 object Entity {
   object common  extends Entity(0)
@@ -481,10 +537,17 @@ object Entity {
   object expiration  extends Entity(18)
   object marketOrder extends Entity(19)
   object rate        extends Entity(20)
+  object tpe         extends Entity(21)
+  object network     extends Entity(22)
 
   object producer     extends Entity(100)
   object connectivity extends Entity(101)
   object auth         extends Entity(102)
+  object params       extends Entity(103)
+  object webSocket    extends Entity(104)
+  object token        extends Entity(105)
+  object payload      extends Entity(106)
+  object subscription extends Entity(107)
 }
 
 sealed abstract class Class(val code: Int)

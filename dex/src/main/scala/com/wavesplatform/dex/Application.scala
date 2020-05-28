@@ -110,8 +110,12 @@ object Application {
   private[this] def startDEX(configFile: Option[String]): Unit = {
 
     val (config, settings) = loadApplicationConfig { configFile.map(new File(_)) }
-    val log                = LoggerFacade(LoggerFactory getLogger getClass)
 
+    // This option is used in logback.xml by default
+    if (Option(System.getProperty("waves.dex.root-directory")).isEmpty)
+      System.setProperty("waves.dex.root-directory", config.getString("waves.dex.root-directory"))
+
+    val log = LoggerFacade(LoggerFactory getLogger getClass)
     log.info("Starting...")
     sys.addShutdownHook { SystemInformationReporter.report(config) }
 

@@ -21,7 +21,6 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.model.OrderBook.AggregatedSnapshot
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
@@ -56,15 +55,10 @@ class OrderValidatorSpecification
   private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDescription.decimals
 
   "OrderValidator" should {
-    "allow buying WAVES for BTC without balance for order fee" in asa() { v =>
-      v shouldBe 'right
-    }
 
     "reject new order" when {
 
-      "this order had already been accepted" in asa(orderStatus = _ => true) { v =>
-        v should produce("OrderDuplicate")
-      }
+      "this order had already been accepted" in asa(hasOrder = true) { _ should produce("OrderDuplicate") }
 
       "sender's address is blacklisted" in {
         val blacklistedAccount = KeyPair("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
@@ -113,7 +107,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(ntpTime)(signed).left.map(Json.toJsObject(_)) should produce("amount should be > 0")
+        OrderValidator.timeAware(time)(signed).left.map(Json.toJsObject(_)) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in blockchainTest() { (ov, bc) =>
@@ -132,12 +126,12 @@ class OrderValidatorSpecification
       "order exists" in {
 
         val pk = KeyPair(randomBytes())
-        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true, _ => OrderBook.AggregatedSnapshot())(_)
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, orderExists = true, OrderBookAggregatedSnapshot.empty)(_)
 
         ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
       }
 
-      "order price has invalid non-zero trailing decimals" in forAll(assetGen(1), accountGen, Gen.choose(1, 7)) {
+      "order price has invalid non-zero trailing decimals" in forAll(issuedAssetGen(1), accountGen, Gen.choose(1, 7)) {
         case (amountAsset, sender, amountDecimals) =>
           blockchainTest(
             assetDescriptions = getDefaultAssetDescriptions(amountAsset -> BriefAssetDescription("AssetName", amountDecimals, hasScript = false))
@@ -626,7 +620,7 @@ class OrderValidatorSpecification
         val enoughBalance = Map[Asset, Long](Waves -> 1000.waves, btc -> 10.btc, eth -> 500.eth)
 
         val orderBook =
-          AggregatedSnapshot(
+          OrderBookAggregatedSnapshot(
             asks = Seq(
               LevelAgg(amount = 32.waves, price = 0.00011842.btc), // buy part of level, value = 11 * 0.00011842 = 0.00130262.btc, remain to execute =  11 - 11 =  0
               LevelAgg(amount = 23.waves, price = 0.00011825.btc), // buy whole level,   value = 23 * 0.00011825 = 0.00271975.btc, remain to execute =  34 - 23 = 11
@@ -634,17 +628,17 @@ class OrderValidatorSpecification
               LevelAgg(amount = 30.waves, price = 0.00011810.btc) //  buy whole level,   value = 30 * 0.00011810 = 0.00354300.btc, remain to execute = 100 - 30 = 70
             ).reverse,
             bids = Seq(
-              LevelAgg(amount = 85.waves, price = 0.00011808.btc), // close part of level, value = 33.waves, remain to execute =  33 - 33 =  0
-              LevelAgg(amount = 12.waves, price = 0.00011805.btc), // close whole level,   value = 12.waves, remain to execute =  45 - 12 = 33
-              LevelAgg(amount = 40.waves, price = 0.00011787.btc), // close whole level,   value = 40.waves, remain to execute =  85 - 40 = 45
-              LevelAgg(amount = 15.waves, price = 0.00011782.btc) //  close whole level,   value = 15.waves, remain to execute = 100 - 15 = 85
+              LevelAgg(amount = 85.waves, price = 0.00011808.btc), // close whole level,   value = 85.waves, remain to execute = 100 - 85 = 15
+              LevelAgg(amount = 12.waves, price = 0.00011805.btc), // close whole level,   value = 12.waves, remain to execute =  15 - 12 = 3
+              LevelAgg(amount = 40.waves, price = 0.00011787.btc), // close part of level, value = 3.waves,  remain to execute =   3 -  3 = 0
+              LevelAgg(amount = 15.waves, price = 0.00011782.btc) //  won't be touched
             )
           )
 
         // cost of 100.waves by the current market state = 0.00354300 + 0.00425664 + 0.00271975 + 0.00130262 = 0.01182201.btc
 
-        val validateByTradableBalance: Map[Asset, Long] => Order => Result[AcceptedOrder] = validateMarketOrderByAccountStateAware { orderBook }
-        val validateByPrice: Order => Result[AcceptedOrder]                               = validateByTradableBalance { enoughBalance }
+        val validateByTradableBalance: Map[Asset, Long] => Order => Result[AcceptedOrder] = validateMarketOrderByAccountStateAware(orderBook)
+        val validateByPrice: Order => Result[AcceptedOrder]                               = validateByTradableBalance(enoughBalance)
 
         val buyAmount, sellAmount = 100.waves
         val (buyPrice, sellPrice) = (0.00011850, 0.00011750) // both prices are enough to collapse counter side
@@ -656,43 +650,47 @@ class OrderValidatorSpecification
 
         withClue("SELL: in order to sell 100.waves price should be <= 0.00011787.btc, otherwise sell less\n") {
           validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011787) } shouldBe 'right                           // the highest acceptable price for selling 100.waves
-          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce("InvalidMarketOrderPrice") // too high price (can only sell 12 + 85 = 97.waves)
+          validateByPrice { createOrder(wavesBtcPair, SELL, amount = 100.waves, price = 0.00011788) } should produce("InvalidMarketOrderPrice") // too high price (can only sell 85 + 12 = 97.waves)
         }
 
-        withClue("BUY: fee in received asset, required balance: Waves -> 0, BTC -> 0.01182201\n") {
+        withClue("BUY: fee in received asset, required balance: Waves = 0.003, BTC > 0\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = Waves, matcherFee = 0.003.waves)
-          validateByTradableBalance { Map(btc -> 0.01182201.btc) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182200.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00300000.waves, btc -> 0.00000001.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00300000.waves, btc -> 0.00000000.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00299999.waves, btc -> 0.00000001.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("BUY: fee in spent asset, required balance: Waves -> 0, BTC -> 0.01182201 + 0.00000035 = 0.01182236\n") {
+        withClue("BUY: fee in spent asset, required balance: Waves = 0, BTC > 0.00000035\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = btc, matcherFee = 0.00000035.btc)
-          validateByTradableBalance { Map(btc -> 0.01182236.btc) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182235.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000036.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(btc -> 0.00000035.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("BUY: fee in third asset, required balance: Waves -> 0, BTC -> 0.01182201, ETH = 0.00649308\n") {
+        withClue("BUY: fee in third asset, required balance: Waves = 0, BTC > 0, ETH = 0.00649308\n") {
           val marketOrder = createOrder(wavesBtcPair, BUY, buyAmount, buyPrice, feeAsset = eth, matcherFee = 0.00649308.eth)
-          validateByTradableBalance { Map(btc -> 0.01182201.btc, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(btc -> 0.01182201.btc, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000001.btc, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(btc -> 0.00000001.btc, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(btc -> 0.00000000.btc, eth -> 0.00649308.eth) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in received asset, required balance: Waves -> 100, BTC -> 0\n") {
+        withClue("SELL: fee in received asset, required balance: Waves = 0.00000001, BTC = 0.00000035\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = btc, matcherFee = 0.00000035.btc)
-          validateByTradableBalance { Map(Waves -> 100.00000000.waves) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 99.99999999.waves) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, btc -> 0.00000035.btc) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00000000.waves, btc -> 0.00000035.btc) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, btc -> 0.00000034.btc) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in spent asset, required balance: Waves -> 100.003, BTC -> 0\n") {
+        withClue("SELL: fee in spent asset, required balance: Waves = 0.00300001, BTC = 0\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = Waves, matcherFee = 0.003.waves)
-          validateByTradableBalance { Map(Waves -> 100.00300000.waves) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 100.00299999.waves) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00300001.waves) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00300000.waves) }(marketOrder) should produce("BalanceNotEnough")
         }
 
-        withClue("SELL: fee in third asset, required balance: Waves -> 100, BTC -> 0, ETH -> 0.00649308\n") {
+        withClue("SELL: fee in third asset, required balance: Waves = 0.00000001, BTC = 0, ETH = 0.00649308\n") {
           val marketOrder = createOrder(wavesBtcPair, SELL, sellAmount, sellPrice, feeAsset = eth, matcherFee = 0.00649308.eth)
-          validateByTradableBalance { Map(Waves -> 100.waves, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
-          validateByTradableBalance { Map(Waves -> 100.waves, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, eth -> 0.00649308.eth) }(marketOrder) shouldBe 'right
+          validateByTradableBalance { Map(Waves -> 0.00000000.waves, eth -> 0.00649308.eth) }(marketOrder) should produce("BalanceNotEnough")
+          validateByTradableBalance { Map(Waves -> 0.00000001.waves, eth -> 0.00649307.eth) }(marketOrder) should produce("BalanceNotEnough")
         }
       }
 
@@ -901,8 +899,7 @@ class OrderValidatorSpecification
 
   private def mkAssetDescription(decimals: Int): BriefAssetDescription = BriefAssetDescription(name = "name", decimals = decimals, hasScript = false)
 
-  private def newBuyOrder: Order =
-    buy(pair = wavesBtcPair, amount = 100.waves, price = 0.0022, matcherFee = Some(0.003.waves))
+  private def newBuyOrder: Order = buy(pair = wavesBtcPair, amount = 100.waves, price = 0.0022, matcherFee = Some(0.003.waves))
 
   private def newBuyOrder(pk: KeyPair, ts: Long = System.currentTimeMillis, version: Byte = 1) =
     buy(
@@ -927,9 +924,9 @@ class OrderValidatorSpecification
         bc,
         tc.createTransaction,
         MatcherAccount,
-        ntpTime,
+        time,
         DynamicSettings.symmetric(matcherFee),
-        matcherSettings.orderRestrictions,
+        matcherSettings.orderRestrictions.get(order.assetPair),
         assetDescriptions,
         rateCache,
         hasMatcherAccountScript = false
@@ -940,34 +937,33 @@ class OrderValidatorSpecification
 
   private def exchangeTransactionCreator(blockchain: AsyncBlockchain,
                                          hasMatcherAccountScript: Boolean = false,
-                                         hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) = {
-    new ExchangeTransactionCreator(MatcherAccount,
-                                   matcherSettings.exchangeTxBaseFee,
-                                   DynamicSettings.symmetric(matcherFee),
-                                   hasMatcherAccountScript,
-                                   hasAssetScript)
-  }
+                                         hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) =
+    new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
-      orderStatus: ByteStr => Boolean = _ => false,
+      hasOrder: Boolean,
       o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus, _ => OrderBook.AggregatedSnapshot())(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
-  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: AggregatedSnapshot)(b: Map[Asset, Long]): Order => Result[AcceptedOrder] = {
-    order =>
-      OrderValidator.accountStateAware(
-        sender = order.sender.toAddress,
-        tradableBalance = b.withDefaultValue(0L).apply,
-        activeOrderCount = 0,
-        orderExists = _ => false,
-        orderBookCache = _ => aggregatedSnapshot
-      ) { MarketOrder(order, b.apply _) }
+  private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(
+      b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
+    OrderValidator.accountStateAware(
+      sender = order.sender.toAddress,
+      tradableBalance = b.withDefaultValue(0L).apply,
+      orderExists = false,
+      orderBookCache = aggregatedSnapshot
+    ) { MarketOrder(order, b.apply _) }
   }
 
   private def msa(ba: Set[Address], o: Order): Order => Result[Order] = {
-    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, matcherSettings, getDefaultAssetDescriptions(_).decimals, rateCache, DynamicSettings.symmetric(matcherFee))
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey,
+                                        ba,
+                                        matcherSettings,
+                                        getDefaultAssetDescriptions(_).decimals,
+                                        rateCache,
+                                        DynamicSettings.symmetric(matcherFee))
   }
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
@@ -1039,9 +1035,9 @@ class OrderValidatorSpecification
         blockchain,
         transactionCreator,
         MatcherAccount.toAddress,
-        ntpTime,
+        time,
         orderFeeSettings,
-        orderRestrictions,
+        orderRestrictions.get(order.assetPair),
         assetDescriptions = assetsDescriptions,
         rateCache,
         matcherAccountScript.nonEmpty

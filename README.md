@@ -1,16 +1,16 @@
-# DEX [![Build Status](https://travis-ci.org/wavesplatform/dex.svg?branch=master)](https://travis-ci.org/wavesplatform/dex)
+# Matcher
 
-Decentralized exchange for Waves Node.
+Matcher for Waves Node.
 
 In the master branch there is a code with functions that is under development. 
-The latest release for each network can be found in the [Releases section](https://github.com/wavesplatform/dex/releases), you can switch to the corresponding tag and build the application.
+The latest release for each network can be found in the [Releases section](https://github.com/wavesplatform/matcher/releases), you can switch to the corresponding tag and build the application.
 
 For further information please refer the official [documentation](https://docs.wavesplatform.com).
 
 # How to Build and Test
 
-The DEX as Node can be built and installed wherever java can run. We ship following artifacts:
-1. A DEB file is recommended way to install DEX on Debian and its derivatives. 
+The Matcher as Node can be built and installed wherever java can run. We ship following artifacts:
+1. A DEB file is recommended way to install Matcher on Debian and its derivatives. 
 2. A TGZ file contains all required JARs
 
 To build and test it your own, you will need to follow these steps:
@@ -66,19 +66,19 @@ About options:
 ## 2. Obtaining Source Codes
 
 ```
-git clone git@github.com:wavesplatform/dex.git waves-dex
-cd waves-dex
+git clone git@github.com:wavesplatform/matcher.git waves-matcher
+cd waves-matcher
 ```
 
-**NOTE**: the directory name must not be "dex" if you work in IntelliJ IDEA, see [Known issues](#9-known-issues).
+**NOTE**: the directory name must not be a one of root directories if you work in IntelliJ IDEA, see [Known issues](#9-known-issues).
 
 ## 3. Compilation and unit tests
 
 ```
-sbt checkPR
+sbt quickCheck
 ```
 
-## 4. Running DEX integration tests (optional)
+## 4. Running Matcher integration tests (optional)
 
 ### SBT
 
@@ -117,21 +117,21 @@ sbt -Dnetwork=testnet packageAll
 
 ## 6. Installing and running
 
-The DEX server runs as a separate service and communicates with a DEX extension on the Node. So:
+The Matcher server runs as a separate service and communicates with a Matcher extension on the Node. So:
 
 1. First of all, you need an installed Node.
-2. Then you need to install a DEX extension to the Node and update its configuration. This is a bridge between the DEX server and the Node.
-3. Next you should install DEX server and properly configure it.
+2. Then you need to install a Matcher extension to the Node and update its configuration. This is a bridge between the Matcher server and the Node.
+3. Next you should install Matcher server and properly configure it.
 4. Run the Node, wait until it will be up with the network.
-5. Run the DEX.
+5. Run the Matcher.
 
 ### 6.1. Node installation
 
 See instructions in their [documentation](https://docs.wavesplatform.com/en/waves-node/how-to-install-a-node/how-to-install-a-node.html).
 
-### 6.2. DEX extension installation and configuration 
+### 6.2. Matcher extension installation and configuration 
 
-Artifacts of DEX extension have names like:
+Artifacts of Matcher extension have names like:
 * `waves-dex-extension{supported-network}_{version}.deb` for DEB artifact. `{supported-network}` is empty for MainNet;
 * `waves-dex-extension-{version}.zip` for ZIP artifact;
 
@@ -146,14 +146,14 @@ The extension will be automatically installed to the Node.
 #### b. 🗜 Installation through ZIP
 
 > If the Node is running manually.
-> Note, if you installed Node from a DEB package, DEX will be removed after update.
+> Note, if you installed Node from a DEB package, Matcher will be removed after update.
 
-To install a DEX extension from ZIP file:
+To install a Matcher extension from ZIP file:
 
 1. Copy the archive to the directory with Node's JAR
 2. Extract the archive. Its files will be added to the existed directories.
 
-To run the Node with DEX extension use following commands:
+To run the Node with Matcher extension use following commands:
 
 *Debian/Ubuntu/macOS*:
 
@@ -167,7 +167,7 @@ java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar:/absolute_p
 java <your_JVM_options> -cp "/absolute_path_to_fat_jar/waves-all.jar;/absolute_path_to_fat_jar/lib/*" com.wavesplatform.Application /path/to/config.conf
 ```
 
-#### 📃 Configration of DEX extension
+#### 📃 Configration of Matcher extension
 
 Add lines to the Node's configuration:
 
@@ -177,21 +177,21 @@ waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"
 waves.dex {
   # gRPC integration settings for Waves Node
   grpc.integration {
-    host = "127.0.0.1" # "0.0.0.0" if the DEX server connects to the DEX extension from other machine 
+    host = "127.0.0.1" # "0.0.0.0" if the Matcher server connects to the Matcher extension from other machine 
     port = 6887
   }
 }
 ````
 
-### 6.3. DEX server installation and configuration
+### 6.3. Matcher server installation and configuration
 
-Artifacts of DEX extension have names like `waves-dex{version}.{deb|zip}`.
+Artifacts of Matcher extension have names like `waves-dex{version}.{deb|zip}`.
 
 #### a. 📦 Installation through DEB
 
 Run: `sudo dpkg -i deb-artifact.deb`
 
-The DEX server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
+The Matcher server will be installed. Note, the service will not start. You should update the configuration (see below) and then start the service:
 * If you are using `system.d` (used on Ubuntu since 15.04): `sudo systemctl start waves-dex`
 * If you are using `init.d`: `sudo /etc/init.d/waves-dex`
 
@@ -199,12 +199,12 @@ If it is a fresh install, configurations were copied to `/etc/waves-dex`.
 
 #### b. 🗜 Installation through ZIP
 
-To install a DEX server from ZIP file:
+To install a Matcher server from ZIP file:
  
 1. Extract it
 2. There are sample configurations:
 
-    * doc/main.conf is a sample DEX server configuration;
+    * doc/main.conf is a sample Matcher server configuration;
     * doc/logback.xml is a sample logging configuration.
     
     Copy them to a directory with production configurations. 
@@ -214,26 +214,26 @@ To run:
 *Debian/Ubuntu/macOS*:
 
 ```
-/path/to/dex/directory/bin/waves-dex -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
+/path/to/matcher/directory/bin/waves-dex -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
 ```
 
 *Windows*:
 
 ```
-/path/to/dex/directory/bin/waves-dex.bat -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
+/path/to/matcher/directory/bin/waves-dex.bat -Dlogback.configurationFile=/path/to/config/directory/logback.xml <your_JVM_options> /path/to/config/directory/main.conf
 ```
 
-#### 📃 Configuration of DEX server
+#### 📃 Configuration of Matcher server
 
-1. There is an example of configuration in the "doc" directory. You need to update the DEX's server configuration or create a new one in (for example, conf/dex.conf):
+1. There is an example of configuration in the "doc" directory. You need to update the Matcher's server configuration or create a new one in (for example, conf/dex.conf):
 
     ```hocon
-    # ... here many lines of your DEX's configuration
+    # ... here many lines of your Matcher's configuration
     waves.dex {
       root-directory = "/full/path/to/base/dex/directory"
       # rest-api.bind-address = "0.0.0.0" # uncomment this line to accept connections from any host
 
-      # host:port of DEX extension gRPC server
+      # host:port of Matcher extension gRPC server
       waves-blockchain-client.grpc.target = "127.0.0.1:6887"
     }
     ```
@@ -266,9 +266,9 @@ All files will be stored in `_local/runtime/mainnet`, including logs in the `log
 
 ## 8. CLI
 
-We have CLI tools accompanying to DEX server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
+We have CLI tools accompanying to Matcher server. Run `waves-dex-cli` to see a full documentation. The CLI functionality includes:
 
-* Generating an account storage (required to run DEX server);
+* Generating an account storage (required to run Matcher server);
 * Generating an account seed by base seed, and printing useful information about it;
 * Generating an API key;
 * And so on.
@@ -290,11 +290,11 @@ Example:
 here:
 
 * `W` is mainnet;
-* `--account-nonce 3` - we suppose you will provide a base seed and DEX server should use the fourth account of it (numeration starts with 0). 
+* `--account-nonce 3` - we suppose you will provide a base seed and Matcher server should use the fourth account of it (numeration starts with 0). 
   If you will provide an account seed, don't specify this option;
 * `--output-directory` - where the `account.dat` file will be stored.
 
-After running this command you will see where your `account.dat` was saved and which settings do you have to add to the DEX server configuration.
+After running this command you will see where your `account.dat` was saved and which settings do you have to add to the Matcher server configuration (`/usr/share/waves-dex/conf/main.conf`).
 Note, the shown settings contain a placeholder for your raw password, insert a real password to your configuration! 
 
 ### 8.2. Generating API key
@@ -326,7 +326,7 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
    if during the previous run the process was killed (by you or system).
    You need to delete all `target` directories on both projects: `waves` and `dex`:
 
-   1. In the cloned DEX directory: `find . -type d -name target | xargs -I{} rm -rf {}`
+   1. In the cloned Matcher directory: `find . -type d -name target | xargs -I{} rm -rf {}`
    2. In the NODE directory:
 
       During the SBT start you see something like this:
@@ -345,9 +345,9 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
    1. You've selected the appropriate project
    2. You've checked "Make project before run"
 
-2. The root directory name must not be "dex" (or other module name): https://youtrack.jetbrains.com/issue/SCL-15210
+2. The root directory name must not be like any root directory of the repository: https://youtrack.jetbrains.com/issue/SCL-15210
 
-3. If the "dex" project disappeared after "Reimport All sbt Projects":
+3. If some module disappeared after "Reimport All sbt Projects":
 
    1. Close the project
    2. Delete the ".idea" subdirectory of the project's directory
@@ -364,6 +364,8 @@ waves.dex.rest-api.api-key-hash = "7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i"
 5. IDE can't find Waves Node's classes in `waves-ext`. Download required artifacts manually: `sbt waves-ext/downloadWavesNodeArtifacts` and 
    then reload SBT configuration in IDE.
 
+6. If you want to run integration tests with Kafka, run the command in sbt before: ```set `dex-it`/Test/envVars := Map("KAFKA_SERVER" -> "kafka-host:9092")```
+
 ## 10. Production recommendations
 
 ### Kafka's queue
@@ -374,7 +376,7 @@ If all of these points are true:
 2. Have a lot of Place and Cancel requests
 3. You face issues when Consumer or Producer can't connect to Kafka
 
-There are recommendations for the OS-related system the DEX server runs on.
+There are recommendations for the OS-related system the Matcher server runs on.
 Note, it is not recommended to change this options if you aren't face the issue.
 
 1. Add these lines to `/etc/sysctl.conf` (the admin rights are required):
@@ -391,7 +393,28 @@ Note, it is not recommended to change this options if you aren't face the issue.
     sudo sysctl -p
     ```
 
-## 11. Contributor notes
+## 11. Benchmarks
+
+We use [sbt-jmh](https://github.com/ktoso/sbt-jmh). For more information, please read its documentation.
+
+To run a benchmark by mask without profiling, use the command:
+
+```
+dex-jmh/jmh:run .*OrderBookAddBenchmark
+```
+
+To run with a benchmark (for example, [async-profiler](https://github.com/jvm-profiling-tools/async-profiler)):
+ 
+1. Make sure you have downloaded it
+2. Add an additional option `-prof`, e.g.:
+
+    ```
+    dex-jmh/jmh:run .*OrderBookAddBenchmark -prof "jmh.extras.Async:asyncProfilerDir=/path/to/async-profiler/directory;dir=/path/to/output/directory;jfr=true"
+    ```
+
+JFR files could be read with [jmc](https://adoptopenjdk.net/jmc.html).
+
+## 12. Contributor notes
 
 ### Branches
 
@@ -428,7 +451,7 @@ A new release is tagged to the commit in a `master` branch. If there is a bug:
 
 2. Publishing a release on GitHub:
 
-  1. Open the project [page](https://github.com/wavesplatform/dex) and click on _Releases_.
+  1. Open the project [page](https://github.com/wavesplatform/matcher) and click on _Releases_.
   2. Click on _Draft a new release_.
 
      1. Choose the pushed tag;

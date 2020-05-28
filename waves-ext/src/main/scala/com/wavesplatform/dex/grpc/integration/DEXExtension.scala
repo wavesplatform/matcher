@@ -9,7 +9,7 @@ import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
-import monix.execution.Scheduler
+import monix.execution.{ExecutionModel, Scheduler}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.NameMapper
@@ -19,30 +19,33 @@ import scala.concurrent.Future
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
   @volatile
-  private var server: Server = _
+  private var server: Server                            = _
+  private var apiService: WavesBlockchainApiGrpcService = _
 
-  implicit val chosenCase: NameMapper          = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  implicit private val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
+  implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+  implicit private val apiScheduler: Scheduler = Scheduler(
+    ec = context.actorSystem.dispatchers.lookup("akka.actor.waves-dex-grpc-scheduler"),
+    executionModel = ExecutionModel.AlwaysAsyncExecution
+  )
 
-  private def startServer(settings: DEXExtensionSettings): Server = {
+  override def start(): Unit = {
+    val settings    = context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration")
     val bindAddress = new InetSocketAddress(settings.host, settings.port)
-    val server = NettyServerBuilder
+    apiService = new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger)
+    server = NettyServerBuilder
       .forAddress(bindAddress)
       .permitKeepAliveWithoutCalls(true)
       .permitKeepAliveTime(500, TimeUnit.MILLISECONDS)
-      .addService(WavesBlockchainApiGrpc.bindService(new WavesBlockchainApiGrpcService(context, settings.balanceChangesBatchLinger), apiScheduler))
+      .addService(WavesBlockchainApiGrpc.bindService(apiService, apiScheduler))
       .build()
       .start()
 
     log.info(s"gRPC DEX extension was bound to $bindAddress")
-    server
   }
-
-  override def start(): Unit = server = startServer(context.settings.config.as[DEXExtensionSettings]("waves.dex.grpc.integration"))
 
   override def shutdown(): Future[Unit] = {
     log.info("Shutting down gRPC DEX extension")
     if (server != null) server.shutdownNow()
-    Future.successful { Unit }
+    Future.successful(())
   }
 }

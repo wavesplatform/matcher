@@ -1,10 +1,13 @@
 package com.wavesplatform.dex
 
+import java.math.BigInteger
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
+import com.softwaremill.diffx.{Derived, Diff}
+import com.wavesplatform.dex.api.websockets.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -18,30 +21,33 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.domain.{crypto => wcrypto}
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
+import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants
 import mouse.any._
 import net.ceedubs.ficus.Ficus._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 
-import scala.concurrent.Await
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
+trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
+
+  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
 
   private val WalletSeed: ByteStr      = ByteStr("Matcher".getBytes("utf-8"))
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
 
   protected val MatcherAccount: KeyPair = KeyPair(MatcherSeed)
-  protected val senderKeyPair: KeyPair  = KeyPair("seed".getBytes("utf-8"))
+  protected val senderKeyPair: KeyPair  = mkKeyPair("seed")
 
   protected val btc: IssuedAsset = mkAssetId("WBTC")
   protected val usd: IssuedAsset = mkAssetId("WUSD")
@@ -49,6 +55,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
 
   protected val wavesBtcPair: AssetPair = AssetPair(Waves, btc)
   protected val wavesUsdPair: AssetPair = AssetPair(Waves, usd)
+  protected val btcUsdPair: AssetPair   = AssetPair(btc, usd)
 
   protected val rateCache: RateCache    = RateCache.inMem unsafeTap { _.upsertRate(usd, 3.7) } unsafeTap { _.upsertRate(btc, 0.00011167) }
   protected val smallFee: Option[Price] = Some(toNormalized(1))
@@ -78,11 +85,14 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   protected def wrapMarketOrder(mo: MarketOrder): QueueEventWithMeta  = wrapEvent(seqNr.incrementAndGet(), QueueEvent.PlacedMarket(mo))
 
   protected def awaitResult[A](result: FutureResult[A]): Result[A] = Await.result(result.value, Duration.Inf)
+  protected def awaitResult[A](result: Future[A]): A               = Await.result(result, Duration.Inf)
 
   protected def getSpentAmountWithFee(order: Order): Long = {
     val lo = LimitOrder(order)
     lo.spentAmount + (if (order.getSpendAssetId == order.feeAsset) lo.fee else 0)
   }
+
+  protected def mkKeyPair(seed: String): KeyPair = KeyPair(seed getBytes "utf-8")
 
   protected def createOrder(pair: AssetPair,
                             orderType: OrderType,
@@ -90,9 +100,10 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
                             price: Double,
                             matcherFee: Long = matcherFee,
                             version: Byte = 3,
-                            feeAsset: Asset = Waves): Order = {
+                            feeAsset: Asset = Waves,
+                            sender: KeyPair = senderKeyPair): Order = {
     Order(
-      sender = senderKeyPair,
+      sender = sender,
       matcher = MatcherAccount,
       pair = pair,
       orderType = orderType,
@@ -108,17 +119,19 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     )
   }
 
-  protected def assetGen(prefix: Byte): Gen[IssuedAsset] = {
+  protected def assetGen: Gen[Asset] = Gen.frequency((9, arbitraryAssetGen), (1, Gen.const(Waves)))
+
+  protected def issuedAssetGen(prefix: Byte): Gen[IssuedAsset] = {
     Gen
       .listOfN(Asset.AssetIdLength - 1, Arbitrary.arbitrary[Byte])
       .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
   }
 
-  protected def arbitraryAssetGen: Gen[IssuedAsset] = assetGen(Random.nextInt(Byte.MaxValue).toByte)
+  protected def arbitraryAssetGen: Gen[IssuedAsset] = issuedAssetGen(Random.nextInt(Byte.MaxValue).toByte)
 
   protected val distinctPairGen: Gen[AssetPair] = for {
-    a1 <- assetGen(1.toByte)
-    a2 <- assetGen(2.toByte)
+    a1 <- issuedAssetGen(1.toByte)
+    a2 <- issuedAssetGen(2.toByte)
   } yield AssetPair(a1, a2)
 
   protected def mkAssetId(prefix: String): IssuedAsset = {
@@ -127,7 +140,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
   }
 
   protected val assetPairGen: Gen[AssetPair] = {
-    Gen.frequency((18, distinctPairGen), (1, assetGen(1).map(AssetPair(_, Waves))), (1, assetGen(2).map(AssetPair(Waves, _))))
+    Gen.frequency((18, distinctPairGen), (1, issuedAssetGen(1).map(AssetPair(_, Waves))), (1, issuedAssetGen(2).map(AssetPair(Waves, _))))
   }
 
   private val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
@@ -147,7 +160,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     value.get
   }
 
-  private val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
+  protected val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   private def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -260,7 +273,11 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield BuyLimitOrder(amount, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield
+    BuyLimitOrder(amount,
+                  matcherFee,
+                  Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+                  BigInteger.ZERO)
 
   protected val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: KeyPair    <- accountGen
@@ -271,7 +288,11 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     expiration: Long   <- maxTimeGen
     matcherFee: Long   <- maxWavesAmountGen
     orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield
+    SellLimitOrder(amount,
+                   matcherFee,
+                   Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion),
+                   BigInteger.ZERO)
 
   protected val limitOrderGenerator: Gen[LimitOrder] = Gen.oneOf(sellLimitOrderGenerator, buyLimitOrderGenerator)
 
@@ -305,7 +326,7 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
   }
 
-  protected val orderV3PairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
+  protected val orderV3MirrorPairGenerator: Gen[((KeyPair, Order), (KeyPair, Order))] =
     for {
       senderBuy: KeyPair   <- accountGen
       senderSell: KeyPair  <- accountGen
@@ -415,5 +436,27 @@ trait MatcherSpecBase extends NTPTime with DiffMatcherWithImplicits with DoubleO
     }
 
     Order.sign(correctedOrder, sender)
+  }
+
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+
+  protected def mkOrderExecutedRaw(submitted: Order, counter: Order, timestamp: Long): OrderExecuted =
+    mkOrderExecuted(LimitOrder(submitted), LimitOrder(counter), timestamp)
+
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder): OrderExecuted =
+    mkOrderExecuted(submittedAo, counterLo, submittedAo.order.timestamp)
+
+  protected def mkOrderExecuted(submittedAo: AcceptedOrder, counterLo: LimitOrder, timestamp: Long): OrderExecuted = {
+    val (counterExecutedFee, submittedExecutedFee) = makerTakerPartialFee(submittedAo, counterLo)
+    OrderExecuted(submittedAo, counterLo, timestamp, counterExecutedFee, submittedExecutedFee)
+  }
+
+  protected def makerTakerPartialFee(submittedAo: AcceptedOrder, counterLo: LimitOrder): (Long, Long) = {
+    val executedAmount = AcceptedOrder.executedAmount(submittedAo, counterLo)
+    (
+      AcceptedOrder.partialFee(counterLo.matcherFee, counterLo.order.amount, executedAmount),
+      AcceptedOrder.partialFee(submittedAo.matcherFee, submittedAo.order.amount, executedAmount)
+    )
   }
 }

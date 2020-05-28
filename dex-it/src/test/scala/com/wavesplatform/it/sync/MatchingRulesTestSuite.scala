@@ -236,8 +236,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
       dex1.api.reservedBalance(alice)(Waves) shouldBe matcherFee / 2
       dex1.api.reservedBalance(alice)(usd) shouldBe 20 * price * amount / PriceConstant
       dex1.api.cancel(alice, buyOrder)
-      dex1.api.reservedBalance(alice) shouldBe Map()
-      dex1.api.orderBook(wctUsdPair).bids shouldBe List()
+      dex1.api.reservedBalance(alice) shouldBe empty
+      dex1.api.orderBook(wctUsdPair).bids shouldBe empty
     }
   }
 

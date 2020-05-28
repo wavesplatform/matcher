@@ -7,6 +7,7 @@ import play.api.libs.json._
 import scala.reflect.ClassTag
 
 package object json {
+
   implicit def eitherFormat[L, R](implicit lFormat: Format[L], rFormat: Format[R], ctl: ClassTag[L], ctr: ClassTag[R]): Format[Either[L, R]] = Format(
     Reads { js =>
       js.validate[R]

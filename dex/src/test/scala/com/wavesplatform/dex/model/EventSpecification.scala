@@ -4,7 +4,6 @@ import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.model.Events.OrderExecuted
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -14,7 +13,7 @@ class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase 
     val pair      = AssetPair(Waves, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))
     val submitted = buy(pair, 425532L, 0.00000238, matcherFee = Some(300000L))
-    val exec      = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L, submitted.matcherFee, counter.matcherFee)
+    val exec      = mkOrderExecutedRaw(submitted, counter)
     exec.executedAmount shouldBe 420169L
     exec.counterRemainingAmount shouldBe 420171L
     exec.counterRemainingAmount shouldBe counter.amount - exec.executedAmount
@@ -32,7 +31,7 @@ class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase 
     val counter   = sell(pair, 100000000, 0.0008, matcherFee = Some(2000L))
     val submitted = buy(pair, 120000000, 0.00085, matcherFee = Some(1000L))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L, submitted.matcherFee, counter.matcherFee)
+    val exec = mkOrderExecutedRaw(submitted, counter)
     exec.submittedRemainingAmount shouldBe 20000000L
     exec.submittedRemainingFee shouldBe 167L
   }
@@ -45,7 +44,7 @@ class EventSpecification extends AnyFreeSpec with Matchers with MatcherSpecBase 
     val bobPk     = KeyPair("bob".getBytes("utf-8"))
     val submitted = sell(pair, 223345000L, 0.00031887, matcherFee = Some(300000), sender = Some(bobPk))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L, submitted.matcherFee, counter.matcherFee)
+    val exec = mkOrderExecutedRaw(submitted, counter)
     exec.executedAmount shouldBe 223344937L
   }
 }

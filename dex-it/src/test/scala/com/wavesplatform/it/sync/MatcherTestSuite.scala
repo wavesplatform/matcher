@@ -1,12 +1,13 @@
 package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
-import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.AcceptedOrderType
@@ -33,9 +34,19 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   private val order1 = mkOrder(alice, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, ttl = 10.minutes) // TTL?
 
+  private val maxOrders = 99
+
+  override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  price-assets = [ "$BtcId", "$UsdId", "WAVES" ]
+       |  order-db.max-orders = $maxOrders
+       |}""".stripMargin
+  )
+
   override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx)
+    wavesNode1.start()
+    broadcastAndAwait(issueAliceAssetTx, issueBob1Asset1Tx, issueBob2Asset2Tx, IssueUsdTx, IssueBtcTx)
+    dex1.start()
   }
 
   "Swagger page is available" in {
@@ -85,8 +96,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
-        dex1.api.reservedBalance(alice) shouldBe Map(aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalance(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
         dex1.api.reservedBalance(bob) shouldBe empty
+      }
+
+      "frozen amount should be listed via matcherBalance REST endpoint with Api Key" in {
+        dex1.api.reservedBalanceWithApiKey(alice) shouldBe Map(Waves -> matcherFee, aliceAsset -> aliceSellAmount)
+        dex1.api.reservedBalanceWithApiKey(bob) shouldBe empty
       }
 
       "and should be listed by trader's publiс key via REST" in {
@@ -259,30 +275,6 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.tryPlace(mkBobOrder) should failWith(3147270) // BalanceNotEnough
       }
 
-      "trader can buy waves for assets with order without having waves" in {
-        val bobWavesBalance = wavesNode1.api.balance(bob, Waves)
-        wavesNode1.api.balance(alice, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(matcher, bobAsset2) shouldBe 0
-        wavesNode1.api.balance(bob, bobAsset2) shouldBe someAssetAmount
-
-        // Bob wants to sell all own assets for 1 Wave
-        val order8 = mkOrder(bob, bob2WavesPair, SELL, someAssetAmount, 1.waves)
-        placeAndAwaitAtDex(order8)
-
-        // Bob moves all waves to Alice
-        val transferAmount = bobWavesBalance - minFee
-        broadcastAndAwait(mkTransfer(bob, alice, transferAmount, Waves))
-
-        wavesNode1.api.balance(bob, Waves) shouldBe 0
-
-        // Order should stay accepted
-        dex1.api.waitForOrderStatus(order8, OrderStatus.Accepted)
-
-        // Cleanup
-        dex1.api.cancel(bob, order8).status shouldBe "OrderCanceled"
-        broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
-      }
-
       "market status" in {
         val ask       = 5.waves
         val askAmount = 5000000
@@ -357,7 +349,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     def mkAliceOrder(i: Int, tpe: OrderType) = mkOrder(alice, pair, tpe, 100L + i, Order.PriceConstant)
 
-    val orders = (1 to (OrderDB.OldestOrderIndexOffset + 5)).flatMap { i =>
+    val orders = (1 to (maxOrders + 5)).flatMap { i =>
       List(
         mkAliceOrder(i, OrderType.BUY),
         mkAliceOrder(i, OrderType.SELL)
@@ -379,11 +371,127 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     oldestSnapshotOffset should be <= currentOffset
 
     val snapshotOffsets = dex1.api.allSnapshotOffsets
-    snapshotOffsets.foreach {
+    snapshotOffsets.xs.foreach {
       case (assetPair, offset) =>
         withClue(assetPair) {
           offset should be <= currentOffset
         }
+    }
+  }
+
+  "Matcher should" - {
+
+    "reject proxy requests if X-User-Public-Key doesn't match query param and process them correctly otherwise " - {
+
+      "/matcher/balance/reserved/{publicKey}" in {
+        dex1.api.tryReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.api.tryReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe 'right
+      }
+
+      "/matcher/orders/{address}/cancel" in {
+
+        val now = System.currentTimeMillis
+
+        val o1 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now)
+        val o2 = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 3000.0, ts = now + 100)
+
+        val orderIds = Set(o1.id(), o2.id())
+
+        Seq(o1, o2).foreach(dex1.api.place)
+
+        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(alice.publicKey)) should failWith(3148801, "Provided user public key is not correct")
+        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe 'right
+      }
+
+      "/matcher/orders/{address}" in {
+        dex1.api.tryOrderHistoryWithApiKey(
+          owner = bob,
+          xUserPublicKey = Some(alice.publicKey)
+        ) should failWith(3148801, "Provided user public key is not correct")
+
+        dex1.api.tryOrderHistoryWithApiKey(
+          owner = bob,
+          xUserPublicKey = Some(bob.publicKey)
+        ) shouldBe 'right
+      }
+
+      "/matcher/orders/{address}/{orderId}" in {
+
+        val ts = System.currentTimeMillis()
+
+        val order          = mkOrderDP(bob, wavesUsdPair, SELL, 1.waves, 4000.0, ts = ts)
+        val notPlacedOrder = mkOrderDP(bob, wavesUsdPair, BUY, 2.waves, 0.004)
+        val notFoundError  = OrderNotFound(notPlacedOrder.id())
+
+        placeAndAwaitAtDex(order)
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = order.id(),
+          xUserPublicKey = Some(alice.publicKey)
+        ) should failWith(3148801, "Provided user public key is not correct")
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = notPlacedOrder.id(),
+          xUserPublicKey = Some(bob.publicKey)
+        ) should failWith(notFoundError.code, notFoundError.message.text)
+
+        dex1.api.tryOrderStatusInfoByIdWithApiKey(
+          owner = bob,
+          orderId = order.id(),
+          xUserPublicKey = Some(bob.publicKey)
+        ) shouldBe Right(
+          ApiOrderBookHistoryItem(
+            id = order.id(),
+            `type` = SELL,
+            orderType = AcceptedOrderType.Limit,
+            amount = 1.waves,
+            filled = 0,
+            price = 4000.usd,
+            fee = 0.003.waves,
+            filledFee = 0,
+            feeAsset = Waves,
+            timestamp = ts,
+            status = OrderStatus.Accepted.name,
+            assetPair = order.assetPair,
+            avgWeighedPrice = 0
+          )
+        )
+
+        dex1.api.cancelAll(bob)
+      }
+    }
+
+    "correctly handle order status info requests (by signature)" in {
+
+      val ts    = System.currentTimeMillis
+      val order = mkOrderDP(alice, wavesBtcPair, SELL, 1.waves, 500, ts = ts)
+
+      val notPlacedOrder = mkOrderDP(alice, wavesBtcPair, BUY, 1.waves, 500)
+      val notFoundError  = OrderNotFound(notPlacedOrder.id())
+
+      placeAndAwaitAtDex(order)
+
+      dex1.api.tryOrderStatusInfoByIdWithSignature(alice, order.id()) shouldBe Right(
+        ApiOrderBookHistoryItem(
+          id = order.id(),
+          `type` = SELL,
+          orderType = AcceptedOrderType.Limit,
+          amount = 1.waves,
+          filled = 0,
+          price = 500.btc,
+          fee = 0.003.waves,
+          filledFee = 0,
+          feeAsset = Waves,
+          timestamp = ts,
+          status = OrderStatus.Accepted.name,
+          assetPair = order.assetPair,
+          avgWeighedPrice = 0
+        )
+      )
+
+      dex1.api.tryOrderStatusInfoByIdWithSignature(alice, notPlacedOrder.id()) should failWith(notFoundError.code, notFoundError.message.text)
     }
   }
 }

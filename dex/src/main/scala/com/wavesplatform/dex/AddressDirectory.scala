@@ -4,21 +4,13 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.{EitherExt2, ScorexLogging}
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.history.HistoryRouter._
 import com.wavesplatform.dex.model.Events
 import com.wavesplatform.dex.model.Events.OrderCancelFailed
-import com.wavesplatform.dex.settings.MatcherSettings
-import monix.execution.Scheduler
-import monix.reactive.Observable
 
 import scala.collection.mutable
 
-class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChanges],
-                       settings: MatcherSettings,
-                       orderDB: OrderDB,
-                       addressActorProps: (Address, Boolean) => Props,
-                       historyRouter: Option[ActorRef])
+class AddressDirectory(orderDB: OrderDB, addressActorProps: (Address, Boolean) => Props, historyRouter: Option[ActorRef])
     extends Actor
     with ScorexLogging {
 
@@ -28,13 +20,6 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
   private var startSchedules: Boolean = false
   private[this] val children          = mutable.AnyRefMap.empty[Address, ActorRef]
 
-  /** Sends balance changes to the AddressActors */
-  spendableBalanceChanges.foreach {
-    _.foreach {
-      case (address, assetBalances) => children.get(address) foreach (_ ! AddressActor.Command.CancelNotEnoughCoinsOrders { assetBalances })
-    }
-  } { Scheduler(context.dispatcher) }
-
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private def createAddressActor(address: Address): ActorRef = {
@@ -42,9 +27,9 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
     watch(actorOf(addressActorProps(address, startSchedules), address.toString))
   }
 
-  private def forward(address: Address, msg: Any): Unit = {
-    val handler = children.getOrElseUpdate(address, createAddressActor(address))
-    handler.forward(msg)
+  private def forward(address: Address, msg: Any): Unit = (children get address, msg) match {
+    case (None, _: AddressActor.Message.BalanceChanged) =>
+    case _                                              => children getOrElseUpdate (address, createAddressActor(address)) forward msg
   }
 
   override def receive: Receive = {
@@ -54,23 +39,14 @@ class AddressDirectory(spendableBalanceChanges: Observable[SpendableBalanceChang
       forward(lo.order.sender, e)
       historyRouter foreach { _ ! SaveOrder(lo, timestamp) }
 
-    case e @ Events.OrderExecuted(submitted, counter, timestamp, _, _) =>
+    case e: Events.OrderExecuted =>
+      import e.{counter, submitted}
       forward(submitted.order.sender, e)
       if (counter.order.sender != submitted.order.sender) forward(counter.order.sender, e)
-
-      lazy val isFirstExecution  = submitted.amount == submitted.order.amount
-      lazy val isSubmittedFilled = e.submittedRemainingAmount == 0
-
-      (submitted.isMarket, isFirstExecution, isSubmittedFilled) match {
-        case (true, true, _) | (false, true, true) => historyRouter foreach { _ ! SaveOrder(submitted, timestamp) }
-        case _                                     => Unit
-      }
-
       historyRouter foreach { _ ! SaveEvent(e) }
 
-    case e @ Events.OrderCanceled(ao, _, timestamp) =>
-      forward(ao.order.sender, e)
-      if (ao.isMarket && ao.amount == ao.order.amount) historyRouter foreach { _ ! SaveOrder(ao, timestamp) }
+    case e: Events.OrderCanceled =>
+      forward(e.acceptedOrder.order.sender, e)
       historyRouter foreach { _ ! SaveEvent(e) }
 
     case e: OrderCancelFailed =>

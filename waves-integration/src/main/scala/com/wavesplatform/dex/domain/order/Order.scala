@@ -164,9 +164,11 @@ object Order extends EntityParser[Order] {
 
   type Id = ByteStr
 
-  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant     = 100000000L
-  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
+  val MaxLiveTime: Long                          = 30L * 24L * 60L * 60L * 1000L
+  val PriceConstantExponent: Int                 = 8
+  val PriceConstantDecimal: java.math.BigDecimal = java.math.BigDecimal.ONE.scaleByPowerOfTen(PriceConstantExponent)
+  val PriceConstant: Long                        = PriceConstantDecimal.longValue()
+  val MaxAmount: Long                            = 100 * PriceConstant * PriceConstant
 
   def apply(senderPublicKey: PublicKey,
             matcherPublicKey: PublicKey,

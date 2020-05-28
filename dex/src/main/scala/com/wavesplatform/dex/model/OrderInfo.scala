@@ -2,6 +2,7 @@ package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
+import com.google.common.primitives.Longs
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -18,13 +19,14 @@ sealed trait OrderInfo[+S <: OrderStatus] {
   def status: S
   def assetPair: AssetPair
   def orderType: AcceptedOrderType
+  def avgWeighedPrice: Long
 }
 
 object OrderInfo {
   type FinalOrderInfo = OrderInfo[OrderStatus.Final]
 
   def v1[S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair): OrderInfo[S] =
-    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair, AcceptedOrderType.Limit)
+    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair, AcceptedOrderType.Limit, price) // TODO avgWeighedPrice in DEX-774
 
   def v2[S <: OrderStatus](order: Order, status: S): OrderInfo[S] =
     v2(order.orderType, order.amount, order.price, order.matcherFee, order.feeAsset, order.timestamp, status, order.assetPair)
@@ -37,20 +39,12 @@ object OrderInfo {
                            timestamp: Long,
                            status: S,
                            assetPair: AssetPair): OrderInfo[S] =
-    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, AcceptedOrderType.Limit)
+    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, AcceptedOrderType.Limit, price) // TODO avgWeighedPrice in DEX-774
 
   def v3[S <: OrderStatus](ao: AcceptedOrder, status: S): OrderInfo[S] = {
     import ao.order
     val acceptedOrderType = if (ao.isLimit) AcceptedOrderType.Limit else AcceptedOrderType.Market
-    v3(order.orderType,
-       order.amount,
-       order.price,
-       order.matcherFee,
-       order.feeAsset,
-       order.timestamp,
-       status,
-       order.assetPair,
-       acceptedOrderType)
+    v3(order.orderType, order.amount, order.price, order.matcherFee, order.feeAsset, order.timestamp, status, order.assetPair, acceptedOrderType)
   }
 
   def v3[S <: OrderStatus](order: Order, status: S, orderType: AcceptedOrderType): OrderInfo[S] =
@@ -65,7 +59,36 @@ object OrderInfo {
                            status: S,
                            assetPair: AssetPair,
                            orderType: AcceptedOrderType): OrderInfo[S] =
-    Impl(3, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType)
+    Impl(3, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType, price) // TODO avgWeighedPrice in DEX-774
+
+  def v4[S <: OrderStatus](side: OrderType,
+                           amount: Long,
+                           price: Long,
+                           matcherFee: Long,
+                           matcherFeeAssetId: Asset,
+                           timestamp: Long,
+                           status: S,
+                           assetPair: AssetPair,
+                           orderType: AcceptedOrderType,
+                           avgWeighedPrice: Long): OrderInfo[S] =
+    Impl(4, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType, avgWeighedPrice)
+
+  def v4[S <: OrderStatus](ao: AcceptedOrder, status: S): OrderInfo[S] = {
+    import ao.order
+    val acceptedOrderType = if (ao.isLimit) AcceptedOrderType.Limit else AcceptedOrderType.Market
+    v4(
+      order.orderType,
+      order.amount,
+      order.price,
+      order.matcherFee,
+      order.feeAsset,
+      order.timestamp,
+      status,
+      order.assetPair,
+      acceptedOrderType,
+      ao.fillingInfo.avgWeighedPrice
+    )
+  }
 
   private case class Impl[+S <: OrderStatus](version: Byte,
                                              side: OrderType,
@@ -76,13 +99,15 @@ object OrderInfo {
                                              timestamp: Long,
                                              status: S,
                                              assetPair: AssetPair,
-                                             orderType: AcceptedOrderType)
+                                             orderType: AcceptedOrderType,
+                                             avgWeighedPrice: Long)
       extends OrderInfo[S]
 
   def encode(oi: FinalOrderInfo): Array[Byte] = oi.version match {
     case x if x <= 1 => encodeV1(oi)
     case 2           => encodeV2(oi)
     case 3           => encodeV3(oi)
+    case 4           => encodeV4(oi)
     case x           => throw new IllegalArgumentException(s"An unknown order version: $x")
   }
 
@@ -92,6 +117,7 @@ object OrderInfo {
       case side @ (0 | 1) => decodeV1(side, buf)
       case 2              => decodeV2(buf)
       case 3              => decodeV3(buf)
+      case 4              => decodeV4(buf)
       case x              => throw new IllegalStateException(s"An unknown version of order info: $x")
     }
   }
@@ -111,6 +137,7 @@ object OrderInfo {
   }
 
   private def decodeV1(side: Byte, buf: ByteBuffer): FinalOrderInfo = {
+
     val version: Byte = 1
     val totalAmount   = buf.getLong()
     val totalFee      = 300000L
@@ -148,6 +175,7 @@ object OrderInfo {
     ).array()
 
   private def decodeV2(buf: ByteBuffer): FinalOrderInfo = {
+
     val side        = OrderType(buf.get)
     val totalAmount = buf.getLong
     val price       = buf.getLong
@@ -174,6 +202,7 @@ object OrderInfo {
       .array()
 
   private def decodeV3(buf: ByteBuffer): FinalOrderInfo = {
+
     val side        = OrderType(buf.get)
     val totalAmount = buf.getLong
     val price       = buf.getLong
@@ -189,6 +218,35 @@ object OrderInfo {
       status = buf.getFinalOrderStatus(3, totalAmount, totalFee),
       assetPair = AssetPair(buf.getAssetId, buf.getAssetId),
       orderType = buf.getAcceptedOrderType
+    )
+  }
+
+  private def encodeV4(oi: OrderInfo.FinalOrderInfo): Array[Byte] = {
+    val size: Int = 52 + oi.feeAsset.byteRepr.length + oi.assetPair.bytes.length + 8
+    encodeVersioned(4, size, oi)
+      .putAcceptedOrderType(oi.orderType)
+      .put(Longs.toByteArray(oi.avgWeighedPrice))
+      .array()
+  }
+
+  private def decodeV4(buf: ByteBuffer): FinalOrderInfo = {
+
+    val side        = OrderType(buf.get)
+    val totalAmount = buf.getLong
+    val price       = buf.getLong
+    val totalFee    = buf.getLong
+
+    OrderInfo.v4(
+      side = side,
+      amount = totalAmount,
+      price = price,
+      matcherFee = totalFee,
+      matcherFeeAssetId = buf.getAssetId,
+      timestamp = buf.getLong,
+      status = buf.getFinalOrderStatus(3, totalAmount, totalFee),
+      assetPair = AssetPair(buf.getAssetId, buf.getAssetId),
+      orderType = buf.getAcceptedOrderType,
+      avgWeighedPrice = buf.getLong
     )
   }
 }

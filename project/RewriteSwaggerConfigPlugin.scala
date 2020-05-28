@@ -42,19 +42,16 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
                   val update =
                     """
 const ui = SwaggerUIBundle({
-  url: "/api-docs/swagger.json",
-  dom_id: '#swagger-ui',
-  presets: [
-    SwaggerUIBundle.presets.apis,
-    SwaggerUIStandalonePreset
-  ],
-  plugins: [
-    SwaggerUIBundle.plugins.DownloadUrl
-  ],
-  layout: "StandaloneLayout",
-  operationsSorter: "alpha"
+    url: "/api-docs/swagger.json",
+    dom_id: '#swagger-ui',
+    deepLinking: true,
+    presets: [ SwaggerUIBundle.presets.apis ],
+    plugins: [ SwaggerUIBundle.plugins.DownloadUrl ],
+    layout: "BaseLayout",
+    operationsSorter: "alpha"
 });
-window.ui = ui;"""
+window.ui = ui;
+"""
                   // Careful! ^ will be inserted as one-liner
                   el.text(update)
               }

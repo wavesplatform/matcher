@@ -3,6 +3,8 @@ package com.wavesplatform.dex.db
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
 object EmptyOrderDB extends OrderDB {
@@ -12,8 +14,8 @@ object EmptyOrderDB extends OrderDB {
   override def get(id: Order.Id): Option[Order]                                                     = None
   override def saveOrderInfo(id: Order.Id, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = {}
   override def saveOrder(o: Order): Unit                                                            = {}
-  override def loadRemainingOrders(owner: Address,
-                                   maybePair: Option[AssetPair],
-                                   activeOrders: Seq[(Order.Id, OrderInfo[OrderStatus])]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
+  override def getFinalizedOrders(owner: Address, maybePair: Option[AssetPair]): Seq[(Order.Id, OrderInfo[OrderStatus])] =
     Seq.empty
+
+  override def getOrderInfo(id: Id): Option[FinalOrderInfo] = None
 }

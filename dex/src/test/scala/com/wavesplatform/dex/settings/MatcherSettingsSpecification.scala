@@ -2,8 +2,10 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.dex.api.OrderBookSnapshotHttpCache
-import com.wavesplatform.dex.db.AccountStorage
+import com.wavesplatform.dex.AddressActor
+import com.wavesplatform.dex.api.http.OrderBookHttpInfo
+import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
+import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -34,6 +36,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       cors = false,
       apiKeyDifferentHost = false
     )
+
     settings.wavesBlockchainClient should matchTo(
       WavesBlockchainClientSettings(
         grpc = GrpcClientSettings(
@@ -48,15 +51,17 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
             connectTimeout = 99.seconds
           )
         ),
-        defaultCachesExpiration = 101.millis
+        defaultCachesExpiration = 101.millis,
+        balanceStreamBufferSize = 100
       )
     )
+
     settings.exchangeTxBaseFee should be(300000)
     settings.actorResponseTimeout should be(11.seconds)
     settings.snapshotsInterval should be(999)
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
-    settings.maxOrdersPerRequest should be(100)
+    settings.orderDb should be(OrderDB.Settings(199))
     settings.priceAssets should be(
       Seq(
         Waves,
@@ -67,8 +72,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.blacklistedAssets shouldBe Set(AssetPair.extractAsset("AbunLGErT5ctzVN8MVjb4Ad9YgjpubB8Hqb17VxzfAck").get.asInstanceOf[IssuedAsset])
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
     settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
-    settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
-      cacheTimeout = 11.minutes,
+    settings.orderBookSnapshotHttpCache shouldBe OrderBookHttpInfo.Settings(
       depthRanges = List(1, 5, 333),
       defaultDepth = Some(5)
     )
@@ -81,7 +85,7 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
     settings.processConsumedTimeout shouldBe 663.seconds
     settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
-    settings.deviation shouldBe DeviationsSettings(true, 1000000, 1000000, 1000000)
+    settings.deviation shouldBe DeviationsSettings(enabled = true, 1000000, 1000000, 1000000)
     settings.allowedAssetPairs shouldBe Set.empty[AssetPair]
     settings.allowedOrderVersions shouldBe Set(11, 22)
     settings.orderRestrictions shouldBe Map.empty[AssetPair, OrderRestrictionsSettings]
@@ -90,6 +94,14 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       interval = 1.day,
       maxPendingTime = 30.days
     )
+    val expectedJwtPublicKey = """foo
+bar
+baz"""
+    settings.webSocketSettings should matchTo(
+      WebSocketSettings(100.milliseconds,
+                        WsHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
+    )
+    settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
 
   "DeviationsSettings in MatcherSettings" should "be validated" in {
@@ -454,5 +466,21 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
       getSettingByConfig(configStr(incorrectRulesOrder(100, 88))) should produce(
         "Invalid setting matching-rules value: Rules should be ordered by offset, but they are: 100, 88")
     }
+  }
+
+  "Subscriptions settings" should "be validated" in {
+
+    val invalidSubscriptionsSettings =
+      s"""
+         | subscriptions {
+         |   max-order-book-number = 0
+         |   max-address-number = 1
+         | }
+         """.stripMargin
+
+    getSettingByConfig(configWithSettings(subscriptionsSettings = invalidSubscriptionsSettings)) should produce(
+      "Invalid setting web-sockets.web-socket-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
+        "Invalid setting web-sockets.web-socket-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
+    )
   }
 }

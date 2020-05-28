@@ -12,17 +12,25 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString("waves.dex.rest-order-limit = 8".stripMargin)
+  private val maxActiveOrders    = 50
+  private val maxFinalizedOrders = 3
+
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(
+    s"""waves.dex {
+       |  address-actor.max-active-orders = $maxActiveOrders
+       |  order-db.max-orders = $maxFinalizedOrders
+       |}""".stripMargin
+  )
 
   private def activeOrders: List[Order.Id] = {
     val activeOrders = dex1.api.orderHistory(alice, activeOnly = Some(true)).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).map(_.id) should equal(activeOrders)
+    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).map(_.id) should matchTo(activeOrders)
     activeOrders
   }
 
   private def allOrders: List[Order.Id] = {
     val allOrders = dex1.api.orderHistory(alice).map(_.id)
-    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)).map(_.id) should equal(allOrders)
+    dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(false)).map(_.id) should matchTo(allOrders)
     allOrders
   }
 
@@ -70,15 +78,15 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
     dex1.api.cancel(alice, cancelled2)
     dex1.api.waitForOrderStatus(cancelled2, OrderStatus.Cancelled)
 
-    val activeOrdersAllFive       = Seq(partial2, active2, partial1, active1, active0).map(_.id())
+    val activeOrdersAllFive       = List(partial2, active2, partial1, active1, active0).map(_.id())
     val allOrdersExceptTheFilled1 = activeOrdersAllFive ++ Seq(cancelled2, filled2, cancelled1).map(_.id())
-    val activeOrdersByPair        = Seq(partial1, active1, active0).map(_.id())
+    val activeOrdersByPair        = List(partial1, active1, active0).map(_.id())
     val allOrdersByPair           = activeOrdersByPair ++ Seq(cancelled1, filled1).map(_.id())
 
-    activeOrders should equal(activeOrdersAllFive)
-    allOrders should equal(allOrdersExceptTheFilled1)
-    activeOrdersBy(alicePair) should equal(activeOrdersByPair)
-    allOrdersBy(alicePair) should equal(allOrdersByPair)
+    activeOrders should matchTo(activeOrdersAllFive)
+    allOrders should matchTo(allOrdersExceptTheFilled1)
+    activeOrdersBy(alicePair) should matchTo(activeOrdersByPair)
+    allOrdersBy(alicePair) should matchTo(allOrdersByPair)
 
     info("'fullOrderHistory' and 'ordersByAddress' must return all active orders, even if they are more than the limit")
 
@@ -90,18 +98,18 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
     dex1.api.waitForOrderStatus(active6, OrderStatus.Accepted)
 
-    val activeOrdersAllNine          = Seq(active6, active5, active4, active3).map(_.id()) ++ activeOrdersAllFive
-    val activeOrdersByPairWithTwoNew = Seq(active4, active3).map(_.id()) ++ activeOrdersByPair
-    val allOrdersByPairWithTwoNew    = Seq(active4, active3).map(_.id()) ++ allOrdersByPair
+    val activeOrdersAllNine          = List(active6, active5, active4, active3).map(_.id()) ++ activeOrdersAllFive
+    val activeOrdersByPairWithTwoNew = List(active4, active3).map(_.id()) ++ activeOrdersByPair
+    val allOrdersByPairWithTwoNew    = List(active4, active3).map(_.id()) ++ allOrdersByPair
 
     {
       val xs = activeOrders
-      xs should equal(allOrders)
-      xs should equal(activeOrdersAllNine)
+      xs should matchTo(allOrders.take(xs.size)) // rest were finalized
+      xs should matchTo(activeOrdersAllNine)
     }
 
-    activeOrdersBy(alicePair) should equal(activeOrdersByPairWithTwoNew)
-    allOrdersBy(alicePair) should equal(allOrdersByPairWithTwoNew)
+    activeOrdersBy(alicePair) should matchTo(activeOrdersByPairWithTwoNew)
+    allOrdersBy(alicePair) should matchTo(allOrdersByPairWithTwoNew)
 
     info("'orderHistoryByPair' must return no more 'rest-order-limit' orders")
 
@@ -113,18 +121,18 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
     dex1.api.waitForOrderStatus(active10, OrderStatus.Accepted)
 
-    val activeOrdersAllThirteen               = Seq(active10, active9, active8, active7).map(_.id()) ++ activeOrdersAllNine
-    val activeOrdersByPairWithTwoMoreNew      = Seq(active8, active7).map(_.id()) ++ activeOrdersByPairWithTwoNew
-    val allOrdersByPairWithTwoNewExceptOneOld = Seq(active8, active7).map(_.id()) ++ allOrdersByPairWithTwoNew.dropRight(1)
+    val activeOrdersAllThirteen               = List(active10, active9, active8, active7).map(_.id()) ++ activeOrdersAllNine
+    val activeOrdersByPairWithTwoMoreNew      = List(active8, active7).map(_.id()) ++ activeOrdersByPairWithTwoNew
+    val allOrdersByPairWithTwoNewExceptOneOld = List(active8, active7).map(_.id()) ++ allOrdersByPairWithTwoNew
 
     {
       val xs = activeOrders
-      xs should equal(allOrders)
-      xs should equal(activeOrdersAllThirteen)
+      xs should matchTo(allOrders.take(xs.size)) // rest were finalized
+      xs should matchTo(activeOrdersAllThirteen)
     }
 
-    activeOrdersBy(alicePair) should equal(activeOrdersByPairWithTwoMoreNew)
-    allOrdersBy(alicePair) should equal(allOrdersByPairWithTwoNewExceptOneOld)
+    activeOrdersBy(alicePair) should matchTo(activeOrdersByPairWithTwoMoreNew)
+    allOrdersBy(alicePair) should matchTo(allOrdersByPairWithTwoNewExceptOneOld)
 
     info("all the methods move active orders that were filled")
 
@@ -133,19 +141,19 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
       mkOrder(bob, bobPair, SELL, 2, 2.waves, ts = now + 22), // fill active2, active5
       mkOrder(bob, alicePair, BUY, 2, 9.waves, ts = now + 23), // fill partial1, active7
       mkOrder(bob, alicePair, BUY, 1, 10.waves, ts = now + 24) // fill active1
-    ).foreach(dex1.api.place)
+    ).foreach(placeAndAwaitAtDex(_, OrderStatus.Filled))
 
-    dex1.api.waitForOrderStatus(active1, OrderStatus.Filled)
+    val activeOrdersAllSeven = List(active10, active9, active8, active6, active4, active3, active0).map(_.id())
 
-    val activeOrdersAllSeven            = Seq(active10, active9, active8, active6, active4, active3, active0).map(_.id())
-    val allOrdersWithOneFilled          = activeOrdersAllSeven ++ Seq(active1).map(_.id())
-    val activeOrdersByPairWithTwoFilled = Seq(active8, active4, active3, active0).map(_.id())
-    val allOrdersByPairWithTwoFilled    = activeOrdersByPairWithTwoFilled ++ Seq(active7, cancelled1, partial1, active1).map(_.id())
+    // Because sorted by timestamp in descending order
+    val allOrdersWithOneFilled          = activeOrdersAllSeven ++ Seq(active7, partial1, active1).map(_.id())
+    val activeOrdersByPairWithTwoFilled = List(active8, active4, active3, active0).map(_.id())
+    val allOrdersByPairWithTwoFilled    = activeOrdersByPairWithTwoFilled ++ Seq(active7, partial1, active1).map(_.id())
 
-    activeOrders should equal(activeOrdersAllSeven)
-    allOrders should equal(allOrdersWithOneFilled)
-    activeOrdersBy(alicePair) should equal(activeOrdersByPairWithTwoFilled)
-    allOrdersBy(alicePair) should equal(allOrdersByPairWithTwoFilled)
+    activeOrders should matchTo(activeOrdersAllSeven)
+    allOrders should matchTo(allOrdersWithOneFilled)
+    activeOrdersBy(alicePair) should matchTo(activeOrdersByPairWithTwoFilled)
+    allOrdersBy(alicePair) should matchTo(allOrdersByPairWithTwoFilled)
 
     info("'orderHistoryByPair' must return all active orders, even if they are more than the limit")
 
@@ -158,16 +166,19 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
     dex1.api.waitForOrderStatus(active15, OrderStatus.Accepted)
 
-    val activeOrdersAllTwelve     = Seq(active15, active14, active13, active12, active11).map(_.id()) ++ activeOrdersAllSeven
-    val activeOrdersByPairAllNine = Seq(active15, active14, active13, active12, active11).map(_.id()) ++ allOrdersByPairWithTwoFilled.take(4)
+    val activeOrdersAllTwelve     = List(active15, active14, active13, active12, active11).map(_.id()) ++ activeOrdersAllSeven
+    val activeOrdersByPairAllNine = List(active15, active14, active13, active12, active11).map(_.id()) ++ allOrdersByPairWithTwoFilled
 
-    activeOrders should equal(allOrders)
-    activeOrders should equal(activeOrdersAllTwelve)
+    {
+      val xs = activeOrders
+      xs should matchTo(allOrders.take(xs.size))
+      xs should matchTo(activeOrdersAllTwelve.take(xs.size))
+    }
 
     {
       val xs = activeOrdersBy(alicePair)
-      xs should equal(allOrdersBy(alicePair))
-      xs should equal(activeOrdersByPairAllNine)
+      xs should matchTo(allOrdersBy(alicePair).take(xs.size)) // rest were finalized
+      xs should matchTo(activeOrdersByPairAllNine.take(xs.size))
     }
   }
 

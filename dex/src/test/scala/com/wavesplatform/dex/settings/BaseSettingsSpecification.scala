@@ -58,11 +58,20 @@ class BaseSettingsSpecification extends AnyFlatSpec {
        |matching-rules = {}
      """.stripMargin
 
+  val correctSubscriptionsSettingsStr: String =
+    s"""
+       |subscriptions {
+       |  max-order-book-number = 20
+       |  max-address-number = 20
+       |}
+       """.stripMargin
+
   def configWithSettings(orderFeeStr: String = correctOrderFeeStr,
                          deviationsStr: String = correctDeviationsStr,
                          allowedAssetPairsStr: String = correctAllowedAssetPairsStr,
                          orderRestrictionsStr: String = correctOrderRestrictionsStr,
-                         matchingRulesStr: String = correctMatchingRulesStr): Config = {
+                         matchingRulesStr: String = correctMatchingRulesStr,
+                         subscriptionsSettings: String = correctSubscriptionsSettingsStr): Config = {
     val configStr =
       s"""waves {
          |  directory = /waves
@@ -70,6 +79,9 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    account-storage {
          |      type = "in-mem"
          |      in-mem.seed-in-base64 = "c3lrYWJsZXlhdA=="
+         |    }
+         |    order-db {
+         |      max-orders = 199
          |    }
          |    rest-api {
          |      address = 127.1.2.3
@@ -91,7 +103,8 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          connect-timeout = 99s
          |        }
          |      }
-         |      default-caches-expiration = 101ms
+         |      default-caches-expiration = 101ms,
+         |      balance-stream-buffer-size = 100
          |    }
          |    exchange-tx-base-fee = 300000
          |    actor-response-timeout = 11s
@@ -114,8 +127,7 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |    ]
          |    white-list-only = yes
          |    allowed-order-versions = [11, 22]
-         |    order-book-snapshot-http-cache {
-         |      cache-timeout = 11m
+         |    order-book-http {
          |      depth-ranges = [1, 5, 333]
          |      default-depth = 5
          |    }
@@ -154,6 +166,23 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      broadcast-until-confirmed = yes
          |      interval = 1 day
          |      max-pending-time = 30 days
+         |    }
+         |    web-sockets {
+         |      messages-interval = 100ms
+         |      web-socket-handler {
+         |        max-connection-lifetime = 20h
+         |        ping-interval = 11s
+         |        pong-timeout = 31s
+         |        jwt-public-key = \"\"\"foo
+         |bar
+         |baz\"\"\"
+         |        $subscriptionsSettings
+         |      }
+         |    }
+         |    address-actor {
+         |      max-active-orders = 400
+         |      ws-messages-interval = 100ms
+         |      batch-cancel-timeout = 18 seconds
          |    }
          |  }
          |}""".stripMargin

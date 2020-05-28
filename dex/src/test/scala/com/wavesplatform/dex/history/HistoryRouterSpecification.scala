@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV1}
 import com.wavesplatform.dex.history.HistoryRouter.{SaveEvent, SaveOrder}
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{AcceptedOrder, LimitOrder}
-import com.wavesplatform.dex.time.NTPTime
+import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -23,7 +23,7 @@ class HistoryRouterSpecification
     with AnyWordSpecLike
     with Matchers
     with BeforeAndAfterAll
-    with NTPTime
+    with SystemTime
     with MatcherSpecBase {
 
   override protected def afterAll(): Unit = {
@@ -72,11 +72,11 @@ class HistoryRouterSpecification
     )
   }
 
-  def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, ntpTime.getTimestamp())
-  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, isSystemCancel = false, ntpTime.getTimestamp())
+  def orderAdded(submitted: LimitOrder): OrderAdded           = OrderAdded(submitted, time.getTimestamp())
+  def orderCancelled(submitted: AcceptedOrder): OrderCanceled = OrderCanceled(submitted, isSystemCancel = false, time.getTimestamp())
 
   def orderExecuted(submitted: AcceptedOrder, counter: LimitOrder): OrderExecuted = {
-    OrderExecuted(submitted, counter, ntpTime.getTimestamp(), submitted.matcherFee, counter.matcherFee)
+    OrderExecuted(submitted, counter, time.getTimestamp(), counter.matcherFee, submitted.matcherFee)
   }
 
   // don't need to use blockchain in order to find out asset decimals, therefore pair parameter isn't used

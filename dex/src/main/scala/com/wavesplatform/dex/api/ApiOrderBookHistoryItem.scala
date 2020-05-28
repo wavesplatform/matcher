@@ -19,9 +19,11 @@ case class ApiOrderBookHistoryItem(id: Order.Id,
                                    feeAsset: Asset,
                                    timestamp: Long,
                                    status: String,
-                                   assetPair: AssetPair)
+                                   assetPair: AssetPair,
+                                   avgWeighedPrice: Long)
 
 object ApiOrderBookHistoryItem {
+
   implicit val orderBookHistoryItemFormat: Format[ApiOrderBookHistoryItem] = Json.format
 
   def fromOrderInfo(id: Order.Id, info: OrderInfo[OrderStatus]): ApiOrderBookHistoryItem = ApiOrderBookHistoryItem(
@@ -36,6 +38,7 @@ object ApiOrderBookHistoryItem {
     feeAsset = info.feeAsset,
     timestamp = info.timestamp,
     status = info.status.name,
-    assetPair = info.assetPair
+    assetPair = info.assetPair,
+    avgWeighedPrice = info.avgWeighedPrice
   )
 }

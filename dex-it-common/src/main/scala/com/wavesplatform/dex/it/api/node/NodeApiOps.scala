@@ -40,6 +40,8 @@ object NodeApiOps {
         else throw new RuntimeException(s"Unexpected error: $e")
     }
 
+    def currentHeight: F[Int] = explicitGet(self.tryCurrentHeight)
+
     def activationStatus: F[ActivationStatusResponse] = explicitGet(self.tryActivationStatus)
     def config: F[Config]                             = explicitGet(self.tryConfig)
   }

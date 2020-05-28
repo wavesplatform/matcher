@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.grpc.integration.{IntegrationSuiteBase, WavesBlockchainClientBuilder}
@@ -40,25 +40,26 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   private implicit val monixScheduler: Scheduler = Scheduler(runNow)
-  private lazy val client = WavesBlockchainClientBuilder.async(
-    WavesBlockchainClientSettings(
-      grpc = GrpcClientSettings(
-        target = wavesNode1.grpcApiTarget,
-        maxHedgedAttempts = 5,
-        maxRetryAttempts = 5,
-        keepAliveWithoutCalls = true,
-        keepAliveTime = 2.seconds,
-        keepAliveTimeout = 5.seconds,
-        idleTimeout = 1.minute,
-        channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-          connectTimeout = 5.seconds
-        )
+
+  private lazy val client =
+    WavesBlockchainClientBuilder.async(
+      WavesBlockchainClientSettings(
+        grpc = GrpcClientSettings(
+          target = wavesNode1.grpcApiTarget,
+          maxHedgedAttempts = 5,
+          maxRetryAttempts = 5,
+          keepAliveWithoutCalls = true,
+          keepAliveTime = 2.seconds,
+          keepAliveTimeout = 5.seconds,
+          idleTimeout = 1.minute,
+          channelOptions = GrpcClientSettings.ChannelOptionsSettings(connectTimeout = 5.seconds)
+        ),
+        defaultCachesExpiration = 100.milliseconds,
+        balanceStreamBufferSize = 100
       ),
-      defaultCachesExpiration = 100.milliseconds
-    ),
-    monixScheduler,
-    ExecutionContext.fromExecutor(grpcExecutor)
-  )
+      monixScheduler,
+      ExecutionContext.fromExecutor(grpcExecutor)
+    )
 
   override implicit def patienceConfig: PatienceConfig = super.patienceConfig.copy(
     timeout = 1.minute,
@@ -67,19 +68,24 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
 
   @volatile private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
-  private val eventsObserver: Observer[SpendableBalanceChanges] = new Observer[SpendableBalanceChanges] {
-    override def onError(ex: Throwable): Unit                       = Unit
-    override def onComplete(): Unit                                 = Unit
-    override def onNext(elem: SpendableBalanceChanges): Future[Ack] = { balanceChanges ++= elem; Continue }
+  private val eventsObserver: Observer[BalanceChanges] = new Observer[BalanceChanges] {
+    override def onError(ex: Throwable): Unit = Unit
+    override def onComplete(): Unit           = Unit
+    override def onNext(elem: BalanceChanges): Future[Ack] = {
+      balanceChanges += elem.address -> (balanceChanges.getOrElse(elem.address, Map.empty) + (elem.asset -> elem.balance))
+      Continue
+    }
   }
 
   private val trueScript = Option(Scripts.alwaysTrue)
 
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
-    val actual = simplify(balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
-      case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
-    })
+    val actual = simplify(
+      balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
+        case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
+      }
+    )
     val expected = simplify(expectedBalanceChanges)
     actual should matchTo(expected)
   }
@@ -105,7 +111,7 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   override def beforeAll(): Unit = {
     super.beforeAll()
     broadcastAndAwait(IssueUsdTx)
-    client.spendableBalanceChanges.subscribe(eventsObserver)
+    client.realTimeBalanceChanges.subscribe(eventsObserver)
   }
 
   "DEX client should receive balance changes via gRPC" in {
@@ -154,12 +160,23 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   }
 
   "broadcastTx" - {
-    "returns true if the transaction passed the validation and was added to the UTX pool" in {
-      val pair       = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
-      val exchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
+    "returns true" - {
+      val pair         = AssetPair.createAssetPair(UsdId.toString, "WAVES").get // TODO
+      def mkExchangeTx = mkDomainExchange(bob, alice, pair, 1L, 2 * Order.PriceConstant, matcher = matcher)
 
-      wait(client.broadcastTx(exchangeTx)) shouldBe true
-      wavesNode1.api.waitForTransaction(exchangeTx.id())
+      "if the transaction passed the validation and was added to the UTX pool" in {
+        val exchangeTx = mkExchangeTx
+
+        wait(client.broadcastTx(exchangeTx)) shouldBe true
+        wavesNode1.api.waitForTransaction(exchangeTx.id())
+      }
+
+      "if the transaction is in the blockchain" in {
+        val exchangeTx = mkExchangeTx
+
+        broadcastAndAwait(exchangeTx)
+        wait(client.broadcastTx(exchangeTx)) shouldBe true
+      }
     }
 
     "returns false if the transaction didn't pass the validation" in {
@@ -272,9 +289,30 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
     }
   }
 
-  "spendableBalance" in {
-    wait(client.spendableBalance(bob, Waves)) shouldBe 494994799299998L
-    wait(client.spendableBalance(bob, randomIssuedAsset)) shouldBe 0L
+  "spendableBalances" in {
+    val issuedAsset = randomIssuedAsset
+    wait { client.spendableBalances(bob, Set(Waves, issuedAsset)) } should matchTo(Map(Waves -> 494994798999996L, issuedAsset -> 0L))
+  }
+
+  "allAssetsSpendableBalance" in {
+
+    val carol = mkKeyPair("carol")
+
+    broadcastAndAwait(
+      mkTransfer(bob, carol, 10.waves, Waves),
+      mkTransfer(alice, carol, 1.usd, usd),
+      mkTransfer(bob, carol, 1.btc, btc)
+    )
+
+    wavesNode1.api.broadcast(mkTransfer(carol, bob, 1.waves, Waves))
+
+    wait(client allAssetsSpendableBalance carol) should matchTo(
+      Map[Asset, Long](
+        Waves -> (10.waves - 1.waves - minFee),
+        usd   -> 1.usd,
+        btc   -> 1.btc
+      )
+    )
   }
 
   "forgedOrder" - {

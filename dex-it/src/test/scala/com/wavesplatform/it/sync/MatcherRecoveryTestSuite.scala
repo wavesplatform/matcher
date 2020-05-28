@@ -28,9 +28,13 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   private var successfulCommandsNumber = 0
 
   "Place, fill and cancel a lot of orders" in {
-    val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
-    val commands = Random.shuffle(orders.map(MatcherCommand.Place(dex1.asyncApi, _))) ++ cancels.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
-    successfulCommandsNumber += executeCommands(commands)
+    val cancels = (1 to cancelsNumber).map(_ => choose(orders))
+
+    val placeCommands  = Random.shuffle(orders.map(MatcherCommand.Place(dex1.asyncApi, _)))
+    val cancelCommands = cancels.map(MatcherCommand.Cancel(dex1.asyncApi, alice, _))
+
+    successfulCommandsNumber += executeCommands(placeCommands)
+    successfulCommandsNumber += executeCommands(cancelCommands)
   }
 
   "Wait until all requests are processed - 1" in {
@@ -41,14 +45,9 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   "Store the current state" in {
     stateBefore = state
-    withClue("common offset") {
-      stateBefore.offset should be > 0L
-    }
+    withClue("common offset") { stateBefore.offset should be > 0L }
     stateBefore.snapshots.foreach {
-      case (assetPair, snapshotOffset) =>
-        withClue(assetPair) {
-          snapshotOffset should be > 0L
-        }
+      case (assetPair, snapshotOffset) => withClue(assetPair) { snapshotOffset should be > 0L }
     }
   }
 
@@ -58,7 +57,7 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   "Verify the state" in {
     val stateAfter = state
-    stateBefore shouldBe stateAfter
+    stateBefore should matchTo(stateAfter)
   }
 
   private def state = cleanState(matcherState(assetPairs, orders, Seq(alice)))

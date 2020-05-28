@@ -1,9 +1,9 @@
 package com.wavesplatform.dex.caches
 
-import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import com.wavesplatform.dex.db.{RateDB, WithDB}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike

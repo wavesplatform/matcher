@@ -11,7 +11,7 @@ import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
 case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty)
-    extends IllegalArgumentException
+    extends IllegalArgumentException(s"JSON parsing errors:\n${errors.mkString("\n")}", cause.orNull)
     with NoStackTrace
 
 trait ApiMarshallers {

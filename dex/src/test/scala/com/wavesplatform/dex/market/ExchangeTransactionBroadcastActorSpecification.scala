@@ -47,7 +47,7 @@ class ExchangeTransactionBroadcastActorSpecification
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
       defaultActor(
-        ntpTime,
+        time,
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
@@ -65,7 +65,7 @@ class ExchangeTransactionBroadcastActorSpecification
     "broadcast a transaction in a next period if it wasn't confirmed" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
       val actor = defaultActor(
-        ntpTime,
+        time,
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
           broadcasted = List(tx)
@@ -89,7 +89,7 @@ class ExchangeTransactionBroadcastActorSpecification
       var broadcasted = Seq.empty[ExchangeTransaction]
       val actor =
         defaultActor(
-          ntpTime,
+          time,
           confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
@@ -112,7 +112,7 @@ class ExchangeTransactionBroadcastActorSpecification
       var broadcasted = Seq.empty[ExchangeTransaction]
       val actor =
         defaultActor(
-          ntpTime,
+          time,
           confirmed = _ => getConfirmation(true),
           broadcast = tx => {
             broadcasted = List(tx)
@@ -134,10 +134,10 @@ class ExchangeTransactionBroadcastActorSpecification
 
     "retries" when {
       "failed to confirm (retry checks)" in {
-        val firstProcessed  = new AtomicBoolean(false)
+        val firstProcessed = new AtomicBoolean(false)
         var triedToConfirm = Seq.empty[ByteStr]
         val actor = defaultActor(
-          ntpTime,
+          time,
           confirmed = { txs =>
             triedToConfirm = txs
             if (!firstProcessed.get) Future.successful(txs.map(id => id -> false).toMap)
@@ -172,7 +172,7 @@ class ExchangeTransactionBroadcastActorSpecification
         val firstProcessing  = new AtomicBoolean(false)
         var triedToBroadcast = Seq.empty[ExchangeTransaction]
         val actor = defaultActor(
-          ntpTime,
+          time,
           confirmed = _ => getConfirmation(false),
           broadcast = { txs =>
             firstProcessing.compareAndSet(false, true)
@@ -213,7 +213,7 @@ class ExchangeTransactionBroadcastActorSpecification
   )
 
   private def sampleEvent(expiration: FiniteDuration = 1.day): ExchangeTransactionCreated = {
-    val ts = ntpTime.getTimestamp
+    val ts = time.getTimestamp
     ExchangeTransactionCreated(
       ExchangeTransactionV2
         .create(

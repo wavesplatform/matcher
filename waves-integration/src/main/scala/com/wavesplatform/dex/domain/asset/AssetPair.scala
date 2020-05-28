@@ -7,10 +7,10 @@ import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, OFormat}
+import play.api.libs.json._
 
 import scala.annotation.meta.field
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 @ApiModel
 case class AssetPair(@(ApiModelProperty @field)(
@@ -49,6 +49,15 @@ object AssetPair {
     case other           => ByteStr.decodeBase58(other).map(IssuedAsset)
   }
 
+  def extractAssetPair(s: String): Try[AssetPair] = s.split('-') match {
+    case Array(amtAssetStr, prcAssetStr) =>
+      AssetPair.createAssetPair(amtAssetStr, prcAssetStr).recoverWith {
+        case e => Failure(new Exception(s"$s (${e.getMessage})", e))
+      }
+
+    case xs => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.length})"))
+  }
+
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
     for {
       a1 <- extractAsset(amountAsset)
@@ -65,16 +74,21 @@ object AssetPair {
   }
 
   implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source    = cfg.getString(path)
-    val sourceArr = source.split("-")
-    val res = sourceArr match {
-      case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-      case _                               => throw new Exception(s"$source (incorrect assets count, expected 2 but got ${sourceArr.size})")
-    }
-    res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
+    val source = cfg.getString(path)
+    extractAssetPair(source).fold(e => throw e, identity)
   }
 
   implicit val assetPairFormat: OFormat[AssetPair] = (
     (JsPath \ "amountAsset").formatWithDefault[Asset](Waves) and (JsPath \ "priceAsset").formatWithDefault[Asset](Waves)
   )(AssetPair.apply, Function.unlift(AssetPair.unapply))
+
+  val assetPairKeyAsStringFormat: Format[AssetPair] = Format(
+    fjs = Reads {
+      case JsString(x) => AssetPair.extractAssetPair(x).fold(e => JsError(e.getMessage), JsSuccess(_))
+      case x           => JsError(JsPath, s"Expected a string, but got ${x.toString().take(10)}...")
+    },
+    tjs = Writes { x =>
+      JsString(x.key)
+    }
+  )
 }

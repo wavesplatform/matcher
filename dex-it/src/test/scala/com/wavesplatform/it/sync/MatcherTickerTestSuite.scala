@@ -17,11 +17,6 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
     dex1.start()
   }
 
-  private val btcUsdPair = AssetPair(
-    amountAsset = btc,
-    priceAsset = usd
-  )
-
   // Because BTC is not a price asset in this test
   private val btcWavesPair = AssetPair(
     amountAsset = btc,

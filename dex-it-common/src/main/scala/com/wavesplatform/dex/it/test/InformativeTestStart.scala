@@ -15,7 +15,7 @@ trait InformativeTestStart extends Suite { self: BaseContainersKit =>
     def print(text: String): Unit = {
       val formatted = s"---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------"
       log.debug(formatted)
-      knownContainers.forEach { _.printDebugMessage(formatted) }
+      knownContainers.get().foreach { _.printDebugMessage(formatted) }
     }
 
     print(s"Test '$testName' started")

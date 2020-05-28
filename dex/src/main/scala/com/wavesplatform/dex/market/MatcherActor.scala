@@ -180,6 +180,11 @@ class MatcherActor(settings: MatcherSettings,
       val s       = sender()
       context.actorOf(WatchDistributedCompletionActor.props(workers, s, Ping, Pong, settings.processConsumedTimeout))
 
+    case AggregatedOrderBookEnvelope(pair, message) =>
+      runFor(pair) { (sender, ref) =>
+        ref.tell(message, sender)
+      }
+
     case ForceSaveSnapshots => context.children.foreach(_ ! SaveSnapshot(lastProcessedNr))
   }
 
@@ -293,6 +298,7 @@ object MatcherActor {
 
   case class ForceStartOrderBook(assetPair: AssetPair)
   case class OrderBookCreated(assetPair: AssetPair)
+  case class AggregatedOrderBookEnvelope(assetPair: AssetPair, message: AggregatedOrderBookActor.Message)
 
   case object GetMarkets
 

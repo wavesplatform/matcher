@@ -77,5 +77,5 @@ class FOps[F[_]](implicit M: ThrowableMonadError[F], W: CanWait[F]) {
 }
 
 object FOps {
-  def apply[F[_]: CanWait: ThrowableMonadError] = new FOps[F]
+  def apply[F[_]: CanWait: ThrowableMonadError]: FOps[F] = new FOps[F]
 }

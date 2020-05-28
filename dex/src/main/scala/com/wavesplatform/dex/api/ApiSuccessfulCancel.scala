@@ -1,8 +1,10 @@
 package com.wavesplatform.dex.api
 
+import com.github.ghik.silencer.silent
 import com.wavesplatform.dex.domain.order.Order
 import play.api.libs.json.{Format, Json}
 
+@silent("deprecated")
 case class ApiSuccessfulCancel(
     orderId: Order.Id,
     success: Boolean = true,

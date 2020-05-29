@@ -2,7 +2,6 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
-import com.google.common.net.HttpHeaders
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.bytes.codec.Base58

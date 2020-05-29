@@ -27,6 +27,20 @@ object TankGenerator extends ScorexLogging {
     assets
   }
 
+  private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
+    println(s"Creating $count asset pairs... ")
+
+    val randomAssetPairs = Random
+      .shuffle(assets)
+      .combinations(2)
+      .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
+      .map(Function.tupled(new AssetPair(_, _)))
+      .take(count)
+      .toList
+
+    savePairs(randomAssetPairs)
+  }
+
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
     val amountPerUser = settings.assetQuantity / 2 / accounts.length
@@ -40,20 +54,6 @@ object TankGenerator extends ScorexLogging {
 
     waitForHeightArise()
     println("Done")
-  }
-
-  private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
-    println(s"Creating $count asset pairs... ")
-
-    val randomAssetPairs = Random
-      .shuffle(assets)
-      .combinations(2)
-      .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
-      .map(Function.tupled(new AssetPair(_, _)))
-      .take(count)
-      .toList
-
-    savePairs(randomAssetPairs)
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
@@ -74,18 +74,24 @@ object TankGenerator extends ScorexLogging {
     Random.shuffle(orders.map(Request("POST", "/matcher/orderbook", "PLACE", _))).toList
   }
 
-  private def mkPlaces(seedPrefix: String, requestsCount: Int): Unit = {
-    print("Making requests for placing...")
+  private def mkPlaces(seedPrefix: String, requestsCount: Int, matching: Boolean): List[Request] = {
+    print(s"Making requests for ${if (matching) "matching" else "placing"} ...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
     val assets   = mkAssets()
     val pairs    = mkAssetPairs(assets)
-    val orders   = mkOrders(accounts, pairs, false)
+    val orders   = mkOrders(accounts, pairs, matching)
 
     distributeAssets(accounts, assets)
-    svRequests(orders.take(requestsCount))
+    val requests = orders.take(requestsCount)
+    svRequests(requests)
+    requests
   }
 
-  private def mkCancels(seedPrefix: String, requestsCount: Int): Unit = {
+  private def mkPlaces(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, false)
+
+  private def mkMatching(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, true)
+
+  private def mkCancels(seedPrefix: String, requestsCount: Int): List[Request] = {
     println("Making requests for cancelling...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
 
@@ -108,21 +114,12 @@ object TankGenerator extends ScorexLogging {
           })
       })
 
-    svRequests(cancels.take(requestsCount))
+    val requests = cancels.take(requestsCount)
+    svRequests(requests)
+    requests
   }
 
-  private def mkMatching(seedPrefix: String, requestsCount: Int): Unit = {
-    println("Making requests for matching...")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400)
-    val assets   = mkAssets()
-    val pairs    = mkAssetPairs(assets)
-    val orders   = mkOrders(accounts, pairs)
-
-    distributeAssets(accounts, assets)
-    svRequests(orders.take(requestsCount))
-  }
-
-  private def mkOrderHistory(seedPrefix: String, requestsCount: Int, pairsFile: File): Unit = {
+  private def mkOrderHistory(seedPrefix: String, requestsCount: Int, pairsFile: File): List[Request] = {
     println("Making requests for getting order history...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400)
     val pairs    = readPairs(pairsFile)
@@ -146,11 +143,44 @@ object TankGenerator extends ScorexLogging {
           ))
       })
 
-    svRequests(List.fill(1000)(all).flatten.take(requestsCount)) //TODO: calculate needed count
+    val requests = List.fill(1000)(Random.shuffle(all)).flatten.take(requestsCount) //TODO: calculate needed count
+
+    svRequests(all)
+    requests
   }
 
-  private def mkAllTypes(): Unit = {
-    println("mkAllTypes")
+  private def mkBalances(seedPrefix: String, requestsCount: Int, pairsFile: File): List[Request] = {
+    println("Making requests for getting reserved and tradable balances...")
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
+    val pairs    = readPairs(pairsFile)
+    val ts       = System.currentTimeMillis
+
+    val all = accounts.flatMap(a => {
+      Request(
+        "GET",
+        s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
+        "RESERVED_BALANCE",
+        headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+      ) ::
+        pairs.map(p => {
+        Request(
+          "GET",
+          s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/tradableBalance/${a.getAddress}",
+          "TRADABLE_BALANCE",
+          headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+        )
+      })
+    })
+
+    val requests = List.fill(1000)(Random.shuffle(all)).flatten.take(requestsCount) //TODO: calculate needed count
+
+    svRequests(requests)
+    requests
+  }
+
+  private def mkAllTypes(seedPrefix: String, requestsCount: Int = 20000): Unit = {
+    println("Making requests...")
+    svRequests(Random.shuffle(mkMatching(seedPrefix, requestsCount) ++ mkOrderHistory(seedPrefix, requestsCount, new File("pairs.txt"))))
   }
 
   private def svRequests(requests: List[Request]): Unit = {
@@ -162,8 +192,15 @@ object TankGenerator extends ScorexLogging {
     try requests.foreach(_.save(output))
     finally output.close()
 
-    println(s"Generated places count: ${requests.filter(_.tag.equals("PLACE")).length}")
-    println(s"Generated cancels count: ${requests.filter(_.tag.equals("CANCEL")).length}")
+    println(s"Generated: ${requests.filter(_.tag.equals("PLACE")).length}")
+    println(s"\tPOST: ${requests.filter(_.httpType.equals("POST")).length}")
+    println(s"\t\tPLACE: ${requests.filter(_.tag.equals("PLACE")).length}")
+    println(s"\t\tCANCEL: ${requests.filter(_.tag.equals("CANCEL")).length}")
+    println(s"\tGET: ${requests.filter(_.httpType.equals("GET")).length}")
+    println(s"\t\tORDER_HISTORY_BY_ACC: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_ACC")).length}")
+    println(s"\t\tORDER_HISTORY_BY_PAIR: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_PAIR")).length}")
+    println(s"\t\tRESERVED_BALANCE: ${requests.filter(_.tag.equals("RESERVED_BALANCE")).length}")
+    println(s"\t\tTRADABLE_BALANCE: ${requests.filter(_.tag.equals("TRADABLE_BALANCE")).length}")
     println(s"Results have been saved to $requestsFile")
   }
 
@@ -173,7 +210,8 @@ object TankGenerator extends ScorexLogging {
       case 2 => mkCancels(seedPrefix, requestsCount)
       case 3 => mkMatching(seedPrefix, requestsCount)
       case 4 => mkOrderHistory(seedPrefix, requestsCount, pairsFile.get)
-      case 5 => mkAllTypes()
+      case 5 => mkBalances(seedPrefix, requestsCount, pairsFile.get)
+      case 6 => mkAllTypes(seedPrefix, requestsCount)
       case _ =>
         println("Wrong number of task ")
     }

@@ -100,7 +100,7 @@ package object utils {
     Source.fromFile(file).getLines.map(l => { new AssetPair(l.split("-")(0), l.split("-")(1)) }).toList
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
-    val requestsFile = new File(s"pairs-${System.currentTimeMillis}.txt")
+    val requestsFile = new File(s"pairs.txt")
     val output       = new PrintWriter(requestsFile, "utf-8")
 
     try pairs.foreach(p => output.println(s"${p.getAmountAsset}-${p.getPriceAsset}"))

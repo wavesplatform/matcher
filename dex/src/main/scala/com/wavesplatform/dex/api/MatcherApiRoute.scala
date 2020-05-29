@@ -195,7 +195,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET", response = classOf[String])
   def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete(JsString(Base58.encode(matcherPublicKey)))
+    complete { ApiMatcherPublicKey(matcherPublicKey) }
   }
 
   @Path("/settings")
@@ -205,19 +205,17 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
         SimpleResponse(
           code = StatusCodes.OK,
-          js = Json.toJsObject(
-            ApiMatcherPublicSettings(
-              matcherPublicKey = matcherPublicKey,
-              matcherVersion = Version.VersionString,
-              priceAssets = matcherSettings.priceAssets,
-              orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.fromSettings(
-                settings = getActualOrderFeeSettings(),
-                matcherAccountFee = matcherAccountFee,
-                allRates = rateCache.getAllRates
-              ),
-              orderVersions = allowedOrderVersions.toSeq.sorted,
-              networkByte = matcherSettings.addressSchemeCharacter.toInt
-            )
+          response = ApiMatcherPublicSettings(
+            matcherPublicKey = matcherPublicKey,
+            matcherVersion = Version.VersionString,
+            priceAssets = matcherSettings.priceAssets,
+            orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.fromSettings(
+              settings = getActualOrderFeeSettings(),
+              matcherAccountFee = matcherAccountFee,
+              allRates = rateCache.getAllRates
+            ),
+            orderVersions = allowedOrderVersions.toSeq.sorted,
+            networkByte = matcherSettings.addressSchemeCharacter.toInt
           )
         )
       }
@@ -231,7 +229,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     httpMethod = "GET",
     response = classOf[Map[String, Double]]
   )
-  def getRates: Route = (path("settings" / "rates") & get) { complete(StatusCodes.OK -> ApiRates(rateCache.getAllRates)) }
+  def getRates: Route = (path("settings" / "rates") & get) { complete(ApiRates(rateCache.getAllRates)) }
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(
@@ -352,7 +350,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def orderBookInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
     withAssetPair(p, redirectToInverse = true, suffix = "/info") { pair =>
-      complete(StatusCodes.OK -> orderBookInfoJson(pair))
+      complete { SimpleResponse(StatusCodes.OK, orderBookInfoJson(pair)) }
     }
   }
 
@@ -459,7 +457,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             case AddressActor.Event.OrderCanceled(x) => StatusCodes.OK -> ApiSuccessfulCancel(x)
             case x: error.MatcherError =>
               if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> ApiError.from(x, "WavesNodeUnavailable")
-              else StatusCodes.BadRequest -> ApiError.from(x, "OrderCancelRejected")
+              else StatusCodes.BadRequest                                       -> ApiError.from(x, "OrderCancelRejected")
           }
         case _ => StatusCodes.BadRequest -> ApiError.from(error.CancelRequestIsIncomplete, "OrderCancelRejected")
       }
@@ -951,7 +949,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     response = classOf[QueueEventWithMeta.Offset]
   )
   def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
-    complete(StatusCodes.OK -> currentOffset())
+    complete { ApiOffset(currentOffset()) }
   }
 
   @Path("/debug/lastOffset")
@@ -962,7 +960,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     response = classOf[QueueEventWithMeta.Offset]
   )
   def getLastOffset: Route = (path("debug" / "lastOffset") & get & withAuth) {
-    complete(lastOffset().map(StatusCodes.OK -> _))
+    complete { lastOffset() map ApiOffset.apply }
   }
 
   @Path("/debug/oldestSnapshotOffset")
@@ -977,7 +975,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
         val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
         val min     = if (defined.isEmpty) -1L else defined.min
-        StatusCodes.OK -> min
+        ApiOffset(min)
       }
     }
   }
@@ -992,7 +990,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        StatusCodes.OK -> ApiSnapshotOffsets(x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset })
+        ApiSnapshotOffsets(x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset })
       }
     }
   }

@@ -20,7 +20,8 @@ class ApiRatesSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
     Map(
       Waves       -> 1,
       issuedAsset -> 3
-    ))
+    )
+  )
 
   "backward JSON compatibility" - {
     "serialization" in {

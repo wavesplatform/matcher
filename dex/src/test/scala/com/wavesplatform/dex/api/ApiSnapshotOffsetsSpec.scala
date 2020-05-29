@@ -19,7 +19,8 @@ class ApiSnapshotOffsetsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
   private val snapshotOffsets = ApiSnapshotOffsets(
     Map(
       AssetPair(issuedAsset, Waves) -> 1
-    ))
+    )
+  )
 
   "backward JSON compatibility" - {
     "serialization" in {

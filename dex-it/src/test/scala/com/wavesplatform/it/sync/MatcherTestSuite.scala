@@ -56,7 +56,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Check cross ordering between Alice and Bob" - {
     "/matcher should respond with the matcher's public key" in {
-      dex1.api.publicKey shouldBe matcher.publicKey
+      dex1.api.publicKey.key shouldBe matcher.publicKey
     }
 
     "sell order could be placed correctly" - {
@@ -364,10 +364,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Debug information was updated" in {
-    val currentOffset = dex1.api.currentOffset
+    val currentOffset = dex1.api.currentOffset.offset
     currentOffset should be > 0L
 
-    val oldestSnapshotOffset = dex1.api.oldestSnapshotOffset
+    val oldestSnapshotOffset = dex1.api.oldestSnapshotOffset.offset
     oldestSnapshotOffset should be <= currentOffset
 
     val snapshotOffsets = dex1.api.allSnapshotOffsets

@@ -19,7 +19,7 @@ import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, `X-Api-Key`}
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
-import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -101,19 +101,22 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
   private val priceAssetDesc  = BriefAssetDescription("PriceAsset", 8, hasScript = false)
 
-  private val settings = MatcherSettings.valueReader
-    .read(ConfigFactory.load(), "waves.dex")
-    .copy(
-      priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
-      orderRestrictions = Map(smartWavesPair -> orderRestrictions)
-    )
+  private val settings =
+    MatcherSettings.valueReader
+      .read(ConfigFactory.load(), "waves.dex")
+      .copy(
+        priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+        orderRestrictions = Map(smartWavesPair -> orderRestrictions)
+      )
 
   // getMatcherPublicKey
   routePath("/") - {
     "returns a public key" in test { route =>
       Get(routePath("/")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[JsString].value shouldBe "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf"
+        responseAs[ApiMatcherPublicKey] should matchTo(
+          ApiMatcherPublicKey(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").right.get)
+        )
       }
     }
   }
@@ -123,7 +126,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns an order book information" in test { route =>
       Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[JsValue].as[ApiOrderBookInfo] should matchTo(
+        responseAs[ApiOrderBookInfo] should matchTo(
           ApiOrderBookInfo(
             restrictions = Some(orderRestrictions),
             matchingRules = ApiOrderBookInfo.MatchingRuleSettings(0.1)
@@ -138,7 +141,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns matcher's settings" in test { route =>
       Get(routePath("/settings")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[JsValue].as[ApiMatcherPublicSettings] should matchTo(
+        responseAs[ApiMatcherPublicSettings] should matchTo(
           ApiMatcherPublicSettings(
             matcherPublicKey = matcherKeyPair.publicKey,
             matcherVersion = Version.VersionString,
@@ -160,7 +163,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns available rates for fee" in test { route =>
       Get(routePath("/settings/rates")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[JsValue].as[ApiRates] should matchTo(ApiRates(Map(Waves -> 1.0)))
+        responseAs[ApiRates] should matchTo(ApiRates(Map(Waves -> 1.0)))
       }
     }
   }
@@ -171,7 +174,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/currentOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue].as[Int] shouldBe 0
+          responseAs[ApiOffset] should matchTo(ApiOffset(0))
         }
       },
       apiKey
@@ -184,7 +187,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/lastOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue].as[Int] shouldBe 0
+          responseAs[ApiOffset] should matchTo(ApiOffset(0))
         }
       },
       apiKey
@@ -197,7 +200,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/oldestSnapshotOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue].as[Int] shouldBe 100
+          responseAs[ApiOffset] should matchTo(ApiOffset(100))
         }
       },
       apiKey
@@ -210,7 +213,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath("/debug/allSnapshotOffsets")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue].as[ApiSnapshotOffsets] should matchTo(
+          responseAs[ApiSnapshotOffsets] should matchTo(
             ApiSnapshotOffsets(
               Map(
                 AssetPair(Waves, priceAsset) -> 100,

@@ -35,7 +35,7 @@ import scala.util.control.NonFatal
 trait DexApi[F[_]] extends HasWaitReady[F] {
   // Won't work with type TryF[T] = F[Either[MatcherError, T]]
 
-  def tryPublicKey: F[Either[MatcherError, PublicKey]]
+  def tryPublicKey: F[Either[MatcherError, ApiMatcherPublicKey]]
 
   def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]]
   def tryReservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Map[Asset, Long]]]
@@ -106,9 +106,9 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryDeleteRate(asset: Asset): F[Either[MatcherError, RatesResponse]]
   def tryRates: F[Either[MatcherError, ApiRates]]
 
-  def tryCurrentOffset: F[Either[MatcherError, Long]]
-  def tryLastOffset: F[Either[MatcherError, Long]]
-  def tryOldestSnapshotOffset: F[Either[MatcherError, Long]]
+  def tryCurrentOffset: F[Either[MatcherError, ApiOffset]]
+  def tryLastOffset: F[Either[MatcherError, ApiOffset]]
+  def tryOldestSnapshotOffset: F[Either[MatcherError, ApiOffset]]
   def tryAllSnapshotOffsets: F[Either[MatcherError, ApiSnapshotOffsets]]
   def trySaveSnapshots: F[Either[MatcherError, Unit]]
 
@@ -132,7 +132,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def waitForTransactionsByOrder(id: Order.Id)(pred: List[ExchangeTransaction] => Boolean): F[List[ExchangeTransaction]]
 
-  def waitForCurrentOffset(pred: Long => Boolean): F[Long]
+  def waitForCurrentOffset(pred: Long => Boolean): F[ApiOffset]
 }
 
 object DexApi {
@@ -168,7 +168,7 @@ object DexApi {
         s"http://${savedHost.getAddress.getHostAddress}:${savedHost.getPort}/matcher"
       }
 
-      override def tryPublicKey: F[Either[MatcherError, PublicKey]] = tryParseJson[ByteStr](sttp.get(uri"$apiUri")).map(PublicKey(_))
+      override def tryPublicKey: F[Either[MatcherError, ApiMatcherPublicKey]] = tryParseJson(sttp.get(uri"$apiUri"))
 
       override def tryReservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Map[Asset, Long]]] =
         tryParseJson {
@@ -379,21 +379,21 @@ object DexApi {
       override def tryRates: F[Either[MatcherError, ApiRates]] =
         tryParseJson[ApiRates](sttp.get(uri"$apiUri/settings/rates").headers(apiKeyHeaders))
 
-      override def tryCurrentOffset: F[Either[MatcherError, Long]] = tryParse {
+      override def tryCurrentOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
         sttp
           .get(uri"$apiUri/debug/currentOffset")
           .headers(apiKeyHeaders)
           .response(asLong)
       }
 
-      override def tryLastOffset: F[Either[MatcherError, Long]] = tryParse {
+      override def tryLastOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
         sttp
           .get(uri"$apiUri/debug/lastOffset")
           .headers(apiKeyHeaders)
           .response(asLong)
       }
 
-      override def tryOldestSnapshotOffset: F[Either[MatcherError, Long]] = tryParse {
+      override def tryOldestSnapshotOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
         sttp
           .get(uri"$apiUri/debug/oldestSnapshotOffset")
           .headers(apiKeyHeaders)
@@ -444,10 +444,10 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
-      override def waitForCurrentOffset(pred: Long => Boolean): F[Long] =
-        repeatUntil[Either[MatcherError, Long]](tryCurrentOffset, RepeatRequestOptions(1.second, 120)) {
+      override def waitForCurrentOffset(pred: Long => Boolean): F[ApiOffset] =
+        repeatUntil[Either[MatcherError, ApiOffset]](tryCurrentOffset, RepeatRequestOptions(1.second, 120)) {
           case Left(_)  => false
-          case Right(x) => pred(x)
+          case Right(x) => pred(x.offset)
         }.map(_.explicitGet())
 
       override def trySettings: F[Either[MatcherError, ApiMatcherPublicSettings]] = tryParseJson {

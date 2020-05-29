@@ -35,7 +35,8 @@ class ApiSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffMa
           message = "Can not persist event, please retry later or contact with the administrator",
           template = "Can not persist event, please retry later or contact with the administrator",
           status = "OrderCancelRejected"
-        ))
+        )
+      )
     )
   )
 

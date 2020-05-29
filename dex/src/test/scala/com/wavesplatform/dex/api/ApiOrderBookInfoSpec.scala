@@ -32,7 +32,8 @@ class ApiOrderBookInfoSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
         stepPrice = 0.000004,
         minPrice = 0.00005,
         maxPrice = 6000
-      )),
+      )
+    ),
     matchingRules = ApiOrderBookInfo.MatchingRuleSettings(
       tickSize = 0.7
     )

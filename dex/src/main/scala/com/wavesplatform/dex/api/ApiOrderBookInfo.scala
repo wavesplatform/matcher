@@ -6,6 +6,7 @@ import play.api.libs.json.{Format, Json, OFormat}
 
 case class ApiOrderBookInfo(restrictions: Option[OrderRestrictionsSettings], matchingRules: ApiOrderBookInfo.MatchingRuleSettings)
 object ApiOrderBookInfo {
+
   implicit val orderBookInfoFormat: OFormat[ApiOrderBookInfo] = Json.format[ApiOrderBookInfo]
 
   case class MatchingRuleSettings(tickSize: Double)

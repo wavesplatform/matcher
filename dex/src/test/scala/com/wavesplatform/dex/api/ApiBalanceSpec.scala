@@ -20,7 +20,8 @@ class ApiBalanceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpli
     Map(
       Waves       -> 100,
       issuedAsset -> 300
-    ))
+    )
+  )
 
   "backward JSON compatibility" - {
     "serialization" in {

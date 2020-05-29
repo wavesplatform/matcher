@@ -17,7 +17,7 @@ object DexApiOps {
 
     private val canExtract: CanExtract[F] = implicitly[CanExtract[F]]; import canExtract.{extract => explicitGet}
 
-    def publicKey: F[PublicKey] = explicitGet(self.tryPublicKey)
+    def publicKey: F[ApiMatcherPublicKey] = explicitGet(self.tryPublicKey)
 
     def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
       explicitGet(self.tryReservedBalance(of, timestamp))
@@ -92,9 +92,9 @@ object DexApiOps {
     def deleteRate(asset: Asset): F[RatesResponse]                             = explicitGet(self.tryDeleteRate(asset))
     def rates: F[ApiRates]                                                     = explicitGet(self.tryRates)
 
-    def currentOffset: F[Long]                    = explicitGet(self.tryCurrentOffset)
-    def lastOffset: F[Long]                       = explicitGet(self.tryLastOffset)
-    def oldestSnapshotOffset: F[Long]             = explicitGet(self.tryOldestSnapshotOffset)
+    def currentOffset: F[ApiOffset]               = explicitGet(self.tryCurrentOffset)
+    def lastOffset: F[ApiOffset]                  = explicitGet(self.tryLastOffset)
+    def oldestSnapshotOffset: F[ApiOffset]        = explicitGet(self.tryOldestSnapshotOffset)
     def allSnapshotOffsets: F[ApiSnapshotOffsets] = explicitGet(self.tryAllSnapshotOffsets)
     def saveSnapshots: F[Unit]                    = explicitGet(self.trySaveSnapshots)
 

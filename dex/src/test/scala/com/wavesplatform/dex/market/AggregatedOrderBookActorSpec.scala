@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.api
+package com.wavesplatform.dex.market
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
@@ -25,7 +25,6 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits

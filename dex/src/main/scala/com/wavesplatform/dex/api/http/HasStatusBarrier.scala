@@ -4,8 +4,7 @@ import akka.http.scaladsl.server.Directive0
 import com.wavesplatform.dex.Matcher
 import com.wavesplatform.dex.api.{DuringShutdown, DuringStart}
 
-trait HasStatusBarrier {
-  this: ApiRoute =>
+trait HasStatusBarrier { this: ApiRoute =>
 
   def matcherStatus: () => Matcher.Status
 
@@ -14,5 +13,4 @@ trait HasStatusBarrier {
     case Matcher.Status.Starting => complete(DuringStart)
     case Matcher.Status.Stopping => complete(DuringShutdown)
   }
-
 }

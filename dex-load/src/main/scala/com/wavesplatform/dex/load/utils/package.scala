@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.load
 
+import java.io.{File, PrintWriter}
+
 import com.google.common.net.HttpHeaders
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
@@ -85,5 +87,16 @@ package object utils {
     val request = s"POST $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"
 
     s"${request.length} ${tag.toUpperCase}\n$request\r\n"
+  }
+
+  def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
+    val requestsFile = new File(s"pairs-${System.currentTimeMillis}.txt")
+    val output       = new PrintWriter(requestsFile, "utf-8")
+
+    try pairs.foreach(p => output.println(s"${p.getAmountAsset}-${p.getPriceAsset}"))
+    finally output.close()
+
+    println(s"\tDone. Pairs have been saved to: $requestsFile")
+    pairs
   }
 }

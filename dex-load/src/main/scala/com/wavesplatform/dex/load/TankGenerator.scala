@@ -11,7 +11,6 @@ import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
 
-
 object TankGenerator extends ScorexLogging {
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
@@ -32,7 +31,7 @@ object TankGenerator extends ScorexLogging {
     println(s"Distributing assets to accounts... ")
     val amountPerUser = settings.assetQuantity / 2 / accounts.length
     accounts
-      .flatMap { acc =>
+      .flatMap { acc => //TODO: change to mass transfer transactions
         Transactions.makeTransferTx(settings.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
           Transactions.makeTransferTx(settings.issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
         }
@@ -44,28 +43,32 @@ object TankGenerator extends ScorexLogging {
   }
 
   private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
-    print(s"Creating $count asset pairs... ")
+    println(s"Creating $count asset pairs... ")
 
     val randomAssetPairs = Random
       .shuffle(assets)
       .combinations(2)
       .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
       .map(Function.tupled(new AssetPair(_, _)))
+      .take(count)
+      .toList
 
-    println("Done")
-    randomAssetPairs.take(count).toList
+    savePairs(randomAssetPairs)
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
     print(s"Creating orders... ")
     val safeAmount = settings.assetQuantity / 2 / accounts.length / 400
 
-    val orders = (0 to 399).map(_ => accounts.map(
-      mkOrder(_,
-              if (math.random < 0.5 || !matching) Type.BUY else Type.SELL,
-              Random.nextInt(safeAmount.toInt),
-              Random.nextInt(safeAmount.toInt),
-              pairs(Random.nextInt(pairs.length)))))
+    val orders = (0 to 399).map(
+      _ =>
+        accounts.map(mkOrder(
+          _,
+          if (math.random < 0.5 || !matching) Type.BUY else Type.SELL,
+          Random.nextInt(safeAmount.toInt),
+          Random.nextInt(safeAmount.toInt),
+          pairs(Random.nextInt(pairs.length))
+        )))
 
     println("Done")
     Random.shuffle(orders.flatten.map(Request(_, "POST", "/matcher/orderbook", "PLACE"))).toList
@@ -86,23 +89,25 @@ object TankGenerator extends ScorexLogging {
     println("Making requests for cancelling...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
 
-    val cancels = accounts.map(a => {
-      Json
-        .parse(getOrderBook(a))
-        .as[List[JsValue]]
-        .map(o => {
-          val id = (o \ "id").as[String]
-          val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
-            case JsSuccess(name, _) => name
-            case _: JsError         => "WAVES"
-          }
-          val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
-            case JsSuccess(name, _) => name
-            case _: JsError         => "WAVES"
-          }
-          Request(Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id), "POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL")
-        })
-    }).flatten
+    val cancels = accounts
+      .map(a => {
+        Json
+          .parse(getOrderBook(a))
+          .as[List[JsValue]]
+          .map(o => {
+            val id = (o \ "id").as[String]
+            val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
+              case JsSuccess(name, _) => name
+              case _: JsError         => "WAVES"
+            }
+            val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
+              case JsSuccess(name, _) => name
+              case _: JsError         => "WAVES"
+            }
+            Request(Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id), "POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL")
+          })
+      })
+      .flatten
 
     svRequests(cancels.take(requestsCount))
   }

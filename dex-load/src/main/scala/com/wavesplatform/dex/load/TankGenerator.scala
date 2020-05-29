@@ -2,11 +2,12 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
+import com.google.common.net.HttpHeaders
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{ApiJson, AssetPair, Base58, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
@@ -60,7 +61,7 @@ object TankGenerator extends ScorexLogging {
     print(s"Creating orders... ")
     val safeAmount = settings.assetQuantity / 2 / accounts.length / 400
 
-    val orders = (0 to 399).map(
+    val orders = (0 to 399).flatMap(
       _ =>
         accounts.map(mkOrder(
           _,
@@ -71,7 +72,7 @@ object TankGenerator extends ScorexLogging {
         )))
 
     println("Done")
-    Random.shuffle(orders.flatten.map(Request(_, "POST", "/matcher/orderbook", "PLACE"))).toList
+    Random.shuffle(orders.map(Request("POST", "/matcher/orderbook", "PLACE", _))).toList
   }
 
   private def mkPlaces(seedPrefix: String, requestsCount: Int): Unit = {
@@ -90,7 +91,7 @@ object TankGenerator extends ScorexLogging {
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
 
     val cancels = accounts
-      .map(a => {
+      .flatMap(a => {
         Json
           .parse(getOrderBook(a))
           .as[List[JsValue]]
@@ -104,10 +105,9 @@ object TankGenerator extends ScorexLogging {
               case JsSuccess(name, _) => name
               case _: JsError         => "WAVES"
             }
-            Request(Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id), "POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL")
+            Request("POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL", Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
       })
-      .flatten
 
     svRequests(cancels.take(requestsCount))
   }
@@ -125,6 +125,30 @@ object TankGenerator extends ScorexLogging {
 
   private def mkOrderHistory(seedPrefix: String, requestsCount: Int): Unit = {
     println("Making requests for getting order history...")
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400)
+    val assets   = mkAssets() //TODO: remove it
+    val pairs    = mkAssetPairs(assets) //TODO: read from file
+    val ts       = System.currentTimeMillis
+
+    val all = accounts
+      .flatMap(a => {
+        Request(
+          "GET",
+          s"/matcher/orderbook/${Base58.encode(a.getPublicKey())}",
+          "ORDER_HISTORY_BY_ACC",
+          headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+        ) ::
+          pairs.map(
+          p =>
+            Request(
+              "GET",
+              s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
+              "ORDER_HISTORY_BY_PAIR",
+              headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+          ))
+      })
+
+    svRequests(List.fill(1000)(all).flatten.take(requestsCount)) //TODO: calculate needed count
   }
 
   private def mkAllTypes(): Unit = {

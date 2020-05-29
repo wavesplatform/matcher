@@ -75,6 +75,12 @@ package object utils {
 
   def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte).writeValueAsString(obj)
 
+  def mkGet(path: String, tag: String = "", additionalHeaders: Map[String, String] = Map.empty) = {
+    val request = s"GET $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders).map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n"
+
+    s"${request.length} ${tag.toUpperCase}\n$request\r\n"
+  }
+
   def mkPost(obj: ApiJson, path: String, tag: String = ""): String = {
     val body = mkJson(obj).replace("\"matcherFeeAssetId\":\"WAVES\",", "")
 

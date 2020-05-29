@@ -69,7 +69,7 @@ object TankGenerator {
         )))
 
     println("Done")
-    Random.shuffle(orders.map(Request("POST", "/matcher/orderbook", "PLACE", _))).toList
+    Random.shuffle(orders.map(Request(Request.POST.toString, "/matcher/orderbook", Request.PLACE.toString, _))).toList
   }
 
   private def mkPlaces(seedPrefix: String, requestsCount: Int, matching: Boolean): List[Request] = {
@@ -106,7 +106,10 @@ object TankGenerator {
               case JsSuccess(name, _) => name
               case _: JsError         => "WAVES"
             }
-            Request("POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL", Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
+            Request(Request.POST.toString,
+                    s"/matcher/orderbook/$aa/$pa/cancel",
+                    Request.CANCEL.toString,
+                    Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
       })
 
@@ -122,17 +125,17 @@ object TankGenerator {
     val all = accounts
       .flatMap(a => {
         Request(
-          "GET",
+          Request.GET.toString,
           s"/matcher/orderbook/${Base58.encode(a.getPublicKey())}",
-          "ORDER_HISTORY_BY_ACC",
+          Request.ORDER_HISTORY_BY_ACC.toString,
           headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
         ) ::
           pairs.map(
           p =>
             Request(
-              "GET",
+              Request.GET.toString,
               s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
-              "ORDER_HISTORY_BY_PAIR",
+              Request.ORDER_HISTORY_BY_PAIR.toString,
               headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
           ))
       })
@@ -148,16 +151,16 @@ object TankGenerator {
 
     val all = accounts.flatMap(a => {
       Request(
-        "GET",
+        Request.GET.toString,
         s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
-        "RESERVED_BALANCE",
+        Request.RESERVED_BALANCE.toString,
         headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
       ) ::
         pairs.map(p => {
         Request(
-          "GET",
+          Request.GET.toString,
           s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/tradableBalance/${a.getAddress}",
-          "TRADABLE_BALANCE",
+          Request.TRADABLE_BALANCE.toString,
           headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
         )
       })
@@ -184,14 +187,14 @@ object TankGenerator {
     finally output.close()
 
     println(s"Generated: ${requests.length}")
-    println(s"\tPOST: ${requests.filter(_.httpType.equals("POST")).length}")
-    println(s"\t\tPLACE: ${requests.filter(_.tag.equals("PLACE")).length}")
-    println(s"\t\tCANCEL: ${requests.filter(_.tag.equals("CANCEL")).length}")
-    println(s"\tGET: ${requests.filter(_.httpType.equals("GET")).length}")
-    println(s"\t\tORDER_HISTORY_BY_ACC: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_ACC")).length}")
-    println(s"\t\tORDER_HISTORY_BY_PAIR: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_PAIR")).length}")
-    println(s"\t\tRESERVED_BALANCE: ${requests.filter(_.tag.equals("RESERVED_BALANCE")).length}")
-    println(s"\t\tTRADABLE_BALANCE: ${requests.filter(_.tag.equals("TRADABLE_BALANCE")).length}")
+    println(s"\t${Request.POST}: ${requests.filter(_.httpType.equals("POST")).length}")
+    println(s"\t\t${Request.PLACE}: ${requests.filter(_.tag.equals("PLACE")).length}")
+    println(s"\t\t${Request.CANCEL}: ${requests.filter(_.tag.equals("CANCEL")).length}")
+    println(s"\t${Request.GET}: ${requests.filter(_.httpType.equals("GET")).length}")
+    println(s"\t\t${Request.ORDER_HISTORY_BY_ACC}: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_ACC")).length}")
+    println(s"\t\t${Request.ORDER_HISTORY_BY_PAIR}: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_PAIR")).length}")
+    println(s"\t\t${Request.RESERVED_BALANCE}: ${requests.filter(_.tag.equals("RESERVED_BALANCE")).length}")
+    println(s"\t\t${Request.TRADABLE_BALANCE}: ${requests.filter(_.tag.equals("TRADABLE_BALANCE")).length}")
     println(s"Results have been saved to $requestsFile")
   }
 

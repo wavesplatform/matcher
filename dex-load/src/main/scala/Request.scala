@@ -6,6 +6,11 @@ import com.google.common.net.HttpHeaders
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.ApiJson
 
+object Request extends Enumeration {
+  type WeekDay = Value
+  val RESERVED_BALANCE, TRADABLE_BALANCE, ORDER_HISTORY_BY_PAIR, ORDER_HISTORY_BY_ACC, CANCEL, PLACE, POST, GET = Value
+}
+
 case class Request(httpType: String, path: String, tag: String, obj: ApiJson = null, headers: Map[String, String] = Map.empty) {
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT       -> "application/json",

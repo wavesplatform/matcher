@@ -2,12 +2,11 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
-import com.google.common.net.HttpHeaders
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{ApiJson, AssetPair, Base58, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
@@ -123,11 +122,10 @@ object TankGenerator extends ScorexLogging {
     svRequests(orders.take(requestsCount))
   }
 
-  private def mkOrderHistory(seedPrefix: String, requestsCount: Int): Unit = {
+  private def mkOrderHistory(seedPrefix: String, requestsCount: Int, pairsFile: File): Unit = {
     println("Making requests for getting order history...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400)
-    val assets   = mkAssets() //TODO: remove it
-    val pairs    = mkAssetPairs(assets) //TODO: read from file
+    val pairs    = readPairs(pairsFile)
     val ts       = System.currentTimeMillis
 
     val all = accounts
@@ -169,12 +167,12 @@ object TankGenerator extends ScorexLogging {
     println(s"Results have been saved to $requestsFile")
   }
 
-  def mkRequests(seedPrefix: String, requestsType: Int = 2, requestsCount: Int = 20000): Unit = {
+  def mkRequests(seedPrefix: String, requestsType: Int = 2, requestsCount: Int = 20000, pairsFile: Option[File]): Unit = {
     requestsType match {
       case 1 => mkPlaces(seedPrefix, requestsCount)
       case 2 => mkCancels(seedPrefix, requestsCount)
       case 3 => mkMatching(seedPrefix, requestsCount)
-      case 4 => mkOrderHistory(seedPrefix, requestsCount)
+      case 4 => mkOrderHistory(seedPrefix, requestsCount, pairsFile.get)
       case 5 => mkAllTypes()
       case _ =>
         println("Wrong number of task ")

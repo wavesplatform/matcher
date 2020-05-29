@@ -11,6 +11,7 @@ import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
 
+import scala.io.Source
 import scala.util.Random
 
 package object utils {
@@ -94,6 +95,9 @@ package object utils {
 
     s"${request.length} ${tag.toUpperCase}\n$request\r\n"
   }
+
+  def readPairs(file: File): List[AssetPair] =
+    Source.fromFile(file).getLines.map(l => { new AssetPair(l.split("-")(0), l.split("-")(1)) }).toList
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
     val requestsFile = new File(s"pairs-${System.currentTimeMillis}.txt")

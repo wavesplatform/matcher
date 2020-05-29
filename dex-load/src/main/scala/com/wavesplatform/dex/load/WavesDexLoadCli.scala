@@ -113,6 +113,11 @@ object WavesDexLoadCli extends ScoptImplicits {
               .text("The count of needed requests")
               .required()
               .action((x, s) => s.copy(requestsCount = x)),
+            opt[File]("pairs-file")
+              .abbr("pf")
+              .text("The path to the file with asset pairs. The format: one asset pair per line")
+              .required()
+              .action((x, s) => s.copy(pairsFile = x.some))
           )
       )
     }
@@ -128,7 +133,7 @@ object WavesDexLoadCli extends ScoptImplicits {
             }
             command match {
               case Command.CreateRequests =>
-                TankGenerator.mkRequests(args.seedPrefix, args.requestsType, args.requestsCount)
+                TankGenerator.mkRequests(args.seedPrefix, args.requestsType, args.requestsCount, args.pairsFile)
 
               case Command.CreateFeederFile =>
                 println(s"Chain id: ${args.addressSchemeByte}")

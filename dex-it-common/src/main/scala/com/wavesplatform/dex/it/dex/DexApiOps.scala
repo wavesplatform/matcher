@@ -98,6 +98,6 @@ object DexApiOps {
     def allSnapshotOffsets: F[ApiSnapshotOffsets] = explicitGet(self.tryAllSnapshotOffsets)
     def saveSnapshots: F[Unit]                    = explicitGet(self.trySaveSnapshots)
 
-    def settings: F[SettingsResponse] = explicitGet(self.trySettings)
+    def settings: F[ApiMatcherPublicSettings] = explicitGet(self.trySettings)
   }
 }

@@ -112,7 +112,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryAllSnapshotOffsets: F[Either[MatcherError, ApiSnapshotOffsets]]
   def trySaveSnapshots: F[Either[MatcherError, Unit]]
 
-  def trySettings: F[Either[MatcherError, SettingsResponse]]
+  def trySettings: F[Either[MatcherError, ApiMatcherPublicSettings]]
 
   // TODO move
 
@@ -450,7 +450,7 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
-      override def trySettings: F[Either[MatcherError, SettingsResponse]] = tryParseJson {
+      override def trySettings: F[Either[MatcherError, ApiMatcherPublicSettings]] = tryParseJson {
         sttp
           .get(uri"$apiUri/settings")
           .headers(apiKeyHeaders)

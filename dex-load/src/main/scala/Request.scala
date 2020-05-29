@@ -7,7 +7,7 @@ import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.ApiJson
 
 object Request extends Enumeration {
-  type WeekDay = Value
+  type Request = Value
   val RESERVED_BALANCE, TRADABLE_BALANCE, ORDER_HISTORY_BY_PAIR, ORDER_HISTORY_BY_ACC, CANCEL, PLACE, POST, GET = Value
 }
 

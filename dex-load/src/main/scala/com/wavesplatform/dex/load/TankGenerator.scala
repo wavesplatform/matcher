@@ -2,15 +2,15 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 
-import com.softwaremill.sttp.{MonadError => _, _}
+import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.load.utils._
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.matcher.{CancelOrder, Order}
-import com.wavesplatform.wavesj.{AssetPair, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
+
 
 object TankGenerator extends ScorexLogging {
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
@@ -56,7 +56,7 @@ object TankGenerator extends ScorexLogging {
     randomAssetPairs.take(count).toList
   }
 
-  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Order] = {
+  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
     print(s"Creating orders... ")
     val safeAmount = settings.assetQuantity / 2 / accounts.length / 400
 
@@ -68,7 +68,7 @@ object TankGenerator extends ScorexLogging {
               pairs(Random.nextInt(pairs.length))))
 
     println("Done")
-    Random.shuffle(orders)
+    Random.shuffle(orders.map(Request(_, "POST", "/matcher/orderbook", "PLACE")))
   }
 
   private def mkPlaces(seedPrefix: String, requestsCount: Int): Unit = {
@@ -100,11 +100,11 @@ object TankGenerator extends ScorexLogging {
             case JsSuccess(name, _) => name
             case _: JsError         => "WAVES"
           }
-          Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id)
+          Request(Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id), "POST", s"/matcher/orderbook/$aa/$pa/cancel", "CANCEL")
         })
     })
 
-    svRequests(cancels = cancels.flatten)
+    svRequests(cancels.flatten)
   }
 
   private def mkMatching(seedPrefix: String, requestsCount: Int): Unit = {
@@ -126,20 +126,17 @@ object TankGenerator extends ScorexLogging {
     println("mkAllTypes")
   }
 
-  private def svRequests(orders: List[Order] = List.empty, cancels: List[CancelOrder] = List.empty): Unit = {
+  private def svRequests(requests: List[Request]): Unit = {
     println("All data has been generated. Now it will be saved...")
+
     val requestsFile = new File(s"requests-${System.currentTimeMillis}.txt")
     val output       = new PrintWriter(requestsFile, "utf-8")
-    try {
-      orders.foreach(o => {
-        output.println(mkPost(o, "/matcher/orderbook", "PLACE"))
-      })
-      cancels.foreach(c => {
-        output.println(mkPost(c, s"/matcher/orderbook/${c.getAssetPair.getAmountAsset}/${c.getAssetPair.getPriceAsset}/cancel", "CANCEL"))
-      })
-    } finally output.close()
-    println(s"Generated orders count: ${orders.length}")
-    println(s"Generated cancels count: ${cancels.length}")
+
+    try requests.foreach(_.save(output))
+    finally output.close()
+
+    println(s"Generated orders count: ${requests.filter(_.tag.equals("PLACE")).length}")
+    println(s"Generated cancels count: ${requests.filter(_.tag.equals("CANCEL")).length}")
     println(s"Results have been saved to $requestsFile")
   }
 

@@ -18,11 +18,6 @@ package object utils {
   implicit val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
   implicit val backend  = HttpURLConnectionBackend()
 
-  val defaultHeaders = Map(
-    HttpHeaders.ACCEPT       -> "application/json",
-    HttpHeaders.CONNECTION   -> "close",
-    HttpHeaders.CONTENT_TYPE -> "application/json"
-  )
 
   def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,

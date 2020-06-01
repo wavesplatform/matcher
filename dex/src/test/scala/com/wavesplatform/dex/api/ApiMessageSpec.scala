@@ -11,11 +11,11 @@ class ApiMessageSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpli
   private val message = ApiMessage("test text")
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiMessage] should matchTo(message)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.stringify(Json.toJson(message)) should matchTo(json)
     }
   }

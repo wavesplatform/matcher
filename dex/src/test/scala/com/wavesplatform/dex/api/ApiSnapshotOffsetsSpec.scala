@@ -12,8 +12,8 @@ class ApiSnapshotOffsetsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
 
   private val json =
     """{
-  "2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh-WAVES" : 1
-}"""
+      |  "2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh-WAVES" : 1
+      |}""".stripMargin
 
   private val issuedAsset = IssuedAsset(Base58.decode("2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh"))
   private val snapshotOffsets = ApiSnapshotOffsets(
@@ -23,11 +23,11 @@ class ApiSnapshotOffsetsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
   )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiSnapshotOffsets] should matchTo(snapshotOffsets)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(snapshotOffsets)) should matchTo(json)
     }
   }

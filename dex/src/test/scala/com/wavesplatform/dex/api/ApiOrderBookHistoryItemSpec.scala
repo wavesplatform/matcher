@@ -14,23 +14,23 @@ class ApiOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMat
 
   private val json =
     """{
-  "id" : "7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN",
-  "type" : "buy",
-  "orderType" : "limit",
-  "amount" : 7757865201004347,
-  "filled" : 0,
-  "price" : 489,
-  "fee" : 6345852410462127,
-  "filledFee" : 0,
-  "feeAsset" : null,
-  "timestamp" : 1578074613225,
-  "status" : "Accepted",
-  "assetPair" : {
-    "amountAsset" : "6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7",
-    "priceAsset" : "8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc"
-  },
-  "avgWeighedPrice" : 0
-}"""
+      |  "id" : "7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN",
+      |  "type" : "buy",
+      |  "orderType" : "limit",
+      |  "amount" : 7757865201004347,
+      |  "filled" : 0,
+      |  "price" : 489,
+      |  "fee" : 6345852410462127,
+      |  "filledFee" : 0,
+      |  "feeAsset" : null,
+      |  "timestamp" : 1578074613225,
+      |  "status" : "Accepted",
+      |  "assetPair" : {
+      |    "amountAsset" : "6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7",
+      |    "priceAsset" : "8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc"
+      |  },
+      |  "avgWeighedPrice" : 0
+      |}""".stripMargin
 
   private val historyItem =
     ApiOrderBookHistoryItem(
@@ -53,11 +53,11 @@ class ApiOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMat
     )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiOrderBookHistoryItem] should matchTo(historyItem)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(historyItem)) should matchTo(json)
     }
   }

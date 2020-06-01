@@ -10,18 +10,18 @@ class ApiOrderBookInfoSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
 
   private val json =
     """{
-  "restrictions" : {
-    "stepAmount" : "0.00000001",
-    "minAmount" : "0.0000002",
-    "maxAmount" : "3000",
-    "stepPrice" : "0.000004",
-    "minPrice" : "0.00005",
-    "maxPrice" : "6000"
-  },
-  "matchingRules" : {
-    "tickSize" : "0.7"
-  }
-}"""
+      |  "restrictions" : {
+      |    "stepAmount" : "0.00000001",
+      |    "minAmount" : "0.0000002",
+      |    "maxAmount" : "3000",
+      |    "stepPrice" : "0.000004",
+      |    "minPrice" : "0.00005",
+      |    "maxPrice" : "6000"
+      |  },
+      |  "matchingRules" : {
+      |    "tickSize" : "0.7"
+      |  }
+      |}""".stripMargin
 
   private val orderBookInfo = ApiOrderBookInfo(
     restrictions = Some(
@@ -40,11 +40,11 @@ class ApiOrderBookInfoSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
   )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiOrderBookInfo] should matchTo(orderBookInfo)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(orderBookInfo)) should matchTo(json)
     }
   }

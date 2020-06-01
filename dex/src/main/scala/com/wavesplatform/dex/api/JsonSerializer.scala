@@ -27,7 +27,7 @@ object JsonSerializer {
     override def deserialize(p: JsonParser, ctxt: DeserializationContext): AssetPair = {
       val node = p.getCodec.readTree[JsonNode](p)
 
-      def readAssetId(fieldName: String) = {
+      def readAssetId(fieldName: String): Asset = {
         val x = node.get(fieldName).asText(Asset.WavesName)
         if (x == Asset.WavesName) Waves else IssuedAsset(ByteStr.decodeBase58(x).get)
       }
@@ -35,5 +35,4 @@ object JsonSerializer {
       AssetPair(readAssetId("amountAsset"), readAssetId("priceAsset"))
     }
   }
-
 }

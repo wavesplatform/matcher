@@ -11,11 +11,11 @@ class ApiOffsetSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplic
   private val offset = ApiOffset(0)
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiOffset] should matchTo(offset)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.toJson(offset).toString should matchTo(json)
     }
   }

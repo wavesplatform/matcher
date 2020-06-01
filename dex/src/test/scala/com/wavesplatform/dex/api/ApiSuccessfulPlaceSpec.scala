@@ -13,30 +13,29 @@ import play.api.libs.json.Json
 
 class ApiSuccessfulPlaceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
-  private val json =
-    """{
-  "message" : {
-    "version" : 1,
-    "id" : "6KUFD9a6acDVM2Y8wqiFrdt35FPE1WF5QgjpPJqtKrP9",
-    "sender" : "3MyE3MtSi6MkXLCu1m7fCsUoJYRt4iibUGS",
-    "senderPublicKey" : "CsoEGd7UrxjBWEdoXbwh1x5fT64NNP8nBJ65xuJRx851",
-    "matcherPublicKey" : "G67KDhqHdjNNb2tnHRgNbDppQEM9ySXdiBip577n2Xoj",
-    "assetPair" : {
-      "amountAsset" : "6RQYnag6kTXaoGi3yPmX9JMpPya8WQntSohisKKCMGr",
-      "priceAsset" : "8pBLJDEwWgrxxHHnVLYbjhUySKy1qteiZGqK8dJeHUA"
-    },
-    "orderType" : "buy",
-    "amount" : 7235959396154477,
-    "price" : 399,
-    "timestamp" : 1580225937287,
-    "expiration" : 1582677054923,
-    "matcherFee" : 5273291907571414,
-    "signature" : "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj",
-    "proofs" : [ "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj" ]
-  },
-  "success" : true,
-  "status" : "OrderAccepted"
-}"""
+  private val json = """{
+                       |  "message" : {
+                       |    "version" : 1,
+                       |    "id" : "6KUFD9a6acDVM2Y8wqiFrdt35FPE1WF5QgjpPJqtKrP9",
+                       |    "sender" : "3MyE3MtSi6MkXLCu1m7fCsUoJYRt4iibUGS",
+                       |    "senderPublicKey" : "CsoEGd7UrxjBWEdoXbwh1x5fT64NNP8nBJ65xuJRx851",
+                       |    "matcherPublicKey" : "G67KDhqHdjNNb2tnHRgNbDppQEM9ySXdiBip577n2Xoj",
+                       |    "assetPair" : {
+                       |      "amountAsset" : "6RQYnag6kTXaoGi3yPmX9JMpPya8WQntSohisKKCMGr",
+                       |      "priceAsset" : "8pBLJDEwWgrxxHHnVLYbjhUySKy1qteiZGqK8dJeHUA"
+                       |    },
+                       |    "orderType" : "buy",
+                       |    "amount" : 7235959396154477,
+                       |    "price" : 399,
+                       |    "timestamp" : 1580225937287,
+                       |    "expiration" : 1582677054923,
+                       |    "matcherFee" : 5273291907571414,
+                       |    "signature" : "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj",
+                       |    "proofs" : [ "5GHs8aQQ3pMEipyotwz6NyzzAQfxizRpzFg7vBsptkQDhxR58cuzkwL2P7XtkTB7KQU7vq6GyZnJTWab2bK3Nixj" ]
+                       |  },
+                       |  "success" : true,
+                       |  "status" : "OrderAccepted"
+                       |}""".stripMargin
 
   private val order = OrderV1(
     senderPublicKey = PublicKey(Base58.decode("CsoEGd7UrxjBWEdoXbwh1x5fT64NNP8nBJ65xuJRx851")),
@@ -57,11 +56,11 @@ class ApiSuccessfulPlaceSpec extends AnyFreeSpec with Matchers with DiffMatcherW
   private val message = ApiSuccessfulPlace(order)
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiSuccessfulPlace] should matchTo(message)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(message)) should matchTo(json)
     }
   }

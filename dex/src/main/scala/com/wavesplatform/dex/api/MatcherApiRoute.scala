@@ -199,7 +199,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/settings")
-  @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET", response = classOf[Any])
+  @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET", response = classOf[ApiMatcherPublicSettings])
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
@@ -227,7 +227,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Asset rates",
     notes = "Get current rates of assets (price of 1 Waves in the specified asset)",
     httpMethod = "GET",
-    response = classOf[Map[String, Double]]
+    response = classOf[Map[Asset, Double]]
   )
   def getRates: Route = (path("settings" / "rates") & get) { complete(ApiRates(rateCache.getAllRates)) }
 
@@ -300,7 +300,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",
     httpMethod = "GET",
-    response = classOf[Any]
+    response = classOf[ApiV0OrderBook]
   )
   @ApiImplicitParams(
     Array(
@@ -341,7 +341,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/info")
-  @ApiOperation(value = "Get order restrictions for the specified asset pair", httpMethod = "GET", response = classOf[Any])
+  @ApiOperation(value = "Get order restrictions for the specified asset pair", httpMethod = "GET", response = classOf[ApiOrderBookInfo])
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),

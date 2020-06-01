@@ -12,11 +12,11 @@ class ApiMatcherPublicKeySpec extends AnyFreeSpec with Matchers with DiffMatcher
   private val matcherPublicKey = ApiMatcherPublicKey(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").right.get)
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiMatcherPublicKey] should matchTo(matcherPublicKey)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.toJson(matcherPublicKey).toString should matchTo(json)
     }
   }

@@ -11,20 +11,20 @@ class ApiSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffMa
   // Note, we removed "result" : null , because it effectively equal to a missing field
   private val json =
     """{
-  "message" : [ [ {
-    "orderId" : "8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK",
-    "success" : true,
-    "status" : "OrderCanceled"
-  }, {
-    "error" : 25601,
-    "message" : "Can not persist event, please retry later or contact with the administrator",
-    "template" : "Can not persist event, please retry later or contact with the administrator",
-    "status" : "OrderCancelRejected",
-    "success" : false
-  } ] ],
-  "success" : true,
-  "status" : "BatchCancelCompleted"
-}"""
+      |  "message" : [ [ {
+      |    "orderId" : "8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK",
+      |    "success" : true,
+      |    "status" : "OrderCanceled"
+      |  }, {
+      |    "error" : 25601,
+      |    "message" : "Can not persist event, please retry later or contact with the administrator",
+      |    "template" : "Can not persist event, please retry later or contact with the administrator",
+      |    "status" : "OrderCancelRejected",
+      |    "success" : false
+      |  } ] ],
+      |  "success" : true,
+      |  "status" : "BatchCancelCompleted"
+      |}""".stripMargin
 
   private val message = ApiSuccessfulBatchCancel(
     List(
@@ -41,11 +41,11 @@ class ApiSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffMa
   )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiSuccessfulBatchCancel] should matchTo(message)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(message)) should matchTo(json)
     }
   }

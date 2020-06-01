@@ -232,7 +232,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns that all is fine" in test(
       { route =>
         Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
-          responseAs[JsValue].as[ApiMessage] should matchTo(ApiMessage("Saving started"))
+          responseAs[ApiMessage] should matchTo(ApiMessage("Saving started"))
         }
       },
       apiKey
@@ -245,12 +245,12 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue].as[OrderBookResult].copy(timestamp = 0L) should matchTo(
-            OrderBookResult(
+          responseAs[ApiV0OrderBook] should matchTo(
+            ApiV0OrderBook(
               timestamp = 0L,
               pair = smartWavesPair,
-              bids = smartWavesAggregatedSnapshot.bids,
-              asks = smartWavesAggregatedSnapshot.asks
+              bids = smartWavesAggregatedSnapshot.bids.toList,
+              asks = smartWavesAggregatedSnapshot.asks.toList
             )
           )
         }

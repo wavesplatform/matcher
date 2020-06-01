@@ -11,9 +11,9 @@ class ApiBalanceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpli
 
   private val json =
     """{
-  "WAVES" : 100,
-  "2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh" : 300
-}"""
+      |  "WAVES" : 100,
+      |  "2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh" : 300
+      |}""".stripMargin
 
   private val issuedAsset = IssuedAsset(Base58.decode("2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh"))
   private val balance = ApiBalance(
@@ -24,11 +24,11 @@ class ApiBalanceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpli
   )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiBalance] should matchTo(balance)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(balance)) should matchTo(json)
     }
   }

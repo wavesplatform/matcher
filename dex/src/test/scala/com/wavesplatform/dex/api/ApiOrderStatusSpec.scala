@@ -20,11 +20,11 @@ class ApiOrderStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWithI
         val apiStatus = ApiOrderStatus.from(status)
 
         status.name - {
-          "serialization" in {
+          "deserialization" in {
             Json.parse(json).as[ApiOrderStatus] should matchTo(apiStatus)
           }
 
-          "deserialization" in {
+          "serialization" in {
             Json.stringify(Json.toJson(apiStatus)) should matchTo(json)
           }
         }

@@ -10,15 +10,15 @@ class ApiErrorSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
   // Note, we removed "result" : null , because it effectively equal to a missing field
   private val json =
     """{
-  "error" : 3148040,
-  "message" : "The order 979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU has already been placed",
-  "template" : "The order {{id}} has already been placed",
-  "params" : {
-    "id" : "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"
-  },
-  "status" : "OrderRejected",
-  "success" : false
-}"""
+      |  "error" : 3148040,
+      |  "message" : "The order 979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU has already been placed",
+      |  "template" : "The order {{id}} has already been placed",
+      |  "params" : {
+      |    "id" : "979P14dmPrcmcYhLeMpJFMuDDchdBeL9ouMPUvvYu1YU"
+      |  },
+      |  "status" : "OrderRejected",
+      |  "success" : false
+      |}""".stripMargin
 
   private val message: ApiError = ApiError(
     error = 3148040,
@@ -29,11 +29,11 @@ class ApiErrorSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
   )
 
   "backward JSON compatibility" - {
-    "serialization" in {
+    "deserialization" in {
       Json.parse(json).as[ApiError] should matchTo(message)
     }
 
-    "deserialization" in {
+    "serialization" in {
       Json.prettyPrint(Json.toJson(message)) should matchTo(json)
     }
   }

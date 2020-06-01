@@ -55,7 +55,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         .actorRef[WsServerMessage](
           { case WsServerMessage.Complete => },
           PartialFunction.empty,
-          10, // TODO????
+          100, // TODO????
           OverflowStrategy.fail
         )
         .named(s"source-$clientId")

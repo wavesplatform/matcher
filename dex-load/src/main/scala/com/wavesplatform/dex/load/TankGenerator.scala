@@ -20,7 +20,7 @@ object TankGenerator {
 
   private def mkAssets(count: Int = 9): List[String] = {
     println(s"Generating $count assets... ")
-    val assets = (1 to count).map(_ => mkAsset).toList
+    val assets = (1 to count).map(_ => mkAsset()).toList
     waitForHeightArise()
     println("Assets have been successfully issued")
     assets
@@ -83,9 +83,9 @@ object TankGenerator {
     orders.take(requestsCount)
   }
 
-  private def mkPlaces(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, false)
+  private def mkPlaces(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, matching = false)
 
-  private def mkMatching(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, true)
+  private def mkMatching(seedPrefix: String, requestsCount: Int): List[Request] = mkPlaces(seedPrefix, requestsCount, matching = true)
 
   private def mkCancels(seedPrefix: String, requestsCount: Int): List[Request] = {
     println("Making requests for cancelling...")
@@ -177,17 +177,16 @@ object TankGenerator {
     )
   }
 
-  private def svRequests(requests: List[Request]): Unit = {
+  private def svRequests(requests: List[Request], outputFile: File): Unit = {
     println("\nAll data has been generated. Now it will be saved...")
 
-    val requestsFile = new File(s"requests-${System.currentTimeMillis}.txt")
-    val output       = new PrintWriter(requestsFile, "utf-8")
+    val output = new PrintWriter(outputFile, "utf-8")
 
     try requests.foreach(_.save(output))
     finally output.close()
 
     println(s"Generated: ${requests.length}")
-    println(s"\t${Request.POST}: ${requests.filter(_.httpType.equals("POST")).length}")
+    println(s"\t${Request.POST}: ${requests.count(_.httpType.equals("POST"))}")
     println(s"\t\t${Request.PLACE}: ${requests.filter(_.tag.equals("PLACE")).length}")
     println(s"\t\t${Request.CANCEL}: ${requests.filter(_.tag.equals("CANCEL")).length}")
     println(s"\t${Request.GET}: ${requests.filter(_.httpType.equals("GET")).length}")
@@ -195,10 +194,10 @@ object TankGenerator {
     println(s"\t\t${Request.ORDER_HISTORY_BY_PAIR}: ${requests.filter(_.tag.equals("ORDER_HISTORY_BY_PAIR")).length}")
     println(s"\t\t${Request.RESERVED_BALANCE}: ${requests.filter(_.tag.equals("RESERVED_BALANCE")).length}")
     println(s"\t\t${Request.TRADABLE_BALANCE}: ${requests.filter(_.tag.equals("TRADABLE_BALANCE")).length}")
-    println(s"Results have been saved to $requestsFile")
+    println(s"Results have been saved to $outputFile")
   }
 
-  def mkRequests(seedPrefix: String, requestsType: Int = 3, requestsCount: Int = 20000, pairsFile: Option[File]): Unit = {
+  def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int = 20000, requestsType: Int = 3): Unit = {
     val requests = requestsType match {
       case 1 => mkPlaces(seedPrefix, requestsCount)
       case 2 => mkCancels(seedPrefix, requestsCount)
@@ -211,6 +210,6 @@ object TankGenerator {
         List.empty
     }
 
-    svRequests(requests)
+    svRequests(requests, outputFile)
   }
 }

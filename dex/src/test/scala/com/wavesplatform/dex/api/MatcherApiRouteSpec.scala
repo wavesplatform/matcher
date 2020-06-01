@@ -33,7 +33,6 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.AggregatedOrderBookActor
 import com.wavesplatform.dex.market.MatcherActor.{AssetInfo, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus.marketStatusReads
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
@@ -264,7 +263,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[MarketStatus] should matchTo(smartWavesMarketStatus)
+          responseAs[ApiMarketStatus] should matchTo(ApiMarketStatus fromMarketStatus smartWavesMarketStatus)
         }
       }
     )

@@ -326,7 +326,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Get Market Status",
     notes = "Get current market data such as last trade, best bid and ask",
     httpMethod = "GET",
-    response = classOf[Any]
+    response = classOf[ApiMarketStatus]
   )
   @ApiImplicitParams(
     Array(

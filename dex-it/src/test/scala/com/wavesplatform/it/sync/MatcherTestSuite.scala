@@ -10,7 +10,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.model.{AcceptedOrderType, LevelAgg}
+import com.wavesplatform.dex.model.{AcceptedOrderType, LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -285,22 +285,16 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.place(mkOrder(bob, bob2WavesPair, SELL, askAmount, ask))
 
         val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp1.lastPrice shouldBe None
-        resp1.lastSide shouldBe None
-        resp1.bid shouldBe None
-        resp1.bidAmount shouldBe None
-        resp1.ask shouldBe Some(ask)
-        resp1.askAmount shouldBe Some(askAmount)
+        resp1.lastTrade shouldBe None
+        resp1.bestBid shouldBe None
+        resp1.bestAsk should matchTo { Option(LevelAgg(askAmount, ask)) }
 
         dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
         val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp2.lastPrice shouldBe Some(ask)
-        resp2.lastSide shouldBe Some(OrderType.BUY.toString)
-        resp2.bid shouldBe Some(bid)
-        resp2.bidAmount shouldBe Some(bidAmount - askAmount)
-        resp2.ask shouldBe None
-        resp2.askAmount shouldBe None
+        resp2.lastTrade should matchTo { Option(LastTrade(ask, askAmount, OrderType.BUY)) }
+        resp2.bestBid should matchTo { Option(LevelAgg(bidAmount - askAmount, bid)) }
+        resp2.bestAsk shouldBe None
       }
     }
   }

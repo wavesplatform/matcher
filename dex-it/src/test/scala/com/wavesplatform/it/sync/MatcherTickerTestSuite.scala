@@ -5,6 +5,7 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 
 class MatcherTickerTestSuite extends MatcherSuiteBase {
@@ -66,12 +67,9 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, bidPrice))
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
-      r.lastPrice shouldBe None
-      r.lastSide shouldBe None
-      r.bid shouldBe Some(bidPrice)
-      r.bidAmount shouldBe Some(2 * bidAmount)
-      r.ask shouldBe None
-      r.askAmount shouldBe None
+      r.lastTrade shouldBe None
+      r.bestBid should matchTo { Option(LevelAgg(2 * bidAmount, bidPrice)) }
+      r.bestAsk shouldBe None
     }
 
     "place ask order for second pair" in {
@@ -79,12 +77,9 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(mkOrder(bob, btcWavesPair, OrderType.SELL, askAmount, askPrice))
 
       val r = dex1.api.orderBookStatus(btcWavesPair)
-      r.lastPrice shouldBe None
-      r.lastSide shouldBe None
-      r.bid shouldBe None
-      r.bidAmount shouldBe None
-      r.ask shouldBe Some(askPrice)
-      r.askAmount shouldBe Some(2 * askAmount)
+      r.lastTrade shouldBe None
+      r.bestBid shouldBe None
+      r.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
     }
 
     "place ask order for first pair" in {
@@ -92,46 +87,34 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, askPrice))
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
-      r.lastPrice shouldBe None
-      r.lastSide shouldBe None
-      r.bid shouldBe Some(bidPrice)
-      r.bidAmount shouldBe Some(2 * bidAmount)
-      r.ask shouldBe Some(askPrice)
-      r.askAmount shouldBe Some(2 * askAmount)
+      r.lastTrade shouldBe None
+      r.bestBid should matchTo { Option(LevelAgg(2 * bidAmount, bidPrice)) }
+      r.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
     }
 
     "match bid order for first pair" in {
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, askAmount, bidPrice), OrderStatus.Filled)
 
       val r1 = dex1.api.orderBookStatus(btcUsdPair)
-      r1.lastPrice shouldBe Some(bidPrice)
-      r1.lastSide shouldBe Some("sell") // TODO stringly typed
-      r1.bid shouldBe Some(bidPrice)
-      r1.bidAmount shouldBe Some(2 * bidAmount - askAmount)
-      r1.ask shouldBe Some(askPrice)
-      r1.askAmount shouldBe Some(2 * askAmount)
+      r1.lastTrade should matchTo { Option(LastTrade(bidPrice, askAmount, OrderType.SELL)) }
+      r1.bestBid should matchTo { Option(LevelAgg(2 * bidAmount - askAmount, bidPrice)) }
+      r1.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
 
       placeAndAwaitAtDex(mkOrder(bob, btcUsdPair, OrderType.SELL, 3 * askAmount, bidPrice), OrderStatus.Filled)
 
       val r2 = dex1.api.orderBookStatus(btcUsdPair)
-      r2.lastPrice shouldBe Some(bidPrice)
-      r2.lastSide shouldBe Some("sell")
-      r2.bid shouldBe None
-      r2.bidAmount shouldBe None
-      r2.ask shouldBe Some(askPrice)
-      r2.askAmount shouldBe Some(2 * askAmount)
+      r2.lastTrade should matchTo { Option(LastTrade(bidPrice, 2 * askAmount, OrderType.SELL)) } // second BUY order (bidAmount = 2 * askAmount) filled
+      r2.bestBid shouldBe None
+      r2.bestAsk should matchTo { Option(LevelAgg(2 * askAmount, askPrice)) }
     }
 
     "match ask order for first pair" in {
       placeAndAwaitAtDex(mkOrder(alice, btcUsdPair, OrderType.BUY, bidAmount, askPrice), OrderStatus.Filled)
 
       val r = dex1.api.orderBookStatus(btcUsdPair)
-      r.lastPrice shouldBe Some(askPrice)
-      r.lastSide shouldBe Some("buy")
-      r.bid shouldBe None
-      r.bidAmount shouldBe None
-      r.ask shouldBe None
-      r.askAmount shouldBe None
+      r.lastTrade should matchTo { Option(LastTrade(askPrice, askAmount, OrderType.BUY)) } // second SELL order filled
+      r.bestBid shouldBe None
+      r.bestAsk shouldBe None
     }
   }
 

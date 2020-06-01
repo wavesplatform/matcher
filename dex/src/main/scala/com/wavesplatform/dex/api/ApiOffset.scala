@@ -12,7 +12,4 @@ object ApiOffset {
     },
     aco => JsNumber(aco.offset)
   )
-
-  implicit def long2ApiOffset(l: Long): ApiOffset = ApiOffset(l)
-  implicit def int2ApiOffset(i: Int): ApiOffset   = ApiOffset(i)
 }

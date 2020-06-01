@@ -7,7 +7,7 @@ import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
@@ -22,8 +22,6 @@ import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
 
@@ -269,33 +267,6 @@ object OrderBookActor {
   )
 
   object MarketStatus {
-    implicit val marketStatusWrites: OWrites[MarketStatus] = { ms =>
-      Json.obj(
-        "lastPrice"  -> ms.lastTrade.map(_.price),
-        "lastAmount" -> ms.lastTrade.map(_.amount),
-        "lastSide"   -> ms.lastTrade.map(_.side.toString),
-        "bid"        -> ms.bestBid.map(_.price),
-        "bidAmount"  -> ms.bestBid.map(_.amount),
-        "ask"        -> ms.bestAsk.map(_.price),
-        "askAmount"  -> ms.bestAsk.map(_.amount)
-      )
-    }
-
-    implicit val marketStatusReads: Reads[MarketStatus] =
-      ((JsPath \ "lastPrice").readNullable[Long] and
-        (JsPath \ "lastAmount").readNullable[Long] and
-        (JsPath \ "lastSide").readNullable[OrderType] and
-        (JsPath \ "bid").readNullable[Long] and
-        (JsPath \ "bidAmount").readNullable[Long] and
-        (JsPath \ "ask").readNullable[Long] and
-        (JsPath \ "askAmount").readNullable[Long]) { (lastPrice, lastAmount, lastSide, bid, bidAmount, ask, askAmount) =>
-        MarketStatus(
-          lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(LastTrade.apply)),
-          bestBid = (bidAmount, bid).tupled.map(Function.tupled(LevelAgg.apply)),
-          bestAsk = (askAmount, ask).tupled.map(Function.tupled(LevelAgg.apply))
-        )
-      }
-
     def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
   }
 

@@ -24,7 +24,6 @@ import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.{CanWait, FOps, RepeatRequestOptions, ThrowableMonadError}
 import com.wavesplatform.dex.it.json._
-import com.wavesplatform.dex.it.sttp.ResponseParsers.asLong
 import com.wavesplatform.dex.it.sttp.SttpBackendOps
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import play.api.libs.json.{JsResultException, Json}
@@ -98,7 +97,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, ApiV0OrderBook]]
 
   def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, ApiOrderBookInfo]]
-  def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]]
+  def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, ApiMarketStatus]]
 
   def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]] // TODO
 
@@ -338,7 +337,7 @@ object DexApi {
           .followRedirects(false)
       }
 
-      override def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, MarketStatusResponse]] = tryParseJson {
+      override def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, ApiMarketStatus]] = tryParseJson {
         sttp
           .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/status")
           .followRedirects(false)
@@ -379,25 +378,22 @@ object DexApi {
       override def tryRates: F[Either[MatcherError, ApiRates]] =
         tryParseJson[ApiRates](sttp.get(uri"$apiUri/settings/rates").headers(apiKeyHeaders))
 
-      override def tryCurrentOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
+      override def tryCurrentOffset: F[Either[MatcherError, ApiOffset]] = tryParseJson {
         sttp
           .get(uri"$apiUri/debug/currentOffset")
           .headers(apiKeyHeaders)
-          .response(asLong)
       }
 
-      override def tryLastOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
+      override def tryLastOffset: F[Either[MatcherError, ApiOffset]] = tryParseJson {
         sttp
           .get(uri"$apiUri/debug/lastOffset")
           .headers(apiKeyHeaders)
-          .response(asLong)
       }
 
-      override def tryOldestSnapshotOffset: F[Either[MatcherError, ApiOffset]] = tryParse {
+      override def tryOldestSnapshotOffset: F[Either[MatcherError, ApiOffset]] = tryParseJson {
         sttp
           .get(uri"$apiUri/debug/oldestSnapshotOffset")
           .headers(apiKeyHeaders)
-          .response(asLong)
       }
 
       override def tryAllSnapshotOffsets: F[Either[MatcherError, ApiSnapshotOffsets]] =

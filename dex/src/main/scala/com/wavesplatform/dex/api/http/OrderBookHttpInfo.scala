@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api
+import com.wavesplatform.dex.api.ApiMarketStatus
 import com.wavesplatform.dex.api.MatcherResponse.toHttpResponse
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.Depth
@@ -22,10 +23,10 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
   def getMarketStatus(assetPair: AssetPair): Future[HttpResponse] =
     askAdapter.getMarketStatus(assetPair).map {
       case Left(e) => toHttpResponse(api.OrderBookUnavailable(e))
-      case Right(x) =>
-        x match {
-          case Some(x) => toHttpResponse(api.SimpleResponse(StatusCodes.OK, Json toJsObject x))
-          case None    => marketStatusNotFound
+      case Right(maybeMarketStatus) =>
+        maybeMarketStatus match {
+          case Some(ms) => toHttpResponse(api.SimpleResponse(StatusCodes.OK, ApiMarketStatus fromMarketStatus ms))
+          case None     => marketStatusNotFound
         }
     }
 

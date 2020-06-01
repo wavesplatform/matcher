@@ -21,9 +21,10 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
   private val emptyWsAddresState: WsAddressState = WsAddressState(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
   @volatile private var accountUpdates           = emptyWsAddresState
   private val orderBookUpdates                   = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
+  @volatile private var gotPings                 = 0
 
   private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
-    case x: WsPingOrPong      => x.some
+    case x: WsPingOrPong      => gotPings += 1; x.some
     case x: WsInitial         => log.info(s"Connection id: ${x.connectionId}"); none
     case x: WsError           => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
     case diff: WsAddressState => accountUpdates = merge(accountUpdates, diff); none
@@ -91,6 +92,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
 
   def collectedAddressState: WsAddressState            = accountUpdates
   def collectedOrderBooks: Map[AssetPair, WsOrderBook] = orderBookUpdates.toMap
+  def pingsNumber: Int                                 = gotPings
 
   def close(): Future[Unit] =
     client

@@ -33,7 +33,7 @@ case class Request(httpType: String, path: String, tag: String, obj: ApiJson = n
       "X-API-Key"                -> settings.apiKey
     )
 
-    val request = s"${Request.POST}  $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"
+    val request = s"${Request.POST} $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"
 
     s"${request.length} ${tag.toUpperCase}\n$request\r\n"
   }

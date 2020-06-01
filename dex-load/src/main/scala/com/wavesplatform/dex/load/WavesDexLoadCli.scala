@@ -181,6 +181,9 @@ object WavesDexLoadCli extends ScoptImplicits {
                     watchedOrderBooks <- cli.wrapByLogs("Stage 1. Getting collected order books... ") {
                       Future.successful { getOrThrow(checkUniq(switch(clients.map(_.collectedOrderBooks)))) }
                     }
+                    _ <- cli.wrapByLogs("Stage 1. Checking amount of pings... ") {
+                      Future.successful { println(clients.map(_.pingsNumber).mkString(", ")) }
+                    }
                     _ <- cli.wrapByLogs("Stage 1. Stopping clients... ") { Future.traverse(clients)(_.close()) }
 
                     _ <- cli.wrapByLogs("Stage 2. Running new clients... ") { Future.traverse(clients)(_.run()) }

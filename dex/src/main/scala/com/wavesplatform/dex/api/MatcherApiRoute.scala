@@ -24,6 +24,7 @@ import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.MatcherError
@@ -540,7 +541,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json array with order ids",
         required = true,
         paramType = "body",
-        dataTypeClass = classOf[Array[String]]
+        dataTypeClass = classOf[ApiSuccessfulBatchCancel]
       ),
     )
   )
@@ -920,7 +921,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         complete(
           storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
             case None => NotImplemented(error.FeatureDisabled)
-            case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
+            case _    => SimpleResponse(ApiMessage("Deleting order book"), StatusCodes.Accepted)
           }
         )
       case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
@@ -932,7 +933,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Get Exchange Transactions for order",
     notes = "Get all exchange transactions created by DEX on execution of the given order",
     httpMethod = "GET",
-    response = classOf[Array[Any]]
+    response = classOf[Array[ExchangeTransactionV2]]
   )
   @ApiImplicitParams(
     Array(
@@ -940,7 +941,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
-    complete(StatusCodes.OK -> Json.toJson(DBUtils.transactionsForOrder(db, orderId)))
+    complete { Json.toJson(DBUtils.transactionsForOrder(db, orderId)) }
   }
 
   @Path("/debug/currentOffset")
@@ -1007,7 +1008,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def saveSnapshots: Route = (path("debug" / "saveSnapshots") & post & withAuth) {
     complete {
       matcher ! ForceSaveSnapshots
-      StatusCodes.OK -> ApiMessage("Saving started")
+      SimpleResponse(ApiMessage("Saving started"))
     }
   }
 

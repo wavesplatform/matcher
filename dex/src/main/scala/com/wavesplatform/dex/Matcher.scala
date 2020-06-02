@@ -431,7 +431,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       CreateExchangeTransactionActor.name
     )
 
-    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
 
     actorSystem.actorOf(
       ExchangeTransactionBroadcastActor

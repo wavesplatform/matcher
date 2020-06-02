@@ -10,6 +10,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
+import com.wavesplatform.dex.market.MatcherActor.AssetInfo
 import com.wavesplatform.dex.model.{AcceptedOrderType, LastTrade, LevelAgg}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
@@ -89,10 +90,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val markets = orderBooks.markets.head
 
         markets.amountAssetName shouldBe aliceAssetName
-        markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(issueAliceAssetTx.getDecimals))
+        markets.amountAssetInfo shouldBe Some(AssetInfo(issueAliceAssetTx.getDecimals))
 
         markets.priceAssetName shouldBe "WAVES"
-        markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(8))
+        markets.priceAssetInfo shouldBe Some(AssetInfo(8))
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {

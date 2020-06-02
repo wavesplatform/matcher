@@ -4,7 +4,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.{AssetDecimalsInfo, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.market.MatcherActor.AssetInfo
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -63,10 +64,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val markets = openMarkets.markets.head
 
       markets.amountAssetName shouldBe "WAVES"
-      markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(8))
+      markets.amountAssetInfo shouldBe Some(AssetInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
-      markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.getDecimals))
+      markets.priceAssetInfo shouldBe Some(AssetInfo(IssueUsdTx.getDecimals))
     }
 
     "check usd and waves balance after fill" in {
@@ -228,10 +229,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val markets     = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
-    markets.amountAssetInfo shouldBe Some(AssetDecimalsInfo(IssueWctTx.getDecimals))
+    markets.amountAssetInfo shouldBe Some(AssetInfo(IssueWctTx.getDecimals))
 
     markets.priceAssetName shouldBe usdAssetName
-    markets.priceAssetInfo shouldBe Some(AssetDecimalsInfo(IssueUsdTx.getDecimals))
+    markets.priceAssetInfo shouldBe Some(AssetInfo(IssueUsdTx.getDecimals))
   }
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {

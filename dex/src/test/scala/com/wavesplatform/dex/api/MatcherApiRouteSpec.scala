@@ -19,6 +19,7 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.ApiMarshallers._
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, `X-Api-Key`}
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -27,20 +28,24 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderJson._
+import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.market.AggregatedOrderBookActor
 import com.wavesplatform.dex.market.MatcherActor.{AssetInfo, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherTransactionWriter}
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue, Json, _}
+import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -696,11 +701,53 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     )
   }
 
+  // cancelAllById
+  routePath("/orders/{address}/cancel") - {
+    val orderId = orderToCancel.id()
+
+    "X-Api-Key is required" in test { route =>
+      Post(
+        routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+        HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+      ) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "an invalid body" in test(
+      { route =>
+        Post(
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(orderId).toString())
+        ).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        }
+      },
+      apiKey
+    )
+
+    "sunny day" in test(
+      { route =>
+        Post(
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+        ).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSuccessfulBatchCancel] should matchTo(
+            ApiSuccessfulBatchCancel(List(Right(ApiSuccessfulCancel(orderId = orderToCancel.id()))))
+          )
+        }
+      },
+      apiKey
+    )
+  }
+
   // orderbooks
   routePath("/orderbook") - {
     "returns all order books" in test(
       { route =>
         Get(routePath("/orderbook")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
           responseAs[ApiTradingMarkets] should matchTo(
             ApiTradingMarkets(
               matcherKeyPair.publicKey,
@@ -726,11 +773,25 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   // orderBookDelete
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
-    "returns an empty snapshot" in test(
+
+    val (someOrder, _) = orderGenerator.sample.get
+
+    "returns an error if there is no such order book" in test(
+      { route =>
+        Delete(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}"))
+          .withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.ServiceUnavailable
+        }
+      },
+      apiKey
+    )
+
+    "returns success message if order book exists" in test(
       { route =>
         Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}"))
           .withHeaders(apiKeyHeader) ~> route ~> check {
-          // TODO
+          status shouldEqual StatusCodes.Accepted
+          responseAs[ApiMessage] should matchTo(ApiMessage("Deleting order book"))
         }
       },
       apiKey
@@ -742,8 +803,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns known transactions with this order" in test(
       { route =>
         Get(routePath(s"/transactions/${okOrder.idStr()}")) ~> route ~> check {
-          // TODO
-          responseAs[JsArray] shouldBe Json.arr()
+          responseAs[JsArray].value should have size 1 // we don't have deserializer for domain exchange transaction (only for WavesJ tx)
         }
       }
     )
@@ -1021,44 +1081,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // cancelAllById
-  routePath("/orders/{address}/cancel") - {
-    val orderId = orderToCancel.id()
-
-    "X-Api-Key is required" in test { route =>
-      Post(
-        routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-        HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-      ) ~> route ~> check {
-        status shouldEqual StatusCodes.Forbidden
-      }
-    }
-
-    "an invalid body" in test(
-      { route =>
-        Post(
-          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-          HttpEntity(ContentTypes.`application/json`, Json.toJson(orderId).toString())
-        ).withHeaders(apiKeyHeader) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
-        }
-      },
-      apiKey
-    )
-
-    "sunny day" in test(
-      { route =>
-        Post(
-          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-        ).withHeaders(apiKeyHeader) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-  }
-
   override def beforeEach(): Unit = {
     super.beforeEach()
     val orderKey = MatcherKeys.order(okOrder.id())
@@ -1184,6 +1206,30 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       TestActor.KeepRunning
     }
 
+    db.readWrite { rw =>
+      val tx =
+        ExchangeTransactionV2
+          .create(
+            matcherKeyPair.privateKey,
+            okOrder,
+            okOrder.updateType(okOrder.orderType.opposite),
+            okOrder.amount,
+            okOrder.price,
+            okOrder.matcherFee,
+            okOrder.matcherFee,
+            0.003.waves,
+            System.currentTimeMillis
+          )
+          .explicitGet()
+
+      val txKey = MatcherKeys.exchangeTransaction(tx.id())
+      if (!rw.has(txKey)) {
+        rw.put(txKey, Some(tx))
+        MatcherTransactionWriter.appendTxId(rw, tx.buyOrder.id(), tx.id())
+        MatcherTransactionWriter.appendTxId(rw, tx.sellOrder.id(), tx.id())
+      }
+    }
+
     val odb = OrderDB(settings.orderDb, db)
     odb.saveOrder(orderToCancel)
 
@@ -1198,44 +1244,49 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         assetDecimals = x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
       )
 
-    val route: Route = MatcherApiRoute(
-      assetPairBuilder = new AssetPairBuilder(
-        settings, {
-          case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
-          case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset =>
-            liftValueAsync[BriefAssetDescription](amountAssetDesc)
-          case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
-            liftValueAsync[BriefAssetDescription](priceAssetDesc)
-          case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+    val route: Route =
+      MatcherApiRoute(
+        assetPairBuilder = new AssetPairBuilder(
+          settings, {
+            case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset =>
+              liftValueAsync[BriefAssetDescription](amountAssetDesc)
+            case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
+              liftValueAsync[BriefAssetDescription](priceAssetDesc)
+            case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+          },
+          Set.empty
+        ),
+        matcherPublicKey = matcherKeyPair.publicKey,
+        matcher = matcherActor.ref,
+        addressActor = addressActor.ref,
+        storeEvent = {
+          case QueueEvent.OrderBookDeleted(pair) if pair == okOrder.assetPair =>
+            Future.successful { QueueEventWithMeta(1L, System.currentTimeMillis, QueueEvent.OrderBookDeleted(pair)).some }
+          case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
         },
-        Set.empty
-      ),
-      matcherPublicKey = matcherKeyPair.publicKey,
-      matcher = matcherActor.ref,
-      addressActor = addressActor.ref,
-      storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
-      orderBook = {
-        case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
-        case _                                                      => None
-      },
-      orderBookHttpInfo = orderBookHttpInfo,
-      getActualTickSize = _ => 0.1,
-      orderValidator = {
-        case x if x == okOrder || x == badOrder => liftValueAsync(x)
-        case _                                  => liftErrorAsync(error.FeatureNotImplemented)
-      },
-      matcherSettings = settings,
-      matcherStatus = () => Matcher.Status.Working,
-      db = db,
-      time = time,
-      currentOffset = () => 0L,
-      lastOffset = () => Future.successful(0L),
-      matcherAccountFee = 300000L,
-      apiKeyHash = Some(crypto secureHash apiKey),
-      rateCache = rateCache,
-      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
-      () => DynamicSettings.symmetric(matcherFee)
-    ).route
+        orderBook = {
+          case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
+          case _                                                      => None
+        },
+        orderBookHttpInfo = orderBookHttpInfo,
+        getActualTickSize = _ => 0.1,
+        orderValidator = {
+          case x if x == okOrder || x == badOrder => liftValueAsync(x)
+          case _                                  => liftErrorAsync(error.FeatureNotImplemented)
+        },
+        matcherSettings = settings,
+        matcherStatus = () => Matcher.Status.Working,
+        db = db,
+        time = time,
+        currentOffset = () => 0L,
+        lastOffset = () => Future.successful(0L),
+        matcherAccountFee = 300000L,
+        apiKeyHash = Some(crypto secureHash apiKey),
+        rateCache = rateCache,
+        validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
+        () => DynamicSettings.symmetric(matcherFee)
+      ).route
 
     f(route)
   }

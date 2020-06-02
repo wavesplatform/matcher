@@ -29,6 +29,7 @@ import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.OrderJson._
 import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -45,7 +46,7 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsArray, JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsString, Json}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -656,9 +657,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 message = s"The account ${badOrder.sender.toAddress} is blacklisted",
                 template = "The account {{address}} is blacklisted",
                 status = "BatchCancelRejected",
-                params = Json.obj(
-                  "address" -> badOrder.sender.toAddress
-                )
+                params = Json.obj("address" -> badOrder.sender.toAddress)
               )
             )
           }
@@ -871,7 +870,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
-  // TODO
+  // upsertRate, deleteRate
   routePath("/settings/rates/{assetId}") - {
 
     val rateCache = RateCache.inMem
@@ -883,8 +882,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.Created
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate $rate for the asset $smartAssetId added"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate $rate for the asset $smartAssetId added"))
           rateCache.getAllRates(smartAsset) shouldBe rate
         }
       },
@@ -896,8 +894,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"
+          responseAs[ApiMessage] should matchTo(
+            ApiMessage(s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"))
           rateCache.getAllRates(smartAsset) shouldBe updatedRate
         }
       },
@@ -909,8 +907,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The provided JSON is invalid. Check the documentation"))
         }
       },
       apiKey,
@@ -921,8 +918,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Asset rate should be positive"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Asset rate should be positive"))
         }
       },
       apiKey,
@@ -934,8 +930,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         Put(routePath(s"/settings/rates/$smartAssetId"), HttpEntity(ContentTypes.`text/plain(UTF-8)`, "5"))
           .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The provided JSON is invalid. Check the documentation"))
         }
       },
       apiKey,
@@ -946,8 +941,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"))
           rateCache.getAllRates.keySet should not contain smartAsset
         }
       },
@@ -959,8 +953,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath("/settings/rates/WAVES"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The rate for WAVES cannot be changed"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The rate for WAVES cannot be changed"))
         }
       },
       apiKey
@@ -970,8 +963,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath("/settings/rates/WAVES"), rate) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -981,8 +973,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -992,8 +983,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath("/settings/rates/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The rate for WAVES cannot be changed"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The rate for WAVES cannot be changed"))
         }
       },
       apiKey
@@ -1003,8 +993,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath("/settings/rates/WAVES")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -1014,8 +1003,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -1026,8 +1014,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         rateCache.deleteRate(smartAsset)
         Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.NotFound
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId was not specified"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate for the asset $smartAssetId was not specified"))
         }
       },
       apiKey,
@@ -1063,20 +1050,31 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
-        val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 1048577
-        (json \ "params" \ "invalidFields").as[List[String]] shouldBe List("/amount")
+        responseAs[ApiError] should matchTo(
+          ApiError(
+            error = 1048577,
+            message = "The provided JSON contains invalid fields: /amount. Check the documentation",
+            template = "The provided JSON contains invalid fields: {{invalidFields}}. Check the documentation",
+            params = Json.obj("invalidFields" -> JsArray(Seq(JsString("/amount")))),
+            status = "InvalidJsonResponse"
+          )
+        )
       }
     }
 
     "completely invalid JSON" in test { route =>
       val orderJson = "{ I AM THE DANGEROUS HACKER"
-
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
-        val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 1048577
-        (json \ "message").as[String] shouldBe "The provided JSON is invalid. Check the documentation"
+        responseAs[ApiError] should matchTo(
+          ApiError(
+            error = 1048577,
+            message = "The provided JSON is invalid. Check the documentation",
+            template = "The provided JSON is invalid. Check the documentation",
+            params = None,
+            status = "InvalidJsonResponse"
+          )
+        )
       }
     }
   }
@@ -1171,7 +1169,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
 
     val orderBookActor = TestProbe("orderBook")
-
     orderBookActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
         case request: AggregatedOrderBookActor.Query.GetHttpView =>
@@ -1211,8 +1208,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         ExchangeTransactionV2
           .create(
             matcherKeyPair.privateKey,
-            okOrder,
-            okOrder.updateType(okOrder.orderType.opposite),
+            okOrder.updateType(BUY),
+            okOrder.updateType(SELL),
             okOrder.amount,
             okOrder.price,
             okOrder.matcherFee,

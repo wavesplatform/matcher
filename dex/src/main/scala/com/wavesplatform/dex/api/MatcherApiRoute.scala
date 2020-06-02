@@ -118,8 +118,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
   }
 
-  private def wrapMessage(message: String): JsObject = Json.obj("message" -> message)
-
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
     case Some(x) => if (x.isRight) pass else complete(OrderBookUnavailable(error.OrderBookBroken(p)))
     case None    => forceCheckOrderBook(p)
@@ -260,8 +258,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               else {
                 val assetStr = asset.toString
                 rateCache.upsertRate(asset, rate) match {
-                  case None     => StatusCodes.Created -> wrapMessage(s"The rate $rate for the asset $assetStr added")
-                  case Some(pv) => StatusCodes.OK      -> wrapMessage(s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
+                  case None     => SimpleResponse(StatusCodes.Created, s"The rate $rate for the asset $assetStr added")
+                  case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr updated, old value = $pv, new value = $rate")
                 }
               }
             )
@@ -290,7 +288,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
           val assetStr = asset.toString
           rateCache.deleteRate(asset) match {
             case None     => RateError(error.RateNotFound(asset), StatusCodes.NotFound)
-            case Some(pv) => StatusCodes.OK -> wrapMessage(s"The rate for the asset $assetStr deleted, old value = $pv")
+            case Some(pv) => SimpleResponse(StatusCodes.OK, s"The rate for the asset $assetStr deleted, old value = $pv")
           }
         }
       )
@@ -921,7 +919,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         complete(
           storeEvent(QueueEvent.OrderBookDeleted(pair)).map {
             case None => NotImplemented(error.FeatureDisabled)
-            case _    => SimpleResponse(ApiMessage("Deleting order book"), StatusCodes.Accepted)
+            case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
           }
         )
       case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
@@ -1008,7 +1006,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def saveSnapshots: Route = (path("debug" / "saveSnapshots") & post & withAuth) {
     complete {
       matcher ! ForceSaveSnapshots
-      SimpleResponse(ApiMessage("Saving started"))
+      SimpleResponse(StatusCodes.OK, "Saving started")
     }
   }
 

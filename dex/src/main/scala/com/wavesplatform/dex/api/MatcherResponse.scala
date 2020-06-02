@@ -67,8 +67,8 @@ object MatcherResponseContent {
 case class SimpleResponse(code: StatusCode, js: JsObject) extends MatcherResponse(code, MatcherResponseContent.Single(js))
 
 object SimpleResponse {
-  def apply(code: StatusCode, message: String): SimpleResponse                             = new SimpleResponse(code, Json.obj("message" -> message))
-  def apply[T](code: StatusCode, response: T)(implicit writes: OWrites[T]): SimpleResponse = new SimpleResponse(code, writes.writes(response))
+  def apply(code: StatusCode, message: String): SimpleResponse                                    = new SimpleResponse(code, Json.obj("message" -> message))
+  def apply[T](response: T, code: StatusCode = C.OK)(implicit writes: OWrites[T]): SimpleResponse = new SimpleResponse(code, writes.writes(response))
 }
 
 case class OrderCanceled(orderId: Order.Id) extends MatcherResponse(C.OK, Json.obj("orderId" -> orderId))

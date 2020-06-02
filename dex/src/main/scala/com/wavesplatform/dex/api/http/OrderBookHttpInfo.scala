@@ -18,14 +18,15 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
     implicit ec: ExecutionContext) {
 
   private val marketStatusNotFound = toHttpResponse(
-    api.SimpleResponse(StatusCodes.NotFound, Json.obj("message" -> "There is no information about this asset pair")))
+    api.SimpleResponse(StatusCodes.NotFound, Json.obj("message" -> "There is no information about this asset pair"))
+  )
 
   def getMarketStatus(assetPair: AssetPair): Future[HttpResponse] =
     askAdapter.getMarketStatus(assetPair).map {
       case Left(e) => toHttpResponse(api.OrderBookUnavailable(e))
       case Right(maybeMarketStatus) =>
         maybeMarketStatus match {
-          case Some(ms) => toHttpResponse(api.SimpleResponse(StatusCodes.OK, ApiMarketStatus fromMarketStatus ms))
+          case Some(ms) => toHttpResponse(api.SimpleResponse(ApiMarketStatus fromMarketStatus ms))
           case None     => marketStatusNotFound
         }
     }

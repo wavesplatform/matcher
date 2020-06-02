@@ -102,7 +102,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
         val order = mkOrder(bob, pair, SELL, amount, price, matcherFee)
         placeAndAwaitAtDex(order)
 
-        dex1.api.tradingPairInfo(pair).get.matchingRules.tickSize.toDouble shouldBe defaultTs
+        dex1.api.tradingPairInfo(pair).get.matchingRules.tickSize shouldBe defaultTs
         dex1.api.cancel(bob, order)
     }
   }
@@ -340,7 +340,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
   "Tick size should have max 8 decimals" in {
     val twoDecimalWavesPair = createAssetPair(twoDecimalAsset, Waves)
     placeAndAwaitAtDex(mkOrder(bob, twoDecimalWavesPair, BUY, amount, price, matcherFee))
-    dex1.api.tradingPairInfo(twoDecimalWavesPair).get.matchingRules.tickSize shouldBe "0.00000001"
+    dex1.api.tradingPairInfo(twoDecimalWavesPair).get.matchingRules.tickSize shouldBe 0.00000001
     dex1.api.cancelAll(bob)
   }
 }

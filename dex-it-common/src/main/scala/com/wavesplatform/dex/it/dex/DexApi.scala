@@ -91,7 +91,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
                             closedOnly: Option[Boolean] = None,
                             timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, List[ApiOrderBookHistoryItem]]]
 
-  def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]]
+  def tryAllOrderBooks: F[Either[MatcherError, ApiTradingMarkets]]
 
   def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiV0OrderBook]]
   def tryOrderBook(assetPair: AssetPair, depth: Int): F[Either[MatcherError, ApiV0OrderBook]]
@@ -317,7 +317,7 @@ object DexApi {
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 
-      override def tryAllOrderBooks: F[Either[MatcherError, MarketDataInfo]] = tryParseJson(sttp.get(uri"$apiUri/orderbook"))
+      override def tryAllOrderBooks: F[Either[MatcherError, ApiTradingMarkets]] = tryParseJson(sttp.get(uri"$apiUri/orderbook"))
 
       override def tryOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiV0OrderBook]] = tryParseJson {
         sttp

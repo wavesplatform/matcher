@@ -3,7 +3,7 @@ package com.wavesplatform.dex.api
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.{AcceptedOrderType, OrderInfo, OrderStatus}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{Json, OFormat}
 
 // TODO
 // 1. Add id to OrderInfo
@@ -24,7 +24,7 @@ case class ApiOrderBookHistoryItem(id: Order.Id,
 
 object ApiOrderBookHistoryItem {
 
-  implicit val orderBookHistoryItemFormat: Format[ApiOrderBookHistoryItem] = Json.format
+  implicit val orderBookHistoryItemFormat: OFormat[ApiOrderBookHistoryItem] = Json.format
 
   def fromOrderInfo(id: Order.Id, info: OrderInfo[OrderStatus]): ApiOrderBookHistoryItem = ApiOrderBookHistoryItem(
     id = id,

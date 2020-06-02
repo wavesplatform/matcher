@@ -76,10 +76,10 @@ object DexApiOps {
                            timestamp: Long = System.currentTimeMillis()): F[List[ApiOrderBookHistoryItem]] =
       explicitGet(self.tryOrderHistoryByPair(owner, assetPair, activeOnly, closedOnly, timestamp))
 
-    def allOrderBooks: F[MarketDataInfo] = explicitGet(self.tryAllOrderBooks)
+    def allOrderBooks: F[ApiTradingMarkets] = explicitGet(self.tryAllOrderBooks)
 
-    def tradingPairInfo(assetPair: AssetPair): F[Option[MarketData]] = allOrderBooks.map {
-      _.markets.find(marketData => marketData.amountAsset == assetPair.amountAssetStr && marketData.priceAsset == assetPair.priceAssetStr)
+    def tradingPairInfo(assetPair: AssetPair): F[Option[ApiMarketDataWithMeta]] = allOrderBooks.map {
+      _.markets.find(marketData => marketData.amountAsset == assetPair.amountAsset && marketData.priceAsset == assetPair.priceAsset)
     }
 
     def orderBook(assetPair: AssetPair): F[ApiV0OrderBook]             = explicitGet(self.tryOrderBook(assetPair))

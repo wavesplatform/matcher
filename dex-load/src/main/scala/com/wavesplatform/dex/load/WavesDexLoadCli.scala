@@ -116,7 +116,6 @@ object WavesDexLoadCli extends ScoptImplicits {
             opt[File]("pairs-file")
               .abbr("pf")
               .text("The path to the file with asset pairs. The format: one asset pair per line")
-              .required()
               .action((x, s) => s.copy(pairsFile = x.some)),
             opt[File]("requests-file")
               .abbr("rf")
@@ -279,7 +278,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                           orderBookNumberPerAccount: Int = 10,
                           requestsType: Int = 1,
                           requestsCount: Int = 30000,
-                          requestsFile: File = new File(s"equests-${System.currentTimeMillis}.txt"),
+                          requestsFile: File = new File(s"requests-${System.currentTimeMillis}.txt"),
                           dexRestApi: String = "",
                           collectTime: FiniteDuration = 5.seconds,
                           wsResponseWaitTime: FiniteDuration = 5.seconds) {

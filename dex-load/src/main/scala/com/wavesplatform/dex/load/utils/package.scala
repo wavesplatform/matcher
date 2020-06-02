@@ -17,7 +17,6 @@ package object utils {
   implicit val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
   implicit val backend  = HttpURLConnectionBackend()
 
-
   def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,
     "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
@@ -71,8 +70,8 @@ package object utils {
 
   def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte).writeValueAsString(obj)
 
-  def readPairs(file: File): List[AssetPair] =
-    Source.fromFile(file).getLines.map(l => { new AssetPair(l.split("-")(0), l.split("-")(1)) }).toList
+  def readPairs(file: Option[File]): List[AssetPair] =
+    if (file == None) List.empty else Source.fromFile(file.get).getLines.map(l => { new AssetPair(l.split("-")(0), l.split("-")(1)) }).toList
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
     val requestsFile = new File(s"pairs.txt")

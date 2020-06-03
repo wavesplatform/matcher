@@ -12,6 +12,9 @@ import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
+
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
@@ -38,6 +41,42 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   override protected def afterEach(): Unit = {
     wavesNodeProxy.toxics().getAll.forEach(_.remove())
     clearOrderBook()
+  }
+
+  "DEXClient should place orders despite of short time disconnect from network" in {
+
+    val orders = (1 to 399).map { i =>
+      mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100 + i)
+    }
+
+    Await.ready(
+      for {
+        _ <- Future.successful(())
+
+        _ <- {
+          orders.foreach(dex1.api.place(_))
+          Future.successful()
+        }
+
+        _ <- {
+          Thread.sleep(5000)
+          dex1.disconnectFromNetwork()
+          Thread.sleep(5000)
+          dex1.connectToNetwork()
+          Future.successful()
+        }
+
+        orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
+
+      } yield {
+        orderBook.bids should have size 399
+        orderBook.asks should be(empty)
+        orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+      },
+      2.minute
+    )
+
+    dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 
   "DEXClient should obtain balance changes when it reconnects after losing connection: " - {

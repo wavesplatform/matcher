@@ -19,4 +19,14 @@ final class LoadTestSettings(conf: Config) {
 
   val assetQuantity = conf.getLong(s"$root.assets.quantity")
   val issueFee      = conf.getLong(s"$root.assets.issue-fee")
+
+  val distribution = Map(
+    "RESERVED_BALANCE" -> conf.getDouble(s"$root.distribution.reserved-balance"),
+    "TRADABLE_BALANCE" -> conf.getDouble(s"$root.distribution.tradable-balance"),
+    "ORDER_HISTORY_BY_PAIR" -> conf.getDouble(s"$root.distribution.order-history-by-pair"),
+    "ORDER_HISTORY_BY_ACC" -> conf.getDouble(s"$root.distribution.order-history-by-pair-and-key"),
+    "CANCEL" -> conf.getDouble(s"$root.distribution.cancel-order"),
+    "PLACE" -> conf.getDouble(s"$root.distribution.place-order"),
+    "ORDER_STATUS" -> conf.getDouble(s"$root.distribution.order-status"),
+  )
 }

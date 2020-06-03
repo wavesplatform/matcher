@@ -1,9 +1,11 @@
 package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
+import java.nio.file.Files
 
 import com.softwaremill.sttp.{MonadError => _}
-import com.wavesplatform.dex.load.utils._
+import com.wavesplatform.dex.domain.order.OrderType
+import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
@@ -74,22 +76,23 @@ object TankGenerator {
     Random.shuffle(orders.map(Request(Request.POST.toString, "/matcher/orderbook", Request.PLACE.toString, _))).toList
   }
 
+  private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File]): List[AssetPair] = {
+    val assets =
+      if (Files.notExists(pairsFile.get.toPath)) mkAssets()
+      else readAssetPairs(pairsFile).map(p => { s"${p.getAmountAsset}-${p.getPriceAsset}" }).mkString("-").split("-").toSet.toList
+
+    val pairs =
+      if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets)
+      else readAssetPairs(pairsFile)
+
+    distributeAssets(accounts, assets)
+    pairs
+  }
+
   private def mkPlaces(seedPrefix: String, requestsCount: Int, pairsFile: Option[File], matching: Boolean): List[Request] = {
     println(s"Making requests for ${if (matching) "matching" else "placing"} ...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-
-    val assets =
-      if (pairsFile == None) mkAssets()
-      else readPairs(pairsFile).map(p => { s"${p.getAmountAsset()}-${p.getPriceAsset()}" }).mkString("-").split("-").toSet.toList
-
-    val pairs =
-      if (pairsFile == None) mkAssetPairs(assets)
-      else readPairs(pairsFile)
-
-    distributeAssets(accounts, assets)
-    val orders = mkOrders(accounts, pairs, matching)
-
-    orders.take(requestsCount)
+    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile), matching).take(requestsCount)
   }
 
   private def mkPlaces(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] =
@@ -130,14 +133,14 @@ object TankGenerator {
   private def mkOrderHistory(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests for getting order history...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-    val pairs    = readPairs(pairsFile)
+    val pairs    = readAssetPairs(pairsFile)
     val ts       = System.currentTimeMillis
 
     val all = accounts
       .flatMap(a => {
         Request(
           Request.GET.toString,
-          s"/matcher/orderbook/${Base58.encode(a.getPublicKey())}",
+          s"/matcher/orderbook/${Base58.encode(a.getPublicKey)}",
           Request.ORDER_HISTORY_BY_ACC.toString,
           headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
         ) ::
@@ -151,13 +154,22 @@ object TankGenerator {
           ))
       })
 
-    Random.shuffle(List.fill(1000)(all).flatten.take(requestsCount)) //TODO: calculate needed count
+    val byPair = List
+      .fill(100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0).toInt)(
+        all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)))
+      .flatten
+    val byAcc = List
+      .fill(100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0).toInt)(
+        all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)))
+      .flatten
+
+    Random.shuffle(byPair ++ byAcc).take(requestsCount)
   }
 
   private def mkBalances(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests for getting reserved and tradable balances...")
     val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-    val pairs    = readPairs(pairsFile)
+    val pairs    = readAssetPairs(pairsFile)
     val ts       = System.currentTimeMillis
 
     val all = accounts.flatMap(a => {
@@ -177,14 +189,48 @@ object TankGenerator {
       })
     })
 
-    Random.shuffle(List.fill(1000)(all).flatten.take(requestsCount)) //TODO: calculate needed count
+    val reserved = List
+      .fill(100000 * settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0).toInt)(
+        all.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)))
+      .flatten
+    val tradable = List
+      .fill(100000 * settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0).toInt)(
+        all.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)))
+      .flatten
+
+    Random.shuffle(reserved ++ tradable).take(requestsCount)
   }
 
-  private def mkAllTypes(seedPrefix: String, requestsCount: Int = 20000, pairsFile: Option[File]): List[Request] = {
+  def placeOrdersForCancel(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): Unit = {
+    println("Placing some orders to prepare cancel-order requests... ")
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
+    val pairs    = mkPairsAndDistribute(accounts, pairsFile)
+
+    for (i <- 0 to settings.distribution.getOrElse(Request.CANCEL.toString, 1.0).toInt) {
+      settings.matcher.placeOrder(
+        accounts(new Random().nextInt(accounts.length - 1)),
+        settings.matcherPublicKey,
+        pairs(new Random().nextInt(pairs.length - 1)),
+        Type.BUY,
+        1,
+        1000000,
+        System.currentTimeMillis + 60 * 60 * 24 * 29 + i,
+        300000,
+        "WAVES",
+        false
+      )
+    }
+    println("Done")
+  }
+
+  private def mkAllTypes(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
+    placeOrdersForCancel(seedPrefix, requestsCount, pairsFile)
     Random.shuffle(
-      mkMatching(seedPrefix, requestsCount, pairsFile) ++ mkBalances(seedPrefix, requestsCount, pairsFile) ++
-        mkOrderHistory(seedPrefix, requestsCount, pairsFile)
+      mkMatching(seedPrefix, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt, pairsFile) ++
+        mkBalances(seedPrefix, requestsCount, pairsFile) ++
+        mkOrderHistory(seedPrefix, requestsCount, pairsFile) ++
+        mkCancels(seedPrefix, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt)
     )
   }
 
@@ -198,13 +244,13 @@ object TankGenerator {
 
     println(s"Generated: ${requests.length}")
     println(s"\t${Request.POST}: ${requests.count(_.httpType.equals(Request.POST.toString))}")
-    println(s"\t\t${Request.PLACE}: ${requests.filter(_.tag.equals(Request.PLACE.toString)).length}")
-    println(s"\t\t${Request.CANCEL}: ${requests.filter(_.tag.equals(Request.CANCEL.toString)).length}")
-    println(s"\t${Request.GET}: ${requests.filter(_.httpType.equals(Request.GET.toString)).length}")
-    println(s"\t\t${Request.ORDER_HISTORY_BY_ACC}: ${requests.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)).length}")
-    println(s"\t\t${Request.ORDER_HISTORY_BY_PAIR}: ${requests.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)).length}")
-    println(s"\t\t${Request.RESERVED_BALANCE}: ${requests.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)).length}")
-    println(s"\t\t${Request.TRADABLE_BALANCE}: ${requests.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)).length}")
+    println(s"\t\t${Request.PLACE}: ${requests.count(_.tag.equals(Request.PLACE.toString))}")
+    println(s"\t\t${Request.CANCEL}: ${requests.count(_.tag.equals(Request.CANCEL.toString))}")
+    println(s"\t${Request.GET}: ${requests.count(_.httpType.equals(Request.GET.toString))}")
+    println(s"\t\t${Request.ORDER_HISTORY_BY_ACC}: ${requests.count(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString))}")
+    println(s"\t\t${Request.ORDER_HISTORY_BY_PAIR}: ${requests.count(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString))}")
+    println(s"\t\t${Request.RESERVED_BALANCE}: ${requests.count(_.tag.equals(Request.RESERVED_BALANCE.toString))}")
+    println(s"\t\t${Request.TRADABLE_BALANCE}: ${requests.count(_.tag.equals(Request.TRADABLE_BALANCE.toString))}")
     println(s"Results have been saved to $outputFile")
   }
 

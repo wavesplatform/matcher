@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
+import java.nio.file.Files
 
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
@@ -70,8 +71,21 @@ package object utils {
 
   def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte).writeValueAsString(obj)
 
-  def readPairs(file: Option[File]): List[AssetPair] =
-    if (file == None) List.empty else Source.fromFile(file.get).getLines.map(l => { new AssetPair(l.split("-")(0), l.split("-")(1)) }).toList
+  def readAssetPairs(file: Option[File]): List[AssetPair] = {
+    if (Files.exists(file.get.toPath)) {
+      val source = Source.fromFile(file.get)
+      val pairs =
+        if (file.isEmpty) List.empty
+        else
+          source.getLines
+            .map(l => {
+              new AssetPair(l.split("-")(0), l.split("-")(1))
+            })
+            .toList
+      source.close()
+      pairs
+    } else List.empty
+  }
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
     val requestsFile = new File(s"pairs.txt")

@@ -55,7 +55,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
                              accounts: Seq[KeyPair],
                              dexApi: DexApi[Id] = dex1.api): MatcherState = {
 
-    val offset               = dexApi.currentOffset.offset
+    val offset               = dexApi.currentOffset
     val snapshots            = dexApi.allSnapshotOffsets
     val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
     val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
@@ -81,7 +81,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     clean {
       api.MatcherState(
         offset,
-        TreeMap(snapshots.xs.toSeq: _*),
+        TreeMap(snapshots.toSeq: _*),
         TreeMap(orderBooks: _*),
         TreeMap(orderStatuses: _*),
         TreeMap(orderTransactionIds: _*),

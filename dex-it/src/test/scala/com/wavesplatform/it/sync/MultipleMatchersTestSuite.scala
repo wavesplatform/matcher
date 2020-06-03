@@ -84,14 +84,14 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   "Wait until all requests are processed" in {
     try {
       val offset1 = dex1.api.waitForCurrentOffset(_ == successfulCommandsNumber - 1) // Index starts from 0
-      dex2.api.waitForCurrentOffset(_ == offset1.offset)
+      dex2.api.waitForCurrentOffset(_ == offset1)
 
       withClue("Last command processed") {
         List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
       }
     } catch {
       case NonFatal(e) =>
-        log.info(s"Last offsets: node1=${dex1.api.lastOffset.offset}, node2=${dex2.api.lastOffset.offset}")
+        log.info(s"Last offsets: node1=${dex1.api.lastOffset}, node2=${dex2.api.lastOffset}")
         throw e
     }
   }

@@ -192,10 +192,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
 
   @Path("/")
-  @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET", response = classOf[String])
-  def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete { ApiMatcherPublicKey(matcherPublicKey) }
-  }
+  @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key in Base58", httpMethod = "GET", response = classOf[String])
+  def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) { complete(matcherPublicKey.toJson) }
 
   @Path("/settings")
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET", response = classOf[ApiMatcherPublicSettings])
@@ -227,9 +225,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     httpMethod = "GET",
     response = classOf[Map[Asset, Double]]
   )
-  def getRates: Route = (path("settings" / "rates") & get) {
-    complete { ApiRates(rateCache.getAllRates) }
-  }
+  def getRates: Route = (path("settings" / "rates") & get) { complete(rateCache.getAllRates.toJson) }
 
   @Path("/settings/rates/{assetId}")
   @ApiOperation(
@@ -518,9 +514,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     )
   )
-  def cancelAll: Route = (path("orderbook" / "cancel") & post) {
-    handleCancelRequest(None)
-  }
+  def cancelAll: Route = (path("orderbook" / "cancel") & post) { handleCancelRequest(None) }
 
   @Path("/orders/{address}/cancel")
   @ApiOperation(
@@ -832,9 +826,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { r =>
-          ApiBalance(r.balance)
-        }
+        askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { _.balance.toJson }
       }
     }
   }
@@ -862,9 +854,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       case Some(upk) if upk != publicKey => invalidUserPublicKey
       case _ =>
         complete {
-          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { r =>
-            ApiBalance(r.balance)
-          }
+          askMapAddressActor[AddressActor.Reply.Balance](publicKey, AddressActor.Query.GetReservedBalance) { _.balance.toJson }
         }
     }
   }
@@ -891,7 +881,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
               ApiOrderStatus.from(r.x)
             }
-
           case None =>
             Future.successful(DBUtils.orderInfo(db, orderId).fold(ApiOrderStatus.from(OrderStatus.NotFound))(x => ApiOrderStatus.from(x.status)))
         }
@@ -905,7 +894,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     notes = "Remove Order Book for a given Asset Pair. Attention! Use this method only when clients can't place orders on this pair!",
     httpMethod = "DELETE",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
-    response = classOf[Any]
+    response = classOf[String]
   )
   @ApiImplicitParams(
     Array(
@@ -949,9 +938,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     response = classOf[QueueEventWithMeta.Offset]
   )
-  def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
-    complete { ApiOffset(currentOffset()) }
-  }
+  def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) { complete(currentOffset().toJson) }
 
   @Path("/debug/lastOffset")
   @ApiOperation(
@@ -961,7 +948,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     response = classOf[QueueEventWithMeta.Offset]
   )
   def getLastOffset: Route = (path("debug" / "lastOffset") & get & withAuth) {
-    complete { lastOffset() map ApiOffset.apply }
+    complete { lastOffset() map (_.toJson) }
   }
 
   @Path("/debug/oldestSnapshotOffset")
@@ -975,8 +962,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { response =>
         val defined = response.offsets.valuesIterator.collect { case Some(x) => x }
-        val min     = if (defined.isEmpty) -1L else defined.min
-        ApiOffset(min)
+        (if (defined.isEmpty) -1L else defined.min).toJson
       }
     }
   }
@@ -991,7 +977,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
     complete {
       (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
-        ApiSnapshotOffsets(x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset })
+        x.offsets.collect { case (assetPair, Some(offset)) => assetPair -> offset }.toJson
       }
     }
   }

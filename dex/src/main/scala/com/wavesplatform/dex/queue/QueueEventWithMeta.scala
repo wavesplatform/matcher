@@ -15,6 +15,7 @@ case class QueueEventWithMeta(offset: QueueEventWithMeta.Offset, timestamp: Long
 }
 
 object QueueEventWithMeta {
+
   type Offset = Long
 
   def toBytes(x: QueueEventWithMeta): Array[Byte] = Longs.toByteArray(x.offset) ++ Longs.toByteArray(x.timestamp) ++ QueueEvent.toBytes(x.event)

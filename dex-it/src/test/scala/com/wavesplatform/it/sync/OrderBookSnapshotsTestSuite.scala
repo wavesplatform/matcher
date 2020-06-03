@@ -45,8 +45,8 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     val allSnapshotOffsets1 = dex1.api.allSnapshotOffsets
 
     withClue("We doesn't show pairs, those have snapshot's offset equal to -1") {
-      if (allSnapshotOffsets1.xs.contains(assetPair1)) allSnapshotOffsets1.xs(assetPair1) should be < interval
-      if (allSnapshotOffsets1.xs.contains(assetPair2)) allSnapshotOffsets1.xs(assetPair2) should be < interval
+      if (allSnapshotOffsets1.contains(assetPair1)) allSnapshotOffsets1(assetPair1) should be < interval
+      if (allSnapshotOffsets1.contains(assetPair2)) allSnapshotOffsets1(assetPair2) should be < interval
     }
 
     ordersPack2.foreach(dex1.api.place)
@@ -55,7 +55,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     val allSnapshotOffsets2 = dex1.api.allSnapshotOffsets
 
     withClue("Asset pairs has right offsets") {
-      allSnapshotOffsets2.xs.foreach {
+      allSnapshotOffsets2.foreach {
         case (pair, offset) =>
           withClue(pair) {
             offset should be < (interval * 2)

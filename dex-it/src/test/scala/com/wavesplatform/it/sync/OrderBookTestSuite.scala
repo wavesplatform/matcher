@@ -5,11 +5,11 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType._
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
+import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 class OrderBookTestSuite extends MatcherSuiteBase {
 
@@ -85,7 +85,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
       }
 
       withClue("getAllSnapshotOffsets") {
-        dex1.api.allSnapshotOffsets.xs.keySet shouldNot contain(wctUsdPair.key)
+        dex1.api.allSnapshotOffsets.keySet shouldNot contain(wctUsdPair.key)
       }
     }
 
@@ -108,7 +108,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "matcher can start after multiple delete events" in {
-      def deleteWctWaves() = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
+      def deleteWctWaves(): Future[Either[MatcherError, Unit]] = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
       val deleteMultipleTimes = deleteWctWaves()
         .zip(deleteWctWaves())
         .map(_ => ())

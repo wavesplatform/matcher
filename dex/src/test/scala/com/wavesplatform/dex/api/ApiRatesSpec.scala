@@ -16,12 +16,12 @@ class ApiRatesSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplici
       |}""".stripMargin
 
   private val issuedAsset = IssuedAsset(Base58.decode("2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh"))
-  private val rates = ApiRates(
+
+  private val rates =
     Map(
-      Waves       -> 1,
-      issuedAsset -> 3
+      Waves       -> 1d,
+      issuedAsset -> 3d
     )
-  )
 
   "backward JSON compatibility" - {
     "deserialization" in {

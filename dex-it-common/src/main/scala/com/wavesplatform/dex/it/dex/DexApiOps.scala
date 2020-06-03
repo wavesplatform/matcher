@@ -19,15 +19,15 @@ object DexApiOps {
 
     def publicKey: F[ApiMatcherPublicKey] = explicitGet(self.tryPublicKey)
 
-    def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
+    def reservedBalance(of: KeyPair, timestamp: Long = System.currentTimeMillis()): F[ApiBalance] = {
       explicitGet(self.tryReservedBalance(of, timestamp))
     }
 
-    def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[Map[Asset, Long]] = {
+    def reservedBalanceWithApiKey(of: KeyPair, xUserPublicKey: Option[PublicKey] = None): F[ApiBalance] = {
       explicitGet(self.tryReservedBalanceWithApiKey(of, xUserPublicKey))
     }
 
-    def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Map[Asset, Long]] = {
+    def tradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[ApiBalance] = {
       explicitGet(self.tryTradableBalance(of, assetPair, timestamp))
     }
 
@@ -88,9 +88,9 @@ object DexApiOps {
     def orderBookInfo(assetPair: AssetPair): F[ApiOrderBookInfo]  = explicitGet(self.tryOrderBookInfo(assetPair))
     def orderBookStatus(assetPair: AssetPair): F[ApiMarketStatus] = explicitGet(self.tryOrderBookStatus(assetPair))
 
-    def upsertRate(asset: Asset, rate: Double): F[(StatusCode, RatesResponse)] = explicitGet(self.tryUpsertRate(asset, rate))
-    def deleteRate(asset: Asset): F[RatesResponse]                             = explicitGet(self.tryDeleteRate(asset))
-    def rates: F[ApiRates]                                                     = explicitGet(self.tryRates)
+    def upsertRate(asset: Asset, rate: Double): F[(StatusCode, ApiMessage)] = explicitGet(self.tryUpsertRate(asset, rate))
+    def deleteRate(asset: Asset): F[ApiMessage]                             = explicitGet(self.tryDeleteRate(asset))
+    def rates: F[ApiRates]                                                  = explicitGet(self.tryRates)
 
     def currentOffset: F[ApiOffset]               = explicitGet(self.tryCurrentOffset)
     def lastOffset: F[ApiOffset]                  = explicitGet(self.tryLastOffset)

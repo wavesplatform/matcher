@@ -16,12 +16,12 @@ class ApiBalanceSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImpli
       |}""".stripMargin
 
   private val issuedAsset = IssuedAsset(Base58.decode("2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh"))
-  private val balance = ApiBalance(
+
+  private val balance =
     Map(
-      Waves       -> 100,
-      issuedAsset -> 300
+      Waves       -> 100L,
+      issuedAsset -> 300L
     )
-  )
 
   "backward JSON compatibility" - {
     "deserialization" in {

@@ -16,10 +16,9 @@ class ApiSnapshotOffsetsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
       |}""".stripMargin
 
   private val issuedAsset = IssuedAsset(Base58.decode("2gCPcEnoZa9LtZzZPFK9fJf7aWzvdBJUABayd1Zj5qFh"))
-  private val snapshotOffsets = ApiSnapshotOffsets(
-    Map(
-      AssetPair(issuedAsset, Waves) -> 1
-    )
+
+  private val snapshotOffsets = Map(
+    AssetPair(issuedAsset, Waves) -> 1L
   )
 
   "backward JSON compatibility" - {

@@ -15,7 +15,7 @@ case class ApiError(
 )
 object ApiError {
 
-  implicit val apiRejectedPlaceFormat: Format[ApiError] = Json.format
+  implicit val apiErrorFormat: Format[ApiError] = Json.format
 
   def apply(error: Int, message: String, template: String, params: JsObject, status: String): ApiError = new ApiError(
     error = error,

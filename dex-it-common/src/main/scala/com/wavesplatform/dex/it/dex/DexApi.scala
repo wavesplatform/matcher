@@ -44,14 +44,19 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryPlace(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
   def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
 
-  def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
-  def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
-  def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]]
+  def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, ApiSuccessfulCancel]] = tryCancel(owner, order.assetPair, order.id())
+  def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulCancel]]
+  def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulCancel]]
 
-  // TODO Response type in DEX-548
-  def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
-  def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
-  def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Unit]]
+  def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiSuccessfulBatchCancel]]
+
+  def tryCancelAllByPair(owner: KeyPair,
+                         assetPair: AssetPair,
+                         timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiSuccessfulBatchCancel]]
+
+  def tryCancelAllByIdsWithApiKey(owner: Address,
+                                  orderIds: Set[Order.Id],
+                                  xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulBatchCancel]]
 
   def tryOrderStatus(order: Order): F[Either[MatcherError, ApiOrderStatus]] = tryOrderStatus(order.assetPair, order.id())
   def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiOrderStatus]]
@@ -99,7 +104,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryOrderBookInfo(assetPair: AssetPair): F[Either[MatcherError, ApiOrderBookInfo]]
   def tryOrderBookStatus(assetPair: AssetPair): F[Either[MatcherError, ApiMarketStatus]]
 
-  def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]] // TODO
+  def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiMessage]]
 
   def tryUpsertRate(asset: Asset, rate: Double): F[Either[MatcherError, (StatusCode, ApiMessage)]]
   def tryDeleteRate(asset: Asset): F[Either[MatcherError, ApiMessage]]
@@ -203,7 +208,7 @@ object DexApi {
       override def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]] =
         tryParseJson(sttp.post(uri"$apiUri/orderbook/market").body(order))
 
-      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] =
+      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulCancel]] =
         tryParseJson {
           val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
@@ -214,17 +219,18 @@ object DexApi {
             .contentType("application/json", "UTF-8")
         }
 
-      override def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]] = tryUnit {
-        val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
-        sttp
-          .post(uri"$apiUri/orderbook/cancel")
-          .body(body)
-          .contentType("application/json", "UTF-8")
-      }
+      override def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiSuccessfulBatchCancel]] =
+        tryParseJson {
+          val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
+          sttp
+            .post(uri"$apiUri/orderbook/cancel")
+            .body(body)
+            .contentType("application/json", "UTF-8")
+        }
 
       override def tryCancelAllByPair(owner: KeyPair,
                                       assetPair: AssetPair,
-                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]] = tryUnit {
+                                      timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiSuccessfulBatchCancel]] = tryParseJson {
         val body = Json.stringify(Json.toJson(batchCancelRequest(owner, timestamp)))
         sttp
           .post(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/cancel")
@@ -234,7 +240,7 @@ object DexApi {
 
       override def tryCancelAllByIdsWithApiKey(owner: Address,
                                                orderIds: Set[Order.Id],
-                                               xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Unit]] = tryUnit {
+                                               xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulBatchCancel]] = tryParseJson {
         sttp
           .post(uri"$apiUri/orders/$owner/cancel")
           .headers(apiKeyWithUserPublicKeyHeaders(xUserPublicKey))
@@ -242,7 +248,7 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, MatcherStatusResponse]] =
+      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulCancel]] =
         tryParseJson {
           sttp
             .post(uri"$apiUri/orders/cancel/${id.toString}")
@@ -344,7 +350,7 @@ object DexApi {
           .headers(apiKeyHeaders)
       }
 
-      override def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, Unit]] = tryUnit {
+      override def tryDeleteOrderBook(assetPair: AssetPair): F[Either[MatcherError, ApiMessage]] = tryParseJson {
         sttp
           .delete(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}")
           .followRedirects(false)

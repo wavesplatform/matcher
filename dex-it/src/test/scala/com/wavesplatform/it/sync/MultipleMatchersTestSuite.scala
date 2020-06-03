@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.ApiSuccessfulBatchCancel
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -126,7 +127,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       }
     }
 
-    def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[Unit]] = Future.sequence {
+    def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[ApiSuccessfulBatchCancel]] = Future.sequence {
       assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
     }
 

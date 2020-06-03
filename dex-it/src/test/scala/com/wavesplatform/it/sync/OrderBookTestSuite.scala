@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiMessage
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -109,7 +110,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     }
 
     "matcher can start after multiple delete events" in {
-      def deleteWctWaves(): Future[Either[MatcherError, Unit]] = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
+      def deleteWctWaves(): Future[Either[MatcherError, ApiMessage]] = dex1.asyncApi.tryDeleteOrderBook(wctWavesPair)
       val deleteMultipleTimes = deleteWctWaves()
         .zip(deleteWctWaves())
         .map(_ => ())

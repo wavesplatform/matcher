@@ -7,7 +7,6 @@ import com.wavesplatform.dex.api.{MatcherResponse => _, _}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.fp.CanExtract
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 
@@ -34,21 +33,23 @@ object DexApiOps {
     def place(order: Order): F[ApiSuccessfulPlace]       = explicitGet(self.tryPlace(order))
     def placeMarket(order: Order): F[ApiSuccessfulPlace] = explicitGet(self.tryPlaceMarket(order))
 
-    def cancel(owner: KeyPair, order: Order): F[MatcherStatusResponse]                       = cancel(owner, order.assetPair, order.id())
-    def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse] = explicitGet(self.tryCancel(owner, assetPair, id))
+    def cancel(owner: KeyPair, order: Order): F[ApiSuccessfulCancel]                       = cancel(owner, order.assetPair, order.id())
+    def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[ApiSuccessfulCancel] = explicitGet(self.tryCancel(owner, assetPair, id))
 
-    def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[MatcherStatusResponse] =
+    def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[ApiSuccessfulCancel] =
       cancelWithApiKey(order.id(), xUserPublicKey)
 
-    def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[MatcherStatusResponse] =
+    def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[ApiSuccessfulCancel] =
       explicitGet(self.tryCancelWithApiKey(id, xUserPublicKey))
 
-    def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[Unit] = explicitGet(self.tryCancelAll(owner, timestamp))
-    def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[Unit] = {
+    def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[ApiSuccessfulBatchCancel] =
+      explicitGet(self.tryCancelAll(owner, timestamp))
+
+    def cancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis()): F[ApiSuccessfulBatchCancel] = {
       explicitGet(self.tryCancelAllByPair(owner, assetPair, timestamp))
     }
 
-    def cancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey] = None): F[Unit] =
+    def cancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey] = None): F[ApiSuccessfulBatchCancel] =
       explicitGet(self.tryCancelAllByIdsWithApiKey(owner, orderIds, xUserPublicKey))
 
     def orderStatus(order: Order): F[ApiOrderStatus]                       = orderStatus(order.assetPair, order.id())

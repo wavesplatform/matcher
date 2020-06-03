@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api
 import com.wavesplatform.dex.api.ApiMatcherPublicSettings.ApiOrderFeeSettings
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.json
 import com.wavesplatform.dex.settings.AssetType.AssetType
 import com.wavesplatform.dex.settings.OrderFeeSettings
 import play.api.libs.json._

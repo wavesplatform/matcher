@@ -45,7 +45,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 
   "DEXClient should place orders despite of short time disconnect from network" in {
 
-    val orders = (1 to 399).map { i =>
+    val orders = (0 to 100).map { i =>
       mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100 + i)
     }
 
@@ -59,9 +59,9 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
         }
 
         _ <- {
-          Thread.sleep(5000)
+          Thread.sleep(500)
           dex1.disconnectFromNetwork()
-          Thread.sleep(5000)
+          Thread.sleep(500)
           dex1.connectToNetwork()
           Future.successful()
         }
@@ -69,8 +69,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
         orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
 
       } yield {
-        orderBook.bids should have size 399
-        orderBook.asks should be(empty)
+        orderBook.asks should have size 100
         orders.foreach(dex1.asyncApi.waitForOrderStatus(_, OrderStatus.Accepted))
       },
       2.minute

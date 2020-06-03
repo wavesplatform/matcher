@@ -31,8 +31,8 @@ object DexApiOps {
       explicitGet(self.tryTradableBalance(of, assetPair, timestamp))
     }
 
-    def place(order: Order): F[MatcherResponse]       = explicitGet(self.tryPlace(order))
-    def placeMarket(order: Order): F[MatcherResponse] = explicitGet(self.tryPlaceMarket(order))
+    def place(order: Order): F[ApiSuccessfulPlace]       = explicitGet(self.tryPlace(order))
+    def placeMarket(order: Order): F[ApiSuccessfulPlace] = explicitGet(self.tryPlaceMarket(order))
 
     def cancel(owner: KeyPair, order: Order): F[MatcherStatusResponse]                       = cancel(owner, order.assetPair, order.id())
     def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[MatcherStatusResponse] = explicitGet(self.tryCancel(owner, assetPair, id))

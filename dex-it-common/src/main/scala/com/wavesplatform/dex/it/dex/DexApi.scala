@@ -41,8 +41,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   def tryTradableBalance(of: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiBalance]]
 
-  def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]]
-  def tryPlaceMarket(order: Order): F[Either[MatcherError, MatcherResponse]]
+  def tryPlace(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
+  def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
 
   def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, MatcherStatusResponse]] = tryCancel(owner, order.assetPair, order.id())
   def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]]
@@ -118,7 +118,7 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
   def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse]
 
-  def waitForOrderPlacement(order: Order): F[MatcherResponse]
+  def waitForOrderPlacement(order: Order): F[ApiSuccessfulPlace]
 
   def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
       pred: List[ApiOrderBookHistoryItem] => Boolean): F[List[ApiOrderBookHistoryItem]]
@@ -192,7 +192,7 @@ object DexApi {
             .headers(timestampAndSignatureHeaders(of, timestamp))
         }
 
-      override def tryPlace(order: Order): F[Either[MatcherError, MatcherResponse]] = tryParseJson {
+      override def tryPlace(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]] = tryParseJson {
         sttp
           .post(uri"$apiUri/orderbook")
           .readTimeout(3.minutes) // TODO find way to decrease timeout!
@@ -200,7 +200,7 @@ object DexApi {
           .body(order)
       }
 
-      override def tryPlaceMarket(order: Order): F[Either[MatcherError, MatcherResponse]] =
+      override def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]] =
         tryParseJson(sttp.post(uri"$apiUri/orderbook/market").body(order))
 
       override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, MatcherStatusResponse]] =
@@ -422,7 +422,7 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
-      override def waitForOrderPlacement(order: Order): F[MatcherResponse] = repeatUntil(tryPlace(order)) { _.isRight }.map(_.explicitGet())
+      override def waitForOrderPlacement(order: Order): F[ApiSuccessfulPlace] = repeatUntil(tryPlace(order))(_.isRight).map(_.explicitGet())
 
       def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
           pred: List[ApiOrderBookHistoryItem] => Boolean): F[List[ApiOrderBookHistoryItem]] =

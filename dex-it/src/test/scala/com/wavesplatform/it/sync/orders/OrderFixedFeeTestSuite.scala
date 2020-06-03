@@ -2,10 +2,10 @@ package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 
@@ -57,8 +57,8 @@ class OrderFixedFeeTestSuite extends OrderFeeBaseTestSuite {
               val bobOrder = mkOrder(bob, pair, OrderType.SELL, orderAmount, priceFixed, matcherFee = minMatcherFee, feeAsset = asset)
               dex1.api.place(bobOrder)
 
-              dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
-              dex1.api.waitForOrderStatus(bobOrder, OrderStatus.Filled)
+              dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
+              dex1.api.waitForOrderStatus(bobOrder, Status.Filled)
 
               waitForOrderAtNode(aliceOrder)
 

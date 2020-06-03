@@ -2,11 +2,11 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.dex.it.fp.CanExtract._
@@ -87,7 +87,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       dex2.api.waitForCurrentOffset(_ == offset1)
 
       withClue("Last command processed") {
-        List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != OrderStatus.NotFound))
+        List(dex1.asyncApi, dex2.asyncApi).foreach(_.waitForOrder(lastOrder)(_.status != Status.NotFound))
       }
     } catch {
       case NonFatal(e) =>
@@ -115,7 +115,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     log.info(s"Total orders: ${allOrders.size}")
 
     allOrders.foreach(dex1.api.place)
-    allOrders.foreach(order => dex1.api.waitForOrder(order)(_.status != OrderStatus.NotFound))
+    allOrders.foreach(order => dex1.api.waitForOrder(order)(_.status != Status.NotFound))
 
     def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Iterable[Unit.type]] = Future.sequence {
       orders.map { order =>

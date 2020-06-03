@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
@@ -23,13 +23,13 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       // Sell order should be in the dex1.api.orderBook
-      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted.name
+      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
 
       // Reboot matcher's node
       dex1.restart()
 
-      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Accepted)
-      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted.name
+      dex1.api.waitForOrderStatus(aliceOrder, Status.Accepted)
+      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
 
       val orders1 = dex1.api.orderBook(ethWavesPair)
       orders1.asks.head.amount shouldBe 500
@@ -48,8 +48,8 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       val orders3 = dex1.api.orderBook(ethWavesPair)
       orders3.asks.head.amount shouldBe 500
 
-      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Cancelled)
-      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Accepted.name
+      dex1.api.waitForOrderStatus(aliceOrder, Status.Cancelled)
+      dex1.api.orderHistory(alice).head.status shouldBe Status.Accepted.name
     }
   }
 }

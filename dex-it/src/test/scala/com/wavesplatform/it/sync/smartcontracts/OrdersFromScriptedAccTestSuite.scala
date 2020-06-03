@@ -1,15 +1,17 @@
 package com.wavesplatform.it.sync.smartcontracts
 
+import com.github.ghik.silencer.silent
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.feature.BlockchainFeatures
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.FeatureStatus.BlockchainStatus
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
 
+@silent("deprecated")
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   private val activationHeight = 5
@@ -127,8 +129,8 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       dex1.api.place(aliceOrder).status shouldBe "OrderAccepted"
 
       // Alice checks that the order in order book
-      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
-      dex1.api.orderHistory(alice).head.status shouldBe OrderStatus.Filled.name
+      dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
+      dex1.api.orderHistory(alice).head.status shouldBe Status.Filled.name
     }
   }
 }

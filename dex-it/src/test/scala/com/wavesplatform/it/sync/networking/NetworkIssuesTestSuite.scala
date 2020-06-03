@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.api.HasToxiProxy
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
@@ -146,7 +146,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
     broadcastAndAwait(wavesNode2.api, mkTransfer(account, bob, amount = 4.waves, asset = Waves))
 
     markup("Now DEX receives balances stream from the node 2 and cancels order")
-    dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(order, Status.Cancelled)
 
     markup("Place order")
     placeAndAwaitAtDex(mkOrder(account, wavesUsdPair, SELL, 1.waves, 5.usd))

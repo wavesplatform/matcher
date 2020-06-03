@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.model.LevelAgg
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
@@ -29,8 +30,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 420169L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(filledAmount), Some(296219L)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(filledAmount), Some(40L)))
+    dex1.api.waitForOrder(submitted)(_ == ApiOrderStatus(Status.Filled, Some(filledAmount), Some(296219L)))
+    dex1.api.waitForOrder(counter)(_ == ApiOrderStatus(Status.PartiallyFilled, Some(filledAmount), Some(40L)))
 
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
@@ -61,8 +62,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 223344937L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
+    dex1.api.waitForOrder(submitted)(_ == ApiOrderStatus(Status.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
+    dex1.api.waitForOrder(counter)(_ == ApiOrderStatus(Status.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
 
     withClue("Alice's reserved balance before cancel")(dex1.api.reservedBalance(alice) shouldBe empty)
 
@@ -82,8 +83,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val submitted = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     dex1.api.place(submitted)
 
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(99523810L), filledFee = Some(298571L)))
-    dex1.api.waitForOrder(counter2)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(8571L)))
+    dex1.api.waitForOrder(submitted)(_ == ApiOrderStatus(Status.Filled, filledAmount = Some(99523810L), filledFee = Some(298571L)))
+    dex1.api.waitForOrder(counter2)(_ == ApiOrderStatus(Status.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(8571L)))
 
     withClue("orderBook check") {
       val ob = dex1.api.orderBook(wavesUsdPair)

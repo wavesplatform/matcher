@@ -17,8 +17,6 @@ case class ApiMatcherPublicSettings(matcherPublicKey: PublicKey,
 
 object ApiMatcherPublicSettings {
 
-  private implicit val assetDoubleMapFormat: Format[Map[Asset, Double]] = json.assetDoubleMapFormat // IntelliJ IDEA issue
-
   sealed trait ApiOrderFeeSettings extends Product with Serializable
   object ApiOrderFeeSettings {
     case class Dynamic(baseFee: Long, rates: Map[Asset, Double]) extends ApiOrderFeeSettings

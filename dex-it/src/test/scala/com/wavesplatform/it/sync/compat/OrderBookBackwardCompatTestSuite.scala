@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync.compat
 
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.HasKafka
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.orderGen
 import com.wavesplatform.it.tags.DexMultipleVersions
 import org.scalacheck.Gen
@@ -23,8 +23,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
           dex2.api.place(order1)
           dex2.api.place(order2)
 
-          waitOnBoth(order1, OrderStatus.Accepted)
-          waitOnBoth(order2, OrderStatus.Accepted)
+          waitOnBoth(order1, Status.Accepted)
+          waitOnBoth(order2, Status.Accepted)
 
           Vector(order1, order2)
         }
@@ -36,8 +36,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
           dex2.api.place(order1)
           dex2.api.placeMarket(order2)
 
-          waitOnBoth(order1, OrderStatus.Filled)
-          waitOnBoth(order2, OrderStatus.Filled)
+          waitOnBoth(order1, Status.Filled)
+          waitOnBoth(order2, Status.Filled)
 
           Vector(order1, order2)
         }
@@ -51,8 +51,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
           dex2.api.place(order1)
           dex2.api.place(order2)
 
-          waitOnBoth(order1, OrderStatus.Accepted)
-          waitOnBoth(order2, OrderStatus.Cancelled)
+          waitOnBoth(order1, Status.Accepted)
+          waitOnBoth(order2, Status.Cancelled)
 
           Vector(order1, order2)
         }
@@ -71,8 +71,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
                 dex2.api.place(order1)
                 dex2.api.placeMarket(order2)
 
-                waitOnBoth(order1, OrderStatus.PartiallyFilled)
-                waitOnBoth(order2, OrderStatus.Filled)
+                waitOnBoth(order1, Status.PartiallyFilled)
+                waitOnBoth(order2, Status.Filled)
 
                 Vector(order2, order1)
               }
@@ -86,8 +86,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
                 dex2.api.place(order1)
                 dex2.api.place(order2)
 
-                waitOnBoth(order1, OrderStatus.PartiallyFilled)
-                waitOnBoth(order2, OrderStatus.Filled)
+                waitOnBoth(order1, Status.PartiallyFilled)
+                waitOnBoth(order2, Status.Filled)
 
                 Vector(order1, order2)
               }
@@ -99,8 +99,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
                 dex2.api.place(order1)
                 dex2.api.placeMarket(order2)
 
-                waitOnBoth(order1, OrderStatus.PartiallyFilled)
-                waitOnBoth(order2, OrderStatus.Filled)
+                waitOnBoth(order1, Status.PartiallyFilled)
+                waitOnBoth(order2, Status.Filled)
 
                 Vector(order1, order2)
               }
@@ -115,8 +115,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
               dex2.api.place(order1)
               dex2.api.place(order2)
 
-              waitOnBoth(order1, OrderStatus.Filled)
-              waitOnBoth(order2, OrderStatus.PartiallyFilled)
+              waitOnBoth(order1, Status.Filled)
+              waitOnBoth(order2, Status.PartiallyFilled)
 
               Vector(order1, order2)
             }
@@ -128,8 +128,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
               dex2.api.place(order1)
               dex2.api.placeMarket(order2)
 
-              waitOnBoth(order1, OrderStatus.Filled)
-              waitOnBoth(order2, OrderStatus.Filled)
+              waitOnBoth(order1, Status.Filled)
+              waitOnBoth(order2, Status.Filled)
 
               Vector(order1, order2)
             }
@@ -148,8 +148,8 @@ class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasK
       val orders = Gen.containerOfN[Vector, Order](200, twoAccountsOrdersGen).sample.get
       orders.foreach(dex2.api.place)
 
-      dex1.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
-      dex2.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+      dex1.api.waitForOrder(orders.last)(_.status != Status.NotFound)
+      dex2.api.waitForOrder(orders.last)(_.status != Status.NotFound)
 
       orders
     }

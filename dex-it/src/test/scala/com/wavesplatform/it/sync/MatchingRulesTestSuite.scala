@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order.PriceConstant
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.LevelAgg
 import com.wavesplatform.it.MatcherSuiteBase
@@ -187,7 +187,7 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     placeAndAwaitAtDex(anotherSellOrder)
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, amount, 7 * price, matcherFee)
-    placeAndAwaitAtDex(buyOrder, OrderStatus.Filled)
+    placeAndAwaitAtDex(buyOrder, Status.Filled)
 
     waitForOrderAtNode(buyOrder)
 
@@ -220,8 +220,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
     dex1.api.orderBook(wctUsdPair).asks shouldBe Seq(LevelAgg(amount, 20 * price))
 
     val buyOrder = mkOrder(alice, wctUsdPair, BUY, 2 * amount, 20 * price, matcherFee)
-    placeAndAwaitAtDex(buyOrder, OrderStatus.PartiallyFilled)
-    dex1.api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+    placeAndAwaitAtDex(buyOrder, Status.PartiallyFilled)
+    dex1.api.waitForOrderStatus(sellOrder, Status.Filled)
 
     waitForOrderAtNode(buyOrder)
 
@@ -302,8 +302,8 @@ class MatchingRulesTestSuite extends MatcherSuiteBase {
             val partiallyFilledOrderId = mkOrder(alice, pair, SELL, 2 * amount, 17 * price, matcherFee)
             dex1.api.place(partiallyFilledOrderId)
 
-            dex1.api.waitForOrderStatus(filledOrderId, OrderStatus.Filled)
-            dex1.api.waitForOrderStatus(partiallyFilledOrderId, OrderStatus.PartiallyFilled)
+            dex1.api.waitForOrderStatus(filledOrderId, Status.Filled)
+            dex1.api.waitForOrderStatus(partiallyFilledOrderId, Status.PartiallyFilled)
             waitForOrderAtNode(filledOrderId)
 
             pair match {

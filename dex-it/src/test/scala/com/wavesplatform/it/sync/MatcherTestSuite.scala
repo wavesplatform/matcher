@@ -1,8 +1,10 @@
 package com.wavesplatform.it.sync
 
+import com.github.ghik.silencer.silent
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -11,13 +13,14 @@ import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.market.MatcherActor.AssetInfo
-import com.wavesplatform.dex.model.{AcceptedOrderType, LastTrade, LevelAgg}
+import com.wavesplatform.dex.model.{AcceptedOrderType, LastTrade, LevelAgg, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
+@silent("deprecated")
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   private val aliceSellAmount = 500
@@ -65,7 +68,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.place(order1).status shouldBe "OrderAccepted" // TODO
 
         // Alice checks that the order in order book
-        dex1.api.waitForOrderStatus(order1, OrderStatus.Accepted)
+        dex1.api.waitForOrderStatus(order1, Status.Accepted)
 
         // Alice check that order is correct
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -119,8 +122,8 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val order2 = mkOrder(bob, aliceWavesPair, BUY, 200, 2.waves * Order.PriceConstant)
         dex1.api.place(order2).status shouldBe "OrderAccepted"
 
-        dex1.api.waitForOrderStatus(order1, OrderStatus.PartiallyFilled)
-        dex1.api.waitForOrderStatus(order2, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(order1, Status.PartiallyFilled)
+        dex1.api.waitForOrderStatus(order2, Status.Filled)
 
         dex1.api.orderHistoryByPair(bob, aliceWavesPair).map(_.id) should contain(order2.id())
         dex1.api.orderHistory(bob).map(_.id) should contain(order2.id())
@@ -183,7 +186,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.place(order4).status shouldBe "OrderAccepted"
 
         // Where were 2 sells that should fulfill placed order
-        dex1.api.waitForOrderStatus(order4, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(order4, Status.Filled)
 
         // Check balances
         waitForOrderAtNode(order4)
@@ -228,7 +231,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = mkOrder(bob, aliceWavesPair, BUY, 130, 2000.waves)
-        placeAndAwaitAtDex(order5, OrderStatus.PartiallyFilled)
+        placeAndAwaitAtDex(order5, Status.PartiallyFilled)
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
@@ -269,7 +272,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Alice wants to buy all Bob's assets for 1 Wave
         val order7 = mkOrder(alice, bob1WavesPair, BUY, someAssetAmount, 0.005.waves)
-        placeAndAwaitAtDex(order7, OrderStatus.Filled)
+        placeAndAwaitAtDex(order7, Status.Filled)
 
         waitForOrderAtNode(order7)
         // Bob tries to do the same operation, but at now he have no assets
@@ -354,7 +357,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     orders.foreach(dex1.api.place)
     orders.foreach { order =>
       val status = dex1.api.orderStatus(order).status
-      withClue(order.idStr())(status should not be OrderStatus.NotFound)
+      withClue(order.idStr())(status should not be Status.NotFound)
     }
   }
 
@@ -448,7 +451,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
             filledFee = 0,
             feeAsset = Waves,
             timestamp = ts,
-            status = OrderStatus.Accepted.name,
+            status = Status.Accepted.name,
             assetPair = order.assetPair,
             avgWeighedPrice = 0
           )

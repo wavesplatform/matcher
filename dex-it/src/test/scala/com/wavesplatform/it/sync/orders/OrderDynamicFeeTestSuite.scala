@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.orders
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.model.LevelAgg
 
 // TODO refactor balances retrieving
@@ -199,7 +199,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.place(order)
       dex1.api.deleteRate(btc)
       dex1.api.place(mkAliceOrder)
-      dex1.api.waitForOrderStatus(order, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(order, Status.Filled)
 
       waitForOrderAtNode(order)
 
@@ -233,7 +233,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       dex1.api.place(aliceOrder)
       dex1.api.reservedBalance(alice)(eth) shouldBe 1920L
       dex1.api.place(mkBobOrder)
-      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.PartiallyFilled)
+      dex1.api.waitForOrderStatus(aliceOrder, Status.PartiallyFilled)
 
       waitForOrderAtNode(aliceOrder)
 
@@ -249,7 +249,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       val bobSecondOrder = mkBobOrder
 
       dex1.api.place(bobSecondOrder)
-      dex1.api.waitForOrderStatus(aliceOrder, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(aliceOrder, Status.Filled)
 
       waitForOrderAtNode(bobSecondOrder)
 
@@ -305,7 +305,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       val aliceOrder = mkAliceOrder
       dex1.api.place(aliceOrder)
 
-      List(bobOrder, aliceOrder).foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Filled))
+      List(bobOrder, aliceOrder).foreach(dex1.api.waitForOrderStatus(_, Status.Filled))
       List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
 
       eventually {
@@ -342,7 +342,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
       )
       dex1.api.place(aliceOrder)
 
-      Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
+      Map(bobOrder -> Status.Filled, aliceOrder -> Status.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
       List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
 
       eventually {
@@ -385,7 +385,7 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         )
         dex1.api.place(aliceOrder)
 
-        Map(bobOrder -> OrderStatus.Filled, aliceOrder -> OrderStatus.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
+        Map(bobOrder -> Status.Filled, aliceOrder -> Status.PartiallyFilled).foreach(Function.tupled(dex1.api.waitForOrderStatus))
         List(bobOrder, aliceOrder).foreach(waitForOrderAtNode(_))
 
         eventually {
@@ -529,8 +529,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(bobOrderId)
         dex1.api.place(aliceOrderId)
 
-        dex1.api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
-        dex1.api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.Filled)
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.PartiallyFilled)
 
         waitForOrderAtNode(bobOrderId)
 
@@ -552,8 +552,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(bobOrderId)
         dex1.api.place(aliceOrderId)
 
-        dex1.api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
-        dex1.api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.Filled)
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.PartiallyFilled)
 
         waitForOrderAtNode(bobOrderId)
 
@@ -577,8 +577,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(aliceOrderId)
         dex1.api.place(bobOrderId)
 
-        dex1.api.waitForOrderStatus(aliceOrderId, OrderStatus.Filled)
-        dex1.api.waitForOrderStatus(bobOrderId, OrderStatus.PartiallyFilled)
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.Filled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.PartiallyFilled)
 
         waitForOrderAtNode(aliceOrderId)
 
@@ -603,10 +603,10 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 2: Byte)
 
-      placeAndAwaitAtDex(sellOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(sellOrder, Status.Filled)
       waitForOrderAtNode(sellOrder)
 
-      dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+      dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled).filledAmount shouldBe Some(1.waves)
 
       wavesNode1.api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves)
       wavesNode1.api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
@@ -625,10 +625,10 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
       val sellOrder = mkOrder(bob, wavesUsdPair, OrderType.SELL, 1.waves, 100, 0.003.waves, version = 3: Byte)
 
-      placeAndAwaitAtDex(sellOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(sellOrder, Status.Filled)
       waitForOrderAtNode(sellOrder)
 
-      dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled).filledAmount shouldBe Some(1.waves)
+      dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled).filledAmount shouldBe Some(1.waves)
 
       wavesNode1.api.balance(alice.toAddress, Waves) should be(aliceWavesBefore + 1.waves - 1)
       wavesNode1.api.balance(bob.toAddress, Waves) should be(bobWavesBefore - 1.waves - 0.003.waves)
@@ -651,8 +651,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(aliceOrderId)
         dex1.api.place(bobOrderId)
 
-        dex1.api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
-        dex1.api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.PartiallyFilled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.Filled)
 
         waitForOrderAtNode(bobOrderId)
 
@@ -681,8 +681,8 @@ class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
         dex1.api.place(aliceOrderId)
         dex1.api.place(bobOrderId)
 
-        dex1.api.waitForOrderStatus(aliceOrderId, OrderStatus.PartiallyFilled)
-        dex1.api.waitForOrderStatus(bobOrderId, OrderStatus.Filled)
+        dex1.api.waitForOrderStatus(aliceOrderId, Status.PartiallyFilled)
+        dex1.api.waitForOrderStatus(bobOrderId, Status.Filled)
 
         waitForOrderAtNode(bobOrderId)
 

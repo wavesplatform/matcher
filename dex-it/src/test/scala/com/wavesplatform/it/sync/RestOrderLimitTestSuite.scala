@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -76,7 +76,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
 
     dex1.api.cancel(alice, cancelled1)
     dex1.api.cancel(alice, cancelled2)
-    dex1.api.waitForOrderStatus(cancelled2, OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(cancelled2, Status.Cancelled)
 
     val activeOrdersAllFive       = List(partial2, active2, partial1, active1, active0).map(_.id())
     val allOrdersExceptTheFilled1 = activeOrdersAllFive ++ Seq(cancelled2, filled2, cancelled1).map(_.id())
@@ -96,7 +96,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
     val active6 = mkOrder(alice, bobPair, BUY, 1, 2.waves, ts = now + 16)
     List(active3, active4, active5, active6).foreach(dex1.api.place)
 
-    dex1.api.waitForOrderStatus(active6, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(active6, Status.Accepted)
 
     val activeOrdersAllNine          = List(active6, active5, active4, active3).map(_.id()) ++ activeOrdersAllFive
     val activeOrdersByPairWithTwoNew = List(active4, active3).map(_.id()) ++ activeOrdersByPair
@@ -119,7 +119,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
     val active10 = mkOrder(alice, bobPair, BUY, 1, 1.waves, ts = now + 20)
     List(active7, active8, active9, active10).foreach(dex1.api.place)
 
-    dex1.api.waitForOrderStatus(active10, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(active10, Status.Accepted)
 
     val activeOrdersAllThirteen               = List(active10, active9, active8, active7).map(_.id()) ++ activeOrdersAllNine
     val activeOrdersByPairWithTwoMoreNew      = List(active8, active7).map(_.id()) ++ activeOrdersByPairWithTwoNew
@@ -141,7 +141,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
       mkOrder(bob, bobPair, SELL, 2, 2.waves, ts = now + 22), // fill active2, active5
       mkOrder(bob, alicePair, BUY, 2, 9.waves, ts = now + 23), // fill partial1, active7
       mkOrder(bob, alicePair, BUY, 1, 10.waves, ts = now + 24) // fill active1
-    ).foreach(placeAndAwaitAtDex(_, OrderStatus.Filled))
+    ).foreach(placeAndAwaitAtDex(_, Status.Filled))
 
     val activeOrdersAllSeven = List(active10, active9, active8, active6, active4, active3, active0).map(_.id())
 
@@ -164,7 +164,7 @@ class RestOrderLimitTestSuite extends MatcherSuiteBase {
     val active15 = mkOrder(alice, alicePair, SELL, 1, 10.waves, ts = now + 29)
     List(active11, active12, active13, active14, active15).foreach(dex1.api.place)
 
-    dex1.api.waitForOrderStatus(active15, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(active15, Status.Accepted)
 
     val activeOrdersAllTwelve     = List(active15, active14, active13, active12, active11).map(_.id()) ++ activeOrdersAllSeven
     val activeOrdersByPairAllNine = List(active15, active14, active13, active12, active11).map(_.id()) ++ allOrdersByPairWithTwoFilled

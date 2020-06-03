@@ -3,12 +3,13 @@ package com.wavesplatform.it.async
 import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.Transfer
@@ -102,11 +103,11 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
       )
       .flatten
       .foreach {
-        case (id, status, sent) => if (sent) withClue(s"$id")(status should not be OrderStatus.NotFound)
+        case (id, status, sent) => if (sent) withClue(s"$id")(status should not be Status.NotFound)
       }
   }
 
-  private def request(order: Order): Future[(Order.Id, OrderStatus, Boolean)] = {
+  private def request(order: Order): Future[(Order.Id, ApiOrderStatus.Status, Boolean)] = {
     for {
       // TODO happens rarely, try to remove after migration to new akka-http
       sent   <- dex1.asyncApi.tryPlace(order).map(_ => true).recover { case x => log.error("Some error with order placement occurred:", x); false }
@@ -114,5 +115,5 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
     } yield (order.id(), status.status, sent)
   }
 
-  private def requests(orders: Seq[Order]): Future[Seq[(Id, OrderStatus, Boolean)]] = Future.traverse(orders)(request)
+  private def requests(orders: Seq[Order]): Future[Seq[(Id, Status, Boolean)]] = Future.traverse(orders)(request)
 }

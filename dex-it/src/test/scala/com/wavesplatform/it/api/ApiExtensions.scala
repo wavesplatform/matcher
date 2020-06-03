@@ -3,13 +3,13 @@ package com.wavesplatform.it.api
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Id
-import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.{ApiOrderBookHistoryItem, ApiOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
@@ -21,8 +21,8 @@ import scala.collection.immutable.TreeMap
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtDex(order: Order,
-                                   expectedStatus: OrderStatus = OrderStatus.Accepted,
-                                   dex: DexContainer = dex1): OrderStatusResponse = {
+                                   expectedStatus: ApiOrderStatus.Status = Status.Accepted,
+                                   dex: DexContainer = dex1): ApiOrderStatus = {
     dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
@@ -35,7 +35,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
-  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {
+  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: ApiOrderStatus.Status = Status.Cancelled): ApiOrderStatus = {
     dex1.api.cancel(owner, order)
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }

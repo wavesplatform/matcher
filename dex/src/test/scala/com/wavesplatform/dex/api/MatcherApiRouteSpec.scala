@@ -480,7 +480,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/${okOrder.id()}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[ApiOrderStatus] should matchTo(ApiOrderStatus("Accepted"))
+          responseAs[ApiOrderStatus] should matchTo(ApiOrderStatus(ApiOrderStatus.Status.Accepted))
         }
       }
     )

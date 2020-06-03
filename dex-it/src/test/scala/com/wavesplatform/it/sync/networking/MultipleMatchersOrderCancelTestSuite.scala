@@ -1,9 +1,9 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.DexItKafkaRequired
@@ -51,11 +51,11 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
     (1 to 3).foreach { amt =>
       val order = mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
       dex2.api.place(order)
-      dex2.api.waitForOrderStatus(order, OrderStatus.Filled)
+      dex2.api.waitForOrderStatus(order, Status.Filled)
     }
 
     // problem solution should prevent sell orders from cancelling!
-    dex1.api.waitForOrderStatus(sellOrders(4), OrderStatus.Cancelled)
-    dex1.api.waitForOrderStatus(sellOrders(3), OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(sellOrders(4), Status.Cancelled)
+    dex1.api.waitForOrderStatus(sellOrders(3), Status.Cancelled)
   }
 }

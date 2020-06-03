@@ -53,8 +53,8 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryCancelAllByPair(owner: KeyPair, assetPair: AssetPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, Unit]]
   def tryCancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, Unit]]
 
-  def tryOrderStatus(order: Order): F[Either[MatcherError, OrderStatusResponse]] = tryOrderStatus(order.assetPair, order.id())
-  def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]]
+  def tryOrderStatus(order: Order): F[Either[MatcherError, ApiOrderStatus]] = tryOrderStatus(order.assetPair, order.id())
+  def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiOrderStatus]]
 
   def tryOrderStatusInfoByIdWithApiKey(owner: Address,
                                        orderId: Order.Id,
@@ -115,16 +115,16 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
 
   // TODO move
 
-  def waitForOrder(order: Order)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] = waitForOrder(order.assetPair, order.id())(pred)
-  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse]
+  def waitForOrder(order: Order)(pred: ApiOrderStatus => Boolean): F[ApiOrderStatus] = waitForOrder(order.assetPair, order.id())(pred)
+  def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: ApiOrderStatus => Boolean): F[ApiOrderStatus]
 
   def waitForOrderPlacement(order: Order): F[ApiSuccessfulPlace]
 
   def waitForOrderHistory[A](owner: KeyPair, activeOnly: Option[Boolean])(
       pred: List[ApiOrderBookHistoryItem] => Boolean): F[List[ApiOrderBookHistoryItem]]
 
-  def waitForOrderStatus(order: Order, status: OrderStatus): F[OrderStatusResponse] = waitForOrderStatus(order.assetPair, order.id(), status)
-  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse]
+  def waitForOrderStatus(order: Order, status: ApiOrderStatus.Status): F[ApiOrderStatus] = waitForOrderStatus(order.assetPair, order.id(), status)
+  def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: ApiOrderStatus.Status): F[ApiOrderStatus]
 
   def waitForTransactionsByOrder(order: Order, atLeast: Int): F[List[ExchangeTransaction]] = waitForTransactionsByOrder(order.id(), atLeast)
   def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[ExchangeTransaction]]
@@ -250,7 +250,7 @@ object DexApi {
             .contentType("application/json", "UTF-8")
         }
 
-      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, OrderStatusResponse]] = {
+      override def tryOrderStatus(assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiOrderStatus]] = {
         tryParseJson {
           sttp
             .get(uri"$apiUri/orderbook/${assetPair.amountAssetStr}/${assetPair.priceAssetStr}/$id")
@@ -416,7 +416,7 @@ object DexApi {
         repeatUntil(request, RepeatRequestOptions(1.second, 60 + 20))(_ == true).map(_ => ())
       }
 
-      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: OrderStatusResponse => Boolean): F[OrderStatusResponse] =
+      override def waitForOrder(assetPair: AssetPair, id: Order.Id)(pred: ApiOrderStatus => Boolean): F[ApiOrderStatus] =
         repeatUntil(tryOrderStatus(assetPair, id), RepeatRequestOptions(1.second, 60)) {
           case Left(_)  => false
           case Right(x) => pred(x)
@@ -431,7 +431,7 @@ object DexApi {
           case Right(x) => pred(x)
         }.map(_.explicitGet())
 
-      override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: OrderStatus): F[OrderStatusResponse] =
+      override def waitForOrderStatus(assetPair: AssetPair, id: Order.Id, status: ApiOrderStatus.Status): F[ApiOrderStatus] =
         waitForOrder(assetPair, id)(_.status == status)
 
       override def waitForTransactionsByOrder(id: Order.Id, atLeast: Int): F[List[ExchangeTransaction]] =

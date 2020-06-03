@@ -1,9 +1,9 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.model.LevelAgg
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -32,13 +32,13 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       dex1.api.tradableBalance(bob, wavesUsdPair)(Waves) shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      placeAndAwaitAtDex(aliceOrder, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder, Status.Filled)
 
       val aliceOrder2 = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
-      placeAndAwaitAtDex(aliceOrder2, OrderStatus.Filled)
+      placeAndAwaitAtDex(aliceOrder2, Status.Filled)
 
       // Bob wants to buy some USD
-      dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(bobOrder1, Status.Filled)
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)
@@ -60,7 +60,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       orderBook2.bids shouldBe empty
 
       dex1.api.cancel(bob, bobOrder2)
-      dex1.api.waitForOrderStatus(bobOrder2, OrderStatus.Cancelled)
+      dex1.api.waitForOrderStatus(bobOrder2, Status.Cancelled)
 
       dex1.api.reservedBalance(bob) shouldBe empty
       dex1.api.reservedBalance(alice) shouldBe empty
@@ -76,9 +76,9 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       val bobOrder1 = mkOrder(bob, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       dex1.api.place(bobOrder1)
 
-      dex1.api.waitForOrderStatus(aliceOrder1, OrderStatus.Filled)
-      dex1.api.waitForOrderStatus(aliceOrder2, OrderStatus.Filled)
-      dex1.api.waitForOrderStatus(bobOrder1, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(aliceOrder1, Status.Filled)
+      dex1.api.waitForOrderStatus(aliceOrder2, Status.Filled)
+      dex1.api.waitForOrderStatus(bobOrder1, Status.Filled)
 
       // Each side get fair amount of assets
       waitForOrderAtNode(bobOrder1)

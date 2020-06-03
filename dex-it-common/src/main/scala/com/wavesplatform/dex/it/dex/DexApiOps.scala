@@ -51,8 +51,8 @@ object DexApiOps {
     def cancelAllByIdsWithApiKey(owner: Address, orderIds: Set[Order.Id], xUserPublicKey: Option[PublicKey] = None): F[Unit] =
       explicitGet(self.tryCancelAllByIdsWithApiKey(owner, orderIds, xUserPublicKey))
 
-    def orderStatus(order: Order): F[OrderStatusResponse]                       = orderStatus(order.assetPair, order.id())
-    def orderStatus(assetPair: AssetPair, id: Order.Id): F[OrderStatusResponse] = explicitGet(self.tryOrderStatus(assetPair, id))
+    def orderStatus(order: Order): F[ApiOrderStatus]                       = orderStatus(order.assetPair, order.id())
+    def orderStatus(assetPair: AssetPair, id: Order.Id): F[ApiOrderStatus] = explicitGet(self.tryOrderStatus(assetPair, id))
 
     def transactionsByOrder(order: Order): F[List[ExchangeTransaction]] = transactionsByOrder(order.id())
     def transactionsByOrder(id: Order.Id): F[List[ExchangeTransaction]] = explicitGet(self.tryTransactionsByOrder(id))

@@ -1,14 +1,13 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.dex.api.{ApiBalance, ApiMarketStatus, ApiOffset, ApiOrderBookHistoryItem, ApiSnapshotOffsets, ApiV0OrderBook}
+import com.wavesplatform.dex.api.{ApiBalance, ApiMarketStatus, ApiOffset, ApiOrderBookHistoryItem, ApiOrderStatus, ApiSnapshotOffsets, ApiV0OrderBook}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatusResponse
 
 case class MatcherState(offset: ApiOffset,
                         snapshots: ApiSnapshotOffsets,
                         orderBooks: Map[AssetPair, (ApiV0OrderBook, ApiMarketStatus)],
-                        orderStatuses: Map[String, OrderStatusResponse],
+                        orderStatuses: Map[String, ApiOrderStatus],
                         orderTransactionIds: Map[String, Seq[String]],
                         reservedBalances: Map[KeyPair, ApiBalance],
                         orderHistory: Map[KeyPair, Map[AssetPair, Seq[ApiOrderBookHistoryItem]]]) {

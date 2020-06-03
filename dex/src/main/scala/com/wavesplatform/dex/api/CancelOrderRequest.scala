@@ -25,20 +25,13 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
 }
 
 object CancelOrderRequest {
+
   implicit val byteArrayFormat: Format[Array[Byte]] = Format(
     {
       case JsString(base58String) => Base58.tryDecodeWithLimit(base58String).fold(_ => JsError("Invalid signature"), b => JsSuccess(b))
       case other                  => JsError(s"Expecting string but got $other")
     },
     b => JsString(Base58.encode(b))
-  )
-
-  implicit val pkFormat: Format[PublicKey] = Format(
-    {
-      case JsString(value) => PublicKey.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
-      case other           => JsError(s"Expecting string but got $other")
-    },
-    pk => JsString(Base58.encode(pk))
   )
 
   protected implicit val byteStrWrites: Format[ByteStr] = com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat

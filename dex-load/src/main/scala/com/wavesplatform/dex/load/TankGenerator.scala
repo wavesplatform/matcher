@@ -6,7 +6,7 @@ import java.nio.file.Files
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{Asset, AssetPair, Base58, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
@@ -31,10 +31,11 @@ object TankGenerator {
     println(s"Creating $count asset pairs... ")
 
     val randomAssetPairs = Random
-      .shuffle(assets)
-      .combinations(2)
-      .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
-      .map(Function.tupled(new AssetPair(_, _)))
+      .shuffle(
+        assets
+          .combinations(2)
+          .map { case List(aa, pa) => if (aa > pa) (aa, pa) else (pa, aa) }
+          .map(Function.tupled(new AssetPair(_, _))))
       .take(count)
       .toList
 
@@ -136,6 +137,8 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
+    val oha   = settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0)
+    val ohp   = settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0)
 
     val all = accounts
       .flatMap(a => {
@@ -155,16 +158,14 @@ object TankGenerator {
           ))
       })
 
-    val byPair = List
-      .fill((100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0)).toInt)(
-        all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)))
+    val reserved = List
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)))
       .flatten
-    val byAcc = List
-      .fill((100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0)).toInt)(
-        all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)))
+    val tradable = List
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)))
       .flatten
 
-    Random.shuffle(byPair ++ byAcc).take(requestsCount)
+    Random.shuffle(reserved ++ tradable).take((requestsCount * (ohp + oha)).toInt)
   }
 
   private def mkBalances(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
@@ -172,6 +173,8 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
+    val rb    = settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0)
+    val tb    = settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0)
 
     val all = accounts.flatMap(a => {
       Request(
@@ -191,15 +194,13 @@ object TankGenerator {
     })
 
     val reserved = List
-      .fill((100000 * settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0)).toInt)(
-        all.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)))
       .flatten
     val tradable = List
-      .fill((100000 * settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0)).toInt)(
-        all.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)))
       .flatten
 
-    Random.shuffle(reserved ++ tradable).take(requestsCount)
+    Random.shuffle(reserved ++ tradable).take((requestsCount * (tb + rb)).toInt)
   }
 
   def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {

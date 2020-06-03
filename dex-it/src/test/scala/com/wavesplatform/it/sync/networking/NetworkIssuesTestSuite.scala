@@ -54,7 +54,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
         _ <- Future.successful(())
 
         _ <- {
-          orders.foreach(dex1.api.place(_))
+          orders.foreach(dex1.asyncApi.place(_))
           Future.successful()
         }
 
@@ -71,7 +71,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       } yield {
         orderBook.bids should have size 399
         orderBook.asks should be(empty)
-        orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+        orders.foreach(dex1.asyncApi.waitForOrderStatus(_, OrderStatus.Accepted))
       },
       2.minute
     )

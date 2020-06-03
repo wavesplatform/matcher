@@ -4,7 +4,6 @@ import java.io.{File, PrintWriter}
 import java.nio.file.Files
 
 import com.softwaremill.sttp.{MonadError => _}
-import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
@@ -44,7 +43,7 @@ object TankGenerator {
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
-    val amountPerUser = settings.assetQuantity / 2 / accounts.length
+    val amountPerUser = settings.assetQuantity / 4 / accounts.length
     accounts
       .flatMap { acc => //TODO: change to mass transfer transactions
         Transactions.makeTransferTx(settings.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
@@ -53,7 +52,10 @@ object TankGenerator {
           else Transactions.makeTransferTx(settings.issuer, acc.getAddress, 1, ass, 300000, "WAVES", "")
         }
       }
-      .flatMap(settings.node.send(_))
+      .flatMap(tx => {
+        println(s"\tSending transfer tx: ${mkJson(tx)}")
+        settings.node.send(tx)
+      })
 
     waitForHeightArise()
   }
@@ -89,21 +91,20 @@ object TankGenerator {
     pairs
   }
 
-  private def mkPlaces(seedPrefix: String, requestsCount: Int, pairsFile: Option[File], matching: Boolean): List[Request] = {
+  private def mkPlaces(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File], matching: Boolean): List[Request] = {
     println(s"Making requests for ${if (matching) "matching" else "placing"} ...")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
+
     mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile), matching).take(requestsCount)
   }
 
-  private def mkPlaces(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] =
-    mkPlaces(seedPrefix, requestsCount, pairsFile: Option[File], matching = false)
+  private def mkPlaces(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] =
+    mkPlaces(accounts, requestsCount, pairsFile: Option[File], matching = false)
 
-  private def mkMatching(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] =
-    mkPlaces(seedPrefix, requestsCount, pairsFile: Option[File], matching = true)
+  private def mkMatching(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] =
+    mkPlaces(accounts, requestsCount, pairsFile: Option[File], matching = true)
 
-  private def mkCancels(seedPrefix: String, requestsCount: Int): List[Request] = {
+  private def mkCancels(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {
     println("Making requests for cancelling...")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
 
     val cancels = accounts
       .flatMap(a => {
@@ -130,11 +131,11 @@ object TankGenerator {
     cancels.take(requestsCount)
   }
 
-  private def mkOrderHistory(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
+  private def mkOrderHistory(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests for getting order history...")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-    val pairs    = readAssetPairs(pairsFile)
-    val ts       = System.currentTimeMillis
+
+    val pairs = readAssetPairs(pairsFile)
+    val ts    = System.currentTimeMillis
 
     val all = accounts
       .flatMap(a => {
@@ -155,22 +156,22 @@ object TankGenerator {
       })
 
     val byPair = List
-      .fill(100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0).toInt)(
+      .fill((100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0)).toInt)(
         all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)))
       .flatten
     val byAcc = List
-      .fill(100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0).toInt)(
+      .fill((100000 * settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0)).toInt)(
         all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)))
       .flatten
 
     Random.shuffle(byPair ++ byAcc).take(requestsCount)
   }
 
-  private def mkBalances(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
-    println("Making requests for getting reserved and tradable balances...")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-    val pairs    = readAssetPairs(pairsFile)
-    val ts       = System.currentTimeMillis
+  private def mkBalances(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
+    println("Making requests for getting reserved and tradable balances... ")
+
+    val pairs = readAssetPairs(pairsFile)
+    val ts    = System.currentTimeMillis
 
     val all = accounts.flatMap(a => {
       Request(
@@ -190,47 +191,47 @@ object TankGenerator {
     })
 
     val reserved = List
-      .fill(100000 * settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0).toInt)(
+      .fill((100000 * settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0)).toInt)(
         all.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)))
       .flatten
     val tradable = List
-      .fill(100000 * settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0).toInt)(
+      .fill((100000 * settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0)).toInt)(
         all.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)))
       .flatten
 
     Random.shuffle(reserved ++ tradable).take(requestsCount)
   }
 
-  def placeOrdersForCancel(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): Unit = {
+  def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {
     println("Placing some orders to prepare cancel-order requests... ")
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
-    val pairs    = mkPairsAndDistribute(accounts, pairsFile)
+    val pairs = mkPairsAndDistribute(accounts, pairsFile)
 
-    for (i <- 0 to settings.distribution.getOrElse(Request.CANCEL.toString, 1.0).toInt) {
-      settings.matcher.placeOrder(
+    for (_ <- 0 to (requestsCount * settings.distribution.getOrElse(Request.CANCEL.toString, 1.0)).toInt) {
+      val o = settings.matcher.placeOrder(
         accounts(new Random().nextInt(accounts.length - 1)),
         settings.matcherPublicKey,
         pairs(new Random().nextInt(pairs.length - 1)),
         Type.BUY,
-        1,
-        1000000,
-        System.currentTimeMillis + 60 * 60 * 24 * 29 + i,
+        10000,
+        10000,
+        System.currentTimeMillis + 60 * 60 * 24 * 29,
         300000,
-        "WAVES",
+        null,
         false
       )
+      println(s"\tPlacing order: ${mkJson(o)}")
     }
     println("Done")
   }
 
-  private def mkAllTypes(seedPrefix: String, requestsCount: Int, pairsFile: Option[File]): List[Request] = {
+  private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
-    placeOrdersForCancel(seedPrefix, requestsCount, pairsFile)
+    placeOrdersForCancel(accounts, requestsCount, pairsFile)
     Random.shuffle(
-      mkMatching(seedPrefix, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt, pairsFile) ++
-        mkBalances(seedPrefix, requestsCount, pairsFile) ++
-        mkOrderHistory(seedPrefix, requestsCount, pairsFile) ++
-        mkCancels(seedPrefix, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt)
+      mkMatching(accounts, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt, pairsFile) ++
+        mkBalances(accounts, requestsCount, pairsFile) ++
+        mkOrderHistory(accounts, requestsCount, pairsFile) ++
+        mkCancels(accounts, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt)
     )
   }
 
@@ -255,13 +256,14 @@ object TankGenerator {
   }
 
   def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int = 20000, requestsType: Int = 3): Unit = {
+    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
     val requests = requestsType match {
-      case 1 => mkPlaces(seedPrefix, requestsCount, pairsFile)
-      case 2 => mkCancels(seedPrefix, requestsCount)
-      case 3 => mkMatching(seedPrefix, requestsCount, pairsFile)
-      case 4 => mkOrderHistory(seedPrefix, requestsCount, pairsFile)
-      case 5 => mkBalances(seedPrefix, requestsCount, pairsFile)
-      case 6 => mkAllTypes(seedPrefix, requestsCount, pairsFile)
+      case 1 => mkPlaces(accounts, requestsCount, pairsFile)
+      case 2 => mkCancels(accounts, requestsCount)
+      case 3 => mkMatching(accounts, requestsCount, pairsFile)
+      case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
+      case 5 => mkBalances(accounts, requestsCount, pairsFile)
+      case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
       case _ =>
         println("Wrong number of task ")
         List.empty

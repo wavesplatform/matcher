@@ -39,8 +39,9 @@ case class Request(httpType: String, path: String, tag: String, obj: ApiJson = n
     s"${request.length} ${tag.toUpperCase}\n$request\r\n"
   }
 
-  def save(pw: PrintWriter): Unit = httpType match {
-    case "POST" => pw.println(mkPost(obj, path, tag))
-    case _      => pw.println(mkGet(path, tag, headers))
-  }
+  def save(pw: PrintWriter): Unit =
+    pw.println(httpType match {
+      case "POST" => mkPost(obj, path, tag)
+      case _      => mkGet(path, tag, headers)
+    })
 }

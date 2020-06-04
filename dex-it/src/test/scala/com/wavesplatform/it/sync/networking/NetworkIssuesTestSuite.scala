@@ -7,10 +7,15 @@ import com.wavesplatform.dex.domain.order.OrderType.SELL
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
+import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
+
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future, blocking}
+import scala.util.{Failure, Success, Try}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -38,6 +43,27 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
   override protected def afterEach(): Unit = {
     wavesNodeProxy.toxics().getAll.forEach(_.remove())
     clearOrderBook()
+  }
+
+  "DEXClient should place orders despite of short time disconnect from network" in {
+    val orders = (0 to 100).map { i =>
+      mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100 + i)
+    }
+
+    Await.result(
+      for {
+        _ <- Future.inSeries(orders)(dex1.asyncApi.place(_).recover { case _ => () }).zip {
+          Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
+        }
+        orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
+      } yield {
+        orderBook.asks should have size 100
+      },
+      2.minute
+    )
+
+    orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+    dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 
   "DEXClient should obtain balance changes when it reconnects after losing connection: " - {

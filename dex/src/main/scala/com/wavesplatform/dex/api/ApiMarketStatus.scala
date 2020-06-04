@@ -4,15 +4,15 @@ import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Json, OWrites, Reads}
 
-case class ApiMarketStatus(lastTrade: Option[LastTrade], bestBid: Option[LevelAgg], bestAsk: Option[LevelAgg])
+case class ApiMarketStatus(lastTrade: Option[ApiLastTrade], bestBid: Option[ApiLevelAgg], bestAsk: Option[ApiLevelAgg])
 
 object ApiMarketStatus {
 
-  def fromMarketStatus(ms: MarketStatus): ApiMarketStatus = ApiMarketStatus(ms.lastTrade, ms.bestBid, ms.bestAsk)
+  def fromMarketStatus(ms: MarketStatus): ApiMarketStatus =
+    ApiMarketStatus(ms.lastTrade.map(ApiLastTrade.fromLastTrade), ms.bestBid.map(ApiLevelAgg.fromLevelAgg), ms.bestAsk.map(ApiLevelAgg.fromLevelAgg))
 
   implicit val apiMarketStatusWrites: OWrites[ApiMarketStatus] = { ms =>
     Json.obj(
@@ -37,9 +37,9 @@ object ApiMarketStatus {
         (JsPath \ "askAmount").readNullable[Long]
     ) { (lastPrice, lastAmount, lastSide, bid, bidAmount, ask, askAmount) =>
       ApiMarketStatus(
-        lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(LastTrade.apply)),
-        bestBid = (bidAmount, bid).tupled.map(Function.tupled(LevelAgg.apply)),
-        bestAsk = (askAmount, ask).tupled.map(Function.tupled(LevelAgg.apply))
+        lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(ApiLastTrade.apply)),
+        bestBid = (bidAmount, bid).tupled.map(Function.tupled(ApiLevelAgg.apply)),
+        bestAsk = (askAmount, ask).tupled.map(Function.tupled(ApiLevelAgg.apply))
       )
     }
 }

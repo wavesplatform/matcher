@@ -192,11 +192,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
 
   @Path("/")
-  @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key in Base58", httpMethod = "GET", response = classOf[String])
+  @ApiOperation(value = "Matcher Public Key", notes = "Get Matcher Public Key in Base58", httpMethod = "GET", response = classOf[String])
   def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) { complete(matcherPublicKey.toJson) }
 
   @Path("/settings")
-  @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET", response = classOf[ApiMatcherPublicSettings])
+  @ApiOperation(value = "Matcher Settings", notes = "Get Matcher Public Settings", httpMethod = "GET", response = classOf[ApiMatcherPublicSettings])
   def getSettings: Route = (path("settings") & get) {
     complete(
       validatedAllowedOrderVersions() map { allowedOrderVersions =>
@@ -205,7 +205,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             matcherPublicKey = matcherPublicKey,
             matcherVersion = Version.VersionString,
             priceAssets = matcherSettings.priceAssets,
-            orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.fromSettings(
+            orderFee = ApiOrderFeeMode.fromSettings(
               settings = getActualOrderFeeSettings(),
               matcherAccountFee = matcherAccountFee,
               allRates = rateCache.getAllRates
@@ -223,7 +223,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Asset rates",
     notes = "Get current rates of assets (price of 1 Waves in the specified asset)",
     httpMethod = "GET",
-    response = classOf[Map[Asset, Double]]
+    response = classOf[Map[String, Double]]
   )
   def getRates: Route = (path("settings" / "rates") & get) { complete(rateCache.getAllRates.toJson) }
 
@@ -351,8 +351,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def orderBookInfo(pair: AssetPair) = ApiOrderBookInfo(
-    restrictions = matcherSettings.orderRestrictions.get(pair),
-    matchingRules = ApiOrderBookInfo.MatchingRuleSettings(tickSize = getActualTickSize(pair).toDouble)
+    restrictions = matcherSettings.orderRestrictions.get(pair).map(ApiOrderRestrictions.fromSettings),
+    matchingRules = ApiMatchingRules(tickSize = getActualTickSize(pair).toDouble)
   )
 
   @Path("/orderbook")
@@ -371,7 +371,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.domain.order.Order"
+        dataType = "com.wavesplatform.dex.domain.order.OrderV3"
       )
     )
   )
@@ -393,7 +393,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.domain.order.Order"
+        dataType = "com.wavesplatform.dex.domain.order.OrderV3"
       )
     )
   )
@@ -594,7 +594,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Order History by Asset Pair and Public Key",
     notes = "Get Order History for a given Asset Pair and Public Key",
     httpMethod = "GET",
-    response = classOf[Array[ApiOrderBookHistoryItem]]
+    response = classOf[List[ApiOrderBookHistoryItem]]
   )
   @ApiImplicitParams(
     Array(
@@ -972,7 +972,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     value = "Get all snapshots' offsets in the queue",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
-    response = classOf[Map[String, QueueEventWithMeta.Offset]]
+    response = classOf[Map[AssetPair, QueueEventWithMeta.Offset]]
   )
   def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
     complete {

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiLevelAgg
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -123,8 +124,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         placeAndAwaitAtDex(bestAskOrder)
         placeAndAwaitAtDex(bestBidOrder)
 
-        dex1.api.orderBook(assetPair).asks should matchTo(List(LevelAgg(2000.waves, 500000)))
-        dex1.api.orderBook(assetPair).bids should matchTo(List(LevelAgg(2000.waves, 300000)))
+        dex1.api.orderBook(assetPair).asks should matchTo(List(ApiLevelAgg(2000.waves, 500000)))
+        dex1.api.orderBook(assetPair).bids should matchTo(List(ApiLevelAgg(2000.waves, 300000)))
 
         placeAndAwaitAtDex(mkOrder(bob, assetPair, BUY, 1000.waves, 90000, 3 * matcherFee, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(bob, assetPair, BUY, 1000.waves, 800000, 3 * matcherFee, feeAsset), Status.Filled)
@@ -146,8 +147,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
         placeAndAwaitAtDex(bestAskOrder, Status.Accepted)
         placeAndAwaitAtDex(bestBidOrder, Status.Accepted)
 
-        dex1.api.orderBook(wavesUsdPair).asks should matchTo(List(LevelAgg(2000.waves, 500)))
-        dex1.api.orderBook(wavesUsdPair).bids should matchTo(List(LevelAgg(2000.waves, 300)))
+        dex1.api.orderBook(wavesUsdPair).asks should matchTo(List(ApiLevelAgg(2000.waves, 500)))
+        dex1.api.orderBook(wavesUsdPair).bids should matchTo(List(ApiLevelAgg(2000.waves, 300)))
 
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 90, 3 * 300, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(alice, wavesUsdPair, BUY, 1000.waves, 800, 3 * 300, feeAsset), Status.Filled)
@@ -250,8 +251,8 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
         Seq(bestAskOrder, bestBidOrder).foreach { placeAndAwaitAtDex(_) }
 
-        dex1.api.orderBook(assetPair).asks should matchTo(List(LevelAgg(2000.waves, 500000)))
-        dex1.api.orderBook(assetPair).bids should matchTo(List(LevelAgg(2000.waves, 300000)))
+        dex1.api.orderBook(assetPair).asks should matchTo(List(ApiLevelAgg(2000.waves, 500000)))
+        dex1.api.orderBook(assetPair).bids should matchTo(List(ApiLevelAgg(2000.waves, 300000)))
 
         placeAndAwaitAtDex(mkOrder(alice, assetPair, SELL, 1000.waves, 850000, 3 * matcherFee, feeAsset), Status.Accepted)
         placeAndAwaitAtDex(mkOrder(alice, assetPair, SELL, 1000.waves, 120000, 3 * matcherFee, feeAsset), Status.Filled)
@@ -309,7 +310,7 @@ class OrderDeviationsTestSuite extends MatcherSuiteBase {
 
           placeAndAwaitAtDex(bestAskOrder)
 
-          dex1.api.orderBook(assetPair).asks should matchTo(List(LevelAgg(1000.waves, 500000)))
+          dex1.api.orderBook(assetPair).asks should matchTo(List(ApiLevelAgg(1000.waves, 500000)))
 
           dex1.api
             .tryPlace(mkOrder(alice, assetPair, SELL, 1000.waves, 850001, 3 * matcherFee, feeAsset)) should failWith(

@@ -1,19 +1,11 @@
 package com.wavesplatform.dex.api
 
-import com.wavesplatform.dex.json.stringAsDoubleFormat
-import com.wavesplatform.dex.settings.OrderRestrictionsSettings
-import play.api.libs.json.{Format, Json, OFormat}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.json.{Json, OFormat}
 
-case class ApiOrderBookInfo(restrictions: Option[OrderRestrictionsSettings], matchingRules: ApiOrderBookInfo.MatchingRuleSettings)
+case class ApiOrderBookInfo(@ApiModelProperty(value = "Restrictions of orders' amount and price") restrictions: Option[ApiOrderRestrictions],
+                            @ApiModelProperty(value = "Matching rules, tick size in particular") matchingRules: ApiMatchingRules)
+
 object ApiOrderBookInfo {
-
   implicit val orderBookInfoFormat: OFormat[ApiOrderBookInfo] = Json.format[ApiOrderBookInfo]
-
-  case class MatchingRuleSettings(tickSize: Double)
-  object MatchingRuleSettings {
-    implicit val matchingRuleSettingsFormat: Format[MatchingRuleSettings] = {
-      implicit val doubleFormat: Format[Double] = stringAsDoubleFormat
-      Json.format[MatchingRuleSettings]
-    }
-  }
 }

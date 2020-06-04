@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.orders
 
+import com.github.ghik.silencer.silent
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
@@ -8,6 +9,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.LevelAgg
 
 // TODO refactor balances retrieving
+@silent("deprecated")
 class OrderDynamicFeeTestSuite extends OrderFeeBaseTestSuite {
 
   private val baseFee = 300000

@@ -1,58 +1,36 @@
 package com.wavesplatform.dex.api
 
-import com.wavesplatform.dex.api.ApiMatcherPublicSettings.ApiOrderFeeSettings
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
-case class ApiMatcherPublicSettings(matcherPublicKey: PublicKey,
-                                    matcherVersion: String,
-                                    priceAssets: Seq[Asset],
-                                    orderFee: ApiOrderFeeSettings,
-                                    orderVersions: Seq[Byte],
-                                    networkByte: Int)
+case class ApiMatcherPublicSettings(@ApiModelProperty(
+                                      value = "Base58 encoded Matcher public key",
+                                      dataType = "string",
+                                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
+                                    ) matcherPublicKey: PublicKey,
+                                    @ApiModelProperty(
+                                      value = "Current Matcher version",
+                                      example = "2.1.3.5"
+                                    ) matcherVersion: String,
+                                    @ApiModelProperty(
+                                      value = "List of the Base58 encoded price asset IDs",
+                                      dataType = "List[string]",
+                                    ) priceAssets: Seq[Asset],
+                                    @ApiModelProperty(
+                                      value = "Order Fee Mode, possible modes: FeeModeDynamic, FeeModeFixed, FeeModePercent"
+                                    ) orderFee: ApiOrderFeeMode,
+                                    @ApiModelProperty(
+                                      value = "List of supported order versions",
+                                      dataType = "List[integer]"
+                                    ) orderVersions: Seq[Byte],
+                                    @ApiModelProperty(
+                                      value = "Network byte",
+                                      dataType = "integer",
+                                      example = "89"
+                                    ) networkByte: Int)
 
 object ApiMatcherPublicSettings {
-
-  sealed trait ApiOrderFeeSettings extends Product with Serializable
-  object ApiOrderFeeSettings {
-    case class Dynamic(baseFee: Long, rates: Map[Asset, Double]) extends ApiOrderFeeSettings
-    object Dynamic {
-      implicit val dynamicFormat: Format[Dynamic] = Json.format[Dynamic]
-    }
-
-    case class Fixed(assetId: Asset, minFee: Long) extends ApiOrderFeeSettings
-    object Fixed {
-      implicit val fixedFormat: Format[Fixed] = Json.format[Fixed]
-    }
-
-    case class Percent(`type`: AssetType, minFee: Double) extends ApiOrderFeeSettings
-    object Percent {
-      implicit val percentFormat: Format[Percent] = Json.format[Percent]
-    }
-
-    implicit val orderFeePublicSettingsFormat: Format[ApiOrderFeeSettings] = Format(
-      fjs = Reads { json =>
-        val r = (json \ "dynamic").asOpt[Dynamic] orElse (json \ "fixed").asOpt[Fixed] orElse (json \ "percent").asOpt[Percent]
-        r.fold[JsResult[ApiOrderFeeSettings]](JsError(s"Can't parse as OrderFeePublicSettings: ${Json.stringify(json)}"))(JsSuccess(_))
-      },
-      tjs = Writes {
-        case x: Dynamic => toJson("dynamic", x)(Dynamic.dynamicFormat)
-        case x: Fixed   => toJson("fixed", x)(Fixed.fixedFormat)
-        case x: Percent => toJson("percent", x)(Percent.percentFormat)
-      }
-    )
-
-    private def toJson[T](key: String, x: T)(implicit w: Writes[T]): JsObject = Json.obj(key -> w.writes(x))
-
-    def fromSettings(settings: OrderFeeSettings, matcherAccountFee: Long, allRates: Map[Asset, Double]): ApiOrderFeeSettings = settings match {
-      case x: OrderFeeSettings.DynamicSettings                    => Dynamic(x.maxBaseFee + matcherAccountFee, allRates)
-      case OrderFeeSettings.FixedSettings(defaultAssetId, minFee) => Fixed(defaultAssetId, minFee)
-      case OrderFeeSettings.PercentSettings(assetType, minFee)    => Percent(assetType, minFee)
-    }
-  }
-
   implicit val matcherPublicSettingsFormat: OFormat[ApiMatcherPublicSettings] = Json.format[ApiMatcherPublicSettings]
 }

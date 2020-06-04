@@ -34,7 +34,7 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
       matcherPublicKey = PublicKey.fromBase58String("2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY").right.get,
       matcherVersion = "2.1.3.3",
       priceAssets = Seq(Waves, issuedAsset),
-      orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Fixed(
+      orderFee = ApiOrderFeeMode.FeeModeFixed(
         assetId = issuedAsset,
         minFee = 300000
       ),

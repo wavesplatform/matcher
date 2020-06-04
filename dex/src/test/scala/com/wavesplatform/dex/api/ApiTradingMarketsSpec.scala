@@ -58,7 +58,7 @@ class ApiTradingMarketsSpec extends AnyFreeSpec with Matchers with DiffMatcherWi
       priceAssetInfo = AssetInfo(8).some,
       created = 1591105681300L,
       restrictions = None,
-      matchingRules = ApiOrderBookInfo.MatchingRuleSettings(0.1)
+      matchingRules = ApiMatchingRules(0.1)
     )
 
   private val tradingMarkets =

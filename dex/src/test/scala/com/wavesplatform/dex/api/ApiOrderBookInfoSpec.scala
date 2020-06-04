@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.api
 
-import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -25,7 +24,7 @@ class ApiOrderBookInfoSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
 
   private val orderBookInfo = ApiOrderBookInfo(
     restrictions = Some(
-      OrderRestrictionsSettings(
+      ApiOrderRestrictions(
         stepAmount = 0.00000001,
         minAmount = 0.0000002,
         maxAmount = 3000,
@@ -34,7 +33,7 @@ class ApiOrderBookInfoSpec extends AnyFreeSpec with Matchers with DiffMatcherWit
         maxPrice = 6000
       )
     ),
-    matchingRules = ApiOrderBookInfo.MatchingRuleSettings(
+    matchingRules = ApiMatchingRules(
       tickSize = 0.7
     )
   )

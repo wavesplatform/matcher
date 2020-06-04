@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync
 import com.github.ghik.silencer.silent
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.{ApiLastTrade, ApiLevelAgg, ApiOrderBookHistoryItem}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -13,7 +13,7 @@ import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.market.MatcherActor.AssetInfo
-import com.wavesplatform.dex.model.{AcceptedOrderType, LastTrade, LevelAgg, OrderStatus}
+import com.wavesplatform.dex.model.{AcceptedOrderType, LevelAgg, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -291,13 +291,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
         resp1.lastTrade shouldBe None
         resp1.bestBid shouldBe None
-        resp1.bestAsk should matchTo { Option(LevelAgg(askAmount, ask)) }
+        resp1.bestAsk should matchTo { Option(ApiLevelAgg(askAmount, ask)) }
 
         dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
         val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
-        resp2.lastTrade should matchTo { Option(LastTrade(ask, askAmount, OrderType.BUY)) }
-        resp2.bestBid should matchTo { Option(LevelAgg(bidAmount - askAmount, bid)) }
+        resp2.lastTrade should matchTo { Option(ApiLastTrade(ask, askAmount, OrderType.BUY)) }
+        resp2.bestBid should matchTo { Option(ApiLevelAgg(bidAmount - askAmount, bid)) }
         resp2.bestAsk shouldBe None
       }
     }

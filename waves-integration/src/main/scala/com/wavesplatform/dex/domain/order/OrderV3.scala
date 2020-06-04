@@ -10,26 +10,56 @@ import com.wavesplatform.dex.domain.bytes.deser.EntityParser
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
+import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-case class OrderV3(senderPublicKey: PublicKey,
-                   matcherPublicKey: PublicKey,
+case class OrderV3(@ApiModelProperty(
+                     value = "Base58 encoded Sender public key",
+                     dataType = "string",
+                     example = "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
+                     required = true
+                   ) senderPublicKey: PublicKey,
+                   @ApiModelProperty(
+                     value = "Base58 encoded Matcher public key",
+                     dataType = "string",
+                     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8",
+                     required = true
+                   ) matcherPublicKey: PublicKey,
                    assetPair: AssetPair,
-                   orderType: OrderType,
+                   @ApiModelProperty(
+                     value = "Order type (sell or buy)",
+                     dataType = "string",
+                     example = "sell",
+                     required = true
+                   ) orderType: OrderType,
                    amount: Long,
                    price: Long,
                    timestamp: Long,
                    expiration: Long,
                    matcherFee: Long,
+                   @ApiModelProperty(
+                     name = "matcherFeeAssetId",
+                     value = "Base58 encoded Matcher fee asset ID, equals to WAVES for Order versions 1 and 2",
+                     dataType = "string",
+                     example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
+                     required = true
+                   )
                    override val feeAsset: Asset,
+                   @ApiModelProperty(
+                     value = "Order proofs as Base58 encoded signatures",
+                     dataType = "List[string]",
+                     required = true
+                   )
                    proofs: Proofs)
     extends Order {
 
-  def version: Byte = 3
+  @ApiModelProperty(dataType = "integer", example = "3", allowableValues = "1, 2, 3", required = true)
+  val version: Byte = 3
 
   override def signature: Array[Byte] = proofs.proofs.head.arr
 
+  @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Bytes.concat(
@@ -47,8 +77,10 @@ case class OrderV3(senderPublicKey: PublicKey,
       )
     )
 
+  @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 
+  @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       {

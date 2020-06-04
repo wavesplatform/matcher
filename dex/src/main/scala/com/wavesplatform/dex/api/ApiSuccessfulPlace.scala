@@ -2,11 +2,12 @@ package com.wavesplatform.dex.api
 
 import com.github.ghik.silencer.silent
 import com.wavesplatform.dex.domain.order.{Order, OrderJson}
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json, OFormat}
 
 @silent("deprecated")
 case class ApiSuccessfulPlace(
-    message: Order,
+    @ApiModelProperty(value = "Order", dataType = "com.wavesplatform.dex.domain.order.OrderV3", required = true) message: Order,
     success: Boolean = true,
     @deprecated(message = "This field is unnecessary", since = "1.2.0") status: String = "OrderAccepted",
 )

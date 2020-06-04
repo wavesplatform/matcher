@@ -2,7 +2,6 @@ package com.wavesplatform.dex.api
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -25,9 +24,9 @@ class ApiMarketStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
 
   private val marketStatus =
     ApiMarketStatus(
-      lastTrade = LastTrade(1000, 2000, OrderType.SELL).some,
-      bestBid = LevelAgg(1111, 2222).some,
-      bestAsk = LevelAgg(3333, 4444).some
+      lastTrade = ApiLastTrade(1000, 2000, OrderType.SELL).some,
+      bestBid = ApiLevelAgg(1111, 2222).some,
+      bestAsk = ApiLevelAgg(3333, 4444).some
     )
 
   "backward JSON compatibility" - {

@@ -14,8 +14,8 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.ApiV0OrderBook
 import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
+import com.wavesplatform.dex.api.{ApiLevelAgg, ApiV0OrderBook}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -303,8 +303,8 @@ class AggregatedOrderBookActorSpec
             ApiV0OrderBook(
               timestamp = 1L,
               pair = pair,
-              bids = List(LevelAgg(50L, 1000L)),
-              asks = List(LevelAgg(99L, 2000L))
+              bids = List(ApiLevelAgg(50L, 1000L)),
+              asks = List(ApiLevelAgg(99L, 2000L))
             )
 
           actual should matchTo(expected)
@@ -355,8 +355,8 @@ class AggregatedOrderBookActorSpec
             ApiV0OrderBook(
               timestamp = 3L,
               pair = pair,
-              bids = List(LevelAgg(50L, 1000L), LevelAgg(30L, 999L)),
-              asks = List(LevelAgg(99L, 2000L), LevelAgg(1L, 2100L))
+              bids = List(ApiLevelAgg(50L, 1000L), ApiLevelAgg(30L, 999L)),
+              asks = List(ApiLevelAgg(99L, 2000L), ApiLevelAgg(1L, 2100L))
             )
 
           actual should matchTo(expected)
@@ -415,8 +415,12 @@ class AggregatedOrderBookActorSpec
       asks = levelAggsFromSide(ob.asks)
     )
 
-  private def levelAggsFromSide(side: Side): List[LevelAgg] =
-    AggregatedOrderBookActor.aggregateByPrice(side).map(AggregatedOrderBookActor.toLevelAgg).toList.sortBy(_.price)(side.ordering)
+  private def levelAggsFromSide(side: Side): List[ApiLevelAgg] =
+    AggregatedOrderBookActor
+      .aggregateByPrice(side)
+      .map(pa => ApiLevelAgg.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
+      .toList
+      .sortBy(_.price)(side.ordering)
 
   private def sum(side: OrderBookSideSnapshot): List[LevelAgg] =
     side.map {

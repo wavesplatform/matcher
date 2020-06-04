@@ -151,8 +151,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         status shouldEqual StatusCodes.OK
         responseAs[ApiOrderBookInfo] should matchTo(
           ApiOrderBookInfo(
-            restrictions = Some(orderRestrictions),
-            matchingRules = ApiOrderBookInfo.MatchingRuleSettings(0.1)
+            restrictions = Some(ApiOrderRestrictions.fromSettings(orderRestrictions)),
+            matchingRules = ApiMatchingRules(0.1)
           )
         )
       }
@@ -169,7 +169,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             matcherPublicKey = matcherKeyPair.publicKey,
             matcherVersion = Version.VersionString,
             priceAssets = List(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
-            orderFee = ApiMatcherPublicSettings.ApiOrderFeeSettings.Dynamic(
+            orderFee = ApiOrderFeeMode.FeeModeDynamic(
               baseFee = 600000,
               rates = Map(Waves -> 1.0)
             ),
@@ -270,8 +270,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             ApiV0OrderBook(
               timestamp = 0L,
               pair = smartWavesPair,
-              bids = smartWavesAggregatedSnapshot.bids.toList,
-              asks = smartWavesAggregatedSnapshot.asks.toList
+              bids = smartWavesAggregatedSnapshot.bids.toList.map(ApiLevelAgg.fromLevelAgg),
+              asks = smartWavesAggregatedSnapshot.asks.toList.map(ApiLevelAgg.fromLevelAgg)
             )
           )
         }
@@ -754,7 +754,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                   AssetInfo(priceAssetDesc.decimals).some,
                   0L,
                   None,
-                  ApiOrderBookInfo.MatchingRuleSettings(0.1)
+                  ApiMatchingRules(0.1)
                 )
               )
             )
@@ -1235,7 +1235,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         assetDecimals = x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
       )
 
-    val route: Route =
+    val route =
       MatcherApiRoute(
         assetPairBuilder = new AssetPairBuilder(
           settings, {

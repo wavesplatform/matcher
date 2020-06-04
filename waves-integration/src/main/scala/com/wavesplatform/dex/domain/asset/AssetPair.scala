@@ -14,14 +14,16 @@ import scala.util.{Failure, Success, Try}
 
 @ApiModel
 case class AssetPair(@(ApiModelProperty @field)(
-                       value = "Base58 encoded amount asset id",
+                       value = "Base58 encoded amount asset ID",
                        dataType = "string",
-                       example = "WAVES"
+                       example = "WAVES",
+                       required = true
                      ) amountAsset: Asset,
                      @(ApiModelProperty @field)(
-                       value = "Base58 encoded amount price id",
+                       value = "Base58 encoded amount price ID",
                        dataType = "string",
-                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
+                       required = true
                      ) priceAsset: Asset) {
 
   @ApiModelProperty(hidden = true)

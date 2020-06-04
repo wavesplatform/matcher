@@ -4,10 +4,15 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.model.LevelAgg
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Json, OFormat}
 
-case class ApiV0OrderBook(timestamp: Long, pair: AssetPair, bids: List[LevelAgg], asks: List[LevelAgg])
+case class ApiV0OrderBook(
+    @ApiModelProperty(value = "Timestamp of the last Order Book update") timestamp: Long,
+    @ApiModelProperty(value = "Corresponding Asset Pair") pair: AssetPair,
+    @ApiModelProperty(value = "List of aggregated bid levels") bids: List[ApiLevelAgg],
+    @ApiModelProperty(value = "List of aggregated ask levels") asks: List[ApiLevelAgg]
+)
 
 object ApiV0OrderBook {
 

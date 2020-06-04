@@ -39,7 +39,7 @@ class ApiV0OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWithI
   private val bids      = List(LevelAgg(10000000000000L, 41), LevelAgg(2500000000000L, 40), LevelAgg(300000000000000L, 1))
   private val asks      = List(LevelAgg(50000000000L, 50), LevelAgg(2500000000000L, 51))
 
-  private val orderBookV0Normalized     = ApiV0OrderBook(0, assetPair, bids, asks)
+  private val orderBookV0Normalized     = ApiV0OrderBook(0, assetPair, bids.map(ApiLevelAgg.fromLevelAgg), asks.map(ApiLevelAgg.fromLevelAgg))
   private val orderBookResultNormalized = OrderBookResult(0, assetPair, bids, asks)
 
   "backward JSON compatibility" - {

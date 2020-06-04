@@ -4,7 +4,7 @@ case class Asset(quantity: Long, issueFee: Long)
 case class Hosts(node: String, matcher: String, shooted: String)
 
 case class Settings(
-    networkByte: String,
+    chainId: String,
     richAccount: String,
     dexRestApiKey: String,
     matcherPublicKey: String,

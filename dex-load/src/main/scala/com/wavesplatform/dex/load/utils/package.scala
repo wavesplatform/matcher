@@ -26,7 +26,7 @@ package object utils {
     .get
 
   val services         = new Services(settings)
-  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, settings.networkByte.charAt(0).toByte)
+  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, settings.chainId.charAt(0).toByte)
   implicit val backend = HttpURLConnectionBackend()
 
   def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
@@ -55,7 +55,7 @@ package object utils {
     val tx =
       Transactions.makeIssueTx(
         issuer,
-        settings.networkByte.charAt(0).toByte,
+        settings.chainId.charAt(0).toByte,
         Random.nextInt(10000000).toString,
         Random.nextInt(10000000).toString,
         settings.assets.quantity,
@@ -80,7 +80,7 @@ package object utils {
                            300000)
   }
 
-  def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte.charAt(0).toByte).writeValueAsString(obj)
+  def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.chainId.charAt(0).toByte).writeValueAsString(obj)
 
   def readAssetPairs(file: Option[File]): List[AssetPair] = {
     if (Files.exists(file.get.toPath)) {

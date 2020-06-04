@@ -14,7 +14,7 @@ import scala.util.Random
 object TankGenerator {
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
-    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.networkByte.charAt(0).toByte)).toList
+    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.chainId.charAt(0).toByte)).toList
     println("Done")
     accounts
   }

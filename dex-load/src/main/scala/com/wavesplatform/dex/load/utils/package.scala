@@ -10,22 +10,33 @@ import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
+import pureconfig._
+import pureconfig.generic.auto._
 
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
-  implicit val settings = new LoadTestSettings(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")))
-  implicit val backend  = HttpURLConnectionBackend()
+
+
+  val settings = ConfigSource
+    .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))
+    .load[Settings]
+    .right
+    .get
+
+  val services         = new Services(settings)
+  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, settings.networkByte.charAt(0).toByte)
+  implicit val backend = HttpURLConnectionBackend()
 
   def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
     "Timestamp" -> timestamp.toString,
-    "Signature" -> settings.matcher.getOrderHistorySignature(account, timestamp)
+    "Signature" -> services.matcher.getOrderHistorySignature(account, timestamp)
   )
 
   def getOrderBook(account: PrivateKeyAccount): String = {
     sttp
-      .get(uri"${settings.matcherUrl}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
+      .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
       .headers(mkOrderHistoryHeaders(account))
       .send()
       .body
@@ -34,27 +45,27 @@ package object utils {
   }
 
   def waitForHeightArise(): Unit = {
-    val toHeight = settings.node.getHeight + 1
+    val toHeight = services.node.getHeight + 1
     print(s"\tWaiting for the next ($toHeight) block... ")
-    while (settings.node.getHeight < toHeight) Thread.sleep(5000)
+    while (services.node.getHeight < toHeight) Thread.sleep(5000)
     println("Done")
   }
 
   def mkAsset(): String = {
     val tx =
       Transactions.makeIssueTx(
-        settings.issuer,
-        settings.networkByte,
+        issuer,
+        settings.networkByte.charAt(0).toByte,
         Random.nextInt(10000000).toString,
         Random.nextInt(10000000).toString,
-        settings.assetQuantity,
+        settings.assets.quantity,
         8, //TODO: random from 2 to 16
         false,
         null,
-        settings.issueFee
+        settings.assets.issueFee
       )
     println(s"\tSending Issue TX: ${mkJson(tx)}")
-    settings.node.send(tx)
+    services.node.send(tx)
     tx.getId.toString
   }
 
@@ -69,7 +80,7 @@ package object utils {
                            300000)
   }
 
-  def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte).writeValueAsString(obj)
+  def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.networkByte.charAt(0).toByte).writeValueAsString(obj)
 
   def readAssetPairs(file: Option[File]): List[AssetPair] = {
     if (Files.exists(file.get.toPath)) {

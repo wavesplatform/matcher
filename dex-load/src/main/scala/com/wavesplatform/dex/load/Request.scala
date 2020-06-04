@@ -29,9 +29,9 @@ case class Request(httpType: String, path: String, tag: String, obj: ApiJson = n
     val body = mkJson(obj).replace("\"matcherFeeAssetId\":\"WAVES\",", "")
 
     val headers = defaultHeaders ++ Map(
-      HttpHeaders.HOST           -> settings.loadHost,
+      HttpHeaders.HOST           -> settings.hosts.shooted,
       HttpHeaders.CONTENT_LENGTH -> body.length.toString,
-      "X-API-Key"                -> settings.apiKey
+      "X-API-Key"                -> settings.dexRestApiKey
     )
 
     val request = s"${Request.POST} $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"

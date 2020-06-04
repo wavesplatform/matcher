@@ -6,7 +6,7 @@ import java.nio.file.Files
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{Asset, AssetPair, Base58, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
 
 import scala.util.Random
@@ -14,7 +14,7 @@ import scala.util.Random
 object TankGenerator {
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
-    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.networkByte)).toList
+    val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.networkByte.charAt(0).toByte)).toList
     println("Done")
     accounts
   }
@@ -44,18 +44,18 @@ object TankGenerator {
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
-    val amountPerUser = settings.assetQuantity / 4 / accounts.length
+    val amountPerUser = settings.assets.quantity / 4 / accounts.length
     accounts
       .flatMap { acc => //TODO: change to mass transfer transactions
-        Transactions.makeTransferTx(settings.issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
-          if (settings.node.getBalance(acc.getAddress, ass) < amountPerUser && settings.node.getBalance(settings.issuer.getAddress, ass) > amountPerUser)
-            Transactions.makeTransferTx(settings.issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
-          else Transactions.makeTransferTx(settings.issuer, acc.getAddress, 1, ass, 300000, "WAVES", "")
+        Transactions.makeTransferTx(issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
+          if (services.node.getBalance(acc.getAddress, ass) < amountPerUser && services.node.getBalance(issuer.getAddress, ass) > amountPerUser)
+            Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
+          else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, 300000, "WAVES", "")
         }
       }
       .flatMap(tx => {
         println(s"\tSending transfer tx: ${mkJson(tx)}")
-        settings.node.send(tx)
+        services.node.send(tx)
       })
 
     waitForHeightArise()
@@ -63,7 +63,7 @@ object TankGenerator {
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
     print(s"Creating orders... ")
-    val safeAmount = settings.assetQuantity / 2 / accounts.length / 400
+    val safeAmount = settings.assets.quantity / 2 / accounts.length / 400
 
     val orders = (0 to 399).flatMap(
       _ =>
@@ -146,7 +146,7 @@ object TankGenerator {
           Request.GET.toString,
           s"/matcher/orderbook/${Base58.encode(a.getPublicKey)}",
           Request.ORDER_HISTORY_BY_ACC.toString,
-          headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+          headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
         ) ::
           pairs.map(
           p =>
@@ -154,7 +154,7 @@ object TankGenerator {
               Request.GET.toString,
               s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
               Request.ORDER_HISTORY_BY_PAIR.toString,
-              headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+              headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
           ))
       })
 
@@ -181,14 +181,14 @@ object TankGenerator {
         Request.GET.toString,
         s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
         Request.RESERVED_BALANCE.toString,
-        headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
       ) ::
         pairs.map(p => {
         Request(
           Request.GET.toString,
           s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/tradableBalance/${a.getAddress}",
           Request.TRADABLE_BALANCE.toString,
-          headers = Map("Signature" -> settings.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+          headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
         )
       })
     })
@@ -208,7 +208,7 @@ object TankGenerator {
     val pairs = mkPairsAndDistribute(accounts, pairsFile)
 
     for (_ <- 0 to (requestsCount * settings.distribution.getOrElse(Request.CANCEL.toString, 1.0)).toInt) {
-      val o = settings.matcher.placeOrder(
+      val o = services.matcher.placeOrder(
         accounts(new Random().nextInt(accounts.length - 1)),
         settings.matcherPublicKey,
         pairs(new Random().nextInt(pairs.length - 1)),

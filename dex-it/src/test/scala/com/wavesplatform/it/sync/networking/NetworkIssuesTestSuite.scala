@@ -16,6 +16,7 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, blocking}
 import scala.util.{Failure, Success, Try}
+
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
 

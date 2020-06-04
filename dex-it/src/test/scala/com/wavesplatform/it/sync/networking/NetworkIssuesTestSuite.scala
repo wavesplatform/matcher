@@ -50,25 +50,19 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       mkOrder(alice, wavesUsdPair, OrderType.SELL, 1.waves, 100 + i)
     }
 
-    def placeOrders: Future[Unit] =
-      Future
-        .inSeries(orders)(dex1.asyncApi.place(_))
-        .transform {
-          case Success(_) => Try()
-          case Failure(e) => Try(e)
-        }
-
     Await.result(
       for {
-        _         <- placeOrders.zip { Future(blocking(wavesNode1.reconnectToNetwork(500, 500))) }
+        _ <- Future.inSeries(orders)(dex1.asyncApi.place(_).recover { case _ => () }).zip {
+          Future(blocking(wavesNode1.reconnectToNetwork(500, 500)))
+        }
         orderBook <- dex1.asyncApi.orderBook(wavesUsdPair)
       } yield {
         orderBook.asks should have size 100
-        orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
       },
       2.minute
     )
 
+    orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 

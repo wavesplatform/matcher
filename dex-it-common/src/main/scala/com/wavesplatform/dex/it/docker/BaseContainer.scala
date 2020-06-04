@@ -132,6 +132,13 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
   def invalidateCaches(): Unit = cachedRestApiAddress.invalidate()
 
+  def reconnectToNetwork(delay: Long = 0, duration: Long = 100): Unit = {
+    Thread.sleep(delay)
+    disconnectFromNetwork()
+    Thread.sleep(duration)
+    connectToNetwork()
+  }
+
   def connectToNetwork(): Unit = {
     invalidateCaches()
 

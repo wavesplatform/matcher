@@ -19,7 +19,7 @@ object TankGenerator {
     accounts
   }
 
-  private def mkAssets(count: Int = 9): List[String] = {
+  private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
     val assets = (1 to count).map(_ => mkAsset()).toList
     waitForHeightArise()
@@ -27,7 +27,7 @@ object TankGenerator {
     assets
   }
 
-  private def mkAssetPairs(assets: List[String], count: Int = 10): List[AssetPair] = {
+  private def mkAssetPairs(assets: List[String], count: Int = settings.assets.pairsCount): List[AssetPair] = {
     println(s"Creating $count asset pairs... ")
 
     val randomAssetPairs = Random
@@ -47,25 +47,26 @@ object TankGenerator {
     val amountPerUser = settings.assets.quantity / 4 / accounts.length
     accounts
       .flatMap { acc => //TODO: change to mass transfer transactions
-        Transactions.makeTransferTx(issuer, acc.getAddress, 10000000000L, "WAVES", 300000, "WAVES", "") :: assets.map { ass =>
-          if (services.node.getBalance(acc.getAddress, ass) < amountPerUser && services.node.getBalance(issuer.getAddress, ass) > amountPerUser)
-            Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, 300000, "WAVES", "")
-          else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, 300000, "WAVES", "")
-        }
+        Transactions.makeTransferTx(issuer, acc.getAddress, settings.defaults.wavesPerAccount, "WAVES", settings.defaults.matcherFee, "WAVES", "") :: assets
+          .map { ass =>
+            if (services.node.getBalance(acc.getAddress, ass) < amountPerUser && services.node.getBalance(issuer.getAddress, ass) > amountPerUser)
+              Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, settings.defaults.matcherFee, "WAVES", "")
+            else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, settings.defaults.matcherFee, "WAVES", "")
+          }
       }
-      .flatMap(tx => {
+      .flatMap { tx =>
         println(s"\tSending transfer tx: ${mkJson(tx)}")
         services.node.send(tx)
-      })
+      }
 
     waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
     print(s"Creating orders... ")
-    val safeAmount = settings.assets.quantity / 2 / accounts.length / 400
+    val safeAmount = settings.assets.quantity / 2 / accounts.length / settings.defaults.maxOrdersPerAccount
 
-    val orders = (0 to 399).flatMap(
+    val orders = (1 to settings.defaults.maxOrdersPerAccount).flatMap(
       _ =>
         accounts.map(mkOrder(
           _,
@@ -76,7 +77,7 @@ object TankGenerator {
         )))
 
     println("Done")
-    Random.shuffle(orders.map(Request(Request.POST.toString, "/matcher/orderbook", Request.PLACE.toString, _))).toList
+    Random.shuffle(orders.map(Request(RequestType.POST, "/matcher/orderbook", RequestTag.PLACE, _))).toList
   }
 
   private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File]): List[AssetPair] = {
@@ -109,8 +110,7 @@ object TankGenerator {
 
     val cancels = accounts
       .flatMap(a => {
-        Json
-          .parse(getOrderBook(a))
+        getOrderBook(a)
           .as[List[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
@@ -122,9 +122,9 @@ object TankGenerator {
               case JsSuccess(name, _) => name
               case _: JsError         => "WAVES"
             }
-            Request(Request.POST.toString,
+            Request(RequestType.POST,
                     s"/matcher/orderbook/$aa/$pa/cancel",
-                    Request.CANCEL.toString,
+                    RequestTag.CANCEL,
                     Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
       })
@@ -137,35 +137,66 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val oha   = settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_ACC.toString, 1.0)
-    val ohp   = settings.distribution.getOrElse(Request.ORDER_HISTORY_BY_PAIR.toString, 1.0)
+    val oha   = settings.distribution.orderHistoryByPairAndKey
+    val ohp   = settings.distribution.orderHistoryByPair
+
+    def mkGetOrderBookByAcc(a: PrivateKeyAccount) = {
+      Request(
+        RequestType.GET,
+        s"/matcher/orderbook/${Base58.encode(a.getPublicKey)}",
+        RequestTag.ORDER_HISTORY_BY_ACC,
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+      )
+    }
+
+    def mkGetOrderBookByPair(a: PrivateKeyAccount, p: AssetPair) = {
+      Request(
+        RequestType.GET,
+        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
+        RequestTag.ORDER_HISTORY_BY_PAIR,
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+      )
+    }
 
     val all = accounts
       .flatMap(a => {
-        Request(
-          Request.GET.toString,
-          s"/matcher/orderbook/${Base58.encode(a.getPublicKey)}",
-          Request.ORDER_HISTORY_BY_ACC.toString,
-          headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
-        ) ::
-          pairs.map(
-          p =>
-            Request(
-              Request.GET.toString,
-              s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
-              Request.ORDER_HISTORY_BY_PAIR.toString,
-              headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
-          ))
+        mkGetOrderBookByAcc(a) :: pairs.map(p => mkGetOrderBookByPair(a, p))
       })
 
     val reserved = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_PAIR)))
       .flatten
     val tradable = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ACC)))
       .flatten
 
     Random.shuffle(reserved ++ tradable).take((requestsCount * (ohp + oha)).toInt)
+  }
+
+  private def mkOrderStatuses(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {
+    print("Making requests for getting order status... ")
+
+    val statuses = accounts
+      .flatMap(a => {
+        getOrderBook(a)
+          .as[List[JsValue]]
+          .map(o => {
+            val id = (o \ "id").as[String]
+            Request(
+              RequestType.GET,
+              s"/matcher/orders/${a.getAddress}/$id",
+              RequestTag.ORDER_STATUS,
+              headers = Map("X-API-Key" -> settings.dexRestApiKey, "X-User-Public-Key" -> Base58.encode(a.getPublicKey()))
+            )
+          })
+      })
+    println("Done")
+
+    Random.shuffle(
+      List
+        .fill(requestsCount / statuses.length + 1)(statuses)
+        .flatten
+        .take(requestsCount))
   }
 
   private def mkBalances(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
@@ -173,31 +204,36 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val rb    = settings.distribution.getOrElse(Request.RESERVED_BALANCE.toString, 1.0)
-    val tb    = settings.distribution.getOrElse(Request.TRADABLE_BALANCE.toString, 1.0)
+    val rb    = settings.distribution.reservedBalance
+    val tb    = settings.distribution.tradableBalance
+
+    def mkReservedBalance(a: PrivateKeyAccount) = {
+      Request(
+        RequestType.GET,
+        s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
+        RequestTag.RESERVED_BALANCE,
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+      )
+    }
+
+    def mkTradableBalance(a: PrivateKeyAccount, p: AssetPair) = {
+      Request(
+        RequestType.GET,
+        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/tradableBalance/${a.getAddress}",
+        RequestTag.TRADABLE_BALANCE,
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+      )
+    }
 
     val all = accounts.flatMap(a => {
-      Request(
-        Request.GET.toString,
-        s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
-        Request.RESERVED_BALANCE.toString,
-        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
-      ) ::
-        pairs.map(p => {
-        Request(
-          Request.GET.toString,
-          s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/tradableBalance/${a.getAddress}",
-          Request.TRADABLE_BALANCE.toString,
-          headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
-        )
-      })
+      mkReservedBalance(a) :: pairs.map(p => { mkTradableBalance(a, p) })
     })
 
     val reserved = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.RESERVED_BALANCE.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.RESERVED_BALANCE)))
       .flatten
     val tradable = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(Request.TRADABLE_BALANCE.toString)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.TRADABLE_BALANCE)))
       .flatten
 
     Random.shuffle(reserved ++ tradable).take((requestsCount * (tb + rb)).toInt)
@@ -207,16 +243,16 @@ object TankGenerator {
     println("Placing some orders to prepare cancel-order requests... ")
     val pairs = mkPairsAndDistribute(accounts, pairsFile)
 
-    for (_ <- 0 to (requestsCount * settings.distribution.getOrElse(Request.CANCEL.toString, 1.0)).toInt) {
+    for (_ <- 0 to requestsCount) {
       val o = services.matcher.placeOrder(
         accounts(new Random().nextInt(accounts.length - 1)),
         settings.matcherPublicKey,
         pairs(new Random().nextInt(pairs.length - 1)),
         Type.BUY,
-        10000,
-        10000,
+        settings.defaults.minimalOrderPrice,
+        settings.defaults.minimalOrderAmount,
         System.currentTimeMillis + 60 * 60 * 24 * 29,
-        300000,
+        settings.defaults.matcherFee,
         null,
         false
       )
@@ -227,12 +263,13 @@ object TankGenerator {
 
   private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
-    placeOrdersForCancel(accounts, requestsCount, pairsFile)
+    placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
     Random.shuffle(
-      mkMatching(accounts, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt, pairsFile) ++
+      mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
+        mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile) ++
         mkBalances(accounts, requestsCount, pairsFile) ++
         mkOrderHistory(accounts, requestsCount, pairsFile) ++
-        mkCancels(accounts, (requestsCount * settings.distribution.getOrElse(Request.PLACE.toString, 1.0)).toInt)
+        mkCancels(accounts, (requestsCount * settings.distribution.placeOrder).toInt)
     )
   }
 
@@ -245,19 +282,15 @@ object TankGenerator {
     finally output.close()
 
     println(s"Generated: ${requests.length}")
-    println(s"\t${Request.POST}: ${requests.count(_.httpType.equals(Request.POST.toString))}")
-    println(s"\t\t${Request.PLACE}: ${requests.count(_.tag.equals(Request.PLACE.toString))}")
-    println(s"\t\t${Request.CANCEL}: ${requests.count(_.tag.equals(Request.CANCEL.toString))}")
-    println(s"\t${Request.GET}: ${requests.count(_.httpType.equals(Request.GET.toString))}")
-    println(s"\t\t${Request.ORDER_HISTORY_BY_ACC}: ${requests.count(_.tag.equals(Request.ORDER_HISTORY_BY_ACC.toString))}")
-    println(s"\t\t${Request.ORDER_HISTORY_BY_PAIR}: ${requests.count(_.tag.equals(Request.ORDER_HISTORY_BY_PAIR.toString))}")
-    println(s"\t\t${Request.RESERVED_BALANCE}: ${requests.count(_.tag.equals(Request.RESERVED_BALANCE.toString))}")
-    println(s"\t\t${Request.TRADABLE_BALANCE}: ${requests.count(_.tag.equals(Request.TRADABLE_BALANCE.toString))}")
+
+    for (v <- RequestType.values) println(s"\t\t$v: ${requests.count(_.httpType.equals(v))}")
+    for (v <- RequestTag.values) println(s"\t\t$v: ${requests.count(_.tag.equals(v))}")
+
     println(s"Results have been saved to $outputFile")
   }
 
-  def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int = 20000, requestsType: Int = 3): Unit = {
-    val accounts = mkAccounts(seedPrefix, requestsCount / 400 + 1)
+  def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int, requestsType: Int): Unit = {
+    val accounts = mkAccounts(seedPrefix, requestsCount / settings.defaults.maxOrdersPerAccount + 1)
     val requests = requestsType match {
       case 1 => mkPlaces(accounts, requestsCount, pairsFile)
       case 2 => mkCancels(accounts, requestsCount)

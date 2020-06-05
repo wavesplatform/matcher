@@ -10,6 +10,7 @@ import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
+import play.api.libs.json.{JsValue, Json}
 import pureconfig._
 import pureconfig.generic.auto._
 
@@ -17,8 +18,6 @@ import scala.io.Source
 import scala.util.Random
 
 package object utils {
-
-
   val settings = ConfigSource
     .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))
     .load[Settings]
@@ -26,7 +25,8 @@ package object utils {
     .get
 
   val services         = new Services(settings)
-  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, settings.chainId.charAt(0).toByte)
+  val networkByte      = settings.chainId.charAt(0).toByte
+  val issuer           = PrivateKeyAccount.fromSeed(settings.richAccount, 0, networkByte)
   implicit val backend = HttpURLConnectionBackend()
 
   def mkOrderHistoryHeaders(account: PrivateKeyAccount, timestamp: Long = System.currentTimeMillis): Map[String, String] = Map(
@@ -34,14 +34,16 @@ package object utils {
     "Signature" -> services.matcher.getOrderHistorySignature(account, timestamp)
   )
 
-  def getOrderBook(account: PrivateKeyAccount): String = {
-    sttp
-      .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
-      .headers(mkOrderHistoryHeaders(account))
-      .send()
-      .body
-      .right
-      .get
+  def getOrderBook(account: PrivateKeyAccount): JsValue = {
+    Json
+      .parse(
+        sttp
+          .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
+          .headers(mkOrderHistoryHeaders(account))
+          .send()
+          .body
+          .right
+          .get)
   }
 
   def waitForHeightArise(): Unit = {
@@ -55,7 +57,7 @@ package object utils {
     val tx =
       Transactions.makeIssueTx(
         issuer,
-        settings.chainId.charAt(0).toByte,
+        networkByte,
         Random.nextInt(10000000).toString,
         Random.nextInt(10000000).toString,
         settings.assets.quantity,
@@ -77,10 +79,10 @@ package object utils {
                            price,
                            amount,
                            System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
-                           300000)
+                           settings.defaults.matcherFee)
   }
 
-  def mkJson(obj: ApiJson): String = new WavesJsonMapper(settings.chainId.charAt(0).toByte).writeValueAsString(obj)
+  def mkJson(obj: ApiJson): String = new WavesJsonMapper(networkByte).writeValueAsString(obj)
 
   def readAssetPairs(file: Option[File]): List[AssetPair] = {
     if (Files.exists(file.get.toPath)) {
@@ -90,7 +92,8 @@ package object utils {
         else
           source.getLines
             .map(l => {
-              new AssetPair(l.split("-")(0), l.split("-")(1))
+              val splitted = l.split("-")
+              new AssetPair(splitted(0), splitted(1))
             })
             .toList
       source.close()
@@ -99,7 +102,7 @@ package object utils {
   }
 
   def savePairs(pairs: List[AssetPair]): List[AssetPair] = {
-    val requestsFile = new File(s"pairs.txt")
+    val requestsFile = new File(settings.defaults.pairsFile)
     val output       = new PrintWriter(requestsFile, "utf-8")
 
     try pairs.foreach(p => output.println(s"${p.getAmountAsset}-${p.getPriceAsset}"))

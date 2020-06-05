@@ -532,7 +532,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   }
 
   // getOrderStatusInfoByIdWithSignature
-  routePath("/orders/{publicKey}/{orderId}") - {
+  routePath("/orderbook/{publicKey}/{orderId}") - {
 
     val testOrder = orderToCancel
     val publicKey = sender.publicKey
@@ -541,7 +541,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "sunny day" in test { route =>
       val ts        = System.currentTimeMillis()
       val signature = Base58.encode(crypto.sign(sender, publicKey ++ Longs.toByteArray(ts)))
-      Get(routePath(s"/orders/$publicKey/$orderId"))
+      Get(routePath(s"/orderbook/$publicKey/$orderId"))
         .withHeaders(
           RawHeader("Timestamp", ts.toString),
           RawHeader("Signature", signature)
@@ -552,7 +552,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
 
     "invalid signature" in test { route =>
-      Get(routePath(s"/orders/$publicKey/$orderId"))
+      Get(routePath(s"/orderbook/$publicKey/$orderId"))
         .withHeaders(
           RawHeader("Timestamp", System.currentTimeMillis.toString),
           RawHeader("Signature", "invalidSignature")

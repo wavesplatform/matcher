@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
@@ -15,7 +16,6 @@ import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future, blocking}
-import scala.util.{Failure, Success, Try}
 
 @NetworkTests
 class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
@@ -62,7 +62,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       2.minute
     )
 
-    orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+    orders.foreach(dex1.api.waitForOrderStatus(_, ApiOrderStatus.Status.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 

@@ -574,7 +574,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
           Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[ApiSuccessfulCancel] should matchTo(ApiSuccessfulCancel(okOrder.id()))
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
           }
         }
       )
@@ -617,7 +617,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             responseAs[ApiSuccessfulBatchCancel] should matchTo(
               ApiSuccessfulBatchCancel(
                 List(
-                  Right(ApiSuccessfulCancel(orderId = okOrder.id())),
+                  Right(ApiSuccessfulSingleCancel(orderId = okOrder.id())),
                   Left(
                     ApiError(
                       error = 25601,
@@ -677,7 +677,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           responseAs[ApiSuccessfulBatchCancel] should matchTo(
             ApiSuccessfulBatchCancel(
               List(
-                Right(ApiSuccessfulCancel(orderId = okOrder.id())),
+                Right(ApiSuccessfulSingleCancel(orderId = okOrder.id())),
                 Left(
                   ApiError(
                     error = 25601,
@@ -727,7 +727,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         ).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[ApiSuccessfulBatchCancel] should matchTo(
-            ApiSuccessfulBatchCancel(List(Right(ApiSuccessfulCancel(orderId = orderToCancel.id()))))
+            ApiSuccessfulBatchCancel(List(Right(ApiSuccessfulSingleCancel(orderId = orderToCancel.id()))))
           )
         }
       },
@@ -748,10 +748,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 ApiMarketDataWithMeta(
                   okOrder.assetPair.amountAsset,
                   amountAssetDesc.name,
-                  AssetInfo(amountAssetDesc.decimals).some,
+                  ApiAssetInfo(amountAssetDesc.decimals).some,
                   okOrder.assetPair.priceAsset,
                   priceAssetDesc.name,
-                  AssetInfo(priceAssetDesc.decimals).some,
+                  ApiAssetInfo(priceAssetDesc.decimals).some,
                   0L,
                   None,
                   ApiMatchingRules(0.1)
@@ -817,7 +817,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         { route =>
           Post(routePath(s"/orders/cancel/${okOrder.id()}")).withHeaders(apiKeyHeader) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[ApiSuccessfulCancel] should matchTo(ApiSuccessfulCancel(okOrder.id()))
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
           }
         },
         apiKey
@@ -856,7 +856,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           Post(routePath(s"/orders/cancel/${okOrder.id()}"))
             .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", okOrder.senderPublicKey.base58)) ~> route ~> check {
             status shouldEqual StatusCodes.OK
-            responseAs[ApiSuccessfulCancel] should matchTo(ApiSuccessfulCancel(okOrder.id()))
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
           }
         },
         apiKey
@@ -1277,8 +1277,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         rateCache = rateCache,
         validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
         () => DynamicSettings.symmetric(matcherFee)
-      ).route
+      )
 
-    f(route)
+    f(route.route)
   }
 }

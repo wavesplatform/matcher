@@ -8,7 +8,7 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
 @ApiModel(
-  description = "Order Fee Settings. Possible modes: DynamicFeeMode, FixedFeeMode, PercentFeeMode",
+  description = "Order Fee Settings. Can be one of: FeeModeDynamic, FeeModeFixed, FeeModePercent",
   subTypes = Array(
     classOf[FeeModeDynamic],
     classOf[FeeModeFixed],

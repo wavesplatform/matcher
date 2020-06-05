@@ -4,9 +4,27 @@ import cats.syntax.option._
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.model.OrderStatus
 import com.wavesplatform.dex.util.getSimpleName
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json, Reads, Writes}
 
-case class ApiOrderStatus(status: Status, filledAmount: Option[Long] = None, filledFee: Option[Long] = None, message: Option[String] = None)
+case class ApiOrderStatus(@ApiModelProperty(
+                            dataType = "string",
+                            allowableValues = "Accepted, NotFound, PartiallyFilled, Filled, Cancelled"
+                          ) status: Status,
+                          @ApiModelProperty(
+                            value = "Filled amount of existed order",
+                            dataType = "integer",
+                            allowEmptyValue = true
+                          ) filledAmount: Option[Long] = None,
+                          @ApiModelProperty(
+                            value = "Filled fee of existed order",
+                            dataType = "integer",
+                            allowEmptyValue = true
+                          ) filledFee: Option[Long] = None,
+                          @ApiModelProperty(
+                            value = "Brief message in case of not existed order",
+                            allowEmptyValue = true
+                          ) message: Option[String] = None)
 
 object ApiOrderStatus {
 

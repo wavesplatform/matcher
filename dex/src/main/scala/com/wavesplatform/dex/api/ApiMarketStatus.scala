@@ -4,10 +4,13 @@ import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Json, OWrites, Reads}
 
-case class ApiMarketStatus(lastTrade: Option[ApiLastTrade], bestBid: Option[ApiLevelAgg], bestAsk: Option[ApiLevelAgg])
+case class ApiMarketStatus(@ApiModelProperty(allowEmptyValue = true) lastTrade: Option[ApiLastTrade],
+                           @ApiModelProperty(allowEmptyValue = true) bestBid: Option[ApiLevelAgg],
+                           @ApiModelProperty(allowEmptyValue = true) bestAsk: Option[ApiLevelAgg])
 
 object ApiMarketStatus {
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontracts
 
+import com.github.ghik.silencer.silent
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -15,6 +16,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 
 import scala.concurrent.duration._
 
+@silent("deprecated")
 class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""")

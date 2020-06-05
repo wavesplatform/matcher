@@ -1,19 +1,33 @@
 package com.wavesplatform.dex.api
 
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 
+@ApiModel(description = "Cancel of multiple orders", parent = classOf[ApiSuccessfulCancel])
 case class ApiSuccessfulBatchCancel(
-    // TODO: In new API: should be a map id -> cancel result
-    message: List[List[Either[ApiError, ApiSuccessfulCancel]]],
-    success: Boolean = true,
-    status: String = "BatchCancelCompleted"
-)
+    @ApiModelProperty(
+      value = "List of successful cancellation messages or errors",
+      dataType = "[[Lcom.wavesplatform.dex.api.ApiSuccessfulSingleCancel;",
+    )
+    message: List[List[Either[ApiError, ApiSuccessfulSingleCancel]]], // TODO: In new API: should be a map id -> cancel result
+    @ApiModelProperty(value = "Success flag")
+    override val success: Boolean = ApiSuccessfulCancel.success,
+    @ApiModelProperty(
+      value = "Status",
+      example = "BatchCancelCompleted",
+      required = false
+    ) override val status: String = "BatchCancelCompleted")
+    extends ApiSuccessfulCancel
 
 object ApiSuccessfulBatchCancel {
+
   implicit val apiSuccessfulBatchCancelFormat: Format[ApiSuccessfulBatchCancel] = {
-    implicit val ef: Format[Either[ApiError, ApiSuccessfulCancel]] = com.wavesplatform.dex.json.eitherFormat[ApiError, ApiSuccessfulCancel]
+
+    implicit val ef: Format[Either[ApiError, ApiSuccessfulSingleCancel]] =
+      com.wavesplatform.dex.json.eitherFormat[ApiError, ApiSuccessfulSingleCancel]
+
     Json.format
   }
 
-  def apply(message: List[Either[ApiError, ApiSuccessfulCancel]]): ApiSuccessfulBatchCancel = ApiSuccessfulBatchCancel(message = List(message))
+  def apply(message: List[Either[ApiError, ApiSuccessfulSingleCancel]]): ApiSuccessfulBatchCancel = ApiSuccessfulBatchCancel(message = List(message))
 }

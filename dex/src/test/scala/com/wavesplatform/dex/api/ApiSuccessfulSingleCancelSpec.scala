@@ -6,7 +6,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.Json
 
-class ApiSuccessfulCancelSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
+class ApiSuccessfulSingleCancelSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
   private val json =
     """{
@@ -15,11 +15,11 @@ class ApiSuccessfulCancelSpec extends AnyFreeSpec with Matchers with DiffMatcher
       |  "status" : "OrderCanceled"
       |}""".stripMargin
 
-  private val message = ApiSuccessfulCancel(orderId = ByteStr.decodeBase58("CijYneWqeJwtYLQvP3T6nRNueTFSmB977ULUDBxPZJNH").get)
+  private val message = ApiSuccessfulSingleCancel(orderId = ByteStr.decodeBase58("CijYneWqeJwtYLQvP3T6nRNueTFSmB977ULUDBxPZJNH").get)
 
   "backward JSON compatibility" - {
     "deserialization" in {
-      Json.parse(json).as[ApiSuccessfulCancel] should matchTo(message)
+      Json.parse(json).as[ApiSuccessfulSingleCancel] should matchTo(message)
     }
 
     "serialization" in {

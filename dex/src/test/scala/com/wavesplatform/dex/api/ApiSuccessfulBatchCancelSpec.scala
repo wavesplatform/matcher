@@ -28,7 +28,7 @@ class ApiSuccessfulBatchCancelSpec extends AnyFreeSpec with Matchers with DiffMa
 
   private val message = ApiSuccessfulBatchCancel(
     List(
-      Right(ApiSuccessfulCancel(orderId = ByteStr.decodeBase58("8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK").get)),
+      Right(ApiSuccessfulSingleCancel(orderId = ByteStr.decodeBase58("8D36dK4snBwJHH9qfDyGo6xP5C4rCH2JPhPbbaJn5mLK").get)),
       Left(
         ApiError(
           error = 25601,

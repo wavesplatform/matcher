@@ -10,18 +10,19 @@ import com.wavesplatform.dex.domain.bytes.deser.EntityParser
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.Stateful
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
-import io.swagger.annotations.ApiModelProperty
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
+@ApiModel(value = "Order")
 case class OrderV3(@ApiModelProperty(
-                     value = "Base58 encoded Sender public key",
+                     value = "Base58 encoded Sender Public Key",
                      dataType = "string",
                      example = "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
                      required = true
                    ) senderPublicKey: PublicKey,
                    @ApiModelProperty(
-                     value = "Base58 encoded Matcher public key",
+                     value = "Base58 encoded Matcher Public Key",
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8",
                      required = true
@@ -47,7 +48,7 @@ case class OrderV3(@ApiModelProperty(
                    )
                    override val feeAsset: Asset,
                    @ApiModelProperty(
-                     value = "Order proofs as Base58 encoded signatures",
+                     value = "Order proofs as Base58 encoded signatures list",
                      dataType = "List[string]",
                      required = true
                    )

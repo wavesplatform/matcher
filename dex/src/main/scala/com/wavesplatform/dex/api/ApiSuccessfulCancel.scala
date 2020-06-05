@@ -1,15 +1,27 @@
 package com.wavesplatform.dex.api
 
 import com.github.ghik.silencer.silent
-import com.wavesplatform.dex.domain.order.Order
-import play.api.libs.json.{Json, OFormat}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 
 @silent("deprecated")
-case class ApiSuccessfulCancel(
-    orderId: Order.Id,
-    success: Boolean = true,
-    @deprecated(message = "This field is unnecessary", since = "1.2.0") status: String = "OrderCanceled",
+@ApiModel(
+  description = "Successful cancellation message. Can be one of: ApiSuccessfulSingleCancel, ApiSuccessfulBatchCancel",
+  subTypes = Array(
+    classOf[ApiSuccessfulSingleCancel],
+    classOf[ApiSuccessfulBatchCancel]
+  )
 )
+class ApiSuccessfulCancel {
+
+  @ApiModelProperty(value = "Success flag")
+  val success: Boolean = ApiSuccessfulCancel.success
+
+  @deprecated(message = "This field is unnecessary", since = "1.2.0")
+  @ApiModelProperty(allowableValues = "OrderCanceled, BatchCancelCompleted")
+  val status: String = ApiSuccessfulCancel.status
+}
+
 object ApiSuccessfulCancel {
-  implicit val apiSuccessfulCancelFormat: OFormat[ApiSuccessfulCancel] = Json.format
+  val success: Boolean = true
+  val status: String   = "OrderCanceled"
 }

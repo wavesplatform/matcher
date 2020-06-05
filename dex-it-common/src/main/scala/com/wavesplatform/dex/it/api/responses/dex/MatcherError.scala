@@ -4,6 +4,7 @@ import play.api.libs.json.{Format, Json}
 import shapeless.ops.hlist.{Mapper, ToTraversable, Zip}
 import shapeless.{::, Generic, HList, HNil, Poly1}
 
+// TODO use ApiError instead
 case class MatcherError(error: Int, message: String, status: String, params: Option[MatcherError.Params])
 object MatcherError {
   implicit val format: Format[MatcherError] = Json.format[MatcherError]

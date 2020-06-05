@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.{ApiAssetInfo, ApiOrderStatus}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -65,7 +65,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val markets = openMarkets.markets.head
 
       markets.amountAssetName shouldBe "WAVES"
-      markets.amountAssetInfo shouldBe Some(AssetInfo(8))
+      markets.amountAssetInfo shouldBe Some(ApiAssetInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
       markets.priceAssetInfo shouldBe Some(AssetInfo(IssueUsdTx.getDecimals))
@@ -230,10 +230,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val markets     = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
-    markets.amountAssetInfo shouldBe Some(AssetInfo(IssueWctTx.getDecimals))
+    markets.amountAssetInfo shouldBe Some(ApiAssetInfo(IssueWctTx.getDecimals))
 
     markets.priceAssetName shouldBe usdAssetName
-    markets.priceAssetInfo shouldBe Some(AssetInfo(IssueUsdTx.getDecimals))
+    markets.priceAssetInfo shouldBe Some(ApiAssetInfo(IssueUsdTx.getDecimals))
   }
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {

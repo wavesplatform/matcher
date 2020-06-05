@@ -4,7 +4,7 @@ import com.github.ghik.silencer.silent
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiLastTrade, ApiLevelAgg, ApiOrderBookHistoryItem}
+import com.wavesplatform.dex.api.{ApiAssetInfo, ApiLastTrade, ApiLevelAgg, ApiOrderBookHistoryItem}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -93,7 +93,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val markets = orderBooks.markets.head
 
         markets.amountAssetName shouldBe aliceAssetName
-        markets.amountAssetInfo shouldBe Some(AssetInfo(issueAliceAssetTx.getDecimals))
+        markets.amountAssetInfo shouldBe Some(ApiAssetInfo(issueAliceAssetTx.getDecimals))
 
         markets.priceAssetName shouldBe "WAVES"
         markets.priceAssetInfo shouldBe Some(AssetInfo(8))

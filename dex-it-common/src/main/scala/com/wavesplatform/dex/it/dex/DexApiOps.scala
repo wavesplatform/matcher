@@ -33,13 +33,13 @@ object DexApiOps {
     def place(order: Order): F[ApiSuccessfulPlace]       = explicitGet(self.tryPlace(order))
     def placeMarket(order: Order): F[ApiSuccessfulPlace] = explicitGet(self.tryPlaceMarket(order))
 
-    def cancel(owner: KeyPair, order: Order): F[ApiSuccessfulCancel]                       = cancel(owner, order.assetPair, order.id())
-    def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[ApiSuccessfulCancel] = explicitGet(self.tryCancel(owner, assetPair, id))
+    def cancel(owner: KeyPair, order: Order): F[ApiSuccessfulSingleCancel]                       = cancel(owner, order.assetPair, order.id())
+    def cancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[ApiSuccessfulSingleCancel] = explicitGet(self.tryCancel(owner, assetPair, id))
 
-    def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[ApiSuccessfulCancel] =
+    def cancelWithApiKey(order: Order, xUserPublicKey: Option[PublicKey] = None): F[ApiSuccessfulSingleCancel] =
       cancelWithApiKey(order.id(), xUserPublicKey)
 
-    def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[ApiSuccessfulCancel] =
+    def cancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[ApiSuccessfulSingleCancel] =
       explicitGet(self.tryCancelWithApiKey(id, xUserPublicKey))
 
     def cancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis()): F[ApiSuccessfulBatchCancel] =

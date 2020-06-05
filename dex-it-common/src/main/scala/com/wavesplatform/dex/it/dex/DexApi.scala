@@ -44,9 +44,9 @@ trait DexApi[F[_]] extends HasWaitReady[F] {
   def tryPlace(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
   def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]]
 
-  def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, ApiSuccessfulCancel]] = tryCancel(owner, order.assetPair, order.id())
-  def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulCancel]]
-  def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulCancel]]
+  def tryCancel(owner: KeyPair, order: Order): F[Either[MatcherError, ApiSuccessfulSingleCancel]] = tryCancel(owner, order.assetPair, order.id())
+  def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulSingleCancel]]
+  def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulSingleCancel]]
 
   def tryCancelAll(owner: KeyPair, timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, ApiSuccessfulBatchCancel]]
 
@@ -208,7 +208,7 @@ object DexApi {
       override def tryPlaceMarket(order: Order): F[Either[MatcherError, ApiSuccessfulPlace]] =
         tryParseJson(sttp.post(uri"$apiUri/orderbook/market").body(order))
 
-      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulCancel]] =
+      override def tryCancel(owner: KeyPair, assetPair: AssetPair, id: Order.Id): F[Either[MatcherError, ApiSuccessfulSingleCancel]] =
         tryParseJson {
           val body = Json.stringify(Json.toJson(cancelRequest(owner, id.toString)))
           sttp
@@ -248,7 +248,7 @@ object DexApi {
           .contentType("application/json", "UTF-8")
       }
 
-      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulCancel]] =
+      override def tryCancelWithApiKey(id: Order.Id, xUserPublicKey: Option[PublicKey]): F[Either[MatcherError, ApiSuccessfulSingleCancel]] =
         tryParseJson {
           sttp
             .post(uri"$apiUri/orders/cancel/${id.toString}")

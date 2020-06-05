@@ -4,23 +4,21 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import io.swagger.annotations.ApiModelProperty
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-import scala.annotation.meta.field
 import scala.util.{Failure, Success, Try}
 
-@ApiModel
-case class AssetPair(@(ApiModelProperty @field)(
+case class AssetPair(@ApiModelProperty(
                        value = "Base58 encoded amount asset ID",
                        dataType = "string",
                        example = "WAVES",
                        required = true
                      ) amountAsset: Asset,
-                     @(ApiModelProperty @field)(
-                       value = "Base58 encoded amount price ID",
+                     @ApiModelProperty(
+                       value = "Base58 encoded price asset ID",
                        dataType = "string",
                        example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
                        required = true

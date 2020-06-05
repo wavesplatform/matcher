@@ -5,8 +5,8 @@ import com.wavesplatform.dex.model.LastTrade
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
-case class ApiLastTrade(price: Long,
-                        amount: Long,
+case class ApiLastTrade(@ApiModelProperty() price: Long,
+                        @ApiModelProperty() amount: Long,
                         @ApiModelProperty(
                           value = "Side (sell or buy)",
                           dataType = "string",

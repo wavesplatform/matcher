@@ -3,7 +3,6 @@ package com.wavesplatform.dex.api
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
-import com.wavesplatform.dex.market.MatcherActor.AssetInfo
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -52,10 +51,10 @@ class ApiTradingMarketsSpec extends AnyFreeSpec with Matchers with DiffMatcherWi
     ApiMarketDataWithMeta(
       amountAsset = Asset.fromString("89M5b2chgRya9A5WnJx4irNuKzXExdEko2m8jmzdFMX").get,
       amountAssetName = "AmountAsset",
-      amountAssetInfo = AssetInfo(8).some,
+      amountAssetInfo = ApiAssetInfo(8).some,
       priceAsset = Asset.fromString("Chn6MVRNBk7mHNBQg67Zhc81aigaoZsLwwNo9QiJ5bd").get,
       priceAssetName = "PriceAsset",
-      priceAssetInfo = AssetInfo(8).some,
+      priceAssetInfo = ApiAssetInfo(8).some,
       created = 1591105681300L,
       restrictions = None,
       matchingRules = ApiMatchingRules(0.1)

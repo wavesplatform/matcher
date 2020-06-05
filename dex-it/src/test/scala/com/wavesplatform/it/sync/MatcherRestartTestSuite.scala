@@ -1,9 +1,11 @@
 package com.wavesplatform.it.sync
 
+import com.github.ghik.silencer.silent
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.it.MatcherSuiteBase
 
+@silent("deprecated")
 class MatcherRestartTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {

@@ -109,6 +109,13 @@ class OrderBookActorSpecification
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
+    "recovery - if there is a matching rule - DEX-775" in obcTestWithPrepare(
+      prepare = (obsdb, p) => obsdb.update(p, 50, Some(OrderBookSnapshot.empty)),
+      matchingRules = NonEmptyList.of(DenormalizedMatchingRule(0, 0.00000001), DenormalizedMatchingRule(40, 0.0000001))
+    ) { (pair, _, tp) =>
+      tp.expectMsg(OrderBookRecovered(pair, Some(50)))
+    }
+
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
         val ord               = buy(p, 10 * Order.PriceConstant, 100)

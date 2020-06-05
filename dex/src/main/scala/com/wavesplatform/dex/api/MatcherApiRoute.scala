@@ -109,8 +109,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       matcherStatusBarrier {
         handleExceptions(gRPCExceptionsHandler) {
           handleRejections(invalidJsonParsingRejectionsHandler) {
-            getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
-              getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~ getOrderStatusInfoByIdWithApiKey ~ getOrderStatusInfoByIdWithSignature ~
+            getOrderStatusInfoByIdWithSignature ~ getOrderBook ~ marketStatus ~ placeLimitOrder ~ placeMarketOrder ~ getAssetPairAndPublicKeyOrderHistory ~
+              getPublicKeyOrderHistory ~ getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~ getOrderStatusInfoByIdWithApiKey ~
               historyDelete ~ cancel ~ cancelAll ~ cancelAllById ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
               upsertRate ~ deleteRate ~ saveSnapshots
           }
@@ -813,7 +813,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       }
   }
 
-  @Path("/orders/{publicKey}/{orderId}")
+  @Path("/orderbook/{publicKey}/{orderId}")
   @ApiOperation(
     value = "Order Status Info by Public Key and ID",
     notes = "Get Status Info of the specified order for a given public key",
@@ -834,7 +834,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            paramType = "header")
     )
   )
-  def getOrderStatusInfoByIdWithSignature: Route = (path("orders" / PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
+  def getOrderStatusInfoByIdWithSignature: Route = (path("orderbook" / PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
     signedGet(publicKey) { getOrderStatusInfo(orderId, publicKey.toAddress) }
   }
 

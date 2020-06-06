@@ -29,7 +29,8 @@ case class Request(httpType: RequestType, path: String, tag: RequestTag, obj: Ap
   val defaultHeaders = Map(
     HttpHeaders.ACCEPT       -> "application/json",
     HttpHeaders.CONNECTION   -> "close",
-    HttpHeaders.CONTENT_TYPE -> "application/json"
+    HttpHeaders.CONTENT_TYPE -> "application/json",
+    HttpHeaders.HOST         -> settings.hosts.shooted
   )
 
   def mkGet(path: String, tag: RequestTag, additionalHeaders: Map[String, String] = Map.empty) = {
@@ -43,7 +44,6 @@ case class Request(httpType: RequestType, path: String, tag: RequestTag, obj: Ap
     val body = mkJson(obj).replace("\"matcherFeeAssetId\":\"WAVES\",", "")
 
     val headers = defaultHeaders ++ Map(
-      HttpHeaders.HOST           -> settings.hosts.shooted,
       HttpHeaders.CONTENT_LENGTH -> body.length.toString,
       "X-API-Key"                -> settings.dexRestApiKey
     )

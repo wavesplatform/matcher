@@ -13,7 +13,7 @@ object RequestTag extends Enumeration {
   val RESERVED_BALANCE      = Value("RESERVED_BALANCE")
   val TRADABLE_BALANCE      = Value("TRADABLE_BALANCE")
   val ORDER_BOOK_BY_PAIR = Value("ORDER_HISTORY_BY_PAIR")
-  val ORDER_HISTORY_BY_ACC  = Value("ORDER_HISTORY_BY_ACC")
+  val ORDER_HISTORY_BY_ADDRESS  = Value("ORDER_HISTORY_BY_ACC")
   val ORDER_STATUS          = Value("ORDER_STATUS")
   val CANCEL                = Value("CANCEL")
   val PLACE                 = Value("PLACE")

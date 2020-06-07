@@ -137,15 +137,15 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val oha   = settings.distribution.orderHistoryByPairAndKey
+    val oha   = settings.distribution.orderHistoryByAddress
     val ohp   = settings.distribution.orderBookByPair
 
     def mkGetOrderBookByAcc(a: PrivateKeyAccount) = {
       Request(
         RequestType.GET,
-        s"/matcher/orderbook/${Base58.encode(a.getPublicKey)}",
-        RequestTag.ORDER_HISTORY_BY_ACC,
-        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+        s"/matcher/orderbook/${a.getAddress}?activeOnly=false&closedOnly=false",
+        RequestTag.ORDER_HISTORY_BY_ADDRESS,
+        headers = Map("X-API-Key" -> settings.dexRestApiKey)
       )
     }
 
@@ -166,7 +166,7 @@ object TankGenerator {
       .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR)))
       .flatten
     val tradable = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ACC)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ADDRESS)))
       .flatten
 
     Random.shuffle(reserved ++ tradable).take((requestsCount * (ohp + oha)).toInt)

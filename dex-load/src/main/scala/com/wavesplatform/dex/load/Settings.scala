@@ -8,7 +8,7 @@ case class Defaults(minimalOrderAmount: Long,
                     maxOrdersPerAccount: Int,
                     wavesPerAccount: Long)
 case class Hosts(node: String, matcher: String, shooted: String)
-case class Distribution(orderHistoryByPair: Double,
+case class Distribution(orderBookByPair: Double,
                         orderStatus: Double,
                         orderHistoryByPairAndKey: Double,
                         tradableBalance: Double,

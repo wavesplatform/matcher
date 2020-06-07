@@ -267,14 +267,15 @@ object WavesDexLoadCli extends ScoptImplicits {
   }
 
   private val defaultFeederFile = new File("feeder.csv")
+  private val defaultAuthFile   = new File("authkey.txt")
 
   private case class Args(addressSchemeByte: Char = 'T',
                           command: Option[Command] = None,
-                          authServicesPrivateKeyFile: File = defaultFeederFile,
+                          authServicesPrivateKeyFile: File = defaultAuthFile,
                           feederFile: File = defaultFeederFile,
                           pairsFile: Option[File] = None,
                           accountsNumber: Int = 1000,
-                          seedPrefix: String = "loadtest-",
+                          seedPrefix: String = "loadtest-07062020-01",
                           orderBookNumberPerAccount: Int = 10,
                           requestsType: Int = 1,
                           requestsCount: Int = 30000,
@@ -287,7 +288,7 @@ object WavesDexLoadCli extends ScoptImplicits {
 
   private def prependScheme(uri: String): String = {
     val (plain, secure) = "ws://" -> "wss://"
-    if (uri.startsWith(secure) || uri.startsWith(plain)) uri else s"$plain$uri"
+    if (uri.startsWith("https://")) s"${uri.replace("https://", secure)}" else s"${uri.replace("http://", plain)}"
   }
 
   private def getOrThrow[K, V](from: Either[Map[K, Seq[DiffResult]], Map[K, V]]): Map[K, V] = from match {

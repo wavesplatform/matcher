@@ -152,9 +152,8 @@ object TankGenerator {
     def mkGetOrderBookByPair(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
         RequestType.GET,
-        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey())}",
-        RequestTag.ORDER_HISTORY_BY_PAIR,
-        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
+        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}",
+        RequestTag.ORDER_BOOK
       )
     }
 
@@ -164,7 +163,7 @@ object TankGenerator {
       })
 
     val reserved = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_PAIR)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_BOOK)))
       .flatten
     val tradable = List
       .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ACC)))

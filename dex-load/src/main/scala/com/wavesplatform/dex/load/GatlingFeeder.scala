@@ -56,7 +56,7 @@ object GatlingFeeder {
     val source = Source.fromFile(pairsFile)
     try {
       val pairs = Random.shuffle(source.getLines.toVector)
-      require(numberPerClient < pairs.size, "numberPerClient > available asset pairs in file")
+      require(numberPerClient <= pairs.size, "numberPerClient > available asset pairs in file")
       pairs.take(numberPerClient).map(x => s"""{"T":"obs","S":"$x","d":100}""").mkString(";")
     } finally source.close()
   }

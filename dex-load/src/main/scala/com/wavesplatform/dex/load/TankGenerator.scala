@@ -181,11 +181,18 @@ object TankGenerator {
           .as[List[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
+            val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
+              case JsSuccess(name, _) => name
+              case _: JsError         => "WAVES"
+            }
+            val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
+              case JsSuccess(name, _) => name
+              case _: JsError         => "WAVES"
+            }
             Request(
               RequestType.GET,
-              s"/matcher/orders/${a.getAddress}/$id",
-              RequestTag.ORDER_STATUS,
-              headers = Map("X-API-Key" -> settings.dexRestApiKey, "X-User-Public-Key" -> Base58.encode(a.getPublicKey()))
+              s"/matcher/orderbook/$aa/$pa/$id",
+              RequestTag.ORDER_STATUS
             )
           })
       })

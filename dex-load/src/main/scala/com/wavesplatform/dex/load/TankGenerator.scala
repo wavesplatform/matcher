@@ -153,7 +153,7 @@ object TankGenerator {
       Request(
         RequestType.GET,
         s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}",
-        RequestTag.ORDER_BOOK
+        RequestTag.ORDER_BOOK_BY_PAIR
       )
     }
 
@@ -163,7 +163,7 @@ object TankGenerator {
       })
 
     val reserved = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_BOOK)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR)))
       .flatten
     val tradable = List
       .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ACC)))

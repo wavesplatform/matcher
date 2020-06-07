@@ -138,7 +138,7 @@ object TankGenerator {
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
     val oha   = settings.distribution.orderHistoryByPairAndKey
-    val ohp   = settings.distribution.orderHistoryByPair
+    val ohp   = settings.distribution.orderBookByPair
 
     def mkGetOrderBookByAcc(a: PrivateKeyAccount) = {
       Request(

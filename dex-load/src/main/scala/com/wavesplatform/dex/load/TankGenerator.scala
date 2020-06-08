@@ -137,8 +137,8 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val oha   = settings.distribution.orderHistoryByPairAndKey
-    val ohp   = settings.distribution.orderBookByPair
+    val obpk   = settings.distribution.orderBookByPairAndKey
+    val obp   = settings.distribution.orderBookByPair
 
     def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
@@ -169,7 +169,7 @@ object TankGenerator {
       .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDERBOOK_BY_PAIR_AND_KEY)))
       .flatten
 
-    Random.shuffle(reserved ++ tradable).take((requestsCount * (ohp + oha)).toInt)
+    Random.shuffle(reserved ++ tradable).take((requestsCount * (obp + obpk)).toInt)
   }
 
   private def mkOrderStatuses(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {

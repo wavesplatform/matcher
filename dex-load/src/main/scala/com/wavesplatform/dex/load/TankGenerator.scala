@@ -261,7 +261,7 @@ object TankGenerator {
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
         mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile) ++
-        mkBalances(accounts, requestsCount, pairsFile) ++
+        mkBalances(accounts, (requestsCount * settings.distribution.tradableBalance).toInt, pairsFile) ++
         mkOrderHistory(accounts, requestsCount, pairsFile) ++
         mkCancels(accounts, (requestsCount * settings.distribution.placeOrder).toInt)
     )

@@ -275,7 +275,7 @@ object WavesDexLoadCli extends ScoptImplicits {
                           feederFile: File = defaultFeederFile,
                           pairsFile: Option[File] = None,
                           accountsNumber: Int = 1000,
-                          seedPrefix: String = "loadtest-08062020-04",
+                          seedPrefix: String = "loadtest-08062020-05",
                           orderBookNumberPerAccount: Int = 10,
                           requestsType: Int = 1,
                           requestsCount: Int = 30000,

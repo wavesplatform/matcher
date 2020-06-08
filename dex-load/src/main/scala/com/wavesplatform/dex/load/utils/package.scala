@@ -34,11 +34,11 @@ package object utils {
     "Signature" -> services.matcher.getOrderHistorySignature(account, timestamp)
   )
 
-  def getOrderBook(account: PrivateKeyAccount): JsValue = {
+  def getOrderBook(account: PrivateKeyAccount, activeOnly: Boolean = true): JsValue = {
     Json
       .parse(
         sttp
-          .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}")
+          .get(uri"${settings.hosts.matcher}/matcher/orderbook/${Base58.encode(account.getPublicKey)}?activeOnly=$activeOnly")
           .headers(mkOrderHistoryHeaders(account))
           .send()
           .body

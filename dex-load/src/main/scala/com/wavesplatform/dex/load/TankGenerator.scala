@@ -143,7 +143,7 @@ object TankGenerator {
     def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
         RequestType.GET,
-        s"/matcher/orderbook/${a.getAddress}/${p.getPriceAsset}/publickey/${Base58.encode(a.getPublicKey)}",
+        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publickey/${Base58.encode(a.getPublicKey)}?activeOnly=false&closedOnly=false",
         RequestTag.ORDERBOOK_BY_PAIR_AND_KEY,
         headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
       )
@@ -177,7 +177,7 @@ object TankGenerator {
 
     val statuses = accounts
       .flatMap(a => {
-        getOrderBook(a)
+        getOrderBook(a, false)
           .as[List[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
@@ -250,7 +250,7 @@ object TankGenerator {
         null,
         false
       )
-      println(s"\tPlacing order: ${mkJson(o)}")
+      println(s"\tPlacing order ${o.getId}: ${mkJson(o)}")
     }
     println("Done")
   }

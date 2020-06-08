@@ -13,7 +13,7 @@ import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.{WsHandlerActor, WsInternalHandlerActor, WsInternalHandlerDirectoryActor}
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
@@ -29,7 +29,8 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
-case class MatcherWebSocketRoute(addressDirectory: ActorRef,
+case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalHandlerDirectoryActor.Message],
+                                 addressDirectory: ActorRef,
                                  matcher: ActorRef,
                                  time: Time,
                                  assetPairBuilder: AssetPairBuilder,
@@ -42,9 +43,9 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   import mat.executionContext
 
-  override def route: Route = pathPrefix("ws") { commonWsRoute }
+  override def route: Route = pathPrefix("ws" / "v0") { internalWsRoute ~ commonWsRoute }
 
-  private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
+  private val commonWsRoute: Route = (pathEnd & get) {
     import webSocketSettings._
 
     val clientId = UUID.randomUUID().toString
@@ -69,6 +70,69 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         behavior = WsHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
         name = s"handler-$clientId"
       )
+
+    val server: Sink[WsHandlerActor.Message, NotUsed] =
+      ActorSink
+        .actorRef[WsHandlerActor.Message](
+          ref = webSocketHandlerRef,
+          onCompleteMessage = WsHandlerActor.Event.Completed(().asRight),
+          onFailureMessage = e => WsHandlerActor.Event.Completed(e.asLeft)
+        )
+        .named(s"server-$clientId")
+
+    // From client to server
+    val serverSink: Sink[Message, NotUsed] =
+      Flow[Message]
+        .mapAsync[WsHandlerActor.Command](1) {
+          case tm: TextMessage =>
+            val parseResult =
+              for {
+                strictText <- tm.toStrict(webSocketHandler.pingInterval / 5).map(_.getStrictText)
+                clientMessage <- Try { Json.parse(strictText).as[WsClientMessage] } match {
+                  case Success(cm)        => Future.successful { WsHandlerActor.Command.ProcessClientMessage(cm) }
+                  case Failure(exception) => Future.failed(exception)
+                }
+              } yield clientMessage
+
+            parseResult.recover { case _ => WsHandlerActor.Command.ForwardClientError(InvalidJson(Nil)) }
+
+          case bm: BinaryMessage =>
+            bm.dataStream.runWith(Sink.ignore)
+            Future.failed { new IllegalArgumentException("Binary messages are not supported") }
+        }
+        .named(s"sink-$clientId")
+        .to(server)
+
+    handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, clientSource) }
+  }
+
+  private val internalWsRoute: Route = (path("internal") & get) {
+    import webSocketSettings._
+
+    val clientId = UUID.randomUUID().toString
+
+    // From server to client
+    val client: Source[TextMessage.Strict, typed.ActorRef[WsServerMessage]] =
+      ActorSource
+        .actorRef[WsServerMessage](
+          { case WsServerMessage.Complete => },
+          PartialFunction.empty,
+          10,
+          OverflowStrategy.fail
+        )
+        .named(s"source-$clientId")
+        .map(WsMessage.toStrictTextMessage(_)(WsServerMessage.wsServerMessageWrites))
+        .watchTermination()(handleTermination[WsServerMessage])
+
+    val (clientRef, clientSource) = client.preMaterialize()
+
+    val webSocketHandlerRef: typed.ActorRef[WsInternalHandlerActor.Message] =
+      mat.system.spawn(
+        behavior = WsInternalHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
+        name = s"handler-$clientId"
+      )
+
+    wsInternalHandlerDirectoryRef ! WsInternalHandlerDirectoryActor.Command.Subscribe(webSocketHandlerRef)
 
     val server: Sink[WsHandlerActor.Message, NotUsed] =
       ActorSink

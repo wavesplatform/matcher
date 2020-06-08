@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiLevelAgg, ApiOrderStatus}
+import com.wavesplatform.dex.api.{ApiOrderStatus, ApiV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.it.MatcherSuiteBase
@@ -88,7 +88,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     withClue("orderBook check") {
       val ob = dex1.api.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(ApiLevelAgg(97142857L, 70L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(ApiV0LevelAgg(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 }

@@ -264,14 +264,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   routePath("/orderbook/{amountAsset}/{priceAsset}") - {
     "returns an order book" in test(
       { route =>
-        Get(routePath(s"/orderbook/$smartAssetId/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[ApiV0OrderBook] should matchTo(
             ApiV0OrderBook(
               timestamp = 0L,
               pair = smartWavesPair,
-              bids = smartWavesAggregatedSnapshot.bids.toList.map(ApiLevelAgg.fromLevelAgg),
-              asks = smartWavesAggregatedSnapshot.asks.toList.map(ApiLevelAgg.fromLevelAgg)
+              bids = smartWavesAggregatedSnapshot.bids.toList.map(ApiV0LevelAgg.fromLevelAgg),
+              asks = smartWavesAggregatedSnapshot.asks.toList.map(ApiV0LevelAgg.fromLevelAgg)
             )
           )
         }

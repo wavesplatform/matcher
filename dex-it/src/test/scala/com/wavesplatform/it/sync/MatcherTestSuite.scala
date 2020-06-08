@@ -4,7 +4,7 @@ import com.github.ghik.silencer.silent
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiAssetInfo, ApiLastTrade, ApiLevelAgg, ApiOrderBookHistoryItem}
+import com.wavesplatform.dex.api.{ApiAssetInfo, ApiLastTrade, ApiOrderBookHistoryItem, ApiV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -172,7 +172,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob checks that the order in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.asks should contain(ApiLevelAgg(150, 1900.waves))
+        orders.asks should contain(ApiV0LevelAgg(150, 1900.waves))
       }
 
       "buy order should match on few price levels" in {
@@ -220,7 +220,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Alice checks that the order is in the order book
         val orders2 = dex1.api.orderBook(aliceWavesPair)
-        orders2.asks should contain(ApiLevelAgg(100, 2000.waves))
+        orders2.asks should contain(ApiV0LevelAgg(100, 2000.waves))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
@@ -234,7 +234,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.bids should contain(ApiLevelAgg(30, 2000.waves))
+        orders.bids should contain(ApiV0LevelAgg(30, 2000.waves))
 
         // Check balances
         waitForOrderAtNode(order5)
@@ -290,13 +290,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val resp1 = dex1.api.orderBookStatus(bob2WavesPair)
         resp1.lastTrade shouldBe None
         resp1.bestBid shouldBe None
-        resp1.bestAsk should matchTo { Option(ApiLevelAgg(askAmount, ask)) }
+        resp1.bestAsk should matchTo { Option(ApiV0LevelAgg(askAmount, ask)) }
 
         dex1.api.place(mkOrder(alice, bob2WavesPair, BUY, bidAmount, bid))
 
         val resp2 = dex1.api.orderBookStatus(bob2WavesPair)
         resp2.lastTrade should matchTo { Option(ApiLastTrade(ask, askAmount, OrderType.BUY)) }
-        resp2.bestBid should matchTo { Option(ApiLevelAgg(bidAmount - askAmount, bid)) }
+        resp2.bestBid should matchTo { Option(ApiV0LevelAgg(bidAmount - askAmount, bid)) }
         resp2.bestAsk shouldBe None
       }
     }

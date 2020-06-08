@@ -15,7 +15,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
-import com.wavesplatform.dex.api.{ApiLevelAgg, ApiV0OrderBook}
+import com.wavesplatform.dex.api.{ApiV0LevelAgg, ApiV0OrderBook}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -303,8 +303,8 @@ class AggregatedOrderBookActorSpec
             ApiV0OrderBook(
               timestamp = 1L,
               pair = pair,
-              bids = List(ApiLevelAgg(50L, 1000L)),
-              asks = List(ApiLevelAgg(99L, 2000L))
+              bids = List(ApiV0LevelAgg(50L, 1000L)),
+              asks = List(ApiV0LevelAgg(99L, 2000L))
             )
 
           actual should matchTo(expected)
@@ -355,8 +355,8 @@ class AggregatedOrderBookActorSpec
             ApiV0OrderBook(
               timestamp = 3L,
               pair = pair,
-              bids = List(ApiLevelAgg(50L, 1000L), ApiLevelAgg(30L, 999L)),
-              asks = List(ApiLevelAgg(99L, 2000L), ApiLevelAgg(1L, 2100L))
+              bids = List(ApiV0LevelAgg(50L, 1000L), ApiV0LevelAgg(30L, 999L)),
+              asks = List(ApiV0LevelAgg(99L, 2000L), ApiV0LevelAgg(1L, 2100L))
             )
 
           actual should matchTo(expected)
@@ -415,10 +415,10 @@ class AggregatedOrderBookActorSpec
       asks = levelAggsFromSide(ob.asks)
     )
 
-  private def levelAggsFromSide(side: Side): List[ApiLevelAgg] =
+  private def levelAggsFromSide(side: Side): List[ApiV0LevelAgg] =
     AggregatedOrderBookActor
       .aggregateByPrice(side)
-      .map(pa => ApiLevelAgg.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
+      .map(pa => ApiV0LevelAgg.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
       .toList
       .sortBy(_.price)(side.ordering)
 

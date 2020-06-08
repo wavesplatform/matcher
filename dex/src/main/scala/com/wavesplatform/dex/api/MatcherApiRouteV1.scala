@@ -52,7 +52,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",
     httpMethod = "GET",
-    response = classOf[Any]
+    response = classOf[ApiV1OrderBook]
   )
   @ApiImplicitParams(
     Array(

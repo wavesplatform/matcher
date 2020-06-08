@@ -9,13 +9,15 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Json, OWrites, Reads}
 
 case class ApiMarketStatus(@ApiModelProperty(allowEmptyValue = true) lastTrade: Option[ApiLastTrade],
-                           @ApiModelProperty(allowEmptyValue = true) bestBid: Option[ApiLevelAgg],
-                           @ApiModelProperty(allowEmptyValue = true) bestAsk: Option[ApiLevelAgg])
+                           @ApiModelProperty(allowEmptyValue = true) bestBid: Option[ApiV0LevelAgg],
+                           @ApiModelProperty(allowEmptyValue = true) bestAsk: Option[ApiV0LevelAgg])
 
 object ApiMarketStatus {
 
   def fromMarketStatus(ms: MarketStatus): ApiMarketStatus =
-    ApiMarketStatus(ms.lastTrade.map(ApiLastTrade.fromLastTrade), ms.bestBid.map(ApiLevelAgg.fromLevelAgg), ms.bestAsk.map(ApiLevelAgg.fromLevelAgg))
+    ApiMarketStatus(ms.lastTrade.map(ApiLastTrade.fromLastTrade),
+                    ms.bestBid.map(ApiV0LevelAgg.fromLevelAgg),
+                    ms.bestAsk.map(ApiV0LevelAgg.fromLevelAgg))
 
   implicit val apiMarketStatusWrites: OWrites[ApiMarketStatus] = { ms =>
     Json.obj(
@@ -41,8 +43,8 @@ object ApiMarketStatus {
     ) { (lastPrice, lastAmount, lastSide, bid, bidAmount, ask, askAmount) =>
       ApiMarketStatus(
         lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(ApiLastTrade.apply)),
-        bestBid = (bidAmount, bid).tupled.map(Function.tupled(ApiLevelAgg.apply)),
-        bestAsk = (askAmount, ask).tupled.map(Function.tupled(ApiLevelAgg.apply))
+        bestBid = (bidAmount, bid).tupled.map(Function.tupled(ApiV0LevelAgg.apply)),
+        bestAsk = (askAmount, ask).tupled.map(Function.tupled(ApiV0LevelAgg.apply))
       )
     }
 }

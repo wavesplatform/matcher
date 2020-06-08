@@ -10,13 +10,7 @@ import com.wavesplatform.wavesj.ApiJson
 
 object RequestTag extends Enumeration {
   type RequestTag = Value
-  val RESERVED_BALANCE      = Value("RESERVED_BALANCE")
-  val TRADABLE_BALANCE      = Value("TRADABLE_BALANCE")
-  val ORDER_BOOK_BY_PAIR = Value("ORDER_HISTORY_BY_PAIR")
-  val ORDER_HISTORY_BY_ADDRESS  = Value("ORDER_HISTORY_BY_ACC")
-  val ORDER_STATUS          = Value("ORDER_STATUS")
-  val CANCEL                = Value("CANCEL")
-  val PLACE                 = Value("PLACE")
+  val TRADABLE_BALANCE, ORDER_BOOK_BY_PAIR, ORDERBOOK_BY_PAIR_AND_KEY, ORDER_STATUS, CANCEL, PLACE = Value
 }
 
 object RequestType extends Enumeration {

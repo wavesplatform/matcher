@@ -10,9 +10,8 @@ case class Defaults(minimalOrderAmount: Long,
 case class Hosts(node: String, matcher: String, shooted: String)
 case class Distribution(orderBookByPair: Double,
                         orderStatus: Double,
-                        orderHistoryByAddress: Double,
+                        orderHistoryByPairAndKey: Double,
                         tradableBalance: Double,
-                        reservedBalance: Double,
                         placeOrder: Double,
                         cancelOrder: Double)
 

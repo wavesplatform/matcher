@@ -7,7 +7,7 @@ import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
-import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
+import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.util.Random
 
@@ -137,19 +137,19 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val oha   = settings.distribution.orderHistoryByAddress
+    val oha   = settings.distribution.orderHistoryByPairAndKey
     val ohp   = settings.distribution.orderBookByPair
 
-    def mkGetOrderBookByAcc(a: PrivateKeyAccount) = {
+    def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
         RequestType.GET,
-        s"/matcher/orderbook/${a.getAddress}?activeOnly=false&closedOnly=false",
-        RequestTag.ORDER_HISTORY_BY_ADDRESS,
-        headers = Map("X-API-Key" -> settings.dexRestApiKey)
+        s"/matcher/orderbook/${a.getAddress}/${p.getPriceAsset}/publickey/${Base58.encode(a.getPublicKey)}",
+        RequestTag.ORDERBOOK_BY_PAIR_AND_KEY,
+        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
       )
     }
 
-    def mkGetOrderBookByPair(a: PrivateKeyAccount, p: AssetPair) = {
+    def mkGetOrderBookByPair(p: AssetPair) = {
       Request(
         RequestType.GET,
         s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}",
@@ -157,16 +157,16 @@ object TankGenerator {
       )
     }
 
-    val all = accounts
+    val all = pairs.map(p => mkGetOrderBookByPair(p)) ++ accounts
       .flatMap(a => {
-        mkGetOrderBookByAcc(a) :: pairs.map(p => mkGetOrderBookByPair(a, p))
+        pairs.map(p => mkGetOrderBookByPairAndKey(a, p))
       })
 
     val reserved = List
       .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR)))
       .flatten
     val tradable = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDER_HISTORY_BY_ADDRESS)))
+      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.ORDERBOOK_BY_PAIR_AND_KEY)))
       .flatten
 
     Random.shuffle(reserved ++ tradable).take((requestsCount * (ohp + oha)).toInt)
@@ -210,17 +210,7 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val rb    = settings.distribution.reservedBalance
     val tb    = settings.distribution.tradableBalance
-
-    def mkReservedBalance(a: PrivateKeyAccount) = {
-      Request(
-        RequestType.GET,
-        s"/matcher/balance/reserved/${Base58.encode(a.getPublicKey())}",
-        RequestTag.RESERVED_BALANCE,
-        headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
-      )
-    }
 
     def mkTradableBalance(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
@@ -232,17 +222,15 @@ object TankGenerator {
     }
 
     val all = accounts.flatMap(a => {
-      mkReservedBalance(a) :: pairs.map(p => { mkTradableBalance(a, p) })
+      pairs.map(p => { mkTradableBalance(a, p) })
     })
 
-    val reserved = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.RESERVED_BALANCE)))
-      .flatten
-    val tradable = List
-      .fill(requestsCount / all.length + 1)(all.filter(_.tag.equals(RequestTag.TRADABLE_BALANCE)))
-      .flatten
-
-    Random.shuffle(reserved ++ tradable).take((requestsCount * (tb + rb)).toInt)
+    Random
+      .shuffle(
+        List
+          .fill(requestsCount / all.length + 1)(all)
+          .flatten)
+      .take(requestsCount)
   }
 
   def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {

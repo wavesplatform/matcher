@@ -6,7 +6,6 @@ import com.wavesplatform.dex.api.{ApiAssetInfo, ApiOrderStatus}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.market.MatcherActor.AssetInfo
 import com.wavesplatform.dex.model.AcceptedOrder
 import com.wavesplatform.it.MatcherSuiteBase
 
@@ -68,7 +67,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       markets.amountAssetInfo shouldBe Some(ApiAssetInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
-      markets.priceAssetInfo shouldBe Some(AssetInfo(IssueUsdTx.getDecimals))
+      markets.priceAssetInfo shouldBe Some(ApiAssetInfo(IssueUsdTx.getDecimals))
     }
 
     "check usd and waves balance after fill" in {

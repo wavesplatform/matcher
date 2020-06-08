@@ -12,8 +12,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.OrderNotFound
 import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.market.MatcherActor.AssetInfo
-import com.wavesplatform.dex.model.{AcceptedOrderType, LevelAgg, OrderStatus}
+import com.wavesplatform.dex.model.{AcceptedOrderType, OrderStatus}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.config.DexTestConfig.issueAssetPair
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -96,7 +95,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         markets.amountAssetInfo shouldBe Some(ApiAssetInfo(issueAliceAssetTx.getDecimals))
 
         markets.priceAssetName shouldBe "WAVES"
-        markets.priceAssetInfo shouldBe Some(AssetInfo(8))
+        markets.priceAssetInfo shouldBe Some(ApiAssetInfo(8))
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
@@ -173,7 +172,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob checks that the order in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.asks should contain(LevelAgg(150, 1900.waves))
+        orders.asks should contain(ApiLevelAgg(150, 1900.waves))
       }
 
       "buy order should match on few price levels" in {
@@ -221,7 +220,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Alice checks that the order is in the order book
         val orders2 = dex1.api.orderBook(aliceWavesPair)
-        orders2.asks should contain(LevelAgg(100, 2000.waves))
+        orders2.asks should contain(ApiLevelAgg(100, 2000.waves))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
@@ -235,7 +234,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.bids should contain(LevelAgg(30, 2000.waves))
+        orders.bids should contain(ApiLevelAgg(30, 2000.waves))
 
         // Check balances
         waitForOrderAtNode(order5)

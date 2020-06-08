@@ -1,10 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiLevelAgg
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.model.LevelAgg
 import com.wavesplatform.it.MatcherSuiteBase
 
 class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
@@ -56,7 +56,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(bobOrder2)
 
       val orderBook2 = dex1.api.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelAgg(bobOrder2.amount, bobOrder2.price))
+      orderBook2.asks shouldBe List(ApiLevelAgg(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
       dex1.api.cancel(bob, bobOrder2)
@@ -96,7 +96,7 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(bobOrder2)
 
       val orderBook2 = dex1.api.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelAgg(bobOrder2.amount, bobOrder2.price))
+      orderBook2.asks shouldBe List(ApiLevelAgg(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
     }
   }

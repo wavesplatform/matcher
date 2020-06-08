@@ -143,7 +143,7 @@ object TankGenerator {
     def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
         RequestType.GET,
-        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publickey/${Base58.encode(a.getPublicKey)}?activeOnly=false&closedOnly=false",
+        s"/matcher/orderbook/${p.getAmountAsset}/${p.getPriceAsset}/publicKey/${Base58.encode(a.getPublicKey)}?activeOnly=false&closedOnly=false",
         RequestTag.ORDERBOOK_BY_PAIR_AND_KEY,
         headers = Map("Signature" -> services.matcher.getOrderHistorySignature(a, ts), "Timestamp" -> ts.toString)
       )

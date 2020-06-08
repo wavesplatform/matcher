@@ -15,7 +15,6 @@ import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
 import com.wavesplatform.dex.util.{ActorNameParser, WorkingStash}
 import com.wavesplatform.dex.{WatchDistributedCompletionActor, error}
-import play.api.libs.json._
 import scorex.utils._
 
 class MatcherActor(settings: MatcherSettings,
@@ -314,7 +313,6 @@ object MatcherActor {
   case object Pong
 
   case class AssetInfo(decimals: Int)
-  implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]
 
   case class MarketData(pair: AssetPair,
                         amountAssetName: String,

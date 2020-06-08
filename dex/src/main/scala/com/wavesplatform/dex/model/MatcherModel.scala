@@ -11,7 +11,6 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
-import play.api.libs.json._
 
 object MatcherModel {
 
@@ -33,9 +32,6 @@ object MatcherModel {
 }
 
 case class LevelAgg(amount: Long, price: Long)
-object LevelAgg {
-  implicit val levelAggFormat: Format[LevelAgg] = Json.format
-}
 
 sealed trait AcceptedOrder {
 

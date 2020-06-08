@@ -205,11 +205,11 @@ class OrderValidatorSpecification
 
         import play.api.libs.json.Json
 
-        val order = Json.fromJson[Order](createOrder(AssetPair(btc, usd), SELL, 100, 3.0).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")).get
+        val json  = createOrder(AssetPair(btc, usd), SELL, 100, 3.0, feeAsset = usd).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")
+        val order = Json.fromJson[Order](json).get
+        order.feeAsset shouldBe Waves
 
-        validateByMatcherSettings { DynamicSettings.symmetric(0.003.waves) }(order).left.get.message.text should include(
-          """But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
-        )
+        validateByMatcherSettings { DynamicSettings.symmetric(0.003.waves) }(order) shouldBe 'right
       }
 
       "matcherFee is not enough (percent mode)" in {

@@ -22,7 +22,7 @@ class ApiOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMat
       |  "price" : 489,
       |  "fee" : 6345852410462127,
       |  "filledFee" : 0,
-      |  "feeAsset" : null,
+      |  "feeAsset" : "WAVES",
       |  "timestamp" : 1578074613225,
       |  "status" : "Accepted",
       |  "assetPair" : {

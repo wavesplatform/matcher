@@ -36,7 +36,7 @@ object Asset {
             )
       case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
     },
-    tjs = Writes(_.maybeBase58Repr.fold[JsValue](JsNull)(JsString))
+    tjs = Writes(asset => JsString(asset.toString))
   )
 
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>

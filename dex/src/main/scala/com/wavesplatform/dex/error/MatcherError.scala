@@ -109,9 +109,7 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      if (given.toString == "WAVES")
-        e"""Required one of the following fee asset: ${'required  -> required}. But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
-      else e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
+      e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Amount, given: Amount)

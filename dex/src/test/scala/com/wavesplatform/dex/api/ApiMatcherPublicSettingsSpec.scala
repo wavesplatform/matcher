@@ -16,7 +16,7 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
     """{
       |  "matcherPublicKey" : "2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY",
       |  "matcherVersion" : "2.1.3.3",
-      |  "priceAssets" : [ null, "4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8" ],
+      |  "priceAssets" : [ "WAVES", "4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8" ],
       |  "orderFee" : {
       |    "fixed" : {
       |      "assetId" : "4LHHvYGNKJUg5hj65aGD5vgScvCBmLpdRFtjokvCjSL8",

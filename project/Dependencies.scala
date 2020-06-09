@@ -136,6 +136,7 @@ object Dependencies {
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+  private val pureConfig    = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
@@ -146,8 +147,6 @@ object Dependencies {
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
     "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided cross CrossVersion.full
   )
-
-  private val load = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
 
   private val quill: Seq[ModuleID] = Seq(
     "org.postgresql" % "postgresql"  % Version.postgresql,
@@ -236,7 +235,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, silencer, load)
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, silencer, pureConfig)
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

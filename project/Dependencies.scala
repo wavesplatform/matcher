@@ -235,7 +235,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, silencer, pureConfig)
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig) ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

@@ -4,12 +4,14 @@ import java.io.{File, PrintWriter}
 import java.nio.file.Files
 
 import com.softwaremill.sttp.{MonadError => _}
+import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions, Transfer}
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.util.Random
+import scala.collection.JavaConversions.seqAsJavaList
 
 object TankGenerator {
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
@@ -43,7 +45,7 @@ object TankGenerator {
   }
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
-    println(s"Distributing assets to accounts... ")
+    println(s"Distributing... ")
     val amountPerUser             = settings.assets.quantity / 4 / accounts.length
     val minimumNeededAssetBalance = settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2
 
@@ -52,20 +54,34 @@ object TankGenerator {
       services.node.getBalance(issuer.getAddress, as) > amountPerUser
     }
 
-    accounts
-      .flatMap { acc => //TODO: change to mass transfer transactions
-        Transactions.makeTransferTx(issuer, acc.getAddress, settings.defaults.wavesPerAccount, "WAVES", settings.defaults.matcherFee, "WAVES", "") :: assets
-          .map { asset =>
-            if (assetBalanceIsNotEnough(acc, asset))
-              Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, asset, settings.defaults.matcherFee, "WAVES", "")
-            else Transactions.makeTransferTx(issuer, acc.getAddress, 1, asset, settings.defaults.matcherFee, "WAVES", "")
-          }
-      }
-      .flatMap { tx =>
-        println(s"\tSending transfer tx: ${mkJson(tx)}")
-        services.node.send(tx)
-      }
+    def massTransferFee(group: List[Transfer]) = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
 
+    println(s"\t assets... ")
+    assets.foreach(asset => {
+      accounts
+        .map(account => {
+          new Transfer(account.getAddress, if (assetBalanceIsNotEnough(account, asset)) minimumNeededAssetBalance else 1)
+        })
+        .grouped(100)
+        .foreach(group => {
+          val tx = Transactions.makeMassTransferTx(issuer, asset, seqAsJavaList[Transfer](group), massTransferFee(group), null)
+          println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
+          services.node.send(tx)
+        })
+    })
+    println(s" Done \n\tWaves... ")
+
+    accounts
+      .map(account => {
+        new Transfer(account.getAddress, settings.defaults.wavesPerAccount)
+      })
+      .grouped(100)
+      .foreach(group => {
+        val tx = Transactions.makeMassTransferTx(issuer, "WAVES", seqAsJavaList[Transfer](group), massTransferFee(group), null)
+        println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
+        services.node.send(tx)
+      })
+    println(s" Done")
     waitForHeightArise()
   }
 

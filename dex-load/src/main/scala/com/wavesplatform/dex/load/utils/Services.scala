@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.load
+package com.wavesplatform.dex.load.utils
 
 import com.wavesplatform.wavesj.Node
 

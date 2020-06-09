@@ -130,6 +130,20 @@ object WavesDexLoadCli extends ScoptImplicits {
               .text("The number of checked accounts")
               .required()
               .action((x, s) => s.copy(accountsNumber = x)),
+          ),
+        cmd(Command.DeleteRequests.name)
+          .action((_, s) => s.copy(command = Command.DeleteRequests.some))
+          .text("Delete number of requests")
+          .children(
+            opt[File]("requests-file")
+              .abbr("rf")
+              .text("The output file")
+              .action((x, s) => s.copy(requestsFile = x)),
+            opt[Int]("requests-count")
+              .abbr("rc")
+              .text("The count of needed requests")
+              .required()
+              .action((x, s) => s.copy(requestsCount = x))
           )
       )
     }
@@ -146,6 +160,9 @@ object WavesDexLoadCli extends ScoptImplicits {
             command match {
               case Command.CreateRequests =>
                 TankGenerator.mkRequests(args.seedPrefix, args.pairsFile, args.requestsFile, args.requestsCount, args.requestsType, args.accountsNumber)
+
+              case Command.DeleteRequests =>
+                RequestDeleter.delRequests(args.requestsFile, args.requestsCount)
 
               case Command.CreateFeederFile =>
                 val authPrivateKey = new String(Files.readAllBytes(args.authServicesPrivateKeyFile.toPath), StandardCharsets.UTF_8)
@@ -268,6 +285,10 @@ object WavesDexLoadCli extends ScoptImplicits {
 
     case object CreateRequests extends Command {
       override def name: String = "create-requests"
+    }
+
+    case object DeleteRequests extends Command {
+      override def name: String = "delete-requests"
     }
   }
 

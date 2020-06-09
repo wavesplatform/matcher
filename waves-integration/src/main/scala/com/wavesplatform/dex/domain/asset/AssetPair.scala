@@ -13,8 +13,9 @@ import scala.util.{Failure, Success, Try}
 
 @ApiModel(
   description =
-    "Pair of assets sorted lexicographically: price asset bytes < amount asset bytes. The exception for assets specified in /matcher/settings priceAssets, " +
-      "see docs https://docs.waves.exchange/en/waves-matcher/matcher-api#asset-pair)")
+    "A pair of assets sorted by two rules:\n" +
+      "1. A price asset is chosen by a priority from priceAssets of /matcher/settings; \n" +
+      "2. If both assets are not present among priceAssets, they are sorted lexicographically: price asset bytes < amount asset bytes")
 case class AssetPair(@ApiModelProperty(
                        value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
                        dataType = "string",

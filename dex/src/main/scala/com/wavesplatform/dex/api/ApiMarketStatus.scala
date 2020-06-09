@@ -56,7 +56,7 @@ case class ApiMarketStatus(@ApiModelProperty(
   @ApiModelProperty(hidden = true)
   val bestAsk: Option[LevelAgg] =
     for {
-      baa <- bidAmount
+      baa <- askAmount
       bap <- ask
     } yield LevelAgg(baa, bap)
 }

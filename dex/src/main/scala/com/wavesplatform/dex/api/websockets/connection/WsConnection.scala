@@ -55,7 +55,10 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
           log.trace(s"Got $strictText")
           Try { Json.parse(strictText).as[WsServerMessage] } match {
             case Failure(exception) => Future.failed(exception)
-            case Success(x)         => Future.successful(x)
+            case Success(x)         => {
+              messagesBuffer.add(x)
+              Future.successful(x)
+            }
           }
         }
       } yield clientMessage

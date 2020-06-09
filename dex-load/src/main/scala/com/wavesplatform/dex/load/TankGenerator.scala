@@ -46,7 +46,7 @@ object TankGenerator {
     println(s"Distributing assets to accounts... ")
     val amountPerUser = settings.assets.quantity / 4 / accounts.length
 
-    def assetBalanceIfEnough(ac: PrivateKeyAccount, as: String): Boolean = {
+    def assetBalanceIsNotEnough(ac: PrivateKeyAccount, as: String): Boolean = {
       services.node.getBalance(ac.getAddress, as) < (settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2) &&
       services.node.getBalance(issuer.getAddress, as) > amountPerUser
     }
@@ -55,7 +55,7 @@ object TankGenerator {
       .flatMap { acc => //TODO: change to mass transfer transactions
         Transactions.makeTransferTx(issuer, acc.getAddress, settings.defaults.wavesPerAccount, "WAVES", settings.defaults.matcherFee, "WAVES", "") :: assets
           .map { ass =>
-            if (assetBalanceIfEnough(acc, ass))
+            if (assetBalanceIsNotEnough(acc, ass))
               Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, settings.defaults.matcherFee, "WAVES", "")
             else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, settings.defaults.matcherFee, "WAVES", "")
           }
@@ -289,8 +289,8 @@ object TankGenerator {
     println(s"Results have been saved to $outputFile")
   }
 
-  def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int, requestsType: Int): Unit = {
-    val accounts = mkAccounts(seedPrefix, requestsCount / settings.defaults.maxOrdersPerAccount + 1)
+  def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int, requestsType: Int, accountsNumber: Int): Unit = {
+    val accounts = mkAccounts(seedPrefix, accountsNumber)
     val requests = requestsType match {
       case 1 => mkPlaces(accounts, requestsCount, pairsFile)
       case 2 => mkCancels(accounts, requestsCount)

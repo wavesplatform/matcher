@@ -46,7 +46,8 @@ object GatlingFeeder {
   }
 
   private def mkAusString(accountPrivateKey: PrivateKeyAccount, authKp: security.PrivateKey): String = {
-    s"""{"T":"aus","S":"${accountPrivateKey.getAddress}","t":"jwt","j":"${mkJwt(accountPrivateKey, authKp)}"}"""
+    s"""{"T":"aus","S":"${accountPrivateKey.getAddress}","t":"jwt","j":"${JwtUtils.mkJwt(authKp,
+                                                                                         Json.toJsObject(mkJwtSignedPayload(accountPrivateKey)))}"}"""
   }
 
   private def mkObsStrings(pairsFile: File, numberPerClient: Int): String = {

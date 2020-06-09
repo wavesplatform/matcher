@@ -270,7 +270,7 @@ object DexApi {
                                                        timestamp: Long = System.currentTimeMillis): F[Either[MatcherError, OrderBookHistoryItem]] =
         tryParseJson {
           sttp
-            .get(uri"$apiUri/orders/${owner.publicKey}/${orderId.toString}")
+            .get(uri"$apiUri/orderbook/${owner.publicKey}/${orderId.toString}")
             .headers(timestampAndSignatureHeaders(owner, timestamp))
         }
 

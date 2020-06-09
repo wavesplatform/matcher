@@ -2,14 +2,16 @@ package com.wavesplatform.dex.tool.connectors
 
 import java.io.File
 
+import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.config.ConfigFactory._
+import com.wavesplatform.dex.cli.{ErrorOr, _}
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
+import com.wavesplatform.dex.error.Implicits.ThrowableOps
 import com.wavesplatform.dex.settings.MatcherSettings.valueReader
 import com.wavesplatform.dex.settings.{MatcherSettings, loadConfig}
-import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.SuperConnector.Env
 import net.ceedubs.ficus.Ficus._
 
@@ -48,7 +50,7 @@ object SuperConnector {
       if (uri.startsWith(secure) || uri.startsWith(plain)) uriWithoutSlash else plain + uriWithoutSlash
     }
 
-    def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(f)(s"  $processing... ", "Done\n", processLeftIndent.some)
+    def logProcessing[A](processing: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(s"  $processing... ", "Done\n", processLeftIndent.some)(f)
 
     def loadMatcherSettings(confPath: String): ErrorOr[MatcherSettings] =
       Try {

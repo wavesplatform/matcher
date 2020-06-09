@@ -3,12 +3,12 @@ package com.wavesplatform.dex.tool.connectors
 import cats.syntax.option._
 import com.google.common.primitives.Longs
 import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.tool.ErrorOr
 import com.wavesplatform.dex.tool.connectors.RestConnector.ErrorOrJsonResponse
 import play.api.libs.json.{JsValue, Json}
 import sttp.client._

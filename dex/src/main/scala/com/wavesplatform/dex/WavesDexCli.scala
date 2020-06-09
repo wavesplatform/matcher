@@ -5,7 +5,10 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.{Base64, Scanner}
 
+import cats.catsInstancesForId
+import cats.syntax.flatMap._
 import cats.syntax.option._
+import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -19,7 +22,7 @@ import scopt.{OParser, RenderingMode}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-object WavesDexCli {
+object WavesDexCli extends ScoptImplicits {
   // todo commands:
   // base64
   // get account by seed [and nonce]
@@ -124,11 +127,11 @@ object WavesDexCli {
               .text("Seed for checking account updates")
               .valueName("<raw-string>")
               .action((x, s) => s.copy(accountSeed = x.some)),
-            opt[String]("time-between-blocks")
+            opt[FiniteDuration]("time-between-blocks")
               .abbr("tbb")
               .text("Time between blocks in the network, 1 minute will be picked if none was specified")
               .valueName("<finite duration>")
-              .action((x, s) => s.copy(timeBetweenBlocks = FiniteDuration(Duration(x).toMillis, MILLISECONDS)))
+              .action((x, s) => s.copy(timeBetweenBlocks = x))
           )
       )
     }
@@ -222,7 +225,7 @@ object WavesDexCli {
             case Command.CheckServer =>
               (
                 for {
-                  _ <- tool.log(
+                  _ <- cli.log(
                     s"""
                       |Passed arguments:
                       |  Waves Node REST API   : ${args.nodeRestApi}
@@ -235,7 +238,7 @@ object WavesDexCli {
                   )
                   superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi, args.authServiceRestApi, args.timeBetweenBlocks)
                   checkResult    <- Checker(superConnector).checkState(args.version, args.accountSeed)
-                  _              <- tool.lift { superConnector.close() }
+                  _              <- cli.lift { superConnector.close() }
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")

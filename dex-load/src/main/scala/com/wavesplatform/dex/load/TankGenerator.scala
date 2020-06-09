@@ -6,7 +6,7 @@ import java.nio.file.Files
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions}
+import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions, Transfer}
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.util.Random
@@ -45,11 +45,17 @@ object TankGenerator {
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
     val amountPerUser = settings.assets.quantity / 4 / accounts.length
+
+    def assetBalanceIfEnough(ac: PrivateKeyAccount, as: String): Boolean = {
+      services.node.getBalance(ac.getAddress, as) < (settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2) &&
+      services.node.getBalance(issuer.getAddress, as) > amountPerUser
+    }
+
     accounts
       .flatMap { acc => //TODO: change to mass transfer transactions
         Transactions.makeTransferTx(issuer, acc.getAddress, settings.defaults.wavesPerAccount, "WAVES", settings.defaults.matcherFee, "WAVES", "") :: assets
           .map { ass =>
-            if (services.node.getBalance(acc.getAddress, ass) < amountPerUser && services.node.getBalance(issuer.getAddress, ass) > amountPerUser)
+            if (assetBalanceIfEnough(acc, ass))
               Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, settings.defaults.matcherFee, "WAVES", "")
             else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, settings.defaults.matcherFee, "WAVES", "")
           }
@@ -137,7 +143,7 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val obpk   = settings.distribution.orderBookByPairAndKey
+    val obpk  = settings.distribution.orderBookByPairAndKey
     val obp   = settings.distribution.orderBookByPair
 
     def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {

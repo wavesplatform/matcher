@@ -4,24 +4,26 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.{ByteStr, deser}
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
-import io.swagger.annotations.ApiModelProperty
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
+@ApiModel(
+  description =
+    "Pair of assets sorted lexicographically: price asset bytes < amount asset bytes. The exception for assets specified in /matcher/settings priceAssets, " +
+      "see docs https://docs.waves.exchange/en/waves-matcher/matcher-api#asset-pair)")
 case class AssetPair(@ApiModelProperty(
-                       value = "Base58 encoded amount asset ID",
-                       dataType = "string",
-                       example = "WAVES",
-                       required = true
-                     ) amountAsset: Asset,
-                     @ApiModelProperty(
-                       value = "Base58 encoded price asset ID",
+                       value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
                        dataType = "string",
                        example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
-                       required = true
+                     ) amountAsset: Asset,
+                     @ApiModelProperty(
+                       value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
+                       dataType = "string",
+                       example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p",
                      ) priceAsset: Asset) {
 
   @ApiModelProperty(hidden = true)

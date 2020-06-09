@@ -18,7 +18,7 @@ import play.api.libs.json.{JsObject, Json}
 case class OrderV3(@ApiModelProperty(
                      value = "Base58 encoded Sender Public Key",
                      dataType = "string",
-                     example = "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
+                     example = "226pFho3kqHiCoiQVAUq5MVFkg3KzGLc2zLNsbH8GmE7",
                      required = true
                    ) senderPublicKey: PublicKey,
                    @ApiModelProperty(
@@ -41,21 +41,43 @@ case class OrderV3(@ApiModelProperty(
                    matcherFee: Long,
                    @ApiModelProperty(
                      name = "matcherFeeAssetId",
-                     value = "Base58 encoded Matcher fee asset ID, equals to WAVES for Order versions 1 and 2",
+                     value = "Base58 encoded Matcher fee asset ID. Waves is used if field isn't specified",
                      dataType = "string",
                      example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
-                     required = true
+                     required = false
                    )
                    override val feeAsset: Asset,
                    @ApiModelProperty(
-                     value = "Order proofs as Base58 encoded signatures list",
+                     value =
+                       "Order proofs as Base58 encoded signatures list. " +
+                         "If Sender's account doesn't have script, put Order's signature as the first proof.\n" +
+                         "Signature = Base58 encoded Curve25519.sign(senderPrivateKey, concat(\n" +
+                         "- version,\n" +
+                         "- bytesOf(senderPublicKey),\n" +
+                         "- bytesOf(matcherPublicKey),\n" +
+                         "- bytesOf(amountAsset),\n" +
+                         "- bytesOf(priceAsset),\n" +
+                         "- bytesOf(orderType), // = 0 for buy, 1 for sell\n" +
+                         "- bigEndianBytes(price),\n" +
+                         "- bigEndianBytes(amount),\n" +
+                         "- bigEndianBytes(timestamp),\n" +
+                         "- bigEndianBytes(expiration),\n" +
+                         "- bigEndianBytes(matcherFee),\n" +
+                         "- bytesOf(matcherFeeAssetId)\n" +
+                         "))",
                      dataType = "List[string]",
                      required = true
                    )
                    proofs: Proofs)
     extends Order {
 
-  @ApiModelProperty(dataType = "integer", example = "3", allowableValues = "1, 2, 3", required = true)
+  @ApiModelProperty(
+    value = "Order version, equals to 3",
+    dataType = "integer",
+    example = "3",
+    allowableValues = "3",
+    required = true
+  )
   val version: Byte = 3
 
   override def signature: Array[Byte] = proofs.proofs.head.arr

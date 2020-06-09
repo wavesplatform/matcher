@@ -24,9 +24,13 @@ class ApiMarketStatusSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
 
   private val marketStatus =
     ApiMarketStatus(
-      lastTrade = ApiLastTrade(1000, 2000, OrderType.SELL).some,
-      bestBid = ApiV0LevelAgg(1111, 2222).some,
-      bestAsk = ApiV0LevelAgg(3333, 4444).some
+      lastPrice = 1000L.some,
+      lastAmount = 2000L.some,
+      lastSide = OrderType.SELL.some,
+      bid = 2222L.some,
+      bidAmount = 1111L.some,
+      ask = 4444L.some,
+      askAmount = 3333L.some
     )
 
   "backward JSON compatibility" - {

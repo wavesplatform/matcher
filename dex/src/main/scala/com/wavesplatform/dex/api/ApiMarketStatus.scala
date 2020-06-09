@@ -1,50 +1,78 @@
 package com.wavesplatform.dex.api
 
-import cats.instances.option.catsStdInstancesForOption
-import cats.syntax.apply._
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg}
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Json, OWrites, Reads}
+import play.api.libs.json.{Json, OFormat}
 
-case class ApiMarketStatus(@ApiModelProperty(allowEmptyValue = true) lastTrade: Option[ApiLastTrade],
-                           @ApiModelProperty(allowEmptyValue = true) bestBid: Option[ApiV0LevelAgg],
-                           @ApiModelProperty(allowEmptyValue = true) bestAsk: Option[ApiV0LevelAgg])
+case class ApiMarketStatus(@ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) lastPrice: Option[Long],
+                           @ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) lastAmount: Option[Long],
+                           @ApiModelProperty(
+                             value = "Side (sell or buy)",
+                             dataType = "string",
+                             example = "buy",
+                             allowEmptyValue = true
+                           )
+                           lastSide: Option[OrderType],
+                           @ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) bid: Option[Long],
+                           @ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) bidAmount: Option[Long],
+                           @ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) ask: Option[Long],
+                           @ApiModelProperty(
+                             allowEmptyValue = true,
+                             dataType = "integer"
+                           ) askAmount: Option[Long]) {
+
+  @ApiModelProperty(hidden = true)
+  val lastTrade: Option[LastTrade] =
+    for {
+      lp <- lastPrice
+      la <- lastAmount
+      ls <- lastSide
+    } yield LastTrade(lp, la, ls)
+
+  @ApiModelProperty(hidden = true)
+  val bestBid: Option[LevelAgg] =
+    for {
+      bba <- bidAmount
+      bbp <- bid
+    } yield LevelAgg(bba, bbp)
+
+  @ApiModelProperty(hidden = true)
+  val bestAsk: Option[LevelAgg] =
+    for {
+      baa <- bidAmount
+      bap <- ask
+    } yield LevelAgg(baa, bap)
+}
 
 object ApiMarketStatus {
 
   def fromMarketStatus(ms: MarketStatus): ApiMarketStatus =
-    ApiMarketStatus(ms.lastTrade.map(ApiLastTrade.fromLastTrade),
-                    ms.bestBid.map(ApiV0LevelAgg.fromLevelAgg),
-                    ms.bestAsk.map(ApiV0LevelAgg.fromLevelAgg))
-
-  implicit val apiMarketStatusWrites: OWrites[ApiMarketStatus] = { ms =>
-    Json.obj(
-      "lastPrice"  -> ms.lastTrade.map(_.price),
-      "lastAmount" -> ms.lastTrade.map(_.amount),
-      "lastSide"   -> ms.lastTrade.map(_.side.toString),
-      "bid"        -> ms.bestBid.map(_.price),
-      "bidAmount"  -> ms.bestBid.map(_.amount),
-      "ask"        -> ms.bestAsk.map(_.price),
-      "askAmount"  -> ms.bestAsk.map(_.amount)
+    ApiMarketStatus(
+      lastPrice = ms.lastTrade.map(_.price),
+      lastAmount = ms.lastTrade.map(_.amount),
+      lastSide = ms.lastTrade.map(_.side),
+      bid = ms.bestBid.map(_.price),
+      bidAmount = ms.bestBid.map(_.amount),
+      ask = ms.bestAsk.map(_.price),
+      askAmount = ms.bestAsk.map(_.amount)
     )
-  }
 
-  implicit val apiMarketStatusReads: Reads[ApiMarketStatus] =
-    (
-      (JsPath \ "lastPrice").readNullable[Long] and
-        (JsPath \ "lastAmount").readNullable[Long] and
-        (JsPath \ "lastSide").readNullable[OrderType] and
-        (JsPath \ "bid").readNullable[Long] and
-        (JsPath \ "bidAmount").readNullable[Long] and
-        (JsPath \ "ask").readNullable[Long] and
-        (JsPath \ "askAmount").readNullable[Long]
-    ) { (lastPrice, lastAmount, lastSide, bid, bidAmount, ask, askAmount) =>
-      ApiMarketStatus(
-        lastTrade = (lastPrice, lastAmount, lastSide).tupled.map(Function.tupled(ApiLastTrade.apply)),
-        bestBid = (bidAmount, bid).tupled.map(Function.tupled(ApiV0LevelAgg.apply)),
-        bestAsk = (askAmount, ask).tupled.map(Function.tupled(ApiV0LevelAgg.apply))
-      )
-    }
+  implicit val apiMarketStatusFormat: OFormat[ApiMarketStatus] = Json.format[ApiMarketStatus]
 }

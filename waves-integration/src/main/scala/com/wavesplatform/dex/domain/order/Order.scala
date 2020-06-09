@@ -17,6 +17,7 @@ import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.serialization.ByteAndJsonSerializable
 import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
+import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -44,6 +45,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
 
   import Order._
 
+  @ApiModelProperty(hidden = true)
   val sender: PublicKey = senderPublicKey
 
   def isValid(atTime: Long): Validation = {
@@ -66,16 +68,22 @@ trait Order extends ByteAndJsonSerializable with Proven {
     (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
+  @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]
-  val id: Coeval[ByteStr]   = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
+  @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]]
+  @ApiModelProperty(hidden = true)
+  val id: Coeval[ByteStr] = Coeval.evalOnce { ByteStr(crypto fastHash bodyBytes()) }
+  @ApiModelProperty(hidden = true)
+  val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
 
+  @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
   }
 
+  @ApiModelProperty(hidden = true)
   def getSpendAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
@@ -101,6 +109,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
+  @ApiModelProperty(hidden = true)
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     Json.obj(
       "version"          -> version,

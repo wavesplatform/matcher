@@ -312,8 +312,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "depth",
                            value = "Limit the number of bid/ask records returned",
                            required = false,
@@ -339,8 +339,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
@@ -356,8 +356,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                 response = classOf[ApiOrderBookInfo])
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
   def orderBookInfo: Route = (path("orderbook" / AssetPairPM / "info") & get) { p =>
@@ -496,8 +496,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = "body",
         value = "Json with data",
@@ -580,7 +580,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = `X-User-Public-Key`.headerName,
         value = "User's public key",
@@ -613,8 +613,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = "body",
         value = "Json with data",
@@ -653,8 +653,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "publicKey", value = "Public Key", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = "activeOnly",
@@ -673,11 +673,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         defaultValue = "false"
       ),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
-      new ApiImplicitParam(name = "Signature",
-                           value = "Signature of [Public Key ++ Timestamp] bytes",
-                           required = true,
-                           dataType = "string",
-                           paramType = "header")
+      new ApiImplicitParam(
+        name = "Signature",
+        value = "Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(publicKey), bigEndianBytes(Timestamp)))",
+        required = true,
+        dataType = "string",
+        paramType = "header"
+      )
     )
   )
   def getAssetPairAndPublicKeyOrderHistory: Route = (path("orderbook" / AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
@@ -718,11 +720,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         defaultValue = "false"
       ),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
-      new ApiImplicitParam(name = "Signature",
-                           value = "Signature of [Public Key ++ Timestamp] bytes",
-                           required = true,
-                           dataType = "string",
-                           paramType = "header")
+      new ApiImplicitParam(
+        name = "Signature",
+        value = "Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(publicKey), bigEndianBytes(Timestamp)))",
+        required = true,
+        dataType = "string",
+        paramType = "header"
+      )
     )
   )
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
@@ -794,7 +798,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(
         name = `X-User-Public-Key`.headerName,
         value = "User's public key",
@@ -825,13 +829,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "publicKey", value = "Public Key", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
-      new ApiImplicitParam(name = "Signature",
-                           value = "Signature of [Public Key ++ Timestamp] bytes",
-                           required = true,
-                           dataType = "string",
-                           paramType = "header")
+      new ApiImplicitParam(
+        name = "Signature",
+        value = "Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(publicKey), bigEndianBytes(Timestamp)))",
+        required = true,
+        dataType = "string",
+        paramType = "header"
+      )
     )
   )
   def getOrderStatusInfoByIdWithSignature: Route = (path("orderbook" / PublicKeyPM / ByteStrPM) & get) { (publicKey, orderId) =>
@@ -841,15 +847,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
   @ApiOperation(
     value = "Tradable Balance for Asset Pair",
-    notes = "Get Tradable Balance for the given Asset Pair",
+    notes = "Get Tradable Balance for the given Asset Pair, returns Map[Base58 encoded Asset ID, Long]",
     httpMethod = "GET",
     tags = Array("balances"),
     response = classOf[ApiBalance]
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
     )
   )
@@ -864,7 +870,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/balance/reserved/{publicKey}")
   @ApiOperation(
     value = "Reserved Balance",
-    notes = "Get non-zero balance of open orders",
+    notes = "Get non-zero balance of open orders, returns Map[Base58 encoded Asset ID, Long]",
     httpMethod = "GET",
     tags = Array("balances"),
     response = classOf[ApiBalance]
@@ -873,11 +879,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     Array(
       new ApiImplicitParam(name = "publicKey", value = "Public Key", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
-      new ApiImplicitParam(name = "Signature",
-                           value = "Signature of [Public Key ++ Timestamp] bytes",
-                           required = true,
-                           dataType = "string",
-                           paramType = "header")
+      new ApiImplicitParam(
+        name = "Signature",
+        value = "Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(publicKey), bigEndianBytes(Timestamp)))",
+        required = true,
+        dataType = "string",
+        paramType = "header"
+      )
     )
   )
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
@@ -900,9 +908,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "orderId", value = "Order ID", required = true, dataType = "string", paramType = "path")
     )
   )
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
@@ -931,8 +939,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset ID in Pair, or 'WAVES'", dataType = "string", paramType = "path")
     )
   )
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { pair =>
@@ -958,7 +966,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "orderId", value = "Order ID", dataType = "string", paramType = "path")
     )
   )
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>

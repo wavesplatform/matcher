@@ -22,7 +22,7 @@ object ApiOrderFeeMode {
   @ApiModel(description = "Basic mode, fee = base fee * asset rate")
   case class FeeModeDynamic(@ApiModelProperty(value = "Base fee in Wavelets") baseFee: Long,
                             @ApiModelProperty(
-                              value = "Asset Rates as map from Base58 encoded asset ID to double",
+                              value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
                               dataType = "Map[string,number]"
                             ) rates: Map[Asset, Double])
       extends ApiOrderFeeMode

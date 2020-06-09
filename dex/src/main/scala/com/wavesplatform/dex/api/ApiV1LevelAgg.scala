@@ -8,7 +8,16 @@ import com.wavesplatform.dex.model.LevelAgg
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, JsArray, _}
 
-case class ApiV1LevelAgg(@ApiModelProperty() amount: Double, @ApiModelProperty() price: Double)
+case class ApiV1LevelAgg(
+    @ApiModelProperty(
+      dataType = "string",
+      example = "831.87648950"
+    ) amount: Double,
+    @ApiModelProperty(
+      dataType = "string",
+      example = "0.00012079"
+    ) price: Double
+)
 
 object ApiV1LevelAgg {
 

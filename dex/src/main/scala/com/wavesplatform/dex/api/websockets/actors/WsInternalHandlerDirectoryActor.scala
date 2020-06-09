@@ -2,8 +2,10 @@ package com.wavesplatform.dex.api.websockets.actors
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
-import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsInternalHandlerDirectoryActor.Command.Subscribe
+import cats.syntax.option._
+import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
+import com.wavesplatform.dex.error.ErrorFormatterContext
+import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.SubscriptionsSettings
 
 import scala.concurrent.duration._
@@ -18,31 +20,40 @@ object WsInternalHandlerDirectoryActor {
 
   sealed trait Command extends Message
   object Command {
-    case class Subscribe(clientRef: ActorRef[WsInternalHandlerActor.Message])         extends Command
-    case class ForwardClientsMessage(wsServerMessage: WsServerMessage) extends Command
+    case class Subscribe(clientRef: ActorRef[WsInternalHandlerActor.Message]) extends Command
+    case class CollectMatch(event: ExchangeTransactionCreated)                extends Command
+    case class CollectCancel()                                                extends Command
+    private[WsInternalHandlerDirectoryActor] case object SendWsUpdates        extends Command
   }
 
   final case class Settings(maxConnectionLifetime: FiniteDuration, subscriptions: SubscriptionsSettings)
 
   // TODO spawn?
-  def apply(settings: Settings): Behavior[Message] =
+  // TODO accept cancels
+  // TODO batches
+  // TODO ignore on start
+  def apply()(implicit efc: ErrorFormatterContext): Behavior[Message] =
     Behaviors.setup[Message] { context =>
-      def state(subscriptions: Set[ActorRef[WsInternalHandlerActor.Message]]): Behavior[Message] =
+      context.system.eventStream
+
+      def default(state: State): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
-            case Subscribe(clientRef) =>
+            case Command.Subscribe(clientRef) =>
               context.watch(clientRef)
-              state(subscriptions + clientRef)
+              default(state.copy(subscriptions = state.subscriptions + clientRef))
 
-            case Command.ForwardClientsMessage(wsMessage) =>
-              val translated = WsInternalHandlerActor.Command.ForwardClientMessage(wsMessage)
-              subscriptions.foreach(_ ! translated)
-              Behaviors.same
+            case Command.CollectMatch(event) =>
+              val x       = WsOrdersUpdate.from(event)
+              val updated = state.collectedUpdates.map(_.append(x))
+              default(state.copy(collectedUpdates = updated))
           }
           .receiveSignal {
-            case (_, Terminated(ws)) => state(subscriptions - ws.unsafeUpcast[WsInternalHandlerActor.Message])
+            case (_, Terminated(ws)) => default(state.copy(subscriptions = state.subscriptions - ws.unsafeUpcast[WsInternalHandlerActor.Message]))
           }
 
-      state(Set.empty)
+      default(State(none, Set.empty))
     }
+
+  private case class State(collectedUpdates: Option[WsOrdersUpdate], subscriptions: Set[ActorRef[WsInternalHandlerActor.Message]])
 }

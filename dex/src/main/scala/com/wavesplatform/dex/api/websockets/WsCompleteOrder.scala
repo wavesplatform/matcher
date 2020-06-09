@@ -10,19 +10,19 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class WsCompleteOrder(id: Order.Id,
-                           timestamp: Option[Long] = None,
-                           amountAsset: Option[Asset] = None,
-                           priceAsset: Option[Asset] = None,
-                           side: Option[OrderType] = None,
-                           isMarket: Option[Boolean] = None,
-                           price: Option[Double] = None,
-                           amount: Option[Double] = None,
-                           fee: Option[Double] = None,
-                           feeAsset: Option[Asset] = None,
-                           status: Option[String] = None,
-                           filledAmount: Option[Double] = None,
-                           filledFee: Option[Double] = None,
-                           avgWeighedPrice: Option[Double] = None,
+                           timestamp: Long,
+                           amountAsset: Asset,
+                           priceAsset: Asset,
+                           side: OrderType,
+                           isMarket: Boolean,
+                           price: Double,
+                           amount: Double,
+                           fee: Double,
+                           feeAsset: Asset,
+                           status: String,
+                           filledAmount: Double,
+                           filledFee: Double,
+                           avgWeighedPrice: Double,
                            eventTimestamp: Long,
                            executedAmount: Option[Double] = None,
                            executedFee: Option[Double] = None,
@@ -40,42 +40,21 @@ object WsCompleteOrder {
 
     WsCompleteOrder(
       ao.id,
-      ao.order.timestamp.some,
-      ao.order.assetPair.amountAsset.some,
-      ao.order.assetPair.priceAsset.some,
-      ao.order.orderType.some,
-      ao.isMarket.some,
-      ao.price.some.map(denormalizePrice),
-      ao.order.amount.some.map(denormalizeAmountAndFee),
-      ao.order.matcherFee.some.map(denormalizeAmountAndFee),
-      ao.feeAsset.some,
-      status.name.some,
+      ao.order.timestamp,
+      ao.order.assetPair.amountAsset,
+      ao.order.assetPair.priceAsset,
+      ao.order.orderType,
+      ao.isMarket,
+      denormalizePrice(ao.price),
+      denormalizeAmountAndFee(ao.order.amount),
+      denormalizeAmountAndFee(ao.order.matcherFee),
+      ao.feeAsset,
+      status.name,
       ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee),
       ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee),
       ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
     )
   }
-
-  def apply(id: Order.Id,
-            status: String,
-            filledAmount: Double,
-            filledFee: Double,
-            avgWeighedPrice: Double,
-            eventTimestamp: Long,
-            executedAmount: Option[Double],
-            executedFee: Option[Double],
-            executedPrice: Option[Double]): WsCompleteOrder =
-    WsCompleteOrder(
-      id,
-      status = status.some,
-      filledAmount = filledAmount.some,
-      filledFee = filledFee.some,
-      avgWeighedPrice = avgWeighedPrice.some,
-      eventTimestamp = eventTimestamp,
-      executedAmount = executedAmount,
-      executedFee = executedFee,
-      executedPrice = executedPrice
-    )
 
   private val isMarketFormat: Format[Boolean] = Format(
     {

@@ -29,7 +29,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/ws")
 @Api(value = "/web sockets/")
-case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalHandlerDirectoryActor.Message],
+case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalHandlerDirectoryActor.Command],
                                  addressDirectory: ActorRef,
                                  matcher: ActorRef,
                                  time: Time,

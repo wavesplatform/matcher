@@ -3,7 +3,8 @@ package com.wavesplatform.dex
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.{ActorRef, ActorSystem, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
 import akka.pattern.{CircuitBreaker, ask, gracefulStop}
@@ -12,8 +13,10 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
-import com.wavesplatform.dex.actors.OrderBookAskAdapter
+import com.wavesplatform.dex.actors.{BroadcastActor, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
+import com.wavesplatform.dex.api.websockets.actors.WsInternalHandlerDirectoryActor
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
@@ -190,7 +193,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
     storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
 
-  private def matcherApiRoutes(apiKeyHash: Option[Array[Byte]]): Seq[ApiRoute] = {
+  private def matcherApiRoutes(apiKeyHash: Option[Array[Byte]], ws: typed.ActorRef[WsInternalHandlerDirectoryActor.Command]): Seq[ApiRoute] = {
     Seq(
       MatcherApiRoute(
         pairBuilder,
@@ -229,7 +232,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         () => status.get(),
         apiKeyHash
       ),
-      MatcherWebSocketRoute(addressActors,
+      MatcherWebSocketRoute(ws,
+                            addressActors,
                             matcherActor,
                             time,
                             pairBuilder,
@@ -437,14 +441,14 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
-    actorSystem.actorOf(
-      CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
-      CreateExchangeTransactionActor.name
+    val wsInternalStreamRouter = actorSystem.spawn(
+      WsInternalHandlerDirectoryActor(),
+      "ws-internal-dir"
     )
 
-    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    val txWriterRef = actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
 
-    actorSystem.actorOf(
+    val wavesNetTxBroadcasterRef = actorSystem.actorOf(
       ExchangeTransactionBroadcastActor
         .props(
           settings.exchangeTransactionBroadcast,
@@ -453,6 +457,20 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           wavesBlockchainAsyncClient.broadcastTx
         ),
       "exchange-transaction-broadcast"
+    )
+
+    val createdTxFanOutRef = actorSystem.spawn(
+      BroadcastActor[Events.ExchangeTransactionCreated](
+        BroadcastActor.routed(txWriterRef),
+        BroadcastActor.routed(wavesNetTxBroadcasterRef),
+        BroadcastActor.adapted(wsInternalStreamRouter)(WsInternalHandlerDirectoryActor.Command.CollectMatch)
+      ),
+      "broadcast-new-transaction"
+    )
+
+    actorSystem.actorOf(
+      CreateExchangeTransactionActor.props(transactionCreator.createTransaction, createdTxFanOutRef),
+      CreateExchangeTransactionActor.name
     )
 
     val startGuard = for {
@@ -475,7 +493,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       _ <- {
         log.info("Preparing HTTP service ...")
         // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
-        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        val combinedRoute =
+          new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash, wsInternalStreamRouter), settings.restApi).compositeRoute
 
         log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)

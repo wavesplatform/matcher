@@ -1,16 +1,14 @@
 package com.wavesplatform.dex.api
 
-import com.github.ghik.silencer.silent
 import com.wavesplatform.dex.error.MatcherError
 import play.api.libs.json.{Format, JsObject, Json}
 
-@silent("deprecated")
 case class ApiError(
     error: Int,
     message: String,
     template: String,
     params: Option[JsObject] = None,
-    @deprecated(message = "This field is unnecessary", since = "1.2.0") status: String,
+    status: String, // @deprecated(message = "This field is unnecessary", since = "1.2.0")
     success: Boolean = false,
 )
 object ApiError {

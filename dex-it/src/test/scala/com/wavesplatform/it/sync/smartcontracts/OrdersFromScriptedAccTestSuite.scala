@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.github.ghik.silencer.silent
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -11,7 +10,6 @@ import com.wavesplatform.dex.it.api.responses.node.ActivationStatusResponse.Feat
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
 
-@silent("deprecated")
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   private val activationHeight = 5

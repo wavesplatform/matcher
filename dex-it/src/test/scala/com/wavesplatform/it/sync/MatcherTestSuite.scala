@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.github.ghik.silencer.silent
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ApiOrderStatus.Status
@@ -19,7 +18,6 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
-@silent("deprecated")
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   private val aliceSellAmount = 500

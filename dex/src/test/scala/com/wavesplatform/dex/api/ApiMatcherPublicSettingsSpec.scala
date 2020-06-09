@@ -10,8 +10,6 @@ import play.api.libs.json.Json
 
 class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMatcherWithImplicits {
 
-  // TODO "WAVES" vs null
-
   private val json =
     """{
       |  "matcherPublicKey" : "2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY",

@@ -8,18 +8,8 @@ import org.scalatest.matchers.{MatchResult, Matcher}
 
 trait DiffMatcherWithImplicits {
 
-  // https://github.com/softwaremill/diffx/issues/69
-  // Sometimes it is useful, sometimes not.
-  //  import com.softwaremill.diffx.Diff._
-  //  implicit val multilineStringsDiff: Diff[String] =
-  //    diffForIterable[String, List](diffForOption(implicitly[Derived[Diff[String]]]))
-  //      .contramap[String](_.split("\n").toList)
-
   implicit val derivedByteStrDiff: Derived[Diff[ByteStr]]     = Derived(getDiff[ByteStr](_.toString == _.toString))
   implicit val derivedPublicKeyDiff: Derived[Diff[PublicKey]] = Derived(derivedByteStrDiff.contramap[PublicKey](_.arr))
-
-  // TODO we actually don't need this, find way to remove this
-  implicit val derivedStringDiff: Derived[Diff[String]] = Derived(getDiff[String](_ == _))
 
   def matchTo[A: Diff](left: A): DiffForMatcher[A] = DiffForMatcher(left)
 }

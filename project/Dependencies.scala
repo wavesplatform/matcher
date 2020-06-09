@@ -147,9 +147,7 @@ object Dependencies {
     "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided cross CrossVersion.full
   )
 
-  private val load: Seq[ModuleID] = Seq(
-    "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
-  )
+  private val load = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
 
   private val quill: Seq[ModuleID] = Seq(
     "org.postgresql" % "postgresql"  % Version.postgresql,
@@ -238,7 +236,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ silencer ++ load
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, silencer, load)
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

@@ -44,20 +44,21 @@ object TankGenerator {
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing assets to accounts... ")
-    val amountPerUser = settings.assets.quantity / 4 / accounts.length
+    val amountPerUser             = settings.assets.quantity / 4 / accounts.length
+    val minimumNeededAssetBalance = settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2
 
     def assetBalanceIsNotEnough(ac: PrivateKeyAccount, as: String): Boolean = {
-      services.node.getBalance(ac.getAddress, as) < (settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2) &&
+      services.node.getBalance(ac.getAddress, as) < minimumNeededAssetBalance &&
       services.node.getBalance(issuer.getAddress, as) > amountPerUser
     }
 
     accounts
       .flatMap { acc => //TODO: change to mass transfer transactions
         Transactions.makeTransferTx(issuer, acc.getAddress, settings.defaults.wavesPerAccount, "WAVES", settings.defaults.matcherFee, "WAVES", "") :: assets
-          .map { ass =>
-            if (assetBalanceIsNotEnough(acc, ass))
-              Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, ass, settings.defaults.matcherFee, "WAVES", "")
-            else Transactions.makeTransferTx(issuer, acc.getAddress, 1, ass, settings.defaults.matcherFee, "WAVES", "")
+          .map { asset =>
+            if (assetBalanceIsNotEnough(acc, asset))
+              Transactions.makeTransferTx(issuer, acc.getAddress, amountPerUser, asset, settings.defaults.matcherFee, "WAVES", "")
+            else Transactions.makeTransferTx(issuer, acc.getAddress, 1, asset, settings.defaults.matcherFee, "WAVES", "")
           }
       }
       .flatMap { tx =>

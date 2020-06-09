@@ -57,6 +57,10 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
             case Failure(exception) => Future.failed(exception)
             case Success(x)         => {
               messagesBuffer.add(x)
+              if(keepAlive) x match {
+                case value: WsPingOrPong => wsHandlerRef ! value
+                case _                   =>
+              }
               Future.successful(x)
             }
           }

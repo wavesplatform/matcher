@@ -12,8 +12,13 @@ import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.util.Random
 import scala.collection.JavaConversions.seqAsJavaList
+import scala.concurrent._
+import java.util.concurrent.{ExecutorService, Executors}
 
 object TankGenerator {
+  private val executor: ExecutorService                          = Executors.newCachedThreadPool
+  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
+
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
     val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.chainId.charAt(0).toByte)).toList
@@ -64,9 +69,15 @@ object TankGenerator {
         })
         .grouped(100)
         .foreach(group => {
-          val tx = Transactions.makeMassTransferTx(issuer, asset, seqAsJavaList[Transfer](group), massTransferFee(group), null)
-          println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
-          services.node.send(tx)
+          Future {
+            blocking {
+              val tx = Transactions.makeMassTransferTx(issuer, asset, seqAsJavaList[Transfer](group), massTransferFee(group), null)
+              println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
+              services.node.send(tx)
+            }
+          }.failed.foreach { t =>
+            println(t)
+          }
         })
     })
     println(s" Done \n\tWaves... ")
@@ -77,9 +88,15 @@ object TankGenerator {
       })
       .grouped(100)
       .foreach(group => {
-        val tx = Transactions.makeMassTransferTx(issuer, "WAVES", seqAsJavaList[Transfer](group), massTransferFee(group), null)
-        println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
-        services.node.send(tx)
+        Future {
+          blocking {
+            val tx = Transactions.makeMassTransferTx(issuer, "WAVES", seqAsJavaList[Transfer](group), massTransferFee(group), null)
+            println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
+            services.node.send(tx)
+          }
+        }.failed.foreach { t =>
+          println(t)
+        }
       })
     println(s" Done")
     waitForHeightArise()
@@ -103,7 +120,7 @@ object TankGenerator {
     Random.shuffle(orders.map(Request(RequestType.POST, "/matcher/orderbook", RequestTag.PLACE, _))).toList
   }
 
-  private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File]): List[AssetPair] = {
+  private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File], distributed: Boolean = false): List[AssetPair] = {
     val assets =
       if (Files.notExists(pairsFile.get.toPath)) mkAssets()
       else readAssetPairs(pairsFile).map(p => { s"${p.getAmountAsset}-${p.getPriceAsset}" }).mkString("-").split("-").toSet.toList
@@ -112,21 +129,26 @@ object TankGenerator {
       if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets)
       else readAssetPairs(pairsFile)
 
-    distributeAssets(accounts, assets)
+    if (!distributed)
+      distributeAssets(accounts, assets)
     pairs
   }
 
-  private def mkPlaces(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File], matching: Boolean): List[Request] = {
-    println(s"Making requests for ${if (matching) "matching" else "placing"} ...")
-
-    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile), matching).take(requestsCount)
+  private def mkPlaces(accounts: List[PrivateKeyAccount],
+                       requestsCount: Int,
+                       pairsFile: Option[File],
+                       distributed: Boolean = false): List[Request] = {
+    println(s"Making requests for placing...")
+    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed), false).take(requestsCount)
   }
 
-  private def mkPlaces(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] =
-    mkPlaces(accounts, requestsCount, pairsFile: Option[File], matching = false)
-
-  private def mkMatching(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] =
-    mkPlaces(accounts, requestsCount, pairsFile: Option[File], matching = true)
+  private def mkMatching(accounts: List[PrivateKeyAccount],
+                         requestsCount: Int,
+                         pairsFile: Option[File],
+                         distributed: Boolean = false): List[Request] = {
+    println(s"Making requests for matching...")
+    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed), true).take(requestsCount)
+  }
 
   private def mkCancels(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {
     println("Making requests for cancelling...")
@@ -283,7 +305,7 @@ object TankGenerator {
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
-        mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile) ++
+        mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, true) ++
         mkBalances(accounts, (requestsCount * settings.distribution.tradableBalance).toInt, pairsFile) ++
         mkOrderHistory(accounts, requestsCount, pairsFile) ++
         mkCancels(accounts, (requestsCount * settings.distribution.placeOrder).toInt)

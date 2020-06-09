@@ -24,9 +24,9 @@ case class CancelOrderRequest(@ApiModelProperty(
                               @ApiModelProperty(allowEmptyValue = true, dataType = "integer") timestamp: Option[Long],
                               @ApiModelProperty(
                                 value =
-                                  "Base58 encoded signature\n" +
-                                    "For single order = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bytesOf(orderId)))\n" +
-                                    "For all orders = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bigEndianBytes(timestamp)))",
+                                  """Base58 encoded signature
+                                    For single order = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bytesOf(orderId)))
+                                    For all orders = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bigEndianBytes(timestamp)))""",
                                 dataType = "string",
                                 example = "65bWzBUbniVuxQLyQdKmjtJ9aJzM6M5tmLfiduq8q59gJXCw4AdqEFb8Ae2ULpve5d4XAWe5Gt34331EjwVSvT9u",
                                 required = true

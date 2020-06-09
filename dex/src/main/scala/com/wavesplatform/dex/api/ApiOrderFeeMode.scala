@@ -20,7 +20,10 @@ sealed trait ApiOrderFeeMode extends Product with Serializable
 object ApiOrderFeeMode {
 
   @ApiModel(description = "Basic mode, fee = base fee * asset rate")
-  case class FeeModeDynamic(@ApiModelProperty(value = "Base fee in Wavelets") baseFee: Long,
+  case class FeeModeDynamic(@ApiModelProperty(
+                              value = "Base fee in Wavelets",
+                              example = "300000"
+                            ) baseFee: Long,
                             @ApiModelProperty(
                               value = "Asset Rates as Map[Base58 encoded Asset ID, Long]",
                               dataType = "Map[string,number]"
@@ -32,7 +35,7 @@ object ApiOrderFeeMode {
 
   @ApiModel(description = "Mode with fixed min fee and fixed asset")
   case class FeeModeFixed(@ApiModelProperty(
-                            value = "Base58 encoded asset ID",
+                            value = "Base58 encoded accepted Asset ID",
                             dataType = "string",
                             example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
                           ) assetId: Asset,
@@ -50,7 +53,8 @@ object ApiOrderFeeMode {
   case class FeeModePercent(@ApiModelProperty(
                               value = "Type of percent fee",
                               dataType = "string",
-                              allowableValues = "amount, price, spending, receiving"
+                              allowableValues = "amount, price, spending, receiving",
+                              example = "price"
                             ) `type`: AssetType,
                             @ApiModelProperty(
                               value = "Min fee in percents",

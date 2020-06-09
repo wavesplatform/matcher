@@ -48,23 +48,22 @@ case class OrderV3(@ApiModelProperty(
                    )
                    override val feeAsset: Asset,
                    @ApiModelProperty(
-                     value =
-                       "Order proofs as Base58 encoded signatures list. " +
-                         "If Sender's account doesn't have script, put Order's signature as the first proof.\n" +
-                         "Signature = Base58 encoded Curve25519.sign(senderPrivateKey, concat(\n" +
-                         "- version,\n" +
-                         "- bytesOf(senderPublicKey),\n" +
-                         "- bytesOf(matcherPublicKey),\n" +
-                         "- bytesOf(amountAsset),\n" +
-                         "- bytesOf(priceAsset),\n" +
-                         "- bytesOf(orderType), // = 0 for buy, 1 for sell\n" +
-                         "- bigEndianBytes(price),\n" +
-                         "- bigEndianBytes(amount),\n" +
-                         "- bigEndianBytes(timestamp),\n" +
-                         "- bigEndianBytes(expiration),\n" +
-                         "- bigEndianBytes(matcherFee),\n" +
-                         "- bytesOf(matcherFeeAssetId)\n" +
-                         "))",
+                     value = """Order proofs as Base58 encoded signatures list.
+                         If Sender's account doesn't have script, put Order's signature as the first proof
+                         Signature = Base58 encoded Curve25519.sign(senderPrivateKey, concat(
+                            version,
+                            bytesOf(senderPublicKey),
+                            bytesOf(matcherPublicKey),
+                            bytesOf(amountAsset),
+                            bytesOf(priceAsset),
+                            bytesOf(orderType), // = 0 for buy, 1 for sell
+                            bigEndianBytes(price),
+                            bigEndianBytes(amount),
+                            bigEndianBytes(timestamp),
+                            bigEndianBytes(expiration),
+                            bigEndianBytes(matcherFee),
+                            bytesOf(matcherFeeAssetId)
+                         ))""",
                      dataType = "List[string]",
                      required = true
                    )
@@ -75,7 +74,6 @@ case class OrderV3(@ApiModelProperty(
     value = "Order version, equals to 3",
     dataType = "integer",
     example = "3",
-    allowableValues = "3",
     required = true
   )
   val version: Byte = 3

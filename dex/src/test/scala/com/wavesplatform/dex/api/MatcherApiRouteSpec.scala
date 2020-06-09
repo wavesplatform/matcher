@@ -36,7 +36,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
 import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.market.MatcherActor.{AssetInfo, GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
+import com.wavesplatform.dex.market.MatcherActor._
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherTransactionWriter}
 import com.wavesplatform.dex.model.MatcherModel.Denormalized

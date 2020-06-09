@@ -229,7 +229,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/settings/rates")
   @ApiOperation(
     value = "Asset rates",
-    notes = "Get current rates of assets (price of 1 Waves in the specified asset)",
+    notes = "Get current rates of assets (price of 1 Waves in the specified asset), returns Map[Base58 encoded Asset ID, Double]",
     httpMethod = "GET",
     tags = Array("rates"),
     response = classOf[ApiRates]
@@ -1015,6 +1015,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/debug/allSnapshotOffsets")
   @ApiOperation(
     value = "Get all snapshots' offsets in the queue",
+    notes = "Returns Map[Asset Pair, Long]",
     httpMethod = "GET",
     authorizations = Array(new Authorization(SwaggerDocService.apiKeyDefinitionName)),
     tags = Array("debug"),

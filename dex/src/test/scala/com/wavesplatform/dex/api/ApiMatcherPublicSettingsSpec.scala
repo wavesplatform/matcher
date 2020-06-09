@@ -48,22 +48,5 @@ class ApiMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffMa
     "serialization" in {
       Json.prettyPrint(Json.toJson(matcherPublicSettings)) should matchTo(json)
     }
-
-    "OrderFeePublicSettings" - {
-      "Dynamic" - {
-        "serialization" ignore {}
-        "deserialization" ignore {}
-      }
-
-      "Fixed" - {
-        "serialization" ignore {}
-        "deserialization" ignore {}
-      }
-
-      "Percent" - {
-        "serialization" ignore {}
-        "deserialization" ignore {}
-      }
-    }
   }
 }

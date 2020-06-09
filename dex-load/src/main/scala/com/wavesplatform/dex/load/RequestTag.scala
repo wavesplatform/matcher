@@ -15,8 +15,7 @@ object RequestTag extends Enumeration {
 
 object RequestType extends Enumeration {
   type RequestType = Value
-  val POST = Value("POST")
-  val GET  = Value("GET")
+  val GET, POST = Value
 }
 
 case class Request(httpType: RequestType, path: String, tag: RequestTag, obj: ApiJson = null, headers: Map[String, String] = Map.empty) {

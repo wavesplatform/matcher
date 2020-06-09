@@ -45,9 +45,6 @@ object GatlingFeeder {
     ).signed(PrivateKey(a.getPrivateKey))
   }
 
-  private def mkJwt(accountPrivateKey: PrivateKeyAccount, authKp: security.PrivateKey): String =
-    JwtUtils.mkJwt(authKp, Json.toJsObject(mkJwtSignedPayload(accountPrivateKey)))
-
   private def mkAusString(accountPrivateKey: PrivateKeyAccount, authKp: security.PrivateKey): String = {
     s"""{"T":"aus","S":"${accountPrivateKey.getAddress}","t":"jwt","j":"${mkJwt(accountPrivateKey, authKp)}"}"""
   }

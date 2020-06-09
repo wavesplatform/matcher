@@ -73,6 +73,8 @@ object Dependencies {
     val commonsNet = "3.6"
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.2.0"
+
+    val pureConfig = "0.12.3"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -143,6 +145,10 @@ object Dependencies {
   private val silencer: Seq[ModuleID] = Seq(
     compilerPlugin("com.github.ghik" %% "silencer-plugin" % Version.silencer cross CrossVersion.full),
     "com.github.ghik" %% "silencer-lib" % Version.silencer % Provided cross CrossVersion.full
+  )
+
+  private val load: Seq[ModuleID] = Seq(
+    "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
   )
 
   private val quill: Seq[ModuleID] = Seq(
@@ -232,7 +238,7 @@ object Dependencies {
       betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ silencer
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx) ++ silencer ++ load
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

@@ -10,7 +10,7 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions, Transfer}
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 import scala.collection.JavaConversions.seqAsJavaList
 import scala.concurrent._
 import java.util.concurrent.{ExecutorService, Executors}
@@ -75,8 +75,9 @@ object TankGenerator {
               println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
               services.node.send(tx)
             }
-          }.failed.foreach { t =>
-            println(t)
+          }.onComplete {
+            case Failure(ex) => println(ex)
+            case _           => Unit
           }
         })
     })
@@ -94,8 +95,9 @@ object TankGenerator {
             println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
             services.node.send(tx)
           }
-        }.failed.foreach { t =>
-          println(t)
+        }.onComplete {
+          case Failure(ex) => println(ex)
+          case _           => Unit
         }
       })
     println(s" Done")

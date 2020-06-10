@@ -4,14 +4,14 @@ import java.util.UUID
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.typed.scaladsl.{ActorSource, _}
 import akka.stream.{Materializer, OverflowStrategy}
 import akka.{Done, NotUsed}
 import cats.syntax.either._
-import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.actors.{WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
@@ -20,28 +20,30 @@ import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.time.Time
+import com.wavesplatform.dex.{AssetPairBuilder, Matcher, error}
 import play.api.libs.json.{Json, Reads}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
-case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
+case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
                                  addressDirectory: ActorRef,
                                  matcher: ActorRef,
                                  time: Time,
                                  assetPairBuilder: AssetPairBuilder,
                                  orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                                  apiKeyHash: Option[Array[Byte]],
-                                 webSocketSettings: WebSocketSettings)(implicit mat: Materializer)
+                                 webSocketSettings: WebSocketSettings,
+                                 matcherStatus: () => Matcher.Status)(implicit mat: Materializer)
     extends ApiRoute
     with AuthRoute
     with ScorexLogging {
 
   import mat.executionContext
 
-  override def route: Route = matcherStatusBarrier {
-    pathPrefix("ws" / "v0") {
+  override def route: Route = pathPrefix("ws" / "v0") {
+    matcherStatusBarrier {
       internalWsRoute ~ commonWsRoute
     }
   }
@@ -92,7 +94,7 @@ case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[W
         name = s"handler-$clientId"
       )
 
-    wsInternalHandlerDirectoryRef ! WsInternalBroadcastActor.Command.Subscribe(webSocketHandlerRef)
+    wsInternalBroadcastRef ! WsInternalBroadcastActor.Command.Subscribe(webSocketHandlerRef)
 
     val server: Sink[WsInternalClientHandlerActor.Message, NotUsed] =
       ActorSink
@@ -150,5 +152,12 @@ case class MatcherWebSocketRoute(wsInternalHandlerDirectoryRef: typed.ActorRef[W
       case Failure(e) => log.trace(s"[c=$cn] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
     client
+  }
+
+  // TODO: remove after merge into master
+  private def matcherStatusBarrier: Directive0 = matcherStatus() match {
+    case Matcher.Status.Working  => pass
+    case Matcher.Status.Starting => complete(error.MatcherIsStarting.toWsHttpResponse(StatusCodes.ServiceUnavailable))
+    case Matcher.Status.Stopping => complete(error.MatcherIsStopping.toWsHttpResponse(StatusCodes.ServiceUnavailable))
   }
 }

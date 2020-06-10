@@ -232,14 +232,17 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         () => status.get(),
         apiKeyHash
       ),
-      MatcherWebSocketRoute(ws,
-                            addressActors,
-                            matcherActor,
-                            time,
-                            pairBuilder,
-                            p => Option { orderBooks.get() } flatMap (_ get p),
-                            apiKeyHash,
-                            settings.webSocketSettings)
+      MatcherWebSocketRoute(
+        ws,
+        addressActors,
+        matcherActor,
+        time,
+        pairBuilder,
+        p => Option { orderBooks.get() } flatMap (_ get p),
+        apiKeyHash,
+        settings.webSocketSettings,
+        () => status.get
+      )
     )
   }
 
@@ -372,6 +375,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield ()
   }.value
 
+  private var wsInternalBroadcast: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.toTyped.ignoreRef
+
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
     Props(
       new AddressActor(
@@ -382,6 +387,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         storeEvent,
         startSchedules,
         spendableBalancesActor,
+        wsInternalBroadcast, // Safe to use here, because AddressActors are created after wsInternalBroadcast initialization
         settings.addressActorSettings
       )
     )
@@ -441,9 +447,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
     def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
 
-    val wsInternalBroadcastRouter = actorSystem.spawn(
+    wsInternalBroadcast = actorSystem.spawn(
       WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
-      "ws-internal-dir"
+      "ws-internal-broadcast"
     )
 
     val txWriterRef = actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
@@ -459,11 +465,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       "exchange-transaction-broadcast"
     )
 
-    val createdTxFanOutRef = actorSystem.spawn(
+    val createdTxFanOutRef: typed.ActorRef[Events.ExchangeTransactionCreated] = actorSystem.spawn(
       BroadcastActor[Events.ExchangeTransactionCreated](
         BroadcastActor.routed(txWriterRef),
         BroadcastActor.routed(wavesNetTxBroadcasterRef),
-        BroadcastActor.adapted(wsInternalBroadcastRouter) { x =>
+        BroadcastActor.adapted(wsInternalBroadcast) { x =>
           WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(x))
         }
       ),
@@ -496,7 +502,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         log.info("Preparing HTTP service ...")
         // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
         val combinedRoute =
-          new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash, wsInternalBroadcastRouter), settings.restApi).compositeRoute
+          new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash, wsInternalBroadcast), settings.restApi).compositeRoute
 
         log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)

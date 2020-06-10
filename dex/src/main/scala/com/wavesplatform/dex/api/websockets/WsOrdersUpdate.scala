@@ -10,7 +10,9 @@ import play.api.libs.json._
 case class WsOrdersUpdate(orders: List[WsCompleteOrder], timestamp: Long = System.currentTimeMillis) extends WsServerMessage {
   override val tpe: String = WsOrdersUpdate.tpe
 
-  def append(other: WsOrdersUpdate): WsOrdersUpdate = {} // prepend to list
+  def append(other: WsOrdersUpdate): WsOrdersUpdate = {
+    // prepend to list 
+  }
 }
 
 object WsOrdersUpdate {
@@ -18,8 +20,38 @@ object WsOrdersUpdate {
   val tpe = "osu"
 
   def from(x: OrderCanceled)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
+    val ao = x.acceptedOrder
 
+    val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
+    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
+
+    def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+
+    WsOrdersUpdate(
+      WsCompleteOrder(
+        id = ao.id,
+        timestamp = ao.order.timestamp,
+        amountAsset = ao.order.assetPair.amountAsset,
+        priceAsset = ao.order.assetPair.priceAsset,
+        side = ao.order.orderType,
+        isMarket = ao.isMarket,
+        price = denormalizePrice(ao.order.price),
+        amount = denormalizeAmountAndFee(ao.order.amount),
+        fee = denormalizeAmountAndFee(ao.order.matcherFee),
+        feeAsset = ao.order.feeAsset,
+        status = "",
+        filledAmount = denormalizeAmountAndFee(ao.order.amount), // TODO test
+        filledFee = denormalizeAmountAndFee(ao.order.matcherFee), // TODO test
+        avgWeighedPrice = denormalizePrice(ao.avgWeighedPriceNominator),
+        eventTimestamp = x.timestamp,
+        executedAmount = denormalizeAmountAndFee(x.reason.executedAmount).some,
+        executedFee = denormalizeAmountAndFee(x.reason.counterExecutedFee).some,
+        executedPrice = denormalizePrice(x.reason.executedPrice).some
+      )
+    )
   }
+
 
   def from(x: ExchangeTransactionCreated)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
     val ao1 = x.reason.counter

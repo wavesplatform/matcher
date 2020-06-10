@@ -73,6 +73,8 @@ object Dependencies {
     val commonsNet = "3.6"
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.2.0"
+
+    val pureConfig = "0.12.3"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version
@@ -134,6 +136,7 @@ object Dependencies {
   private val influxDb      = "org.influxdb" % "influxdb-java" % Version.influxDb
   private val commonsNet    = "commons-net" % "commons-net" % Version.commonsNet
   private val sttpClient    = "com.softwaremill.sttp.client" %% "core" % Version.sttpClient
+  private val pureConfig    = "com.github.pureconfig" %% "pureconfig" % Version.pureConfig
 
   private val monocle: Seq[ModuleID] = Seq(
     "com.github.julien-truffaut" %% "monocle-core"  % Version.monocle,
@@ -231,6 +234,8 @@ object Dependencies {
       wavesJ,
       betterMonadicFor
     ) ++ testKit ++ quill ++ silencer ++ monocle
+
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig) ++ silencer
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 

@@ -13,6 +13,8 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 trait JwtUtils {
 
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JwtPayload): String = mkJwt(authServiceKeyPair, Json.toJsObject(payload))
+  def mkJwt(authServiceKeyPrivateKey: security.PrivateKey, payload: JsObject): String =
+    JwtJson.encode(payload, authServiceKeyPrivateKey, JwtAlgorithm.RS256)
   def mkJwt(authServiceKeyPair: security.KeyPair, payload: JsObject): String =
     JwtJson.encode(payload, authServiceKeyPair.getPrivate, JwtAlgorithm.RS256)
 

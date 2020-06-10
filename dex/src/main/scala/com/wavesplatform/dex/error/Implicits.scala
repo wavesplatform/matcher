@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.error
 
+import java.io.{PrintWriter, StringWriter}
+
 import cats.Show._
 import cats.instances.list._
 import cats.syntax.contravariant._
@@ -117,6 +119,14 @@ object Implicits {
   object FormatArg extends Poly1 {
     implicit def mapAt[T: Show: Writes]: Case.Aux[(Symbol, T), (String, String, JsValue)] = at[(Symbol, T)] {
       case (name, arg) => (name.name, arg.show, implicitly[Writes[T]] writes arg)
+    }
+  }
+
+  implicit class ThrowableOps(private val t: Throwable) extends AnyVal {
+    def getWithStackTrace: String = {
+      val sw = new StringWriter
+      t.printStackTrace(new PrintWriter(sw))
+      s"$t, ${sw.toString}"
     }
   }
 }

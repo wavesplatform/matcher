@@ -1,6 +1,4 @@
-package com.wavesplatform.dex.api.websockets.connection
-
-import java.util.concurrent.ConcurrentLinkedQueue
+package com.wavesplatform.dex.load.ws
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
@@ -8,29 +6,27 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
-import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.websockets.connection.TestWsHandlerActor
+import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import play.api.libs.json.Json
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success, Try}
 
-class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
+class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessage])(implicit system: ActorSystem) extends ScorexLogging {
 
-  log.info(s"""Connecting to Matcher WS API:
-            |         URI = $uri
-            |  Keep alive = $keepAlive""".stripMargin)
+  import system.dispatcher
+  private implicit val materializer = Materializer(system)
+  private val wsHandlerRef          = system.actorOf(TestWsHandlerActor.props(keepAlive = true))
 
-  import materializer.executionContext
-
-  private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
+  log.info(s"Connecting to Matcher WS API: $uri")
 
   protected def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict =
     WsMessage.toStrictTextMessage(cm)(WsClientMessage.wsClientMessageWrites)
 
-  // From test to server
+  // To server
   private val source: Source[TextMessage.Strict, ActorRef] = {
     val completionMatcher: PartialFunction[Any, CompletionStrategy] = { case akka.actor.Status.Success(_) => CompletionStrategy.draining }
     val failureMatcher: PartialFunction[Any, Throwable]             = { case Status.Failure(cause)        => cause }
@@ -44,25 +40,16 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
       }
   }
 
-  private val messagesBuffer: ConcurrentLinkedQueue[WsServerMessage] = new ConcurrentLinkedQueue[WsServerMessage]()
-
-  // From server to test
+  // To client
   private val sink: Sink[Message, Future[Done]] = Sink.foreach {
-    case tm: TextMessage =>
+    case tm: TextMessage => // TODO move to tests
       for {
         strictText <- tm.toStrict(1.second).map(_.getStrictText)
         clientMessage <- {
           log.trace(s"Got $strictText")
           Try { Json.parse(strictText).as[WsServerMessage] } match {
             case Failure(exception) => Future.failed(exception)
-            case Success(x)         => {
-              messagesBuffer.add(x)
-              if(keepAlive) x match {
-                case value: WsPingOrPong => wsHandlerRef ! value
-                case _                   =>
-              }
-              Future.successful(x)
-            }
+            case Success(x)         => Future.successful { receive(x).foreach(wsHandlerRef ! _) }
           }
         }
       } yield clientMessage
@@ -83,15 +70,11 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
 
   val (connectionResponse, closed) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
-  val connectionOpenedTs: Long                   = System.currentTimeMillis
-  val connectionClosedTs: Future[Long]           = closed.map(_ => System.currentTimeMillis)
-  val connectionLifetime: Future[FiniteDuration] = connectionClosedTs.map(cc => FiniteDuration(cc - connectionOpenedTs, MILLISECONDS))
-
-  def messages: List[WsServerMessage] = messagesBuffer.iterator().asScala.toList
-  def clearMessages(): Unit           = messagesBuffer.clear()
-
   def send(message: WsClientMessage): Unit = wsHandlerRef ! TestWsHandlerActor.SendToServer(message)
 
-  def close(): Unit     = if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
   def isClosed: Boolean = closed.isCompleted
+  def close(): Future[Done] = {
+    if (!isClosed) wsHandlerRef ! TestWsHandlerActor.CloseConnection
+    closed
+  }
 }

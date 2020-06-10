@@ -5,6 +5,7 @@ import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import ch.qos.logback.classic.{Level, Logger}
+import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -13,7 +14,6 @@ import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.settings.GrpcClientSettings.ChannelOptionsSettings
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
-import com.wavesplatform.dex.tool.ErrorOr
 import monix.execution.Scheduler.Implicits.{global => monixScheduler}
 import org.slf4j.LoggerFactory
 

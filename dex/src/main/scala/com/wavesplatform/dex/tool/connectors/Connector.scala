@@ -2,7 +2,7 @@ package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.either._
 import cats.syntax.option._
-import com.wavesplatform.dex.tool.ErrorOr
+import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 
 import scala.annotation.tailrec

@@ -39,6 +39,13 @@ lazy val `dex-it` = project
     `dex-it-common`
   )
 
+lazy val `dex-load` = project
+  .settings(commonOwaspSettings)
+  .dependsOn(
+    dex,
+    `dex-it-common`
+  )
+
 lazy val `waves-grpc` = project.settings(commonOwaspSettings)
 
 lazy val `waves-ext` = project
@@ -62,12 +69,14 @@ lazy val `dex-jmh` = project.dependsOn(dex % "compile;test->test")
 lazy val it = project
   .settings(
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
-    Test / test := Def.sequential(
-      root / Compile / cleanAll,
-      Def.task {
-        Command.process("fullCheck", state.value)
-      }
-    ).value
+    Test / test := Def
+      .sequential(
+        root / Compile / cleanAll,
+        Def.task {
+          Command.process("fullCheck", state.value)
+        }
+      )
+      .value
   )
 
 lazy val root = (project in file("."))
@@ -76,6 +85,7 @@ lazy val root = (project in file("."))
   .aggregate(
     dex,
     `dex-it`,
+    `dex-load`,
     `dex-it-common`,
     `dex-jmh`,
     `dex-test-common`,

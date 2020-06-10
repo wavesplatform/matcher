@@ -24,6 +24,7 @@ import play.api.libs.json.JsValue
 import scala.Ordered._
 import scala.concurrent.duration._
 import scala.util.Random
+import com.wavesplatform.dex.cli._
 
 // noinspection ScalaStyle
 case class Checker(superConnector: SuperConnector) {
@@ -31,10 +32,9 @@ case class Checker(superConnector: SuperConnector) {
   import Checker._
   import superConnector._
 
-  type CheckResult[A]       = ErrorOr[A]
-  type CheckLoggedResult[A] = CheckResult[(A, String)]
+  type CheckLoggedResult[A] = ErrorOr[(A, String)]
 
-  private def logCheck[A](name: String)(f: => CheckResult[A]): CheckResult[A] = wrapByLogs(f)(s"  $name... ", "Passed\n", checkLeftIndent.some)
+  private def logCheck[A](name: String)(f: => ErrorOr[A]): ErrorOr[A] = wrapByLogs(s"  $name... ", "Passed\n", checkLeftIndent.some)(f)
 
   private def denormalize(value: Long, decimals: Int = testAssetDecimals.toInt): Double =
     Denormalization.denormalizeAmountAndFee(value, decimals).toDouble
@@ -47,7 +47,7 @@ case class Checker(superConnector: SuperConnector) {
   private def getAssetPairInfo(f: AssetInfo, s: AssetInfo): AssetPairInfo =
     if (f.asset.compatId < s.asset.compatId) AssetPairInfo(s, f) else AssetPairInfo(f, s)
 
-  private def checkVersion(version: String): CheckResult[Unit] = dexRest.getMatcherSettings.flatMap { response =>
+  private def checkVersion(version: String): ErrorOr[Unit] = dexRest.getMatcherSettings.flatMap { response =>
     val parsedVersion = (response \ "matcherVersion").get.as[String]
     Either.cond(parsedVersion == version, (), s"""Failed! Expected "$version", but got "$parsedVersion"""")
   }
@@ -128,19 +128,18 @@ case class Checker(superConnector: SuperConnector) {
       _ <- dexRest.waitForOrderStatus(order, OrderStatus.Cancelled.name)
     } yield order -> s"Order with id ${order.id()} cancelled"
 
-  private def checkExecution(assetPairInfo: AssetPairInfo): CheckResult[String] = {
+  private def checkExecution(assetPairInfo: AssetPairInfo): ErrorOr[String] = {
 
     val counter     = mkMatcherOrder(assetPairInfo.assetPair, BUY)
     val submitted   = mkMatcherOrder(assetPairInfo.assetPair, SELL)
     val submittedId = submitted.id()
 
-    def checkFillingAtDex(orderStatus: JsValue): CheckResult[Boolean] = {
+    def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
 
       lazy val expectedFilledStatus = {
         val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
         ApiOrderStatus.apiOrderStatusFormat.writes(ApiOrderStatus from orderStatus).toString
       }
-
       (
         for {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]
@@ -149,7 +148,7 @@ case class Checker(superConnector: SuperConnector) {
       ).toRight[String](s"Check of submitted order filling failed! Expected $expectedFilledStatus, but got ${orderStatus.toString}")
     }
 
-    def awaitSubmittedOrderAtNode: CheckResult[Seq[JsValue]] =
+    def awaitSubmittedOrderAtNode: ErrorOr[Seq[JsValue]] =
       for {
         txs <- dexRest
           .repeatRequest(dexRest getTxsByOrderId submittedId)(_.isRight)(nodeRest.repeatRequestOptions)
@@ -173,7 +172,7 @@ case class Checker(superConnector: SuperConnector) {
     }
   }
 
-  private def checkWsOrderBook(assetPairInfo: AssetPairInfo): CheckResult[String] =
+  private def checkWsOrderBook(assetPairInfo: AssetPairInfo): ErrorOr[String] =
     dexWs.subscribeForOrderBookUpdates(assetPairInfo.assetPair).map { snapshot =>
       s"""\n
          |    Got snapshot for ${assetPairInfo.assetPairName} pair:
@@ -181,7 +180,7 @@ case class Checker(superConnector: SuperConnector) {
          """.stripMargin
     }
 
-  private def checkWsAccountUpdates(maybeSeed: Option[String]): CheckResult[String] = {
+  private def checkWsAccountUpdates(maybeSeed: Option[String]): ErrorOr[String] = {
     authServiceRest.fold { lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided") } { as =>
       for {
         credentials <- as.getAuthCredentials(maybeSeed)
@@ -195,7 +194,7 @@ case class Checker(superConnector: SuperConnector) {
 
   def checkState(version: String, maybeAccountSeed: Option[String]): ErrorOr[String] =
     for {
-      _                                  <- log("\nChecking:\n")
+      _                                  <- log[ErrorOr]("\nChecking:\n")
       _                                  <- logCheck("1. DEX version") { checkVersion(version) }
       (balance, balanceNotes)            <- logCheck("2. Matcher balance") { checkBalance }
       (wuJIoInfo, firstAssetNotes)       <- logCheck("3. First test asset") { checkTestAsset(balance, firstTestAssetName) }

@@ -6,8 +6,8 @@ import cats.syntax.either._
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.api.websockets.connection.WsConnectionOps._
+import com.wavesplatform.dex.cli.{ErrorOr, lift}
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.tool._
 import com.wavesplatform.dex.tool.connectors.AuthServiceRestConnector.AuthCredentials
 import com.wavesplatform.dex.tool.connectors.Connector.RepeatRequestOptions
 

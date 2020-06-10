@@ -15,7 +15,7 @@ case class AddressWsMutableState(address: Address,
                                  pendingSubscription: Set[ActorRef[WsAddressState]],
                                  changedSpendableAssets: Set[Asset],
                                  changedReservableAssets: Set[Asset],
-                                 ordersChanges: Map[Order.Id, WsOrder]) {
+                                 ordersChanges: Map[Order.Id, WsOrder]) { // TODO Probably use an ordered Map and pass it to WsAddressState
 
   val hasActiveSubscriptions: Boolean = activeSubscription.nonEmpty
   val hasChanges: Boolean             = getAllChangedAssets.nonEmpty || ordersChanges.nonEmpty

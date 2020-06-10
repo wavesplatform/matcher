@@ -9,8 +9,7 @@ import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
-import com.wavesplatform.dex.error.{MatcherError, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
-import com.wavesplatform.dex.settings.SubscriptionsSettings
+import com.wavesplatform.dex.error.{MatcherError, WsConnectionPongTimeout}
 import com.wavesplatform.dex.time.Time
 
 import scala.collection.immutable.Queue
@@ -20,29 +19,25 @@ import scala.concurrent.duration._
   * Controls WebSocket connection for order updates stream
   * Handles user messages (pongs) add schedules timeouts (pongs, max connection lifetime)
   */
-object WsInternalHandlerActor {
+object WsInternalClientHandlerActor {
 
   sealed trait Message extends Product with Serializable
 
   sealed trait Command extends Message
   object Command {
-    case class ProcessClientMessage(wsMessage: WsPingOrPong)          extends Command
-    case class ForwardClientMessage(wsServerMessage: WsServerMessage) extends Command
-    case class CloseConnection(reason: MatcherError)                  extends Command
+    case class ProcessClientMessage(wsMessage: WsPingOrPong)     extends Command
+    case class ForwardToClient(wsServerMessage: WsServerMessage) extends Command
+    case class CloseConnection(reason: MatcherError)             extends Command
 
     private[WsHandlerActor] case object SendPing extends Command
   }
 
-  sealed trait Event extends Product with Serializable
+  sealed trait Event extends Message
   object Event {
     case class Completed(completionStatus: Either[Throwable, Unit]) extends Event
   }
 
-  final case class Settings(maxConnectionLifetime: FiniteDuration,
-                            pingInterval: FiniteDuration,
-                            pongTimeout: FiniteDuration,
-                            jwtPublicKey: String,
-                            subscriptions: SubscriptionsSettings)
+  final case class Settings(healthCheck: WsHealthCheckSettings)
 
   def apply(settings: Settings,
             time: Time,
@@ -58,20 +53,19 @@ object WsInternalHandlerActor {
 
       def scheduleOnce(delay: FiniteDuration, message: Message): Cancellable = context.scheduleOnce(delay, context.self, message)
 
-      val maxLifetimeExceeded = scheduleOnce(settings.maxConnectionLifetime, Command.CloseConnection(WsConnectionMaxLifetimeExceeded))
-      val firstPing           = scheduleOnce(settings.pingInterval, Command.SendPing)
+      val firstPing = scheduleOnce(settings.healthCheck.pingInterval, Command.SendPing)
 
-      def schedulePongTimeout(): Cancellable = scheduleOnce(settings.pongTimeout, Command.CloseConnection(WsConnectionPongTimeout))
+      def schedulePongTimeout(): Cancellable = scheduleOnce(settings.healthCheck.pongTimeout, Command.CloseConnection(WsConnectionPongTimeout))
 
       def sendPingAndScheduleNextOne(): (WsPingOrPong, Cancellable) = {
         val ping     = WsPingOrPong(matcherTime)
-        val nextPing = scheduleOnce(settings.pingInterval, Command.SendPing)
+        val nextPing = scheduleOnce(settings.healthCheck.pingInterval, Command.SendPing)
         clientRef ! ping
         ping -> nextPing
       }
 
       def cancelSchedules(nextPing: Cancellable, pongTimeout: Cancellable): Unit =
-        List(nextPing, pongTimeout, maxLifetimeExceeded, firstPing).foreach { _.cancel() }
+        List(nextPing, pongTimeout, firstPing).foreach { _.cancel() }
 
       def awaitPong(maybeExpectedPong: Option[WsPingOrPong],
                     pongTimeout: Cancellable,
@@ -85,7 +79,7 @@ object WsInternalHandlerActor {
               val updatedPongTimeout          = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
               awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions)
 
-            case Command.ForwardClientMessage(wsMessage) =>
+            case Command.ForwardToClient(wsMessage) =>
               clientRef ! wsMessage
               Behaviors.same
 

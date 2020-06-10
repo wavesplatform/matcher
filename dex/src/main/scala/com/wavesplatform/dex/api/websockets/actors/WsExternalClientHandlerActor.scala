@@ -6,7 +6,7 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor.Command.CancelAddressSubscription
+import com.wavesplatform.dex.api.websockets.actors.WsExternalClientHandlerActor.Command.CancelAddressSubscription
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
@@ -24,31 +24,31 @@ import scala.util.{Failure, Success}
   * Controls WebSocket connection and order book/address subscriptions.
   * Handles user messages (pongs, subscription requests) add schedules timeouts (pongs, max connection lifetime)
   */
-object WsHandlerActor {
+object WsExternalClientHandlerActor {
 
   sealed trait Message extends Product with Serializable
 
   sealed trait Command extends Message
   object Command {
     case class ProcessClientMessage(wsMessage: WsClientMessage) extends Command
-    case class ForwardClientError(error: MatcherError)          extends Command
+    case class ForwardToClient(error: WsError)                  extends Command
     case class CloseConnection(reason: MatcherError)            extends Command
 
-    private[WsHandlerActor] case class CancelAddressSubscription(address: Address) extends Command
-    private[WsHandlerActor] case object SendPing                                   extends Command
+    private[WsExternalClientHandlerActor] case class CancelAddressSubscription(address: Address) extends Command
+    private[WsExternalClientHandlerActor] case object SendPing                                   extends Command
   }
 
   sealed trait Event extends Message
   object Event {
-    private[WsHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Event
-    case class Completed(completionStatus: Either[Throwable, Unit])             extends Event
+    private[WsExternalClientHandlerActor] case class AssetPairValidated(assetPair: AssetPair) extends Event
+    case class Completed(completionStatus: Either[Throwable, Unit])                           extends Event
   }
 
-  final case class Settings(maxConnectionLifetime: FiniteDuration,
-                            pingInterval: FiniteDuration,
-                            pongTimeout: FiniteDuration,
+  final case class Settings(messagesInterval: FiniteDuration,
+                            maxConnectionLifetime: FiniteDuration,
                             jwtPublicKey: String,
-                            subscriptions: SubscriptionsSettings)
+                            subscriptions: SubscriptionsSettings,
+                            healthCheck: WsHealthCheckSettings)
 
   def apply(settings: Settings,
             time: Time,
@@ -61,20 +61,20 @@ object WsHandlerActor {
       import context.executionContext
       import settings.subscriptions._
 
-      context.setLoggerName(s"WsHandlerActor[c=${clientRef.path.name}]")
+      context.setLoggerName(s"WsExternalHandlerActor[c=${clientRef.path.name}]")
 
       def matcherTime: Long = time.getTimestamp()
 
       def scheduleOnce(delay: FiniteDuration, message: Message): Cancellable = context.scheduleOnce(delay, context.self, message)
 
       val maxLifetimeExceeded = scheduleOnce(settings.maxConnectionLifetime, Command.CloseConnection(WsConnectionMaxLifetimeExceeded))
-      val firstPing           = scheduleOnce(settings.pingInterval, Command.SendPing)
+      val firstPing           = scheduleOnce(settings.healthCheck.pingInterval, Command.SendPing)
 
-      def schedulePongTimeout(): Cancellable = scheduleOnce(settings.pongTimeout, Command.CloseConnection(WsConnectionPongTimeout))
+      def schedulePongTimeout(): Cancellable = scheduleOnce(settings.healthCheck.pongTimeout, Command.CloseConnection(WsConnectionPongTimeout))
 
       def sendPingAndScheduleNextOne(): (WsPingOrPong, Cancellable) = {
         val ping     = WsPingOrPong(matcherTime)
-        val nextPing = scheduleOnce(settings.pingInterval, Command.SendPing)
+        val nextPing = scheduleOnce(settings.healthCheck.pingInterval, Command.SendPing)
         clientRef ! ping
         ping -> nextPing
       }
@@ -105,8 +105,8 @@ object WsHandlerActor {
               val updatedPongTimeout: Cancellable = if (pongTimeout.isCancelled) schedulePongTimeout() else pongTimeout
               awaitPong(expectedPong.some, updatedPongTimeout, newNextPing, orderBookSubscriptions, addressSubscriptions)
 
-            case Command.ForwardClientError(matcherError) =>
-              clientRef ! WsError.from(matcherError, matcherTime)
+            case Command.ForwardToClient(x) =>
+              clientRef ! x
               Behaviors.same
 
             case Command.ProcessClientMessage(wsMessage) =>
@@ -128,12 +128,13 @@ object WsHandlerActor {
                   }
 
                 case subscribe: WsOrderBookSubscribe =>
-                  // TODO DEX-700 test for order book that hasn't been created before
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), matcherTime)
                   else if (!orderBookSubscriptions.contains(subscribe.key)) {
                     assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {
-                      case Success(Left(e))  => clientRef ! WsError.from(e, matcherTime)
-                      case Success(Right(_)) => context.self ! Event.AssetPairValidated(subscribe.key)
+                      case Success(Left(e)) => clientRef ! WsError.from(e, matcherTime)
+                      case Success(Right(_)) =>
+                        context.log.debug(s"WsOrderBookSubscribe(k=${subscribe.key}) is successful")
+                        context.self ! Event.AssetPairValidated(subscribe.key)
                       case Failure(e) =>
                         context.log.warn(s"An error during validation the asset pair ${subscribe.key}", e)
                         clientRef ! WsError.from(error.WavesNodeConnectionBroken, matcherTime)
@@ -159,7 +160,7 @@ object WsHandlerActor {
                         .fold {
 
                           addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
-                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful")
 
                           if (addressSubscriptions.lengthCompare(maxAddressNumber) == 0) {
                             // safe since maxAddressNumber > 0

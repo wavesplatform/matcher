@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.WsExternalClientHandlerActor
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -106,7 +106,7 @@ bar
 baz"""
     settings.webSocketSettings should matchTo(
       WebSocketSettings(100.milliseconds,
-                        WsHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
+                        WsExternalClientHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
     )
     settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }

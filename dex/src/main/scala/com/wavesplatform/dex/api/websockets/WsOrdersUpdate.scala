@@ -3,19 +3,23 @@ package com.wavesplatform.dex.api.websockets
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
+import com.wavesplatform.dex.model.Events.{ExchangeTransactionCreated, OrderCanceled}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class WsOrdersUpdate(orders: List[WsCompleteOrder], timestamp: Long = System.currentTimeMillis) extends WsServerMessage {
   override val tpe: String = WsOrdersUpdate.tpe
 
-  def append(other: WsOrdersUpdate): WsOrdersUpdate = {}
+  def append(other: WsOrdersUpdate): WsOrdersUpdate = {} // prepend to list
 }
 
 object WsOrdersUpdate {
 
   val tpe = "osu"
+
+  def from(x: OrderCanceled)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
+
+  }
 
   def from(x: ExchangeTransactionCreated)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
     val ao1 = x.reason.counter

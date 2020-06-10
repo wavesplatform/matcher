@@ -37,6 +37,8 @@ import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success}
+import akka.actor.typed
+import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 
 class AddressActor(owner: Address,
                    time: Time,
@@ -45,6 +47,7 @@ class AddressActor(owner: Address,
                    store: StoreEvent,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
+                   wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
@@ -243,6 +246,7 @@ class AddressActor(owner: Address,
         log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
       }
+      wsInternalHandlerDirectoryRef ! WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(event))
 
     case command @ OrderCancelFailed(id, reason) =>
       val prefix = s"Got $command"

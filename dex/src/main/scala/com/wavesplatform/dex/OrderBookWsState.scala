@@ -18,7 +18,7 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
                             lastTrade: Option[LastTrade],
                             changedTickSize: Option[Double]) {
 
-  private val genLens: GenLens[OrderBookWsState] = GenLens[OrderBookWsState]
+  val genLens: GenLens[OrderBookWsState] = GenLens[OrderBookWsState]
 
   def addSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState = copy(wsConnections = wsConnections.updated(x, 0L))
 

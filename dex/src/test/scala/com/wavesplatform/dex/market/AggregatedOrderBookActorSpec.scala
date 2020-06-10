@@ -1,4 +1,4 @@
-package com.wavesplatform.dex.api
+package com.wavesplatform.dex.market
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
@@ -14,8 +14,8 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.http.TestParsers
 import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
+import com.wavesplatform.dex.api.{ApiV0LevelAgg, ApiV0OrderBook}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -25,7 +25,6 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
@@ -47,7 +46,6 @@ class AggregatedOrderBookActorSpec
     with ScalaCheckPropertyChecks
     with NoShrink
     with MatcherSpecLike
-    with TestParsers
     with OrderBookGen
     with DiffMatcherWithImplicits
     with Eventually {
@@ -144,7 +142,7 @@ class AggregatedOrderBookActorSpec
     "apply" - {
       "should init with provided order book" in forAll(orderBookGen) { orderBook =>
         val ref      = mk(orderBook)
-        val actual   = orderBookFrom { get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 10, _)) }
+        val actual   = ApiV0OrderBook.fromHttpResponse { get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 10, _)) }
         val expected = orderBookResultFrom(orderBook)
         actual.copy(timestamp = 0L) should matchTo(expected)
       }
@@ -300,14 +298,14 @@ class AggregatedOrderBookActorSpec
             ts = 1L
           )
 
-          val actual = orderBookFrom(get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 1, _)))
-          val expected = OrderBookResult(
-            pair = pair,
-            assetPairDecimals = None,
-            asks = List(LevelAgg(99L, 2000L)),
-            bids = List(LevelAgg(50L, 1000L)),
-            timestamp = 1L
-          )
+          val actual = ApiV0OrderBook.fromHttpResponse(get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 1, _)))
+          val expected =
+            ApiV0OrderBook(
+              timestamp = 1L,
+              pair = pair,
+              bids = List(ApiV0LevelAgg(50L, 1000L)),
+              asks = List(ApiV0LevelAgg(99L, 2000L))
+            )
 
           actual should matchTo(expected)
         }
@@ -352,14 +350,14 @@ class AggregatedOrderBookActorSpec
             ts = 3L
           )
 
-          val actual = orderBookFrom(get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 2, _)))
-          val expected = OrderBookResult(
-            pair = pair,
-            assetPairDecimals = None,
-            asks = List(LevelAgg(99L, 2000L), LevelAgg(1L, 2100L)),
-            bids = List(LevelAgg(50L, 1000L), LevelAgg(30L, 999L)),
-            timestamp = 3L
-          )
+          val actual = ApiV0OrderBook.fromHttpResponse(get[HttpResponse](ref)(Query.GetHttpView(MatcherModel.Normalized, 2, _)))
+          val expected =
+            ApiV0OrderBook(
+              timestamp = 3L,
+              pair = pair,
+              bids = List(ApiV0LevelAgg(50L, 1000L), ApiV0LevelAgg(30L, 999L)),
+              asks = List(ApiV0LevelAgg(99L, 2000L), ApiV0LevelAgg(1L, 2100L))
+            )
 
           actual should matchTo(expected)
         }
@@ -409,16 +407,20 @@ class AggregatedOrderBookActorSpec
     }
   }
 
-  private def orderBookResultFrom(ob: OrderBook): OrderBookResult = OrderBookResult(
-    pair = pair,
-    asks = levelAggsFromSide(ob.asks),
-    bids = levelAggsFromSide(ob.bids),
-    assetPairDecimals = None,
-    timestamp = 0L
-  )
+  private def orderBookResultFrom(ob: OrderBook): ApiV0OrderBook =
+    ApiV0OrderBook(
+      timestamp = 0L,
+      pair = pair,
+      bids = levelAggsFromSide(ob.bids),
+      asks = levelAggsFromSide(ob.asks)
+    )
 
-  private def levelAggsFromSide(side: Side): List[LevelAgg] =
-    AggregatedOrderBookActor.aggregateByPrice(side).map(AggregatedOrderBookActor.toLevelAgg).toList.sortBy(_.price)(side.ordering)
+  private def levelAggsFromSide(side: Side): List[ApiV0LevelAgg] =
+    AggregatedOrderBookActor
+      .aggregateByPrice(side)
+      .map(pa => ApiV0LevelAgg.fromLevelAgg(AggregatedOrderBookActor.toLevelAgg(pa)))
+      .toList
+      .sortBy(_.price)(side.ordering)
 
   private def sum(side: OrderBookSideSnapshot): List[LevelAgg] =
     side.map {

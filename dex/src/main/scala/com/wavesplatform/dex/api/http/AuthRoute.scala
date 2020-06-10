@@ -12,13 +12,12 @@ trait AuthRoute { this: ApiRoute =>
 
   protected val apiKeyHash: Option[Array[Byte]]
 
-  def withAuth(implicit trm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
+  def withAuth(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive0 = {
 
     def correctResponse(statusCode: StatusCode, matcherError: MatcherError): ToResponseMarshallable = this match {
       case _: MatcherWebSocketRoute => matcherError.toWsHttpResponse(statusCode)
       case _                        => SimpleErrorResponse(statusCode, matcherError)
     }
-
     apiKeyHash.fold[Directive0] { complete(SimpleErrorResponse(StatusCodes.InternalServerError, ApiKeyIsNotProvided)) } { hashFromSettings =>
       optionalHeaderValueByType[`X-Api-Key`](()).flatMap {
         case Some(key) if java.util.Arrays.equals(crypto secureHash key.value, hashFromSettings) => pass
@@ -31,7 +30,7 @@ trait AuthRoute { this: ApiRoute =>
     }
   }
 
-  def withUserPublicKeyOpt(implicit trm: ToResponseMarshaller[MatcherResponse]): Directive1[Option[PublicKey]] =
+  def withUserPublicKeyOpt(implicit matcherResponseTrm: ToResponseMarshaller[MatcherResponse]): Directive1[Option[PublicKey]] =
     optionalHeaderValueByType[`X-User-Public-Key`](()).flatMap {
       case None => provide(None)
       case Some(rawPublicKey) =>

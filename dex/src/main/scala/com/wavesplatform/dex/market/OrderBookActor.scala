@@ -22,7 +22,6 @@ import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
 import mouse.any._
 import org.slf4j.LoggerFactory
-import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext
 
@@ -273,18 +272,6 @@ object OrderBookActor {
   )
 
   object MarketStatus {
-    implicit val marketStatusWrites: OWrites[MarketStatus] = { ms =>
-      Json.obj(
-        "lastPrice"  -> ms.lastTrade.map(_.price),
-        "lastAmount" -> ms.lastTrade.map(_.amount),
-        "lastSide"   -> ms.lastTrade.map(_.side.toString),
-        "bid"        -> ms.bestBid.map(_.price),
-        "bidAmount"  -> ms.bestBid.map(_.amount),
-        "ask"        -> ms.bestAsk.map(_.price),
-        "askAmount"  -> ms.bestAsk.map(_.amount)
-      )
-    }
-
     def apply(ob: OrderBook): MarketStatus = MarketStatus(ob.lastTrade, ob.bestBid, ob.bestAsk)
   }
 

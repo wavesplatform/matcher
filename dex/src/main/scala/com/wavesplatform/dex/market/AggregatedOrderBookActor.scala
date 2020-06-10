@@ -176,7 +176,7 @@ object AggregatedOrderBookActor {
       ws: OrderBookWsState
   ) {
 
-    private val genLens: GenLens[State] = GenLens[State]
+    val genLens: GenLens[State] = GenLens[State]
 
     lazy val marketStatus: MarketStatus = MarketStatus(
       lastTrade = lastTrade,

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.api
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.it.MatcherSuiteBase
 
 class GetSettingsTestSuite extends MatcherSuiteBase {
@@ -19,13 +20,13 @@ class GetSettingsTestSuite extends MatcherSuiteBase {
     }
 
     "return matcher's public key" in {
-      dex1.api.settings.matcherPublicKey should be(matcher.publicKey.toString)
+      dex1.api.settings.matcherPublicKey should be(matcher.publicKey)
     }
 
     "return correct list of price assets" in {
-      dex1.api.settings.priceAssets should contain(UsdId.toString)
-      dex1.api.settings.priceAssets should contain(BtcId.toString)
-      dex1.api.settings.priceAssets should contain("WAVES")
+      Seq(usd, btc, Waves).foreach { asset =>
+        dex1.api.settings.priceAssets should contain(asset)
+      }
     }
   }
 }

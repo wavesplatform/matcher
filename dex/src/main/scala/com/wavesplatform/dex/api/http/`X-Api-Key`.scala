@@ -5,9 +5,9 @@ import akka.http.scaladsl.model.headers._
 import scala.util.Try
 
 object `X-Api-Key` extends ModeledCustomHeaderCompanion[`X-Api-Key`] {
-  final val headerName            = "X-API-Key" // Constant that compatible with annotations
-  override final val name: String = headerName
+  final val headerName = "X-API-Key" // Constant that compatible with annotations
 
+  override final val name: String                     = headerName
   override def parse(value: String): Try[`X-Api-Key`] = Try(new `X-Api-Key`(value))
 }
 

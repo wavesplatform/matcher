@@ -8,17 +8,7 @@ import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.model.{
-  AcceptedOrder,
-  BuyLimitOrder,
-  BuyMarketOrder,
-  LimitOrder,
-  MarketOrder,
-  OrderBook,
-  OrderBookSnapshot,
-  SellLimitOrder,
-  SellMarketOrder
-}
+import com.wavesplatform.dex.model.{AcceptedOrder, BuyLimitOrder, BuyMarketOrder, LimitOrder, MarketOrder, OrderBook, OrderBookSnapshot, SellLimitOrder, SellMarketOrder}
 import org.scalacheck.Gen
 
 import scala.collection.JavaConverters._

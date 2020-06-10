@@ -1,10 +1,10 @@
 package com.wavesplatform.dex.api
 
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
-import akka.http.scaladsl.server.{Directive0, Directive1, Route}
-import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, OrderBookHttpInfo}
+import akka.http.scaladsl.server.{Directive1, Route}
+import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute, HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{ErrorFormatterContext, MatcherError}
@@ -21,22 +21,15 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
                              apiKeyHash: Option[Array[Byte]])(implicit val errorContext: ErrorFormatterContext)
     extends ApiRoute
     with AuthRoute
+    with HasStatusBarrier
     with ScorexLogging {
 
   import PathMatchers._
-
-  private implicit val trm: ToResponseMarshaller[MatcherResponse] = MatcherResponse.toResponseMarshaller
 
   override lazy val route: Route = pathPrefix("api" / "v1") {
     matcherStatusBarrier {
       getOrderBook
     }
-  }
-
-  private def matcherStatusBarrier: Directive0 = matcherStatus() match {
-    case Matcher.Status.Working  => pass
-    case Matcher.Status.Starting => complete(DuringStart)
-    case Matcher.Status.Stopping => complete(DuringShutdown)
   }
 
   private def withAssetPair(p: AssetPair,
@@ -59,7 +52,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",
     httpMethod = "GET",
-    response = classOf[Any]
+    response = classOf[ApiV1OrderBook]
   )
   @ApiImplicitParams(
     Array(

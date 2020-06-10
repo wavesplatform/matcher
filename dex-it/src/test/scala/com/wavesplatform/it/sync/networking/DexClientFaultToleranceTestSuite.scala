@@ -2,11 +2,11 @@ package com.wavesplatform.it.sync.networking
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.api.node.NodeApi
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
@@ -41,7 +41,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
     dex1.api.place(aliceBuyOrder)
-    dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Accepted)
 
     markup(s"Disconnect DEX from the network and perform USD transfer from Alice to Bob")
     wavesNodeProxy.setConnectionCut(true)
@@ -52,7 +52,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     markup("Connect DEX back to the network, DEX should know about transfer and cancel Alice's order")
     wavesNodeProxy.setConnectionCut(false)
 
-    dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Cancelled)
 
     withClue("Cleanup") {
       broadcastAndAwait(bob2AliceTransferTx)
@@ -72,7 +72,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
 
     markup("Alice places order that requires some amount of USD, DEX receives balances stream from the node 1")
     dex1.api.place(aliceBuyOrder)
-    dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Accepted)
 
     markup("Up node 2")
     wavesNode2.start()
@@ -89,11 +89,11 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     usdBalancesShouldBe(wavesNode2.api, expectedAliceBalance = 0, expectedBobBalance = defaultAssetQuantity)
 
     markup("Now DEX receives balances stream from the node 2 and cancels Alice's order")
-    dex1.api.waitForOrderStatus(aliceBuyOrder, OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(aliceBuyOrder, Status.Cancelled)
 
     markup("Bob places order that requires some amount of USD, DEX receives balances stream from the node 2")
     dex1.api.place(bobBuyOrder)
-    dex1.api.waitForOrderStatus(bobBuyOrder, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(bobBuyOrder, Status.Accepted)
 
     markup("Up node 1")
     wavesNode1.start()
@@ -109,7 +109,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     usdBalancesShouldBe(wavesNode1.api, defaultAssetQuantity, 0)
 
     markup("Now DEX receives balances stream from the node 1 and cancels Bob's order")
-    dex1.api.waitForOrderStatus(bobBuyOrder, OrderStatus.Cancelled)
+    dex1.api.waitForOrderStatus(bobBuyOrder, Status.Cancelled)
   }
 
   "DEXClient should correctly handle gRPC errors" in {
@@ -130,7 +130,7 @@ class DexClientFaultToleranceTestSuite extends MatcherSuiteBase with HasToxiProx
     wavesNode1.connectToNetwork()
 
     dex1.api.waitForOrderPlacement(order)
-    dex1.api.waitForOrderStatus(order, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(order, Status.Accepted)
     dex1.api.tradableBalance(mkKeyPair("random"), wavesUsdPair) should matchTo { Map.empty[Asset, Long] }
   }
 

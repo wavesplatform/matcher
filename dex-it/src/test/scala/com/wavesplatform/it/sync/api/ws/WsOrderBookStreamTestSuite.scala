@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -10,7 +11,6 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus}
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictionsSettings}
 import com.wavesplatform.it.WsSuiteBase
@@ -135,7 +135,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
       placeAndAwaitAtDex(firstOrder)
       dex1.api.cancelAll(carol)
-      dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Cancelled)
+      dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Status.Cancelled)
 
       markup("No orders")
       val wsc0    = mkWsOrderBookConnection(wavesBtcPair, dex1)
@@ -199,7 +199,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       markup("Two orders and trade")
 
-      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Filled)
+      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Status.Filled)
 
       val wsc3    = mkWsOrderBookConnection(wavesBtcPair, dex1)
       val buffer3 = wsc3.receiveAtLeastN[WsOrderBook](1)
@@ -286,7 +286,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       markup("An execution and adding a new order")
       val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
-      placeAndAwaitAtDex(order, ApiOrderStatus.PartiallyFilled)
+      placeAndAwaitAtDex(order, ApiOrderStatus.Status.PartiallyFilled)
 
       val buffer2 = wsc.receiveAtLeastN[WsOrderBook](1)
       buffer2.size should (be >= 1 and be <= 2)
@@ -308,7 +308,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.clearMessages()
 
       dex1.api.cancelAll(carol)
-      dex1.api.waitForOrderStatus(order, ApiOrderStatus.Cancelled)
+      dex1.api.waitForOrderStatus(order, ApiOrderStatus.Status.Cancelled)
 
       val buffer3 = wsc.receiveAtLeastN[WsOrderBook](1)
       buffer3.size shouldBe 1

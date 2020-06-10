@@ -5,7 +5,9 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
+import com.wavesplatform.dex.api.ApiOrderStatus
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -23,7 +25,6 @@ import play.api.libs.json.JsValue
 import scala.Ordered._
 import scala.concurrent.duration._
 import scala.util.Random
-import com.wavesplatform.dex.cli._
 
 // noinspection ScalaStyle
 case class Checker(superConnector: SuperConnector) {
@@ -134,7 +135,11 @@ case class Checker(superConnector: SuperConnector) {
     val submittedId = submitted.id()
 
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
-      lazy val expectedFilledStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee).json.toString
+
+      lazy val expectedFilledStatus = {
+        val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
+        ApiOrderStatus.apiOrderStatusFormat.writes(ApiOrderStatus from orderStatus).toString
+      }
       (
         for {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]

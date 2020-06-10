@@ -111,6 +111,7 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
+      "-Ywarn-macros:after", // https://github.com/scala/bug/issues/11099
       "-Xlint",
       "-Ypartial-unification",
       "-opt:l:inline",

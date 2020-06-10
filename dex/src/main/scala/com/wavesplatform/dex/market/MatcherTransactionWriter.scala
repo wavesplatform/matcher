@@ -7,7 +7,6 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.model.Events._
-import com.wavesplatform.dex.settings.MatcherSettings
 import org.iq80.leveldb.DB
 
 class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {
@@ -38,9 +37,9 @@ object MatcherTransactionWriter {
 
   def name: String = "MatcherTransactionWriter"
 
-  def props(db: DB, settings: MatcherSettings): Props = Props(new MatcherTransactionWriter(db))
+  def props(db: DB): Props = Props(new MatcherTransactionWriter(db))
 
-  private def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {
+  def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {
     val key       = MatcherKeys.orderTxIdsSeqNr(orderId)
     val nextSeqNr = rw.get(key) + 1
     rw.put(key, nextSeqNr)

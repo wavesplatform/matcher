@@ -2,31 +2,51 @@ package com.wavesplatform.dex.api
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Status}
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.testkit.{TestActor, TestProbe}
+import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Longs
+import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
+import com.wavesplatform.dex.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex._
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.OrderBookHttpInfo
+import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, `X-Api-Key`}
 import com.wavesplatform.dex.caches.RateCache
+import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.db.{OrderDB, WithDB}
-import com.wavesplatform.dex.domain.account.KeyPair
+import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.order.OrderJson._
+import com.wavesplatform.dex.domain.order.OrderOps._
+import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
+import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.transaction.ExchangeTransactionV2
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect._
+import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus}
-import com.wavesplatform.dex.settings.MatcherSettings
+import com.wavesplatform.dex.market.MatcherActor._
+import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherTransactionWriter}
+import com.wavesplatform.dex.model.MatcherModel.Denormalized
+import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
+import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{JsArray, JsString, Json}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -34,8 +54,9 @@ import scala.util.Random
 
 class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase with PathMockFactory with Eventually with WithDB {
 
-  private val settings       = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex")
-  private val apiKey         = "apiKey"
+  private val apiKey       = "apiKey"
+  private val apiKeyHeader = RawHeader(`X-Api-Key`.headerName, apiKey)
+
   private val matcherKeyPair = KeyPair("matcher".getBytes("utf-8"))
   private val smartAsset     = arbitraryAssetGen.sample.get
   private val smartAssetId   = smartAsset.id
@@ -49,6 +70,358 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     hasScript = false
   )
 
+  private val orderRestrictions = OrderRestrictionsSettings(
+    stepAmount = 0.00000001,
+    minAmount = 0.00000001,
+    maxAmount = 1000.0,
+    stepPrice = 0.00000001,
+    minPrice = 0.00000001,
+    maxPrice = 2000.0,
+  )
+
+  private val priceAssetId = issuedAssetIdGen.map(ByteStr(_)).sample.get
+  private val priceAsset   = IssuedAsset(priceAssetId)
+
+  private val smartWavesPair = AssetPair(smartAsset, Waves)
+  private val smartWavesAggregatedSnapshot = OrderBookAggregatedSnapshot(
+    bids = Seq(
+      LevelAgg(10000000000000L, 41),
+      LevelAgg(2500000000000L, 40),
+      LevelAgg(300000000000000L, 1),
+    ),
+    asks = Seq(
+      LevelAgg(50000000000L, 50),
+      LevelAgg(2500000000000L, 51)
+    )
+  )
+
+  private val smartWavesMarketStatus = MarketStatus(
+    lastTrade = Some(LastTrade(1000, 2000, OrderType.SELL)),
+    bestBid = Some(LevelAgg(1111, 2222)),
+    bestAsk = Some(LevelAgg(3333, 4444))
+  )
+
+  private val (okOrder, okOrderSenderPrivateKey)   = orderGenerator.sample.get
+  private val (badOrder, badOrderSenderPrivateKey) = orderGenerator.sample.get
+
+  private val amountAssetDesc = BriefAssetDescription("AmountAsset", 8, hasScript = false)
+  private val priceAssetDesc  = BriefAssetDescription("PriceAsset", 8, hasScript = false)
+
+  private val settings =
+    MatcherSettings.valueReader
+      .read(ConfigFactory.load(), "waves.dex")
+      .copy(
+        priceAssets = Seq(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+        orderRestrictions = Map(smartWavesPair -> orderRestrictions)
+      )
+
+  private implicit val apiMarketDataWithMetaDiff: Diff[ApiMarketDataWithMeta] = Derived[Diff[ApiMarketDataWithMeta]].ignore[Long](_.created)
+
+  private def mkHistoryItem(order: Order, status: String): ApiOrderBookHistoryItem =
+    ApiOrderBookHistoryItem(
+      id = order.id(),
+      `type` = order.orderType,
+      orderType = AcceptedOrderType.Limit,
+      amount = order.amount,
+      filled = 0L,
+      price = order.price,
+      fee = order.matcherFee,
+      filledFee = 0L,
+      feeAsset = order.feeAsset,
+      timestamp = order.timestamp,
+      status = status,
+      assetPair = order.assetPair,
+      avgWeighedPrice = 0 // TODO Its false in case of new orders! Fix in DEX-774
+    )
+
+  // getMatcherPublicKey
+  routePath("/") - {
+    "returns a public key" in test { route =>
+      Get(routePath("/")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[ApiMatcherPublicKey] should matchTo(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").right.get)
+      }
+    }
+  }
+
+  // orderBookInfo
+  routePath("/orderbook/{amountAsset}/{priceAsset}/info") - {
+    "returns an order book information" in test { route =>
+      Get(routePath(s"/orderbook/$smartAssetId/WAVES/info")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[ApiOrderBookInfo] should matchTo(
+          ApiOrderBookInfo(
+            restrictions = Some(ApiOrderRestrictions.fromSettings(orderRestrictions)),
+            matchingRules = ApiMatchingRules(0.1)
+          )
+        )
+      }
+    }
+  }
+
+  // getSettings
+  routePath("/matcher/settings") - {
+    "returns matcher's settings" in test { route =>
+      Get(routePath("/settings")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[ApiMatcherPublicSettings] should matchTo(
+          ApiMatcherPublicSettings(
+            matcherPublicKey = matcherKeyPair.publicKey,
+            matcherVersion = Version.VersionString,
+            priceAssets = List(badOrder.assetPair.priceAsset, okOrder.assetPair.priceAsset, priceAsset, Waves),
+            orderFee = ApiOrderFeeMode.FeeModeDynamic(
+              baseFee = 600000,
+              rates = Map(Waves -> 1.0)
+            ),
+            orderVersions = List[Byte](1, 2, 3),
+            networkByte = AddressScheme.current.chainId.toInt
+          )
+        )
+      }
+    }
+  }
+
+  // getRates
+  routePath("/settings/rates") - {
+    "returns available rates for fee" in test { route =>
+      Get(routePath("/settings/rates")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[ApiRates] should matchTo(Map[Asset, Double](Waves -> 1.0))
+      }
+    }
+  }
+
+  // getCurrentOffset
+  routePath("/debug/currentOffset") - {
+    "returns a current offset in the queue" in test(
+      { route =>
+        Get(routePath("/debug/currentOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOffset] should matchTo(0L)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getLastOffset
+  routePath("/debug/lastOffset") - {
+    "returns the last offset in the queue" in test(
+      { route =>
+        Get(routePath("/debug/lastOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOffset] should matchTo(0L)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getOldestSnapshotOffset
+  routePath("/debug/oldestSnapshotOffset") - {
+    "returns the oldest snapshot offset among all order books" in test(
+      { route =>
+        Get(routePath("/debug/oldestSnapshotOffset")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOffset] should matchTo(100L)
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getAllSnapshotOffsets
+  routePath("/debug/allSnapshotOffsets") - {
+    "returns a dictionary with order books offsets" in test(
+      { route =>
+        Get(routePath("/debug/allSnapshotOffsets")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSnapshotOffsets] should matchTo(
+            Map(
+              AssetPair(Waves, priceAsset) -> 100L,
+              AssetPair(smartAsset, Waves) -> 120L
+            )
+          )
+        }
+      },
+      apiKey
+    )
+  }
+
+  // saveSnapshots
+  routePath("/debug/saveSnapshots") - {
+    "returns that all is fine" in test(
+      { route =>
+        Post(routePath("/debug/saveSnapshots")).withHeaders(apiKeyHeader) ~> route ~> check {
+          responseAs[ApiMessage] should matchTo(ApiMessage("Saving started"))
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getOrderBook
+  routePath("/orderbook/{amountAsset}/{priceAsset}") - {
+    "returns an order book" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiV0OrderBook] should matchTo(
+            ApiV0OrderBook(
+              timestamp = 0L,
+              pair = smartWavesPair,
+              bids = smartWavesAggregatedSnapshot.bids.toList.map(ApiV0LevelAgg.fromLevelAgg),
+              asks = smartWavesAggregatedSnapshot.asks.toList.map(ApiV0LevelAgg.fromLevelAgg)
+            )
+          )
+        }
+      }
+    )
+  }
+
+  // marketStatus
+  routePath("/orderbook/[amountAsset]/[priceAsset]/status") - {
+    "returns an order book status" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/status")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiMarketStatus] should matchTo(ApiMarketStatus fromMarketStatus smartWavesMarketStatus)
+        }
+      }
+    )
+  }
+
+  // placeLimitOrder
+  routePath("/orderbook") - {
+    "returns a placed limit order" in test(
+      { route =>
+        Post(routePath("/orderbook"), Json.toJson(okOrder)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSuccessfulPlace] should matchTo(ApiSuccessfulPlace(okOrder))
+        }
+      }
+    )
+
+    "returns an error if the placement of limit order was rejected" in test(
+      { route =>
+        Post(routePath("/orderbook"), Json.toJson(badOrder)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          responseAs[ApiError] should matchTo(
+            ApiError(
+              error = 3148040,
+              message = s"The order ${badOrder.idStr()} has already been placed",
+              template = "The order {{id}} has already been placed",
+              params = Json.obj(
+                "id" -> badOrder.idStr()
+              ),
+              status = "OrderRejected"
+            )
+          )
+        }
+      }
+    )
+  }
+
+  // placeMarketOrder
+  routePath("/orderbook/market") - {
+    "returns a placed market order" in test(
+      { route =>
+        Post(routePath("/orderbook/market"), Json.toJson(okOrder)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSuccessfulPlace] should matchTo(ApiSuccessfulPlace(okOrder))
+        }
+      }
+    )
+
+    "returns an error if the placement of market order was rejected" in test(
+      { route =>
+        Post(routePath("/orderbook/market"), Json.toJson(badOrder)) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          responseAs[ApiError] should matchTo(
+            ApiError(
+              error = 3148040,
+              message = s"The order ${badOrder.idStr()} has already been placed",
+              template = "The order {{id}} has already been placed",
+              params = Json.obj(
+                "id" -> badOrder.idStr()
+              ),
+              status = "OrderRejected"
+            )
+          )
+        }
+      }
+    )
+  }
+
+  private val historyItem: ApiOrderBookHistoryItem = mkHistoryItem(okOrder, OrderStatus.Accepted.name)
+
+  // getAssetPairAndPublicKeyOrderHistory
+  routePath("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}") - {
+    "returns an order history filtered by asset pair" in test(
+      { route =>
+        val now       = System.currentTimeMillis()
+        val signature = crypto.sign(okOrderSenderPrivateKey, okOrder.senderPublicKey ++ Longs.toByteArray(now))
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/publicKey/${okOrder.senderPublicKey}"))
+          .withHeaders(
+            RawHeader("Timestamp", s"$now"),
+            RawHeader("Signature", s"$signature")
+          ) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
+        }
+      }
+    )
+  }
+
+  // getPublicKeyOrderHistory
+  routePath("/orderbook/{publicKey}") - {
+    "returns an order history" in test(
+      { route =>
+        val now       = System.currentTimeMillis()
+        val signature = crypto.sign(okOrderSenderPrivateKey, okOrder.senderPublicKey ++ Longs.toByteArray(now))
+        Get(routePath(s"/orderbook/${okOrder.senderPublicKey}"))
+          .withHeaders(
+            RawHeader("Timestamp", s"$now"),
+            RawHeader("Signature", s"$signature")
+          ) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
+        }
+      }
+    )
+  }
+
+  // getAllOrderHistory
+  routePath("/orders/{address}") - {
+    "returns an order history by api key" in test(
+      { route =>
+        Get(routePath(s"/orders/${okOrder.senderPublicKey.toAddress}")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[List[ApiOrderBookHistoryItem]] should matchTo(List(historyItem))
+        }
+      },
+      apiKey
+    )
+  }
+
+  // tradableBalance
+  routePath("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}") - {
+    "returns a tradable balance" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${okOrder.senderPublicKey.toAddress}")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiBalance] should matchTo(
+            Map(
+              smartAsset -> 100L,
+              Waves      -> 100L
+            )
+          )
+        }
+      }
+    )
+  }
+
+  // reservedBalance
   routePath("/balance/reserved/{publicKey}") - {
 
     val publicKey = matcherKeyPair.publicKey
@@ -64,13 +437,15 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns a reserved balance for specified publicKey" in test { route =>
       mkGet(route)(Base58.encode(publicKey), ts, Base58.encode(signature)) ~> check {
         status shouldBe StatusCodes.OK
+        responseAs[ApiBalance] should matchTo { Map[Asset, Long](Waves -> 350L) }
       }
     }
 
     "works with an API key too" in test(
       { route =>
-        Get(routePath(s"/balance/reserved/${Base58.encode(publicKey)}")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Get(routePath(s"/balance/reserved/${Base58.encode(publicKey)}")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.OK
+          responseAs[ApiBalance] should matchTo { Map[Asset, Long](Waves -> 350L) }
         }
       },
       apiKey
@@ -80,8 +455,14 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       "signature" in test { route =>
         mkGet(route)(Base58.encode(publicKey), ts, ";;") ~> check {
           status shouldBe StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The request has an invalid signature"
+          responseAs[ApiError] should matchTo(
+            ApiError(
+              error = 1051904,
+              message = "The request has an invalid signature",
+              template = "The request has an invalid signature",
+              status = "InvalidSignature"
+            )
+          )
         }
       }
 
@@ -93,6 +474,397 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     }
   }
 
+  // orderStatus
+  routePath("/orderbook/{amountAsset}/{priceAsset}/{orderId}") - {
+    "returns an order status" in test(
+      { route =>
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/${okOrder.id()}")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOrderStatus] should matchTo(ApiOrderStatus(ApiOrderStatus.Status.Accepted))
+        }
+      }
+    )
+  }
+
+  // getOrderStatusInfoByIdWithApiKey
+  routePath("/orders/{address}/{orderId}") - {
+
+    val testOrder = orderToCancel
+    val address   = testOrder.sender.toAddress
+    val orderId   = testOrder.id()
+
+    "X-API-Key is required" in test { route =>
+      Get(routePath(s"/orders/$address/$orderId")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "X-User-Public-Key is not required" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId")).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOrderBookHistoryItem] should matchTo(mkHistoryItem(orderToCancel, OrderStatus.Accepted.name))
+        }
+      },
+      apiKey
+    )
+
+    "X-User-Public-Key is specified, but wrong" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId"))
+          .withHeaders(apiKeyHeader, RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.Forbidden
+        }
+      },
+      apiKey
+    )
+
+    "sunny day (order exists)" in test(
+      { route =>
+        Get(routePath(s"/orders/$address/$orderId"))
+          .withHeaders(apiKeyHeader, RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiOrderBookHistoryItem] should matchTo(mkHistoryItem(orderToCancel, OrderStatus.Accepted.name))
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getOrderStatusInfoByIdWithSignature
+  routePath("/orderbook/{publicKey}/{orderId}") - {
+
+    val testOrder = orderToCancel
+    val publicKey = sender.publicKey
+    val orderId   = testOrder.id()
+
+    "sunny day" in test { route =>
+      val ts        = System.currentTimeMillis()
+      val signature = Base58.encode(crypto.sign(sender, publicKey ++ Longs.toByteArray(ts)))
+      Get(routePath(s"/orderbook/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", ts.toString),
+          RawHeader("Signature", signature)
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        responseAs[ApiOrderBookHistoryItem] should matchTo(mkHistoryItem(orderToCancel, OrderStatus.Accepted.name))
+      }
+    }
+
+    "invalid signature" in test { route =>
+      Get(routePath(s"/orderbook/$publicKey/$orderId"))
+        .withHeaders(
+          RawHeader("Timestamp", System.currentTimeMillis.toString),
+          RawHeader("Signature", "invalidSignature")
+        ) ~> route ~> check {
+        status shouldEqual StatusCodes.BadRequest
+      }
+    }
+  }
+
+  // cancel
+  routePath("/orderbook/{amountAsset}/{priceAsset}/cancel") - {
+
+    "single cancel" - {
+      "returns that an order was canceled" in test(
+        { route =>
+          val unsignedRequest =
+            CancelOrderRequest(okOrderSenderPrivateKey.publicKey, Some(okOrder.id()), timestamp = None, signature = Array.emptyByteArray)
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+
+          Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
+          }
+        }
+      )
+
+      "returns an error" in test(
+        { route =>
+          val unsignedRequest =
+            CancelOrderRequest(badOrderSenderPrivateKey.publicKey, Some(badOrder.id()), timestamp = None, signature = Array.emptyByteArray)
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(badOrderSenderPrivateKey, unsignedRequest.toSign))
+
+          Post(routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.BadRequest
+            responseAs[ApiError] should matchTo(
+              ApiError(
+                error = 9437193,
+                message = s"The order ${badOrder.id()} not found",
+                template = "The order {{id}} not found",
+                status = "OrderCancelRejected",
+                params = Json.obj("id" -> badOrder.id())
+              )
+            )
+          }
+        }
+      )
+    }
+
+    "massive cancel" - {
+      "returns canceled orders" in test(
+        { route =>
+          val unsignedRequest = CancelOrderRequest(
+            sender = okOrderSenderPrivateKey.publicKey,
+            orderId = None,
+            timestamp = Some(System.currentTimeMillis),
+            signature = Array.emptyByteArray
+          )
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+
+          Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[ApiSuccessfulBatchCancel] should matchTo(
+              ApiSuccessfulBatchCancel(
+                List(
+                  Right(ApiSuccessfulSingleCancel(orderId = okOrder.id())),
+                  Left(
+                    ApiError(
+                      error = 25601,
+                      message = "Can not persist event, please retry later or contact with the administrator",
+                      template = "Can not persist event, please retry later or contact with the administrator",
+                      status = "OrderCancelRejected"
+                    )
+                  )
+                )
+              )
+            )
+          }
+        }
+      )
+
+      "returns an error" in test(
+        { route =>
+          val unsignedRequest = CancelOrderRequest(
+            sender = okOrderSenderPrivateKey.publicKey,
+            orderId = None,
+            timestamp = Some(System.currentTimeMillis()),
+            signature = Array.emptyByteArray
+          )
+          val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+
+          Post(routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
+            status shouldEqual StatusCodes.ServiceUnavailable
+            responseAs[ApiError] should matchTo(
+              ApiError(
+                error = 3145733,
+                message = s"The account ${badOrder.sender.toAddress} is blacklisted",
+                template = "The account {{address}} is blacklisted",
+                status = "BatchCancelRejected",
+                params = Json.obj("address" -> badOrder.sender.toAddress)
+              )
+            )
+          }
+        }
+      )
+    }
+  }
+
+  // cancelAll
+  routePath("/orderbook/cancel") - {
+    "returns canceled orders" in test(
+      { route =>
+        val unsignedRequest = CancelOrderRequest(
+          sender = okOrderSenderPrivateKey.publicKey,
+          orderId = None,
+          timestamp = Some(System.currentTimeMillis),
+          signature = Array.emptyByteArray
+        )
+        val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
+
+        Post(routePath("/orderbook/cancel"), signedRequest) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSuccessfulBatchCancel] should matchTo(
+            ApiSuccessfulBatchCancel(
+              List(
+                Right(ApiSuccessfulSingleCancel(orderId = okOrder.id())),
+                Left(
+                  ApiError(
+                    error = 25601,
+                    message = "Can not persist event, please retry later or contact with the administrator",
+                    template = "Can not persist event, please retry later or contact with the administrator",
+                    status = "OrderCancelRejected"
+                  )
+                )
+              )
+            )
+          )
+        }
+      }
+    )
+  }
+
+  // cancelAllById
+  routePath("/orders/{address}/cancel") - {
+    val orderId = orderToCancel.id()
+
+    "X-Api-Key is required" in test { route =>
+      Post(
+        routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+        HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+      ) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "an invalid body" in test(
+      { route =>
+        Post(
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(orderId).toString())
+        ).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+        }
+      },
+      apiKey
+    )
+
+    "sunny day" in test(
+      { route =>
+        Post(
+          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
+          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
+        ).withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiSuccessfulBatchCancel] should matchTo(
+            ApiSuccessfulBatchCancel(List(Right(ApiSuccessfulSingleCancel(orderId = orderToCancel.id()))))
+          )
+        }
+      },
+      apiKey
+    )
+  }
+
+  // orderbooks
+  routePath("/orderbook") - {
+    "returns all order books" in test(
+      { route =>
+        Get(routePath("/orderbook")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[ApiTradingMarkets] should matchTo(
+            ApiTradingMarkets(
+              matcherKeyPair.publicKey,
+              Seq(
+                ApiMarketDataWithMeta(
+                  okOrder.assetPair.amountAsset,
+                  amountAssetDesc.name,
+                  ApiAssetInfo(amountAssetDesc.decimals).some,
+                  okOrder.assetPair.priceAsset,
+                  priceAssetDesc.name,
+                  ApiAssetInfo(priceAssetDesc.decimals).some,
+                  0L,
+                  None,
+                  ApiMatchingRules(0.1)
+                )
+              )
+            )
+          )
+        }
+      }
+    )
+  }
+
+  // orderBookDelete
+  routePath("/orderbook/{amountAsset}/{priceAsset}") - {
+
+    val (someOrder, _) = orderGenerator.sample.get
+
+    "returns an error if there is no such order book" in test(
+      { route =>
+        Delete(routePath(s"/orderbook/${someOrder.assetPair.amountAssetStr}/${someOrder.assetPair.priceAssetStr}"))
+          .withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.ServiceUnavailable
+        }
+      },
+      apiKey
+    )
+
+    "returns success message if order book exists" in test(
+      { route =>
+        Delete(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}"))
+          .withHeaders(apiKeyHeader) ~> route ~> check {
+          status shouldEqual StatusCodes.Accepted
+          responseAs[ApiMessage] should matchTo(ApiMessage("Deleting order book"))
+        }
+      },
+      apiKey
+    )
+  }
+
+  // getTransactionsByOrder
+  routePath("/transactions/{orderId}") - {
+    "returns known transactions with this order" in test(
+      { route =>
+        Get(routePath(s"/transactions/${okOrder.idStr()}")) ~> route ~> check {
+          responseAs[JsArray].value should have size 1 // we don't have deserializer for domain exchange transaction (only for WavesJ tx)
+        }
+      }
+    )
+  }
+
+  // forceCancelOrder
+  routePath("/orders/cancel/{orderId}") - {
+
+    "X-Api-Key is required" in test { route =>
+      Post(routePath(s"/orders/cancel/${okOrder.id()}")) ~> route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+    }
+
+    "single cancel with API key" - {
+
+      "X-User-Public-Key isn't required, returns that an order was canceled" in test(
+        { route =>
+          Post(routePath(s"/orders/cancel/${okOrder.id()}")).withHeaders(apiKeyHeader) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
+          }
+        },
+        apiKey
+      )
+
+      "X-User-Public-Key is specified, but wrong" in test(
+        { route =>
+          Post(routePath(s"/orders/cancel/${okOrder.id()}"))
+            .withHeaders(apiKeyHeader, RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
+            status shouldEqual StatusCodes.BadRequest
+          }
+        },
+        apiKey
+      )
+
+      "returns an error" in test(
+        { route =>
+          Post(routePath(s"/orders/cancel/${badOrder.id()}")).withHeaders(apiKeyHeader) ~> route ~> check {
+            status shouldEqual StatusCodes.BadRequest
+            responseAs[ApiError] should matchTo(
+              ApiError(
+                error = 9437193,
+                message = s"The order ${badOrder.id()} not found",
+                template = "The order {{id}} not found",
+                status = "OrderCancelRejected",
+                params = Json.obj("id" -> badOrder.id())
+              )
+            )
+          }
+        },
+        apiKey
+      )
+
+      "sunny day" in test(
+        { route =>
+          Post(routePath(s"/orders/cancel/${okOrder.id()}"))
+            .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", okOrder.senderPublicKey.base58)) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            responseAs[ApiSuccessfulSingleCancel] should matchTo(ApiSuccessfulSingleCancel(okOrder.id()))
+          }
+        },
+        apiKey
+      )
+    }
+  }
+
+  // upsertRate, deleteRate
   routePath("/settings/rates/{assetId}") - {
 
     val rateCache = RateCache.inMem
@@ -102,10 +874,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "add rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.Created
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate $rate for the asset $smartAssetId added"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate $rate for the asset $smartAssetId added"))
           rateCache.getAllRates(smartAsset) shouldBe rate
         }
       },
@@ -115,10 +886,10 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "update rate" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), updatedRate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"
+          responseAs[ApiMessage] should matchTo(
+            ApiMessage(s"The rate for the asset $smartAssetId updated, old value = $rate, new value = $updatedRate"))
           rateCache.getAllRates(smartAsset) shouldBe updatedRate
         }
       },
@@ -128,10 +899,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "update rate incorrectly (incorrect body)" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), "qwe").withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The provided JSON is invalid. Check the documentation"))
         }
       },
       apiKey,
@@ -140,10 +910,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "update rate incorrectly (incorrect value)" in test(
       { route =>
-        Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath(s"/settings/rates/$smartAssetId"), 0).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Asset rate should be positive"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Asset rate should be positive"))
         }
       },
       apiKey,
@@ -153,10 +922,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "update rate incorrectly (incorrect content type)" in test(
       { route =>
         Put(routePath(s"/settings/rates/$smartAssetId"), HttpEntity(ContentTypes.`text/plain(UTF-8)`, "5"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+          .withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The provided JSON is invalid. Check the documentation"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The provided JSON is invalid. Check the documentation"))
         }
       },
       apiKey,
@@ -165,10 +933,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "delete rate" in test(
       { route =>
-        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate for the asset $smartAssetId deleted, old value = $updatedRate"))
           rateCache.getAllRates.keySet should not contain smartAsset
         }
       },
@@ -178,10 +945,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "changing waves rate" in test(
       { route =>
-        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Put(routePath("/settings/rates/WAVES"), rate).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The rate for WAVES cannot be changed"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The rate for WAVES cannot be changed"))
         }
       },
       apiKey
@@ -191,8 +957,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath("/settings/rates/WAVES"), rate) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -202,8 +967,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Put(routePath("/settings/rates/WAVES"), rate).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -211,10 +975,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
     "deleting waves rate" in test(
       { route =>
-        Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath("/settings/rates/WAVES")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.BadRequest
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "The rate for WAVES cannot be changed"
+          responseAs[ApiMessage] should matchTo(ApiMessage("The rate for WAVES cannot be changed"))
         }
       },
       apiKey
@@ -224,8 +987,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath("/settings/rates/WAVES")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -235,8 +997,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       { route =>
         Delete(routePath("/settings/rates/WAVES")).withHeaders(RawHeader("X-API-KEY", "wrongApiKey")) ~> route ~> check {
           status shouldBe StatusCodes.Forbidden
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual "Provided API key is not correct"
+          responseAs[ApiMessage] should matchTo(ApiMessage("Provided API key is not correct"))
         }
       },
       apiKey
@@ -245,10 +1006,9 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "delete rate for the asset that doesn't have rate" in test(
       { route =>
         rateCache.deleteRate(smartAsset)
-        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
+        Delete(routePath(s"/settings/rates/$smartAssetId")).withHeaders(apiKeyHeader) ~> route ~> check {
           status shouldBe StatusCodes.NotFound
-          val message = (responseAs[JsValue] \ "message").as[JsString]
-          message.value shouldEqual s"The rate for the asset $smartAssetId was not specified"
+          responseAs[ApiMessage] should matchTo(ApiMessage(s"The rate for the asset $smartAssetId was not specified"))
         }
       },
       apiKey,
@@ -284,246 +1044,241 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
-        val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 1048577
-        (json \ "params" \ "invalidFields").as[List[String]] shouldBe List("/amount")
+        responseAs[ApiError] should matchTo(
+          ApiError(
+            error = 1048577,
+            message = "The provided JSON contains invalid fields: /amount. Check the documentation",
+            template = "The provided JSON contains invalid fields: {{invalidFields}}. Check the documentation",
+            params = Json.obj("invalidFields" -> JsArray(Seq(JsString("/amount")))),
+            status = "InvalidJsonResponse"
+          )
+        )
       }
     }
 
     "completely invalid JSON" in test { route =>
       val orderJson = "{ I AM THE DANGEROUS HACKER"
-
       Post(routePath("/orderbook"), HttpEntity(ContentTypes.`application/json`, orderJson)) ~> route ~> check {
         status shouldEqual StatusCodes.BadRequest
-        val json = responseAs[JsValue]
-        (json \ "error").as[Int] shouldBe 1048577
-        (json \ "message").as[String] shouldBe "The provided JSON is invalid. Check the documentation"
+        responseAs[ApiError] should matchTo(
+          ApiError(
+            error = 1048577,
+            message = "The provided JSON is invalid. Check the documentation",
+            template = "The provided JSON is invalid. Check the documentation",
+            params = None,
+            status = "InvalidJsonResponse"
+          )
+        )
       }
     }
   }
 
-  // cancelAllById
-  routePath("/orders/{address}/cancel") - {
-    val orderId = orderToCancel.id()
-
-    "X-Api-Key is required" in test { route =>
-      Post(
-        routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-        HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-      ) ~> route ~> check {
-        status shouldEqual StatusCodes.Forbidden
-      }
-    }
-
-    "an invalid body" in test(
-      { route =>
-        Post(
-          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-          HttpEntity(ContentTypes.`application/json`, Json.toJson(orderId).toString())
-        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
-        }
-      },
-      apiKey
-    )
-
-    "sunny day" in test(
-      { route =>
-        Post(
-          routePath(s"/orders/${orderToCancel.sender.toAddress}/cancel"),
-          HttpEntity(ContentTypes.`application/json`, Json.toJson(Set(orderId)).toString())
-        ).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-  }
-
-  // forceCancelOrder
-  routePath("/orders/cancel/{orderId}") - {
-    val orderId = orderToCancel.id()
-
-    "X-Api-Key is required" in test { route =>
-      Post(routePath(s"/orders/cancel/$orderId")) ~> route ~> check {
-        status shouldEqual StatusCodes.Forbidden
-      }
-    }
-
-    "X-User-Public-Key is not required" in test(
-      { route =>
-        Post(routePath(s"/orders/cancel/$orderId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-
-    "X-User-Public-Key is specified, but wrong" in test(
-      { route =>
-        Post(routePath(s"/orders/cancel/$orderId"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
-        }
-      },
-      apiKey
-    )
-
-    "sunny day" in test(
-      { route =>
-        Post(routePath(s"/orders/cancel/$orderId"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-  }
-
-  routePath("/orders/{address}/{orderId}") - {
-
-    val testOrder = orderToCancel
-    val address   = testOrder.sender.toAddress
-    val orderId   = testOrder.id()
-
-    "X-API-Key is required" in test { route =>
-      Get(routePath(s"/orders/$address/$orderId")) ~> route ~> check {
-        status shouldEqual StatusCodes.Forbidden
-      }
-    }
-
-    "X-User-Public-Key is not required" in test(
-      { route =>
-        Get(routePath(s"/orders/$address/$orderId")).withHeaders(RawHeader("X-API-KEY", apiKey)) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-
-    "X-User-Public-Key is specified, but wrong" in test(
-      { route =>
-        Get(routePath(s"/orders/$address/$orderId"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", matcherKeyPair.publicKey.base58)) ~> route ~> check {
-          status shouldEqual StatusCodes.Forbidden
-        }
-      },
-      apiKey
-    )
-
-    "sunny day (order exists)" in test(
-      { route =>
-        Get(routePath(s"/orders/$address/$orderId"))
-          .withHeaders(RawHeader("X-API-KEY", apiKey), RawHeader("X-User-Public-Key", orderToCancel.senderPublicKey.base58)) ~> route ~> check {
-          status shouldEqual StatusCodes.OK
-        }
-      },
-      apiKey
-    )
-  }
-
-  routePath("/settings") - {
-    "Public key should be returned" in test(
-      { route =>
-        Get(routePath(s"/settings")) ~> route ~> check {
-          status shouldBe StatusCodes.OK
-          (responseAs[JsValue] \ "matcherPublicKey").as[JsString].value shouldBe matcherKeyPair.publicKey.toString
-        }
-      }
-    )
-  }
-
-  routePath("/orderbook/{publicKey}/{orderId}") - {
-
-    val testOrder = orderToCancel
-    val publicKey = sender.publicKey
-    val orderId   = testOrder.id()
-
-    "sunny day" in test { route =>
-      val ts        = System.currentTimeMillis()
-      val signature = Base58.encode(crypto.sign(sender, publicKey ++ Longs.toByteArray(ts)))
-      Get(routePath(s"/orderbook/$publicKey/$orderId"))
-        .withHeaders(
-          RawHeader("Timestamp", ts.toString),
-          RawHeader("Signature", signature)
-        ) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-      }
-    }
-
-    "invalid signature" in test { route =>
-      Get(routePath(s"/orderbook/$publicKey/$orderId"))
-        .withHeaders(
-          RawHeader("Timestamp", System.currentTimeMillis.toString),
-          RawHeader("Signature", "invalidSignature")
-        ) ~> route ~> check {
-        status shouldEqual StatusCodes.BadRequest
-      }
-    }
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    val orderKey = MatcherKeys.order(okOrder.id())
+    db.put(orderKey.keyBytes, orderKey.encode(Some(okOrder)))
   }
 
   private def test[U](f: Route => U, apiKey: String = "", rateCache: RateCache = RateCache.inMem): U = {
 
     val addressActor = TestProbe("address")
-
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
+      val response = msg match {
+        case AddressDirectory.Envelope(_, msg) =>
+          msg match {
+            case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
+            case PlaceOrder(x, _)                      => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
+
+            case AddressActor.Query.GetOrdersStatuses(_, _) =>
+              AddressActor.Reply.OrdersStatuses(List(okOrder.id() -> OrderInfo.v4(LimitOrder(okOrder), OrderStatus.Accepted)))
+
+            case AddressActor.Query.GetOrderStatus(orderId) =>
+              if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
+              else Status.Failure(new RuntimeException(s"Unknown order $orderId"))
+
+            case AddressActor.Command.CancelOrder(orderId) =>
+              if (orderId == okOrder.id() || orderId == orderToCancel.id()) AddressActor.Event.OrderCanceled(orderId)
+              else error.OrderNotFound(orderId)
+
+            case x @ AddressActor.Command.CancelAllOrders(pair, _) =>
+              if (pair.contains(badOrder.assetPair)) error.AddressIsBlacklisted(badOrder.sender)
+              else if (pair.forall(_ == okOrder.assetPair))
+                AddressActor.Event.BatchCancelCompleted(
+                  Map(
+                    okOrder.id()  -> Right(AddressActor.Event.OrderCanceled(okOrder.id())),
+                    badOrder.id() -> Left(error.CanNotPersistEvent)
+                  )
+                )
+              else Status.Failure(new RuntimeException(s"Can't handle $x"))
+
+            case AddressActor.Command.CancelOrders(ids) =>
+              AddressActor.Event.BatchCancelCompleted(
+                ids.map { id =>
+                  id -> (if (id == orderToCancel.id()) Right(AddressActor.Event.OrderCanceled(okOrder.id())) else Left(error.CanNotPersistEvent))
+                }.toMap
+              )
+
+            case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap)
+
+            case _: AddressActor.Query.GetOrderStatusInfo =>
+              AddressActor.Reply.OrdersStatusInfo(OrderInfo.v4(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
+
+            case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
+          }
+
+        case x => Status.Failure(new RuntimeException(s"Unknown message: $x"))
+      }
+
+      sender ! response
+      TestActor.KeepRunning
+    }
+
+    val matcherActor = TestProbe("matcher")
+    matcherActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       msg match {
-        case AddressDirectory.Envelope(_, AddressActor.Query.GetReservedBalance) => sender ! AddressActor.Reply.Balance(Map.empty)
-        case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrders) if address == orderToCancel.sender.toAddress =>
-          sender ! api.BatchCancelCompleted { command.orderIds.map(id => id -> api.OrderCanceled(id)).toMap }
-        case AddressDirectory.Envelope(address, command: AddressActor.Command.CancelOrder) if address == orderToCancel.sender.toAddress =>
-          sender ! api.OrderCanceled(command.orderId)
-        case AddressDirectory.Envelope(address, _: AddressActor.Query.GetOrderStatusInfo) if address == orderToCancel.sender.toAddress =>
-          val ao = LimitOrder(orderToCancel)
-          sender ! AddressActor.Reply.OrdersStatusInfo(OrderInfo.v4(ao, OrderStatus.Accepted).some)
+        case GetSnapshotOffsets =>
+          sender ! SnapshotOffsetsResponse(
+            Map(
+              AssetPair(Waves, priceAsset)      -> Some(100L),
+              smartWavesPair                    -> Some(120L),
+              AssetPair(smartAsset, priceAsset) -> None,
+            )
+          )
+
+        case GetMarkets =>
+          sender ! List(
+            MarketData(
+              pair = okOrder.assetPair,
+              amountAssetName = amountAssetDesc.name,
+              priceAssetName = priceAssetDesc.name,
+              created = System.currentTimeMillis(),
+              amountAssetInfo = Some(AssetInfo(amountAssetDesc.decimals)),
+              priceAssetInfo = Some(AssetInfo(priceAssetDesc.decimals))
+            )
+          )
         case _ =>
       }
 
-      TestActor.NoAutoPilot
+      TestActor.KeepRunning
+    }
+
+    val orderBookActor = TestProbe("orderBook")
+    orderBookActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
+      msg match {
+        case request: AggregatedOrderBookActor.Query.GetHttpView =>
+          val assetPairDecimals = request.format match {
+            case Denormalized => Some(smartAssetDesc.decimals -> 8)
+            case _            => None
+          }
+
+          val entity =
+            OrderBookResult(
+              0L,
+              smartWavesPair,
+              smartWavesAggregatedSnapshot.bids,
+              smartWavesAggregatedSnapshot.asks,
+              assetPairDecimals
+            )
+
+          val httpResponse =
+            HttpResponse(
+              entity = HttpEntity(
+                ContentTypes.`application/json`,
+                OrderBookResult.toJson(entity)
+              )
+            )
+
+          request.client ! httpResponse
+
+        case request: AggregatedOrderBookActor.Query.GetMarketStatus => request.client ! smartWavesMarketStatus
+        case _                                                       =>
+      }
+
+      TestActor.KeepRunning
+    }
+
+    db.readWrite { rw =>
+      val tx =
+        ExchangeTransactionV2
+          .create(
+            matcherKeyPair.privateKey,
+            okOrder.updateType(BUY),
+            okOrder.updateType(SELL),
+            okOrder.amount,
+            okOrder.price,
+            okOrder.matcherFee,
+            okOrder.matcherFee,
+            0.003.waves,
+            System.currentTimeMillis
+          )
+          .explicitGet()
+
+      val txKey = MatcherKeys.exchangeTransaction(tx.id())
+      if (!rw.has(txKey)) {
+        rw.put(txKey, Some(tx))
+        MatcherTransactionWriter.appendTxId(rw, tx.buyOrder.id(), tx.id())
+        MatcherTransactionWriter.appendTxId(rw, tx.sellOrder.id(), tx.id())
+      }
     }
 
     val odb = OrderDB(settings.orderDb, db)
     odb.saveOrder(orderToCancel)
 
-    val orderBookAskAdapter = new OrderBookAskAdapter(new AtomicReference(Map.empty), 5.seconds)
-    val orderBookHttpInfo = new OrderBookHttpInfo(
-      settings.orderBookSnapshotHttpCache,
-      orderBookAskAdapter,
-      time,
-      x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
-    )
+    val orderBooks          = new AtomicReference(Map(smartWavesPair -> orderBookActor.ref.asRight[Unit]))
+    val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, 5.seconds)
 
-    val route: Route = MatcherApiRoute(
-      assetPairBuilder = new AssetPairBuilder(
-        settings,
-        x => {
-          if (x == smartAsset)
-            liftValueAsync[BriefAssetDescription](BriefAssetDescription(smartAssetDesc.name, smartAssetDesc.decimals, hasScript = false))
-          else liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+    val orderBookHttpInfo =
+      new OrderBookHttpInfo(
+        settings = settings.orderBookSnapshotHttpCache,
+        askAdapter = orderBookAskAdapter,
+        time = time,
+        assetDecimals = x => if (x == smartAsset) Some(smartAssetDesc.decimals) else throw new IllegalArgumentException(s"No information about $x")
+      )
+
+    val route =
+      MatcherApiRoute(
+        assetPairBuilder = new AssetPairBuilder(
+          settings, {
+            case `smartAsset` => liftValueAsync[BriefAssetDescription](smartAssetDesc)
+            case x if x == okOrder.assetPair.amountAsset || x == badOrder.assetPair.amountAsset =>
+              liftValueAsync[BriefAssetDescription](amountAssetDesc)
+            case x if x == okOrder.assetPair.priceAsset || x == badOrder.assetPair.priceAsset =>
+              liftValueAsync[BriefAssetDescription](priceAssetDesc)
+            case x => liftErrorAsync[BriefAssetDescription](error.AssetNotFound(x))
+          },
+          Set.empty
+        ),
+        matcherPublicKey = matcherKeyPair.publicKey,
+        matcher = matcherActor.ref,
+        addressActor = addressActor.ref,
+        storeEvent = {
+          case QueueEvent.OrderBookDeleted(pair) if pair == okOrder.assetPair =>
+            Future.successful { QueueEventWithMeta(1L, System.currentTimeMillis, QueueEvent.OrderBookDeleted(pair)).some }
+          case _ => Future.failed(new NotImplementedError("Storing is not implemented"))
         },
-        Set.empty
-      ),
-      matcherPublicKey = matcherKeyPair.publicKey,
-      matcher = ActorRef.noSender,
-      addressActor = addressActor.ref,
-      storeEvent = _ => Future.failed(new NotImplementedError("Storing is not implemented")),
-      orderBook = _ => None,
-      orderBookHttpInfo = orderBookHttpInfo,
-      getActualTickSize = _ => 0.1,
-      orderValidator = _ => liftErrorAsync { error.FeatureNotImplemented },
-      matcherSettings = settings,
-      matcherStatus = () => Matcher.Status.Working,
-      db = db,
-      time = time,
-      currentOffset = () => 0L,
-      lastOffset = () => Future.successful(0L),
-      matcherAccountFee = 300000L,
-      apiKeyHash = Some(crypto secureHash apiKey),
-      rateCache = rateCache,
-      validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
-      () => DynamicSettings.symmetric(matcherFee)
-    ).route
+        orderBook = {
+          case x if x == okOrder.assetPair || x == badOrder.assetPair => Some(Right(orderBookActor.ref))
+          case _                                                      => None
+        },
+        orderBookHttpInfo = orderBookHttpInfo,
+        getActualTickSize = _ => 0.1,
+        orderValidator = {
+          case x if x == okOrder || x == badOrder => liftValueAsync(x)
+          case _                                  => liftErrorAsync(error.FeatureNotImplemented)
+        },
+        matcherSettings = settings,
+        matcherStatus = () => Matcher.Status.Working,
+        db = db,
+        time = time,
+        currentOffset = () => 0L,
+        lastOffset = () => Future.successful(0L),
+        matcherAccountFee = 300000L,
+        apiKeyHash = Some(crypto secureHash apiKey),
+        rateCache = rateCache,
+        validatedAllowedOrderVersions = () => Future.successful { Set(1, 2, 3) },
+        () => DynamicSettings.symmetric(matcherFee)
+      )
 
-    f(route)
+    f(route.route)
   }
 }

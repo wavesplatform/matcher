@@ -2,10 +2,10 @@ package com.wavesplatform.it.sync.compat
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.api.MultipleVersions
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.MatcherState
@@ -38,7 +38,7 @@ trait BackwardCompatSuiteBase extends MatcherSuiteBase with MultipleVersions {
     )
   }
 
-  protected def waitOnBoth(order: Order, status: OrderStatus): Unit = {
+  protected def waitOnBoth(order: Order, status: Status): Unit = {
     dex1.api.waitForOrderStatus(order, status)
     dex2.api.waitForOrderStatus(order, status)
   }

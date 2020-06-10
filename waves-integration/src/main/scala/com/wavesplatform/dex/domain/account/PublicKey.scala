@@ -35,7 +35,7 @@ object PublicKey extends TaggedType[ByteStr] {
     def toAddress: Address = Address.fromPublicKey(pk)
   }
 
-  implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](
+  implicit val publicKeyJsonFormat: Format[PublicKey] = Format[PublicKey](
     byteStrFormat.map(this.apply),
     Writes(pk => byteStrFormat.writes(pk))
   )

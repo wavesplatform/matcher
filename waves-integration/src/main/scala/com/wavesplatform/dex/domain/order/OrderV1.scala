@@ -8,62 +8,25 @@ import com.wavesplatform.dex.domain.bytes.deser.EntityParser
 import com.wavesplatform.dex.domain.bytes.deser.EntityParser.{Signature, Stateful}
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto._
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 
-/**
-  * Order to matcher service for asset exchange
-  */
-@ApiModel
-case class OrderV1(@ApiModelProperty(
-                     value = "Base58 encoded Sender public key",
-                     required = true,
-                     dataType = "string",
-                     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
-                   )
-                   senderPublicKey: PublicKey,
-                   @ApiModelProperty(
-                     value = "Base58 encoded Matcher public key",
-                     required = true,
-                     dataType = "string",
-                     example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
-                   )
+case class OrderV1(senderPublicKey: PublicKey,
                    matcherPublicKey: PublicKey,
-                   @ApiModelProperty(value = "Asset pair", required = true)
                    assetPair: AssetPair,
-                   @ApiModelProperty(
-                     value = "Order type (sell or buy)",
-                     required = true,
-                     dataType = "string",
-                     example = "sell"
-                   )
                    orderType: OrderType,
-                   @ApiModelProperty(value = "Amount", required = true)
                    amount: Long,
-                   @ApiModelProperty(value = "Price", required = true)
                    price: Long,
-                   @ApiModelProperty(value = "Timestamp", required = true)
                    timestamp: Long,
-                   @ApiModelProperty(value = "Expiration timestamp", required = true)
                    expiration: Long,
-                   @ApiModelProperty(value = "Matcher fee", required = true)
                    matcherFee: Long,
-                   @ApiModelProperty(
-                     value = "Order proofs",
-                     required = true,
-                     dataType = "[Ljava.lang.String;"
-                   )
                    proofs: Proofs)
     extends Order
     with Authorized {
 
-  @ApiModelProperty(required = true, dataType = "long", example = "1")
   override def version: Byte = 1
 
-  @ApiModelProperty(hidden = true)
   override def signature: Array[Byte] = proofs.proofs.head.arr
 
-  @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     senderPublicKey ++ matcherPublicKey ++
       assetPair.bytes ++ orderType.bytes ++
@@ -72,7 +35,6 @@ case class OrderV1(@ApiModelProperty(
       Longs.toByteArray(matcherFee)
   )
 
-  @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature)
 }
 

@@ -46,7 +46,7 @@ object MatcherErrorDoc {
                     /##### Sample
                     /
                     /```json
-                    /${Json.prettyPrint(x.toJson)}
+                    /${Json.prettyPrint(Json.toJsObject(x))}
                     /```
                     /""".stripMargin('/')
             }

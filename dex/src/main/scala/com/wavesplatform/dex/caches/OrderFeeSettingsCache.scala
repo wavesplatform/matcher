@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.caches
 
-import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
+import com.wavesplatform.dex.settings.OrderFeeSettings
 
 import scala.collection.immutable.TreeMap
 

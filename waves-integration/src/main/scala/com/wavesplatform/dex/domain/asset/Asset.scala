@@ -6,8 +6,6 @@ import com.wavesplatform.dex.domain.utils.base58Length
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
 
-import scala.util.Success
-
 sealed trait Asset extends Product with Serializable
 
 object Asset {
@@ -17,44 +15,37 @@ object Asset {
 
   val WavesName = "WAVES"
 
+  // TODO Refactor:
+  //  1. toString is a method used only for debugging purposes.
+  //     Also for better readability it should contain a class like IssuedAsset(stringHere)
+  //  2. Used something else for any logic. E.g. trait Representation[T], where T <: String
   final case class IssuedAsset(id: ByteStr) extends Asset { override def toString: String = id.base58 }
   final case object Waves                   extends Asset { override def toString: String = WavesName }
 
-  implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
-    case JsString(str) =>
-      Base58.tryDecodeWithLimit(str) match {
-        case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
-        case _            => JsError("Expected base58-encoded assetId")
-      }
-    case _ => JsError("Expected base58-encoded assetId")
-  }
-
-  implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
-    JsString(asset.id.base58)
-  }
-
-  implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => if (json.value == WavesName) JsSuccess(Waves) else assetReads.reads(json)
-    case JsNull         => JsSuccess(Waves)
-    case _              => JsError("Expected base58-encoded assetId or null")
-  }
-
-  implicit val assetIdWrites: Writes[Asset] = Writes {
-    case Waves           => JsString(WavesName)
-    case IssuedAsset(id) => JsString(id.base58)
-  }
-
-  implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
-  implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
+  implicit val assetFormat: Format[Asset] = Format(
+    fjs = Reads {
+      case JsNull | JsString("") | JsString(`WavesName`) => JsSuccess(Waves)
+      case JsString(s) =>
+        if (s.length > AssetIdStringLength) JsError(JsPath, JsonValidationError("error.invalid.asset"))
+        else
+          Base58
+            .tryDecodeWithLimit(s)
+            .fold[JsResult[Asset]](
+              _ => JsError(JsPath, JsonValidationError("error.incorrect.base58")),
+              id => JsSuccess(IssuedAsset(id))
+            )
+      case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
+    },
+    tjs = Writes(asset => JsString(asset.toString))
+  )
 
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
     AssetPair.extractAsset(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
   }
 
-  def fromString(maybeStr: Option[String]): Asset = {
-    maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
-  }
+  def fromString(x: String): Option[Asset] =
+    if (x == WavesName) Some(Waves)
+    else ByteStr.decodeBase58(x).fold(_ => None, xs => Some(IssuedAsset(xs)))
 
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
     maybeBStr.fold[Asset](Waves)(IssuedAsset)

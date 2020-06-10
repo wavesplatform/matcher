@@ -2,7 +2,8 @@ package com.wavesplatform.dex.api.websockets
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.Address
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.json
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -22,18 +23,7 @@ object WsAddressState {
   def wsUnapply(arg: WsAddressState): Option[(String, Long, Long, Address, Map[Asset, WsBalances], Seq[WsOrder])] =
     (arg.tpe, arg.timestamp, arg.updateId, arg.address, arg.balances, arg.orders).some
 
-  implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = Format(
-    { // TODO use reads for Map[Asset, T]!
-      case JsObject(ab) => JsSuccess(ab.toMap.map { case (a, b) => AssetPair.extractAsset(a).get -> WsBalances.wsBalancesFormat.reads(b).get })
-      case _            => JsError("Cannot parse asset balances map!")
-    }, { balances =>
-      Json.obj(
-        balances.map {
-          case (a, bs) => a.toString -> Json.toJsFieldJsValueWrapper(bs)(WsBalances.writes)
-        }.toSeq: _*
-      )
-    }
-  )
+  implicit val balancesMapFormat: Format[Map[Asset, WsBalances]] = json.assetMapFormat[WsBalances]
 
   implicit val wsAddressStateFormat: Format[WsAddressState] = (
     (__ \ "T").format[String] and

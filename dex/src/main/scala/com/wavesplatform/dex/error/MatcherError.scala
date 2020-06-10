@@ -12,7 +12,7 @@ import com.wavesplatform.dex.error.Class.{common => commonClass, _}
 import com.wavesplatform.dex.error.Entity.{common => commonEntity, _}
 import com.wavesplatform.dex.error.Implicits._
 import com.wavesplatform.dex.settings.{DeviationsSettings, OrderRestrictionsSettings}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OWrites}
 
 sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessage) extends Product with Serializable {
   def this(obj: Entity, part: Entity, klass: Class, message: MatcherErrorMessage) = this(
@@ -25,20 +25,19 @@ sealed abstract class MatcherError(val code: Int, val message: MatcherErrorMessa
 
 object MatcherError {
 
+  implicit val matcherErrorWrites: OWrites[MatcherError] = OWrites { x =>
+    val obj           = x.message
+    val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
+    Json
+      .obj(
+        "error"    -> x.code,
+        "message"  -> obj.text,
+        "template" -> obj.template
+      )
+      .deepMerge(wrappedParams)
+  }
+
   implicit final class Ops(val self: MatcherError) extends AnyVal {
-
-    def toJson: JsObject = {
-      val obj           = self.message
-      val wrappedParams = if (obj.params == JsObject.empty) obj.params else Json.obj("params" -> obj.params)
-      Json
-        .obj(
-          "error"    -> self.code,
-          "message"  -> obj.text,
-          "template" -> obj.template
-        )
-        .deepMerge(wrappedParams)
-    }
-
     def toWsHttpResponse(statusCode: StatusCode): HttpResponse = {
       HttpResponse(
         status = statusCode,
@@ -110,9 +109,7 @@ case class UnexpectedFeeAsset(required: Set[Asset], given: Asset)
       order,
       fee,
       unexpected,
-      if (given.toString == "WAVES")
-        e"""Required one of the following fee asset: ${'required  -> required}. But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
-      else e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
+      e"Required one of the following fee asset: ${'required -> required}. But given ${'given -> given}"
     )
 
 case class FeeNotEnough(required: Amount, given: Amount)

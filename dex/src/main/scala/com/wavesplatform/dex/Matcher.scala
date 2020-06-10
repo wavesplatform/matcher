@@ -34,8 +34,7 @@ import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
-import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.settings.OrderFeeSettings.OrderFeeSettings
+import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
 import com.wavesplatform.dex.util._
 import monix.eval.Task
@@ -432,7 +431,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       CreateExchangeTransactionActor.name
     )
 
-    actorSystem.actorOf(MatcherTransactionWriter.props(db, settings), MatcherTransactionWriter.name)
+    actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
 
     actorSystem.actorOf(
       ExchangeTransactionBroadcastActor

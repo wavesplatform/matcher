@@ -113,57 +113,38 @@ object OrderJson {
     )
   }
 
-  private val assetReads: Reads[Asset] = {
-    case JsNull | JsString("") => JsSuccess(Waves)
-    case JsString(s) =>
-      AssetPair.extractAsset(s) match {
-        case Failure(_)       => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
-        case Success(assetId) => JsSuccess(assetId)
-      }
-    case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
-  }
-
-  implicit val assetPairReads: Reads[AssetPair] = {
-    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
-      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(assetReads)
-    r(AssetPair(_, _))
-  }
-
-  implicit val orderTypeReads: Reads[OrderType] =
-    JsPath.read[String].map(OrderType.apply)
-
   private val orderV1V2Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "assetPair").read[AssetPair] and
-      (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "price").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long] and
-      (JsPath \ "signature").readNullable[Array[Byte]] and
-      (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
-      (JsPath \ "version").readNullable[Byte]
+    val r =
+      (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
+        (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+        (JsPath \ "assetPair").read[AssetPair] and
+        (JsPath \ "orderType").read[OrderType] and
+        (JsPath \ "amount").read[Long] and
+        (JsPath \ "price").read[Long] and
+        (JsPath \ "timestamp").read[Long] and
+        (JsPath \ "expiration").read[Long] and
+        (JsPath \ "matcherFee").read[Long] and
+        (JsPath \ "signature").readNullable[Array[Byte]] and
+        (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
+        (JsPath \ "version").readNullable[Byte]
     r(readOrderV1V2 _)
   }
 
   private val orderV3Reads: Reads[Order] = {
-    val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
-      (JsPath \ "assetPair").read[AssetPair] and
-      (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "price").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long] and
-      (JsPath \ "signature").readNullable[Array[Byte]] and
-      (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
-      (JsPath \ "version").read[Byte] and
-      (JsPath \ "matcherFeeAssetId")
-        .readNullable[Array[Byte]]
-        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
+    val r =
+      (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
+        (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
+        (JsPath \ "assetPair").read[AssetPair] and
+        (JsPath \ "orderType").read[OrderType] and
+        (JsPath \ "amount").read[Long] and
+        (JsPath \ "price").read[Long] and
+        (JsPath \ "timestamp").read[Long] and
+        (JsPath \ "expiration").read[Long] and
+        (JsPath \ "matcherFee").read[Long] and
+        (JsPath \ "signature").readNullable[Array[Byte]] and
+        (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
+        (JsPath \ "version").read[Byte] and
+        (JsPath \ "matcherFeeAssetId").readWithDefault[Asset](Waves)
     r(readOrderV3 _)
   }
 
@@ -176,5 +157,5 @@ object OrderJson {
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }
 
-  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json()))
+  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order] { _.json() })
 }

@@ -48,7 +48,6 @@ trait Order extends ByteAndJsonSerializable with Proven {
   @ApiModelProperty(hidden = true)
   val sender: PublicKey = senderPublicKey
 
-  @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
     assetPair.isValid &&
@@ -72,11 +71,11 @@ trait Order extends ByteAndJsonSerializable with Proven {
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]
   @ApiModelProperty(hidden = true)
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
+  val bytes: Coeval[Array[Byte]]
+  @ApiModelProperty(hidden = true)
+  val id: Coeval[ByteStr] = Coeval.evalOnce { ByteStr(crypto fastHash bodyBytes()) }
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
-  @ApiModelProperty(hidden = true)
-  val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Asset = orderType match {
@@ -90,7 +89,6 @@ trait Order extends ByteAndJsonSerializable with Proven {
     case OrderType.SELL => assetPair.amountAsset
   }
 
-  @ApiModelProperty(hidden = true)
   def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
@@ -103,7 +101,6 @@ trait Order extends ByteAndJsonSerializable with Proven {
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
-  @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (orderType == OrderType.BUY) matchAmount
@@ -120,7 +117,7 @@ trait Order extends ByteAndJsonSerializable with Proven {
       "sender"           -> senderPublicKey.stringRepr,
       "senderPublicKey"  -> Base58.encode(senderPublicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-      "assetPair"        -> assetPair.json,
+      "assetPair"        -> Json.toJsObject(assetPair),
       "orderType"        -> orderType.toString,
       "amount"           -> amount,
       "price"            -> price,
@@ -132,10 +129,8 @@ trait Order extends ByteAndJsonSerializable with Proven {
     )
   }
 
-  @ApiModelProperty(hidden = true)
   def jsonStr: String = Json.stringify(json())
 
-  @ApiModelProperty(hidden = true)
   override def equals(obj: Any): Boolean = obj match {
     case o: Order =>
       senderPublicKey == o.senderPublicKey &&
@@ -150,10 +145,8 @@ trait Order extends ByteAndJsonSerializable with Proven {
     case _ => false
   }
 
-  @ApiModelProperty(hidden = true)
   override def hashCode(): Int = idStr.hashCode()
 
-  @ApiModelProperty(hidden = true)
   override def toString: String = {
     val feeAssetStr = if (version == 3) s" feeAsset=${feeAsset.toString}," else ""
     s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$feeAssetStr proofs=$proofs)"

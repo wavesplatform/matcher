@@ -9,10 +9,28 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
 
-case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKey,
-                              @ApiModelProperty(dataType = "java.lang.String") orderId: Option[ByteStr],
-                              @ApiModelProperty() timestamp: Option[Long],
-                              @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
+case class CancelOrderRequest(@ApiModelProperty(
+                                value = "Base58 encoded Sender Public Key",
+                                dataType = "string",
+                                example = "J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf",
+                                required = true
+                              ) sender: PublicKey,
+                              @ApiModelProperty(
+                                value = "Base58 encoded Order ID",
+                                dataType = "string",
+                                example = "7VEr4T9icqopHWLawGAZ7AQiJbjAcnzXn65ekYvbpwnN",
+                                allowEmptyValue = true
+                              ) orderId: Option[ByteStr],
+                              @ApiModelProperty(allowEmptyValue = true, dataType = "integer") timestamp: Option[Long],
+                              @ApiModelProperty(
+                                value =
+                                  """Base58 encoded signature
+                                    For single order = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bytesOf(orderId)))
+                                    For all orders = Base58 encoded Curve25519.sign(senderPrivateKey, concat(bytesOf(sender), bigEndianBytes(timestamp)))""",
+                                dataType = "string",
+                                example = "65bWzBUbniVuxQLyQdKmjtJ9aJzM6M5tmLfiduq8q59gJXCw4AdqEFb8Ae2ULpve5d4XAWe5Gt34331EjwVSvT9u",
+                                required = true
+                              ) signature: Array[Byte]) {
 
   @ApiModelProperty(hidden = true)
   lazy val toSign: Array[Byte] = (orderId, timestamp) match {
@@ -25,20 +43,13 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
 }
 
 object CancelOrderRequest {
+
   implicit val byteArrayFormat: Format[Array[Byte]] = Format(
     {
       case JsString(base58String) => Base58.tryDecodeWithLimit(base58String).fold(_ => JsError("Invalid signature"), b => JsSuccess(b))
       case other                  => JsError(s"Expecting string but got $other")
     },
     b => JsString(Base58.encode(b))
-  )
-
-  implicit val pkFormat: Format[PublicKey] = Format(
-    {
-      case JsString(value) => PublicKey.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
-      case other           => JsError(s"Expecting string but got $other")
-    },
-    pk => JsString(Base58.encode(pk))
   )
 
   protected implicit val byteStrWrites: Format[ByteStr] = com.wavesplatform.dex.domain.bytes.ByteStr.byteStrFormat

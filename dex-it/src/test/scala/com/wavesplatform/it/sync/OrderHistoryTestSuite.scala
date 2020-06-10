@@ -3,13 +3,14 @@ package com.wavesplatform.it.sync
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.AddressActor.OrderListType
+import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
+import com.wavesplatform.dex.api.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.model.Normalization
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType._
-import com.wavesplatform.dex.it.api.responses.dex._
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -304,8 +305,8 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
       val order1 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 1.waves, 2.0)
       dex1.api.place(order1)
 
-      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 2.0), OrderStatus.Filled)
-      dex1.api.waitForOrderStatus(order1, OrderStatus.Filled)
+      placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 1.waves, 2.0), Status.Filled)
+      dex1.api.waitForOrderStatus(order1, Status.Filled)
 
       val order2 = mkOrderDP(carol, wavesUsdPair, OrderType.SELL, 2.waves, 3.0)
       dex1.api.place(order2)
@@ -356,7 +357,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
   }
 
-  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[OrderBookHistoryItem]] = List(
+  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[ApiOrderBookHistoryItem]] = List(
     dex1.api.orderHistory(account, activeOnly),
     dex1.api.orderHistoryByPair(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)

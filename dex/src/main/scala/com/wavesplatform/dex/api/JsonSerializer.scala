@@ -19,15 +19,15 @@ object JsonSerializer {
   mapper.registerModule(DefaultScalaModule)
   mapper.registerModule(coreTypeSerializers)
 
-  def serialize(value: Any): String                             = mapper.writeValueAsString(value)
-  def deserialize[T](value: String)(implicit m: Manifest[T]): T = mapper.readValue(value)
+  def serialize(value: Any): String              = mapper.writeValueAsString(value)
+  def deserialize[T: Manifest](value: String): T = mapper.readValue(value)
 
   private class AssetPairDeserializer extends StdDeserializer[AssetPair](classOf[AssetPair]) {
 
     override def deserialize(p: JsonParser, ctxt: DeserializationContext): AssetPair = {
       val node = p.getCodec.readTree[JsonNode](p)
 
-      def readAssetId(fieldName: String) = {
+      def readAssetId(fieldName: String): Asset = {
         val x = node.get(fieldName).asText(Asset.WavesName)
         if (x == Asset.WavesName) Waves else IssuedAsset(ByteStr.decodeBase58(x).get)
       }
@@ -35,5 +35,4 @@ object JsonSerializer {
       AssetPair(readAssetId("amountAsset"), readAssetId("priceAsset"))
     }
   }
-
 }

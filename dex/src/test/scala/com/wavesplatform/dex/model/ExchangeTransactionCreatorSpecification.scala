@@ -11,10 +11,10 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -68,7 +68,7 @@ class ExchangeTransactionCreatorSpecification
         test(preconditions)
       }
 
-      def test(preconditions: Gen[(Order, Order)]) = forAll(preconditions) {
+      def test(preconditions: Gen[(Order, Order)]): Assertion = forAll(preconditions) {
         case (buyOrder, sellOrder) =>
           val tc = getExchangeTransactionCreator()
           val oe = mkOrderExecutedRaw(buyOrder, sellOrder)

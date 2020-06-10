@@ -1,8 +1,8 @@
 package com.wavesplatform.dex.caches
 
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.settings.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, PercentSettings}
+import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 

@@ -6,21 +6,24 @@ import com.wavesplatform.dex.domain.validation.Validation
 import com.wavesplatform.dex.domain.validation.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json.{Format, JsError, JsObject, JsPath, JsString, JsSuccess, Json, Reads, Writes}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
-import scala.annotation.meta.field
 import scala.util.{Failure, Success, Try}
 
-@ApiModel
-case class AssetPair(@(ApiModelProperty @field)(
-                       value = "Base58 encoded amount asset id",
+@ApiModel(
+  description = """A pair of assets sorted by two rules:
+      1. A price asset is chosen by a priority from priceAssets of /matcher/settings;
+      2. If both assets are not present among priceAssets, they are sorted lexicographically: price asset bytes < amount asset bytes""")
+case class AssetPair(@ApiModelProperty(
+                       value = "Base58 encoded amount asset ID. Waves is used if field isn't specified",
                        dataType = "string",
-                       example = "WAVES"
+                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
                      ) amountAsset: Asset,
-                     @(ApiModelProperty @field)(
-                       value = "Base58 encoded amount price id",
+                     @ApiModelProperty(
+                       value = "Base58 encoded price asset ID. Waves is used if field isn't specified",
                        dataType = "string",
-                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+                       example = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p",
                      ) priceAsset: Asset) {
 
   @ApiModelProperty(hidden = true)
@@ -35,11 +38,6 @@ case class AssetPair(@(ApiModelProperty @field)(
 
   def isValid: Validation = (amountAsset != priceAsset) :| "Invalid AssetPair"
   def bytes: Array[Byte]  = amountAsset.byteRepr ++ priceAsset.byteRepr
-
-  def json: JsObject = Json.obj(
-    "amountAsset" -> amountAsset.maybeBase58Repr,
-    "priceAsset"  -> priceAsset.maybeBase58Repr
-  )
 
   def reverse: AssetPair = AssetPair(priceAsset, amountAsset)
 
@@ -82,7 +80,9 @@ object AssetPair {
     extractAssetPair(source).fold(e => throw e, identity)
   }
 
-  implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
+  implicit val assetPairFormat: OFormat[AssetPair] = (
+    (JsPath \ "amountAsset").formatWithDefault[Asset](Waves) and (JsPath \ "priceAsset").formatWithDefault[Asset](Waves)
+  )(AssetPair.apply, Function.unlift(AssetPair.unapply))
 
   val assetPairKeyAsStringFormat: Format[AssetPair] = Format(
     fjs = Reads {

@@ -68,7 +68,7 @@ class AddressActor(owner: Address,
       val orderId = command.order.id()
 
       if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
-      if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -173,15 +173,17 @@ class AddressActor(owner: Address,
 
     case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
       log.trace(s"Got $storeFailed")
-      pendingCommands.remove(orderId).foreach { _.client ! CanNotPersist(reason) }
-      queueEvent match {
-        case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
-          activeOrders.remove(orderId).foreach { ao =>
-            openVolume = openVolume |-| ao.reservableBalance
-            if (addressWsMutableState.hasActiveSubscriptions)
-              addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
-          }
-        case _ =>
+      pendingCommands.remove(orderId).foreach { command =>
+        command.client ! CanNotPersist(reason)
+        queueEvent match {
+          case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
+            activeOrders.remove(orderId).foreach { ao =>
+              openVolume = openVolume |-| ao.reservableBalance
+              if (addressWsMutableState.hasActiveSubscriptions)
+                addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
+            }
+          case _ =>
+        }
       }
 
     case event: ValidationEvent =>
@@ -430,8 +432,12 @@ class AddressActor(owner: Address,
           else addressWsMutableState.putOrderFillingInfoAndStatusUpdate(remaining, status)
       }
 
-      // We already notified clients about these changes after order passed validation (see def place)
-      if (status != OrderStatus.Accepted) addressWsMutableState = addressWsMutableState.putReservedAssets(openVolumeDiff.keySet)
+      // OrderStatus.Accepted means that we've already notified clients about these balance changes after order passed validation (see def place)
+      // Empty origActiveOrder means that:
+      //  - for master DEX order was previously removed from active ones in handling of Event.StoreFailed
+      //  - for slave DEX it is a new order and we have to send balance changes via WS API
+      if (status != OrderStatus.Accepted || origActiveOrder.isEmpty)
+        addressWsMutableState = addressWsMutableState.putReservedAssets(openVolumeDiff.keySet)
     }
   }
 

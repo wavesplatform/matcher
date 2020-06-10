@@ -82,8 +82,8 @@ case class AddressWsMutableState(address: Address,
 
 object AddressWsMutableState {
 
-  def empty(address: Address) = AddressWsMutableState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
-  val numberMaxSafeInteger    = 9007199254740991L
+  def empty(address: Address): AddressWsMutableState = AddressWsMutableState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
+  val numberMaxSafeInteger                           = 9007199254740991L
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1
 }

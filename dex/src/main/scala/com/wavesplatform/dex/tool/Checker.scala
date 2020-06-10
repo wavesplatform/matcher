@@ -7,6 +7,7 @@ import cats.syntax.option._
 import cats.syntax.traverse._
 import com.wavesplatform.dex.api.ApiOrderStatus
 import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -24,7 +25,6 @@ import play.api.libs.json.JsValue
 import scala.Ordered._
 import scala.concurrent.duration._
 import scala.util.Random
-import com.wavesplatform.dex.cli._
 
 // noinspection ScalaStyle
 case class Checker(superConnector: SuperConnector) {

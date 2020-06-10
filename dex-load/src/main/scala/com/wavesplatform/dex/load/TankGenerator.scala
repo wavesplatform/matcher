@@ -51,16 +51,14 @@ object TankGenerator {
 
   private def distributeAssets(accounts: List[PrivateKeyAccount], assets: List[String]): Unit = {
     println(s"Distributing... ")
-    val minimumNeededAssetBalance = settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderAmount * 2
+    val minimumNeededAssetBalance = settings.defaults.maxOrdersPerAccount * settings.defaults.minimalOrderPrice * 10000
 
     def massTransferFee(group: List[Transfer]) = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
 
     assets.foreach(asset => {
       println(s"\t -- $asset")
       accounts
-        .map(account => {
-          new Transfer(account.getAddress, minimumNeededAssetBalance)
-        })
+        .map(account => new Transfer(account.getAddress, minimumNeededAssetBalance))
         .grouped(100)
         .foreach(group => {
           try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group, massTransferFee(group), null))
@@ -73,9 +71,7 @@ object TankGenerator {
     println(s"\t -- WAVES")
 
     accounts
-      .map(account => {
-        new Transfer(account.getAddress, settings.defaults.wavesPerAccount)
-      })
+      .map(account => new Transfer(account.getAddress, settings.defaults.wavesPerAccount))
       .grouped(100)
       .foreach(group => {
         try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group, massTransferFee(group), null))
@@ -91,15 +87,13 @@ object TankGenerator {
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
     print(s"Creating orders... ")
-    val safeAmount = settings.assets.quantity / 2 / accounts.length / settings.defaults.maxOrdersPerAccount
-
     val orders = (1 to settings.defaults.maxOrdersPerAccount).flatMap(
       _ =>
         accounts.map(mkOrder(
           _,
           if (math.random < 0.5 || !matching) Type.BUY else Type.SELL,
-          Random.nextInt(safeAmount.toInt),
-          Random.nextInt(safeAmount.toInt),
+          settings.defaults.minimalOrderAmount + Random.nextInt(settings.defaults.minimalOrderAmount.toInt * 10),
+          settings.defaults.minimalOrderPrice + Random.nextInt(settings.defaults.minimalOrderPrice.toInt * 10),
           pairs(Random.nextInt(pairs.length))
         )))
 
@@ -134,7 +128,7 @@ object TankGenerator {
                          pairsFile: Option[File],
                          distributed: Boolean = false): List[Request] = {
     println(s"Making requests for matching...")
-    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed), true).take(requestsCount)
+    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed)).take(requestsCount)
   }
 
   private def mkCancels(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {

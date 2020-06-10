@@ -279,7 +279,7 @@ object TankGenerator {
           Type.BUY,
           settings.defaults.minimalOrderPrice,
           settings.defaults.minimalOrderAmount,
-          System.currentTimeMillis + 60 * 60 * 24 * 29,
+          System.currentTimeMillis + 60 * 60 * 24 * 29 * 1000,
           settings.defaults.matcherFee,
           null,
           false

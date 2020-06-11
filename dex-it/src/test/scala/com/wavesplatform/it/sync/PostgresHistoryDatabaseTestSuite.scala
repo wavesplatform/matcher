@@ -4,8 +4,8 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -363,7 +363,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       dex1.api.placeMarket(unmatchableMarketBuyOrder)
       dex1.api.waitForOrder(unmatchableMarketBuyOrder)(
-        _ == ApiOrderStatus(Status.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct))
+        _ == HttpOrderStatus(Status.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct))
       )
 
       eventually {
@@ -403,7 +403,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       val marketBuyOrder = bigBuyOrder
       dex1.api.placeMarket(marketBuyOrder)
-      dex1.api.waitForOrder(marketBuyOrder)(_ == ApiOrderStatus(Status.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
+      dex1.api.waitForOrder(marketBuyOrder)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
 
       eventually {
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(

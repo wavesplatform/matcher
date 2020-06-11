@@ -5,8 +5,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.connection.{WsConnection, WsConnectionOps}
+import com.wavesplatform.dex.api.ws.connection.{WsConnection, WsConnectionOps}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressSubscribe, WsInitial, WsOrderBookSubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext

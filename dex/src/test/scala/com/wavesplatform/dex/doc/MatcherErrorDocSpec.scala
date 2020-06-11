@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.doc
 
-import com.wavesplatform.dex.util.getSimpleName
+import com.wavesplatform.dex.meta.getSimpleName
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.compat
 
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.orderGen

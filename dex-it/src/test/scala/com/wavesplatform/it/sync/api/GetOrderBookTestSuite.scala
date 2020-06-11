@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.api
 
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiV0OrderBook
+import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
@@ -24,7 +24,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
     )
 
   // DEX-642
-  private implicit val orderBookResponseDiff: Diff[ApiV0OrderBook] = Derived[Diff[ApiV0OrderBook]].ignore(_.timestamp)
+  private implicit val orderBookResponseDiff: Diff[HttpV0OrderBook] = Derived[Diff[HttpV0OrderBook]].ignore(_.timestamp)
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
@@ -33,7 +33,7 @@ class GetOrderBookTestSuite extends MatcherSuiteBase {
   }
 
   def checkDepth(forTheseDepths: Array[Int] = Array(), thisDepthWillBePicked: Int): Unit = {
-    val orderBook: ApiV0OrderBook = dex1.api.orderBook(wavesUsdPair, thisDepthWillBePicked)
+    val orderBook: HttpV0OrderBook = dex1.api.orderBook(wavesUsdPair, thisDepthWillBePicked)
 
     if (thisDepthWillBePicked < ordersCount) {
       orderBook.asks.size shouldBe thisDepthWillBePicked

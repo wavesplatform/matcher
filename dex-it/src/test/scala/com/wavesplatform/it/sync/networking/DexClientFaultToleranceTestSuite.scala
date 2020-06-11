@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.networking
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.HasToxiProxy

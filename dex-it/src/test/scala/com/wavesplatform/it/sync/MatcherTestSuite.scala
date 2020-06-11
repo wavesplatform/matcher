@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiAssetInfo, ApiOrderBookHistoryItem, ApiV0LevelAgg}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderBookHistoryItem, HttpV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType._
@@ -74,7 +74,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
 
       "orderType should be limit for a limit order" in {
-        def validateHistory(label: String, orders: Seq[ApiOrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+        def validateHistory(label: String, orders: Seq[HttpOrderBookHistoryItem]): Unit = withClue(s"$label: ") {
           orders should have size 1
           orders.head.orderType shouldBe AcceptedOrderType.Limit
         }
@@ -90,10 +90,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         val markets = orderBooks.markets.head
 
         markets.amountAssetName shouldBe aliceAssetName
-        markets.amountAssetInfo shouldBe Some(ApiAssetInfo(issueAliceAssetTx.getDecimals))
+        markets.amountAssetInfo shouldBe Some(HttpAssetInfo(issueAliceAssetTx.getDecimals))
 
         markets.priceAssetName shouldBe "WAVES"
-        markets.priceAssetInfo shouldBe Some(ApiAssetInfo(8))
+        markets.priceAssetInfo shouldBe Some(HttpAssetInfo(8))
       }
 
       "frozen amount should be listed via matcherBalance REST endpoint" in {
@@ -170,7 +170,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Bob checks that the order in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.asks should contain(ApiV0LevelAgg(150, 1900.waves))
+        orders.asks should contain(HttpV0LevelAgg(150, 1900.waves))
       }
 
       "buy order should match on few price levels" in {
@@ -218,7 +218,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Alice checks that the order is in the order book
         val orders2 = dex1.api.orderBook(aliceWavesPair)
-        orders2.asks should contain(ApiV0LevelAgg(100, 2000.waves))
+        orders2.asks should contain(HttpV0LevelAgg(100, 2000.waves))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
@@ -232,7 +232,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
         // Check that remaining part of the order is in the order book
         val orders = dex1.api.orderBook(aliceWavesPair)
-        orders.bids should contain(ApiV0LevelAgg(30, 2000.waves))
+        orders.bids should contain(HttpV0LevelAgg(30, 2000.waves))
 
         // Check balances
         waitForOrderAtNode(order5)
@@ -437,7 +437,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           orderId = order.id(),
           xUserPublicKey = Some(bob.publicKey)
         ) shouldBe Right(
-          ApiOrderBookHistoryItem(
+          HttpOrderBookHistoryItem(
             id = order.id(),
             `type` = SELL,
             orderType = AcceptedOrderType.Limit,
@@ -469,7 +469,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       placeAndAwaitAtDex(order)
 
       dex1.api.tryOrderStatusInfoByIdWithSignature(alice, order.id()) shouldBe Right(
-        ApiOrderBookHistoryItem(
+        HttpOrderBookHistoryItem(
           id = order.id(),
           `type` = SELL,
           orderType = AcceptedOrderType.Limit,

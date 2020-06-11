@@ -276,7 +276,7 @@ We have CLI tools accompanying to Matcher server. Run `waves-dex-cli` to see a f
 If you want to run CLI from SBT, use the following template:
 
 ```bash
-dex/runMain com.wavesplatform.dex.WavesDexCli here-your-arguments
+dex/runMain com.wavesplatform.dex.cli.WavesDexCli here-your-arguments
 ```
 
 ### 8.1. Generating account storage
@@ -302,7 +302,7 @@ Note, the shown settings contain a placeholder for your raw password, insert a r
 Example:
 
 ```bash
-./bin/waves-dex-cli com.wavesplatform.dex.WavesDexCli create-api-key --api-key "integration-test-rest-api"
+./bin/waves-dex-cli com.wavesplatform.dex.cli.WavesDexCli create-api-key --api-key "integration-test-rest-api"
 ```
 
 An output:

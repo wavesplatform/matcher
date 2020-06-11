@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.{Marshaller, PredefinedToEntityMarshallers
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
+import com.wavesplatform.dex.api.http.json.CustomJson
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import play.api.libs.json._
 

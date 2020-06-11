@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.github.dockerjava.api.model.ContainerNetwork
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization._

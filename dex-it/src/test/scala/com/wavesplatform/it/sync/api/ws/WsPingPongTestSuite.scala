@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.api.ws
 
 import akka.http.scaladsl.model.ws.TextMessage
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.connection.WsConnection
-import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsError, WsMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsError, WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.error.InvalidJson
 import com.wavesplatform.it.WsSuiteBase
 

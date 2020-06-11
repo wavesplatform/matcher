@@ -12,9 +12,16 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
-import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
-import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
+import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, SpendableBalancesActor}
+import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
+import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.routes.ApiRoute
+import com.wavesplatform.dex.api.ws.routes
+import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -30,13 +37,10 @@ import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
-import com.wavesplatform.dex.util._
 import monix.eval.Task
 import mouse.any.anySyntaxMouse
 
@@ -195,7 +199,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         validateOrder,
         settings,
         () => status.get(),
-        db,
+        orderDB,
         time,
         () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
@@ -218,13 +222,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         () => status.get(),
         apiKeyHash
       ),
-      MatcherWebSocketRoute(addressActors,
-                            matcherActor,
-                            time,
-                            pairBuilder,
-                            p => Option { orderBooks.get() } flatMap (_ get p),
-                            apiKeyHash,
-                            settings.webSocketSettings)
+      routes.MatcherWebSocketRoute(addressActors,
+                                   matcherActor,
+                                   time,
+                                   pairBuilder,
+                                   p => Option { orderBooks.get() } flatMap (_ get p),
+                                   apiKeyHash,
+                                   settings.webSocketSettings)
     )
   }
 
@@ -303,7 +307,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
-        new AddressDirectory(
+        new AddressDirectoryActor(
           orderDB,
           createAddressActor,
           historyRouter
@@ -431,10 +435,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       CreateExchangeTransactionActor.name
     )
 
-    actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
     actorSystem.actorOf(
-      ExchangeTransactionBroadcastActor
+      BroadcastExchangeTransactionActor
         .props(
           settings.exchangeTransactionBroadcast,
           time,
@@ -491,7 +495,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield {
       log.info("Last offset has been reached, notify addresses")
       log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
-      addressActors ! AddressDirectory.StartSchedules
+      addressActors ! AddressDirectoryActor.StartSchedules
     }
 
     startGuard.onComplete {
@@ -545,6 +549,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 }
 
 object Matcher extends ScorexLogging {
+
+  def forceStopApplication(reason: ApplicationStopReason): Unit = System.exit(reason.code)
 
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 

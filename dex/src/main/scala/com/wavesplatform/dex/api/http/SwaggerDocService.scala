@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.dex.Version
+import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import io.swagger.models.Swagger
 import io.swagger.models.auth.{ApiKeyAuthDefinition, In}
 

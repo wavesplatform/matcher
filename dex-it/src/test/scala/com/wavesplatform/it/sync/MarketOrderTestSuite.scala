@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiOrderBookHistoryItem, ApiOrderStatus}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -74,7 +74,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
     }
   }
 
-  def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): ApiOrderStatus = {
+  def placeMarketOrder(sender: KeyPair, pair: AssetPair, orderType: OrderType, amount: Long, price: Long): HttpOrderStatus = {
     val mo = mkOrder(sender, pair, orderType, amount, price, matcherFee = fixedFee)
     dex1.api.placeMarket(mo)
     dex1.api.waitForOrderStatus(mo, Status.Filled)
@@ -123,7 +123,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       wavesNode1.api.balance(account2, Waves) shouldBe amount
       wavesNode1.api.balance(account2, usd) should be(price * amount / 1.waves)
 
-      def validateHistory(label: String, orders: Seq[ApiOrderBookHistoryItem]): Unit = withClue(s"$label: ") {
+      def validateHistory(label: String, orders: Seq[HttpOrderBookHistoryItem]): Unit = withClue(s"$label: ") {
         orders should have size 1
         orders.head.orderType shouldBe AcceptedOrderType.Market
       }

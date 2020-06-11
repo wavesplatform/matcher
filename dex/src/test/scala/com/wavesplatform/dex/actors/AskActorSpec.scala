@@ -2,7 +2,6 @@ package com.wavesplatform.dex.actors
 
 import akka.actor.ActorRef
 import akka.testkit.TestProbe
-import com.wavesplatform.dex.market.MatcherSpecLike
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import org.scalatest.freespec.AnyFreeSpec

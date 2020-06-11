@@ -1,14 +1,14 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
+import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.api.HasToxiProxy
 import com.wavesplatform.dex.it.docker.WavesNodeContainer
-import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.WsSuiteBase
 import com.wavesplatform.it.tags.NetworkTests
 import eu.rekawek.toxiproxy.model.ToxicDirection
@@ -62,7 +62,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       2.minute
     )
 
-    orders.foreach(dex1.api.waitForOrderStatus(_, ApiOrderStatus.Status.Accepted))
+    orders.foreach(dex1.api.waitForOrderStatus(_, HttpOrderStatus.Status.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 

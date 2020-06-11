@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.settings
 
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
+import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.duration.FiniteDuration

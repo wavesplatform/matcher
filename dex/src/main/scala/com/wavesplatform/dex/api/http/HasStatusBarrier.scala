@@ -2,7 +2,8 @@ package com.wavesplatform.dex.api.http
 
 import akka.http.scaladsl.server.Directive0
 import com.wavesplatform.dex.Matcher
-import com.wavesplatform.dex.api.{DuringShutdown, DuringStart}
+import com.wavesplatform.dex.api.http.entities.{DuringShutdown, DuringStart}
+import com.wavesplatform.dex.api.routes.ApiRoute
 
 trait HasStatusBarrier { this: ApiRoute =>
 

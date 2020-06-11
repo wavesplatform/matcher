@@ -52,6 +52,7 @@ class AddressActor(owner: Address,
   import context.dispatcher
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
+  private val ignoreRef           = context.system.toTyped.ignoreRef.toClassic
 
   private var placementQueue  = Queue.empty[Order.Id]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
@@ -145,9 +146,13 @@ class AddressActor(owner: Address,
 
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
-        val msg = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
-        log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $msg")
-        toCancel.foreach(x => cancel(x.order))
+        val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
+        log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
+        toCancel.foreach { x =>
+          val id = x.order.id()
+          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
+          cancel(x.order)
+        }
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
@@ -257,6 +262,7 @@ class AddressActor(owner: Address,
         case Some(ao) =>
           if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
             log.debug(s"$prefix, storing cancel event")
+            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
             cancel(ao.order)
           } else {
             log.trace(s"$prefix, can't find an active order")
@@ -448,11 +454,12 @@ class AddressActor(owner: Address,
   }
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
+    val inProgress = pendingCancels
     // Now a user can have 100 active transaction maximum - easy to traverse.
     activeOrders.values.toVector
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .iterator
-      .filter(_.isLimit)
+      .filter(x => x.isLimit && !inProgress.contains(x.id))
       .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {
         case ((restBalance, toDelete), (order, requiredBalance)) =>
@@ -467,6 +474,11 @@ class AddressActor(owner: Address,
       }
       ._2
   }
+
+  private def pendingCancels: Set[Order.Id] =
+    pendingCommands.collect {
+      case (_, PendingCommand(Command.CancelOrder(id), _)) => id
+    }.toSet
 
   private def cancellationInProgress(id: Order.Id): Boolean = pendingCommands.get(id).fold(false) {
     _.command match {

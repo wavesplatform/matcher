@@ -10,7 +10,8 @@ object RequestDeleter {
   def delRequests(file: File, deletedCount: Int): Unit = {
     if (Files.exists(file.toPath)) {
       val source = Source.fromFile(file)
-      val output = new PrintWriter(s"requests-after-drop-${System.currentTimeMillis}.txt", "utf-8")
+      val outputFile = s"requests-after-drop-${System.currentTimeMillis}.txt"
+      val output = new PrintWriter(outputFile, "utf-8")
 
       var i = 0
       var j = 0
@@ -32,8 +33,8 @@ object RequestDeleter {
             line
           })
           .drop(i)
-          .foreach(l => output.println(l))
-        println(s"$deletedCount of $r requests have been dropped from $file, and saved to $output")
+          .foreach(line => output.print(s"$line\r\n"))
+        println(s"$deletedCount of $r requests have been dropped from ${file.getAbsolutePath}, and saved to $outputFile")
       } finally output.close()
     }
   }

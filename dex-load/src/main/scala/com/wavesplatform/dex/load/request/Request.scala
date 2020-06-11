@@ -25,7 +25,7 @@ case class Request(httpType: RequestType,
     val request =
       s"${RequestType.GET} $path HTTP/1.1\r\n${(defaultHeaders ++ additionalHeaders).map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n"
 
-    s"${request.length} $tag\n$request\r\n"
+    s"${request.length} $tag\r\n$request\r\n"
   }
 
   def mkPost(obj: ApiJson, path: String, tag: RequestTag, stringBody: String = ""): String = {
@@ -38,7 +38,7 @@ case class Request(httpType: RequestType,
 
     val request = s"${RequestType.POST} $path HTTP/1.1\r\n${headers.map { case (k, v) => s"$k: $v" }.mkString("\r\n")}\r\n\r\n$body"
 
-    s"${request.length} $tag\n$request\r\n"
+    s"${request.length} $tag\r\n$request\r\n"
   }
 
   def save(pw: PrintWriter): Unit = {

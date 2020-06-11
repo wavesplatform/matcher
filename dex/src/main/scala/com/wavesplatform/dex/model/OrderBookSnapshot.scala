@@ -2,6 +2,8 @@ package com.wavesplatform.dex.model
 
 import java.nio.ByteBuffer
 
+import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs
+
 import scala.collection.mutable
 
 case class OrderBookSnapshot(bids: OrderBookSideSnapshot, asks: OrderBookSideSnapshot, lastTrade: Option[LastTrade])

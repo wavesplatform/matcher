@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.dex.api.ApiOrderStatus.{apply => _, _}
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.{apply => _, _}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

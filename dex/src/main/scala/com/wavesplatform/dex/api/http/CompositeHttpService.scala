@@ -8,6 +8,7 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Directive0, Route, RouteResult}
 import com.wavesplatform.dex.Application
+import com.wavesplatform.dex.api.routes.ApiRoute
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.settings.RestAPISettings
 

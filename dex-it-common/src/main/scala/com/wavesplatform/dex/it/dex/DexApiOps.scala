@@ -3,7 +3,7 @@ package com.wavesplatform.dex.it.dex
 import cats.Functor
 import cats.syntax.functor._
 import com.softwaremill.sttp.StatusCode
-import com.wavesplatform.dex.api._
+import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order

@@ -3,7 +3,8 @@ package com.wavesplatform.dex.load.ws
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws._
+import com.wavesplatform.dex.api.ws.entities.WsOrder
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -19,14 +20,14 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
   private val emptyWsAddresState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
-  @volatile private var accountUpdates           = emptyWsAddresState
-  private val orderBookUpdates                   = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
-  @volatile private var gotPings                 = 0
+  @volatile private var accountUpdates             = emptyWsAddresState
+  private val orderBookUpdates                     = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
+  @volatile private var gotPings                   = 0
 
   private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
-    case x: WsPingOrPong      => gotPings += 1; x.some
-    case x: WsInitial         => log.info(s"Connection id: ${x.connectionId}"); none
-    case x: WsError           => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
+    case x: WsPingOrPong        => gotPings += 1; x.some
+    case x: WsInitial           => log.info(s"Connection id: ${x.connectionId}"); none
+    case x: WsError             => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
     case diff: WsAddressChanges => accountUpdates = merge(accountUpdates, diff); none
     case diff: WsOrderBookChanges =>
       val updatedOb = orderBookUpdates.get(diff.assetPair) match {
@@ -90,9 +91,9 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     }
   }
 
-  def collectedAddressState: WsAddressChanges            = accountUpdates
+  def collectedAddressState: WsAddressChanges                 = accountUpdates
   def collectedOrderBooks: Map[AssetPair, WsOrderBookChanges] = orderBookUpdates.toMap
-  def pingsNumber: Int                                 = gotPings
+  def pingsNumber: Int                                        = gotPings
 
   def close(): Future[Unit] =
     client

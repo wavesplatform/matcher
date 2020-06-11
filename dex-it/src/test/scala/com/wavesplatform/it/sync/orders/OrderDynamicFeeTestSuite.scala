@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.orders
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.ApiV0LevelAgg
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiV0LevelAgg
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 

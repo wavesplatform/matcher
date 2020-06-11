@@ -4,8 +4,11 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
-import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
-import com.wavesplatform.dex.AddressDirectoryActor.Envelope
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.actors.address.AddressActor.Command.PlaceOrder
+import com.wavesplatform.dex.actors.address.AddressDirectoryActor.Envelope
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.{MatcherSpecLike, SpendableBalancesActor}
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -13,12 +16,10 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.market.MatcherSpecLike
+import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.dex.util.getSimpleName
-import com.wavesplatform.dex.{MatcherSpecBase, _}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.docker.DexContainer

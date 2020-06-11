@@ -12,7 +12,7 @@ import cats.syntax.option._
 import cats.{Id, catsInstancesForId}
 import com.github.ghik.silencer.silent
 import com.softwaremill.diffx._
-import com.wavesplatform.dex.api.ws.{WsAddressChanges, WsOrderBookChanges}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.bytes.ByteStr

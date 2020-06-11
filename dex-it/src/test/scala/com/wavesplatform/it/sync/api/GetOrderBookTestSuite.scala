@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.api
 
 import com.softwaremill.diffx.{Derived, Diff}
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiV0OrderBook
+import com.wavesplatform.dex.api.http.entities.ApiV0OrderBook
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}

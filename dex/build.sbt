@@ -50,7 +50,7 @@ inConfig(Compile)(
     sourceGenerators += swaggerUiVersionSourceTask.taskValue,
     discoveredMainClasses := Seq(
       "com.wavesplatform.dex.Application",
-      "com.wavesplatform.dex.WavesDexCli"
+      "com.wavesplatform.dex.cli.WavesDexCli"
     ),
     mainClass := discoveredMainClasses.value.headOption,
     run / fork := true

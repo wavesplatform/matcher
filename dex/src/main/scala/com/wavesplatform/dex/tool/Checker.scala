@@ -5,8 +5,8 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
-import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.ws.{WsAddressChanges, WsOrderBookChanges}
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

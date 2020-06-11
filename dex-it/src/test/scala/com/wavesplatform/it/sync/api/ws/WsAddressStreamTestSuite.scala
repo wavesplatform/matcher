@@ -2,7 +2,8 @@ package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.ws.connection.WsConnection
-import com.wavesplatform.dex.api.ws.{WsOrder, _}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves

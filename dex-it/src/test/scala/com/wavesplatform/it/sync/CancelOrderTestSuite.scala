@@ -3,14 +3,14 @@ package com.wavesplatform.it.sync
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
-import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.Transfer
 

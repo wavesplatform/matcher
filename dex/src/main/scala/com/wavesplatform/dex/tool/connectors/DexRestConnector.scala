@@ -2,7 +2,7 @@ package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.HttpCancelOrder
+import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair

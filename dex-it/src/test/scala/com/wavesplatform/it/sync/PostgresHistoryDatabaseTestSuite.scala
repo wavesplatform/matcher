@@ -4,8 +4,8 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import com.wavesplatform.dex.api.ws.{WsBalances, WsOrder, WsOrderBookChanges}
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
+import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 

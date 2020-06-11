@@ -2,7 +2,6 @@ package com.wavesplatform.dex.db
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.dex.DbKeys
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset

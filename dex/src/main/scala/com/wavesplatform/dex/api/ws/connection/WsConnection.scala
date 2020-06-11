@@ -8,7 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSocketRequest}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
-import com.wavesplatform.dex.api.ws._
+import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsMessage, WsPingOrPong, WsServerMessage}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import play.api.libs.json.Json
 
@@ -55,9 +55,9 @@ class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: Acto
           log.trace(s"Got $strictText")
           Try { Json.parse(strictText).as[WsServerMessage] } match {
             case Failure(exception) => Future.failed(exception)
-            case Success(x)         => {
+            case Success(x) => {
               messagesBuffer.add(x)
-              if(keepAlive) x match {
+              if (keepAlive) x match {
                 case value: WsPingOrPong => wsHandlerRef ! value
                 case _                   =>
               }

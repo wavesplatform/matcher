@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import org.scalacheck.Gen

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.feature.BlockchainFeatures

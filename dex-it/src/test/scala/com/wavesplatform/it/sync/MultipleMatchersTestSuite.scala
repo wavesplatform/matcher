@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync
 
 import cats.Id
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.ApiSuccessfulBatchCancel
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiSuccessfulBatchCancel
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.AssetPair

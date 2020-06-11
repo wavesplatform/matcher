@@ -3,9 +3,9 @@ package com.wavesplatform.dex.tool.connectors
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.syntax.either._
-import com.wavesplatform.dex.api.ws._
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.connection.WsConnectionOps._
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.cli.{ErrorOr, lift}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.tool.connectors.AuthServiceRestConnector.AuthCredentials

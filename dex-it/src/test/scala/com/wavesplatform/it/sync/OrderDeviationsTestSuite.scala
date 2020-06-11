@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.ApiV0LevelAgg
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiV0LevelAgg
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}

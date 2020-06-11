@@ -4,6 +4,7 @@ import java.math.BigInteger
 import java.nio.ByteBuffer
 
 import cats.syntax.semigroup._
+import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -360,7 +361,7 @@ class OrderBookTestSuite
   }
 
   "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
-    import OrderBookSideSnapshotCodecs.{encodeLoV1, encodeLoV2}
+    import com.wavesplatform.dex.codecs.OrderBookSideSnapshotCodecs.{encodeLoV1, encodeLoV2}
     Seq(encodeLoV1 _, encodeLoV2 _).foreach { encode =>
       val dest = new mutable.ArrayBuilder.ofByte
       encode(dest, x)

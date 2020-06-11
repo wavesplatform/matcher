@@ -4,8 +4,12 @@ import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import com.softwaremill.diffx.Diff
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.PlayJsonException
-import com.wavesplatform.dex.api.ws.WsOrderBookChanges.WsSide
+import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsOrder, WsOrderBookSettings}
+import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -14,7 +18,6 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
-import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -131,7 +134,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
     updateId          <- Gen.choose(0L, Long.MaxValue)
     ts                <- Gen.choose(0L, Long.MaxValue)
     orderBookSettings <- Gen.option(orderBookSettingsGen)
-  } yield WsOrderBookChanges(assetPair, asks, bids, lastTrade, updateId, orderBookSettings, ts)
+  } yield protocol.WsOrderBookChanges(assetPair, asks, bids, lastTrade, updateId, orderBookSettings, ts)
 
   private def wsSide(pricesGen: Gen[Long]): Gen[WsSide] = {
     val itemGen = Gen.zip(pricesGen, amountGen)

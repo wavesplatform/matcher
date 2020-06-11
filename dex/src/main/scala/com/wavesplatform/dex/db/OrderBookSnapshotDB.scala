@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
-import com.wavesplatform.dex.DbKeys
 import com.wavesplatform.dex.db.leveldb.{DBExt, Key}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot

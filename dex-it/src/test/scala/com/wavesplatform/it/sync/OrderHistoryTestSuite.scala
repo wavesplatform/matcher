@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.AddressActor.OrderListType
-import com.wavesplatform.dex.api.ApiOrderBookHistoryItem
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
+import com.wavesplatform.dex.api.http.entities.ApiOrderBookHistoryItem
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

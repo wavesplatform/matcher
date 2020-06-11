@@ -3,7 +3,7 @@ package com.wavesplatform.dex.api.ws
 import java.security
 import java.security.KeyPairGenerator
 
-import com.wavesplatform.dex.api.ws.WsAddressSubscribe.JwtPayload
+import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
 import play.api.libs.json.{JsObject, Json}
 

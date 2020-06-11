@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.DbKeys
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair

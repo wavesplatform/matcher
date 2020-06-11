@@ -60,7 +60,7 @@ object ReleasePlugin extends AutoPlugin {
           val outputDirectory = (Compile / releaseDirectory).value
           streams.value.log.info(s"Saving documentation to $outputDirectory")
           (LocalProject("dex") / Compile / runMain)
-            .toTask(s" com.wavesplatform.dex.WavesDexCli create-documentation --output-directory $outputDirectory")
+            .toTask(s" com.wavesplatform.dex.cli.WavesDexCli create-documentation --output-directory $outputDirectory")
         }.value,
         writeReleaseNotes := {
           val runner           = git.runner.value

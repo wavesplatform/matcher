@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.dex.api.{ApiBalance, ApiMarketStatus, ApiOffset, ApiOrderBookHistoryItem, ApiOrderStatus, ApiSnapshotOffsets, ApiV0OrderBook}
+import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
 

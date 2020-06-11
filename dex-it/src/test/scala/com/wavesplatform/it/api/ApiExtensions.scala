@@ -3,8 +3,8 @@ package com.wavesplatform.it.api
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Id
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.{ApiOrderBookHistoryItem, ApiOrderStatus}
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{ApiOrderBookHistoryItem, ApiOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

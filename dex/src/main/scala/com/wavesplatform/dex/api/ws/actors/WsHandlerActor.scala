@@ -5,15 +5,18 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.{actor => classic}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.ws._
+import com.wavesplatform.dex.actors.MatcherActor
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.ws.actors.WsHandlerActor.Command.CancelAddressSubscription
+import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.{Address, AddressScheme}
 import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.{MatcherError, SubscriptionsLimitReached, WsConnectionMaxLifetimeExceeded, WsConnectionPongTimeout}
-import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherActor}
+import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.SubscriptionsSettings
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.{AddressActor, AddressDirectoryActor, AssetPairBuilder, error}
 import shapeless.{Inl, Inr}
 
 import scala.collection.immutable.Queue

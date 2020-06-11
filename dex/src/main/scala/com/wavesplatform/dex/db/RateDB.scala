@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.DbKeys
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.bytes.ByteStr

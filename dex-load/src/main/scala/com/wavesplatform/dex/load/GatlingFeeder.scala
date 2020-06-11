@@ -6,7 +6,7 @@ import java.security.KeyFactory
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Base64
 
-import com.wavesplatform.dex.api.ws.WsAddressSubscribe.JwtPayload
+import com.wavesplatform.dex.api.ws.protocol.WsAddressSubscribe.JwtPayload
 import com.wavesplatform.dex.auth.JwtUtils
 import com.wavesplatform.dex.domain.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.dex.domain.bytes.ByteStr

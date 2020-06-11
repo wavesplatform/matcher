@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.api.ws.connection
 
 import akka.actor.{Actor, ActorRef, Props}
-import com.wavesplatform.dex.api.ws.{WsClientMessage, WsPingOrPong}
+import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsPingOrPong}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 
 /**

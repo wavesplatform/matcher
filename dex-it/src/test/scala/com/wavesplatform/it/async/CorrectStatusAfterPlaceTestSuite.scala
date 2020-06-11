@@ -3,8 +3,8 @@ package com.wavesplatform.it.async
 import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair

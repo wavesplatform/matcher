@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.ApiRates
+import com.wavesplatform.dex.api.http.entities.ApiRates
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order

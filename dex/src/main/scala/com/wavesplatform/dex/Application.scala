@@ -10,8 +10,8 @@ import com.typesafe.config._
 import com.wavesplatform.dex.actors.RootActorSystem
 import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.dex.logs.SystemInformationReporter
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.util.SystemInformationReporter
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.orders
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.dex.api.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.OrderType

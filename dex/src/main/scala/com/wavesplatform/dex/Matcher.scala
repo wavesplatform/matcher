@@ -12,9 +12,16 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
-import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
-import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
+import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor}
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
+import com.wavesplatform.dex.actors.orderbook.{AggregatedOrderBookActor, OrderBookActor, OrderBookSnapshotStoreActor}
+import com.wavesplatform.dex.actors.tx.{BroadcastExchangeTransactionActor, CreateExchangeTransactionActor, WriteExchangeTransactionActor}
+import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, SpendableBalancesActor}
+import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
+import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
+import com.wavesplatform.dex.api.routes.ApiRoute
+import com.wavesplatform.dex.api.ws.routes
+import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -30,8 +37,6 @@ import com.wavesplatform.dex.grpc.integration.WavesBlockchainClientBuilder
 import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.history.HistoryRouter
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market._
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
@@ -218,13 +223,13 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         () => status.get(),
         apiKeyHash
       ),
-      MatcherWebSocketRoute(addressActors,
-                            matcherActor,
-                            time,
-                            pairBuilder,
-                            p => Option { orderBooks.get() } flatMap (_ get p),
-                            apiKeyHash,
-                            settings.webSocketSettings)
+      routes.MatcherWebSocketRoute(addressActors,
+                                   matcherActor,
+                                   time,
+                                   pairBuilder,
+                                   p => Option { orderBooks.get() } flatMap (_ get p),
+                                   apiKeyHash,
+                                   settings.webSocketSettings)
     )
   }
 

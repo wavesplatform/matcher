@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSock
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.ws.connection.TestWsHandlerActor
-import com.wavesplatform.dex.api.ws.{WsClientMessage, WsMessage, WsServerMessage}
+import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import play.api.libs.json.Json
 

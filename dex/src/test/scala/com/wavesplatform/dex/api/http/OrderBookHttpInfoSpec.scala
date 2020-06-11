@@ -5,14 +5,14 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, Props}
-import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.ApiV0OrderBook
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
+import com.wavesplatform.dex.actors.{MatcherSpecLike, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.OrderBookHttpInfoSpec.FakeOrderBookActor
+import com.wavesplatform.dex.api.http.entities.ApiV0OrderBook
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherSpecLike}
 import com.wavesplatform.dex.model.{LastTrade, LevelAmounts, MatcherModel, OrderBook}
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule
 import com.wavesplatform.dex.time.{SystemTime, Time}

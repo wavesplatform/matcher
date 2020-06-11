@@ -2,18 +2,18 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
+import java.util.concurrent.{ExecutorService, Executors}
 
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.request._
-import com.wavesplatform.dex.load.utils.{settings, _}
+import com.wavesplatform.dex.load.utils._
+import com.wavesplatform.wavesj._
 import com.wavesplatform.wavesj.matcher.Order.Type
-import com.wavesplatform.wavesj.{AssetPair, Base58, PrivateKeyAccount, Transactions, Transfer}
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
-import scala.util.{Failure, Random, Success}
-import scala.collection.JavaConversions.seqAsJavaList
+import scala.collection.JavaConverters._
 import scala.concurrent._
-import java.util.concurrent.{ExecutorService, Executors}
+import scala.util.{Failure, Random}
 
 object TankGenerator {
   private val executor: ExecutorService                          = Executors.newCachedThreadPool
@@ -71,7 +71,7 @@ object TankGenerator {
         .foreach(group => {
           Future {
             blocking {
-              val tx = Transactions.makeMassTransferTx(issuer, asset, seqAsJavaList[Transfer](group), massTransferFee(group), null)
+              val tx = Transactions.makeMassTransferTx(issuer, asset, group.asJava, massTransferFee(group), null)
               println(s"\t\tSending mass-transfer tx: ${mkJson(tx)}")
               services.node.send(tx)
             }
@@ -104,7 +104,7 @@ object TankGenerator {
     waitForHeightArise()
   }
 
-  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
+  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {
     print(s"Creating orders... ")
     val safeAmount = settings.assets.quantity / 2 / accounts.length / settings.defaults.maxOrdersPerAccount
 
@@ -257,7 +257,6 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val tb    = settings.distribution.tradableBalance
 
     def mkTradableBalance(a: PrivateKeyAccount, p: AssetPair) = {
       Request(

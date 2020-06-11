@@ -7,11 +7,11 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.model.HttpResponse
 import cats.syntax.either._
 import cats.syntax.option._
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.{Depth, Query}
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.MatcherError
-import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Depth, Query}
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.DecimalsFormat
 import com.wavesplatform.dex.model.OrderBookAggregatedSnapshot
 

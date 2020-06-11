@@ -33,7 +33,7 @@ import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
-import scala.collection.mutable.{AnyRefMap => MutableMap}
+import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success}
@@ -58,7 +58,10 @@ class AddressActor(owner: Address,
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private var openVolume   = Map.empty[Asset, Long]
-  private val expiration   = MutableMap.empty[ByteStr, Cancellable]
+  private val expiration   = MutableMap.empty[Order.Id, Cancellable]
+
+  // Saves from cases when a client does multiple requests with the same order
+  private val failedPlacements = MutableSet.empty[Order.Id]
 
   private var addressWsMutableState = AddressWsMutableState.empty(owner)
 
@@ -68,7 +71,7 @@ class AddressActor(owner: Address,
       val orderId = command.order.id()
 
       if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
-      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      else if (failedPlacements.contains(orderId) || hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -173,6 +176,7 @@ class AddressActor(owner: Address,
 
     case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
       log.trace(s"Got $storeFailed")
+      failedPlacements.add(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! CanNotPersist(reason)
         queueEvent match {
@@ -185,6 +189,8 @@ class AddressActor(owner: Address,
           case _ =>
         }
       }
+
+    case _: Event.StoreSucceeded => if (failedPlacements.nonEmpty) failedPlacements.clear()
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")
@@ -493,14 +499,14 @@ class AddressActor(owner: Address,
         case Failure(e) =>
           e match {
             case _: TimeoutException            => log.warn(s"Timeout during storing $event for $orderId")
-            case _: CircuitBreakerOpenException => log.warn(s"Fail fast due to circuit breaker")
+            case _: CircuitBreakerOpenException => log.warn("Fail fast due to circuit breaker")
             case _                              =>
           }
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, event)
-        case Success(None)        => log.trace(s"$event saved")
+        case Success(None)        => self ! Event.StoreSucceeded(orderId, event); log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
 
@@ -588,6 +594,7 @@ object AddressActor {
       override def orderId: Order.Id = acceptedOrder.id
     }
     case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
+    case class StoreSucceeded(orderId: Order.Id, queueEvent: QueueEvent)                    extends Event
   }
 
   sealed trait WsCommand extends Message

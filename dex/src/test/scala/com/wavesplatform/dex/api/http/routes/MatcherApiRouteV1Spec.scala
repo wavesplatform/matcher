@@ -14,7 +14,7 @@ import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.entities.{ApiV1LevelAgg, ApiV1OrderBook, HttpOrderBook}
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBook, HttpV1LevelAgg, HttpV1OrderBook}
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -119,11 +119,11 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       { route =>
         Get(routePath(s"/orderbook/WAVES/${usd.id}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[ApiV1OrderBook] should matchTo(
-            entities.ApiV1OrderBook(
+          responseAs[HttpV1OrderBook] should matchTo(
+            entities.HttpV1OrderBook(
               timestamp = 0L,
-              bids = wavesUsdAggregatedSnapshot.bids.toList.map(ApiV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
-              asks = wavesUsdAggregatedSnapshot.asks.toList.map(ApiV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
+              bids = wavesUsdAggregatedSnapshot.bids.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair)),
+              asks = wavesUsdAggregatedSnapshot.asks.toList.map(HttpV1LevelAgg.fromLevelAgg(_, wavesUsdPair))
             )
           )
         }

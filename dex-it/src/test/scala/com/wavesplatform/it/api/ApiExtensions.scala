@@ -3,8 +3,8 @@ package com.wavesplatform.it.api
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Id
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{ApiOrderBookHistoryItem, ApiOrderStatus}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -21,8 +21,8 @@ import scala.collection.immutable.TreeMap
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtDex(order: Order,
-                                   expectedStatus: ApiOrderStatus.Status = Status.Accepted,
-                                   dex: DexContainer = dex1): ApiOrderStatus = {
+                                   expectedStatus: HttpOrderStatus.Status = Status.Accepted,
+                                   dex: DexContainer = dex1): HttpOrderStatus = {
     dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
@@ -35,7 +35,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
-  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: ApiOrderStatus.Status = Status.Cancelled): ApiOrderStatus = {
+  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: HttpOrderStatus.Status = Status.Cancelled): HttpOrderStatus = {
     dex1.api.cancel(owner, order)
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
@@ -75,7 +75,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
             case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
           }
 
-          account -> (TreeMap.empty[AssetPair, Seq[ApiOrderBookHistoryItem]] ++ assetPairHistory)
+          account -> (TreeMap.empty[AssetPair, Seq[HttpOrderBookHistoryItem]] ++ assetPairHistory)
       }
 
     clean {

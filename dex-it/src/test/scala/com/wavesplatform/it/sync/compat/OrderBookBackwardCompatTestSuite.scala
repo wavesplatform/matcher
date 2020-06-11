@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.compat
 
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}

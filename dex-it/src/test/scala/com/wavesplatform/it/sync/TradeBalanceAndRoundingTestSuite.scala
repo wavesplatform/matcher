@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
-import com.wavesplatform.dex.api.http.entities.{ApiAssetInfo, ApiOrderStatus}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpOrderStatus}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -49,10 +49,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       val aliceOrder = mkOrder(alice, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       dex1.api.place(aliceOrder)
-      dex1.api.waitForOrder(aliceOrder)(_ == ApiOrderStatus(Status.Filled, filledAmount = Some(420169L), filledFee = Some(296219L)))
+      dex1.api.waitForOrder(aliceOrder)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(420169L), filledFee = Some(296219L)))
 
       // Bob wants to buy some USD
-      dex1.api.waitForOrder(bobOrder1)(_ == ApiOrderStatus(Status.PartiallyFilled, filledAmount = Some(420169L), filledFee = Some(40L)))
+      dex1.api.waitForOrder(bobOrder1)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(420169L), filledFee = Some(40L)))
 
       // Each side get fair amount of assets
       waitForOrderAtNode(aliceOrder)
@@ -64,10 +64,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val markets = openMarkets.markets.head
 
       markets.amountAssetName shouldBe "WAVES"
-      markets.amountAssetInfo shouldBe Some(ApiAssetInfo(8))
+      markets.amountAssetInfo shouldBe Some(HttpAssetInfo(8))
 
       markets.priceAssetName shouldBe usdAssetName
-      markets.priceAssetInfo shouldBe Some(ApiAssetInfo(IssueUsdTx.getDecimals))
+      markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.getDecimals))
     }
 
     "check usd and waves balance after fill" in {
@@ -229,10 +229,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val markets     = openMarkets.markets.last
 
     markets.amountAssetName shouldBe wctAssetName
-    markets.amountAssetInfo shouldBe Some(ApiAssetInfo(IssueWctTx.getDecimals))
+    markets.amountAssetInfo shouldBe Some(HttpAssetInfo(IssueWctTx.getDecimals))
 
     markets.priceAssetName shouldBe usdAssetName
-    markets.priceAssetInfo shouldBe Some(ApiAssetInfo(IssueUsdTx.getDecimals))
+    markets.priceAssetInfo shouldBe Some(HttpAssetInfo(IssueUsdTx.getDecimals))
   }
 
   "Alice and Bob trade WCT-WAVES on not enough fee when place order" - {
@@ -283,7 +283,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
     val aliceOrder = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 0.001.waves, 10.0)
     dex1.api.place(aliceOrder)
-    dex1.api.waitForOrder(aliceOrder)(_ == ApiOrderStatus(Status.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
+    dex1.api.waitForOrder(aliceOrder)(_ == HttpOrderStatus(Status.Cancelled, filledAmount = Some(0), filledFee = Some(0)))
 
     withClue("Alice's reserved balance:") {
       dex1.api.reservedBalance(alice) shouldBe empty

@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.directives.FutureDirectives
 import akka.http.scaladsl.server.{Directive1, Route}
 import com.wavesplatform.dex.Matcher
-import com.wavesplatform.dex.api.http.entities.{ApiV1OrderBook, InfoNotFound}
+import com.wavesplatform.dex.api.http.entities.{HttpV1OrderBook, InfoNotFound}
 import com.wavesplatform.dex.api.http.{HasStatusBarrier, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute, PathMatchers}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -54,7 +54,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair",
     httpMethod = "GET",
-    response = classOf[ApiV1OrderBook]
+    response = classOf[HttpV1OrderBook]
   )
   @ApiImplicitParams(
     Array(

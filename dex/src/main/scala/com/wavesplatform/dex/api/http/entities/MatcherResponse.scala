@@ -67,7 +67,7 @@ object MatcherResponseContent {
 case class SimpleResponse(code: StatusCode, js: JsObject) extends MatcherResponse(code, MatcherResponseContent.Single(js))
 
 object SimpleResponse {
-  def apply(code: StatusCode, message: String): SimpleResponse                                    = new SimpleResponse(code, Json.toJsObject(ApiMessage(message)))
+  def apply(code: StatusCode, message: String): SimpleResponse                                    = new SimpleResponse(code, Json.toJsObject(HttpMessage(message)))
   def apply[T](response: T, code: StatusCode = C.OK)(implicit writes: OWrites[T]): SimpleResponse = new SimpleResponse(code, writes.writes(response))
 }
 

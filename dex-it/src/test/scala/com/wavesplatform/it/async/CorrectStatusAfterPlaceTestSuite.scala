@@ -3,8 +3,8 @@ package com.wavesplatform.it.async
 import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -107,7 +107,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
       }
   }
 
-  private def request(order: Order): Future[(Order.Id, ApiOrderStatus.Status, Boolean)] = {
+  private def request(order: Order): Future[(Order.Id, HttpOrderStatus.Status, Boolean)] = {
     for {
       // TODO happens rarely, try to remove after migration to new akka-http
       sent   <- dex1.asyncApi.tryPlace(order).map(_ => true).recover { case x => log.error("Some error with order placement occurred:", x); false }

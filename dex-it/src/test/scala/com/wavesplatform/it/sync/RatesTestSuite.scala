@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.softwaremill.sttp.StatusCodes
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiRates
+import com.wavesplatform.dex.api.http.entities.HttpRates
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
@@ -19,7 +19,7 @@ class RatesTestSuite extends MatcherSuiteBase {
        |}""".stripMargin
   )
 
-  val defaultRateMap: ApiRates = Map(Waves -> 1d)
+  val defaultRateMap: HttpRates = Map(Waves -> 1d)
 
   val wctRate        = 0.2
   val wctRateUpdated = 0.5

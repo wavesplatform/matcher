@@ -8,19 +8,18 @@ import play.api.libs.json.{Format, JsValue, Writes}
 
 package object entities {
 
-  type ApiMatcherPublicKey = PublicKey
-  type ApiRates            = Map[Asset, Double]
-  type ApiOffset           = QueueEventWithMeta.Offset
-  type ApiSnapshotOffsets  = Map[AssetPair, ApiOffset]
-  type ApiBalance          = Map[Asset, Long]
+  type HttpMatcherPublicKey = PublicKey
+  type HttpRates            = Map[Asset, Double]
+  type HttpOffset           = QueueEventWithMeta.Offset
+  type HttpSnapshotOffsets  = Map[AssetPair, HttpOffset]
+  type HttpBalance          = Map[Asset, Long]
 
-  implicit val apiMatcherPublicKeyFormat: Format[PublicKey]         = PublicKey.publicKeyJsonFormat
-  implicit val apiRatesFormat: Format[ApiRates]                     = assetDoubleMapFormat
-  implicit val apiSnapshotOffsetsFormat: Format[ApiSnapshotOffsets] = assetPairMapFormat[Long]
-  implicit val apiBalanceFormat: Format[ApiBalance]                 = assetMapFormat[Long]
+  implicit val httpMatcherPublicKeyFormat: Format[PublicKey]          = PublicKey.publicKeyJsonFormat
+  implicit val httpRatesFormat: Format[HttpRates]                     = assetDoubleMapFormat
+  implicit val httpSnapshotOffsetsFormat: Format[HttpSnapshotOffsets] = assetPairMapFormat[Long]
+  implicit val httpBalanceFormat: Format[HttpBalance]                 = assetMapFormat[Long]
 
-  implicit class ApiOps[A](private val self: A)(implicit writes: Writes[A]) {
+  implicit class HttpOps[A](private val self: A)(implicit writes: Writes[A]) {
     def toJson: JsValue = writes.writes(self)
   }
-
 }

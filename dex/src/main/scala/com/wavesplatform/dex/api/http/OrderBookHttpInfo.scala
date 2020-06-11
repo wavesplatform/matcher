@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusC
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Depth
 import com.wavesplatform.dex.api.http.entities.MatcherResponse.toHttpResponse
-import com.wavesplatform.dex.api.http.entities.{ApiMarketStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
+import com.wavesplatform.dex.api.http.entities.{HttpMarketStatus, HttpOrderBook, OrderBookUnavailable, SimpleResponse}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.time.Time
@@ -24,7 +24,7 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
       case Left(e) => toHttpResponse(OrderBookUnavailable(e))
       case Right(maybeMarketStatus) =>
         maybeMarketStatus match {
-          case Some(ms) => toHttpResponse(SimpleResponse(ApiMarketStatus fromMarketStatus ms))
+          case Some(ms) => toHttpResponse(SimpleResponse(HttpMarketStatus fromMarketStatus ms))
           case None     => marketStatusNotFound
         }
     }

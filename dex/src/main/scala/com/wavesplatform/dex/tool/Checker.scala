@@ -5,7 +5,7 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -138,7 +138,7 @@ case class Checker(superConnector: SuperConnector) {
 
       lazy val expectedFilledStatus = {
         val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
-        ApiOrderStatus.apiOrderStatusFormat.writes(ApiOrderStatus from orderStatus).toString
+        HttpOrderStatus.httpOrderStatusFormat.writes(HttpOrderStatus from orderStatus).toString
       }
       (
         for {

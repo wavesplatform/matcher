@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsLastTrade, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol
@@ -137,7 +137,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       val firstOrder = mkOrderDP(carol, wavesBtcPair, BUY, 1.05.waves, 0.00011403)
       placeAndAwaitAtDex(firstOrder)
       dex1.api.cancelAll(carol)
-      dex1.api.waitForOrderStatus(firstOrder, ApiOrderStatus.Status.Cancelled)
+      dex1.api.waitForOrderStatus(firstOrder, HttpOrderStatus.Status.Cancelled)
 
       markup("No orders")
       val wsc0    = mkWsOrderBookConnection(wavesBtcPair, dex1)
@@ -201,7 +201,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       markup("Two orders and trade")
 
-      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), ApiOrderStatus.Status.Filled)
+      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 0.5.waves, 0.00013), HttpOrderStatus.Status.Filled)
 
       val wsc3    = mkWsOrderBookConnection(wavesBtcPair, dex1)
       val buffer3 = wsc3.receiveAtLeastN[WsOrderBookChanges](1)
@@ -288,7 +288,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       markup("An execution and adding a new order")
       val order = mkOrderDP(carol, wavesBtcPair, SELL, 1.5.waves, 0.00012)
-      placeAndAwaitAtDex(order, ApiOrderStatus.Status.PartiallyFilled)
+      placeAndAwaitAtDex(order, HttpOrderStatus.Status.PartiallyFilled)
 
       val buffer2 = wsc.receiveAtLeastN[WsOrderBookChanges](1)
       buffer2.size should (be >= 1 and be <= 2)
@@ -310,7 +310,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
       wsc.clearMessages()
 
       dex1.api.cancelAll(carol)
-      dex1.api.waitForOrderStatus(order, ApiOrderStatus.Status.Cancelled)
+      dex1.api.waitForOrderStatus(order, HttpOrderStatus.Status.Cancelled)
 
       val buffer3 = wsc.receiveAtLeastN[WsOrderBookChanges](1)
       buffer3.size shouldBe 1

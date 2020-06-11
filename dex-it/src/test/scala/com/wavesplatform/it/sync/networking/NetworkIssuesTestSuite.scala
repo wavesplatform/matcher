@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync.networking
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.domain.order.OrderType.SELL
@@ -62,7 +62,7 @@ class NetworkIssuesTestSuite extends WsSuiteBase with HasToxiProxy {
       2.minute
     )
 
-    orders.foreach(dex1.api.waitForOrderStatus(_, ApiOrderStatus.Status.Accepted))
+    orders.foreach(dex1.api.waitForOrderStatus(_, HttpOrderStatus.Status.Accepted))
     dex1.api.cancelAllByPair(alice, wavesUsdPair)
   }
 

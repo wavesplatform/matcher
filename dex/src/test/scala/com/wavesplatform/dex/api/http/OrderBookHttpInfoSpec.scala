@@ -8,7 +8,7 @@ import akka.actor.{Actor, Props}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.actors.{MatcherSpecLike, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.OrderBookHttpInfoSpec.FakeOrderBookActor
-import com.wavesplatform.dex.api.http.entities.ApiV0OrderBook
+import com.wavesplatform.dex.api.http.entities.HttpV0OrderBook
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -36,8 +36,8 @@ class OrderBookHttpInfoSpec extends AnyFreeSpec with Matchers with SystemTime wi
         val aggOrderBookRef   = system.actorOf(Props(new FakeOrderBookActor(pair)))
         val askAdapter        = new OrderBookAskAdapter(new AtomicReference(Map(pair -> Right(aggOrderBookRef))), 5.seconds)
         val orderBookHttpInfo = new OrderBookHttpInfo(OrderBookHttpInfo.Settings(List(3, 9), None), askAdapter, time, _ => Some(8))
-        def get(depth: Option[Int]): ApiV0OrderBook =
-          ApiV0OrderBook.fromHttpResponse(Await.result(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth), 5.seconds))
+        def get(depth: Option[Int]): HttpV0OrderBook =
+          HttpV0OrderBook.fromHttpResponse(Await.result(orderBookHttpInfo.getHttpView(pair, MatcherModel.Normalized, depth), 5.seconds))
 
         val middlePrice = 1000L
         val now         = time.getTimestamp()

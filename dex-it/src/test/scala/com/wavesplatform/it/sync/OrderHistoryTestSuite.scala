@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
-import com.wavesplatform.dex.api.http.entities.ApiOrderBookHistoryItem
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.HttpOrderBookHistoryItem
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -357,7 +357,7 @@ class OrderHistoryTestSuite extends MatcherSuiteBase with TableDrivenPropertyChe
     }
   }
 
-  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[ApiOrderBookHistoryItem]] = List(
+  private def orderHistory(account: KeyPair, pair: AssetPair, activeOnly: Option[Boolean]): List[List[HttpOrderBookHistoryItem]] = List(
     dex1.api.orderHistory(account, activeOnly),
     dex1.api.orderHistoryByPair(account, pair, activeOnly),
     dex1.api.orderHistoryWithApiKey(account, activeOnly)

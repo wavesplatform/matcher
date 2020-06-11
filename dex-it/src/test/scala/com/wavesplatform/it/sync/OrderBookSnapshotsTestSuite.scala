@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.http.entities.ApiOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.it.{MatcherSuiteBase, orderGen}
 import org.scalacheck.Gen
@@ -68,7 +68,7 @@ class OrderBookSnapshotsTestSuite extends MatcherSuiteBase {
     dex1.restart()
     dex1.api.waitForCurrentOffset(_ == ordersPack1Size + ordersPack2Size - 1)
     ordersPack1.foreach { order =>
-      dex1.api.orderStatus(order) should not be ApiOrderStatus.Status.NotFound.name
+      dex1.api.orderStatus(order) should not be HttpOrderStatus.Status.NotFound.name
     }
   }
 }

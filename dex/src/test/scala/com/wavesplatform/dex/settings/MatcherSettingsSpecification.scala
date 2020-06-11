@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
+import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -83,6 +84,12 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.consumer.maxBufferSize shouldBe 777
     settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
+    settings.eventsQueue.circuitBreaker should matchTo(
+      CircuitBreakerSettings(
+        maxFailures = 999,
+        callTimeout = 123.seconds,
+        resetTimeout = 1.day
+      ))
     settings.processConsumedTimeout shouldBe 663.seconds
     settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
     settings.deviation shouldBe DeviationsSettings(enabled = true, 1000000, 1000000, 1000000)

@@ -4,7 +4,7 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, Cancellable, Status, typed}
-import akka.pattern.{ask, pipe}
+import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
@@ -492,8 +492,9 @@ class AddressActor(owner: Address,
         case Success(_)    => Success(None)
         case Failure(e) =>
           e match {
-            case _: TimeoutException => log.warn(s"Timeout during storing $event for $orderId")
-            case _                   =>
+            case _: TimeoutException            => log.warn(s"Timeout during storing $event for $orderId")
+            case _: CircuitBreakerOpenException => log.warn(s"Fail fast due to circuit breaker")
+            case _                              =>
           }
           Success(Some(error.CanNotPersistEvent))
       }

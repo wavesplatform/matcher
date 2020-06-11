@@ -71,8 +71,13 @@ class AddressActor(owner: Address,
       log.debug(s"Got $command")
       val orderId = command.order.id()
 
+<<<<<<< HEAD:dex/src/main/scala/com/wavesplatform/dex/actors/address/AddressActor.scala
       if (totalActiveOrders >= settings.maxActiveOrders) sender ! error.ActiveOrdersLimitReached(settings.maxActiveOrders)
       if (hasOrder(orderId)) sender ! error.OrderDuplicate(orderId)
+=======
+      if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
+      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+>>>>>>> c15714329... DEX-785 Active orders removing during Kafka issues (#290):dex/src/main/scala/com/wavesplatform/dex/AddressActor.scala
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -178,6 +183,7 @@ class AddressActor(owner: Address,
 
     case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
       log.trace(s"Got $storeFailed")
+<<<<<<< HEAD:dex/src/main/scala/com/wavesplatform/dex/actors/address/AddressActor.scala
       pendingCommands.remove(orderId).foreach { _.client ! reason }
       queueEvent match {
         case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
@@ -187,6 +193,19 @@ class AddressActor(owner: Address,
               wsAddressState = wsAddressState.putReservedAssets(ao.reservableBalance.keySet)
           }
         case _ =>
+=======
+      pendingCommands.remove(orderId).foreach { command =>
+        command.client ! CanNotPersist(reason)
+        queueEvent match {
+          case QueueEvent.Placed(_) | QueueEvent.PlacedMarket(_) =>
+            activeOrders.remove(orderId).foreach { ao =>
+              openVolume = openVolume |-| ao.reservableBalance
+              if (addressWsMutableState.hasActiveSubscriptions)
+                addressWsMutableState = addressWsMutableState.putReservedAssets(ao.reservableBalance.keySet)
+            }
+          case _ =>
+        }
+>>>>>>> c15714329... DEX-785 Active orders removing during Kafka issues (#290):dex/src/main/scala/com/wavesplatform/dex/AddressActor.scala
       }
 
     case event: ValidationEvent =>
@@ -430,8 +449,17 @@ class AddressActor(owner: Address,
           else wsAddressState.putOrderFillingInfoAndStatusUpdate(remaining, status)
       }
 
+<<<<<<< HEAD:dex/src/main/scala/com/wavesplatform/dex/actors/address/AddressActor.scala
       // We already notified clients about these changes after order passed validation (see def place)
       if (status != OrderStatus.Accepted) wsAddressState = wsAddressState.putReservedAssets(openVolumeDiff.keySet)
+=======
+      // OrderStatus.Accepted means that we've already notified clients about these balance changes after order passed validation (see def place)
+      // Empty origActiveOrder means that:
+      //  - for master DEX order was previously removed from active ones in handling of Event.StoreFailed
+      //  - for slave DEX it is a new order and we have to send balance changes via WS API
+      if (status != OrderStatus.Accepted || origActiveOrder.isEmpty)
+        addressWsMutableState = addressWsMutableState.putReservedAssets(openVolumeDiff.keySet)
+>>>>>>> c15714329... DEX-785 Active orders removing during Kafka issues (#290):dex/src/main/scala/com/wavesplatform/dex/AddressActor.scala
     }
   }
 

@@ -83,8 +83,13 @@ case class WsAddressState(address: Address,
 
 object WsAddressState {
 
+<<<<<<< HEAD:dex/src/main/scala/com/wavesplatform/dex/api/ws/state/WsAddressState.scala
   def empty(address: Address): WsAddressState = WsAddressState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
   val numberMaxSafeInteger                    = 9007199254740991L
+=======
+  def empty(address: Address): AddressWsMutableState = AddressWsMutableState(address, Map.empty, Set.empty, Set.empty, Set.empty, Map.empty)
+  val numberMaxSafeInteger                           = 9007199254740991L
+>>>>>>> c15714329... DEX-785 Active orders removing during Kafka issues (#290):dex/src/main/scala/com/wavesplatform/dex/AddressWsMutableState.scala
 
   def getNextUpdateId(currentUpdateId: Long): Long = if (currentUpdateId == numberMaxSafeInteger) 1 else currentUpdateId + 1
 }

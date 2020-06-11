@@ -15,8 +15,9 @@ import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.MatcherSettings
-import com.wavesplatform.dex.util.ActorNameParser
 import scorex.utils._
+
+import scala.util.Failure
 
 class MatcherActor(settings: MatcherSettings,
                    assetPairsDB: AssetPairsDB,
@@ -156,7 +157,13 @@ class MatcherActor(settings: MatcherSettings,
       context.stop(self)
 
     case Terminated(ref) =>
-      val pair = ActorNameParser.orderBookPair(ref.path.name).toOption
+      val orderBookActorName = ref.path.name
+      val xs                 = orderBookActorName.split('-')
+
+      val pair =
+        (if (xs.length == 2) AssetPair.createAssetPair(xs.head, xs(1))
+         else Failure(new IllegalArgumentException(s"Can't extract a pair from the order book name: '$orderBookActorName'"))).toOption
+
       pair.foreach { p =>
         orderBooks.getAndUpdate { obs =>
           obs.get(p) match {

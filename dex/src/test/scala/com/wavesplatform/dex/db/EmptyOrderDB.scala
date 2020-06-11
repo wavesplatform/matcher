@@ -4,6 +4,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
+import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.dex.model.{OrderInfo, OrderStatus}
 
@@ -18,4 +19,6 @@ object EmptyOrderDB extends OrderDB {
     Seq.empty
 
   override def getOrderInfo(id: Id): Option[FinalOrderInfo] = None
+
+  override def transactionsByOrder(orderId: Id): Seq[ExchangeTransaction] = Seq.empty
 }

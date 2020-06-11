@@ -8,6 +8,7 @@ import java.util.{Base64, Scanner}
 import cats.catsInstancesForId
 import cats.syntax.flatMap._
 import cats.syntax.option._
+import com.wavesplatform.dex._
 import com.wavesplatform.dex.db.AccountStorage
 import com.wavesplatform.dex.doc.MatcherErrorDoc
 import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair}
@@ -15,7 +16,6 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.tool.Checker
 import com.wavesplatform.dex.tool.connectors.SuperConnector
-import com.wavesplatform.dex.{MatcherStateCheckingFailedError, Version, cli, domain, util}
 import scopt.{OParser, RenderingMode}
 
 import scala.concurrent.duration._
@@ -240,7 +240,7 @@ object WavesDexCli extends ScoptImplicits {
                 } yield checkResult
               ) match {
                 case Right(diagnosticNotes) => println(s"$diagnosticNotes\nCongratulations! All checks passed!")
-                case Left(error)            => println(error); util.forceStopApplication(MatcherStateCheckingFailedError)
+                case Left(error)            => println(error); Matcher.forceStopApplication(MatcherStateCheckingFailedError)
               }
           }
           println("Done")

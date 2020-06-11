@@ -21,7 +21,7 @@ import com.wavesplatform.dex.api.http.headers.`X-User-Public-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.routes.{ApiRoute, AuthRoute}
 import com.wavesplatform.dex.caches.RateCache
-import com.wavesplatform.dex.db.DBUtils
+import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -44,7 +44,6 @@ import com.wavesplatform.dex.time.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon
-import org.iq80.leveldb.DB
 import play.api.libs.json._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,7 +63,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderValidator: Order => FutureResult[Order],
                            matcherSettings: MatcherSettings,
                            matcherStatus: () => Matcher.Status,
-                           db: DB,
+                           orderDb: OrderDB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
                            lastOffset: () => Future[QueueEventWithMeta.Offset],
@@ -599,7 +598,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   )
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth & withUserPublicKeyOpt) { (orderId, userPublicKey) =>
     def reject: StandardRoute = complete(OrderCancelRejected(error.OrderNotFound(orderId)))
-    (DBUtils.order(db, orderId), userPublicKey) match {
+    (orderDb.get(orderId), userPublicKey) match {
       case (None, _)                                                         => reject
       case (Some(order), Some(pk)) if pk.toAddress != order.sender.toAddress => reject
       case (Some(order), _)                                                  => handleCancelRequest(None, order.sender, Some(orderId), None)
@@ -922,13 +921,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
       complete {
-        DBUtils.order(db, orderId) match {
+        orderDb.get(orderId) match {
           case Some(order) =>
             askMapAddressActor[AddressActor.Reply.GetOrderStatus](order.sender, AddressActor.Query.GetOrderStatus(orderId)) { r =>
               ApiOrderStatus.from(r.x)
             }
           case None =>
-            Future.successful(DBUtils.orderInfo(db, orderId).fold(ApiOrderStatus.from(OrderStatus.NotFound))(x => ApiOrderStatus.from(x.status)))
+            Future.successful(orderDb.getOrderInfo(orderId).fold(ApiOrderStatus.from(OrderStatus.NotFound))(x => ApiOrderStatus.from(x.status)))
         }
       }
     }
@@ -976,7 +975,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
-    complete { Json.toJson(DBUtils.transactionsForOrder(db, orderId)) }
+    complete { Json.toJson(orderDb.transactionsByOrder(orderId)) }
   }
 
   @Path("/debug/currentOffset")

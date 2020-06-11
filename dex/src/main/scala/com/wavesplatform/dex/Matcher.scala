@@ -41,7 +41,6 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
-import com.wavesplatform.dex.util._
 import monix.eval.Task
 import mouse.any.anySyntaxMouse
 
@@ -200,7 +199,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         validateOrder,
         settings,
         () => status.get(),
-        db,
+        orderDB,
         time,
         () => lastProcessedOffset,
         () => matcherQueue.lastEventOffset,
@@ -550,6 +549,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 }
 
 object Matcher extends ScorexLogging {
+
+  def forceStopApplication(reason: ApplicationStopReason): Unit = System.exit(reason.code)
 
   type StoreEvent = QueueEvent => Future[Option[QueueEventWithMeta]]
 

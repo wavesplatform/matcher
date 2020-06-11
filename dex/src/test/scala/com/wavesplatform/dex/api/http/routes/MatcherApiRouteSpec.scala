@@ -23,7 +23,33 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.entities.{ApiAssetInfo, ApiBalance, ApiError, ApiMarketDataWithMeta, ApiMarketStatus, ApiMatcherPublicKey, ApiMatcherPublicSettings, ApiMatchingRules, ApiMessage, ApiOffset, ApiOrderBookHistoryItem, ApiOrderBookInfo, ApiOrderFeeMode, ApiOrderRestrictions, ApiOrderStatus, ApiRates, ApiSnapshotOffsets, ApiSuccessfulBatchCancel, ApiSuccessfulPlace, ApiSuccessfulSingleCancel, ApiTradingMarkets, ApiV0LevelAgg, ApiV0OrderBook, HttpOrderBook, _}
+import com.wavesplatform.dex.api.http.entities.{
+  ApiAssetInfo,
+  ApiBalance,
+  ApiError,
+  ApiMarketDataWithMeta,
+  ApiMarketStatus,
+  ApiMatcherPublicKey,
+  ApiMatcherPublicSettings,
+  ApiMatchingRules,
+  ApiMessage,
+  ApiOffset,
+  ApiOrderBookHistoryItem,
+  ApiOrderBookInfo,
+  ApiOrderFeeMode,
+  ApiOrderRestrictions,
+  ApiOrderStatus,
+  ApiRates,
+  ApiSnapshotOffsets,
+  ApiSuccessfulBatchCancel,
+  ApiSuccessfulPlace,
+  ApiSuccessfulSingleCancel,
+  ApiTradingMarkets,
+  ApiV0LevelAgg,
+  ApiV0OrderBook,
+  HttpOrderBook,
+  _
+}
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
@@ -1274,7 +1300,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         },
         matcherSettings = settings,
         matcherStatus = () => Matcher.Status.Working,
-        db = db,
+        orderDb = odb,
         time = time,
         currentOffset = () => 0L,
         lastOffset = () => Future.successful(0L),

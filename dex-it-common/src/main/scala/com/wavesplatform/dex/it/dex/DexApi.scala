@@ -147,14 +147,14 @@ object DexApi {
     def toUri: String = s"${p.amountAsset.toString}/${p.priceAsset.toString}"
   }
 
-  private def cancelRequest(sender: KeyPair, orderId: String): CancelOrderRequest = {
-    val req       = CancelOrderRequest(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
+  private def cancelRequest(sender: KeyPair, orderId: String): HttpCancelOrder = {
+    val req       = HttpCancelOrder(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }
 
-  private def batchCancelRequest(sender: KeyPair, timestamp: Long): CancelOrderRequest = {
-    val req       = CancelOrderRequest(sender, None, Some(timestamp), Array.emptyByteArray)
+  private def batchCancelRequest(sender: KeyPair, timestamp: Long): HttpCancelOrder = {
+    val req       = HttpCancelOrder(sender, None, Some(timestamp), Array.emptyByteArray)
     val signature = crypto.sign(sender, req.toSign)
     req.copy(signature = signature)
   }

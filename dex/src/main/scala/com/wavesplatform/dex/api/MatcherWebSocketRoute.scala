@@ -13,8 +13,8 @@ import akka.{Done, NotUsed}
 import cats.syntax.either._
 import com.wavesplatform.dex.AssetPairBuilder
 import com.wavesplatform.dex.api.http.{ApiRoute, AuthRoute}
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
-import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsMessage, WsServerMessage}
+import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
+import com.wavesplatform.dex.api.ws.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.InvalidJson

@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.dex.api.websockets.connection.WsConnection
-import com.wavesplatform.dex.api.websockets.{WsOrder, _}
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.{WsOrder, _}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -80,7 +80,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val acc = mkAccountWithBalance(10.waves -> Waves)
 
       val wsc = mkWsAddressConnection(acc, dex1)
-      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.receiveAtLeastN[WsAddressChanges](1)
       wsc.clearMessages()
 
       markup("Unsubscribe")
@@ -90,12 +90,12 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
       markup("Subscribe")
       wsc.send(WsAddressSubscribe(acc, WsAddressSubscribe.defaultAuthType, mkJwt(acc)))
-      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.receiveAtLeastN[WsAddressChanges](1)
       wsc.clearMessages()
 
       markup("Update")
       broadcastAndAwait(mkTransfer(alice, acc.toAddress, 2.usd, usd, feeAmount = 1.waves))
-      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.receiveAtLeastN[WsAddressChanges](1)
 
       wsc.close()
     }
@@ -105,7 +105,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when account is empty" in {
         val account      = mkKeyPair("Test")
         val wsac         = mkWsAddressConnection(account)
-        val addressState = wsac.receiveAtLeastN[WsAddressState](1).head
+        val addressState = wsac.receiveAtLeastN[WsAddressChanges](1).head
         addressState.address shouldBe account.toAddress
         assertChanges(wsac, squash = false)()()
         wsac.close()
@@ -360,7 +360,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
     val acc = mkAccountWithBalance(10.waves -> Waves); Thread.sleep(150)
     val wsc = mkWsAddressConnection(acc, dex1, subscriptionLifetime = 3.seconds)
 
-    wsc.receiveAtLeastN[WsAddressState](1) // snapshot
+    wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot
     wsc.receiveAtLeastN[WsError](1).head should matchTo(
       WsError(
         0, // ignored
@@ -376,7 +376,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       wsc.send(WsAddressSubscribe(acc.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     }
 
-    wsc.receiveAtLeastN[WsAddressState](1) // snapshot
+    wsc.receiveAtLeastN[WsAddressChanges](1) // snapshot
     wsc.receiveNoMessages(3.5.seconds)
 
     wsc.close()
@@ -390,7 +390,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 
     Seq(alice, bob, carol, eve, alice).foreach { keyPair =>
       wsc.send(WsAddressSubscribe(keyPair, WsAddressSubscribe.defaultAuthType, mkJwt(keyPair)))
-      wsc.receiveAtLeastN[WsAddressState](1)
+      wsc.receiveAtLeastN[WsAddressChanges](1)
     }
 
     wsc.receiveAtLeastN[WsError](2) should matchTo {

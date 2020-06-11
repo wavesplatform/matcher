@@ -20,7 +20,7 @@ import com.wavesplatform.dex.effect.{liftErrorAsync, liftValueAsync}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.AggregatedOrderBookActor
-import com.wavesplatform.dex.model.{LevelAgg, OrderBookAggregatedSnapshot, OrderBookResult}
+import com.wavesplatform.dex.model.{LevelAgg, OrderBookAggregatedSnapshot, HttpOrderBook}
 import com.wavesplatform.dex.settings.MatcherSettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
@@ -56,7 +56,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
       msg match {
         case request: AggregatedOrderBookActor.Query.GetHttpView =>
           val entity =
-            OrderBookResult(
+            HttpOrderBook(
               0L,
               wavesUsdPair,
               wavesUsdAggregatedSnapshot.bids,
@@ -68,7 +68,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
             HttpResponse(
               entity = HttpEntity(
                 ContentTypes.`application/json`,
-                OrderBookResult.toJson(entity)
+                HttpOrderBook.toJson(entity)
               )
             )
 

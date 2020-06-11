@@ -55,7 +55,7 @@ class SpendableBalancesActorSpecification
     }
   }
 
-  lazy val ad: ActorRef  = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
+  lazy val ad: ActorRef  = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
   lazy val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, ad)))
 
   def createAddressActor(address: Address, enableSchedules: Boolean): Props = {
@@ -142,7 +142,7 @@ class SpendableBalancesActorSpecification
 
       def updateAndExpectBalanceChanges(update: (Asset, Long)*)(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]): Unit = {
         sba ! SpendableBalancesActor.Command.UpdateStates { Map(alice -> update.toMap) }
-        val envelope = testProbe.expectMsgType[AddressDirectory.Envelope]
+        val envelope = testProbe.expectMsgType[AddressDirectoryActor.Envelope]
         envelope.address should matchTo(alice)
         envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
           AddressActor.Message.BalanceChanged(allChanges, decreasingChanges)

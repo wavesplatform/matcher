@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.db
 
-import com.wavesplatform.dex.MatcherKeys
+import com.wavesplatform.dex.DbKeys
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -29,33 +29,33 @@ object OrderDB {
   case class Settings(maxOrders: Int)
 
   def apply(settings: Settings, db: DB): OrderDB = new OrderDB with ScorexLogging {
-    override def containsInfo(id: Order.Id): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
+    override def containsInfo(id: Order.Id): Boolean = db.readOnly(_.has(DbKeys.orderInfo(id)))
 
     override def status(id: Order.Id): OrderStatus.Final = db.readOnly { ro =>
-      ro.get(MatcherKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
+      ro.get(DbKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
     }
 
     override def saveOrder(o: Order): Unit = db.readWrite { rw =>
-      val k = MatcherKeys.order(o.id())
+      val k = DbKeys.order(o.id())
       if (!rw.has(k)) {
         rw.put(k, Some(o))
       }
     }
 
-    override def get(id: Order.Id): Option[Order] = db.readOnly(_.get(MatcherKeys.order(id)))
+    override def get(id: Order.Id): Option[Order] = db.readOnly(_.get(DbKeys.order(id)))
 
     override def saveOrderInfo(id: Order.Id, sender: Address, oi: FinalOrderInfo): Unit = {
-      val orderInfoKey = MatcherKeys.orderInfo(id)
+      val orderInfoKey = DbKeys.orderInfo(id)
       if (!db.has(orderInfoKey)) {
         db.readWrite { rw =>
-          val newCommonSeqNr = rw.inc(MatcherKeys.finalizedCommonSeqNr(sender))
-          rw.put(MatcherKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
+          val newCommonSeqNr = rw.inc(DbKeys.finalizedCommonSeqNr(sender))
+          rw.put(DbKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
 
-          val newPairSeqNr = rw.inc(MatcherKeys.finalizedPairSeqNr(sender, oi.assetPair))
-          rw.put(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
+          val newPairSeqNr = rw.inc(DbKeys.finalizedPairSeqNr(sender, oi.assetPair))
+          rw.put(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
           if (newPairSeqNr > settings.maxOrders) // Indexes start with 1, so if maxOrders=100 and newPairSeqNr=101, we delete 1 (the first)
-            rw.get(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
-              .map(MatcherKeys.order)
+            rw.get(DbKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - settings.maxOrders))
+              .map(DbKeys.order)
               .foreach(x => rw.delete(x))
 
           rw.put(orderInfoKey, Some(oi))
@@ -67,19 +67,19 @@ object OrderDB {
       db.readOnly { ro =>
         val (seqNr, key) = maybePair match {
           case Some(p) =>
-            (ro.get(MatcherKeys.finalizedPairSeqNr(owner, p)), MatcherKeys.finalizedPair(owner, p, _: Int))
+            (ro.get(DbKeys.finalizedPairSeqNr(owner, p)), DbKeys.finalizedPair(owner, p, _: Int))
           case None =>
-            (ro.get(MatcherKeys.finalizedCommonSeqNr(owner)), MatcherKeys.finalizedCommon(owner, _: Int))
+            (ro.get(DbKeys.finalizedCommonSeqNr(owner)), DbKeys.finalizedCommon(owner, _: Int))
         }
 
         (for {
           offset <- 0 until math.min(seqNr, settings.maxOrders)
           id     <- db.get(key(seqNr - offset))
-          oi     <- db.get(MatcherKeys.orderInfo(id))
+          oi     <- db.get(DbKeys.orderInfo(id))
         } yield id -> oi).sorted
       }
 
-    override def getOrderInfo(id: Id): Option[FinalOrderInfo] = db.readOnly(_.get(MatcherKeys.orderInfo(id)))
+    override def getOrderInfo(id: Id): Option[FinalOrderInfo] = db.readOnly(_.get(DbKeys.orderInfo(id)))
   }
 
   implicit def orderInfoOrdering[S <: OrderStatus]: Ordering[(ByteStr, OrderInfo[S])] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }

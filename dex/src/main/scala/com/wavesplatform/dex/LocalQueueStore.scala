@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.primitives.{Longs, Shorts}
-import com.wavesplatform.dex.MatcherKeys._
+import com.wavesplatform.dex.DbKeys._
 import com.wavesplatform.dex.db.leveldb.{DBExt, ReadOnlyDB}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.iq80.leveldb.{DB, ReadOptions}

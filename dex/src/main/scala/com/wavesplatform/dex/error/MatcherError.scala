@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.error
 
 import akka.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCode}
-import com.wavesplatform.dex.api.websockets.headers.{`X-Error-Code`, `X-Error-Message`}
+import com.wavesplatform.dex.api.ws.headers.{`X-Error-Code`, `X-Error-Message`}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}

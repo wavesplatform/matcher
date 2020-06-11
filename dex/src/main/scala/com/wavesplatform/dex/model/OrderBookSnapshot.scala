@@ -10,8 +10,8 @@ object OrderBookSnapshot {
   val empty: OrderBookSnapshot = OrderBookSnapshot(bids = Map.empty, asks = Map.empty, None)
 
   def serialize(dest: mutable.ArrayBuilder[Byte], x: OrderBookSnapshot): Unit = {
-    OrderBookSideSnapshot.encode(dest, x.bids)
-    OrderBookSideSnapshot.encode(dest, x.asks)
+    OrderBookSideSnapshotCodecs.encode(dest, x.bids)
+    OrderBookSideSnapshotCodecs.encode(dest, x.asks)
     x.lastTrade match {
       case None => dest += 0
       case Some(lastTrade) =>
@@ -22,8 +22,8 @@ object OrderBookSnapshot {
 
   def fromBytes(bb: ByteBuffer): OrderBookSnapshot =
     OrderBookSnapshot(
-      OrderBookSideSnapshot.decode(bb),
-      OrderBookSideSnapshot.decode(bb),
+      OrderBookSideSnapshotCodecs.decode(bb),
+      OrderBookSideSnapshotCodecs.decode(bb),
       bb.get match {
         case 0 => None
         case 1 => Some(LastTrade.fromBytes(bb))

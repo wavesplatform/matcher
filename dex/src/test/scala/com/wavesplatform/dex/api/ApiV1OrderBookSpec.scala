@@ -3,7 +3,7 @@ package com.wavesplatform.dex.api
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
-import com.wavesplatform.dex.model.{LevelAgg, OrderBookResult}
+import com.wavesplatform.dex.model.{LevelAgg, HttpOrderBook}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -35,7 +35,7 @@ class ApiV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWithI
       asks = asks.map(la => ApiV1LevelAgg.fromLevelAgg(la, wavesUsdPair))
     )
 
-  private val orderBookResult = OrderBookResult(0, wavesUsdPair, bids, asks, Some(8 -> 2))
+  private val orderBookResult = HttpOrderBook(0, wavesUsdPair, bids, asks, Some(8 -> 2))
 
   "backward JSON compatibility" - {
     "deserialization" in {
@@ -43,7 +43,7 @@ class ApiV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWithI
     }
 
     "serialization" in {
-      Json.prettyPrint(Json.parse(OrderBookResult toJson orderBookResult)) should matchTo(json)
+      Json.prettyPrint(Json.parse(HttpOrderBook toJson orderBookResult)) should matchTo(json)
     }
   }
 }

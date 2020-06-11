@@ -150,9 +150,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
-  private def withCancelRequest(f: CancelOrderRequest => Route): Route =
+  private def withCancelRequest(f: HttpCancelOrder => Route): Route =
     post {
-      entity(as[CancelOrderRequest]) { req =>
+      entity(as[HttpCancelOrder]) { req =>
         if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
@@ -503,7 +503,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.HttpCancelOrder"
       )
     )
   )
@@ -531,7 +531,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.HttpCancelOrder"
       )
     )
   )
@@ -620,13 +620,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.dex.api.CancelOrderRequest"
+        dataType = "com.wavesplatform.dex.api.HttpCancelOrder"
       )
     )
   )
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
     post {
-      entity(as[CancelOrderRequest]) { req =>
+      entity(as[HttpCancelOrder]) { req =>
         complete {
           req.orderId.fold[MatcherResponse](NotImplemented(error.FeatureNotImplemented))(OrderDeleted)
         }
@@ -1047,7 +1047,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @inline
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
       f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
-    (addressActor ? AddressDirectory.Envelope(sender, msg))
+    (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
       .mapTo[A]
       .map(f)
       .recover {
@@ -1065,7 +1065,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   @inline
   private def askAddressActor(sender: Address, msg: AddressActor.Message)(handleResponse: LogicResponseHandler): Future[ToResponseMarshallable] = {
-    (addressActor ? AddressDirectory.Envelope(sender, msg))
+    (addressActor ? AddressDirectoryActor.Envelope(sender, msg))
       .map(handleResponse.orElse(handleUnknownResponse))
       .recover {
         case e: AskTimeoutException =>

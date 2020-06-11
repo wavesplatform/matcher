@@ -5,7 +5,7 @@ import akka.pattern.ask
 import akka.testkit.TestProbe
 import akka.util.Timeout
 import com.wavesplatform.dex.AddressActor.Command.PlaceOrder
-import com.wavesplatform.dex.AddressDirectory.Envelope
+import com.wavesplatform.dex.AddressDirectoryActor.Envelope
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB, WithDB}
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -84,7 +84,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   private val addressDir = system.actorOf(
     Props(
-      new AddressDirectory(
+      new AddressDirectoryActor(
         EmptyOrderDB,
         createAddressActor,
         None
@@ -118,7 +118,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
   private def openVolume(senderPublicKey: PublicKey, assetId: Asset, addressDirectory: ActorRef = addressDir): Long = {
     Await
       .result(
-        (addressDirectory ? AddressDirectory
+        (addressDirectory ? AddressDirectoryActor
           .Envelope(senderPublicKey, AddressActor.Query.GetReservedBalance)).mapTo[AddressActor.Reply.Balance].map(_.balance),
         Duration.Inf
       )
@@ -471,7 +471,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
     lazy val addressDir = system.actorOf(
       Props(
-        new AddressDirectory(
+        new AddressDirectoryActor(
           new TestOrderDB(100),
           createAddressActor,
           None

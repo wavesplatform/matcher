@@ -12,7 +12,7 @@ import cats.syntax.option._
 import cats.{Id, catsInstancesForId}
 import com.github.ghik.silencer.silent
 import com.softwaremill.diffx._
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.api.ws.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli.ScoptImplicits
 import com.wavesplatform.dex.domain.account.AddressScheme
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -159,7 +159,8 @@ object WavesDexLoadCli extends ScoptImplicits {
             }
             command match {
               case Command.CreateRequests =>
-                TankGenerator.mkRequests(args.seedPrefix, args.pairsFile, args.requestsFile, args.requestsCount, args.requestsType, args.accountsNumber)
+                TankGenerator
+                  .mkRequests(args.seedPrefix, args.pairsFile, args.requestsFile, args.requestsCount, args.requestsType, args.accountsNumber)
 
               case Command.DeleteRequests =>
                 RequestDeleter.delRequests(args.requestsFile, args.requestsCount)
@@ -345,8 +346,8 @@ object WavesDexLoadCli extends ScoptImplicits {
   // The compiler is lie! This is used in WsOrder.id
   @silent("never used") private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
 
-  private implicit val wsAddressStateDiff: Diff[WsAddressState] = Derived[Diff[WsAddressState]].ignore(_.timestamp).ignore(_.updateId)
-  private implicit val wsOrderBookDiff: Diff[WsOrderBook]       = Derived[Diff[WsOrderBook]].ignore(_.timestamp).ignore(_.updateId)
+  private implicit val wsAddressChangesDiff: Diff[WsAddressChanges]     = Derived[Diff[WsAddressChanges]].ignore(_.timestamp).ignore(_.updateId)
+  private implicit val wsOrderBookChangesDiff: Diff[WsOrderBookChanges] = Derived[Diff[WsOrderBookChanges]].ignore(_.timestamp).ignore(_.updateId)
 
   private def getDiff[T](comparison: (T, T) => Boolean): Diff[T] = { (left: T, right: T, _: List[FieldPath]) =>
     if (comparison(left, right)) Identical(left) else DiffResultValue(left, right)

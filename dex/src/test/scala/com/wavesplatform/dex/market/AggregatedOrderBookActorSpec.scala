@@ -14,7 +14,7 @@ import akka.testkit.TestProbe
 import cats.data.NonEmptyList
 import com.wavesplatform.dex.NoShrink
 import com.wavesplatform.dex.actors.OrderBookAskAdapter
-import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
+import com.wavesplatform.dex.api.ws.{WsMessage, WsOrderBookChanges, WsOrderBookSettings}
 import com.wavesplatform.dex.api.{ApiV0LevelAgg, ApiV0OrderBook}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -368,7 +368,7 @@ class AggregatedOrderBookActorSpec
         val wsEventsProbe: TypedTestProbe[WsMessage] = testKit.createTestProbe[WsMessage]()
 
         def checkOrderBookSettingsInSnapshot(maybeRestrictions: Option[OrderRestrictionsSettings], tickSize: Double): Unit = {
-          val snapshot = wsEventsProbe.expectMessageType[WsOrderBook]
+          val snapshot = wsEventsProbe.expectMessageType[WsOrderBookChanges]
           snapshot.updateId shouldBe 0
           snapshot.asks shouldBe empty
           snapshot.bids shouldBe empty
@@ -395,7 +395,7 @@ class AggregatedOrderBookActorSpec
           checkOrderBookSettingsInSnapshot(restrictions, tickSize)
 
           aoba ! Command.ApplyChanges(LevelAmounts.empty, None, tickSize = Some(0.30), ts = 10L)
-          val changes = wsEventsProbe.expectMessageType[WsOrderBook]
+          val changes = wsEventsProbe.expectMessageType[WsOrderBookChanges]
 
           changes.updateId shouldBe 1
           changes.asks shouldBe empty

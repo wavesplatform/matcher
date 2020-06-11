@@ -303,7 +303,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
-        new AddressDirectory(
+        new AddressDirectoryActor(
           orderDB,
           createAddressActor,
           historyRouter
@@ -431,10 +431,10 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       CreateExchangeTransactionActor.name
     )
 
-    actorSystem.actorOf(MatcherTransactionWriter.props(db), MatcherTransactionWriter.name)
+    actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
     actorSystem.actorOf(
-      ExchangeTransactionBroadcastActor
+      BroadcastExchangeTransactionActor
         .props(
           settings.exchangeTransactionBroadcast,
           time,
@@ -491,7 +491,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield {
       log.info("Last offset has been reached, notify addresses")
       log.info(s"DEX server is connected to Node with an address: ${connectedNodeAddress.getHostAddress}")
-      addressActors ! AddressDirectory.StartSchedules
+      addressActors ! AddressDirectoryActor.StartSchedules
     }
 
     startGuard.onComplete {

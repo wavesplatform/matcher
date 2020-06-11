@@ -38,7 +38,7 @@ import com.wavesplatform.dex.gen.issuedAssetIdGen
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor._
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
-import com.wavesplatform.dex.market.{AggregatedOrderBookActor, MatcherTransactionWriter}
+import com.wavesplatform.dex.market.{AggregatedOrderBookActor, WriteExchangeTransactionActor}
 import com.wavesplatform.dex.model.MatcherModel.Denormalized
 import com.wavesplatform.dex.model.{LimitOrder, OrderInfo, OrderStatus, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
@@ -569,7 +569,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       "returns that an order was canceled" in test(
         { route =>
           val unsignedRequest =
-            CancelOrderRequest(okOrderSenderPrivateKey.publicKey, Some(okOrder.id()), timestamp = None, signature = Array.emptyByteArray)
+            HttpCancelOrder(okOrderSenderPrivateKey.publicKey, Some(okOrder.id()), timestamp = None, signature = Array.emptyByteArray)
           val signedRequest = unsignedRequest.copy(signature = crypto.sign(okOrderSenderPrivateKey, unsignedRequest.toSign))
 
           Post(routePath(s"/orderbook/${okOrder.assetPair.amountAssetStr}/${okOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
@@ -582,7 +582,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       "returns an error" in test(
         { route =>
           val unsignedRequest =
-            CancelOrderRequest(badOrderSenderPrivateKey.publicKey, Some(badOrder.id()), timestamp = None, signature = Array.emptyByteArray)
+            HttpCancelOrder(badOrderSenderPrivateKey.publicKey, Some(badOrder.id()), timestamp = None, signature = Array.emptyByteArray)
           val signedRequest = unsignedRequest.copy(signature = crypto.sign(badOrderSenderPrivateKey, unsignedRequest.toSign))
 
           Post(routePath(s"/orderbook/${badOrder.assetPair.amountAssetStr}/${badOrder.assetPair.priceAssetStr}/cancel"), signedRequest) ~> route ~> check {
@@ -604,7 +604,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "massive cancel" - {
       "returns canceled orders" in test(
         { route =>
-          val unsignedRequest = CancelOrderRequest(
+          val unsignedRequest = HttpCancelOrder(
             sender = okOrderSenderPrivateKey.publicKey,
             orderId = None,
             timestamp = Some(System.currentTimeMillis),
@@ -635,7 +635,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
       "returns an error" in test(
         { route =>
-          val unsignedRequest = CancelOrderRequest(
+          val unsignedRequest = HttpCancelOrder(
             sender = okOrderSenderPrivateKey.publicKey,
             orderId = None,
             timestamp = Some(System.currentTimeMillis()),
@@ -664,7 +664,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
   routePath("/orderbook/cancel") - {
     "returns canceled orders" in test(
       { route =>
-        val unsignedRequest = CancelOrderRequest(
+        val unsignedRequest = HttpCancelOrder(
           sender = okOrderSenderPrivateKey.publicKey,
           orderId = None,
           timestamp = Some(System.currentTimeMillis),
@@ -1075,7 +1075,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    val orderKey = MatcherKeys.order(okOrder.id())
+    val orderKey = DbKeys.order(okOrder.id())
     db.put(orderKey.keyBytes, orderKey.encode(Some(okOrder)))
   }
 
@@ -1084,7 +1084,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     val addressActor = TestProbe("address")
     addressActor.setAutoPilot { (sender: ActorRef, msg: Any) =>
       val response = msg match {
-        case AddressDirectory.Envelope(_, msg) =>
+        case AddressDirectoryActor.Envelope(_, msg) =>
           msg match {
             case AddressActor.Query.GetReservedBalance => AddressActor.Reply.Balance(Map(Waves -> 350L))
             case PlaceOrder(x, _)                      => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
@@ -1172,7 +1172,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           }
 
           val entity =
-            OrderBookResult(
+            HttpOrderBook(
               0L,
               smartWavesPair,
               smartWavesAggregatedSnapshot.bids,
@@ -1184,7 +1184,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             HttpResponse(
               entity = HttpEntity(
                 ContentTypes.`application/json`,
-                OrderBookResult.toJson(entity)
+                HttpOrderBook.toJson(entity)
               )
             )
 
@@ -1213,11 +1213,11 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
           )
           .explicitGet()
 
-      val txKey = MatcherKeys.exchangeTransaction(tx.id())
+      val txKey = DbKeys.exchangeTransaction(tx.id())
       if (!rw.has(txKey)) {
         rw.put(txKey, Some(tx))
-        MatcherTransactionWriter.appendTxId(rw, tx.buyOrder.id(), tx.id())
-        MatcherTransactionWriter.appendTxId(rw, tx.sellOrder.id(), tx.id())
+        WriteExchangeTransactionActor.appendTxId(rw, tx.buyOrder.id(), tx.id())
+        WriteExchangeTransactionActor.appendTxId(rw, tx.sellOrder.id(), tx.id())
       }
     }
 

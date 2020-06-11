@@ -4,15 +4,15 @@ import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
-import com.wavesplatform.dex.api.websockets.{WsError, WsOrderBook, WsServerMessage}
+import com.wavesplatform.dex.api.ws.{WsError, WsOrderBookChanges, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
-import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
+import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, HttpOrderBook, Side}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.{OrderBookWsState, error}
+import com.wavesplatform.dex.{WsOrderBookState, error}
 import monocle.macros.GenLens
 
 import scala.collection.immutable.TreeMap
@@ -33,8 +33,8 @@ object AggregatedOrderBookActor {
   sealed trait Command extends Message
   object Command {
     case class ApplyChanges(levelChanges: LevelAmounts, lastTrade: Option[LastTrade], tickSize: Option[Double], ts: Long) extends Command
-    case class AddWsSubscription(client: ActorRef[WsOrderBook])                                                           extends Command
-    case class RemoveWsSubscription(client: ActorRef[WsOrderBook])                                                        extends Command
+    case class AddWsSubscription(client: ActorRef[WsOrderBookChanges])                                                           extends Command
+    case class RemoveWsSubscription(client: ActorRef[WsOrderBookChanges])                                                        extends Command
     private[AggregatedOrderBookActor] case object SendWsUpdates                                                           extends Command
   }
 
@@ -97,7 +97,7 @@ object AggregatedOrderBookActor {
               if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
               val ob = state.toOrderBookAggregatedSnapshot
 
-              client ! WsOrderBook.from(
+              client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
                 amountDecimals = amountDecimals,
                 priceDecimals = priceDecimals,
@@ -138,7 +138,7 @@ object AggregatedOrderBookActor {
               Behaviors.stopped
           }
           .receiveSignal {
-            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws.unsafeUpcast[WsOrderBook]) }
+            case (_, Terminated(ws)) => default { state.modifyWs(_ withoutSubscription ws.unsafeUpcast[WsOrderBookChanges]) }
           }
 
       default(init)
@@ -151,7 +151,7 @@ object AggregatedOrderBookActor {
     }
 
     val entity =
-      OrderBookResult(
+      HttpOrderBook(
         state.lastUpdateTs,
         assetPair,
         state.bids.take(depth).map { case (price, amount) => LevelAgg(amount, price) }.toList,
@@ -162,7 +162,7 @@ object AggregatedOrderBookActor {
     HttpResponse(
       entity = HttpEntity(
         ContentTypes.`application/json`,
-        OrderBookResult.toJson(entity)
+        HttpOrderBook.toJson(entity)
       )
     )
   }
@@ -173,7 +173,7 @@ object AggregatedOrderBookActor {
       lastTrade: Option[LastTrade],
       lastUpdateTs: Long,
       compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-      ws: OrderBookWsState
+      ws: WsOrderBookState
   ) {
 
     val genLens: GenLens[State] = GenLens[State]
@@ -201,7 +201,7 @@ object AggregatedOrderBookActor {
     def modifyHttpView(f: Map[(DecimalsFormat, Depth), HttpResponse] => Map[(DecimalsFormat, Depth), HttpResponse]): State =
       genLens(_.compiledHttpView).modify(f)(this)
 
-    def modifyWs(f: OrderBookWsState => OrderBookWsState): State = genLens(_.ws).modify(f)(this)
+    def modifyWs(f: WsOrderBookState => WsOrderBookState): State = genLens(_.ws).modify(f)(this)
   }
 
   object State {
@@ -213,7 +213,7 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = OrderBookWsState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None)
+        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None)
       )
 
     def fromOrderBook(ob: OrderBook): State = State(

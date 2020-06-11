@@ -6,8 +6,8 @@ import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestPr
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.websockets
-import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.ws
+import com.wavesplatform.dex.api.ws._
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -69,7 +69,7 @@ class ActorsWebSocketInteractionsSpecification
       } else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
     }
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
 
     lazy val spendableBalancesActor =
       system.actorOf(
@@ -93,17 +93,17 @@ class ActorsWebSocketInteractionsSpecification
       )
     }
 
-    def subscribe(): Unit = addressDir ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
+    def subscribe(): Unit = addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(wsEventsProbe.ref))
 
     def placeOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       eventsProbe.expectMsg(ao match { case lo: LimitOrder => QueueEvent.Placed(lo); case mo: MarketOrder => QueueEvent.PlacedMarket(mo) })
       addressDir ! OrderAdded(ao, System.currentTimeMillis)
     }
 
     def cancelOrder(ao: AcceptedOrder, isSystemCancel: Boolean): Unit = {
       if (ao.isLimit) {
-        addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.CancelOrder(ao.id))
+        addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.CancelOrder(ao.id))
         eventsProbe.expectMsg(QueueEvent.Canceled(ao.order.assetPair, ao.id))
       }
       addressDir ! OrderCanceled(ao, isSystemCancel, System.currentTimeMillis)
@@ -132,10 +132,10 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder], expectedUpdateId: Long): Unit = {
-      val wsAddressState = wsEventsProbe.expectMessageType[WsAddressState]
-      wsAddressState.balances should matchTo(expectedBalances)
-      wsAddressState.orders should matchTo(expectedOrders)
-      wsAddressState.updateId should matchTo(expectedUpdateId)
+      val wsAddressChanges = wsEventsProbe.expectMessageType[WsAddressChanges]
+      wsAddressChanges.balances should matchTo(expectedBalances)
+      wsAddressChanges.orders should matchTo(expectedOrders)
+      wsAddressChanges.updateId should matchTo(expectedUpdateId)
     }
 
     f(
@@ -378,12 +378,12 @@ class ActorsWebSocketInteractionsSpecification
         val tradableBalance = Map(Waves -> 100.waves, usd -> 300.usd, eth -> 2.eth)
         updateBalances(tradableBalance)
 
-        def subscribe(tp: TypedTestProbe[WsMessage]): Unit = ad ! AddressDirectory.Envelope(address, AddressActor.WsCommand.AddWsSubscription(tp.ref))
+        def subscribe(tp: TypedTestProbe[WsMessage]): Unit = ad ! AddressDirectoryActor.Envelope(address, AddressActor.WsCommand.AddWsSubscription(tp.ref))
 
         def expectWsBalance(tp: TypedTestProbe[WsMessage], expected: Map[Asset, WsBalances], expectedUpdateId: Long): Unit = {
-          val wsAddressState = tp.expectMessageType[WsAddressState]
-          wsAddressState.balances should matchTo(expected)
-          wsAddressState.updateId should matchTo(expectedUpdateId)
+          val wsAddressChanges = tp.expectMessageType[WsAddressChanges]
+          wsAddressChanges.balances should matchTo(expected)
+          wsAddressChanges.updateId should matchTo(expectedUpdateId)
         }
 
         val webSubscription, mobileSubscription, desktopSubscription = testKit.createTestProbe[WsMessage]()
@@ -462,7 +462,7 @@ class ActorsWebSocketInteractionsSpecification
           val now = System.currentTimeMillis()
           ad ! OrderAdded(counter, now)
 
-          ad ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
+          ad ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(submitted.order, submitted.isMarket))
           ep.expectMsg(QueueEvent.Placed(submitted))
 
           ad ! OrderAdded(submitted, now)
@@ -696,8 +696,8 @@ class ActorsWebSocketInteractionsSpecification
     "reply with error message if node is unavailable" in webSocketTest {
       (ad, ep, wsp, _, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
         val bob = mkKeyPair("bob")
-        ad ! AddressDirectory.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
-        wsp.expectMessageType[WsError] should matchTo(websockets.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
+        ad ! AddressDirectoryActor.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
+        wsp.expectMessageType[WsError] should matchTo(ws.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
     }
   }
 }

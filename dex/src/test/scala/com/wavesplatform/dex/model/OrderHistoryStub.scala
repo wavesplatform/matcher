@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.queue.QueueEventWithMeta
 import com.wavesplatform.dex.time.Time
-import com.wavesplatform.dex.{AddressActor, AddressDirectory, SpendableBalancesActor}
+import com.wavesplatform.dex.{AddressActor, AddressDirectoryActor, SpendableBalancesActor}
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -47,7 +47,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
 
   lazy val addressDir = system.actorOf(
     Props(
-      new AddressDirectory(
+      new AddressDirectoryActor(
         EmptyOrderDB,
         createAddressActor,
         None

@@ -6,7 +6,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
 import com.wavesplatform.dex.api.ApiOrderStatus
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.api.ws.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
@@ -176,7 +176,7 @@ case class Checker(superConnector: SuperConnector) {
     dexWs.subscribeForOrderBookUpdates(assetPairInfo.assetPair).map { snapshot =>
       s"""\n
          |    Got snapshot for ${assetPairInfo.assetPairName} pair:
-         |    ${WsOrderBook.wsOrderBookStateFormat.writes(snapshot).toString}\n
+         |    ${WsOrderBookChanges.wsOrderBookChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }
 
@@ -187,7 +187,7 @@ case class Checker(superConnector: SuperConnector) {
         snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
       } yield s"""\n
            |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address${maybeSeed.fold(" (key pair randomly generated)")(_ => "")}:
-           |    ${WsAddressState.wsAddressStateFormat.writes(snapshot).toString}\n
+           |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }
   }

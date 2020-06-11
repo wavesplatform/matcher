@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
-import com.wavesplatform.dex.api.websockets.WsError
+import com.wavesplatform.dex.api.ws.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.KeyPair

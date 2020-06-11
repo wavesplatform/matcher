@@ -3,9 +3,9 @@ package com.wavesplatform.dex.tool.connectors
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import cats.syntax.either._
-import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.connection.WsConnection
-import com.wavesplatform.dex.api.websockets.connection.WsConnectionOps._
+import com.wavesplatform.dex.api.ws._
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.connection.WsConnectionOps._
 import com.wavesplatform.dex.cli.{ErrorOr, lift}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.tool.connectors.AuthServiceRestConnector.AuthCredentials
@@ -36,16 +36,16 @@ case class DexWsConnector private (target: String, wsc: WsConnection)(implicit s
       _         <- clearMessages()
     } yield wsInitial
 
-  def subscribeForOrderBookUpdates(assetPair: AssetPair): ErrorOr[WsOrderBook] =
+  def subscribeForOrderBookUpdates(assetPair: AssetPair): ErrorOr[WsOrderBookChanges] =
     for {
       _        <- lift { wsc.send(WsOrderBookSubscribe(assetPair, defaultDepth)) }
-      snapshot <- receiveAtLeastN[WsOrderBook](1).bimap(ex => s"Cannot get order book snapshot! $ex", _.head)
+      snapshot <- receiveAtLeastN[WsOrderBookChanges](1).bimap(ex => s"Cannot get order book snapshot! $ex", _.head)
     } yield snapshot
 
-  def subscribeForAccountUpdates(credentials: AuthCredentials): ErrorOr[WsAddressState] =
+  def subscribeForAccountUpdates(credentials: AuthCredentials): ErrorOr[WsAddressChanges] =
     for {
       _        <- lift { wsc.send(WsAddressSubscribe(credentials.keyPair, WsAddressSubscribe.defaultAuthType, credentials.token)) }
-      snapshot <- receiveAtLeastN[WsAddressState](1).bimap(ex => s"Cannot get account snapshot! $ex", _.head)
+      snapshot <- receiveAtLeastN[WsAddressChanges](1).bimap(ex => s"Cannot get account snapshot! $ex", _.head)
     } yield snapshot
 
   def clearMessages(): ErrorOr[Unit] = lift { wsc.clearMessages() }

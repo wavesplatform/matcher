@@ -360,20 +360,20 @@ class OrderBookTestSuite
   }
 
   "LimitOrder serialization" in forAll(limitOrderGenerator) { x =>
-    import OrderBookSideSnapshot.{encodeLoV1, encodeLoV2}
+    import OrderBookSideSnapshotCodecs.{encodeLoV1, encodeLoV2}
     Seq(encodeLoV1 _, encodeLoV2 _).foreach { encode =>
       val dest = new mutable.ArrayBuilder.ofByte
       encode(dest, x)
       val bb = ByteBuffer.wrap(dest.result())
-      OrderBookSideSnapshot.decodeLo(bb) should matchTo(x)
+      OrderBookSideSnapshotCodecs.decodeLo(bb) should matchTo(x)
     }
   }
 
   "OrderBookSideSnapshot serialization" in forAll(sideSnapshotSerGen) { x =>
     val dest = new mutable.ArrayBuilder.ofByte
-    OrderBookSideSnapshot.encode(dest, x)
+    OrderBookSideSnapshotCodecs.encode(dest, x)
     val bb = ByteBuffer.wrap(dest.result())
-    OrderBookSideSnapshot.decode(bb) should matchTo(x)
+    OrderBookSideSnapshotCodecs.decode(bb) should matchTo(x)
   }
 
   "LastTrade serialization" in forAll(lastTradeGen) { x =>

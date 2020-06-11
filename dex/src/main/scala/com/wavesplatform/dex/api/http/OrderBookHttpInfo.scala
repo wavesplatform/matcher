@@ -8,7 +8,7 @@ import com.wavesplatform.dex.api.MatcherResponse.toHttpResponse
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.Depth
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
-import com.wavesplatform.dex.model.OrderBookResult
+import com.wavesplatform.dex.model.HttpOrderBook
 import com.wavesplatform.dex.time.Time
 import play.api.libs.json.Json
 
@@ -38,11 +38,11 @@ class OrderBookHttpInfo(settings: OrderBookHttpInfo.Settings, askAdapter: OrderB
     }
 
   private def getDefaultHttpView(assetPair: AssetPair, format: DecimalsFormat): HttpResponse = {
-    val entity = OrderBookResult(time.correctedTime(), assetPair, Seq.empty, Seq.empty, assetPairDecimals(assetPair, format))
+    val entity = HttpOrderBook(time.correctedTime(), assetPair, Seq.empty, Seq.empty, assetPairDecimals(assetPair, format))
     HttpResponse(
       entity = HttpEntity(
         ContentTypes.`application/json`,
-        OrderBookResult.toJson(entity)
+        HttpOrderBook.toJson(entity)
       )
     )
   }

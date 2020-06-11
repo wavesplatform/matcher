@@ -220,10 +220,10 @@ class AddressActorSpecification
       )
     }
 
-    lazy val addressDir = system.actorOf(Props(new AddressDirectory(EmptyOrderDB, createAddressActor, None)))
+    lazy val addressDir = system.actorOf(Props(new AddressDirectoryActor(EmptyOrderDB, createAddressActor, None)))
 
     def addOrder(ao: AcceptedOrder): Unit = {
-      addressDir ! AddressDirectory.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
+      addressDir ! AddressDirectoryActor.Envelope(address, AddressActor.Command.PlaceOrder(ao.order, ao.isMarket))
       ao match {
         case lo: LimitOrder =>
           eventsProbe.expectMsg(QueueEvent.Placed(lo))

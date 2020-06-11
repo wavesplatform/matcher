@@ -6,7 +6,7 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.util.Codecs.ByteBufferExt
+import com.wavesplatform.dex.util.ByteBufferCodecs.ByteBufferExt
 
 sealed trait OrderInfo[+S <: OrderStatus] {
   def version: Byte

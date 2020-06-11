@@ -91,7 +91,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
           if (fullState contains address) fullState = fullState.updated(address, knownBalance ++ clean)
           else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ clean)
 
-          addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(clean, forAudit))
+          addressDirectory ! AddressDirectoryActor.Envelope(address, AddressActor.Message.BalanceChanged(clean, forAudit))
       }
 
     // Subtract is called when there is a web socket connection and thus we have `fullState` for this address

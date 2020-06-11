@@ -3,7 +3,7 @@ package com.wavesplatform.dex.load.ws
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.ws.{InvalidUpgradeResponse, ValidUpgrade}
 import cats.syntax.option._
-import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.ws._
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -18,17 +18,17 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
 
   private val log = LoggerFactory.getLogger(s"WsApiClient[$address]")
 
-  private val emptyWsAddresState: WsAddressState = WsAddressState(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
+  private val emptyWsAddresState: WsAddressChanges = WsAddressChanges(Address.fromString(address).explicitGet(), Map.empty, Seq.empty, 0L)
   @volatile private var accountUpdates           = emptyWsAddresState
-  private val orderBookUpdates                   = mutable.AnyRefMap.empty[AssetPair, WsOrderBook]
+  private val orderBookUpdates                   = mutable.AnyRefMap.empty[AssetPair, WsOrderBookChanges]
   @volatile private var gotPings                 = 0
 
   private val receive: Function[WsServerMessage, Option[WsClientMessage]] = {
     case x: WsPingOrPong      => gotPings += 1; x.some
     case x: WsInitial         => log.info(s"Connection id: ${x.connectionId}"); none
     case x: WsError           => log.error(s"Got error: $x"); throw new RuntimeException(s"Got $x")
-    case diff: WsAddressState => accountUpdates = merge(accountUpdates, diff); none
-    case diff: WsOrderBook =>
+    case diff: WsAddressChanges => accountUpdates = merge(accountUpdates, diff); none
+    case diff: WsOrderBookChanges =>
       val updatedOb = orderBookUpdates.get(diff.assetPair) match {
         case Some(origOb) => merge(origOb, diff)
         case None         => diff
@@ -37,7 +37,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
       none
   }
 
-  private def merge(orig: WsAddressState, diff: WsAddressState): WsAddressState = WsAddressState(
+  private def merge(orig: WsAddressChanges, diff: WsAddressChanges): WsAddressChanges = WsAddressChanges(
     address = diff.address,
     balances = orig.balances ++ diff.balances,
     orders = diff.orders.foldLeft(orig.orders) {
@@ -67,7 +67,7 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     avgWeighedPrice = orig.avgWeighedPrice.orElse(diff.avgWeighedPrice)
   )
 
-  private def merge(orig: WsOrderBook, diff: WsOrderBook): WsOrderBook = WsOrderBook(
+  private def merge(orig: WsOrderBookChanges, diff: WsOrderBookChanges): WsOrderBookChanges = WsOrderBookChanges(
     assetPair = orig.assetPair,
     asks = orig.asks ++ diff.asks,
     bids = orig.bids ++ diff.bids,
@@ -90,8 +90,8 @@ class WsCollectChangesClient(apiUri: String, address: String, aus: String, obs: 
     }
   }
 
-  def collectedAddressState: WsAddressState            = accountUpdates
-  def collectedOrderBooks: Map[AssetPair, WsOrderBook] = orderBookUpdates.toMap
+  def collectedAddressState: WsAddressChanges            = accountUpdates
+  def collectedOrderBooks: Map[AssetPair, WsOrderBookChanges] = orderBookUpdates.toMap
   def pingsNumber: Int                                 = gotPings
 
   def close(): Future[Unit] =

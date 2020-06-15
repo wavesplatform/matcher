@@ -55,7 +55,7 @@ object Dependencies {
     val playJson = "2.8.1"
 
     val googleGuava = "28.2-jre"
-    val kafka       = "2.4.0"
+    val kafka       = "2.5.0"
 
     val swagger   = "1.1.1"
     val swaggerUi = "3.24.3"

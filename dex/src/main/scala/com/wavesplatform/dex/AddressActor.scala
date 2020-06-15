@@ -180,7 +180,6 @@ class AddressActor(owner: Address,
       sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
     case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
-      log.trace(s"Got $storeFailed")
       failedPlacements.add(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! CanNotPersist(reason)
@@ -509,11 +508,15 @@ class AddressActor(owner: Address,
         case Success(None) => Success(Some(error.FeatureDisabled))
         case Success(_)    => Success(None)
         case Failure(e) =>
-          e match {
-            case _: TimeoutException            => log.warn(s"Timeout during storing $event for $orderId")
-            case _: CircuitBreakerOpenException => log.warn("Fail fast due to circuit breaker")
-            case _                              =>
-          }
+          val prefix = s"Store failed for $orderId, $event"
+          log.warn(
+            e match {
+              case _: TimeoutException            => s"$prefix: timeout during storing $event for $orderId"
+              case _: CircuitBreakerOpenException => s"$prefix: fail fast due to circuit breaker"
+              case _                              => prefix
+            },
+            e
+          )
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {

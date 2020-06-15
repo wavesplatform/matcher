@@ -181,8 +181,8 @@ ${formatEvents(events)}
 """
 
         withClue(clue) {
-          obInvariant(ob)
-          obInvariant(updatedOb)
+          obAskBidIntersectionInvariant(ob)
+          obAskBidIntersectionInvariant(updatedOb)
         }
     }
 
@@ -258,7 +258,7 @@ $updatedSnapshot
     }
 
     "order book invariant" in test(removedGen) { (_, _, obAfter, _, _) =>
-      obInvariant(obAfter)
+      obAskBidIntersectionInvariant(obAfter)
     }
 
     "no other order was removed" in test(removedGen) { (ob, orderIdToCancel, obAfter, _, _) =>
@@ -354,7 +354,7 @@ ${canceledOrders.mkString("\n")}
     }
   }
 
-  private def obInvariant(ob: OrderBook): Unit = {
+  private def obAskBidIntersectionInvariant(ob: OrderBook): Unit = {
     val firstAskPrice = ob.asks.headOption.map(_._1).getOrElse(Long.MaxValue)
     val firstBidPrice = ob.bids.headOption.map(_._1).getOrElse(Long.MinValue)
     firstAskPrice should be > firstBidPrice

@@ -13,7 +13,7 @@ import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
-import com.wavesplatform.it.tags.DexItKafkaRequired
+import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 import org.scalacheck.Gen
 
 import scala.concurrent.duration.DurationInt
@@ -21,7 +21,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 import scala.util.control.NonFatal
 
-@DexItKafkaRequired
+@DexItExternalKafkaRequired
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config =

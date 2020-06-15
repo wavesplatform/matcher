@@ -45,7 +45,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
   protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
-    dex1.api.waitForTransactionsByOrder(orderId, 1).unsafeTap {
+    dexApi.waitForTransactionsByOrder(orderId, 1).unsafeTap {
       _.foreach(tx => wavesNodeApi.waitForTransaction(tx.getId))
     }
 

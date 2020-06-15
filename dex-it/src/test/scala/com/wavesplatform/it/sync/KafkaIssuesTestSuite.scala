@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.github.dockerjava.api.model.{ContainerNetwork, NetworkSettings}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -12,18 +11,34 @@ import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus => ApiOrderStatus
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
-import com.wavesplatform.it.tags.DexItKafkaRequired
 
-import scala.collection.JavaConverters._
+import scala.concurrent.duration.DurationInt
 
-@DexItKafkaRequired
 class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
+
+  private val deliveryTimeout = 1100.millis
+  private val resetTimeout    = 2.seconds
+  private val maxFailures     = 5
+
+  // Hacks, see DEX-794
+  private val connectionIdleTimeout   = deliveryTimeout + 1.second
+  private val waitAfterNetworkChanges = connectionIdleTimeout * 2
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex { 
   price-assets = [ "$UsdId", "WAVES" ]
-  events-queue.kafka.producer.client {
-    request.timeout.ms = 1000
-    delivery.timeout.ms = 1100
+  events-queue {
+    kafka.producer.client {
+      acks = 1
+      request.timeout.ms = 1000
+      delivery.timeout.ms = ${deliveryTimeout.toMillis}
+      retry.backoff.ms = 2000
+      connections.max.idle.ms = ${connectionIdleTimeout.toMillis}
+    }
+
+    circuit-breaker {
+      max-failures = $maxFailures
+      reset-timeout = ${resetTimeout.toMillis}ms
+    }
   }
 }""")
 
@@ -37,7 +52,31 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.start()
   }
 
-  private val networkId = kafka.network.getId
+  "Matcher should able to restore the work after kafka issues solved" in {
+    placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0))
+
+    disconnectKafkaFromNetwork()
+    Thread.sleep(waitAfterNetworkChanges.toMillis)
+
+    val offsetBefore = dex1.api.currentOffset
+
+    (1 to maxFailures).foreach { i =>
+      dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, i.waves, 3.0)) shouldBe 'left
+    }
+    Thread.sleep(deliveryTimeout.toMillis)
+    Thread.sleep(resetTimeout.toMillis)
+
+    connectKafkaToNetwork()
+    Thread.sleep(waitAfterNetworkChanges.toMillis)
+
+    withClue("Messages weren't saved to the queue") {
+      dex1.api.currentOffset shouldBe offsetBefore
+    }
+
+    // dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe 'right
+
+    dex1.api.cancelAll(alice)
+  }
 
   "Matcher should free reserved balances if order wasn't placed into the queue" in {
 
@@ -51,7 +90,6 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     val sellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 10.waves, 3.0)
     placeAndAwaitAtDex(sellOrder)
 
-    dex1.api.currentOffset shouldBe 0
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac) { Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)) } {
@@ -59,6 +97,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     }
 
     disconnectKafkaFromNetwork()
+    Thread.sleep(waitAfterNetworkChanges.toMillis)
 
     dex1.api.tryCancel(alice, sellOrder) shouldBe 'left
 
@@ -77,6 +116,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     oh.head.id shouldBe sellOrder.id()
 
     connectKafkaToNetwork()
+    Thread.sleep(waitAfterNetworkChanges.toMillis)
 
     dex1.api.tryCancel(alice, sellOrder) shouldBe 'right
     dex1.api.waitForOrderStatus(sellOrder, ApiOrderStatus.Cancelled)
@@ -101,40 +141,4 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.api.cancelAll(alice)
     wsac.close()
   }
-
-  private def disconnectKafkaFromNetwork(): Unit = {
-    writeGlobalLog("--- Disconnecting Kafka from the network ---")
-    kafka.dockerClient
-      .disconnectFromNetworkCmd()
-      .withContainerId(kafka.containerId)
-      .withNetworkId(networkId)
-      .exec()
-
-    waitForNetworkSettings(_.getNetworks.containsKey(networkId))
-  }
-
-  private def connectKafkaToNetwork(): Unit = {
-    writeGlobalLog("--- Connecting Kafka to the network ---")
-    kafka.dockerClient
-      .connectToNetworkCmd()
-      .withContainerId(kafka.containerId)
-      .withNetworkId(networkId)
-      .withContainerNetwork(
-        new ContainerNetwork()
-          .withIpamConfig(new ContainerNetwork.Ipam().withIpv4Address(kafkaIp))
-          .withAliases(kafka.networkAliases.asJava))
-      .exec()
-
-    waitForNetworkSettings(!_.getNetworks.containsKey(networkId))
-  }
-
-  private def waitForNetworkSettings(pred: NetworkSettings => Boolean): Unit =
-    Iterator
-      .continually {
-        Thread.sleep(1000)
-        kafka.dockerClient.inspectContainerCmd(kafka.containerId).exec().getNetworkSettings
-      }
-      .zipWithIndex
-      .find { case (ns, attempt) => pred(ns) || attempt == 10 }
-      .fold(log.warn(s"Can't wait on ${kafka.containerId}"))(_ => ())
 }

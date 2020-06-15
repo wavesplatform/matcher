@@ -6,9 +6,9 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.tags.DexItKafkaRequired
+import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 
-@DexItKafkaRequired
+@DexItExternalKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
@@ -49,25 +49,25 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
     dex1.api.saveSnapshots
     dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.events-queue.type = local").withFallback(dexInitialSuiteConfig))
-    // HACK: Because we switched the queue, we need to place 5 orders to move offset of queue
-    (1 to 5).foreach { i =>
-      val order = mkOrderDP(acc3, ethWavesPair, OrderType.SELL, 1.eth, 1)
-      dex1.api.place(order)
+    // HACK: Because we switched the queue, we need to place 5 orders to move offset of queue.
+    // If we don't do this, internal cancels will be ignored by order books.
+    (1 to 5).foreach { _ =>
+      dex1.api.place(mkOrderDP(acc3, ethWavesPair, OrderType.SELL, 1.eth, 1))
     }
 
-    (1 to 3).foreach { amt =>
-      val order = mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
-      dex2.api.place(order)
-      dex2.api.waitForOrderStatus(order, OrderStatus.Filled)
+    val submittedOrders = (1 to 3).map { amt =>
+      mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
+    }
+    submittedOrders.foreach(placeAndAwaitAtDex(_, OrderStatus.Filled, dex2))
+    submittedOrders.foreach(waitForOrderAtNode(_, dex2.api))
+
+    (0 to 2).foreach { i =>
+      dex1.api.waitForOrderStatus(sellOrders(i), OrderStatus.Accepted)
     }
 
     // TODO problem solution should prevent sell orders from cancelling!
     (3 to 4).foreach { i =>
       dex1.api.waitForOrderStatus(sellOrders(i), OrderStatus.Cancelled)
-    }
-
-    (0 to 2).foreach { i =>
-      dex1.api.waitForOrderStatus(sellOrders(i), OrderStatus.Accepted)
     }
   }
 }

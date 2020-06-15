@@ -16,28 +16,26 @@ import scala.concurrent.duration.DurationInt
 
 class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
 
-  private val deliveryTimeout = 1100.millis
-  private val resetTimeout    = 2.seconds
-  private val maxFailures     = 5
+  private val requestTimeout = 15.seconds
+  private val maxFailures    = 5
 
   // Hacks, see DEX-794
-  private val connectionIdleTimeout   = deliveryTimeout + 1.second
-  private val waitAfterNetworkChanges = connectionIdleTimeout * 2
+  private val deliveryTimeout         = requestTimeout + 1.second
+  private val waitAfterNetworkChanges = deliveryTimeout
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex { 
   price-assets = [ "$UsdId", "WAVES" ]
   events-queue {
     kafka.producer.client {
       acks = 1
-      request.timeout.ms = 1000
+      request.timeout.ms = ${requestTimeout.toMillis}
       delivery.timeout.ms = ${deliveryTimeout.toMillis}
-      retry.backoff.ms = 2000
-      connections.max.idle.ms = ${connectionIdleTimeout.toMillis}
+      connections.max.idle.ms = ${deliveryTimeout.toMillis}
     }
 
     circuit-breaker {
       max-failures = $maxFailures
-      reset-timeout = ${resetTimeout.toMillis}ms
+      reset-timeout = 2000ms
     }
   }
 }""")
@@ -63,9 +61,8 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     (1 to maxFailures).foreach { i =>
       dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, i.waves, 3.0)) shouldBe 'left
     }
-    Thread.sleep(deliveryTimeout.toMillis)
-    Thread.sleep(resetTimeout.toMillis)
 
+    Thread.sleep(requestTimeout.toMillis)
     connectKafkaToNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 

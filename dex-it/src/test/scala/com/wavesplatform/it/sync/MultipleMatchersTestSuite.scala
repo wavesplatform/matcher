@@ -79,6 +79,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
 
     successfulCommandsNumber = executeCommands(places ++ cancels)
     successfulCommandsNumber += executeCommands(List(MatcherCommand.Place(dex1.asyncApi, lastOrder)))
+    log.info(s"Successful commands: $successfulCommandsNumber")
   }
 
   "Wait until all requests are processed" in {

@@ -63,7 +63,7 @@ object ExchangeTransactionV1 extends ExchangeTransactionParser[ExchangeTransacti
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, ExchangeTransactionV1] = {
-    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher, unverified.bodyBytes())))
     }
   }

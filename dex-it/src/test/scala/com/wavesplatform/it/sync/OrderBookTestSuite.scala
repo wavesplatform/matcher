@@ -64,7 +64,7 @@ class OrderBookTestSuite extends MatcherSuiteBase {
     aliceRBForBothPairs = reservedBalancesOf(alice)
     bobRBForBothPairs = reservedBalancesOf(bob)
 
-    dex1.api.tryDeleteOrderBook(wctUsdPair) shouldBe 'right
+    dex1.api.tryDeleteOrderBook(wctUsdPair) shouldBe Symbol("right")
   }
 
   "When delete order book" - {

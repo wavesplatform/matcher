@@ -80,7 +80,7 @@ object PbToWavesConversions {
   implicit class PbByteStringOps(val self: ByteString) extends AnyVal {
     def toVanilla: ByteStr        = ByteStr(self.toByteArray)
     def toVanillaAsset: Asset     = if (self.isEmpty) Asset.Waves else Asset.IssuedAsset(self.toVanilla)
-    def toVanillaAddress: Address = Address.fromBytes { self.toByteArray } explicitGetErr ()
+    def toVanillaAddress: Address = Address.fromBytes(self.toByteArray).explicitGetErr()
   }
 
   implicit class PbMaybeDescriptionOps(val self: MaybeDescription) extends AnyVal {

@@ -31,7 +31,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   private val wsBalancesGen = for {
     tradable <- maxWavesAmountGen
     reserved <- maxWavesAmountGen
-  } yield WsBalances(tradable, reserved)
+  } yield WsBalances(tradable.toDouble, reserved.toDouble)
 
   private val wsOrderGen = for {
     (order, _)    <- orderGenerator
@@ -152,7 +152,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
         format
           .reads(json)
           .fold(
-            e => throw PlayJsonException(None, e),
+            e => throw PlayJsonException(None, e.map { case (jp, errorsSeq) => jp -> errorsSeq.to(Seq) } to Seq),
             identity
           )
 

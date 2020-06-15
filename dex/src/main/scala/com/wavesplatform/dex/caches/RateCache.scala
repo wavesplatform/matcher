@@ -7,8 +7,8 @@ import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import org.iq80.leveldb.DB
 
-import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
+import scala.jdk.CollectionConverters._
 
 trait RateCache {
 

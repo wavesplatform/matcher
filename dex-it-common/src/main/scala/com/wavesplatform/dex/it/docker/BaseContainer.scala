@@ -16,8 +16,8 @@ import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 import org.testcontainers.images.builder.Transferable
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 
 abstract class BaseContainer(protected val baseContainerPath: String, private val underlying: GenericContainer)

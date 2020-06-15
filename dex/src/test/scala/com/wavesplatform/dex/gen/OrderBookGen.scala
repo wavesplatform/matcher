@@ -11,7 +11,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.model.{AcceptedOrder, BuyLimitOrder, BuyMarketOrder, LimitOrder, MarketOrder, OrderBook, OrderBookSnapshot, SellLimitOrder, SellMarketOrder}
 import org.scalacheck.Gen
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait OrderBookGen {
   val matcher = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8)))
@@ -55,7 +55,7 @@ trait OrderBookGen {
       orders <- Gen.sequence(prices.map { price =>
         Gen.resize(maxOrdersInLevel, Gen.nonEmptyListOf(limitOrderGen(orderGen(Gen.const(price), side))))
       })
-    } yield (levelNumber, orders.asScala.flatten)
+    } yield (levelNumber, orders.asScala.flatten.toSeq)
 
   def limitOrderGen(orderGen: Gen[Order]): Gen[LimitOrder] =
     for {

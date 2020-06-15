@@ -102,7 +102,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
-    r shouldBe 'left
+    r shouldBe Symbol("left")
     r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 
@@ -129,7 +129,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
-    r shouldBe 'left
+    r shouldBe Symbol("left")
     r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 }

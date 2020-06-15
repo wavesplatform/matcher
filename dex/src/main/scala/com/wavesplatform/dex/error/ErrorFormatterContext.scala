@@ -2,9 +2,9 @@ package com.wavesplatform.dex.error
 
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.Asset
-
 import scala.util.Try
 
+@FunctionalInterface
 trait ErrorFormatterContext {
   def assetDecimals(asset: Asset): Option[Int]
   def unsafeAssetDecimals(asset: Asset): Int = assetDecimals(asset) match {

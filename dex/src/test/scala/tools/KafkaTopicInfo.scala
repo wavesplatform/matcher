@@ -11,8 +11,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters._
 
 object KafkaTopicInfo extends App {
   implicit val system: ActorSystem = ActorSystem()

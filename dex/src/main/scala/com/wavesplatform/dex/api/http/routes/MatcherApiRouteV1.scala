@@ -68,7 +68,7 @@ case class MatcherApiRouteV1(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
-    parameters('depth.as[Int].?) { depth =>
+    parameters(Symbol("depth").as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
         complete { orderBookHttpInfo.getHttpView(pair, MatcherModel.Denormalized, depth) }
       }

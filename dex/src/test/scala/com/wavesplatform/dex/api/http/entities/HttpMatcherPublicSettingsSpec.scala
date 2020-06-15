@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.entities
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -29,7 +30,7 @@ class HttpMatcherPublicSettingsSpec extends AnyFreeSpec with Matchers with DiffM
 
   private val matcherPublicSettings =
     HttpMatcherPublicSettings(
-      matcherPublicKey = PublicKey.fromBase58String("2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY").right.get,
+      matcherPublicKey = PublicKey.fromBase58String("2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY").explicitGet(),
       matcherVersion = "2.1.3.3",
       priceAssets = Seq(Waves, issuedAsset),
       orderFee = HttpOrderFeeMode.FeeModeFixed(

@@ -31,10 +31,10 @@ object Dependencies {
     val janino             = "3.1.2"
     val logbackJsonEncoder = "6.4"
 
-    val silencer = "1.6.0"
+    val silencer = "1.7.0"
 
-    val kamonCore          = "2.1.1"
-    val kamonInfluxDb      = "2.1.1"
+    val kamonCore     = "2.1.1"
+    val kamonInfluxDb = "2.1.1"
 
     val wavesProtobufSchemas = "1.2.5"
     val wavesJ               = "0.16.0"
@@ -96,7 +96,7 @@ object Dependencies {
   private val diffx                = "com.softwaremill.diffx" %% "diffx-scalatest" % Version.diffx
   private val catsCore             = catsModule("core")
   private val catsTaglessMacros    = "org.typelevel" %% "cats-tagless-macros" % Version.catsTaglessMacros
-  private val kindProjector        = compilerPlugin("org.spire-math" %% "kind-projector" % Version.kindProjector)
+  private val kindProjector        = compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full)
   private val betterMonadicFor     = compilerPlugin("com.olegpy" %% "better-monadic-for" % Version.betterMonadicFor)
   private val mouse                = "org.typelevel" %% "mouse" % Version.mouse
   private val shapeless            = "com.chuusai" %% "shapeless" % Version.shapeless
@@ -105,7 +105,7 @@ object Dependencies {
   private val ficus                = "com.iheart" %% "ficus" % Version.ficus
   private val logback              = "ch.qos.logback" % "logback-classic" % Version.logback
   private val logbackJsonEncoder   = "net.logstash.logback" % "logstash-logback-encoder" % Version.logbackJsonEncoder
-  private val slf4j                = "org.slf4j" % "slf4j-api" % Version.slf4j
+  private val slf4j                = "org.slf4j" %% "slf4j-api" % Version.slf4j
   private val julToSlf4j           = "org.slf4j" % "jul-to-slf4j" % Version.slf4j
   private val janino               = "org.codehaus.janino" % "janino" % Version.janino
   private val kamonCore            = kamonModule("core", Version.kamonCore)
@@ -169,7 +169,7 @@ object Dependencies {
     javaLevelDb
   ) map (_ % Test)
 
-  private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit ++ silencer
+  private val integrationTestKit: Seq[ModuleID] = Seq(wavesJ, logback % Test) ++ testKit
 
   val globalEnforcedVersions = Def.setting(
     Seq(
@@ -231,9 +231,9 @@ object Dependencies {
       sttpClient,
       wavesJ,
       betterMonadicFor
-    ) ++ testKit ++ quill ++ silencer ++ monocle
+    ) ++ testKit ++ quill ++ monocle
 
-    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig) ++ silencer
+    lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)
 
     lazy val dexIt: Seq[ModuleID] = integrationTestKit
 
@@ -253,9 +253,7 @@ object Dependencies {
     lazy val dexTestCommon: Seq[ModuleID] = Seq(diffx, scalaTest, scalaCheck, scalaTestPlusCheck)
 
     lazy val wavesExt: Seq[ModuleID] = Seq(
-      julToSlf4j,
-      grpcNetty,
-      grpcScalaPb
+      grpcNetty
     )
 
     lazy val wavesGrpc: Seq[ModuleID] = Seq(wavesProtobufSchemas, grpcScalaPb) ++ silencer

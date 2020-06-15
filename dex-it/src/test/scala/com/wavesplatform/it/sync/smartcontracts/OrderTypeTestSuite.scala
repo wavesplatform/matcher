@@ -131,7 +131,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1.api.tryBroadcast(txs.head)
-        r shouldBe 'left
+        r shouldBe Symbol("left")
         r.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
       }
     }

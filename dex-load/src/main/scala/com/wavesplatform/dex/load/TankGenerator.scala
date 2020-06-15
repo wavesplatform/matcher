@@ -7,8 +7,8 @@ import java.util.concurrent.{ExecutorService, Executors}
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.request._
 import com.wavesplatform.dex.load.utils.{settings, _}
-import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj._
+import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.collection.JavaConversions.seqAsJavaList
@@ -85,7 +85,7 @@ object TankGenerator {
     waitForHeightArise()
   }
 
-  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean = true): List[Request] = {
+  private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {
     print(s"Creating orders... ")
     val orders = (1 to settings.defaults.maxOrdersPerAccount).flatMap(
       _ =>
@@ -128,7 +128,7 @@ object TankGenerator {
                          pairsFile: Option[File],
                          distributed: Boolean = false): List[Request] = {
     println(s"Making requests for matching...")
-    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed)).take(requestsCount)
+    mkOrders(accounts, mkPairsAndDistribute(accounts, pairsFile, distributed), true).take(requestsCount)
   }
 
   private def mkCancels(accounts: List[PrivateKeyAccount], requestsCount: Int): List[Request] = {
@@ -241,7 +241,6 @@ object TankGenerator {
 
     val pairs = readAssetPairs(pairsFile)
     val ts    = System.currentTimeMillis
-    val tb    = settings.distribution.tradableBalance
 
     def mkTradableBalance(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
@@ -261,7 +260,7 @@ object TankGenerator {
         List
           .fill(requestsCount / all.length + 1)(all)
           .flatten)
-      .take((requestsCount * tb).toInt)
+      .take(requestsCount)
   }
 
   def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {
@@ -298,7 +297,7 @@ object TankGenerator {
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
         mkMatching(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile, true) ++
-        mkBalances(accounts, requestsCount, pairsFile) ++
+        mkBalances(accounts, (requestsCount * settings.distribution.tradableBalance).toInt, pairsFile) ++
         mkOrderHistory(accounts, requestsCount, pairsFile) ++
         mkCancels(accounts, (requestsCount * settings.distribution.placeOrder).toInt)
     )

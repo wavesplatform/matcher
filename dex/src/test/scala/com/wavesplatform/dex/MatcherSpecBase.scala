@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.softwaremill.diffx.{Derived, Diff}
-import com.wavesplatform.dex.api.websockets.WsError
+import com.wavesplatform.dex.api.ws.protocol.WsError
 import com.wavesplatform.dex.asset.DoubleOps
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -26,7 +26,7 @@ import com.wavesplatform.dex.model.OrderValidator.Result
 import com.wavesplatform.dex.model.{BuyLimitOrder, LimitOrder, OrderValidator, SellLimitOrder, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, loadConfig}
+import com.wavesplatform.dex.settings.{AssetType, MatcherSettings, OrderFeeSettings, loadConfig}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
 import com.wavesplatform.dex.waves.WavesFeeConstants

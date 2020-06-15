@@ -108,19 +108,19 @@ class OrderRestrictionsTestSuite extends MatcherSuiteBase {
   }
 
   "order restrictions endpoints" in {
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minAmount shouldBe "0.1"
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxAmount shouldBe "100000000"
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepAmount shouldBe "0.1"
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minPrice shouldBe "0.0001"
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxPrice shouldBe "1000"
-    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepPrice shouldBe "0.001"
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minAmount shouldBe 0.1
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxAmount shouldBe 100000000
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepAmount shouldBe 0.1
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.minPrice shouldBe 0.0001
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.maxPrice shouldBe 1000
+    dex1.api.orderBookInfo(wctUsdPair).restrictions.get.stepPrice shouldBe 0.001
 
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minAmount shouldBe "0.1"
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxAmount shouldBe "100000000"
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepAmount shouldBe "0.1"
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minPrice shouldBe "0.0001"
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe "1000"
-    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe "0.001"
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minAmount shouldBe 0.1
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxAmount shouldBe 100000000
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepAmount shouldBe 0.1
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.minPrice shouldBe 0.0001
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.maxPrice shouldBe 1000
+    dex1.api.tradingPairInfo(wctUsdPair).get.restrictions.get.stepPrice shouldBe 0.001
 
     dex1.api.orderBookInfo(wavesBtcPair).restrictions shouldBe empty
 

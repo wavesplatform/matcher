@@ -1,8 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.MatcherSuiteBase
 
 class OrderV3TestSuite extends MatcherSuiteBase {
@@ -32,8 +32,8 @@ class OrderV3TestSuite extends MatcherSuiteBase {
       val orderV3 = mkOrder(bob, wavesUsdPair, OrderType.SELL, 2, price, version = 3)
       dex1.api.place(orderV3)
 
-      dex1.api.waitForOrderStatus(orderV1, OrderStatus.PartiallyFilled)
-      dex1.api.waitForOrderStatus(orderV3, OrderStatus.Filled)
+      dex1.api.waitForOrderStatus(orderV1, Status.PartiallyFilled)
+      dex1.api.waitForOrderStatus(orderV3, Status.Filled)
     }
   }
 

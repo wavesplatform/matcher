@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.model
 
 import com.google.common.base.Charsets
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.WithDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
@@ -20,11 +21,10 @@ import com.wavesplatform.dex.effect.FutureResult
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.clients.RunScriptResult
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.OrderValidator.{AsyncBlockchain, Result}
 import com.wavesplatform.dex.settings.AssetType.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
+import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.dex.time.TestTime
 import com.wavesplatform.dex.{MatcherSpecBase, NoShrink}
@@ -35,6 +35,7 @@ import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -106,7 +107,7 @@ class OrderValidatorSpecification
           case x: OrderV2 => x.copy(amount = 0L)
         }
         val signed = Order.sign(unsigned, pk)
-        OrderValidator.timeAware(time)(signed).left.map(_.toJson) should produce("amount should be > 0")
+        OrderValidator.timeAware(time)(signed).left.map(Json.toJsObject(_)) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in blockchainTest() { (ov, bc) =>
@@ -204,11 +205,11 @@ class OrderValidatorSpecification
 
         import play.api.libs.json.Json
 
-        val order = Json.fromJson[Order](createOrder(AssetPair(btc, usd), SELL, 100, 3.0).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")).get
+        val json  = createOrder(AssetPair(btc, usd), SELL, 100, 3.0, feeAsset = usd).json() ++ Json.obj("matcherFeeAssetId" -> "WAVES")
+        val order = Json.fromJson[Order](json).get
+        order.feeAsset shouldBe Waves
 
-        validateByMatcherSettings { DynamicSettings.symmetric(0.003.waves) }(order).left.get.message.text should include(
-          """But given "WAVES" as Base58 string. Remove this field if you want to specify WAVES in JSON"""
-        )
+        validateByMatcherSettings { DynamicSettings.symmetric(0.003.waves) }(order) shouldBe 'right
       }
 
       "matcherFee is not enough (percent mode)" in {

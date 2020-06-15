@@ -5,8 +5,8 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.model.AcceptedOrder.partialFee
 import com.wavesplatform.dex.model.OrderValidator.multiplyFeeByDouble
-import com.wavesplatform.dex.settings.AssetType
-import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.{DynamicSettings, FixedSettings, PercentSettings}
+import com.wavesplatform.dex.settings.{AssetType, OrderFeeSettings}
 
 object Fee {
 

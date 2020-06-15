@@ -6,16 +6,18 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
-import com.wavesplatform.dex.AddressActor.OrderListType
+import com.wavesplatform.dex.MatcherSpecBase
+import com.wavesplatform.dex.actors.address.AddressActor
+import com.wavesplatform.dex.actors.address.AddressActor.OrderListType
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
+import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.time.SystemTime
-import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpecLike
@@ -48,11 +50,11 @@ class OrderHistoryBalanceSpecification
 
   def openVolume(address: Address, asset: Asset): Long = oh.ref(address).openVolume(asset)
 
-  def activeOrderIds(sender: Address)                        = oh.ref(sender).activeOrderIds
-  def allOrderIds(sender: Address)                           = oh.ref(sender).allOrderIds
-  def activeOrderIdsByPair(sender: Address, pair: AssetPair) = oh.ref(sender).activeOrderIdsByPair(pair)
-  def allOrderIdsByPair(sender: Address, pair: AssetPair)    = oh.ref(sender).allOrderIdsByPair(pair)
-  def orderStatus(orderId: ByteStr)                          = oh.ref(orderId).orderStatus(orderId)
+  def activeOrderIds(sender: Address): Vector[Id]                        = oh.ref(sender).activeOrderIds
+  def allOrderIds(sender: Address): Vector[Id]                           = oh.ref(sender).allOrderIds
+  def activeOrderIdsByPair(sender: Address, pair: AssetPair): Vector[Id] = oh.ref(sender).activeOrderIdsByPair(pair)
+  def allOrderIdsByPair(sender: Address, pair: AssetPair): Vector[Id]    = oh.ref(sender).allOrderIdsByPair(pair)
+  def orderStatus(orderId: ByteStr): OrderStatus                         = oh.ref(orderId).orderStatus(orderId)
 
   property("New buy order added") {
     val ord = buy(WctBtc, 10000, 0.0007)
@@ -918,6 +920,6 @@ private object OrderHistoryBalanceSpecification {
       askAddressActor[AddressActor.Reply.Balance](ref, AddressActor.Query.GetReservedBalance).balance.getOrElse(asset, 0L)
 
     def orderStatus(orderId: ByteStr): OrderStatus =
-      askAddressActor[OrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId))
+      askAddressActor[AddressActor.Reply.GetOrderStatus](ref, AddressActor.Query.GetOrderStatus(orderId)).x
   }
 }

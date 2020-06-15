@@ -7,6 +7,7 @@ import cats.instances.map.catsKernelStdCommutativeMonoidForMap
 import cats.syntax.either._
 import cats.syntax.flatMap._
 import cats.syntax.semigroup.catsSyntaxSemigroup
+import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset
@@ -24,11 +25,10 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error._
 import com.wavesplatform.dex.grpc.integration.clients.{RunScriptResult, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
-import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.OrderExecuted
 import com.wavesplatform.dex.settings.OrderFeeSettings._
-import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderRestrictionsSettings}
+import com.wavesplatform.dex.settings.{AssetType, DeviationsSettings, MatcherSettings, OrderFeeSettings, OrderRestrictionsSettings}
 import com.wavesplatform.dex.time.Time
 import kamon.Kamon
 

@@ -9,25 +9,32 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction._
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ExchangeTransactionV2(buyOrder: Order,
-                                 sellOrder: Order,
-                                 amount: Long,
-                                 price: Long,
-                                 buyMatcherFee: Long,
-                                 sellMatcherFee: Long,
-                                 fee: Long,
-                                 timestamp: Long,
-                                 proofs: Proofs)
+@ApiModel(value = "ExchangeTransaction")
+case class ExchangeTransactionV2(@ApiModelProperty(name = "order1", dataType = "com.wavesplatform.dex.domain.order.OrderV3") buyOrder: Order,
+                                 @ApiModelProperty(name = "order2", dataType = "com.wavesplatform.dex.domain.order.OrderV3") sellOrder: Order,
+                                 @ApiModelProperty() amount: Long,
+                                 @ApiModelProperty() price: Long,
+                                 @ApiModelProperty() buyMatcherFee: Long,
+                                 @ApiModelProperty() sellMatcherFee: Long,
+                                 @ApiModelProperty() fee: Long,
+                                 @ApiModelProperty() timestamp: Long,
+                                 @ApiModelProperty(
+                                   value = "Exchange Transaction proofs as Base58 encoded signatures list",
+                                   dataType = "List[string]",
+                                 ) proofs: Proofs)
     extends ExchangeTransaction {
 
   import ExchangeTransactionV2._
 
-  override def version: Byte = 2
+  @ApiModelProperty(dataType = "integer", example = "2", allowableValues = "1, 2")
+  override val version: Byte = 2
 
+  @ApiModelProperty(hidden = true)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Array(0: Byte, ExchangeTransaction.typeId, version) ++
@@ -38,6 +45,7 @@ case class ExchangeTransactionV2(buyOrder: Order,
         Longs.toByteArray(timestamp)
     )
 
+  @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
 }
 

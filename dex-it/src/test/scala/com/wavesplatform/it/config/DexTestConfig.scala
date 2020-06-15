@@ -1,12 +1,12 @@
 package com.wavesplatform.it.config
 
-import com.wavesplatform.dex.AssetPairBuilder
+import com.wavesplatform.dex.actors.MatcherActor
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.it.waves.Implicits.toVanilla
 import com.wavesplatform.dex.it.waves.MkWavesEntities._
-import com.wavesplatform.dex.market.MatcherActor
+import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.wavesj.transactions.IssueTransaction
 

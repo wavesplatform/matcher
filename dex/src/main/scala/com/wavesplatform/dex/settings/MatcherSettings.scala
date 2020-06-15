@@ -4,7 +4,7 @@ import java.io.File
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.dex.AddressActor
+import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
 import com.wavesplatform.dex.db.AccountStorage.Settings.{valueReader => accountStorageSettingsReader}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
@@ -15,7 +15,7 @@ import com.wavesplatform.dex.model.OrderValidator
 import com.wavesplatform.dex.settings.DenormalizedMatchingRule.denormalizedMatchingRuleNelReader
 import com.wavesplatform.dex.settings.DeviationsSettings._
 import com.wavesplatform.dex.settings.EventsQueueSettings.eventsQueueSettingsReader
-import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, _}
+import com.wavesplatform.dex.settings.OrderFeeSettings._
 import com.wavesplatform.dex.settings.OrderHistorySettings._
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings.orderRestrictionsSettingsReader
 import com.wavesplatform.dex.settings.PostgresConnection._

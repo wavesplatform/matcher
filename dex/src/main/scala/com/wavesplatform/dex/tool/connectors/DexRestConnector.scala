@@ -2,7 +2,7 @@ package com.wavesplatform.dex.tool.connectors
 
 import cats.syntax.option._
 import com.google.common.primitives.Longs
-import com.wavesplatform.dex.api.CancelOrderRequest
+import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.cli.ErrorOr
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -19,13 +19,13 @@ case class DexRestConnector(target: String) extends RestConnector {
 
   private val apiUri = s"$targetUri/matcher"
 
-  private def mkCancelRequest(orderId: Order.Id, owner: KeyPair): CancelOrderRequest = {
-    val cancelRequest = CancelOrderRequest(owner, orderId.some, None, Array.emptyByteArray)
+  private def mkCancelRequest(orderId: Order.Id, owner: KeyPair): HttpCancelOrder = {
+    val cancelRequest = HttpCancelOrder(owner, orderId.some, None, Array.emptyByteArray)
     val signature     = crypto.sign(owner, cancelRequest.toSign)
     cancelRequest.copy(signature = signature)
   }
 
-  private def cancelOrdersByRequest(cancelRequest: CancelOrderRequest, assetPair: AssetPair): ErrorOrJsonResponse = mkResponse {
+  private def cancelOrdersByRequest(cancelRequest: HttpCancelOrder, assetPair: AssetPair): ErrorOrJsonResponse = mkResponse {
     _.post(uri"$apiUri/orderbook/${assetPair.amountAsset}/${assetPair.priceAsset}/cancel")
       .body(Json.stringify(Json toJson cancelRequest))
       .contentType(MediaType.ApplicationJson)

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.compat
 
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.orderGen
 import com.wavesplatform.it.tags.DexMultipleVersions
@@ -22,12 +22,12 @@ class DatabaseBackwardCompatTestSuite extends BackwardCompatSuiteBase {
     val orders = Gen.containerOfN[Vector, Order](200, twoAccountsOrdersGen).sample.get
     orders.foreach(dex2.api.place)
 
-    dex2.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+    dex2.api.waitForOrder(orders.last)(_.status != Status.NotFound)
     dex2.stopWithoutRemove()
 
     dex1.start()
     orders.groupBy(_.assetPair).valuesIterator.foreach { orders =>
-      dex1.api.waitForOrder(orders.last)(_.status != OrderStatus.NotFound)
+      dex1.api.waitForOrder(orders.last)(_.status != Status.NotFound)
     }
     Thread.sleep(3.seconds.toMillis) // An additional time to wait the concurrent processing
 

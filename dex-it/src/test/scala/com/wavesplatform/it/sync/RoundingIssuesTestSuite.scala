@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpOrderStatus, HttpV0LevelAgg}
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType
-import com.wavesplatform.dex.it.api.responses.dex.{LevelResponse, OrderStatus, OrderStatusResponse}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 
@@ -28,16 +29,17 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 420169L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, Some(filledAmount), Some(296219L)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, Some(filledAmount), Some(40L)))
+    dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, Some(filledAmount), Some(296219L)))
+    dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, Some(filledAmount), Some(40L)))
 
     val tx = waitForOrderAtNode(counter)
     dex1.api.cancel(alice, counter)
 
-    val exchangeTx = wavesNode1.api.transactionInfo(tx.head.getId).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.getId}'")) match {
-      case r: ExchangeTransaction => r
-      case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
-    }
+    val exchangeTx =
+      wavesNode1.api.transactionInfo(tx.head.getId).getOrElse(throw new RuntimeException(s"Can't find tx with id = '${tx.head.getId}'")) match {
+        case r: ExchangeTransaction => r
+        case x                      => throw new RuntimeException(s"Expected ExchangeTransaction, but got $x")
+      }
 
     exchangeTx.getPrice shouldBe counter.price
     exchangeTx.getAmount shouldBe filledAmount
@@ -59,8 +61,8 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     dex1.api.place(submitted)
 
     val filledAmount = 223344937L
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
-    dex1.api.waitForOrder(counter)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
+    dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(filledAmount), filledFee = Some(299999L)))
+    dex1.api.waitForOrder(counter)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(filledAmount), filledFee = Some(72559L)))
 
     withClue("Alice's reserved balance before cancel")(dex1.api.reservedBalance(alice) shouldBe empty)
 
@@ -80,13 +82,13 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val submitted = mkOrder(alice, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     dex1.api.place(submitted)
 
-    dex1.api.waitForOrder(submitted)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(99523810L), filledFee = Some(298571L)))
-    dex1.api.waitForOrder(counter2)(_ == OrderStatusResponse(OrderStatus.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(8571L)))
+    dex1.api.waitForOrder(submitted)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(99523810L), filledFee = Some(298571L)))
+    dex1.api.waitForOrder(counter2)(_ == HttpOrderStatus(Status.PartiallyFilled, filledAmount = Some(2857143L), filledFee = Some(8571L)))
 
     withClue("orderBook check") {
       val ob = dex1.api.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(HttpV0LevelAgg(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 }

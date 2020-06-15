@@ -6,9 +6,9 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.config.genesis._
-import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration.FiniteDuration
 

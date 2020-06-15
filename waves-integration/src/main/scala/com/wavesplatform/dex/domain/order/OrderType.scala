@@ -2,7 +2,7 @@ package com.wavesplatform.dex.domain.order
 
 import play.api.libs.json._
 
-sealed trait OrderType {
+sealed trait OrderType extends Product with Serializable {
   def bytes: Array[Byte]
   def opposite: OrderType
 }
@@ -12,25 +12,19 @@ object OrderType {
   case object BUY extends OrderType {
     def bytes: Array[Byte]           = Array(0.toByte)
     override def opposite: OrderType = SELL
-    override def toString: String    = "buy"
+    override val toString: String    = "buy"
   }
 
   case object SELL extends OrderType {
     def bytes: Array[Byte]           = Array(1.toByte)
     override def opposite: OrderType = BUY
-    override def toString: String    = "sell"
+    override val toString: String    = "sell"
   }
 
   def apply(value: Int): OrderType = value match {
     case 0 => OrderType.BUY
     case 1 => OrderType.SELL
     case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
-  }
-
-  def apply(value: String): OrderType = value match {
-    case "buy"  => OrderType.BUY
-    case "sell" => OrderType.SELL
-    case _      => throw new RuntimeException("Unexpected OrderType")
   }
 
   def reverse(orderType: OrderType): OrderType = orderType match {
@@ -40,12 +34,12 @@ object OrderType {
 
   implicit val orderTypeFormat: Format[OrderType] = Format(
     {
-      case JsString("BUY")  => JsSuccess(BUY)
-      case JsString("SELL") => JsSuccess(SELL)
-      case x                => JsError(JsPath, s"Can't read OrderType from ${x.getClass.getName}")
+      case JsString(BUY.`toString`)  => JsSuccess(BUY)
+      case JsString(SELL.`toString`) => JsSuccess(SELL)
+      case x                         => JsError(JsPath, s"Can't read OrderType from ${x.getClass.getName}")
     }, {
-      case BUY  => JsString("BUY")
-      case SELL => JsString("SELL")
+      case BUY  => JsString(BUY.`toString`)
+      case SELL => JsString(SELL.`toString`)
     }
   )
 

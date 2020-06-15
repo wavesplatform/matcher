@@ -11,9 +11,9 @@ import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.dex.error
 import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
 import com.wavesplatform.dex.model.AcceptedOrder.FillingInfo
-import play.api.libs.json.{JsObject, JsValue, Json}
 
 object MatcherModel {
+
   def getCost(amount: Long, price: Long): Long =
     new BigDecimal(price)
       .multiply(new BigDecimal(amount))
@@ -323,7 +323,6 @@ case class SellMarketOrder(amount: Long, fee: Long, order: Order, availableForSp
 
 sealed trait OrderStatus {
   def name: String
-  def json: JsValue
 
   def filledAmount: Long
   def filledFee: Long
@@ -334,42 +333,35 @@ object OrderStatus {
   sealed trait Final extends OrderStatus
 
   case object Accepted extends OrderStatus {
-
-    val name           = "Accepted"
-    def json: JsObject = Json.obj("status" -> name)
+    val name = "Accepted"
 
     override def filledAmount: Long = 0
     override def filledFee: Long    = 0
   }
 
   case object NotFound extends Final {
-
-    val name           = "NotFound"
-    def json: JsObject = Json.obj("status" -> name, "message" -> "The limit order is not found")
+    val name = "NotFound"
 
     override def filledAmount: Long = 0
     override def filledFee: Long    = 0
   }
 
   case class PartiallyFilled(filledAmount: Long, filledFee: Long) extends OrderStatus {
-    val name: String   = PartiallyFilled.name
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = PartiallyFilled.name
   }
   object PartiallyFilled {
     val name = "PartiallyFilled"
   }
 
   case class Filled(filledAmount: Long, filledFee: Long) extends Final {
-    val name: String   = Filled.name
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = Filled.name
   }
   object Filled {
     val name = "Filled"
   }
 
   case class Cancelled(filledAmount: Long, filledFee: Long) extends Final {
-    val name: String   = Cancelled.name
-    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filledAmount, "filledFee" -> filledFee)
+    val name = Cancelled.name
   }
   object Cancelled {
     val name = "Cancelled"

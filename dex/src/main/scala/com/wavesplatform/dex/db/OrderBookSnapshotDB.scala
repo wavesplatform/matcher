@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply.catsSyntaxTuple2Semigroupal
-import com.wavesplatform.dex.MatcherKeys
 import com.wavesplatform.dex.db.leveldb.{DBExt, Key}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.model.OrderBookSnapshot
@@ -37,7 +36,7 @@ object OrderBookSnapshotDB {
     }
 
     private def keys(assetPair: AssetPair): (Key[Option[Offset]], Key[Option[OrderBookSnapshot]]) =
-      (MatcherKeys.orderBookSnapshotOffset(assetPair), MatcherKeys.orderBookSnapshot(assetPair))
+      (DbKeys.orderBookSnapshotOffset(assetPair), DbKeys.orderBookSnapshot(assetPair))
   }
 
   def inMem: OrderBookSnapshotDB = new OrderBookSnapshotDB {

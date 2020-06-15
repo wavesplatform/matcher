@@ -1,8 +1,7 @@
 package com.wavesplatform.dex.doc
 
 import com.wavesplatform.dex.error.{Class, Entity, MatcherError}
-import com.wavesplatform.dex.meta.DescendantSamples
-import com.wavesplatform.dex.util.getSimpleName
+import com.wavesplatform.dex.meta.{DescendantSamples, getSimpleName}
 import play.api.libs.json.Json
 
 object MatcherErrorDoc {
@@ -46,7 +45,7 @@ object MatcherErrorDoc {
                     /##### Sample
                     /
                     /```json
-                    /${Json.prettyPrint(x.toJson)}
+                    /${Json.prettyPrint(Json.toJsObject(x))}
                     /```
                     /""".stripMargin('/')
             }

@@ -4,12 +4,13 @@ import java.sql.{Connection, DriverManager}
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.history.DBRecords.{EventRecord, OrderRecord}
 import com.wavesplatform.dex.history.HistoryRouter._
-import com.wavesplatform.dex.it.api.responses.dex.{OrderStatus, OrderStatusResponse}
 import com.wavesplatform.dex.settings.PostgresConnection
 import com.wavesplatform.dex.settings.PostgresConnection._
 import com.wavesplatform.it.MatcherSuiteBase
@@ -209,14 +210,14 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     val sellOrder1 = sellOrder
     dex1.api.place(sellOrder1)
 
-    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dex1.api.waitForOrderStatus(sellOrder1, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled)
+    dex1.api.waitForOrderStatus(sellOrder1, Status.Filled)
 
     val sellOrder2 = sellOrder
     dex1.api.place(sellOrder2)
 
-    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.PartiallyFilled)
-    dex1.api.waitForOrderStatus(sellOrder2, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, Status.PartiallyFilled)
+    dex1.api.waitForOrderStatus(sellOrder2, Status.Filled)
 
     dex1.api.cancel(alice, buyOrder)
 
@@ -275,8 +276,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     dex1.api.place(buyOrder)
     dex1.api.place(sellOrder)
 
-    dex1.api.waitForOrderStatus(buyOrder, OrderStatus.Filled)
-    dex1.api.waitForOrderStatus(sellOrder, OrderStatus.Filled)
+    dex1.api.waitForOrderStatus(buyOrder, Status.Filled)
+    dex1.api.waitForOrderStatus(sellOrder, Status.Filled)
 
     eventually {
       withClue("checking info for counter order\n") {
@@ -308,8 +309,8 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
     dex1.api.place(smallBuyOrder)
     dex1.api.place(bigSellOrder)
 
-    dex1.api.waitForOrderStatus(smallBuyOrder, OrderStatus.Filled)
-    dex1.api.waitForOrderStatus(bigSellOrder, OrderStatus.PartiallyFilled)
+    dex1.api.waitForOrderStatus(smallBuyOrder, Status.Filled)
+    dex1.api.waitForOrderStatus(bigSellOrder, Status.PartiallyFilled)
 
     eventually {
       withClue("checking info for small counter order\n") {
@@ -362,7 +363,7 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       dex1.api.placeMarket(unmatchableMarketBuyOrder)
       dex1.api.waitForOrder(unmatchableMarketBuyOrder)(
-        _ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct))
+        _ == HttpOrderStatus(Status.Filled, filledAmount = Some(0.wct), filledFee = Some(0.wct))
       )
 
       eventually {
@@ -397,12 +398,12 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
       orders.foreach { order =>
         dex1.api.place(order)
-        dex1.api.waitForOrderStatus(order, OrderStatus.Accepted)
+        dex1.api.waitForOrderStatus(order, Status.Accepted)
       }
 
       val marketBuyOrder = bigBuyOrder
       dex1.api.placeMarket(marketBuyOrder)
-      dex1.api.waitForOrder(marketBuyOrder)(_ == OrderStatusResponse(OrderStatus.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
+      dex1.api.waitForOrder(marketBuyOrder)(_ == HttpOrderStatus(Status.Filled, filledAmount = Some(300.wct), filledFee = Some(1020L)))
 
       eventually {
         getOrderInfoById(marketBuyOrder.id()).get should matchTo(

@@ -2,12 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.{apply => _, _}
 import com.wavesplatform.dex.domain.account.{Address, KeyPair}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.OrderType._
-import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 import org.scalatest._
 
@@ -30,7 +31,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     val ethOrder  = mkOrder(alice, ethWavesPair, SELL, dec8, dec8)
     val btcOrder1 = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
     List(usdOrder, wctOrder, ethOrder, btcOrder1).foreach(dex1.api.place)
-    dex1.api.waitForOrderStatus(btcOrder1, OrderStatus.Accepted)
+    dex1.api.waitForOrderStatus(btcOrder1, Status.Accepted)
 
     Then("We blacklist some assets and addresses and restart the node")
     dex1.restartWithNewSuiteConfig(
@@ -51,10 +52,10 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     testOrderPlacementDenied(mkOrder(bob, wavesBtcPair, SELL, dec8, dec8), bob)
 
     And("orders of blacklisted address are still available")
-    dex1.api.orderStatus(btcOrder1).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(btcOrder1).status shouldBe Status.Accepted
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("OrderBook for blacklisted assets is not available")
     testOrderBookDenied(wctWavesPair, IssuedAsset(WctId))
@@ -64,11 +65,11 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     And("OrderHistory returns info about all orders")
     val aliceOrderHistory = dex1.api.orderHistory(alice, activeOnly = Some(true))
     aliceOrderHistory.size shouldBe 3
-    aliceOrderHistory.foreach(_.status shouldBe OrderStatus.Accepted)
+    aliceOrderHistory.foreach(_.status shouldBe Status.Accepted.name)
 
     val bobOrderHistory = dex1.api.orderHistory(bob, activeOnly = Some(true))
     bobOrderHistory.size shouldBe 1
-    bobOrderHistory.head.status shouldBe OrderStatus.Accepted
+    bobOrderHistory.head.status shouldBe Status.Accepted.name
 
     And("Trading markets have info about all asset pairs")
     dex1.api.allOrderBooks.markets.size shouldBe 4
@@ -78,7 +79,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.reservedBalance(bob).size shouldBe 1
 
     And("orders for other assets are still available")
-    dex1.api.orderStatus(usdOrder).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(usdOrder).status shouldBe Status.Accepted
 
     And("order can be placed on allowed pair with blacklisted asset")
     val btcOrder2 = mkOrder(alice, wavesBtcPair, SELL, dec8, dec8)
@@ -92,8 +93,8 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     dex1.api.orderBook(ethWavesPair).asks.size shouldBe 1
 
     And("order statuses are available again")
-    dex1.api.orderStatus(wctOrder).status shouldBe OrderStatus.Accepted
-    dex1.api.orderStatus(ethOrder).status shouldBe OrderStatus.Accepted
+    dex1.api.orderStatus(wctOrder).status shouldBe Status.Accepted
+    dex1.api.orderStatus(ethOrder).status shouldBe Status.Accepted
 
     And("new orders can be placed")
     val newWctOrder = mkOrder(alice, wctWavesPair, BUY, dec2, dec8)
@@ -101,7 +102,7 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
     val btcOrder3   = mkOrder(bob, wavesBtcPair, SELL, dec8, dec8)
     val newOrders   = List(newWctOrder, newEthOrder, btcOrder3)
     newOrders.foreach(dex1.api.place)
-    newOrders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Accepted))
+    newOrders.foreach(dex1.api.waitForOrderStatus(_, Status.Accepted))
   }
 
   private def testOrderPlacementDenied(order: Order, address: Address): Unit =

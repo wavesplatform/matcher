@@ -3,12 +3,12 @@ package com.wavesplatform.dex.model
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.Longs
+import com.wavesplatform.dex.codecs.ByteBufferCodecs.ByteBufferExt
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.util.Codecs.ByteBufferExt
 
-trait OrderInfo[+S <: OrderStatus] {
+sealed trait OrderInfo[+S <: OrderStatus] {
   def version: Byte
   def side: OrderType
   def amount: Long
@@ -26,7 +26,7 @@ object OrderInfo {
   type FinalOrderInfo = OrderInfo[OrderStatus.Final]
 
   def v1[S <: OrderStatus](side: OrderType, amount: Long, price: Long, timestamp: Long, status: S, assetPair: AssetPair): OrderInfo[S] =
-    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair, AcceptedOrderType.Limit, price)
+    Impl(1, side, amount, price, 300000L, Waves, timestamp, status, assetPair, AcceptedOrderType.Limit, price) // TODO avgWeighedPrice in DEX-774
 
   def v2[S <: OrderStatus](order: Order, status: S): OrderInfo[S] =
     v2(order.orderType, order.amount, order.price, order.matcherFee, order.feeAsset, order.timestamp, status, order.assetPair)
@@ -39,7 +39,7 @@ object OrderInfo {
                            timestamp: Long,
                            status: S,
                            assetPair: AssetPair): OrderInfo[S] =
-    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, AcceptedOrderType.Limit, price)
+    Impl(2, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, AcceptedOrderType.Limit, price) // TODO avgWeighedPrice in DEX-774
 
   def v3[S <: OrderStatus](ao: AcceptedOrder, status: S): OrderInfo[S] = {
     import ao.order
@@ -59,7 +59,7 @@ object OrderInfo {
                            status: S,
                            assetPair: AssetPair,
                            orderType: AcceptedOrderType): OrderInfo[S] =
-    Impl(3, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType, price)
+    Impl(3, side, amount, price, matcherFee, matcherFeeAssetId, timestamp, status, assetPair, orderType, price) // TODO avgWeighedPrice in DEX-774
 
   def v4[S <: OrderStatus](side: OrderType,
                            amount: Long,

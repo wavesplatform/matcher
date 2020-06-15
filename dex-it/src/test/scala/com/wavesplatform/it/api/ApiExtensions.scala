@@ -3,13 +3,14 @@ package com.wavesplatform.it.api
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Id
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
+import com.wavesplatform.dex.api.http.entities.{HttpOrderBookHistoryItem, HttpOrderStatus}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
-import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
@@ -20,8 +21,8 @@ import scala.collection.immutable.TreeMap
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtDex(order: Order,
-                                   expectedStatus: OrderStatus = OrderStatus.Accepted,
-                                   dex: DexContainer = dex1): OrderStatusResponse = {
+                                   expectedStatus: HttpOrderStatus.Status = Status.Accepted,
+                                   dex: DexContainer = dex1): HttpOrderStatus = {
     dex.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
@@ -34,7 +35,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
-  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {
+  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: HttpOrderStatus.Status = Status.Cancelled): HttpOrderStatus = {
     dex1.api.cancel(owner, order)
     dex1.api.waitForOrderStatus(order, expectedStatus)
   }
@@ -45,7 +46,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
 
   protected def waitForOrderAtNode(orderId: Order.Id, dexApi: DexApi[Id], wavesNodeApi: NodeApi[Id]): Seq[ExchangeTransaction] =
-    dex1.api.waitForTransactionsByOrder(orderId, 1).unsafeTap {
+    dexApi.waitForTransactionsByOrder(orderId, 1).unsafeTap {
       _.foreach(tx => wavesNodeApi.waitForTransaction(tx.getId))
     }
 
@@ -54,16 +55,16 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
                              accounts: Seq[KeyPair],
                              dexApi: DexApi[Id] = dex1.api): MatcherState = {
 
-    val offset               = dex1.api.currentOffset
-    val snapshots            = dex1.api.allSnapshotOffsets
-    val orderBooks           = assetPairs.map(x => (x, (dex1.api.orderBook(x), dex1.api.orderBookStatus(x))))
-    val orderStatuses        = orders.map(x => x.idStr() -> dex1.api.orderStatus(x))
-    val orderTransactionIds  = orders.map(x => x.idStr() -> dex1.api.transactionsByOrder(x).map(_.getId.getBase58String))
-    val reservedBalances     = accounts.map(x => x -> dex1.api.reservedBalance(x))
+    val offset               = dexApi.currentOffset
+    val snapshots            = dexApi.allSnapshotOffsets
+    val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
+    val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String))
+    val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
-      case (account, pair) => (account, pair, dex1.api.orderHistoryByPair(account, pair))
+      case (account, pair) => (account, pair, dexApi.orderHistoryByPair(account, pair))
     }
 
     val orderHistoryMap = orderHistory
@@ -74,7 +75,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
             case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
           }
 
-          account -> (TreeMap.empty[AssetPair, Seq[OrderBookHistoryItem]] ++ assetPairHistory)
+          account -> (TreeMap.empty[AssetPair, Seq[HttpOrderBookHistoryItem]] ++ assetPairHistory)
       }
 
     clean {

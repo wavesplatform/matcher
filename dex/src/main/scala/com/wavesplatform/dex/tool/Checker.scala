@@ -5,7 +5,9 @@ import cats.instances.list.catsStdInstancesForList
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
-import com.wavesplatform.dex.api.websockets.{WsAddressState, WsOrderBook}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
+import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
+import com.wavesplatform.dex.cli._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -23,7 +25,6 @@ import play.api.libs.json.JsValue
 import scala.Ordered._
 import scala.concurrent.duration._
 import scala.util.Random
-import com.wavesplatform.dex.cli._
 
 // noinspection ScalaStyle
 case class Checker(superConnector: SuperConnector) {
@@ -134,7 +135,11 @@ case class Checker(superConnector: SuperConnector) {
     val submittedId = submitted.id()
 
     def checkFillingAtDex(orderStatus: JsValue): ErrorOr[Boolean] = {
-      lazy val expectedFilledStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee).json.toString
+
+      lazy val expectedFilledStatus = {
+        val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
+        HttpOrderStatus.httpOrderStatusFormat.writes(HttpOrderStatus from orderStatus).toString
+      }
       (
         for {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]
@@ -171,7 +176,7 @@ case class Checker(superConnector: SuperConnector) {
     dexWs.subscribeForOrderBookUpdates(assetPairInfo.assetPair).map { snapshot =>
       s"""\n
          |    Got snapshot for ${assetPairInfo.assetPairName} pair:
-         |    ${WsOrderBook.wsOrderBookStateFormat.writes(snapshot).toString}\n
+         |    ${WsOrderBookChanges.wsOrderBookChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }
 
@@ -182,7 +187,7 @@ case class Checker(superConnector: SuperConnector) {
         snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
       } yield s"""\n
            |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address${maybeSeed.fold(" (key pair randomly generated)")(_ => "")}:
-           |    ${WsAddressState.wsAddressStateFormat.writes(snapshot).toString}\n
+           |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }
   }

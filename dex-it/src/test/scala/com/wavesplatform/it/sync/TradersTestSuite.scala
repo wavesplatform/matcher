@@ -1,13 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Price
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
-import com.wavesplatform.dex.it.api.responses.dex.{MatcherError, OrderStatus}
+import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.it.MatcherSuiteBase
 
 class TradersTestSuite extends MatcherSuiteBase {
@@ -85,7 +86,7 @@ class TradersTestSuite extends MatcherSuiteBase {
       withClue("Cleanup") {
         dex1.api.orderBook(wctWavesPair).bids shouldNot be(empty)
         dex1.api.cancelAll(bob)
-        dex1.api.waitForOrderStatus(correctBobOrder, OrderStatus.Cancelled)
+        dex1.api.waitForOrderStatus(correctBobOrder, Status.Cancelled)
       }
     }
 
@@ -104,17 +105,17 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1.api.broadcast(transferTx)
 
             withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled\n") {
-              dex1.api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active\n") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup\n") {
               wavesNode1.api.waitForTransaction(transferTx)
               dex1.api.cancelAll(bob)
-              dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
               broadcastAndAwait(mkTransfer(alice, bob, transferAmount, wct))
             }
           }
@@ -132,17 +133,17 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1.api.broadcast(lease)
 
             withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled") {
-              dex1.api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
               wavesNode1.api.waitForTransaction(lease)
               dex1.api.cancelAll(bob)
-              dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
               broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
             }
           }
@@ -160,17 +161,17 @@ class TradersTestSuite extends MatcherSuiteBase {
             wavesNode1.api.broadcast(transferTx)
 
             withClue(s"The newest order of version $orderV '${newestOrder.idStr()}' was cancelled") {
-              dex1.api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
             }
 
             withClue(s"The oldest order of version $orderV '${oldestOrder.idStr()}' is still active") {
-              dex1.api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+              dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
             }
 
             withClue("Cleanup") {
               wavesNode1.api.waitForTransaction(transferTx)
               dex1.api.cancelAll(bob)
-              dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+              dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
               broadcastAndAwait(mkTransfer(alice, bob, transferAmount, Waves))
             }
           }
@@ -189,16 +190,16 @@ class TradersTestSuite extends MatcherSuiteBase {
           wavesNode1.api.broadcast(lease)
 
           withClue(s"The newest order '${newestOrder.idStr()}' is Cancelled") {
-            dex1.api.waitForOrderStatus(newestOrder, OrderStatus.Cancelled)
+            dex1.api.waitForOrderStatus(newestOrder, Status.Cancelled)
           }
           withClue(s"The oldest order '${oldestOrder.idStr()}' is still active") {
-            dex1.api.orderStatus(oldestOrder).status shouldBe OrderStatus.Accepted
+            dex1.api.orderStatus(oldestOrder).status shouldBe Status.Accepted
           }
 
           withClue("Cleanup") {
             wavesNode1.api.waitForTransaction(lease)
             dex1.api.cancelAll(bob)
-            dex1.api.waitForOrderStatus(oldestOrder, OrderStatus.Cancelled)
+            dex1.api.waitForOrderStatus(oldestOrder, Status.Cancelled)
             broadcastAndAwait(mkLeaseCancel(bob, lease.getId))
           }
         }
@@ -214,7 +215,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           wavesNode1.api.broadcast(lease)
 
           withClue(s"The order '${order.idStr()}' was cancelled") {
-            dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+            dex1.api.waitForOrderStatus(order, Status.Cancelled)
           }
 
           withClue("Cleanup") {
@@ -233,7 +234,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           wavesNode1.api.broadcast(mkTransfer(bob, alice, transferAmount, Waves, matcherFee)) // TODO fee
 
           withClue(s"The order '${order.idStr()}' was cancelled") {
-            dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
+            dex1.api.waitForOrderStatus(order, Status.Cancelled)
           }
 
           withClue("Cleanup") {
@@ -260,7 +261,7 @@ class TradersTestSuite extends MatcherSuiteBase {
           val currHeight = wavesNode1.api.currentHeight
 
           withClue(s"The order '${bobOrder.idStr()}' was cancelled") {
-            dex1.api.waitForOrderStatus(bobOrder, OrderStatus.Cancelled)
+            dex1.api.waitForOrderStatus(bobOrder, Status.Cancelled)
           }
 
           dex1.api.cancelAll(alice)

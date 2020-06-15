@@ -2,9 +2,9 @@ package com.wavesplatform.dex.settings
 
 import cats.data.NonEmptyList
 import com.typesafe.config.Config
-import com.wavesplatform.dex.AddressActor
+import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.api.websockets.actors.WsHandlerActor
+import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -13,7 +13,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
-import com.wavesplatform.dex.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
+import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import net.ceedubs.ficus.Ficus._

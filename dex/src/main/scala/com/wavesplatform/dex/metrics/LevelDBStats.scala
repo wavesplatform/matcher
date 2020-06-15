@@ -12,6 +12,6 @@ object LevelDBStats {
     def recordTagged(tag: String, totalBytes: Long): Unit   = h.refine("key", tag).record(totalBytes)
   }
 
-  val read: HistogramMetric  = Kamon.histogram("node.db.read", MeasurementUnit.information.bytes)
-  val write: HistogramMetric = Kamon.histogram("node.db.write", MeasurementUnit.information.bytes)
+  val read: HistogramMetric  = Kamon.histogram("dex.db.read", MeasurementUnit.information.bytes)
+  val write: HistogramMetric = Kamon.histogram("dex.db.write", MeasurementUnit.information.bytes)
 }

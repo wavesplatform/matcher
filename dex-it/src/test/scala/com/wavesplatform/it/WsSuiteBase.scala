@@ -1,8 +1,8 @@
 package com.wavesplatform.it
 
 import com.softwaremill.diffx.{Derived, Diff}
-import com.wavesplatform.dex.api.websockets.connection.WsConnection
-import com.wavesplatform.dex.api.websockets.{WsError, WsServerMessage}
+import com.wavesplatform.dex.api.ws.connection.WsConnection
+import com.wavesplatform.dex.api.ws.protocol.{WsError, WsServerMessage}
 import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}

@@ -23,8 +23,7 @@ object WsOrdersUpdate {
   val tpe = "osu"
 
   def from(x: OrderCanceled)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = WsOrdersUpdate(
-    NonEmptyList.one(WsCompleteOrder.fromCancelled(x.acceptedOrder, x.timestamp)),
-    timestamp = x.timestamp
+    NonEmptyList.one(WsCompleteOrder.from(x))
   )
 
   def from(x: ExchangeTransactionCreated)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
@@ -36,27 +35,7 @@ object WsOrdersUpdate {
 
     def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
-
-    def from(ao: AcceptedOrder): WsCompleteOrder = WsCompleteOrder(
-      id = ao.id,
-      timestamp = ao.order.timestamp,
-      amountAsset = ao.order.assetPair.amountAsset,
-      priceAsset = ao.order.assetPair.priceAsset,
-      side = ao.order.orderType,
-      isMarket = ao.isMarket,
-      price = denormalizePrice(ao.order.price),
-      amount = denormalizeAmountAndFee(ao.order.amount),
-      fee = denormalizeAmountAndFee(ao.order.matcherFee),
-      feeAsset = ao.order.feeAsset,
-      status = ao.status.name,
-      filledAmount = denormalizeAmountAndFee(ao.fillingInfo.filledAmount),
-      filledFee = denormalizeAmountAndFee(ao.fillingInfo.filledFee),
-      avgWeighedPrice = denormalizePrice(ao.fillingInfo.avgWeighedPrice),
-      eventTimestamp = x.reason.timestamp,
-      executedAmount = denormalizeAmountAndFee(x.reason.executedAmount).some,
-      executedFee = denormalizeAmountAndFee(x.reason.counterExecutedFee).some,
-      executedPrice = denormalizePrice(x.reason.executedPrice).some
-    )
+    def from(ao: AcceptedOrder): WsCompleteOrder     = WsCompleteOrder.from(ao, x.reason, denormalizeAmountAndFee, denormalizePrice)
 
     WsOrdersUpdate(NonEmptyList.of(ao1, x.reason.submitted).map(from), timestamp = x.tx.timestamp)
   }

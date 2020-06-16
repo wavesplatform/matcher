@@ -248,11 +248,10 @@ class AddressActor(owner: Address,
       wsInternalHandlerDirectoryRef ! WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(event))
 
     case command @ OrderCancelFailed(id, reason) =>
-      val prefix = s"Got $command"
       pendingCommands.remove(id) match {
-        case None => log.debug(s"$prefix is stale")
+        case None => // Ok on secondary matcher
         case Some(pc) =>
-          log.trace(s"$prefix, sending a response to a client")
+          log.trace(s"Got $command, sending a response to a client")
           pc.client ! api.OrderCancelRejected(reason)
       }
 

@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.api.websockets.{WsError, WsOrderBook, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.{Amount, Price}
+import com.wavesplatform.dex.market.AggregatedOrderBookActor.State._
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.model.MatcherModel.{DecimalsFormat, Denormalized}
 import com.wavesplatform.dex.model.{LastTrade, LevelAgg, LevelAmounts, OrderBook, OrderBookAggregatedSnapshot, OrderBookResult, Side}
@@ -176,8 +177,6 @@ object AggregatedOrderBookActor {
       ws: OrderBookWsState
   ) {
 
-    private val genLens: GenLens[State] = GenLens[State]
-
     lazy val marketStatus: MarketStatus = MarketStatus(
       lastTrade = lastTrade,
       bestBid = bids.headOption.map(toLevelAgg),
@@ -199,9 +198,9 @@ object AggregatedOrderBookActor {
     )
 
     def modifyHttpView(f: Map[(DecimalsFormat, Depth), HttpResponse] => Map[(DecimalsFormat, Depth), HttpResponse]): State =
-      genLens(_.compiledHttpView).modify(f)(this)
+      compiledHttpViewLens.modify(f)(this)
 
-    def modifyWs(f: OrderBookWsState => OrderBookWsState): State = genLens(_.ws).modify(f)(this)
+    def modifyWs(f: OrderBookWsState => OrderBookWsState): State = wsLens.modify(f)(this)
   }
 
   object State {
@@ -215,6 +214,10 @@ object AggregatedOrderBookActor {
         compiledHttpView = Map.empty,
         ws = OrderBookWsState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None)
       )
+
+    val genLens: GenLens[State] = GenLens[State]
+    val compiledHttpViewLens    = genLens(_.compiledHttpView)
+    val wsLens                  = genLens(_.ws)
 
     def fromOrderBook(ob: OrderBook): State = State(
       asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order

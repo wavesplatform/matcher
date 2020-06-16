@@ -22,16 +22,16 @@ package object it {
     Await.result(Future.sequence(xs.map(executeCommand(_, ignoreErrors))), timeout).sum
   }
 
-  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] = x match {
-    case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
-    case MatcherCommand.Cancel(api, owner, order) =>
-      try api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
-      catch {
-        case NonFatal(e) =>
-          if (ignoreErrors) Future.successful(0)
-          else Future.failed(e)
-      }
-  }
+  private def executeCommand(x: MatcherCommand, ignoreErrors: Boolean): Future[Int] =
+    try x match {
+      case MatcherCommand.Place(api, order) => api.tryPlace(order).map(_.fold(_ => 0, _ => 1))
+      case MatcherCommand.Cancel(api, owner, order) =>
+        api.tryCancel(owner, order).map(_.fold(_ => 0, _ => 1))
+    } catch {
+      case NonFatal(e) =>
+        if (ignoreErrors) Future.successful(0)
+        else Future.failed(e)
+    }
 
   def orderGen(matcher: PublicKey,
                trader: KeyPair,

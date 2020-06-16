@@ -25,14 +25,21 @@ case class OrderBook private (bids: Side, asks: Side, lastTrade: Option[LastTrad
 
     orderIds.get(orderId).fold((this, Option.empty[OrderCanceled], LevelAmounts.empty)) {
       case (orderType, price) =>
-        val updatedOrderIds = orderIds - orderId
-        if (orderType == OrderType.SELL) {
+        val (updatedAsks, updatedBids, lo) = if (orderType == OrderType.SELL) {
           val (updatedAsks, lo) = asks.unsafeRemove(price, orderId)
-          (copy(asks = updatedAsks, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
+          (updatedAsks, bids, lo)
         } else {
           val (updatedBids, lo) = bids.unsafeRemove(price, orderId)
-          (copy(bids = updatedBids, orderIds = updatedOrderIds), mkEvent(lo), Group.inverse(LevelAmounts.mkDiff(price, lo)))
+          (asks, updatedBids, lo)
         }
+
+        val updatedOrderIds = orderIds - orderId
+
+        (
+          copy(asks = updatedAsks, bids = updatedBids, orderIds = updatedOrderIds),
+          mkEvent(lo),
+          Group.inverse(LevelAmounts.mkDiff(price, lo))
+        )
     }
   }
 
@@ -107,7 +114,7 @@ object OrderBook {
       }
 
   /**
-    * @param submitted It is expected, that submitted is valid on eventTs
+    * @param submitted It is expected, that submitted is valid on eventTs and it is a new order
     */
   private def doMatch(eventTs: Long,
                       tickSize: Long,
@@ -141,7 +148,7 @@ object OrderBook {
             else
               (
                 ob.unsafeWithoutBest(counter.order.orderType),
-                updatedLevelChanges |+| Group.inverse(LevelAmounts.mkDiff(levelPrice, counterRemaining))
+                updatedLevelChanges |-| LevelAmounts.mkDiff(levelPrice, counterRemaining)
               )
           }
 
@@ -221,7 +228,7 @@ object OrderBook {
     val r = HashMap.newBuilder[Order.Id, (OrderType, Price)]
 
     for {
-      (price, level) <- (bids: Iterable[(Price, Seq[LimitOrder])]) ++ asks
+      (price, level) <- asks.toIterator ++ bids.toIterator
       lo             <- level
     } r.+=((lo.order.id(), (lo.order.orderType, price))) // The compiler doesn't allow write this less ugly
 

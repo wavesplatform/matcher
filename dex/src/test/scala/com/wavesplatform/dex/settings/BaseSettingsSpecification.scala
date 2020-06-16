@@ -155,6 +155,12 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          client.bar = 3
          |        }
          |      }
+         |
+         |      circuit-breaker {
+         |        max-failures = 999
+         |        call-timeout = 123s
+         |        reset-timeout = 1d
+         |      }
          |    }
          |    process-consumed-timeout = 663s
          |    $orderFeeStr

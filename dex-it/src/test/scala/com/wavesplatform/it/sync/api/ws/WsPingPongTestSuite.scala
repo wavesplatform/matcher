@@ -15,7 +15,7 @@ class WsPingPongTestSuite extends WsSuiteBase {
   private val maxConnectionLifetime = 6.seconds
   private val pingInterval          = 1.second
   private val pongTimeout           = pingInterval * 3
-  private val delta                 = 0.5.seconds
+  private val delta                 = 1.second
 
   private implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
 

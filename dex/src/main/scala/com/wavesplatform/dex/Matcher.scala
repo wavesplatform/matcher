@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
-import akka.pattern.{ask, gracefulStop}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -180,6 +180,16 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield o
   }
 
+  private val storeBreaker = new CircuitBreaker(
+    actorSystem.scheduler,
+    maxFailures = settings.eventsQueue.circuitBreaker.maxFailures,
+    callTimeout = settings.eventsQueue.circuitBreaker.callTimeout,
+    resetTimeout = settings.eventsQueue.circuitBreaker.resetTimeout
+  )
+
+  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
+    storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+
   private def matcherApiRoutes(apiKeyHash: Option[Array[Byte]]): Seq[ApiRoute] = {
     Seq(
       MatcherApiRoute(
@@ -187,7 +197,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         matcherPublicKey,
         matcherActor,
         addressActors,
-        matcherQueue.storeEvent,
+        storeEvent,
         p => Option { orderBooks.get() } flatMap (_ get p),
         orderBookHttpInfo,
         getActualTickSize = assetPair => {
@@ -365,7 +375,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         time,
         orderDB,
         validateForAddress,
-        matcherQueue.storeEvent,
+        storeEvent,
         startSchedules,
         spendableBalancesActor,
         settings.addressActorSettings

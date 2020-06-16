@@ -16,7 +16,6 @@ import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.Gen
-import org.scalatest.Assertion
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -158,6 +157,35 @@ ${diff.mkString("\n")}
         }
     }
 
+    "order book invariant" in forAll(coinsInvariantPropGen) {
+      case (askOrders, bidOrders, newOrder) =>
+        val ob                     = mkOrderBook(askOrders, bidOrders)
+        val (updatedOb, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+
+        val clue =
+          s"""
+Pair:
+$assetPair
+
+Order:
+${format(newOrder)}
+
+OrderBook before:
+${format(ob)}
+
+OrderBook after:
+${format(updatedOb)}
+
+Events:
+${formatEvents(events)}
+"""
+
+        withClue(clue) {
+          obAskBidIntersectionInvariant(ob)
+          obAskBidIntersectionInvariant(updatedOb)
+        }
+    }
+
     "result.levelChanges contains diff for updatedOrderBook.level" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob       = mkOrderBook(askOrders, bidOrders)
@@ -229,6 +257,10 @@ $updatedSnapshot
       orderRemoved shouldBe true
     }
 
+    "order book invariant" in test(removedGen) { (_, _, obAfter, _, _) =>
+      obAskBidIntersectionInvariant(obAfter)
+    }
+
     "no other order was removed" in test(removedGen) { (ob, orderIdToCancel, obAfter, _, _) =>
       val orderIdsBefore = orderIds(ob)
       val orderIdsAfter  = orderIds(obAfter)
@@ -250,7 +282,7 @@ $updatedSnapshot
       expectedLevelChanges should matchTo(actualLevelChanges)
     }
 
-    def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Assertion): Unit = forAll(gen) {
+    def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Any): Unit = forAll(gen) {
       case (origOb, orderIdToCancel) =>
         val (updatedOb, events, levelChanges) = origOb.cancel(orderIdToCancel, ts)
         withClue(mkClue(orderIdToCancel, origOb, updatedOb, events, levelChanges)) {
@@ -320,6 +352,12 @@ ${canceledOrders.mkString("\n")}
 
         expectedLevelChanges should matchTo(levelChanges)
     }
+  }
+
+  private def obAskBidIntersectionInvariant(ob: OrderBook): Unit = {
+    val firstAskPrice = ob.asks.headOption.map(_._1).getOrElse(Long.MaxValue)
+    val firstBidPrice = ob.bids.headOption.map(_._1).getOrElse(Long.MinValue)
+    firstAskPrice should be > firstBidPrice
   }
 
   private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_.order.id()).toSet

@@ -4,7 +4,7 @@ import java.time.{Instant, Duration => JDuration}
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, Cancellable, Status, typed}
-import akka.pattern.{ask, pipe}
+import akka.pattern.{CircuitBreakerOpenException, ask, pipe}
 import akka.{actor => classic}
 import cats.instances.long.catsKernelStdGroupForLong
 import cats.kernel.Group
@@ -33,7 +33,7 @@ import com.wavesplatform.dex.time.Time
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Queue
-import scala.collection.mutable.{AnyRefMap => MutableMap}
+import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success}
@@ -52,13 +52,17 @@ class AddressActor(owner: Address,
   import context.dispatcher
 
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
+  private val ignoreRef           = context.system.toTyped.ignoreRef.toClassic
 
   private var placementQueue  = Queue.empty[Order.Id]
   private val pendingCommands = MutableMap.empty[Order.Id, PendingCommand]
 
   private val activeOrders = MutableMap.empty[Order.Id, AcceptedOrder]
   private var openVolume   = Map.empty[Asset, Long]
-  private val expiration   = MutableMap.empty[ByteStr, Cancellable]
+  private val expiration   = MutableMap.empty[Order.Id, Cancellable]
+
+  // Saves from cases when a client does multiple requests with the same order
+  private val failedPlacements = MutableSet.empty[Order.Id]
 
   private var addressWsMutableState = AddressWsMutableState.empty(owner)
 
@@ -68,7 +72,7 @@ class AddressActor(owner: Address,
       val orderId = command.order.id()
 
       if (totalActiveOrders >= settings.maxActiveOrders) sender ! api.OrderRejected(error.ActiveOrdersLimitReached(settings.maxActiveOrders))
-      else if (hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
+      else if (failedPlacements.contains(orderId) || hasOrder(orderId)) sender ! api.OrderRejected(error.OrderDuplicate(orderId))
       else {
         val shouldProcess = placementQueue.isEmpty
         placementQueue = placementQueue.enqueue(orderId)
@@ -142,9 +146,13 @@ class AddressActor(owner: Address,
 
       if (toCancel.isEmpty) log.trace(s"Got $msg, nothing to cancel")
       else {
-        val msg = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
-        log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $msg")
-        toCancel.foreach(x => cancel(x.order))
+        val cancelledText = toCancel.map(x => s"${x.insufficientAmount} ${x.assetId} for ${x.order.idStr()}").mkString(", ")
+        log.debug(s"Got $msg, canceling ${toCancel.size} of ${activeOrders.size}: doesn't have $cancelledText")
+        toCancel.foreach { x =>
+          val id = x.order.id()
+          pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
+          cancel(x.order)
+        }
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
@@ -172,7 +180,7 @@ class AddressActor(owner: Address,
       sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
     case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
-      log.trace(s"Got $storeFailed")
+      failedPlacements.add(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! CanNotPersist(reason)
         queueEvent match {
@@ -185,6 +193,8 @@ class AddressActor(owner: Address,
           case _ =>
         }
       }
+
+    case _: Event.StoreSucceeded => if (failedPlacements.nonEmpty) failedPlacements.clear()
 
     case event: ValidationEvent =>
       log.trace(s"Got $event")
@@ -251,6 +261,7 @@ class AddressActor(owner: Address,
         case Some(ao) =>
           if ((ao.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
             log.debug(s"$prefix, storing cancel event")
+            pendingCommands.put(id, PendingCommand(Command.CancelOrder(id), ignoreRef)) // To prevent orders being cancelled twice
             cancel(ao.order)
           } else {
             log.trace(s"$prefix, can't find an active order")
@@ -442,11 +453,12 @@ class AddressActor(owner: Address,
   }
 
   private def getOrdersToCancel(actualBalance: Map[Asset, Long]): Queue[InsufficientBalanceOrder] = {
+    val inProgress = pendingCancels
     // Now a user can have 100 active transaction maximum - easy to traverse.
     activeOrders.values.toVector
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .iterator
-      .filter(_.isLimit)
+      .filter(x => x.isLimit && !inProgress.contains(x.id))
       .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {
         case ((restBalance, toDelete), (order, requiredBalance)) =>
@@ -461,6 +473,11 @@ class AddressActor(owner: Address,
       }
       ._2
   }
+
+  private def pendingCancels: Set[Order.Id] =
+    pendingCommands.collect {
+      case (_, PendingCommand(Command.CancelOrder(id), _)) => id
+    }.toSet
 
   private def cancellationInProgress(id: Order.Id): Boolean = pendingCommands.get(id).fold(false) {
     _.command match {
@@ -491,15 +508,20 @@ class AddressActor(owner: Address,
         case Success(None) => Success(Some(error.FeatureDisabled))
         case Success(_)    => Success(None)
         case Failure(e) =>
-          e match {
-            case _: TimeoutException => log.warn(s"Timeout during storing $event for $orderId")
-            case _                   =>
-          }
+          val prefix = s"Store failed for $orderId, $event"
+          log.warn(
+            e match {
+              case _: TimeoutException            => s"$prefix: timeout during storing $event for $orderId"
+              case _: CircuitBreakerOpenException => s"$prefix: fail fast due to circuit breaker"
+              case _                              => prefix
+            },
+            e
+          )
           Success(Some(error.CanNotPersistEvent))
       }
       .onComplete {
         case Success(Some(error)) => self ! Event.StoreFailed(orderId, error, event)
-        case Success(None)        => log.trace(s"$event saved")
+        case Success(None)        => self ! Event.StoreSucceeded(orderId, event); log.trace(s"$event saved")
         case _                    => throw new IllegalStateException("Impossibru")
       }
 
@@ -587,6 +609,7 @@ object AddressActor {
       override def orderId: Order.Id = acceptedOrder.id
     }
     case class StoreFailed(orderId: Order.Id, reason: MatcherError, queueEvent: QueueEvent) extends Event
+    case class StoreSucceeded(orderId: Order.Id, queueEvent: QueueEvent)                    extends Event
   }
 
   sealed trait WsCommand extends Message

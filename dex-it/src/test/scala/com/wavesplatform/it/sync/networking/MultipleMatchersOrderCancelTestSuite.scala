@@ -6,9 +6,9 @@ import com.wavesplatform.dex.domain.order.OrderType
 import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.MatcherSuiteBase
-import com.wavesplatform.it.tags.DexItKafkaRequired
+import com.wavesplatform.it.tags.DexItExternalKafkaRequired
 
-@DexItKafkaRequired
+@DexItExternalKafkaRequired
 class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
   override protected def dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex.price-assets = [ "$UsdId", "WAVES" ]""".stripMargin)
@@ -17,7 +17,7 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     wavesNode1.start()
-    broadcastAndAwait(IssueUsdTx)
+    broadcastAndAwait(IssueUsdTx, IssueEthTx)
     dex1.start()
     dex2.start()
   }
@@ -34,9 +34,11 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
     val acc1 = mkAccountWithBalance(15.015.waves -> Waves)
     val acc2 = mkAccountWithBalance(0.015.waves  -> Waves, 15.usd -> usd)
+    val acc3 = mkAccountWithBalance(1.waves      -> Waves, 10.eth -> eth) // Account for fake orders
 
+    val ts = System.currentTimeMillis()
     val sellOrders = (1 to 5).map { amt =>
-      mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, amt)
+      mkOrderDP(acc1, wavesUsdPair, OrderType.SELL, amt.waves, amt, ts = ts + amt) // To cancel latest first
     }
 
     sellOrders.foreach { placeAndAwaitAtDex(_) }
@@ -47,15 +49,25 @@ class MultipleMatchersOrderCancelTestSuite extends MatcherSuiteBase {
 
     dex1.api.saveSnapshots
     dex1.restartWithNewSuiteConfig(ConfigFactory.parseString(s"waves.dex.events-queue.type = local").withFallback(dexInitialSuiteConfig))
-
-    (1 to 3).foreach { amt =>
-      val order = mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
-      dex2.api.place(order)
-      dex2.api.waitForOrderStatus(order, OrderStatus.Filled)
+    // HACK: Because we switched the queue, we need to place 5 orders to move offset of queue.
+    // If we don't do this, internal cancels will be ignored by order books.
+    (1 to 5).foreach { _ =>
+      dex1.api.place(mkOrderDP(acc3, ethWavesPair, OrderType.SELL, 1.eth, 1))
     }
 
-    // problem solution should prevent sell orders from cancelling!
-    dex1.api.waitForOrderStatus(sellOrders(4), OrderStatus.Cancelled)
-    dex1.api.waitForOrderStatus(sellOrders(3), OrderStatus.Cancelled)
+    val submittedOrders = (1 to 3).map { amt =>
+      mkOrderDP(acc2, wavesUsdPair, OrderType.BUY, amt.waves, amt)
+    }
+    submittedOrders.foreach(placeAndAwaitAtDex(_, OrderStatus.Filled, dex2))
+    submittedOrders.foreach(waitForOrderAtNode(_, dex2.api))
+
+    (0 to 2).foreach { i =>
+      dex1.api.waitForOrderStatus(sellOrders(i), OrderStatus.Accepted)
+    }
+
+    // TODO problem solution should prevent sell orders from cancelling!
+    (3 to 4).foreach { i =>
+      dex1.api.waitForOrderStatus(sellOrders(i), OrderStatus.Cancelled)
+    }
   }
 }

@@ -75,7 +75,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
     "correctly handle rejections" in {
       val invalidAssetPair = AssetPair(Waves, eth)
 
-      val wsc = mkWsConnection(dex1)
+      val wsc = mkDexWsConnection(dex1)
       wsc.send(WsOrderBookSubscribe(invalidAssetPair, 1))
 
       wsc.receiveAtLeastN[WsError](1).head should matchTo(
@@ -410,7 +410,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(bob, btcUsdPair, SELL, 1.btc, 8698.782732)
       ) foreach { placeAndAwaitAtDex(_) }
 
-      val wsc = mkWsConnection(dex1)
+      val wsc = mkDexWsConnection(dex1)
 
       Seq(wavesUsdPair, wavesBtcPair, ethWavesPair, btcUsdPair, wavesUsdPair).foreach { assetPair =>
         wsc.send(WsOrderBookSubscribe(assetPair, 1))

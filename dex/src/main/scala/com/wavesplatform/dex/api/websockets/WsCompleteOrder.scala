@@ -123,7 +123,7 @@ object WsCompleteOrder {
         (__ \ "a").format[Double](doubleAsStringFormat) and         // amount
         (__ \ "f").format[Double](doubleAsStringFormat) and         // fee
         (__ \ "F").format[Asset] and                                // fee asset
-        (__ \ "s").format[String](orderStatusFormat) and            // status: ACCEPTED or FILLED or PARTIALLY_FILLED or CANCELLED
+        (__ \ "s").format[String](orderStatusFormat) and            // status: FILLED or PARTIALLY_FILLED or CANCELLED
         (__ \ "q").format[Double](doubleAsStringFormat) and         // filled amount
         (__ \ "Q").format[Double](doubleAsStringFormat) and         // filled fee
         (__ \ "r").format[Double](doubleAsStringFormat) and         // average weighed price

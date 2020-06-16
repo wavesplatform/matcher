@@ -34,6 +34,7 @@ object WsInternalBroadcastActor {
         Behaviors
           .receiveMessage[Message] {
             case Command.Collect(update) =>
+              context.log.info(s"Got Collect(${update})") // Json.toJson(update)
               default {
                 state
                   .withUpdates(update)
@@ -41,6 +42,7 @@ object WsInternalBroadcastActor {
               }
 
             case Command.Subscribe(clientRef) =>
+              context.log.info(s"[${clientRef.path.name}] subscribed")
               context.watch(clientRef)
               default {
                 state
@@ -49,6 +51,7 @@ object WsInternalBroadcastActor {
               }
 
             case Command.SendWsUpdates =>
+              context.log.info(s"Got SendWsUpdates, sending ${state.collectedUpdates}") // Json.toJson(state.collectedUpdates)
               state.collectedUpdates
                 .map(WsInternalClientHandlerActor.Command.ForwardToClient)
                 .foreach { message =>
@@ -57,7 +60,9 @@ object WsInternalBroadcastActor {
               default(state.withoutUpdates.runSchedule(settings.messagesInterval, context))
           }
           .receiveSignal {
-            case (_, Terminated(ws)) => default(state.updateSubscriptions(_ - ws.unsafeUpcast[WsInternalClientHandlerActor.Message]))
+            case (_, Terminated(clientRef)) =>
+              context.log.info(s"[${clientRef.path.name}] closed")
+              default(state.updateSubscriptions(_ - clientRef.unsafeUpcast[WsInternalClientHandlerActor.Message]))
           }
 
       default(State(none, Set.empty, Cancellable.alreadyCancelled))
@@ -76,10 +81,12 @@ object WsInternalBroadcastActor {
     }
 
     def runSchedule(interval: FiniteDuration, context: ActorContext[Message]): State =
-      if (schedule.isCancelled && subscriptions.nonEmpty) copy(schedule = context.scheduleOnce(interval, context.self, Command.SendWsUpdates))
+      if (schedule.isCancelled && subscriptions.nonEmpty && collectedUpdates.nonEmpty)
+        copy(schedule = context.scheduleOnce(interval, context.self, Command.SendWsUpdates))
       else this
 
-    def withoutUpdates: State                 = copy(collectedUpdates = none)
-    def withUpdates(x: WsOrdersUpdate): State = if (subscriptions.isEmpty) this else copy(collectedUpdates = collectedUpdates.map(_.append(x)))
+    def withoutUpdates: State = copy(collectedUpdates = none)
+    def withUpdates(x: WsOrdersUpdate): State =
+      if (subscriptions.isEmpty) this else copy(collectedUpdates = collectedUpdates.foldLeft(x)(_ append _).some)
   }
 }

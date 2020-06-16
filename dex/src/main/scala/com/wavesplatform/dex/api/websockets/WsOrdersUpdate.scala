@@ -27,7 +27,7 @@ object WsOrdersUpdate {
   )
 
   def from(x: ExchangeTransactionCreated)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
-    val ao1       = x.reason.counter
+    val ao1       = x.reason.counterRemaining
     val assetPair = ao1.order.assetPair
 
     val amountAssetDecimals = efc.assetDecimals(assetPair.amountAsset)
@@ -37,7 +37,7 @@ object WsOrdersUpdate {
     def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
     def from(ao: AcceptedOrder): WsCompleteOrder     = WsCompleteOrder.from(ao, x.reason, denormalizeAmountAndFee, denormalizePrice)
 
-    WsOrdersUpdate(NonEmptyList.of(ao1, x.reason.submitted).map(from), timestamp = x.tx.timestamp)
+    WsOrdersUpdate(NonEmptyList.of(ao1, x.reason.submittedRemaining).map(from), timestamp = x.tx.timestamp)
   }
 
   def wsUnapply(arg: WsOrdersUpdate): Option[(String, Long, NonEmptyList[WsCompleteOrder])] = (arg.tpe, arg.timestamp, arg.orders).some

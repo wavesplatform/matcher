@@ -470,6 +470,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         BroadcastActor.routed(txWriterRef),
         BroadcastActor.routed(wavesNetTxBroadcasterRef),
         BroadcastActor.adapted(wsInternalBroadcast) { x =>
+          log.info(s"Sending to WS $x")
           WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(x))
         }
       ),

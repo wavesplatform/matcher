@@ -7,9 +7,9 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
@@ -96,14 +96,16 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   def mkAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
     val account = mkKeyPair(s"account-test-${ThreadLocalRandom.current().nextInt}")
-    balances.foreach {
+    val transfers = balances.map {
       case (balance, asset) =>
         val sender = asset match {
           case Waves           => alice
           case ia: IssuedAsset => if (wavesNode1.api.assetBalance(alice, ia).balance >= balance) alice else bob
         }
-        broadcastAndAwait { mkTransfer(sender, account, balance, asset, 0.003.waves) }
+        mkTransfer(sender, account, balance, asset, 0.003.waves)
     }
+    transfers.foreach(wavesNode1.api.broadcast)
+    transfers.foreach(wavesNode1.api.waitForTransaction)
     account
   }
 

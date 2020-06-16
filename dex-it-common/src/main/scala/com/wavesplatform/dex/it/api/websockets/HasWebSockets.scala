@@ -39,19 +39,25 @@ trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps w
                                       keepAlive: Boolean = true,
                                       subscriptionLifetime: FiniteDuration = 1.hour): WsConnection = {
     val jwt        = mkJwt(client, lifetime = subscriptionLifetime)
-    val connection = mkWsConnection(dex, keepAlive)
+    val connection = mkDexWsConnection(dex, keepAlive)
     connection.send(WsAddressSubscribe(client.toAddress, WsAddressSubscribe.defaultAuthType, jwt))
     connection
   }
 
   protected def mkWsOrderBookConnection(assetPair: AssetPair, dex: DexContainer, depth: Int = 1): WsConnection = {
-    val connection = mkWsConnection(dex)
+    val connection = mkDexWsConnection(dex)
     connection.send(WsOrderBookSubscribe(assetPair, depth))
     connection
   }
 
-  protected def mkWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection = {
-    new WsConnection(getWsStreamUri(dex), keepAlive) unsafeTap { wsc =>
+  protected def mkWsInternalConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
+    mkWsConnection(s"${getWsStreamUri(dex)}/internal", keepAlive)
+
+  protected def mkDexWsConnection(dex: DexContainer, keepAlive: Boolean = true): WsConnection =
+    mkWsConnection(getWsStreamUri(dex), keepAlive)
+
+  protected def mkWsConnection(uri: String, keepAlive: Boolean = true): WsConnection = {
+    new WsConnection(uri, keepAlive) unsafeTap { wsc =>
       addConnection(wsc)
       eventually { wsc.collectMessages[WsInitial] should have size 1 }
       wsc.clearMessages()

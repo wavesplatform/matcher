@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder, WsOrderBook}
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 
@@ -39,5 +39,9 @@ trait WsMessageOps {
           )
         )
     }
+  }
+
+  implicit class WsOrderUpdatesListOps(self: List[WsOrdersUpdate]) {
+    def orderEvents: Map[Order.Id, List[WsCompleteOrder]] = self.flatMap(_.orders.toList).groupBy(_.id)
   }
 }

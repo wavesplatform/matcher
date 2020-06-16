@@ -41,7 +41,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val fooAddress = mkKeyPair("foo").toAddress
       val barKeyPair = mkKeyPair("bar")
 
-      val wsc = mkWsConnection(dex1)
+      val wsc = mkDexWsConnection(dex1)
       wsc.send(
         WsAddressSubscribe(
           fooAddress,
@@ -385,7 +385,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   }
 
   "Connection should close old address subscriptions when address subscriptions limit has been reached" in {
-    val wsc = mkWsConnection(dex1)
+    val wsc = mkDexWsConnection(dex1)
 
     val carol = mkKeyPair("carol")
     val eve   = mkKeyPair("eve")

@@ -70,7 +70,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       dex1.api.currentOffset shouldBe offsetBefore
     }
 
-    // dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe 'right
+     dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe 'right
 
     dex1.api.cancelAll(alice)
   }

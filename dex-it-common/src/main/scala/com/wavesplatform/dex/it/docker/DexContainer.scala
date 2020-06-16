@@ -55,7 +55,7 @@ object DexContainer extends ScorexLogging {
                          tryHttpBackend: LoggingSttpBackend[Try, Nothing],
                          futureHttpBackend: LoggingSttpBackend[Future, Nothing],
                          ec: ExecutionContext): DexContainer = {
-767
+
     val underlying = GenericContainer(
       dockerImage = s"com.wavesplatform/dex-it:$tag",
       exposedPorts = Seq(restApiPort),

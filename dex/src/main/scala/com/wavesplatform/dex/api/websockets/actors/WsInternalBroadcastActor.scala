@@ -24,7 +24,7 @@ object WsInternalBroadcastActor {
     case class Collect(update: WsOrdersUpdate) extends Command
   }
 
-  final case class Settings(wsMessagesInterval: FiniteDuration)
+  final case class Settings(messagesInterval: FiniteDuration)
 
   def apply(settings: Settings): Behavior[Message] =
     Behaviors.setup[Message] { context =>
@@ -37,7 +37,7 @@ object WsInternalBroadcastActor {
               default {
                 state
                   .withUpdates(update)
-                  .runSchedule(settings.wsMessagesInterval, context)
+                  .runSchedule(settings.messagesInterval, context)
               }
 
             case Command.Subscribe(clientRef) =>
@@ -45,7 +45,7 @@ object WsInternalBroadcastActor {
               default {
                 state
                   .updateSubscriptions(_ + clientRef)
-                  .runSchedule(settings.wsMessagesInterval, context)
+                  .runSchedule(settings.messagesInterval, context)
               }
 
             case Command.SendWsUpdates =>
@@ -54,7 +54,7 @@ object WsInternalBroadcastActor {
                 .foreach { message =>
                   state.subscriptions.foreach(_ ! message)
                 }
-              default(state.withoutUpdates.runSchedule(settings.wsMessagesInterval, context))
+              default(state.withoutUpdates.runSchedule(settings.messagesInterval, context))
           }
           .receiveSignal {
             case (_, Terminated(ws)) => default(state.updateSubscriptions(_ - ws.unsafeUpcast[WsInternalClientHandlerActor.Message]))

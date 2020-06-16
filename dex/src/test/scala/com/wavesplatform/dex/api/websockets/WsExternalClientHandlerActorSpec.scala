@@ -10,8 +10,8 @@ import akka.testkit.TestProbe
 import cats.syntax.either._
 import com.wavesplatform.dex.AddressActor.WsCommand
 import com.wavesplatform.dex._
-import com.wavesplatform.dex.api.websockets.actors.WsExternalClientHandlerActor
 import com.wavesplatform.dex.api.websockets.actors.WsExternalClientHandlerActor.Command.ProcessClientMessage
+import com.wavesplatform.dex.api.websockets.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -293,11 +293,16 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
 
     val wsHandlerRef = testKit.spawn(
       WsExternalClientHandlerActor(
-        settings = WsExternalClientHandlerActor.Settings(10.minutes,
-                                                         1.minute,
-                                                         3.minutes,
-                                                         Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
-                                                         subscriptionsSettings),
+        settings = WsExternalClientHandlerActor.Settings(
+          messagesInterval = 100.millis,
+          maxConnectionLifetime = 10.minutes,
+          jwtPublicKey = Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
+          subscriptions = subscriptionsSettings,
+          healthCheck = WsHealthCheckSettings(
+            pingInterval = 1.minute,
+            pongTimeout = 3.minutes
+          )
+        ),
         time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,

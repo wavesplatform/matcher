@@ -4,6 +4,7 @@ import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 
 import com.softwaremill.diffx.Diff
+import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.websockets.WsOrderBook.WsSide
 import com.wavesplatform.dex.domain.account.KeyPair
@@ -14,7 +15,6 @@ import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.settings.OrderRestrictionsSettings
-import com.wavesplatform.dex.{AddressActor, MatcherSpecBase}
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

@@ -14,7 +14,8 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
+import com.wavesplatform.dex.model.Events.{ExchangeTransactionCreated, OrderExecuted}
+import com.wavesplatform.dex.model.LimitOrder
 import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
 import com.wavesplatform.dex.time.Time
 import org.scalamock.scalatest.PathMockFactory
@@ -46,7 +47,7 @@ class ExchangeTransactionBroadcastActorSpecification
   "ExchangeTransactionBroadcastActor" should {
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      defaultActor(
+      val actor = defaultActor(
         time,
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
@@ -56,7 +57,7 @@ class ExchangeTransactionBroadcastActorSpecification
       )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       eventually {
         broadcasted shouldBe Seq(event.tx)
       }
@@ -74,7 +75,7 @@ class ExchangeTransactionBroadcastActorSpecification
       )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
@@ -98,7 +99,7 @@ class ExchangeTransactionBroadcastActorSpecification
         )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       actor ! ExchangeTransactionBroadcastActor.CheckAndSend
@@ -121,7 +122,7 @@ class ExchangeTransactionBroadcastActorSpecification
         )
 
       val event = sampleEvent(500.millis)
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       actor ! ExchangeTransactionBroadcastActor.CheckAndSend
@@ -150,7 +151,7 @@ class ExchangeTransactionBroadcastActorSpecification
         )
 
         val event = sampleEvent()
-        system.eventStream.publish(event)
+        actor ! event
         eventually {
           firstProcessed.get shouldBe true
         }
@@ -182,7 +183,7 @@ class ExchangeTransactionBroadcastActorSpecification
         )
 
         val event = sampleEvent()
-        system.eventStream.publish(event)
+        actor ! event
         eventually {
           firstProcessing.get() shouldBe true
           triedToBroadcast should not be empty
@@ -214,38 +215,48 @@ class ExchangeTransactionBroadcastActorSpecification
 
   private def sampleEvent(expiration: FiniteDuration = 1.day): ExchangeTransactionCreated = {
     val ts = time.getTimestamp
+    val buyOrder = Order.buy(
+      sender = KeyPair(Array.emptyByteArray),
+      matcher = KeyPair(Array.emptyByteArray),
+      pair = pair,
+      amount = 100,
+      price = 6000000L,
+      timestamp = ts,
+      expiration = ts + expiration.toMillis,
+      matcherFee = 100
+    )
+    val sellOrder = Order.sell(
+      sender = KeyPair(Array.emptyByteArray),
+      matcher = KeyPair(Array.emptyByteArray),
+      pair = pair,
+      amount = 100,
+      price = 6000000L,
+      timestamp = ts,
+      expiration = ts + expiration.toMillis,
+      matcherFee = 100
+    )
+    val event = OrderExecuted(
+      submitted = LimitOrder(buyOrder),
+      counter = LimitOrder(sellOrder),
+      timestamp = ts,
+      counterExecutedFee = 300000L,
+      submittedExecutedFee = 300000L
+    )
     ExchangeTransactionCreated(
-      ExchangeTransactionV2
+      tx = ExchangeTransactionV2
         .create(
-          buyOrder = Order.buy(
-            sender = KeyPair(Array.emptyByteArray),
-            matcher = KeyPair(Array.emptyByteArray),
-            pair = pair,
-            amount = 100,
-            price = 6000000L,
-            timestamp = ts,
-            expiration = ts + expiration.toMillis,
-            matcherFee = 100
-          ),
-          sellOrder = Order.sell(
-            sender = KeyPair(Array.emptyByteArray),
-            matcher = KeyPair(Array.emptyByteArray),
-            pair = pair,
-            amount = 100,
-            price = 6000000L,
-            timestamp = ts,
-            expiration = ts + expiration.toMillis,
-            matcherFee = 100
-          ),
-          amount = 100,
-          price = 6000000L,
-          buyMatcherFee = 0L,
-          sellMatcherFee = 0L,
+          buyOrder = buyOrder,
+          sellOrder = sellOrder,
+          amount = event.executedAmount,
+          price = event.executedPrice,
+          buyMatcherFee = event.submittedExecutedFee,
+          sellMatcherFee = event.counterExecutedFee,
           fee = 300000L,
           timestamp = ts,
           proofs = Proofs.empty
         )
-        .explicitGet()
+        .explicitGet(),
+      reason = event
     )
   }
 }

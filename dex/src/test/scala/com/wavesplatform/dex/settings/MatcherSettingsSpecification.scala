@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.api.websockets.actors.WsExternalClientHandlerActor
+import com.wavesplatform.dex.api.websockets.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -105,8 +105,11 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 bar
 baz"""
     settings.webSocketSettings should matchTo(
-      WebSocketSettings(100.milliseconds,
-                        WsExternalClientHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
+      WebSocketSettings(
+        externalClientHandler = WsExternalClientHandlerActor.Settings(1.day, 3.days, expectedJwtPublicKey, SubscriptionsSettings(20, 20), WsHealthCheckSettings(9.minutes, 129.minutes)),
+        internalBroadcast = WsInternalBroadcastActor.Settings(923.millis),
+        internalClientHandler = WsInternalClientHandlerActor.Settings(WsHealthCheckSettings(10.minutes, 374.minutes))
+      )
     )
     settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
@@ -486,8 +489,8 @@ baz"""
          """.stripMargin
 
     getSettingByConfig(configWithSettings(subscriptionsSettings = invalidSubscriptionsSettings)) should produce(
-      "Invalid setting web-sockets.web-socket-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
-        "Invalid setting web-sockets.web-socket-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
+      "Invalid setting web-sockets.external-client-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
+        "Invalid setting web-sockets.external-client-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
     )
   }
 }

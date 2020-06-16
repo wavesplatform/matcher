@@ -21,10 +21,12 @@ class WsPingPongTestSuite extends WsSuiteBase {
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(
-      s"""waves.dex.web-sockets.web-socket-handler {
+      s"""waves.dex.web-sockets.external-client-handler {
         |    max-connection-lifetime = $maxConnectionLifetime
-        |    ping-interval = $pingInterval
-        |    pong-timeout = $pongTimeout
+        |    health-check = {
+        |      ping-interval = $pingInterval
+        |      pong-timeout = $pongTimeout
+        |    }
         | }
         |""".stripMargin
     )

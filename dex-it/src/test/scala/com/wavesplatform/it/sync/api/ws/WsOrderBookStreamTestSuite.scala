@@ -58,7 +58,7 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
        |      }
        |    ]
        |  }
-       |  web-sockets.web-socket-handler.subscriptions.max-order-book-number = 3
+       |  web-sockets.external-client-handler.subscriptions.max-order-book-number = 3
        |}
        """.stripMargin
   )

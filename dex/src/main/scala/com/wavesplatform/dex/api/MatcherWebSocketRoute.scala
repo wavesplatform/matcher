@@ -72,7 +72,7 @@ case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsIntern
         .named(s"server-$clientId")
 
     val serverSink: Sink[Message, NotUsed] =
-      mkServerSink[WsPingOrPong, WsExternalClientHandlerActor.Command](clientId, externalClientHandler.healthCheck.pingInterval / 5) {
+      mkServerSink[WsClientMessage, WsExternalClientHandlerActor.Command](clientId, externalClientHandler.healthCheck.pingInterval / 5) {
         case Right(x) => WsExternalClientHandlerActor.Command.ProcessClientMessage(x)
         case Left(x)  => WsExternalClientHandlerActor.Command.ForwardToClient(x)
       }.to(server)

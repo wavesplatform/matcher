@@ -14,6 +14,7 @@ import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 import scala.collection.JavaConverters._
 
 trait HasDex { self: BaseContainersKit =>
+  private val defaultTag = Option(System.getenv("DEX_TAG")).getOrElse("latest")
 
   protected implicit def toDexExplicitGetOps[F[_]: CanExtract: Functor](self: DexApi[F]): DexApiOps.ExplicitGetDexApiOps[F] = {
     new DexApiOps.ExplicitGetDexApiOps[F](self)
@@ -40,7 +41,7 @@ trait HasDex { self: BaseContainersKit =>
   protected def createDex(name: String,
                           runConfig: Config = dexRunConfig,
                           suiteInitialConfig: Config = dexInitialSuiteConfig,
-                          tag: String = "latest"): DexContainer =
+                          tag: String = defaultTag): DexContainer =
     DexContainer(name, networkName, network, getIp(name), runConfig, suiteInitialConfig, localLogsDir, tag) unsafeTap addKnownContainer
 
   lazy val dex1: DexContainer = createDex("dex-1")

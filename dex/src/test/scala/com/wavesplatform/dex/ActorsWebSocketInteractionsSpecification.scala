@@ -3,6 +3,7 @@ package com.wavesplatform.dex
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
@@ -88,7 +89,8 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
           enableSchedules,
-          spendableBalancesActor
+          spendableBalancesActor,
+          system.toTyped.ignoreRef
         )
       )
     }
@@ -501,19 +503,13 @@ class ActorsWebSocketInteractionsSpecification
           )
 
           placeOrder(counter1)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)),
-                                    Seq(WsOrder.fromDomain(counter1)),
-                                    1)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)), Seq(WsOrder.fromDomain(counter1)), 1)
 
           placeOrder(counter2)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)),
-                                    Seq(WsOrder.fromDomain(counter2)),
-                                    2)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)), Seq(WsOrder.fromDomain(counter2)), 2)
 
           placeOrder(counter3)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)),
-                                    Seq(WsOrder.fromDomain(counter3)),
-                                    3)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)), Seq(WsOrder.fromDomain(counter3)), 3)
 
           mo = matchOrders(mo, counter1)._1
           expectWsBalancesAndOrders(

@@ -292,12 +292,12 @@ class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers wit
     val connectionId = UUID.randomUUID().toString
 
     val wsHandlerRef = testKit.spawn(
-      WsExternalHandlerActor(
+      WsExternalClientHandlerActor(
         settings = WsExternalClientHandlerActor.Settings(10.minutes,
-                                           1.minute,
-                                           3.minutes,
-                                           Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
-                                           subscriptionsSettings),
+                                                         1.minute,
+                                                         3.minutes,
+                                                         Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
+                                                         subscriptionsSettings),
         time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,

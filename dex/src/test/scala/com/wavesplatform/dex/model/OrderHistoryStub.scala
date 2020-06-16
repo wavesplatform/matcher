@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.model
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.wavesplatform.dex.db.{EmptyOrderDB, TestOrderDB}
 import com.wavesplatform.dex.domain.account.Address
@@ -34,7 +35,9 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         (_, _) => Future.successful(Right(())),
         e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
         enableSchedules,
-        spendableBalanceActor
+        spendableBalanceActor,
+        system.toTyped.ignoreRef,
+        AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
       )
     )
   }
@@ -42,7 +45,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
       ao.order.sender,
-      system.actorOf(createAddressActor(ao.order.sender, true))
+      system.actorOf(createAddressActor(ao.order.sender, enableSchedules = true))
     )
 
   lazy val addressDir = system.actorOf(

@@ -2,6 +2,7 @@ package com.wavesplatform.dex
 
 import java.util.concurrent.ConcurrentHashMap
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.pattern.ask
 import akka.testkit.{TestKit, TestProbe}
@@ -67,7 +68,8 @@ class SpendableBalancesActorSpecification
         (_, _) => Future.successful(Right(())),
         event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0, 0, event)) } },
         enableSchedules,
-        sba
+        sba,
+        system.toTyped.ignoreRef
       )
     )
   }

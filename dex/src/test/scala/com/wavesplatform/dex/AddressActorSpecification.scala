@@ -2,6 +2,7 @@ package com.wavesplatform.dex
 
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
@@ -214,8 +215,9 @@ class AddressActorSpecification
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          false,
-          spendableBalancesActor
+          enableSchedules,
+          spendableBalancesActor,
+          system.toTyped.ignoreRef
         )
       )
     }

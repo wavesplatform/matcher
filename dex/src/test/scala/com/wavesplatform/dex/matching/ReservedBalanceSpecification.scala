@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.matching
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
@@ -106,7 +107,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         (_, _) => Future.successful(Right(())),
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         enableSchedules,
-        spendableBalancesActor
+        spendableBalancesActor,
+        system.toTyped.ignoreRef
       )
     )
   }
@@ -495,7 +497,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
             Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
           },
           enableSchedules,
-          spendableBalancesActor
+          spendableBalancesActor,
+          system.toTyped.ignoreRef
         )
       )
     }

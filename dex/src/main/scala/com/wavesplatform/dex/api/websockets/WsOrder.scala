@@ -26,6 +26,8 @@ case class WsOrder(id: Order.Id,
 
 object WsOrder {
 
+  def fromDomain(ao: AcceptedOrder)(implicit efc: ErrorFormatterContext): WsOrder = fromDomain(ao, ao.status)
+
   def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)

@@ -49,7 +49,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
-    val result = WsOrder.fromDomain(ao, AddressActor.activeStatus(ao))
+    val result = WsOrder.fromDomain(ao)
 
     if (isNew) result
     else

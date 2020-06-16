@@ -30,7 +30,7 @@ case class WsCompleteOrder(id: Order.Id,
 
 object WsCompleteOrder {
 
-  def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsCompleteOrder = {
+  def fromCancelled(ao: AcceptedOrder, timestamp: Long)(implicit efc: ErrorFormatterContext): WsCompleteOrder = {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
     val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
@@ -39,20 +39,24 @@ object WsCompleteOrder {
     def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
     WsCompleteOrder(
-      ao.id,
-      ao.order.timestamp,
-      ao.order.assetPair.amountAsset,
-      ao.order.assetPair.priceAsset,
-      ao.order.orderType,
-      ao.isMarket,
-      denormalizePrice(ao.price),
-      denormalizeAmountAndFee(ao.order.amount),
-      denormalizeAmountAndFee(ao.order.matcherFee),
-      ao.feeAsset,
-      status.name,
-      ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee),
-      ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee),
-      ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
+      id = ao.id,
+      timestamp = ao.order.timestamp,
+      amountAsset = ao.order.assetPair.amountAsset,
+      priceAsset = ao.order.assetPair.priceAsset,
+      side = ao.order.orderType,
+      isMarket = ao.isMarket,
+      price = denormalizePrice(ao.order.price),
+      amount = denormalizeAmountAndFee(ao.order.amount),
+      fee = denormalizeAmountAndFee(ao.order.matcherFee),
+      feeAsset = ao.order.feeAsset,
+      status = OrderStatus.Cancelled.name,
+      filledAmount = denormalizeAmountAndFee(ao.order.amount),
+      filledFee = denormalizeAmountAndFee(ao.order.matcherFee),
+      avgWeighedPrice = denormalizePrice(ao.fillingInfo.avgWeighedPrice),
+      eventTimestamp = timestamp,
+      executedAmount = none,
+      executedFee = none,
+      executedPrice = none
     )
   }
 

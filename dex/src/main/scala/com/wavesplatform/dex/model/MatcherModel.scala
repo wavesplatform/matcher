@@ -61,11 +61,11 @@ sealed trait AcceptedOrder {
 
   val matcherFee: Long = order.matcherFee
 
-  def fillingInfo: FillingInfo = {
+  def filledAmount = order.amount - amount
+  def filledFee    = order.matcherFee - fee
 
+  def fillingInfo: FillingInfo = {
     val isNew           = amount == order.amount
-    val filledAmount    = order.amount - amount
-    val filledFee       = order.matcherFee - fee
     val avgWeighedPrice = if (isNew) 0 else avgWeighedPriceNominator.divide(BigInteger valueOf filledAmount).longValueExact()
 
     FillingInfo(isNew, filledAmount, filledFee, avgWeighedPrice)
@@ -114,6 +114,11 @@ sealed trait AcceptedOrder {
 
   def forMarket(fm: MarketOrder => Unit): Unit
   def forLimit(fl: LimitOrder => Unit): Unit
+
+  def status: OrderStatus =
+    if (amount == order.amount) OrderStatus.Accepted
+    else if (isValid) OrderStatus.PartiallyFilled(filledAmount, filledFee)
+    else OrderStatus.Filled(filledAmount, filledFee)
 }
 
 object AcceptedOrder {

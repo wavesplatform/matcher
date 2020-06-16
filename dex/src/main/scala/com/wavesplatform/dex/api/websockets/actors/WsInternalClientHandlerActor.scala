@@ -29,7 +29,7 @@ object WsInternalClientHandlerActor {
     case class ForwardToClient(wsServerMessage: WsServerMessage) extends Command
     case class CloseConnection(reason: MatcherError)             extends Command
 
-    private[WsHandlerActor] case object SendPing extends Command
+    private[WsInternalClientHandlerActor] case object SendPing extends Command
   }
 
   sealed trait Event extends Message

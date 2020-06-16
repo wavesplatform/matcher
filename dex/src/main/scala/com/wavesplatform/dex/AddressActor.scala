@@ -13,6 +13,7 @@ import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
 import com.wavesplatform.dex.api.websockets._
+import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -37,8 +38,6 @@ import scala.collection.mutable.{AnyRefMap => MutableMap, HashSet => MutableSet}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Failure, Success}
-import akka.actor.typed
-import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 
 class AddressActor(owner: Address,
                    time: Time,
@@ -161,20 +160,20 @@ class AddressActor(owner: Address,
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
     case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
 
-    case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(activeStatus)
+    case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status)
 
     case Query.GetOrderStatusInfo(orderId) =>
       sender ! Reply.OrdersStatusInfo(
         activeOrders
           .get(orderId)
-          .map(ao => OrderInfo.v4(ao, activeStatus(ao))) orElse orderDB.getOrderInfo(orderId)
+          .map(ao => OrderInfo.v4(ao, ao.status)) orElse orderDB.getOrderInfo(orderId)
       )
 
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =
         if (orderListType.hasActive)
           getActiveLimitOrders(maybePair)
-            .map(ao => ao.id -> OrderInfo.v4(ao, activeStatus(ao)))
+            .map(ao => ao.id -> OrderInfo.v4(ao, ao.status))
             .toSeq
             .sorted
         else Seq.empty
@@ -297,7 +296,7 @@ class AddressActor(owner: Address,
         case Right(spendableBalance) =>
           addressWsMutableState.sendSnapshot(
             balances = mkWsBalances(spendableBalance),
-            orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao)))(collection.breakOut),
+            orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
           )
           if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending
           addressWsMutableState = addressWsMutableState.flushPendingSubscriptions()
@@ -398,13 +397,8 @@ class AddressActor(owner: Address,
     lazy val openVolumeDiff        = remaining.reservableBalance |-| origReservableBalance
 
     val (status, isSystemCancel) = event match {
-      case _: OrderAdded        => (activeStatus(remaining), false)
       case event: OrderCanceled => (OrderStatus.finalCancelStatus(remaining, event.isSystemCancel), event.isSystemCancel)
-      case _: OrderExecuted =>
-        val r =
-          if (remaining.isValid) activeStatus(remaining)
-          else OrderStatus.Filled(remaining.fillingInfo.filledAmount, remaining.fillingInfo.filledFee)
-        (r, false)
+      case _                    => (remaining.status, false)
     }
 
     log.trace(s"New status of ${remaining.id} is $status")
@@ -545,9 +539,6 @@ object AddressActor {
   type Resp = api.MatcherResponse
 
   private val ExpirationThreshold = 50.millis
-
-  private[dex] def activeStatus(ao: AcceptedOrder): OrderStatus =
-    if (ao.amount == ao.order.amount) OrderStatus.Accepted else OrderStatus.PartiallyFilled(ao.order.amount - ao.amount, ao.order.matcherFee - ao.fee)
 
   /**
     * r = currentBalance |-| requiredBalance

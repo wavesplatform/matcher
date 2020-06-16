@@ -179,7 +179,7 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(lo)
           expectWsBalancesAndOrders(
             Map(usd -> WsBalances(285, 15), Waves -> WsBalances(99.997, 0.003)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             1
           )
 
@@ -215,7 +215,7 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(buyOrder)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(270, 30), Waves -> WsBalances(99.997, 0.003)),
-              Seq(WsOrder.fromDomain(buyOrder, OrderStatus.Accepted)),
+              Seq(WsOrder.fromDomain(buyOrder)),
               1
             )
           }
@@ -293,7 +293,7 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(mo)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(150, 150), eth -> WsBalances(1.99998297, 0.00001703)),
-              Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+              Seq(WsOrder.fromDomain(mo)),
               1
             )
           }
@@ -426,7 +426,7 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(114.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             0
           )
       }
@@ -440,7 +440,7 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(99.997, 0.003), btc -> WsBalances(0, 1)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             0
           )
       }
@@ -472,7 +472,7 @@ class ActorsWebSocketInteractionsSpecification
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(94.997, 0)),
             Seq(
-              WsOrder.fromDomain(oe.submittedRemaining, OrderStatus.Filled(5.waves, 0.003.waves))
+              WsOrder.fromDomain(oe.submittedRemaining) // TODO , OrderStatus.Filled(5.waves, 0.003.waves))
             ),
             1
           )
@@ -502,17 +502,17 @@ class ActorsWebSocketInteractionsSpecification
 
           placeOrder(counter1)
           expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)),
-                                    Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)),
+                                    Seq(WsOrder.fromDomain(counter1)),
                                     1)
 
           placeOrder(counter2)
           expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)),
-                                    Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)),
+                                    Seq(WsOrder.fromDomain(counter2)),
                                     2)
 
           placeOrder(counter3)
           expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)),
-                                    Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)),
+                                    Seq(WsOrder.fromDomain(counter3)),
                                     3)
 
           mo = matchOrders(mo, counter1)._1
@@ -595,7 +595,7 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(mo)
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 12.003)),
-            Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(mo)),
             1
           )
 
@@ -666,7 +666,7 @@ class ActorsWebSocketInteractionsSpecification
         placeOrder(bo)
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
-          Seq(WsOrder.fromDomain(bo, OrderStatus.Accepted)),
+          Seq(WsOrder.fromDomain(bo)),
           1
         )
 

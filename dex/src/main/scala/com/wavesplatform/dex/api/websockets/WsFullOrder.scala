@@ -1,6 +1,9 @@
 package com.wavesplatform.dex.api.websockets
 
+import cats.instances.option._
+import cats.syntax.apply._
 import cats.syntax.option._
+import com.wavesplatform.dex.api.websockets.WsFullOrder.WsExecutionInfo
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization
@@ -11,42 +14,124 @@ import com.wavesplatform.dex.model.{AcceptedOrder, OrderStatus}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsCompleteOrder(id: Order.Id,
-                           owner: Address,
-                           timestamp: Long,
-                           amountAsset: Asset,
-                           priceAsset: Asset,
-                           side: OrderType,
-                           isMarket: Boolean,
-                           price: Double,
-                           amount: Double,
-                           fee: Double,
-                           feeAsset: Asset,
-                           status: String,
-                           filledAmount: Double,
-                           filledFee: Double,
-                           avgWeighedPrice: Double,
-                           eventTimestamp: Long,
-                           // TODO
-                           executedAmount: Option[Double] = None,
-                           executedFee: Option[Double] = None,
-                           executionPrice: Option[Double] = None)
+case class WsFullOrder(id: Order.Id,
+                       owner: Address,
+                       timestamp: Long,
+                       amountAsset: Asset,
+                       priceAsset: Asset,
+                       side: OrderType,
+                       isMarket: Boolean,
+                       price: Double,
+                       amount: Double,
+                       fee: Double,
+                       feeAsset: Asset,
+                       status: String,
+                       filledAmount: Double,
+                       filledFee: Double,
+                       avgWeighedPrice: Double,
+                       eventTimestamp: Long,
+                       executionInfo: Option[WsExecutionInfo])
 
-object WsCompleteOrder {
+object WsFullOrder {
 
-  def from(event: OrderCanceled)(implicit efc: ErrorFormatterContext): WsCompleteOrder = {
+  def apply(id: Order.Id,
+            owner: Address,
+            timestamp: Long,
+            amountAsset: Asset,
+            priceAsset: Asset,
+            side: OrderType,
+            isMarket: Boolean,
+            price: Double,
+            amount: Double,
+            fee: Double,
+            feeAsset: Asset,
+            status: String,
+            filledAmount: Double,
+            filledFee: Double,
+            avgWeighedPrice: Double,
+            eventTimestamp: Long,
+            executedAmount: Option[Double],
+            executedFee: Option[Double],
+            executionPrice: Option[Double]): WsFullOrder = WsFullOrder(
+    id,
+    owner,
+    timestamp,
+    amountAsset,
+    priceAsset,
+    side,
+    isMarket,
+    price,
+    amount,
+    fee,
+    feeAsset,
+    status,
+    filledAmount,
+    filledFee,
+    avgWeighedPrice,
+    eventTimestamp,
+    (executedAmount, executedFee, executionPrice).mapN(WsExecutionInfo)
+  )
+
+  def wsUnapply(arg: WsFullOrder): Option[(
+      Order.Id,
+      Address,
+      Long,
+      Asset,
+      Asset,
+      OrderType,
+      Boolean,
+      Double,
+      Double,
+      Double,
+      Asset,
+      String,
+      Double,
+      Double,
+      Double,
+      Long,
+      Option[Double],
+      Option[Double],
+      Option[Double]
+  )] = {
+    import arg._
+    (
+      id,
+      owner,
+      timestamp,
+      amountAsset,
+      priceAsset,
+      side,
+      isMarket,
+      price,
+      amount,
+      fee,
+      feeAsset,
+      status,
+      filledAmount,
+      filledFee,
+      avgWeighedPrice,
+      eventTimestamp,
+      executionInfo.map(_.amount),
+      executionInfo.map(_.fee),
+      executionInfo.map(_.price)
+    ).some
+  }
+
+  case class WsExecutionInfo(amount: Double, fee: Double, price: Double)
+
+  def from(event: OrderCanceled)(implicit efc: ErrorFormatterContext): WsFullOrder = {
     val ao = event.acceptedOrder
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
-    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
     val feeAssetDecimals    = efc.assetDecimals(ao.order.feeAsset)
+    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
     def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, feeAssetDecimals).toDouble
 
     val fillingInfo = ao.fillingInfo
-    WsCompleteOrder(
+    WsFullOrder(
       id = ao.id,
       owner = ao.order.sender.toAddress,
       timestamp = ao.order.timestamp,
@@ -63,9 +148,7 @@ object WsCompleteOrder {
       filledFee = denormalizeFee(fillingInfo.filledFee),
       avgWeighedPrice = denormalizePrice(fillingInfo.avgWeighedPrice),
       eventTimestamp = event.timestamp,
-      executedAmount = none,
-      executedFee = none,
-      executionPrice = none
+      executionInfo = none
     )
   }
 
@@ -73,11 +156,11 @@ object WsCompleteOrder {
            event: OrderExecuted,
            denormalizeAmount: Long => Double,
            denormalizePrice: Long => Double,
-           denormalizeFee: Long => Double)(implicit efc: ErrorFormatterContext): WsCompleteOrder = {
+           denormalizeFee: Long => Double)(implicit efc: ErrorFormatterContext): WsFullOrder = {
     val fillingInfo = ao.fillingInfo
     val executedFee = if (ao.id == event.counter.order.id()) event.counterExecutedFee else event.submittedExecutedFee
 
-    WsCompleteOrder(
+    WsFullOrder(
       id = ao.id,
       owner = ao.order.sender.toAddress,
       timestamp = ao.order.timestamp,
@@ -94,9 +177,11 @@ object WsCompleteOrder {
       filledFee = denormalizeFee(fillingInfo.filledFee),
       avgWeighedPrice = denormalizePrice(fillingInfo.avgWeighedPrice),
       eventTimestamp = event.timestamp,
-      executedAmount = denormalizeAmount(event.executedAmount).some,
-      executedFee = denormalizeFee(executedFee).some,
-      executionPrice = denormalizePrice(event.executedPrice).some
+      executionInfo = WsExecutionInfo(
+        amount = denormalizeAmount(event.executedAmount),
+        fee = denormalizeFee(executedFee),
+        price = denormalizePrice(event.executedPrice)
+      ).some
     )
   }
 
@@ -127,7 +212,7 @@ object WsCompleteOrder {
     }
   )
 
-  implicit val wsCompleteOrderFormat: Format[WsCompleteOrder] =
+  implicit val wsCompleteOrderFormat: Format[WsFullOrder] =
     (
       (__ \ "i").format[Order.Id] and                               // id
         (__ \ "o").format[Address] and                              // owner's address
@@ -148,5 +233,5 @@ object WsCompleteOrder {
         (__ \ "c").formatNullable[Double](doubleAsStringFormat) and // executed amount
         (__ \ "h").formatNullable[Double](doubleAsStringFormat) and // executed fee
         (__ \ "e").formatNullable[Double](doubleAsStringFormat)     // executed price
-    )(WsCompleteOrder.apply, unlift(WsCompleteOrder.unapply))
+    )(WsFullOrder.apply, unlift(WsFullOrder.wsUnapply))
 }

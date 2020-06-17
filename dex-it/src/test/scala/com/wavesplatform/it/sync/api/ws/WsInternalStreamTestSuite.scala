@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.api.ws
 
 import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets.WsFullOrder.WsExecutionInfo
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.domain.asset.Asset.Waves
@@ -60,7 +61,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order1.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order1,
               OrderStatus.PartiallyFilled,
               filledAmount = 1,
@@ -75,15 +76,15 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order2.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(order2,
-                                    OrderStatus.Filled,
-                                    filledAmount = 1,
-                                    filledFee = 0.003,
-                                    avgWeighedPrice = 3,
-                                    executedAmount = 1,
-                                    executedFee = 0.003,
-                                    executedPrice = 3,
-                                    isMarket = false))
+            mkExecutedFullOrder(order2,
+                                OrderStatus.Filled,
+                                filledAmount = 1,
+                                filledFee = 0.003,
+                                avgWeighedPrice = 3,
+                                executedAmount = 1,
+                                executedFee = 0.003,
+                                executedPrice = 3,
+                                isMarket = false))
         }
 
         wsc.close()
@@ -107,7 +108,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order1.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order1,
               OrderStatus.Filled,
               filledAmount = 1,
@@ -122,7 +123,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order2.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order2,
               OrderStatus.Filled,
               filledAmount = 2,
@@ -137,7 +138,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order3.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order3,
               OrderStatus.Filled,
               filledAmount = 3,
@@ -148,7 +149,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedPrice = 3,
               isMarket = true
             ),
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order3,
               OrderStatus.PartiallyFilled,
               filledAmount = 1,
@@ -181,7 +182,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order.id()) should matchTo {
           List(
-            mkCancelledCompleteOrder(
+            mkCancelledFullOrder(
               order,
               filledAmount = 0,
               filledFee = 0,
@@ -210,7 +211,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order1.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order1,
               OrderStatus.Filled,
               filledAmount = 2,
@@ -225,7 +226,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order2.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order2,
               OrderStatus.Filled,
               filledAmount = 2,
@@ -240,7 +241,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order3.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order3,
               OrderStatus.Filled,
               filledAmount = 4,
@@ -251,7 +252,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedPrice = 3,
               isMarket = false
             ),
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order3,
               OrderStatus.PartiallyFilled,
               filledAmount = 2,
@@ -297,7 +298,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order1.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order1,
               OrderStatus.Filled,
               filledAmount = 2,
@@ -313,7 +314,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order2.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order2,
               OrderStatus.Filled,
               filledAmount = 1,
@@ -328,14 +329,14 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order3.id()) should matchTo {
           List(
-            mkCancelledCompleteOrder(
+            mkCancelledFullOrder(
               order3,
               filledAmount = 2,
               filledFee = 4,
               avgWeighedPrice = 3,
               isMarket = false
             ),
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order3,
               OrderStatus.PartiallyFilled,
               filledAmount = 2,
@@ -351,7 +352,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
 
         orderEvents(order4.id()) should matchTo {
           List(
-            mkExecutedCompleteOrder(
+            mkExecutedFullOrder(
               order4,
               OrderStatus.PartiallyFilled,
               filledAmount = 1,
@@ -377,41 +378,35 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
     }
   }
 
-  private def mkExecutedCompleteOrder(order: Order,
-                                      status: OrderStatus,
-                                      filledAmount: Double,
-                                      filledFee: Double,
-                                      avgWeighedPrice: Double,
-                                      executedAmount: Double,
-                                      executedFee: Double,
-                                      executedPrice: Double,
-                                      isMarket: Boolean): WsCompleteOrder =
-    mkCompleteOrder(order, status, filledAmount, filledFee, avgWeighedPrice, executedAmount.some, executedFee.some, executedPrice.some, isMarket)
+  private def mkExecutedFullOrder(order: Order,
+                                  status: OrderStatus,
+                                  filledAmount: Double,
+                                  filledFee: Double,
+                                  avgWeighedPrice: Double,
+                                  executedAmount: Double,
+                                  executedFee: Double,
+                                  executedPrice: Double,
+                                  isMarket: Boolean): WsFullOrder =
+    mkFullOrder(order, status, filledAmount, filledFee, avgWeighedPrice, WsExecutionInfo(executedAmount, executedFee, executedPrice).some, isMarket)
 
-  private def mkCancelledCompleteOrder(order: Order,
-                                       filledAmount: Double,
-                                       filledFee: Double,
-                                       avgWeighedPrice: Double,
-                                       isMarket: Boolean): WsCompleteOrder =
-    mkCompleteOrder(order, OrderStatus.Cancelled, filledAmount, filledFee, avgWeighedPrice, none, none, none, isMarket)
+  private def mkCancelledFullOrder(order: Order, filledAmount: Double, filledFee: Double, avgWeighedPrice: Double, isMarket: Boolean): WsFullOrder =
+    mkFullOrder(order, OrderStatus.Cancelled, filledAmount, filledFee, avgWeighedPrice, none, isMarket)
 
-  private def mkCompleteOrder(order: Order,
-                              status: OrderStatus,
-                              filledAmount: Double,
-                              filledFee: Double,
-                              avgWeighedPrice: Double,
-                              executedAmount: Option[Double],
-                              executedFee: Option[Double],
-                              executedPrice: Option[Double],
-                              isMarket: Boolean): WsCompleteOrder = {
+  private def mkFullOrder(order: Order,
+                          status: OrderStatus,
+                          filledAmount: Double,
+                          filledFee: Double,
+                          avgWeighedPrice: Double,
+                          executionInfo: Option[WsExecutionInfo],
+                          isMarket: Boolean): WsFullOrder = {
     val amountAssetDecimals = efc.assetDecimals(order.assetPair.amountAsset)
     val priceAssetDecimals  = efc.assetDecimals(order.assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
-    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
     def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, order.feeAsset).toDouble
+    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
-    WsCompleteOrder(
+    WsFullOrder(
       id = order.id(),
       owner = order.sender.toAddress,
       timestamp = 0L,
@@ -428,9 +423,9 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       filledFee = filledFee,
       avgWeighedPrice = avgWeighedPrice,
       eventTimestamp = 0L,
-      executedAmount = executedAmount,
-      executedFee = executedFee,
-      executionPrice = executedPrice
+      executedAmount = executionInfo.map(_.amount),
+      executedFee = executionInfo.map(_.fee),
+      executionPrice = executionInfo.map(_.price)
     )
   }
 }

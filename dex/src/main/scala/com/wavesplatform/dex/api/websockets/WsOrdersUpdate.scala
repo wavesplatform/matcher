@@ -9,7 +9,7 @@ import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class WsOrdersUpdate(orders: NonEmptyList[WsCompleteOrder], timestamp: Long = System.currentTimeMillis) extends WsServerMessage {
+case class WsOrdersUpdate(orders: NonEmptyList[WsFullOrder], timestamp: Long = System.currentTimeMillis) extends WsServerMessage {
   override val tpe: String = WsOrdersUpdate.tpe
 
   def append(other: WsOrdersUpdate): WsOrdersUpdate = copy(
@@ -23,7 +23,7 @@ object WsOrdersUpdate {
   val tpe = "osu"
 
   def from(x: OrderCanceled)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = WsOrdersUpdate(
-    NonEmptyList.one(WsCompleteOrder.from(x))
+    NonEmptyList.one(WsFullOrder.from(x))
   )
 
   def from(x: OrderExecuted, ts: Long)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
@@ -36,8 +36,8 @@ object WsOrdersUpdate {
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
-    def from(ao: AcceptedOrder): WsCompleteOrder =
-      WsCompleteOrder.from(
+    def from(ao: AcceptedOrder): WsFullOrder =
+      WsFullOrder.from(
         ao,
         x,
         denormalizeAmount,
@@ -48,7 +48,7 @@ object WsOrdersUpdate {
     WsOrdersUpdate(NonEmptyList.of(ao1, x.submittedRemaining).map(from), timestamp = ts)
   }
 
-  def wsUnapply(arg: WsOrdersUpdate): Option[(String, Long, NonEmptyList[WsCompleteOrder])] = (arg.tpe, arg.timestamp, arg.orders).some
+  def wsUnapply(arg: WsOrdersUpdate): Option[(String, Long, NonEmptyList[WsFullOrder])] = (arg.tpe, arg.timestamp, arg.orders).some
 
   implicit def nonEmptyListFormat[T: Format]: Format[NonEmptyList[T]] = Format(
     Reads.list[T].flatMap { xs =>
@@ -60,7 +60,7 @@ object WsOrdersUpdate {
   implicit val wsOrdersUpdateFormat: Format[WsOrdersUpdate] = (
     (__ \ "T").format[String] and
       (__ \ "_").format[Long] and
-      (__ \ "o").format(nonEmptyListFormat[WsCompleteOrder])
+      (__ \ "o").format(nonEmptyListFormat[WsFullOrder])
   )(
     (_, ts, orders) => WsOrdersUpdate(orders, ts),
     unlift(WsOrdersUpdate.wsUnapply)

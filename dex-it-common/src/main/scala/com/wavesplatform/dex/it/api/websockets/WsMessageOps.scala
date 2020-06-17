@@ -46,12 +46,12 @@ trait WsMessageOps {
     /**
       * @return Map order.id -> list of changes. The newest messages in the beginning
       */
-    def orderEvents: Map[Order.Id, List[WsCompleteOrder]] = flattenOrders.groupBy(_.id)
+    def orderEvents: Map[Order.Id, List[WsFullOrder]] = flattenOrders.groupBy(_.id)
 
     /**
      * Reverse because the latest messages are in the end
      * @return The newest messages in the beginning. This is how we need to do for clients
      */
-    def flattenOrders: List[WsCompleteOrder] = self.reverse.flatMap(_.orders.toList)
+    def flattenOrders: List[WsFullOrder] = self.reverse.flatMap(_.orders.toList)
   }
 }

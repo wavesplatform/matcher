@@ -36,7 +36,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
   private def mkWsInternalConnection(): WsConnection = mkWsInternalConnection(dex1)
 
   "Internal stream should" - {
-    "not send message if there is no matches" in {
+    "not send message if there is no matches or cancels" in {
       val wsc = mkWsInternalConnection()
       wsc.receiveNoMessages()
       wsc.close()
@@ -50,6 +50,8 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         val wsc = mkWsInternalConnection()
 
         List(order1, order2).foreach(dex1.api.place)
+        dex1.api.waitForOrderStatus(order2, OrderStatus.Filled)
+
         val buffer = wsc.receiveAtLeastN[WsOrdersUpdate](1)
         buffer should have size 1
 
@@ -87,50 +89,21 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
         wsc.close()
       }
 
-      "market order match" ignore {}
+      "market order match" in {
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 1.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3)
+        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4)
 
-      "one cancel" in {
-        val order = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
-        val wsc   = mkWsInternalConnection()
+        val wsc = mkWsInternalConnection()
 
-        placeAndAwaitAtDex(order)
-        cancelAndAwait(bob, order)
+        List(order1, order2).foreach(dex1.api.place)
+        placeAndAwaitAtDex(order3, OrderStatus.Filled, isMarketOrder = true)
 
         val buffer = wsc.receiveAtLeastN[WsOrdersUpdate](1)
         buffer should have size 1
 
         val orderEvents = buffer.orderEvents
-        orderEvents.keys should have size 1
-        orderEvents.keys.head shouldBe order.id()
-
-        orderEvents(order.id()) should matchTo {
-          List(
-            mkCancelledCompleteOrder(
-              order,
-              filledAmount = 0,
-              filledFee = 0,
-              avgWeighedPrice = 0,
-              isMarket = false
-            ))
-        }
-
-        wsc.close()
-      }
-
-      "multiple matches" in {
-        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 1.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
-        val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3, matcherFee = 0.003.waves, feeAsset = Waves)
-        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 3.waves, 4, matcherFee = 0.003.waves, feeAsset = Waves)
-        val orders = List(order1, order2, order3)
-
-        val wsc = mkWsInternalConnection()
-
-        orders.foreach(dex1.api.place)
-        orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Filled))
-
-        val buffer      = wsc.receiveAtLeastN[WsOrdersUpdate](1)
-        val orderEvents = buffer.orderEvents
-        orderEvents.keySet should matchTo(orders.map(_.id()).toSet)
+        orderEvents.keySet should matchTo(Set(order1.id(), order2.id(), order3.id()))
 
         orderEvents(order1.id()) should matchTo {
           List(
@@ -173,7 +146,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 2,
               executedFee = 0.002,
               executedPrice = 3,
-              isMarket = false
+              isMarket = true
             ),
             mkExecutedCompleteOrder(
               order3,
@@ -184,6 +157,109 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
               executedAmount = 1,
               executedFee = 0.001,
               executedPrice = 3,
+              isMarket = true
+            )
+          )
+        }
+
+        wsc.close()
+      }
+
+      "one cancel" in {
+        val order = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 5.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val wsc   = mkWsInternalConnection()
+
+        placeAndAwaitAtDex(order)
+        cancelAndAwait(bob, order)
+
+        val buffer = wsc.receiveAtLeastN[WsOrdersUpdate](1)
+        buffer should have size 1
+
+        val orderEvents = buffer.orderEvents
+        orderEvents.keys should have size 1
+        orderEvents.keys.head shouldBe order.id()
+
+        orderEvents(order.id()) should matchTo {
+          List(
+            mkCancelledCompleteOrder(
+              order,
+              filledAmount = 0,
+              filledFee = 0,
+              avgWeighedPrice = 0,
+              isMarket = false
+            ))
+        }
+
+        wsc.close()
+      }
+
+      "multiple matches" in {
+        val order1 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 3, matcherFee = 0.004.btc, feeAsset = btc)
+        val order2 = mkOrderDP(bob, wavesUsdPair, OrderType.SELL, 2.waves, 2, matcherFee = 0.003.waves, feeAsset = Waves)
+        val order3 = mkOrderDP(alice, wavesUsdPair, OrderType.BUY, 4.waves, 4, matcherFee = 0.003.waves, feeAsset = Waves)
+        val orders = List(order1, order2, order3)
+
+        val wsc = mkWsInternalConnection()
+
+        orders.foreach(dex1.api.place)
+        orders.foreach(dex1.api.waitForOrderStatus(_, OrderStatus.Filled))
+
+        val buffer      = wsc.receiveAtLeastN[WsOrdersUpdate](1)
+        val orderEvents = buffer.orderEvents
+        orderEvents.keySet should matchTo(orders.map(_.id()).toSet)
+
+        orderEvents(order1.id()) should matchTo {
+          List(
+            mkExecutedCompleteOrder(
+              order1,
+              OrderStatus.Filled,
+              filledAmount = 2,
+              filledFee = 0.004,
+              avgWeighedPrice = 3,
+              executedAmount = 2,
+              executedFee = 0.004,
+              executedPrice = 3,
+              isMarket = false
+            ))
+        }
+
+        orderEvents(order2.id()) should matchTo {
+          List(
+            mkExecutedCompleteOrder(
+              order2,
+              OrderStatus.Filled,
+              filledAmount = 2,
+              filledFee = 0.003,
+              avgWeighedPrice = 2,
+              executedAmount = 2,
+              executedFee = 0.003,
+              executedPrice = 2,
+              isMarket = false
+            ))
+        }
+
+        orderEvents(order3.id()) should matchTo {
+          List(
+            mkExecutedCompleteOrder(
+              order3,
+              OrderStatus.Filled,
+              filledAmount = 4,
+              filledFee = 0.003,
+              avgWeighedPrice = 2.5,
+              executedAmount = 2,
+              executedFee = 0.0015,
+              executedPrice = 3,
+              isMarket = false
+            ),
+            mkExecutedCompleteOrder(
+              order3,
+              OrderStatus.PartiallyFilled,
+              filledAmount = 2,
+              filledFee = 0.0015,
+              avgWeighedPrice = 2,
+              executedAmount = 2,
+              executedFee = 0.0015,
+              executedPrice = 2,
               isMarket = false
             )
           )

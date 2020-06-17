@@ -2,6 +2,7 @@ package com.wavesplatform.dex.market
 
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{Actor, ActorRef, ActorSystem, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActor, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
@@ -10,6 +11,7 @@ import com.wavesplatform.dex.db.{AssetPairsDB, OrderBookSnapshotDB, WithDB}
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.dex.market.MatcherActorSpecification.{DeletingActor, FailAtStartActor, NothingDoActor, RecoveringActor, _}
@@ -410,6 +412,8 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
+    implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+
     TestActorRef(
       new MatcherActor(
         matcherSettings,
@@ -422,9 +426,8 @@ class MatcherActorSpecification
             matcher,
             addressActor,
             snapshotStoreActor,
+            system.toTyped.ignoreRef,
             assetPair,
-            8,
-            8,
             time,
             NonEmptyList.one(DenormalizedMatchingRule(0, 0.00000001)),
             _ => {},

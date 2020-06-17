@@ -5,6 +5,7 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
@@ -30,11 +31,12 @@ object WsInternalBroadcastActor {
     Behaviors.setup[Message] { context =>
       context.system.eventStream
 
-      def default(state: State): Behavior[Message] =
+      def default(state: State): Behavior[Message] = {
+        context.log.info(s"State:\nsubscriptions: ${state.subscriptions.map(_.path.name).toList.sorted}\nupdates: ${state.collectedUpdates}\nschedule.cancelled: ${state.schedule.isCancelled}")
         Behaviors
           .receiveMessage[Message] {
             case Command.Collect(update) =>
-              context.log.info(s"Got Collect(${update})") // Json.toJson(update)
+              context.log.info(s"Got Collect(${Json.toJson(update)})")
               default {
                 state
                   .withUpdates(update)
@@ -51,19 +53,20 @@ object WsInternalBroadcastActor {
               }
 
             case Command.SendWsUpdates =>
-              context.log.info(s"Got SendWsUpdates, sending ${state.collectedUpdates}") // Json.toJson(state.collectedUpdates)
+              context.log.info(s"Got SendWsUpdates, sending ${Json.toJson(state.collectedUpdates)}")
               state.collectedUpdates
                 .map(WsInternalClientHandlerActor.Command.ForwardToClient)
                 .foreach { message =>
                   state.subscriptions.foreach(_ ! message)
                 }
-              default(state.withoutUpdates.runSchedule(settings.messagesInterval, context))
+              default(state.withoutUpdates.withCompletedSchedule.runSchedule(settings.messagesInterval, context))
           }
           .receiveSignal {
             case (_, Terminated(clientRef)) =>
-              context.log.info(s"[${clientRef.path.name}] closed")
+              context.log.info(s"[${clientRef.path.name}] unsubscribed")
               default(state.updateSubscriptions(_ - clientRef.unsafeUpcast[WsInternalClientHandlerActor.Message]))
           }
+      }
 
       default(State(none, Set.empty, Cancellable.alreadyCancelled))
     }
@@ -80,6 +83,9 @@ object WsInternalBroadcastActor {
       } else s
     }
 
+    // Cancellable.isCancelled == false if the task was completed
+    def withCompletedSchedule: State = copy(schedule = Cancellable.alreadyCancelled)
+
     def runSchedule(interval: FiniteDuration, context: ActorContext[Message]): State =
       if (schedule.isCancelled && subscriptions.nonEmpty && collectedUpdates.nonEmpty)
         copy(schedule = context.scheduleOnce(interval, context.self, Command.SendWsUpdates))
@@ -87,6 +93,12 @@ object WsInternalBroadcastActor {
 
     def withoutUpdates: State = copy(collectedUpdates = none)
     def withUpdates(x: WsOrdersUpdate): State =
-      if (subscriptions.isEmpty) this else copy(collectedUpdates = collectedUpdates.foldLeft(x)(_ append _).some)
+      if (subscriptions.isEmpty) this
+      else
+        copy(
+          collectedUpdates = collectedUpdates
+            .foldLeft(x) { case (updates, orig) => orig.append(updates) }
+            .some
+        )
   }
 }

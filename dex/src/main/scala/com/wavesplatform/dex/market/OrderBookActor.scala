@@ -6,10 +6,14 @@ import akka.{actor => classic}
 import cats.data.NonEmptyList
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.apply._
+import cats.syntax.option._
+import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
+import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import com.wavesplatform.dex.error
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.market.MatcherActor.{ForceStartOrderBook, OrderBookCreated, SaveSnapshot}
 import com.wavesplatform.dex.market.OrderBookActor._
 import com.wavesplatform.dex.metrics.TimerExt
@@ -20,7 +24,6 @@ import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, O
 import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.util.WorkingStash
 import kamon.Kamon
-import mouse.any._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
@@ -30,15 +33,14 @@ class OrderBookActor(settings: Settings,
                      owner: classic.ActorRef,
                      addressActor: classic.ActorRef,
                      snapshotStore: classic.ActorRef,
+                     wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
                      assetPair: AssetPair,
-                     amountDecimals: Int,
-                     priceDecimals: Int,
                      time: Time,
                      var matchingRules: NonEmptyList[DenormalizedMatchingRule],
                      updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
                      normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
                      getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
-                     restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext)
+                     restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext, efc: ErrorFormatterContext)
     extends classic.Actor
     with WorkingStash
     with ScorexLogging {
@@ -97,8 +99,8 @@ class OrderBookActor(settings: Settings,
         AggregatedOrderBookActor(
           settings.aggregated,
           assetPair,
-          amountDecimals,
-          priceDecimals,
+          efc.assetDecimals(assetPair.amountAsset),
+          efc.assetDecimals(assetPair.priceAsset),
           restrictions,
           matchingRules.head.tickSize.toDouble,
           time,
@@ -108,7 +110,8 @@ class OrderBookActor(settings: Settings,
       )
       context.watch(aggregatedRef)
 
-      processEvents(orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
+      // Timestamp here doesn't matter
+      processEvents(time.getTimestamp(), orderBook.allOrders.map(lo => OrderAdded(lo, lo.order.timestamp)))
 
       owner ! OrderBookRecovered(assetPair, lastSavedSnapshotOffset)
       context.become(working)
@@ -171,10 +174,22 @@ class OrderBookActor(settings: Settings,
     }
     val lastTrade = if (hasTrades) orderBook.lastTrade else None
     aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, None, timestamp)
-    processEvents(events)
+    processEvents(timestamp, events)
   }
 
-  private def processEvents(events: TraversableOnce[Event]): Unit = events.foreach(addressActor ! _.unsafeTap(logEvent))
+  private def processEvents(timestamp: Long, events: TraversableOnce[Event]): Unit = {
+    events.foreach { event =>
+      logEvent(event)
+      addressActor ! event
+
+      val changes = event match {
+        case event: Events.OrderExecuted => WsOrdersUpdate.from(event, timestamp).some
+        case event: Events.OrderCanceled => WsOrdersUpdate.from(event).some
+        case _                           => none
+      }
+      changes.map(WsInternalBroadcastActor.Command.Collect).foreach(wsInternalHandlerDirectoryRef ! _)
+    }
+  }
 
   private def logEvent(e: Event): Unit = log.info {
     import Events._
@@ -191,7 +206,7 @@ class OrderBookActor(settings: Settings,
         // TODO replace by process() in Scala 2.13
         orderBook = updatedOrderBook
         aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, None, None, cancelEvent.timestamp)
-        processEvents(List(cancelEvent))
+        processEvents(cancelEvent.timestamp, List(cancelEvent))
       case _ =>
         log.warn(s"Error applying $event: order not found")
         addressActor ! OrderCancelFailed(id, error.OrderNotFound(id))
@@ -237,24 +252,22 @@ object OrderBookActor {
             parent: classic.ActorRef,
             addressActor: classic.ActorRef,
             snapshotStore: classic.ActorRef,
+            wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
             assetPair: AssetPair,
-            amountDecimals: Int,
-            priceDecimals: Int,
             time: Time,
             matchingRules: NonEmptyList[DenormalizedMatchingRule],
             updateCurrentMatchingRules: DenormalizedMatchingRule => Unit,
             normalizeMatchingRule: DenormalizedMatchingRule => MatchingRule,
             getMakerTakerFeeByOffset: Long => (AcceptedOrder, LimitOrder) => (Long, Long),
-            restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext): classic.Props =
+            restrictions: Option[OrderRestrictionsSettings])(implicit ec: ExecutionContext, efc: ErrorFormatterContext): classic.Props =
     classic.Props(
       new OrderBookActor(
         settings,
         parent,
         addressActor,
         snapshotStore,
+        wsInternalHandlerDirectoryRef,
         assetPair,
-        amountDecimals,
-        priceDecimals,
         time,
         matchingRules,
         updateCurrentMatchingRules,

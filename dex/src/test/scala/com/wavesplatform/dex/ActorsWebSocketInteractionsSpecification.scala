@@ -3,7 +3,6 @@ package com.wavesplatform.dex
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.testkit.typed.scaladsl.{ActorTestKit, TestProbe => TypedTestProbe}
-import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.syntax.option._
@@ -89,8 +88,7 @@ class ActorsWebSocketInteractionsSpecification
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
           enableSchedules,
-          spendableBalancesActor,
-          system.toTyped.ignoreRef
+          spendableBalancesActor
         )
       )
     }
@@ -159,10 +157,9 @@ class ActorsWebSocketInteractionsSpecification
   "Actors web socket interaction" should {
     "correctly process web socket requests" when {
 
-      "brand new sender subscribes" in webSocketTest {
-        (_, _, _, address, subscribeAddress, placeOrder, cancel, _, updateBalances, expectWsBalancesAndOrders) =>
-          subscribeAddress()
-          expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
+      "brand new sender subscribes" in webSocketTest { (_, _, _, _, subscribeAddress, _, _, _, _, expectWsBalancesAndOrders) =>
+        subscribeAddress()
+        expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
       }
 
       "sender places order and then cancel it" in webSocketTest {
@@ -448,7 +445,7 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "order executes right after it was placed" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (ad, ep, _, address, subscribeAddress, _, _, _, updateBalances, expectWsBalancesAndOrders) =>
           updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
 
           val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
@@ -481,7 +478,7 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "market order executes (address is sender of counters)" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (_, _, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
           def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): (MarketOrder, LimitOrder) = {
             val oe = executeOrder(submittedMarket, counter)
             oe.submittedMarketRemaining(submittedMarket) -> oe.counterRemaining
@@ -568,7 +565,7 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "market order executes (address is sender of market)" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (_, _, _, address, subscribeAddress, placeOrder, _, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
           def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): MarketOrder = {
             executeOrder(submittedMarket, counter).submittedMarketRemaining(submittedMarket)
           }
@@ -648,7 +645,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     "correctly process order partially filling" in webSocketTest {
-      (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+      (_, _, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
         updateBalances(Map(usd -> 10.usd, Waves -> 10.waves))
         subscribeAddress()
         expectWsBalancesAndOrders(
@@ -689,11 +686,10 @@ class ActorsWebSocketInteractionsSpecification
         )
     }
 
-    "reply with error message if node is unavailable" in webSocketTest {
-      (ad, ep, wsp, _, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
-        val bob = mkKeyPair("bob")
-        ad ! AddressDirectory.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
-        wsp.expectMessageType[WsError] should matchTo(websockets.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
+    "reply with error message if node is unavailable" in webSocketTest { (ad, _, wsp, _, _, _, _, _, _, _) =>
+      val bob = mkKeyPair("bob")
+      ad ! AddressDirectory.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
+      wsp.expectMessageType[WsError] should matchTo(websockets.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
     }
   }
 }

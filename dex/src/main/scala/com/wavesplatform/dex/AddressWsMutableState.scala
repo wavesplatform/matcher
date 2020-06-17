@@ -49,6 +49,7 @@ case class AddressWsMutableState(address: Address,
 
     val ad = efc.assetDecimals(ao.order.assetPair.amountAsset)
     val pd = efc.assetDecimals(ao.order.assetPair.priceAsset)
+    val fd = efc.assetDecimals(ao.feeAsset)
 
     putOrderUpdate(
       id = ao.id,
@@ -57,7 +58,7 @@ case class AddressWsMutableState(address: Address,
         .copy(
           status = newStatus.name.some,
           filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
-          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, ad).toDouble),
+          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble), // TODO test
           avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble)
         )
     )

@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.api.websockets
 
 import cats.syntax.option._
+import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
@@ -11,6 +12,7 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class WsCompleteOrder(id: Order.Id,
+                           owner: Address,
                            timestamp: Long,
                            amountAsset: Asset,
                            priceAsset: Asset,
@@ -25,9 +27,10 @@ case class WsCompleteOrder(id: Order.Id,
                            filledFee: Double,
                            avgWeighedPrice: Double,
                            eventTimestamp: Long,
+                           // TODO
                            executedAmount: Option[Double] = None,
                            executedFee: Option[Double] = None,
-                           executedPrice: Option[Double] = None)
+                           executionPrice: Option[Double] = None)
 
 object WsCompleteOrder {
 
@@ -36,53 +39,66 @@ object WsCompleteOrder {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
     val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
+    val feeAssetDecimals    = efc.assetDecimals(ao.order.feeAsset)
 
-    def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
-    def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+    def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+    def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, feeAssetDecimals).toDouble
 
+    val fillingInfo = ao.fillingInfo
     WsCompleteOrder(
       id = ao.id,
+      owner = ao.order.sender.toAddress,
       timestamp = ao.order.timestamp,
       amountAsset = ao.order.assetPair.amountAsset,
       priceAsset = ao.order.assetPair.priceAsset,
       side = ao.order.orderType,
       isMarket = ao.isMarket,
       price = denormalizePrice(ao.order.price),
-      amount = denormalizeAmountAndFee(ao.order.amount),
-      fee = denormalizeAmountAndFee(ao.order.matcherFee),
+      amount = denormalizeAmount(ao.order.amount),
+      fee = denormalizeFee(ao.order.matcherFee),
       feeAsset = ao.order.feeAsset,
       status = OrderStatus.Cancelled.name,
-      filledAmount = denormalizeAmountAndFee(ao.order.amount),
-      filledFee = denormalizeAmountAndFee(ao.order.matcherFee),
-      avgWeighedPrice = denormalizePrice(ao.fillingInfo.avgWeighedPrice),
+      filledAmount = denormalizeAmount(fillingInfo.filledAmount),
+      filledFee = denormalizeFee(fillingInfo.filledFee),
+      avgWeighedPrice = denormalizePrice(fillingInfo.avgWeighedPrice),
       eventTimestamp = event.timestamp,
       executedAmount = none,
       executedFee = none,
-      executedPrice = none
+      executionPrice = none
     )
   }
 
-  def from(ao: AcceptedOrder, event: OrderExecuted, denormalizeAmountAndFee: Long => Double, denormalizePrice: Long => Double)(
-      implicit efc: ErrorFormatterContext): WsCompleteOrder = WsCompleteOrder(
-    id = ao.id,
-    timestamp = ao.order.timestamp,
-    amountAsset = ao.order.assetPair.amountAsset,
-    priceAsset = ao.order.assetPair.priceAsset,
-    side = ao.order.orderType,
-    isMarket = ao.isMarket,
-    price = denormalizePrice(ao.order.price),
-    amount = denormalizeAmountAndFee(ao.order.amount),
-    fee = denormalizeAmountAndFee(ao.order.matcherFee),
-    feeAsset = ao.order.feeAsset,
-    status = ao.status.name,
-    filledAmount = denormalizeAmountAndFee(ao.fillingInfo.filledAmount),
-    filledFee = denormalizeAmountAndFee(ao.fillingInfo.filledFee),
-    avgWeighedPrice = denormalizePrice(ao.fillingInfo.avgWeighedPrice),
-    eventTimestamp = event.timestamp,
-    executedAmount = denormalizeAmountAndFee(event.executedAmount).some,
-    executedFee = denormalizeAmountAndFee(event.counterExecutedFee).some,
-    executedPrice = denormalizePrice(event.executedPrice).some
-  )
+  def from(ao: AcceptedOrder,
+           event: OrderExecuted,
+           denormalizeAmount: Long => Double,
+           denormalizePrice: Long => Double,
+           denormalizeFee: Long => Double)(implicit efc: ErrorFormatterContext): WsCompleteOrder = {
+    val fillingInfo = ao.fillingInfo
+    val executedFee = if (ao.id == event.counter.order.id()) event.counterExecutedFee else event.submittedExecutedFee
+
+    WsCompleteOrder(
+      id = ao.id,
+      owner = ao.order.sender.toAddress,
+      timestamp = ao.order.timestamp,
+      amountAsset = ao.order.assetPair.amountAsset,
+      priceAsset = ao.order.assetPair.priceAsset,
+      side = ao.order.orderType,
+      isMarket = ao.isMarket,
+      price = denormalizePrice(ao.order.price),
+      amount = denormalizeAmount(ao.order.amount),
+      fee = denormalizeFee(ao.order.matcherFee),
+      feeAsset = ao.order.feeAsset,
+      status = ao.status.name,
+      filledAmount = denormalizeAmount(fillingInfo.filledAmount),
+      filledFee = denormalizeFee(fillingInfo.filledFee),
+      avgWeighedPrice = denormalizePrice(fillingInfo.avgWeighedPrice),
+      eventTimestamp = event.timestamp,
+      executedAmount = denormalizeAmount(event.executedAmount).some,
+      executedFee = denormalizeFee(executedFee).some,
+      executionPrice = denormalizePrice(event.executedPrice).some
+    )
+  }
 
   private val isMarketFormat: Format[Boolean] = Format(
     {
@@ -114,6 +130,7 @@ object WsCompleteOrder {
   implicit val wsCompleteOrderFormat: Format[WsCompleteOrder] =
     (
       (__ \ "i").format[Order.Id] and                               // id
+        (__ \ "o").format[Address] and                              // owner's address
         (__ \ "t").format[Long] and                                 // timestamp
         (__ \ "A").format[Asset] and                                // amount asset
         (__ \ "P").format[Asset] and                                // price asset

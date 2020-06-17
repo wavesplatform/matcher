@@ -5,7 +5,7 @@ import cats.syntax.option._
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.model.AcceptedOrder
-import com.wavesplatform.dex.model.Events.{ExchangeTransactionCreated, OrderCanceled}
+import com.wavesplatform.dex.model.Events.{OrderCanceled, OrderExecuted}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -26,18 +26,26 @@ object WsOrdersUpdate {
     NonEmptyList.one(WsCompleteOrder.from(x))
   )
 
-  def from(x: ExchangeTransactionCreated)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
-    val ao1       = x.reason.counterRemaining
+  def from(x: OrderExecuted, ts: Long)(implicit efc: ErrorFormatterContext): WsOrdersUpdate = {
+    val ao1       = x.counterRemaining
     val assetPair = ao1.order.assetPair
 
     val amountAssetDecimals = efc.assetDecimals(assetPair.amountAsset)
     val priceAssetDecimals  = efc.assetDecimals(assetPair.priceAsset)
 
-    def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
-    def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
-    def from(ao: AcceptedOrder): WsCompleteOrder     = WsCompleteOrder.from(ao, x.reason, denormalizeAmountAndFee, denormalizePrice)
+    def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
-    WsOrdersUpdate(NonEmptyList.of(ao1, x.reason.submittedRemaining).map(from), timestamp = x.tx.timestamp)
+    def from(ao: AcceptedOrder): WsCompleteOrder =
+      WsCompleteOrder.from(
+        ao,
+        x,
+        denormalizeAmount,
+        denormalizePrice,
+        Denormalization.denormalizeAmountAndFee(_, efc.assetDecimals(ao.feeAsset)).toDouble
+      )
+
+    WsOrdersUpdate(NonEmptyList.of(ao1, x.submittedRemaining).map(from), timestamp = ts)
   }
 
   def wsUnapply(arg: WsOrdersUpdate): Option[(String, Long, NonEmptyList[WsCompleteOrder])] = (arg.tpe, arg.timestamp, arg.orders).some

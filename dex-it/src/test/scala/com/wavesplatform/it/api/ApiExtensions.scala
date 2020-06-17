@@ -34,9 +34,9 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
-  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {
+  protected def cancelAndAwait(owner: KeyPair, order: Order): OrderStatusResponse = {
     dex1.api.cancel(owner, order)
-    dex1.api.waitForOrderStatus(order, expectedStatus)
+    dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
   }
 
   protected def waitForOrderAtNode(order: Order,

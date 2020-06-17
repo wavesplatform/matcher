@@ -15,7 +15,6 @@ import cats.instances.future._
 import cats.syntax.functor._
 import com.wavesplatform.dex.actors.{BroadcastActor, OrderBookAskAdapter}
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
-import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
 import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
@@ -107,20 +106,19 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
 
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.assetDecimals)
     OrderBookActor.props(
       OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,
+      wsInternalBroadcast, // Safe to use here, because OrderBookActors are created after wsInternalBroadcast initialization
       assetPair,
-      amountDecimals = assetDecimals(assetPair.amountAsset),
-      priceDecimals = assetDecimals(assetPair.priceAsset),
       time,
-      matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
+      matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
-      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.assetDecimals),
       Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
       settings.orderRestrictions.get(assetPair)
     )
@@ -308,7 +306,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             )
         },
         orderBooks,
-        (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, assetsCache.unsafeGetDecimals),
+        orderBookProps(_, _),
         assetsCache.get(_)
       ),
       MatcherActor.name
@@ -387,7 +385,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         storeEvent,
         startSchedules,
         spendableBalancesActor,
-        wsInternalBroadcast, // Safe to use here, because AddressActors are created after wsInternalBroadcast initialization
         settings.addressActorSettings
       )
     )
@@ -468,11 +465,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     val createdTxFanOutRef: typed.ActorRef[Events.ExchangeTransactionCreated] = actorSystem.spawn(
       BroadcastActor[Events.ExchangeTransactionCreated](
         BroadcastActor.routed(txWriterRef),
-        BroadcastActor.routed(wavesNetTxBroadcasterRef),
-        BroadcastActor.adapted(wsInternalBroadcast) { x =>
-          log.info(s"Sending to WS $x")
-          WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(x))
-        }
+        BroadcastActor.routed(wavesNetTxBroadcasterRef)
       ),
       "broadcast-new-transaction"
     )

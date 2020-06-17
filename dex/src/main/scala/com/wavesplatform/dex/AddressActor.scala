@@ -13,7 +13,6 @@ import com.wavesplatform.dex.AddressActor._
 import com.wavesplatform.dex.Matcher.StoreEvent
 import com.wavesplatform.dex.api.CanNotPersist
 import com.wavesplatform.dex.api.websockets._
-import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.db.OrderDB
 import com.wavesplatform.dex.db.OrderDB.orderInfoOrdering
 import com.wavesplatform.dex.domain.account.Address
@@ -46,7 +45,6 @@ class AddressActor(owner: Address,
                    store: StoreEvent,
                    var enableSchedules: Boolean,
                    spendableBalancesActor: ActorRef,
-                   wsInternalHandlerDirectoryRef: typed.ActorRef[WsInternalBroadcastActor.Command],
                    settings: AddressActor.Settings = AddressActor.Settings.default)(implicit efc: ErrorFormatterContext)
     extends Actor
     with ScorexLogging {
@@ -245,7 +243,6 @@ class AddressActor(owner: Address,
         log.trace(s"Confirming cancellation for $id")
         pc.client ! api.OrderCanceled(id)
       }
-      wsInternalHandlerDirectoryRef ! WsInternalBroadcastActor.Command.Collect(WsOrdersUpdate.from(event))
 
     case command @ OrderCancelFailed(id, reason) =>
       pendingCommands.remove(id) match {

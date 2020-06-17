@@ -68,7 +68,7 @@ sealed trait AcceptedOrder {
     val isNew           = amount == order.amount
     val avgWeighedPrice = if (isNew) 0 else avgWeighedPriceNominator.divide(BigInteger valueOf filledAmount).longValueExact()
 
-    FillingInfo(isNew, filledAmount, filledFee, avgWeighedPrice)
+    FillingInfo(filledAmount, filledFee, avgWeighedPrice)
   }
 
   def requiredFee: Long                 = fee
@@ -225,7 +225,7 @@ object AcceptedOrder {
     }
   }
 
-  final case class FillingInfo(isNew: Boolean, filledAmount: Long, filledFee: Long, avgWeighedPrice: Long)
+  final case class FillingInfo(filledAmount: Long, filledFee: Long, avgWeighedPrice: Long)
 }
 
 sealed trait BuyOrder extends AcceptedOrder {

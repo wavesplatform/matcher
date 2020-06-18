@@ -25,8 +25,8 @@ class AssetPairBuilder(settings: MatcherSettings,
 
   private[this] val indices  = settings.priceAssets.zipWithIndex.toMap
   private[this] val timer    = Kamon.timer("matcher.asset-pair-builder")
-  private[this] val create   = timer.refine("action" -> "create")
-  private[this] val validate = timer.refine("action" -> "validate")
+  private[this] val create   = timer.withTag("action", "create")
+  private[this] val validate = timer.withTag("action", "validate")
 
   def isCorrectlyOrdered(pair: AssetPair): Boolean = (indices.get(pair.priceAsset), indices.get(pair.amountAsset)) match {
     case (None, None)         => pair.priceAsset.compatId < pair.amountAsset.compatId

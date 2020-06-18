@@ -28,23 +28,22 @@ object Dependencies {
 
     val logback            = "1.2.3"
     val slf4j              = "1.7.30"
-    val janino             = "3.1.0"
-    val logbackJsonEncoder = "6.3"
+    val janino             = "3.1.2"
+    val logbackJsonEncoder = "6.4"
 
     val silencer = "1.6.0"
 
-    val kamonCore          = "1.1.6"
-    val kamonInfluxDb      = "1.0.3"
-    val kamonSystemMetrics = "1.0.1"
+    val kamonCore          = "2.1.1"
+    val kamonInfluxDb      = "2.1.1"
 
     val wavesProtobufSchemas = "1.2.5"
     val wavesJ               = "0.16.0"
 
-    val postgresql = "42.2.9"
+    val postgresql = "42.2.14"
     val quillJdbc  = "3.5.1"
 
     val sttp       = "1.7.2"
-    val sttpClient = "2.1.1"
+    val sttpClient = "2.2.0"
 
     val testContainers          = "0.37.0"
     val testContainersPostgres  = "1.14.3"
@@ -55,7 +54,7 @@ object Dependencies {
     val playJson = "2.9.0"
 
     val googleGuava = "28.2-jre"
-    val kafka       = "2.4.0"
+    val kafka       = "2.5.0"
 
     val swagger   = "1.1.2"
     val swaggerUi = "3.26.1"
@@ -68,7 +67,7 @@ object Dependencies {
 
     val javaLevelDb = "0.12"
     val jniLevelDb  = "1.18.3"
-    val influxDb    = "2.17"
+    val influxDb    = "2.19"
 
     val commonsNet = "3.6"
     val nettyCodec = "4.1.33.Final"
@@ -223,7 +222,6 @@ object Dependencies {
       jniLevelDb,
       kamonCore,
       kamonModule("influxdb", Version.kamonInfluxDb),
-      kamonModule("system-metrics", Version.kamonSystemMetrics),
       influxDb,
       commonsNet,
       swaggerUi,

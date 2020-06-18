@@ -42,7 +42,7 @@ object OrderValidator extends ScorexLogging {
   type Result[T]       = Either[MatcherError, T]
   type AsyncBlockchain = WavesBlockchainClient[Future]
 
-  private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
+  private val timer = Kamon.timer("matcher.validation").withTag("type", "blockchain")
 
   val MinExpiration: Long = 60 * 1000L
 

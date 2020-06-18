@@ -23,7 +23,7 @@ import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.actors.tx.WriteExchangeTransactionActor
 import com.wavesplatform.dex.api.RouteSpec
 import com.wavesplatform.dex.api.http.ApiMarshallers._
-import com.wavesplatform.dex.api.http.entities.{HttpAssetInfo, HttpBalance, HttpError, HttpMarketDataWithMeta, HttpMarketStatus, HttpMatcherPublicKey, HttpMatcherPublicSettings, HttpMatchingRules, HttpMessage, HttpOffset, HttpOrderBook, HttpOrderBookHistoryItem, HttpOrderBookInfo, HttpOrderFeeMode, HttpOrderRestrictions, HttpOrderStatus, HttpRates, HttpSnapshotOffsets, HttpSuccessfulBatchCancel, HttpSuccessfulPlace, HttpSuccessfulSingleCancel, HttpTradingMarkets, HttpV0LevelAgg, HttpV0OrderBook, _}
+import com.wavesplatform.dex.api.http.entities._
 import com.wavesplatform.dex.api.http.headers.`X-Api-Key`
 import com.wavesplatform.dex.api.http.protocol.HttpCancelOrder
 import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
@@ -121,7 +121,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
         orderRestrictions = Map(smartWavesPair -> orderRestrictions)
       )
 
-  private implicit val httpMarketDataWithMetaDiff: Diff[HttpMarketDataWithMeta] = Derived[Diff[HttpMarketDataWithMeta]].ignore[Long](_.created)
+  private implicit val httpMarketDataWithMetaDiff: Diff[HttpMarketDataWithMeta] =
+    Derived[Diff[HttpMarketDataWithMeta]].ignore[HttpMarketDataWithMeta, Long](_.created)
 
   private def mkHistoryItem(order: Order, status: String): HttpOrderBookHistoryItem =
     HttpOrderBookHistoryItem(

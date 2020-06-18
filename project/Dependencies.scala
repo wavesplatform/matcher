@@ -5,14 +5,14 @@ object Dependencies {
 
   object Version {
 
-    val akka     = "2.6.5"
-    val akkaHttp = "10.1.11"
+    val akka     = "2.6.6"
+    val akkaHttp = "10.1.12"
 
-    val scalaTest          = "3.1.0"
+    val scalaTest          = "3.1.2"
     val scalaCheck         = "1.14.3"
-    val scalaTestPlusCheck = "3.1.0.1"
+    val scalaTestPlusCheck = "3.1.2.0"
     val scalaMock          = "4.4.0"
-    val diffx              = "0.3.19"
+    val diffx              = "0.3.29"
 
     val cats              = "2.0.0"
     val catsTaglessMacros = "0.11"
@@ -37,7 +37,7 @@ object Dependencies {
     val kamonInfluxDb      = "1.0.3"
     val kamonSystemMetrics = "1.0.1"
 
-    val wavesProtobufSchemas = "1.0.0"
+    val wavesProtobufSchemas = "1.2.5"
     val wavesJ               = "0.16.0"
 
     val postgresql = "42.2.9"

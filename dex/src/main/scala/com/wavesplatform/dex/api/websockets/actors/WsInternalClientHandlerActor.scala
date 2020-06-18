@@ -16,7 +16,7 @@ import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 
 /**
-  * Controls WebSocket connection for order updates stream
+  * Controls a single WebSocket connection for order updates stream
   * Handles user messages (pongs) add schedules timeouts (pongs, max connection lifetime)
   */
 object WsInternalClientHandlerActor {

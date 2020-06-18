@@ -9,8 +9,7 @@ import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
 import scala.concurrent.duration._
 
 /**
-  * Contains subscriptions for
-  * Handles user messages (pongs) add schedules timeouts (pongs, max connection lifetime)
+  * Contains subscriptions for internal stream and broadcast messages.
   */
 object WsInternalBroadcastActor {
 

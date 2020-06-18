@@ -26,7 +26,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
 
   override def preStart(): Unit = scheduleSend()
 
-  private val default: Receive = { case ExchangeTransactionCreated(tx, _) => broadcast(tx) }
+  private val default: Receive = { case ExchangeTransactionCreated(tx) => broadcast(tx) }
 
   private def watching(toCheck: Vector[ExchangeTransaction], toNextCheck: Vector[ExchangeTransaction]): Receive = {
     case CheckAndSend =>
@@ -59,7 +59,7 @@ class ExchangeTransactionBroadcastActor(settings: ExchangeTransactionBroadcastSe
           self ! StashTransactionsToCheck(broadcastedTxs)
         }
 
-    case ExchangeTransactionCreated(tx, _) =>
+    case ExchangeTransactionCreated(tx) =>
       val r = for {
         confirmed <- confirmed(List(tx.id())).map(_.getOrElse(tx.id(), false))
         _         <- if (confirmed) Future.unit else broadcast(tx)

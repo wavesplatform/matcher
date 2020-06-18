@@ -470,9 +470,7 @@ class ActorsWebSocketInteractionsSpecification
 
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(94.997, 0)),
-            Seq(
-              WsOrder.fromDomain(oe.submittedRemaining) // TODO , OrderStatus.Filled(5.waves, 0.003.waves))
-            ),
+            Seq(WsOrder.fromDomain(oe.submittedRemaining)),
             1
           )
       }

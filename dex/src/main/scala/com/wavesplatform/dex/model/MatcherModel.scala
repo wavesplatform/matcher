@@ -445,5 +445,5 @@ object Events {
 
   case class OrderCancelFailed(id: Order.Id, reason: error.MatcherError)
 
-  case class ExchangeTransactionCreated(tx: ExchangeTransaction, reason: OrderExecuted)
+  case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 }

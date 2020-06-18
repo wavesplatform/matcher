@@ -14,8 +14,7 @@ import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction.{ExchangeTransaction, ExchangeTransactionV2}
 import com.wavesplatform.dex.domain.utils.EitherExt2
-import com.wavesplatform.dex.model.Events.{ExchangeTransactionCreated, OrderExecuted}
-import com.wavesplatform.dex.model.LimitOrder
+import com.wavesplatform.dex.model.Events.ExchangeTransactionCreated
 import com.wavesplatform.dex.settings.{ExchangeTransactionBroadcastSettings, loadConfig}
 import com.wavesplatform.dex.time.Time
 import org.scalamock.scalatest.PathMockFactory
@@ -215,48 +214,38 @@ class ExchangeTransactionBroadcastActorSpecification
 
   private def sampleEvent(expiration: FiniteDuration = 1.day): ExchangeTransactionCreated = {
     val ts = time.getTimestamp
-    val buyOrder = Order.buy(
-      sender = KeyPair(Array.emptyByteArray),
-      matcher = KeyPair(Array.emptyByteArray),
-      pair = pair,
-      amount = 100,
-      price = 6000000L,
-      timestamp = ts,
-      expiration = ts + expiration.toMillis,
-      matcherFee = 100
-    )
-    val sellOrder = Order.sell(
-      sender = KeyPair(Array.emptyByteArray),
-      matcher = KeyPair(Array.emptyByteArray),
-      pair = pair,
-      amount = 100,
-      price = 6000000L,
-      timestamp = ts,
-      expiration = ts + expiration.toMillis,
-      matcherFee = 100
-    )
-    val event = OrderExecuted(
-      submitted = LimitOrder(buyOrder),
-      counter = LimitOrder(sellOrder),
-      timestamp = ts,
-      counterExecutedFee = 300000L,
-      submittedExecutedFee = 300000L
-    )
     ExchangeTransactionCreated(
-      tx = ExchangeTransactionV2
+      ExchangeTransactionV2
         .create(
-          buyOrder = buyOrder,
-          sellOrder = sellOrder,
-          amount = event.executedAmount,
-          price = event.executedPrice,
-          buyMatcherFee = event.submittedExecutedFee,
-          sellMatcherFee = event.counterExecutedFee,
+          buyOrder = Order.buy(
+            sender = KeyPair(Array.emptyByteArray),
+            matcher = KeyPair(Array.emptyByteArray),
+            pair = pair,
+            amount = 100,
+            price = 6000000L,
+            timestamp = ts,
+            expiration = ts + expiration.toMillis,
+            matcherFee = 100
+          ),
+          sellOrder = Order.sell(
+            sender = KeyPair(Array.emptyByteArray),
+            matcher = KeyPair(Array.emptyByteArray),
+            pair = pair,
+            amount = 100,
+            price = 6000000L,
+            timestamp = ts,
+            expiration = ts + expiration.toMillis,
+            matcherFee = 100
+          ),
+          amount = 100,
+          price = 6000000L,
+          buyMatcherFee = 0L,
+          sellMatcherFee = 0L,
           fee = 300000L,
           timestamp = ts,
           proofs = Proofs.empty
         )
-        .explicitGet(),
-      reason = event
+        .explicitGet()
     )
   }
 }

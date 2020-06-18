@@ -13,7 +13,7 @@ import akka.util.Timeout
 import cats.data.EitherT
 import cats.instances.future._
 import cats.syntax.functor._
-import com.wavesplatform.dex.actors.{BroadcastActor, OrderBookAskAdapter}
+import com.wavesplatform.dex.actors.OrderBookAskAdapter
 import com.wavesplatform.dex.api.http.{ApiRoute, CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.websockets.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.{MatcherApiRoute, MatcherApiRouteV1, MatcherWebSocketRoute}
@@ -306,7 +306,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             )
         },
         orderBooks,
-        orderBookProps(_, _),
+        orderBookProps,
         assetsCache.get(_)
       ),
       MatcherActor.name
@@ -462,16 +462,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       "exchange-transaction-broadcast"
     )
 
-    val createdTxFanOutRef: typed.ActorRef[Events.ExchangeTransactionCreated] = actorSystem.spawn(
-      BroadcastActor[Events.ExchangeTransactionCreated](
-        BroadcastActor.routed(txWriterRef),
-        BroadcastActor.routed(wavesNetTxBroadcasterRef)
-      ),
-      "broadcast-new-transaction"
-    )
-
     actorSystem.actorOf(
-      CreateExchangeTransactionActor.props(transactionCreator.createTransaction, createdTxFanOutRef),
+      CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
       CreateExchangeTransactionActor.name
     )
 

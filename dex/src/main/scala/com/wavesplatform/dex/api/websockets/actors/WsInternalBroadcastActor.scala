@@ -5,7 +5,6 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import cats.syntax.option._
 import com.wavesplatform.dex.api.websockets.WsOrdersUpdate
-import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
@@ -31,12 +30,10 @@ object WsInternalBroadcastActor {
     Behaviors.setup[Message] { context =>
       context.system.eventStream
 
-      def default(state: State): Behavior[Message] = {
-        context.log.info(s"State:\nsubscriptions: ${state.subscriptions.map(_.path.name).toList.sorted}\nupdates: ${state.collectedUpdates}\nschedule.cancelled: ${state.schedule.isCancelled}")
+      def default(state: State): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
             case Command.Collect(update) =>
-              context.log.info(s"Got Collect(${Json.toJson(update)})")
               default {
                 state
                   .withUpdates(update)
@@ -53,7 +50,6 @@ object WsInternalBroadcastActor {
               }
 
             case Command.SendWsUpdates =>
-              context.log.info(s"Got SendWsUpdates, sending ${Json.toJson(state.collectedUpdates)}")
               state.collectedUpdates
                 .map(WsInternalClientHandlerActor.Command.ForwardToClient)
                 .foreach { message =>
@@ -66,7 +62,6 @@ object WsInternalBroadcastActor {
               context.log.info(s"[${clientRef.path.name}] unsubscribed")
               default(state.updateSubscriptions(_ - clientRef.unsafeUpcast[WsInternalClientHandlerActor.Message]))
           }
-      }
 
       default(State(none, Set.empty, Cancellable.alreadyCancelled))
     }

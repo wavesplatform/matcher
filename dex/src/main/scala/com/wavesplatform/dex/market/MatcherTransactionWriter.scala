@@ -14,7 +14,7 @@ class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {
   import MatcherTransactionWriter._
 
   override def receive: Receive = {
-    case ExchangeTransactionCreated(tx, _) => saveExchangeTx(tx)
+    case ExchangeTransactionCreated(tx) => saveExchangeTx(tx)
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = db.readWrite { rw =>

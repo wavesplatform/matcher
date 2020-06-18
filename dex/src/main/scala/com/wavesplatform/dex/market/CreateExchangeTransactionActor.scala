@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.market
 
-import akka.actor.{Actor, Props, typed}
+import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.CreateExchangeTransactionActor.OrderExecutedObserved
@@ -15,9 +15,7 @@ import scala.collection.mutable
   * and broadcasts it further.
   * If both orders have the same owner, an ExchangeTransaction is created immediately.
   */
-class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recipient: typed.ActorRef[ExchangeTransactionCreated])
-    extends Actor
-    with ScorexLogging {
+class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recipients: List[ActorRef]) extends Actor with ScorexLogging {
 
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
 
@@ -33,7 +31,8 @@ class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recip
         createTransaction(event) match {
           case Right(tx) =>
             log.info(s"Created transaction: $tx")
-            recipient ! ExchangeTransactionCreated(tx, event)
+            val created = ExchangeTransactionCreated(tx)
+            recipients.foreach(_ ! created)
           case Left(ex) =>
             log.warn(
               s"""Can't create tx: $ex
@@ -52,5 +51,6 @@ object CreateExchangeTransactionActor {
 
   case class OrderExecutedObserved(sender: Address, event: OrderExecuted)
 
-  def props(createTransaction: CreateTransaction, recipient: typed.ActorRef[ExchangeTransactionCreated]): Props = Props(new CreateExchangeTransactionActor(createTransaction, recipient))
+  def props(createTransaction: CreateTransaction, recipients: List[ActorRef]): Props =
+    Props(new CreateExchangeTransactionActor(createTransaction, recipients))
 }

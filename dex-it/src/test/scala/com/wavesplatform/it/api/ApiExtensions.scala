@@ -105,8 +105,7 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
         }
         mkTransfer(sender, account, balance, asset, 0.003.waves)
     }
-    transfers.foreach(wavesNode1.api.broadcast)
-    transfers.foreach(wavesNode1.api.waitForTransaction)
+    transfers.par.foreach(wavesNode1.api.broadcast)
     account
   }
 

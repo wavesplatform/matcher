@@ -20,7 +20,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
          |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-         |  web-sockets.internal-broadcast.messages-interval = ${messagesInterval.toMillis}ms
+         |  web-sockets.internal-broadcast.messages-interval = $messagesInterval
          |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 
@@ -266,14 +266,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
           )
         }
 
-        withClue("An order of items are preserved") {
-          val matches = buffer.flattenOrders
-          matches.zip(matches.tail).foreach {
-            case (next, prev) =>
-              next.eventTimestamp should be >= prev.eventTimestamp
-          }
-        }
-
+        checkItemsOrder(buffer)
         wsc.close()
       }
 
@@ -365,14 +358,7 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
             ))
         }
 
-        withClue("An order of items are preserved") {
-          val matches = buffer.flattenOrders
-          matches.zip(matches.tail).foreach {
-            case (next, prev) =>
-              next.eventTimestamp should be >= prev.eventTimestamp
-          }
-        }
-
+        checkItemsOrder(buffer)
         wsc.close()
       }
     }
@@ -427,5 +413,13 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
       executedFee = executionInfo.map(_.fee),
       executionPrice = executionInfo.map(_.price)
     )
+  }
+
+  private def checkItemsOrder(buffer: List[WsOrdersUpdate]): Unit = withClue("An order of items are preserved") {
+    val matches = buffer.flattenOrders
+    matches.zip(matches.tail).foreach {
+      case (next, prev) =>
+        next.eventTimestamp should be >= prev.eventTimestamp
+    }
   }
 }

@@ -16,17 +16,17 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
   protected val delta = 1.second
 
-  private implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
+  protected implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
 
   protected def wsStreamUri: String
-  protected def mkWsTestConnection(): WsConnection = mkWsConnection(wsStreamUri, keepAlive = false)
+  protected def mkWsUnmanagedConnection(): WsConnection = mkWsConnection(wsStreamUri, keepAlive = false)
 
   "Web socket connection should be closed " - {
 
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
 
       "without sending pong" in {
-        val wsac                       = mkWsTestConnection()
+        val wsac                       = mkWsUnmanagedConnection()
         val expectedConnectionLifetime = pingInterval + pongTimeout
         val connectionLifetime         = Await.result(wsac.connectionLifetime, expectedConnectionLifetime + delta)
 
@@ -44,7 +44,7 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
       }
 
       "with sending pong" in {
-        val wsac = mkWsTestConnection()
+        val wsac = mkWsUnmanagedConnection()
 
         Thread.sleep(pingInterval + 0.1.second)
         wsac.isClosed shouldBe false
@@ -67,8 +67,8 @@ abstract class WsPingPongBaseSuite extends WsSuiteBase {
       }
 
       "even if pong is sent from another connection" in {
-        val wsac1 = mkWsTestConnection()
-        val wsac2 = mkWsTestConnection()
+        val wsac1 = mkWsUnmanagedConnection()
+        val wsac2 = mkWsUnmanagedConnection()
 
         wsac1.isClosed shouldBe false
         wsac2.isClosed shouldBe false

@@ -160,7 +160,7 @@ object WsExternalClientHandlerActor {
                         .fold {
 
                           addressRef ! AddressDirectory.Envelope(subscribe.key, AddressActor.WsCommand.AddWsSubscription(clientRef))
-                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful")
+                          context.log.debug(s"WsAddressSubscribe(k=$address, t=$authType) is successful, will expire in $subscriptionLifetime")
 
                           if (addressSubscriptions.lengthCompare(maxAddressNumber) == 0) {
                             // safe since maxAddressNumber > 0

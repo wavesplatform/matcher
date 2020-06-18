@@ -137,7 +137,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       timestamp = order.timestamp,
       status = status,
       assetPair = order.assetPair,
-      avgWeighedPrice = 0 // TODO Its false in case of new orders! Fix in DEX-774
+      avgWeighedPrice = 0
     )
 
   // getMatcherPublicKey

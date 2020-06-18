@@ -14,13 +14,13 @@ object Dependencies {
     val scalaMock          = "4.4.0"
     val diffx              = "0.3.29"
 
-    val cats              = "2.0.0"
+    val cats              = "2.1.1"
     val catsTaglessMacros = "0.11"
     val kindProjector     = "0.9.10"
     val betterMonadicFor  = "0.3.1"
-    val mouse             = "0.24"
+    val mouse             = "0.25"
     val shapeless         = "2.3.3"
-    val monocle           = "2.0.4"
+    val monocle           = "2.0.5"
 
     val typesafeConfig = "1.4.0"
     val scopt          = "4.0.0-RC2"
@@ -41,15 +41,15 @@ object Dependencies {
     val wavesJ               = "0.16.0"
 
     val postgresql = "42.2.9"
-    val quillJdbc  = "3.5.0"
+    val quillJdbc  = "3.5.1"
 
     val sttp       = "1.7.2"
     val sttpClient = "2.1.1"
 
-    val testContainers          = "0.35.2"
-    val testContainersPostgres  = "1.12.5"
-    val testContainersKafka     = "1.13.0"
-    val testContainersToxiProxy = "1.12.5"
+    val testContainers          = "0.37.0"
+    val testContainersPostgres  = "1.14.3"
+    val testContainersKafka     = "1.14.3"
+    val testContainersToxiProxy = "1.14.3"
 
     val jackson  = "2.10.0"
     val playJson = "2.9.0"
@@ -60,11 +60,11 @@ object Dependencies {
     val swagger   = "1.1.2"
     val swaggerUi = "3.26.1"
 
-    val scorexCrypto = "2.1.7"
+    val scorexCrypto = "2.1.8"
 
-    val monix = "3.0.0"
+    val monix = "3.2.2"
 
-    val supertagged = "1.4"
+    val supertagged = "1.5"
 
     val javaLevelDb = "0.12"
     val jniLevelDb  = "1.18.3"
@@ -72,7 +72,7 @@ object Dependencies {
 
     val commonsNet = "3.6"
     val nettyCodec = "4.1.33.Final"
-    val jwt        = "4.2.0"
+    val jwt        = "4.3.0"
 
     val pureConfig = "0.12.3"
   }

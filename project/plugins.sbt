@@ -15,7 +15,7 @@ Seq(
   "se.marcuslonnberg"  % "sbt-docker"             % "1.5.0",
   "com.typesafe.sbt"   % "sbt-git"                % "0.9.3",
   "org.scalameta"      % "sbt-scalafmt"           % "2.0.1",
-  "ch.epfl.scala"      % "sbt-scalafix"           % "0.9.11",
+  "ch.epfl.scala"      % "sbt-scalafix"           % "0.9.17",
   /*
   undeclaredCompileDependencies{test}
   unusedCompileDependencies{test}
@@ -29,7 +29,8 @@ Seq(
 
 libraryDependencies ++= Seq(
   "org.vafer"            % "jdeb"            % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
-  "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4"
+  "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4",
+  "commons-codec"        % "commons-codec"   % "1.14"
 )
 
 addCompilerPlugin("org.scalamacros" % "paradise"        % "2.1.1" cross CrossVersion.full) // Remove after scala 2.13 migration

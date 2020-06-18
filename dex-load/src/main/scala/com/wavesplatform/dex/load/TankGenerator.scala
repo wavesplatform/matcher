@@ -2,7 +2,6 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
-import java.util.concurrent.{ExecutorService, Executors}
 
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.request._
@@ -12,12 +11,9 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.collection.JavaConversions.seqAsJavaList
-import scala.concurrent._
 import scala.util.Random
 
 object TankGenerator {
-  private val executor: ExecutorService                          = Executors.newFixedThreadPool(20)
-  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")

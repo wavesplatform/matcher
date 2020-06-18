@@ -31,7 +31,7 @@ object Dependencies {
     val janino             = "3.1.0"
     val logbackJsonEncoder = "6.3"
 
-    val silencer = "1.4.4"
+    val silencer = "1.6.0"
 
     val kamonCore          = "1.1.6"
     val kamonInfluxDb      = "1.0.3"

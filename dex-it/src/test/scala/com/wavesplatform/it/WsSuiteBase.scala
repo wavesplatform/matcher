@@ -10,7 +10,7 @@ import scala.reflect.ClassTag
 
 trait WsSuiteBase extends MatcherSuiteBase with HasWebSockets {
 
-  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
+  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
 
   final implicit class WsConnectionOps(val self: WsConnection) {
     def receiveAtLeastN[T <: WsServerMessage: ClassTag](n: Int): List[T] = {

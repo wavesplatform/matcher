@@ -29,7 +29,7 @@ Seq(
 
 libraryDependencies ++= Seq(
   "org.vafer"            % "jdeb"            % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
-  "com.thesamet.scalapb" %% "compilerplugin" % "0.10.4",
+  "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4",
   "commons-codec"        % "commons-codec"   % "1.14"
 )
 

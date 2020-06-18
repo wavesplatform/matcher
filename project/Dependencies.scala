@@ -52,13 +52,13 @@ object Dependencies {
     val testContainersToxiProxy = "1.12.5"
 
     val jackson  = "2.10.0"
-    val playJson = "2.8.1"
+    val playJson = "2.9.0"
 
     val googleGuava = "28.2-jre"
     val kafka       = "2.4.0"
 
-    val swagger   = "1.1.1"
-    val swaggerUi = "3.24.3"
+    val swagger   = "1.1.2"
+    val swaggerUi = "3.26.1"
 
     val scorexCrypto = "2.1.7"
 

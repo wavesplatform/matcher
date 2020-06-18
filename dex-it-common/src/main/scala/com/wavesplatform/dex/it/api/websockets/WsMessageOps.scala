@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.it.api.websockets
 
-import com.wavesplatform.dex.api.websockets.{WsBalances, WsOrder, WsOrderBook}
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
 
@@ -39,5 +39,19 @@ trait WsMessageOps {
           )
         )
     }
+  }
+
+  implicit class WsOrderUpdatesListOps(self: List[WsOrdersUpdate]) {
+
+    /**
+      * @return Map order.id -> list of changes. The newest messages in the beginning
+      */
+    def orderEvents: Map[Order.Id, List[WsFullOrder]] = flattenOrders.groupBy(_.id)
+
+    /**
+     * Reverse because the latest messages are in the end
+     * @return The newest messages in the beginning. This is how we need to do for clients
+     */
+    def flattenOrders: List[WsFullOrder] = self.reverse.flatMap(_.orders.toList)
   }
 }

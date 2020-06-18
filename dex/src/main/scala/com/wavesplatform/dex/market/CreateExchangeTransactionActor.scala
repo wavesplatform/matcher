@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.market
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.market.CreateExchangeTransactionActor.OrderExecutedObserved
@@ -15,7 +15,7 @@ import scala.collection.mutable
   * and broadcasts it further.
   * If both orders have the same owner, an ExchangeTransaction is created immediately.
   */
-class CreateExchangeTransactionActor(createTransaction: CreateTransaction) extends Actor with ScorexLogging {
+class CreateExchangeTransactionActor(createTransaction: CreateTransaction, recipients: List[ActorRef]) extends Actor with ScorexLogging {
 
   private val pendingEvents = mutable.Set.empty[OrderExecuted]
 
@@ -24,14 +24,15 @@ class CreateExchangeTransactionActor(createTransaction: CreateTransaction) exten
   override def receive: Receive = {
     case OrderExecutedObserved(sender, event) =>
       val sameOwner = event.counter.order.sender == event.submitted.order.sender
-      log.debug(
-        s"Execution observed at $sender for OrderExecuted(${event.submitted.order.id()}, ${event.counter.order.id()}), amount=${event.executedAmount})${if (sameOwner) " Same owner for both orders" else ""}")
+      log.debug(s"Execution observed at $sender for OrderExecuted(${event.submitted.order.id()}, ${event.counter.order
+        .id()}), amount=${event.executedAmount})${if (sameOwner) " Same owner for both orders" else ""}")
       if (sameOwner || pendingEvents.contains(event)) {
         import event.{counter, submitted}
         createTransaction(event) match {
           case Right(tx) =>
             log.info(s"Created transaction: $tx")
-            context.system.eventStream.publish(ExchangeTransactionCreated(tx))
+            val created = ExchangeTransactionCreated(tx)
+            recipients.foreach(_ ! created)
           case Left(ex) =>
             log.warn(
               s"""Can't create tx: $ex
@@ -50,5 +51,6 @@ object CreateExchangeTransactionActor {
 
   case class OrderExecutedObserved(sender: Address, event: OrderExecuted)
 
-  def props(createTransaction: CreateTransaction): Props = Props(new CreateExchangeTransactionActor(createTransaction))
+  def props(createTransaction: CreateTransaction, recipients: List[ActorRef]): Props =
+    Props(new CreateExchangeTransactionActor(createTransaction, recipients))
 }

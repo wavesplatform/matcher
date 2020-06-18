@@ -18,10 +18,11 @@ import com.wavesplatform.dex.api.http.TestParsers
 import com.wavesplatform.dex.api.websockets.{WsMessage, WsOrderBook, WsOrderBookSettings}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.AssetPair
+import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.market.AggregatedOrderBookActor.{Command, Message, Query}
 import com.wavesplatform.dex.market.OrderBookActor.MarketStatus
@@ -95,6 +96,8 @@ class AggregatedOrderBookActorSpec
         val obsdb = OrderBookSnapshotDB.inMem
         obsdb.update(pair, 0, Some(initOb.snapshot))
 
+        implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+
         val owner = TestProbe()
         val orderBookRef = system.actorOf(
           Props(
@@ -103,9 +106,8 @@ class AggregatedOrderBookActorSpec
               owner.ref,
               TestProbe().ref,
               system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
+              system.toTyped.ignoreRef,
               pair,
-              8,
-              8,
               time,
               NonEmptyList.one(DenormalizedMatchingRule(0L, DenormalizedMatchingRule.DefaultTickSize)),
               _ => (),

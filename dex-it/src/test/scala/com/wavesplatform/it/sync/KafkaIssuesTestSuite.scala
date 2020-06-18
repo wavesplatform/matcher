@@ -90,7 +90,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
     assertChanges(wsac) { Map(Waves -> WsBalances(initialWavesBalance - 10.003, 10.003)) } {
-      WsOrder.fromDomain(LimitOrder(sellOrder), OrderStatus.Accepted)
+      WsOrder.fromDomain(LimitOrder(sellOrder))
     }
 
     disconnectKafkaFromNetwork()
@@ -132,7 +132,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 30.003.waves))
 
     assertChanges(wsac, squash = false) { Map(Waves -> WsBalances(initialWavesBalance - 30.003, 30.003)) } {
-      WsOrder.fromDomain(LimitOrder(bigSellOrder), OrderStatus.Accepted)
+      WsOrder.fromDomain(LimitOrder(bigSellOrder))
     }
 
     dex1.api.cancelAll(alice)

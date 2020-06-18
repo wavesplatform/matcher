@@ -157,10 +157,9 @@ class ActorsWebSocketInteractionsSpecification
   "Actors web socket interaction" should {
     "correctly process web socket requests" when {
 
-      "brand new sender subscribes" in webSocketTest {
-        (_, _, _, address, subscribeAddress, placeOrder, cancel, _, updateBalances, expectWsBalancesAndOrders) =>
-          subscribeAddress()
-          expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
+      "brand new sender subscribes" in webSocketTest { (_, _, _, _, subscribeAddress, _, _, _, _, expectWsBalancesAndOrders) =>
+        subscribeAddress()
+        expectWsBalancesAndOrders(Map.empty, Seq.empty, 0)
       }
 
       "sender places order and then cancel it" in webSocketTest {
@@ -179,7 +178,7 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(lo)
           expectWsBalancesAndOrders(
             Map(usd -> WsBalances(285, 15), Waves -> WsBalances(99.997, 0.003)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             1
           )
 
@@ -215,7 +214,7 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(buyOrder)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(270, 30), Waves -> WsBalances(99.997, 0.003)),
-              Seq(WsOrder.fromDomain(buyOrder, OrderStatus.Accepted)),
+              Seq(WsOrder.fromDomain(buyOrder)),
               1
             )
           }
@@ -293,7 +292,7 @@ class ActorsWebSocketInteractionsSpecification
             placeOrder(mo)
             expectWsBalancesAndOrders(
               Map(usd -> WsBalances(150, 150), eth -> WsBalances(1.99998297, 0.00001703)),
-              Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+              Seq(WsOrder.fromDomain(mo)),
               1
             )
           }
@@ -426,7 +425,7 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(114.997, 0.003), usd -> WsBalances(297, 3), eth -> WsBalances(5, 0)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             0
           )
       }
@@ -440,13 +439,13 @@ class ActorsWebSocketInteractionsSpecification
           subscribeAddress()
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(99.997, 0.003), btc -> WsBalances(0, 1)),
-            Seq(WsOrder.fromDomain(lo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(lo)),
             0
           )
       }
 
       "order executes right after it was placed" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (ad, ep, _, address, subscribeAddress, _, _, _, updateBalances, expectWsBalancesAndOrders) =>
           updateBalances { Map(Waves -> 100.waves, btc -> 1.btc) }
 
           val counter   = LimitOrder(createOrder(wavesUsdPair, BUY, 5.waves, 3.0))
@@ -471,15 +470,13 @@ class ActorsWebSocketInteractionsSpecification
 
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(94.997, 0)),
-            Seq(
-              WsOrder.fromDomain(oe.submittedRemaining, OrderStatus.Filled(5.waves, 0.003.waves))
-            ),
+            Seq(WsOrder.fromDomain(oe.submittedRemaining)),
             1
           )
       }
 
       "market order executes (address is sender of counters)" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (_, _, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
           def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): (MarketOrder, LimitOrder) = {
             val oe = executeOrder(submittedMarket, counter)
             oe.submittedMarketRemaining(submittedMarket) -> oe.counterRemaining
@@ -501,19 +498,13 @@ class ActorsWebSocketInteractionsSpecification
           )
 
           placeOrder(counter1)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)),
-                                    Seq(WsOrder.fromDomain(counter1, OrderStatus.Accepted)),
-                                    1)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(55, 15), Waves -> WsBalances(99.997, 0.003)), Seq(WsOrder.fromDomain(counter1)), 1)
 
           placeOrder(counter2)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)),
-                                    Seq(WsOrder.fromDomain(counter2, OrderStatus.Accepted)),
-                                    2)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(39.5, 30.5), Waves -> WsBalances(99.994, 0.006)), Seq(WsOrder.fromDomain(counter2)), 2)
 
           placeOrder(counter3)
-          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)),
-                                    Seq(WsOrder.fromDomain(counter3, OrderStatus.Accepted)),
-                                    3)
+          expectWsBalancesAndOrders(Map(usd -> WsBalances(23.5, 46.5), Waves -> WsBalances(99.991, 0.009)), Seq(WsOrder.fromDomain(counter3)), 3)
 
           mo = matchOrders(mo, counter1)._1
           expectWsBalancesAndOrders(
@@ -572,7 +563,7 @@ class ActorsWebSocketInteractionsSpecification
       }
 
       "market order executes (address is sender of market)" in webSocketTest {
-        (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+        (_, _, _, address, subscribeAddress, placeOrder, _, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
           def matchOrders(submittedMarket: MarketOrder, counter: LimitOrder): MarketOrder = {
             executeOrder(submittedMarket, counter).submittedMarketRemaining(submittedMarket)
           }
@@ -595,7 +586,7 @@ class ActorsWebSocketInteractionsSpecification
           placeOrder(mo)
           expectWsBalancesAndOrders(
             Map(Waves -> WsBalances(87.997, 12.003)),
-            Seq(WsOrder.fromDomain(mo, OrderStatus.Accepted)),
+            Seq(WsOrder.fromDomain(mo)),
             1
           )
 
@@ -652,7 +643,7 @@ class ActorsWebSocketInteractionsSpecification
     }
 
     "correctly process order partially filling" in webSocketTest {
-      (ad, ep, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
+      (_, _, _, address, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
         updateBalances(Map(usd -> 10.usd, Waves -> 10.waves))
         subscribeAddress()
         expectWsBalancesAndOrders(
@@ -666,7 +657,7 @@ class ActorsWebSocketInteractionsSpecification
         placeOrder(bo)
         expectWsBalancesAndOrders(
           Map(usd -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)),
-          Seq(WsOrder.fromDomain(bo, OrderStatus.Accepted)),
+          Seq(WsOrder.fromDomain(bo)),
           1
         )
 
@@ -693,11 +684,10 @@ class ActorsWebSocketInteractionsSpecification
         )
     }
 
-    "reply with error message if node is unavailable" in webSocketTest {
-      (ad, ep, wsp, _, subscribeAddress, placeOrder, cancel, executeOrder, updateBalances, expectWsBalancesAndOrders) =>
-        val bob = mkKeyPair("bob")
-        ad ! AddressDirectory.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
-        wsp.expectMessageType[WsError] should matchTo(websockets.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
+    "reply with error message if node is unavailable" in webSocketTest { (ad, _, wsp, _, _, _, _, _, _, _) =>
+      val bob = mkKeyPair("bob")
+      ad ! AddressDirectory.Envelope(bob.toAddress, AddressActor.WsCommand.AddWsSubscription(wsp.ref))
+      wsp.expectMessageType[WsError] should matchTo(websockets.WsError(0L, WavesNodeConnectionBroken.code, WavesNodeConnectionBroken.message.text))
     }
   }
 }

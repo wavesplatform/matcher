@@ -21,7 +21,7 @@ trait HasJwt extends JwtUtils {
   }
 
   protected def jwtPublicKeyConfig: Config = ConfigFactory.parseString(
-    s"""waves.dex.web-sockets.web-socket-handler.jwt-public-key = \"\"\"-----BEGIN PUBLIC KEY-----
+    s"""waves.dex.web-sockets.external-client-handler.jwt-public-key = \"\"\"-----BEGIN PUBLIC KEY-----
        |${Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded).grouped(64).mkString("\n")}
        |-----END PUBLIC KEY-----\"\"\"
        |""".stripMargin

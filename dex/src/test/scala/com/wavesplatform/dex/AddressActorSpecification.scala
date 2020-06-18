@@ -214,7 +214,7 @@ class AddressActorSpecification
             eventsProbe.ref ! event
             Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
           },
-          false,
+          enableSchedules,
           spendableBalancesActor
         )
       )

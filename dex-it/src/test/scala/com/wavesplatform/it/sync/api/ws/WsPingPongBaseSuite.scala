@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.api.ws
 
 import akka.http.scaladsl.model.ws.TextMessage
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsError, WsMessage, WsPingOrPong}
 import com.wavesplatform.dex.error.InvalidJson
@@ -10,50 +9,24 @@ import com.wavesplatform.it.WsSuiteBase
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class WsPingPongTestSuite extends WsSuiteBase {
+abstract class WsPingPongBaseSuite extends WsSuiteBase {
 
-  private val maxConnectionLifetime = 6.seconds
-  private val pingInterval          = 1.second
-  private val pongTimeout           = pingInterval * 3
-  private val delta                 = 1.second
+  protected val pingInterval = 1.second
+  protected val pongTimeout  = pingInterval * 3
 
-  private implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
+  protected val delta = 1.second
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory
-    .parseString(
-      s"""waves.dex.web-sockets.web-socket-handler {
-        |    max-connection-lifetime = $maxConnectionLifetime
-        |    ping-interval = $pingInterval
-        |    pong-timeout = $pongTimeout
-        | }
-        |""".stripMargin
-    )
-    .withFallback(jwtPublicKeyConfig)
+  protected implicit def duration2Long(d: FiniteDuration): Long = d.toMillis
+
+  protected def wsStreamUri: String
+  protected def mkWsUnmanagedConnection(): WsConnection = mkWsConnection(wsStreamUri, keepAlive = false)
 
   "Web socket connection should be closed " - {
-
-    s"by max-connection-lifetime = $maxConnectionLifetime" in {
-
-      val wsac               = mkWsAddressConnection(alice, dex1)
-      val connectionLifetime = Await.result(wsac.connectionLifetime, maxConnectionLifetime + delta)
-
-      connectionLifetime should (be >= maxConnectionLifetime and be <= maxConnectionLifetime + delta)
-      wsac.pings.size should be >= 5
-      wsac.isClosed shouldBe true
-
-      wsac.collectMessages[WsError].head should matchTo(
-        WsError(
-          timestamp = 0L, // ignored
-          code = 109077767, // WsConnectionMaxLifetimeExceeded
-          message = "WebSocket has reached max allowed lifetime"
-        )
-      )
-    }
 
     s"by pong timeout (ping-interval = $pingInterval, pong-timeout = 3 * ping-interval = $pongTimeout)" - {
 
       "without sending pong" in {
-        val wsac                       = mkWsAddressConnection(alice, dex1, keepAlive = false)
+        val wsac                       = mkWsUnmanagedConnection()
         val expectedConnectionLifetime = pingInterval + pongTimeout
         val connectionLifetime         = Await.result(wsac.connectionLifetime, expectedConnectionLifetime + delta)
 
@@ -71,8 +44,7 @@ class WsPingPongTestSuite extends WsSuiteBase {
       }
 
       "with sending pong" in {
-
-        val wsac = mkWsAddressConnection(alice, dex1, keepAlive = false)
+        val wsac = mkWsUnmanagedConnection()
 
         Thread.sleep(pingInterval + 0.1.second)
         wsac.isClosed shouldBe false
@@ -95,8 +67,8 @@ class WsPingPongTestSuite extends WsSuiteBase {
       }
 
       "even if pong is sent from another connection" in {
-        val wsac1 = mkWsAddressConnection(alice, dex1, keepAlive = false)
-        val wsac2 = mkWsAddressConnection(alice, dex1, keepAlive = false)
+        val wsac1 = mkWsUnmanagedConnection()
+        val wsac2 = mkWsUnmanagedConnection()
 
         wsac1.isClosed shouldBe false
         wsac2.isClosed shouldBe false
@@ -127,8 +99,7 @@ class WsPingPongTestSuite extends WsSuiteBase {
   "Web socket connection should not be closed " - {
 
     "when incorrect message has been sent to te Matcher" in {
-
-      val wsc = new WsConnection(getWsStreamUri(dex1), keepAlive = false) {
+      val wsc = new WsConnection(wsStreamUri, keepAlive = false) {
         override def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict = cm match {
           case WsPingOrPong(timestamp) if timestamp == -1 => TextMessage.Strict(s"broken")
           case other: WsClientMessage                     => WsMessage.toStrictTextMessage(other)(WsClientMessage.wsClientMessageWrites)

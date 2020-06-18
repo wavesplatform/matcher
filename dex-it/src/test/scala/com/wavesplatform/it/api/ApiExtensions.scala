@@ -7,9 +7,9 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.order.Order
-import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.api.node.{NodeApi, NodeApiExtensions}
 import com.wavesplatform.dex.it.api.responses.dex.{OrderBookHistoryItem, OrderStatus, OrderStatusResponse}
+import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
 import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
@@ -21,8 +21,9 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   protected def placeAndAwaitAtDex(order: Order,
                                    expectedStatus: OrderStatus = OrderStatus.Accepted,
-                                   dex: DexContainer = dex1): OrderStatusResponse = {
-    dex.api.place(order)
+                                   dex: DexContainer = dex1,
+                                   isMarketOrder: Boolean = false): OrderStatusResponse = {
+    if (isMarketOrder) dex1.api.placeMarket(order) else dex1.api.place(order)
     dex.api.waitForOrderStatus(order, expectedStatus)
   }
 
@@ -34,9 +35,9 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
     waitForOrderAtNode(order.id(), dexApi, wavesNodeApi)
   }
 
-  protected def cancelAndAwait(owner: KeyPair, order: Order, expectedStatus: OrderStatus = OrderStatus.Cancelled): OrderStatusResponse = {
+  protected def cancelAndAwait(owner: KeyPair, order: Order): OrderStatusResponse = {
     dex1.api.cancel(owner, order)
-    dex1.api.waitForOrderStatus(order, expectedStatus)
+    dex1.api.waitForOrderStatus(order, OrderStatus.Cancelled)
   }
 
   protected def waitForOrderAtNode(order: Order,
@@ -96,13 +97,17 @@ trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 
   def mkAccountWithBalance(balances: (Long, Asset)*): KeyPair = {
     val account = mkKeyPair(s"account-test-${ThreadLocalRandom.current().nextInt}")
-    balances.foreach {
+    val transfers = balances.map {
       case (balance, asset) =>
         val sender = asset match {
           case Waves           => alice
           case ia: IssuedAsset => if (wavesNode1.api.assetBalance(alice, ia).balance >= balance) alice else bob
         }
-        broadcastAndAwait { mkTransfer(sender, account, balance, asset, 0.003.waves) }
+        mkTransfer(sender, account, balance, asset, 0.003.waves)
+    }
+    transfers.par.foreach { x =>
+      wavesNode1.api.broadcast(x)
+      wavesNode1.api.waitForTransaction(x)
     }
     account
   }

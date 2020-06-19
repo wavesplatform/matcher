@@ -17,14 +17,6 @@ import scala.util.Try
 
 case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestConnector with JwtUtils {
 
-  def loginPageRequest: ErrorOr[Unit] = {
-    val uri = uri"$hostPortUri/swagger-ui.html"
-    for {
-      errorOrResponse <- Try { basicRequest.get(uri).send().body }.toEither.leftMap(ex => s"Cannot load swagger UI! ${ex.getWithStackTrace}")
-      _               <- errorOrResponse
-    } yield ()
-  }
-
   private def mkAuthTokenRequestParams(keyPair: KeyPair): List[QuerySegment] = {
     val jwtPayload = mkJwtSignedPayload(keyPair, networkByte = chainId)
     List(
@@ -38,19 +30,21 @@ case class AuthServiceRestConnector(target: String, chainId: Byte) extends RestC
 
   def getAuthCredentials(maybeSeed: Option[String]): ErrorOr[AuthCredentials] = {
 
-    val keyPair       = KeyPair(crypto secureHash (maybeSeed getOrElse s"minion${ThreadLocalRandom.current.nextInt}" getBytes StandardCharsets.UTF_8))
+    val seed          = maybeSeed getOrElse s"minion${ThreadLocalRandom.current.nextInt}"
+    val keyPair       = KeyPair(crypto secureHash (seed getBytes StandardCharsets.UTF_8))
     val requestParams = mkAuthTokenRequestParams(keyPair)
     val uri           = targetUri.copy(querySegments = requestParams)
 
     mkResponse { _.post(uri) }.map { j =>
       AuthCredentials(
         keyPair = keyPair,
-        token = (j \ "access_token").as[String]
+        token = (j \ "access_token").as[String],
+        seed = seed
       )
     }
   }
 }
 
 object AuthServiceRestConnector {
-  final case class AuthCredentials(keyPair: KeyPair, token: String)
+  final case class AuthCredentials(keyPair: KeyPair, token: String, seed: String)
 }

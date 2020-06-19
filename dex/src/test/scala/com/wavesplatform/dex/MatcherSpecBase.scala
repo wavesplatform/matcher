@@ -41,7 +41,7 @@ import scala.util.Random
 
 trait MatcherSpecBase extends SystemTime with DiffMatcherWithImplicits with DoubleOps with WavesFeeConstants { _: Suite =>
 
-  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[Long](_.timestamp)
+  protected implicit val wsErrorDiff: Diff[WsError] = Derived[Diff[WsError]].ignore[WsError, Long](_.timestamp)
 
   private val WalletSeed: ByteStr      = ByteStr("Matcher".getBytes("utf-8"))
   private val MatcherSeed: Array[Byte] = wcrypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))

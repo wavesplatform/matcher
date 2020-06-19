@@ -85,7 +85,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private type LogicResponseHandler = PartialFunction[Any, ToResponseMarshallable]
 
   private val timer      = Kamon.timer("matcher.api-requests")
-  private val placeTimer = timer.refine("action" -> "place")
+  private val placeTimer = timer.withTag("action", "place")
 
   private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
   private val invalidUserPublicKey: StandardRoute                            = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }

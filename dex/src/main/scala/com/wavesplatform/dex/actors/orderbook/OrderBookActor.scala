@@ -50,8 +50,8 @@ class OrderBookActor(settings: Settings,
   private var lastSavedSnapshotOffset = Option.empty[QueueEventWithMeta.Offset]
   private var lastProcessedOffset     = Option.empty[QueueEventWithMeta.Offset]
 
-  private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
-  private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
+  private val addTimer    = Kamon.timer("matcher.orderbook.add").withTag("pair", assetPair.toString)
+  private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").withTag("pair", assetPair.toString)
   private var orderBook   = OrderBook.empty
 
   private var actualRule: MatchingRule = normalizeMatchingRule(matchingRules.head)

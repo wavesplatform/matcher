@@ -25,7 +25,7 @@ case class NodeRestConnector(target: String, chainId: Byte) extends RestConnecto
           .map(_.map(json => (json \ "timestamp").as[Long]))
           .ensure("0 or 1 blocks have been forged at the moment, try again later")(_.size > 1)
       } yield {
-        val timeBetweenBlocks = (blocksTs.zip(blocksTs.tail).map { case (older, newer) => newer - older }.sum / blocksCount * 1.5 / 1000).toInt
+        val timeBetweenBlocks = ((blocksTs.last - blocksTs.head) / blocksCount * 1.5 / 1000).toInt
         RepeatRequestOptions(timeBetweenBlocks, 1.second)
       }
     ).fold(ex => throw new RuntimeException(s"Could not construct repeat request options: $ex"), identity)

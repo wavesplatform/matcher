@@ -16,7 +16,7 @@ object MatcherScriptRunner {
 
   def apply(script: Script, order: Order): (Log[Id], Either[String, EVALUATED]) = script match {
     case s: ExprScript =>
-      MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Eval.later(order), isDApp = false) match {
+      MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Eval.later(order)) match {
         case Left(error) => (List.empty, Left(error))
         case Right(ctx)  => EvaluatorV1.apply().applyWithLogging(ctx, s.expr)
       }
@@ -25,8 +25,7 @@ object MatcherScriptRunner {
       MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
-        Eval.later(order),
-        isDApp = true
+        Eval.later(order)
       ) match {
         case Left(error) => (List.empty, Left(error))
         case Right(ctx) =>

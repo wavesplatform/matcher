@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import cats.syntax.either._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.services.AssetDescriptionResponse.MaybeDescription
@@ -29,29 +29,19 @@ object PbToWavesConversions {
         r <- {
           val proofs = Proofs(self.proofs.map(_.toVanilla))
           tx.version match {
-            case 1 =>
-              exchange.ExchangeTransactionV1.create(
-                data.orders.head.toVanilla.asInstanceOf[exchange.OrderV1], // todo
-                data.orders.last.toVanilla.asInstanceOf[exchange.OrderV1],
-                data.amount,
-                data.price,
-                data.buyMatcherFee,
-                data.sellMatcherFee,
-                fee.amount,
-                tx.timestamp,
-                proofs.toSignature
-              )
-            case 2 =>
-              exchange.ExchangeTransactionV2.create(
-                data.orders.head.toVanilla,
-                data.orders.last.toVanilla,
-                data.amount,
-                data.price,
-                data.buyMatcherFee,
-                data.sellMatcherFee,
-                fee.amount,
-                tx.timestamp,
-                proofs
+            case 1 | 2 =>
+              exchange.ExchangeTransaction.create(
+                version = tx.version.toByte,
+                order1 = data.orders.head.toVanilla,
+                order2 = data.orders.last.toVanilla,
+                amount = data.amount,
+                price = data.price,
+                buyMatcherFee = data.buyMatcherFee,
+                sellMatcherFee = data.sellMatcherFee,
+                fee = fee.amount,
+                timestamp = tx.timestamp,
+                proofs = proofs,
+                chainId = AddressScheme.current.chainId
               )
             case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
           }

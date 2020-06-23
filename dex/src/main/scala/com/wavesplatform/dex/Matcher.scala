@@ -20,8 +20,7 @@ import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, Spendabl
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
-import com.wavesplatform.dex.api.ws.routes
-import com.wavesplatform.dex.api.ws.routes.MatcherWebSocketRoute
+import com.wavesplatform.dex.api.ws.routes._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
 import com.wavesplatform.dex.db.leveldb._
@@ -183,54 +182,52 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield o
   }
 
-  private def matcherApiRoutes(apiKeyHash: Option[Array[Byte]]): Seq[ApiRoute] = {
-    Seq(
-      MatcherApiRoute(
-        pairBuilder,
-        matcherPublicKey,
-        matcherActor,
-        addressActors,
-        matcherQueue.storeEvent,
-        p => Option { orderBooks.get() } flatMap (_ get p),
-        orderBookHttpInfo,
-        getActualTickSize = assetPair => {
-          matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
-        },
-        validateOrder,
-        settings,
-        () => status.get(),
-        orderDB,
-        time,
-        () => lastProcessedOffset,
-        () => matcherQueue.lastEventOffset,
-        ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
-        apiKeyHash,
-        rateCache,
-        validatedAllowedOrderVersions = () => {
-          Future
-            .sequence {
-              settings.allowedOrderVersions.map(version =>
-                OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
-            }
-            .map { _.collect { case Right(version) => version } }
-        },
-        () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
-      ),
-      MatcherApiRouteV1(
-        pairBuilder,
-        orderBookHttpInfo,
-        () => status.get(),
-        apiKeyHash
-      ),
-      routes.MatcherWebSocketRoute(addressActors,
-                                   matcherActor,
-                                   time,
-                                   pairBuilder,
-                                   p => Option { orderBooks.get() } flatMap (_ get p),
-                                   apiKeyHash,
-                                   settings.webSocketSettings)
+  private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
+
+  private lazy val httpApiRouteV0: MatcherApiRoute =
+    MatcherApiRoute(
+      pairBuilder,
+      matcherPublicKey,
+      matcherActor,
+      addressActors,
+      matcherQueue.storeEvent,
+      p => Option { orderBooks.get() } flatMap (_ get p),
+      orderBookHttpInfo,
+      getActualTickSize = assetPair => {
+        matchingRulesCache.getDenormalizedRuleForNextOrder(assetPair, lastProcessedOffset, assetsCache.unsafeGetDecimals).tickSize
+      },
+      validateOrder,
+      settings,
+      () => status.get(),
+      orderDB,
+      time,
+      () => lastProcessedOffset,
+      () => matcherQueue.lastEventOffset,
+      ExchangeTransactionCreator.getAdditionalFeeForScript(hasMatcherAccountScript),
+      maybeApiKeyHash,
+      rateCache,
+      validatedAllowedOrderVersions = () => {
+        Future
+          .sequence {
+            settings.allowedOrderVersions.map(version =>
+              OrderValidator.checkOrderVersion(version, wavesBlockchainAsyncClient.isFeatureActivated).value)
+          }
+          .map { _.collect { case Right(version) => version } }
+      },
+      () => orderFeeSettingsCache.getSettingsForOffset(lastProcessedOffset + 1)
     )
-  }
+
+  private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
+
+  private lazy val wsApiRoute = MatcherWebSocketRoute(addressActors,
+                                                      matcherActor,
+                                                      time,
+                                                      pairBuilder,
+                                                      p => Option { orderBooks.get() } flatMap (_ get p),
+                                                      maybeApiKeyHash,
+                                                      settings.webSocketSettings)
+
+  private lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
 
   lazy val matcherApiTypes: Set[Class[_]] = Set(
     classOf[MatcherApiRoute],
@@ -379,32 +376,20 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdown(): Future[Unit] = {
+
     setStatus(Status.Stopping)
+
     val r = for {
+      _ <- { log.info("Shutting down all WebSocket connections..."); wsApiRoute.gracefulShutdown() }
       _ <- {
-        log.info("Shutting down HTTP server...")
+        log.info("Shutting down HTTP and WS servers...")
         Option(matcherServerBinding).fold[Future[HttpTerminated]](Future.successful(HttpServerTerminated))(_.terminate(1.second))
       }
-      _ <- {
-        log.info("Shutting down actors...")
-        gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown)
-      }
-      _ <- {
-        log.info("Shutting down gRPC client...")
-        wavesBlockchainAsyncClient.close()
-      }
-      _ <- {
-        log.info("Shutting down queue...")
-        Future(blocking(matcherQueue.close(5.seconds)))
-      }
-      _ <- {
-        log.info("Shutting down materializer...")
-        Future.successful(materializer.shutdown())
-      }
-      _ <- {
-        log.debug("Shutting down DB...")
-        Future(blocking(db.close()))
-      }
+      _ <- { log.info("Shutting down actors..."); gracefulStop(matcherActor, 3.seconds, MatcherActor.Shutdown) }
+      _ <- { log.info("Shutting down gRPC client..."); wavesBlockchainAsyncClient.close() }
+      _ <- { log.info("Shutting down queue..."); Future { blocking(matcherQueue close 5.seconds) } }
+      _ <- { log.info("Shutting down materializer..."); Future.successful(materializer.shutdown()) }
+      _ <- { log.info("Shutting down DB..."); Future { blocking(db.close()) } }
     } yield ()
 
     r.andThen {
@@ -428,8 +413,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           }
       }
 
-    def checkApiKeyHash(): Future[Option[Array[Byte]]] = Future { Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode }
-
     actorSystem.actorOf(
       CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
       CreateExchangeTransactionActor.name
@@ -449,7 +432,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     )
 
     val startGuard = for {
-      apiKeyHash <- checkApiKeyHash()
       (_, http) <- {
         log.info("Loading known assets ...")
         loadAllKnownAssets()
@@ -468,7 +450,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       _ <- {
         log.info("Preparing HTTP service ...")
         // Indirectly initializes matcherActor, so it must be after loadAllKnownAssets
-        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes(apiKeyHash), settings.restApi).compositeRoute
+        val combinedRoute = new CompositeHttpService(matcherApiTypes, matcherApiRoutes, settings.restApi).compositeRoute
 
         log.info(s"Binding REST and WebSocket API ${settings.restApi.address}:${settings.restApi.port} ...")
         http.bindAndHandle(combinedRoute, settings.restApi.address, settings.restApi.port)

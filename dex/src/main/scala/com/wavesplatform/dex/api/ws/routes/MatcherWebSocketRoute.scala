@@ -1,6 +1,7 @@
 package com.wavesplatform.dex.api.ws.routes
 
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, typed}
@@ -16,7 +17,7 @@ import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
 import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsMessage, WsServerMessage}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.error.InvalidJson
+import com.wavesplatform.dex.error.{InvalidJson, MatcherIsStopping}
 import com.wavesplatform.dex.model.AssetPairBuilder
 import com.wavesplatform.dex.settings.WebSocketSettings
 import com.wavesplatform.dex.time.Time
@@ -24,7 +25,8 @@ import io.swagger.annotations.Api
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 
-import scala.concurrent.Future
+import scala.collection.JavaConverters._
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 @Path("/ws")
@@ -42,9 +44,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
 
   import mat.executionContext
 
+  private val wsHandlers = new ConcurrentHashMap[typed.ActorRef[WsHandlerActor.Message], Promise[Done]]()
+
   override def route: Route = pathPrefix("ws") { commonWsRoute }
 
   private val commonWsRoute: Route = (pathPrefix("v0") & pathEnd & get) {
+
     import webSocketSettings._
 
     val clientId = UUID.randomUUID().toString
@@ -69,6 +74,8 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
         behavior = WsHandlerActor(webSocketHandler, time, assetPairBuilder, clientRef, matcher, addressDirectory, clientId),
         name = s"handler-$clientId"
       )
+
+    wsHandlers.put(webSocketHandlerRef, Promise[Done])
 
     val server: Sink[WsHandlerActor.Message, NotUsed] =
       ActorSink
@@ -100,10 +107,24 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
             Future.failed { new IllegalArgumentException("Binary messages are not supported") }
         }
         .named(s"sink-$clientId")
+        .watchTermination() { (notUsed, future) =>
+          completeWsHandlerTerminationPromise(webSocketHandlerRef, future)
+          notUsed
+        }
         .to(server)
 
-    handleWebSocketMessages { Flow.fromSinkAndSourceCoupled(serverSink, clientSource) }
+    val flow: Flow[Message, TextMessage.Strict, NotUsed] = Flow.fromSinkAndSourceCoupled(serverSink, clientSource)
+    flow.watchTermination()((_, future) => completeWsHandlerTerminationPromise(webSocketHandlerRef, future))
+    handleWebSocketMessages(flow)
   }
+
+  private def completeWsHandlerTerminationPromise(wsHandler: typed.ActorRef[WsHandlerActor.Message], future: Future[Done]): Unit =
+    wsHandlers.computeIfPresent(
+      wsHandler, { (_, p) =>
+        future.onComplete(p.tryComplete)
+        p
+      }
+    )
 
   private def handleTermination[T](client: typed.ActorRef[T], r: Future[Done]): typed.ActorRef[T] = {
     val cn = client.path.name
@@ -112,5 +133,12 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
       case Failure(e) => log.trace(s"[c=$cn] WebSocket connection closed with an error: ${Option(e.getMessage).getOrElse(e.getClass.getName)}")
     }(mat.executionContext)
     client
+  }
+
+  def gracefulShutdown(): Future[Iterable[Done]] = {
+    val activeConnections = wsHandlers.asScala.filter { case (_, p) => !p.isCompleted }
+    log.info(s"Closing ${activeConnections.size} connections")
+    activeConnections.keySet.foreach(_ ! WsHandlerActor.Command.CloseConnection(MatcherIsStopping))
+    Future.sequence { activeConnections.values.map(_.future) }
   }
 }

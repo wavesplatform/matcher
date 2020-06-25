@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.http.routes
 
+import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{ActorRef, Status}
@@ -30,7 +31,7 @@ import com.wavesplatform.dex.api.http.{OrderBookHttpInfo, entities}
 import com.wavesplatform.dex.caches.RateCache
 import com.wavesplatform.dex.db.leveldb.DBExt
 import com.wavesplatform.dex.db.{DbKeys, OrderDB, WithDB}
-import com.wavesplatform.dex.domain.account.{AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.dex.domain.account.{Address, AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
@@ -413,6 +414,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
   // tradableBalance
   routePath("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}") - {
+
     "returns a tradable balance" in test(
       { route =>
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/${okOrder.senderPublicKey.toAddress}")) ~> route ~> check {
@@ -421,6 +423,30 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             Map(
               smartAsset -> 100L,
               Waves      -> 100L
+            )
+          )
+        }
+      }
+    )
+
+    "returns error when address is from the other network" in test(
+      { route =>
+        val otherNetworkChainId: Byte = 99
+        val addressFromOtherNetwork   = Address.fromPublicKey(mkKeyPair(s"seed-${ThreadLocalRandom.current().nextInt}").publicKey, otherNetworkChainId)
+
+        val currentNetwork = s"${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar})"
+        val otherNetwork   = s"$otherNetworkChainId(${otherNetworkChainId.toChar})"
+
+        Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/$addressFromOtherNetwork")) ~> route ~> check {
+          status shouldEqual StatusCodes.BadRequest
+          println(responseAs[String])
+          responseAs[HttpError] should matchTo(
+            HttpError(
+              error = 4194304,
+              message = s"Provided address in not correct, reason: Data from other network: expected: $currentNetwork, actual: $otherNetwork",
+              template = "Provided address in not correct, reason: {{reason}}",
+              params = Json.obj("reason" -> s"Data from other network: expected: $currentNetwork, actual: $otherNetwork"),
+              status = "InvalidAddress"
             )
           )
         }
@@ -599,8 +625,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 error = 9437193,
                 message = s"The order ${badOrder.id()} not found",
                 template = "The order {{id}} not found",
-                status = "OrderCancelRejected",
-                params = Json.obj("id" -> badOrder.id())
+                params = Json.obj("id" -> badOrder.id()),
+                status = "OrderCancelRejected"
               )
             )
           }
@@ -657,8 +683,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 error = 3145733,
                 message = s"The account ${badOrder.sender.toAddress} is blacklisted",
                 template = "The account {{address}} is blacklisted",
-                status = "BatchCancelRejected",
-                params = Json.obj("address" -> badOrder.sender.toAddress)
+                params = Json.obj("address" -> badOrder.sender.toAddress),
+                status = "BatchCancelRejected"
               )
             )
           }
@@ -849,8 +875,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
                 error = 9437193,
                 message = s"The order ${badOrder.id()} not found",
                 template = "The order {{id}} not found",
-                status = "OrderCancelRejected",
-                params = Json.obj("id" -> badOrder.id())
+                params = Json.obj("id" -> badOrder.id()),
+                status = "OrderCancelRejected"
               )
             )
           }

@@ -119,12 +119,7 @@ case class MatcherWebSocketRoute(addressDirectory: ActorRef,
   }
 
   private def completeWsHandlerTerminationPromise(wsHandler: typed.ActorRef[WsHandlerActor.Message], future: Future[Done]): Unit =
-    wsHandlers.computeIfPresent(
-      wsHandler, { (_, p) =>
-        future.onComplete(p.tryComplete)
-        p
-      }
-    )
+    wsHandlers.computeIfPresent(wsHandler, (_, p) => p completeWith future)
 
   private def handleTermination[T](client: typed.ActorRef[T], r: Future[Done]): typed.ActorRef[T] = {
     val cn = client.path.name

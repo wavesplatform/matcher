@@ -40,6 +40,9 @@ object OrderInfoSpec {
       case 2 => OrderInfo.v2[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair)
       case 3 => OrderInfo.v3[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType)
       case 4 => OrderInfo.v4[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType, avgWeighedPrice)
+      case 5 =>
+        OrderInfo
+          .v5[A](o.orderType, o.amount, o.price, o.matcherFee, o.feeAsset, o.timestamp, status, o.assetPair, aoType, avgWeighedPrice, o.version)
     }
   }
 }

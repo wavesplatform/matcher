@@ -508,7 +508,12 @@ case class SubscriptionsLimitReached(limit: Int, id: String)
       e"The limit of ${'limit -> limit} subscriptions of this type was reached. The subscription of ${'id -> id} was stopped"
     )
 
+case class InvalidAddress(reason: String)
+    extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${'reason -> reason}")
+
 sealed abstract class Entity(val code: Int)
+
+// noinspection ScalaStyle
 object Entity {
   object common  extends Entity(0)
   object request extends Entity(1)
@@ -549,6 +554,8 @@ object Entity {
 }
 
 sealed abstract class Class(val code: Int)
+
+// noinspection ScalaStyle
 object Class {
   object common       extends Class(0)
   object broken       extends Class(1)

@@ -2,11 +2,11 @@ package com.wavesplatform.dex.domain.account
 
 import java.nio.ByteBuffer
 
+import cats.syntax.either._
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
-import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.error.ValidationError.InvalidAddress
 import com.wavesplatform.dex.domain.utils.{ScorexLogging, base58Length}
 import play.api.libs.json._
@@ -19,12 +19,12 @@ sealed trait Address extends AddressOrAlias {
 //noinspection ScalaDeprecation
 object Address extends ScorexLogging {
 
-  val Prefix               = "address:"
-  val AddressVersion: Byte = 1
-  val ChecksumLength       = 4
-  val HashLength           = 20
-  val AddressLength        = 1 + 1 + HashLength + ChecksumLength
-  val AddressStringLength  = base58Length(AddressLength)
+  val Prefix: String           = "address:"
+  val AddressVersion: Byte     = 1
+  val ChecksumLength: Int      = 4
+  val HashLength: Int          = 20
+  val AddressLength: Int       = 1 + 1 + HashLength + ChecksumLength
+  val AddressStringLength: Int = base58Length(AddressLength)
 
   private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder
     .newBuilder()
@@ -70,24 +70,25 @@ object Address extends ScorexLogging {
           )
           .right
           .flatMap {
-            res =>
+            _ =>
               val Array(version, network, _*) = addressBytes.arr
-
-              (for {
-                _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-                _ <- Either.cond(network == chainId,
-                                 (),
-                                 s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
-                checkSum          = addressBytes.takeRight(ChecksumLength)
-                checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-                _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
-              } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+              (
+                for {
+                  _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+                  _ <- Either.cond(network == chainId,
+                                   (),
+                                   s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
+                  checkSum          = addressBytes.takeRight(ChecksumLength)
+                  checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+                  _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+                } yield createUnsafe(addressBytes)
+              ).leftMap(err => InvalidAddress(err))
           }
       }
     )
   }
 
-  def fromString(addressStr: String): Either[ValidationError, Address] = {
+  def fromString(addressStr: String): Either[InvalidAddress, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(base58String.length <= AddressStringLength,

@@ -131,7 +131,6 @@ object WsHandlerActor {
                   }
 
                 case subscribe: WsOrderBookSubscribe =>
-                  // TODO DEX-700 test for order book that hasn't been created before
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), matcherTime)
                   else if (!orderBookSubscriptions.contains(subscribe.key)) {
                     assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {

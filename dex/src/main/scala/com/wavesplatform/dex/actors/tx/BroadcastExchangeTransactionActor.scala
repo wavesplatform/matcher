@@ -24,16 +24,14 @@ class BroadcastExchangeTransactionActor(settings: ExchangeTransactionBroadcastSe
 
   import context.dispatcher
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[ExchangeTransactionCreated])
-    scheduleSend()
+  private val default: Receive = {
+    case ExchangeTransactionCreated(tx) => broadcast(tx)
+    case CheckAndSend                   => // ignore
   }
-
-  private val default: Receive = { case ExchangeTransactionCreated(tx) => broadcast(tx) }
 
   private def watching(toCheck: Vector[ExchangeTransaction], toNextCheck: Vector[ExchangeTransaction]): Receive = {
     case CheckAndSend =>
-      val nowMs    = time.getTimestamp
+      val nowMs    = time.getTimestamp()
       val expireMs = nowMs - settings.maxPendingTime.toMillis
 
       confirmed { toCheck.map(_.id()) }
@@ -80,7 +78,10 @@ class BroadcastExchangeTransactionActor(settings: ExchangeTransactionBroadcastSe
     case StashTransactionsToCheck(txs) => scheduleSend(); context.become { watching(toNextCheck ++ txs, Vector.empty) }
   }
 
-  override val receive: Receive = if (settings.broadcastUntilConfirmed) watching(toCheck = Vector.empty, toNextCheck = Vector.empty) else default
+  override val receive: Receive = if (settings.broadcastUntilConfirmed) {
+    scheduleSend()
+    watching(toCheck = Vector.empty, toNextCheck = Vector.empty)
+  } else default
 
   private def scheduleSend(): Unit = context.system.scheduler.scheduleOnce(settings.interval, self, CheckAndSend)
 

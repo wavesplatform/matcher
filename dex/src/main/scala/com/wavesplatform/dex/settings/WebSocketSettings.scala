@@ -1,13 +1,12 @@
 package com.wavesplatform.dex.settings
 
-import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import net.ceedubs.ficus.readers.NameMapper
 
-import scala.concurrent.duration.FiniteDuration
-
-final case class WebSocketSettings(messagesInterval: FiniteDuration, webSocketHandler: WsHandlerActor.Settings)
+final case class WebSocketSettings(externalClientHandler: WsExternalClientHandlerActor.Settings,
+                                   internalBroadcast: WsInternalBroadcastActor.Settings,
+                                   internalClientHandler: WsInternalClientHandlerActor.Settings)
 
 object WebSocketSettings {
-
   implicit val chosenCase: NameMapper = MatcherSettings.chosenCase
 }

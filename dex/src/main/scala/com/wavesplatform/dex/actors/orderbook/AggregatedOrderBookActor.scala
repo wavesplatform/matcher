@@ -4,6 +4,7 @@ import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
 import com.wavesplatform.dex.actors.orderbook.OrderBookActor.MarketStatus
 import com.wavesplatform.dex.api.http.entities.HttpOrderBook
 import com.wavesplatform.dex.api.ws.protocol.{WsError, WsOrderBookChanges, WsServerMessage}
@@ -201,9 +202,9 @@ object AggregatedOrderBookActor {
     )
 
     def modifyHttpView(f: Map[(DecimalsFormat, Depth), HttpResponse] => Map[(DecimalsFormat, Depth), HttpResponse]): State =
-      genLens(_.compiledHttpView).modify(f)(this)
+      compiledHttpViewLens.modify(f)(this)
 
-    def modifyWs(f: WsOrderBookState => WsOrderBookState): State = genLens(_.ws).modify(f)(this)
+    def modifyWs(f: WsOrderBookState => WsOrderBookState): State = wsLens.modify(f)(this)
   }
 
   object State {
@@ -217,6 +218,10 @@ object AggregatedOrderBookActor {
         compiledHttpView = Map.empty,
         ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None)
       )
+
+    val genLens: GenLens[State] = GenLens[State]
+    val compiledHttpViewLens    = genLens(_.compiledHttpView)
+    val wsLens                  = genLens(_.ws)
 
     def fromOrderBook(ob: OrderBook): State = State(
       asks = empty.asks ++ aggregateByPrice(ob.asks), // ++ to preserve an order

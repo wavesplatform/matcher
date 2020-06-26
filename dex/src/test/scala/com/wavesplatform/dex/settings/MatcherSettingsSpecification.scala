@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.OrderBookHttpInfo
-import com.wavesplatform.dex.api.ws.actors.WsHandlerActor
+import com.wavesplatform.dex.api.ws.actors.{WsExternalClientHandlerActor, WsHealthCheckSettings, WsInternalBroadcastActor, WsInternalClientHandlerActor}
 import com.wavesplatform.dex.db.{AccountStorage, OrderDB}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
@@ -13,6 +13,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.grpc.integration.settings.{GrpcClientSettings, WavesBlockchainClientSettings}
 import com.wavesplatform.dex.model.Implicits.AssetPairOps
 import com.wavesplatform.dex.queue.LocalMatcherQueue
+import com.wavesplatform.dex.settings.EventsQueueSettings.CircuitBreakerSettings
 import com.wavesplatform.dex.settings.OrderFeeSettings.PercentSettings
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import com.wavesplatform.dex.test.matchers.ProduceError.produce
@@ -83,6 +84,12 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
     settings.eventsQueue.kafka.consumer.maxBufferSize shouldBe 777
     settings.eventsQueue.kafka.consumer.client.getInt("foo") shouldBe 2
     settings.eventsQueue.kafka.producer.client.getInt("bar") shouldBe 3
+    settings.eventsQueue.circuitBreaker should matchTo(
+      CircuitBreakerSettings(
+        maxFailures = 999,
+        callTimeout = 123.seconds,
+        resetTimeout = 1.day
+      ))
     settings.processConsumedTimeout shouldBe 663.seconds
     settings.orderFee should matchTo(Map[Long, OrderFeeSettings](-1L -> PercentSettings(AssetType.AMOUNT, 0.1)))
     settings.deviation shouldBe DeviationsSettings(enabled = true, 1000000, 1000000, 1000000)
@@ -98,8 +105,11 @@ class MatcherSettingsSpecification extends BaseSettingsSpecification with Matche
 bar
 baz"""
     settings.webSocketSettings should matchTo(
-      WebSocketSettings(100.milliseconds,
-                        WsHandlerActor.Settings(20.hours, 11.seconds, 31.seconds, expectedJwtPublicKey, SubscriptionsSettings(20, 20)))
+      WebSocketSettings(
+        externalClientHandler = WsExternalClientHandlerActor.Settings(1.day, 3.days, expectedJwtPublicKey, SubscriptionsSettings(20, 20), WsHealthCheckSettings(9.minutes, 129.minutes)),
+        internalBroadcast = WsInternalBroadcastActor.Settings(923.millis),
+        internalClientHandler = WsInternalClientHandlerActor.Settings(WsHealthCheckSettings(10.minutes, 374.minutes))
+      )
     )
     settings.addressActorSettings should matchTo(AddressActor.Settings(100.milliseconds, 18.seconds, 400))
   }
@@ -479,8 +489,8 @@ baz"""
          """.stripMargin
 
     getSettingByConfig(configWithSettings(subscriptionsSettings = invalidSubscriptionsSettings)) should produce(
-      "Invalid setting web-sockets.web-socket-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
-        "Invalid setting web-sockets.web-socket-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
+      "Invalid setting web-sockets.external-client-handler.subscriptions.max-order-book-number value: 0 (max order book number should be > 1), " +
+        "Invalid setting web-sockets.external-client-handler.subscriptions.max-address-number value: 1 (max address number should be > 1)"
     )
   }
 }

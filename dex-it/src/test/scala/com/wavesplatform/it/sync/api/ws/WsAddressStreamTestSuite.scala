@@ -21,7 +21,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
          |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-         |  web-sockets.web-socket-handler.subscriptions.max-address-number = 3
+         |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
          |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 
@@ -42,7 +42,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val fooAddress = mkKeyPair("foo").toAddress
       val barKeyPair = mkKeyPair("bar")
 
-      val wsc = mkWsConnection(dex1)
+      val wsc = mkDexWsConnection(dex1)
       wsc.send(
         WsAddressSubscribe(
           fooAddress,
@@ -128,8 +128,8 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd -> WsBalances(50, 100), Waves -> WsBalances(9.997, 0.003)),
           Map(usd -> WsBalances(39.70, 110.30))
         )(
-          WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-          WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
+          WsOrder.fromDomain(LimitOrder(bo1)),
+          WsOrder.fromDomain(LimitOrder(bo2))
         )
 
         cancelAndAwait(acc, bo1)
@@ -175,7 +175,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd   -> WsBalances(45.5, 0)),
           Map(usd   -> WsBalances(55.5, 0))
         )(
-          WsOrder.fromDomain(mo, status = Accepted),
+          WsOrder.fromDomain(mo),
           WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
           WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
           WsOrder(mo.id, status = Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
@@ -203,7 +203,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd   -> WsBalances(0, 0)),
           Map(Waves -> WsBalances(19.997, 0)) // since balance increasing comes after transaction mining, + 10 - 0.003, Waves balance on Node = 19.997
         )(
-          WsOrder.fromDomain(LimitOrder(bo), OrderStatus.Accepted),
+          WsOrder.fromDomain(LimitOrder(bo)),
           WsOrder(bo.id(), status = OrderStatus.Filled.name, filledAmount = 10.0, filledFee = 0.003, avgWeighedPrice = 1.0)
         )
 
@@ -229,7 +229,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd   -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)), // Waves balance on Node = 10
           Map(Waves -> WsBalances(14.997, 0.0015)) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
         )(
-          WsOrder.fromDomain(limitOrder, OrderStatus.Accepted),
+          WsOrder.fromDomain(limitOrder),
           WsOrder(limitOrder.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)
         )
 
@@ -341,15 +341,15 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       Map(usd -> WsBalances(400, 100), Waves -> WsBalances(9.997, 0.003)),
       Map(usd -> WsBalances(300, 200), Waves -> WsBalances(9.994, 0.006))
     )(
-      WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-      WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
+      WsOrder.fromDomain(LimitOrder(bo1)),
+      WsOrder.fromDomain(LimitOrder(bo2))
     )
 
     val wsc2 = mkWsAddressConnection(acc, dex1)
 
     assertChanges(wsc2) { Map(Waves -> WsBalances(9.994, 0.006), usd -> WsBalances(300, 200)) }(
-      WsOrder.fromDomain(LimitOrder(bo1), OrderStatus.Accepted),
-      WsOrder.fromDomain(LimitOrder(bo2), OrderStatus.Accepted)
+      WsOrder.fromDomain(LimitOrder(bo1)),
+      WsOrder.fromDomain(LimitOrder(bo2))
     )
 
     Seq(wsc1, wsc2).foreach { _.close() }
@@ -384,7 +384,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
   }
 
   "Connection should close old address subscriptions when address subscriptions limit has been reached" in {
-    val wsc = mkWsConnection(dex1)
+    val wsc = mkDexWsConnection(dex1)
 
     val carol = mkKeyPair("carol")
     val eve   = mkKeyPair("eve")

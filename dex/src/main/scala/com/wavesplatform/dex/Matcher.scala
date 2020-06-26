@@ -3,10 +3,11 @@ package com.wavesplatform.dex
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.typed.scaladsl.adapter._
+import akka.actor.{ActorRef, ActorSystem, Props, typed}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.{HttpServerTerminated, HttpTerminated, ServerBinding}
-import akka.pattern.{ask, gracefulStop}
+import akka.pattern.{CircuitBreaker, ask, gracefulStop}
 import akka.stream.Materializer
 import akka.util.Timeout
 import cats.data.EitherT
@@ -20,6 +21,7 @@ import com.wavesplatform.dex.actors.{MatcherActor, OrderBookAskAdapter, Spendabl
 import com.wavesplatform.dex.api.http.routes.{MatcherApiRoute, MatcherApiRouteV1}
 import com.wavesplatform.dex.api.http.{CompositeHttpService, OrderBookHttpInfo}
 import com.wavesplatform.dex.api.routes.ApiRoute
+import com.wavesplatform.dex.api.ws.actors.WsInternalBroadcastActor
 import com.wavesplatform.dex.api.ws.routes._
 import com.wavesplatform.dex.caches.{MatchingRulesCache, OrderFeeSettingsCache, RateCache}
 import com.wavesplatform.dex.db._
@@ -106,20 +108,19 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
 
-  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef, assetDecimals: Asset => Int): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, assetDecimals)
+  private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.assetDecimals)
     OrderBookActor.props(
-      OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.messagesInterval)),
+      OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
       matcherActor,
       addressActors,
       orderBookSnapshotStore,
+      wsInternalBroadcast, // Safe to use here, because OrderBookActors are created after wsInternalBroadcast initialization
       assetPair,
-      amountDecimals = assetDecimals(assetPair.amountAsset),
-      priceDecimals = assetDecimals(assetPair.priceAsset),
       time,
-      matchingRules = matchingRulesCache.getMatchingRules(assetPair, assetDecimals),
+      matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.assetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
-      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, assetDecimals),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.assetDecimals),
       Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
       settings.orderRestrictions.get(assetPair)
     )
@@ -182,6 +183,16 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield o
   }
 
+  private val storeBreaker = new CircuitBreaker(
+    actorSystem.scheduler,
+    maxFailures = settings.eventsQueue.circuitBreaker.maxFailures,
+    callTimeout = settings.eventsQueue.circuitBreaker.callTimeout,
+    resetTimeout = settings.eventsQueue.circuitBreaker.resetTimeout
+  )
+
+  private def storeEvent(payload: QueueEvent): Future[Option[QueueEventWithMeta]] =
+    storeBreaker.withCircuitBreaker(matcherQueue.storeEvent(payload))
+
   private val maybeApiKeyHash: Option[Array[Byte]] = Option(settings.restApi.apiKeyHash) filter (_.nonEmpty) map Base58.decode
 
   private lazy val httpApiRouteV0: MatcherApiRoute =
@@ -219,13 +230,17 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private lazy val httpApiRouteV1 = MatcherApiRouteV1(pairBuilder, orderBookHttpInfo, () => status.get(), maybeApiKeyHash)
 
-  private lazy val wsApiRoute = MatcherWebSocketRoute(addressActors,
-                                                      matcherActor,
-                                                      time,
-                                                      pairBuilder,
-                                                      p => Option { orderBooks.get() } flatMap (_ get p),
-                                                      maybeApiKeyHash,
-                                                      settings.webSocketSettings)
+  private lazy val wsApiRoute = MatcherWebSocketRoute(
+    wsInternalBroadcast, // safe, wsApiRoute is used after initialization of wsInternalBroadcast
+    addressActors,
+    matcherActor,
+    time,
+    pairBuilder,
+    p => Option { orderBooks.get() } flatMap (_ get p),
+    maybeApiKeyHash,
+    settings.webSocketSettings,
+    () => status.get()
+  )
 
   private lazy val matcherApiRoutes: Seq[ApiRoute] = Seq(httpApiRouteV0, httpApiRouteV1, wsApiRoute)
 
@@ -291,7 +306,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             )
         },
         orderBooks,
-        (assetPair, matcherActor) => orderBookProps(assetPair, matcherActor, assetsCache.unsafeGetDecimals),
+        orderBookProps,
         assetsCache.get(_)
       ),
       MatcherActor.name
@@ -358,6 +373,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     } yield ()
   }.value
 
+  private var wsInternalBroadcast: typed.ActorRef[WsInternalBroadcastActor.Command] = actorSystem.toTyped.ignoreRef
+
   private def createAddressActor(address: Address, startSchedules: Boolean): Props = {
     Props(
       new AddressActor(
@@ -365,7 +382,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
         time,
         orderDB,
         validateForAddress,
-        matcherQueue.storeEvent,
+        storeEvent,
         startSchedules,
         spendableBalancesActor,
         settings.addressActorSettings
@@ -413,14 +430,14 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           }
       }
 
-    actorSystem.actorOf(
-      CreateExchangeTransactionActor.props(transactionCreator.createTransaction),
-      CreateExchangeTransactionActor.name
+    wsInternalBroadcast = actorSystem.spawn(
+      WsInternalBroadcastActor(settings.webSocketSettings.internalBroadcast),
+      "ws-internal-broadcast"
     )
 
-    actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
+    val txWriterRef = actorSystem.actorOf(WriteExchangeTransactionActor.props(db), WriteExchangeTransactionActor.name)
 
-    actorSystem.actorOf(
+    val wavesNetTxBroadcasterRef = actorSystem.actorOf(
       BroadcastExchangeTransactionActor
         .props(
           settings.exchangeTransactionBroadcast,
@@ -429,6 +446,11 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           wavesBlockchainAsyncClient.broadcastTx
         ),
       "exchange-transaction-broadcast"
+    )
+
+    actorSystem.actorOf(
+      CreateExchangeTransactionActor.props(transactionCreator.createTransaction, List(txWriterRef, wavesNetTxBroadcasterRef)),
+      CreateExchangeTransactionActor.name
     )
 
     val startGuard = for {

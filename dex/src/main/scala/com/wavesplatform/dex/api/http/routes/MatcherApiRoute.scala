@@ -966,7 +966,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             case None => NotImplemented(error.FeatureDisabled)
             case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
           }
-        )
+        .recover {
+              case e: Throwable =>
+                log.error("Can not persist event", e)
+                CanNotPersist(error.CanNotPersistEvent)
+            })
       case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
     }
   }

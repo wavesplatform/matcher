@@ -50,6 +50,7 @@ case class WsAddressState(address: Address,
 
     val ad = efc.assetDecimals(ao.order.assetPair.amountAsset)
     val pd = efc.assetDecimals(ao.order.assetPair.priceAsset)
+    val fd = efc.assetDecimals(ao.feeAsset)
 
     putOrderUpdate(
       id = ao.id,
@@ -58,7 +59,7 @@ case class WsAddressState(address: Address,
         .copy(
           status = newStatus.name.some,
           filledAmount = ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee(_, ad).toDouble),
-          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, ad).toDouble),
+          filledFee = ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee(_, fd).toDouble),
           avgWeighedPrice = ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice(_, ad, pd).toDouble)
         )
     )

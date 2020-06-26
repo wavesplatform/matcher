@@ -15,7 +15,7 @@ import com.wavesplatform.dex.actors.address.{AddressActor, AddressDirectoryActor
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.Command
 import com.wavesplatform.dex.api.ws.HasJwt
-import com.wavesplatform.dex.api.ws.actors.WsHandlerActor.Command.ProcessClientMessage
+import com.wavesplatform.dex.api.ws.actors.WsExternalClientHandlerActor.Command.ProcessClientMessage
 import com.wavesplatform.dex.api.ws.protocol._
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -31,7 +31,7 @@ import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
-class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
+class WsExternalClientHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecBase with HasJwt {
 
   private val testKit = ActorTestKit()
 
@@ -212,7 +212,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.AddWsSubscription(clientRef)))
       t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(clientKeyPair, WsCommand.AddWsSubscription(clientRef)))
 
-      t.wsHandlerRef ! WsHandlerActor.Event.Completed(().asRight)
+      t.wsHandlerRef ! WsExternalClientHandlerActor.Event.Completed(().asRight)
 
       t.matcherProbe.expectMsg(AggregatedOrderBookEnvelope(assetPair, Command.RemoveWsSubscription(clientRef)))
       t.addressProbe.expectMsg(AddressDirectoryActor.Envelope(clientKeyPair, WsCommand.RemoveWsSubscription(clientRef)))
@@ -283,7 +283,7 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
   private case class TestInstances(clientProbe: TypedTestProbe[WsMessage],
                                    matcherProbe: TestProbe,
                                    addressProbe: TestProbe,
-                                   wsHandlerRef: ActorRef[WsHandlerActor.Message],
+                                   wsHandlerRef: ActorRef[WsExternalClientHandlerActor.Message],
                                    connectionId: String)
 
   private def test(f: TestInstances => Unit): Unit = {
@@ -295,12 +295,17 @@ class WsHandlerActorSpec extends AnyFreeSpecLike with Matchers with MatcherSpecB
     val connectionId = UUID.randomUUID().toString
 
     val wsHandlerRef = testKit.spawn(
-      WsHandlerActor(
-        settings = WsHandlerActor.Settings(10.minutes,
-                                           1.minute,
-                                           3.minutes,
-                                           Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
-                                           subscriptionsSettings),
+      WsExternalClientHandlerActor(
+        settings = WsExternalClientHandlerActor.Settings(
+          messagesInterval = 100.millis,
+          maxConnectionLifetime = 10.minutes,
+          jwtPublicKey = Base64.getEncoder.encodeToString(authServiceKeyPair.getPublic.getEncoded),
+          subscriptions = subscriptionsSettings,
+          healthCheck = WsHealthCheckSettings(
+            pingInterval = 1.minute,
+            pongTimeout = 3.minutes
+          )
+        ),
         time = time,
         assetPairBuilder = new AssetPairBuilder(
           matcherSettings,

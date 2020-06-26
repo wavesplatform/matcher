@@ -155,6 +155,12 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |          client.bar = 3
          |        }
          |      }
+         |
+         |      circuit-breaker {
+         |        max-failures = 999
+         |        call-timeout = 123s
+         |        reset-timeout = 1d
+         |      }
          |    }
          |    process-consumed-timeout = 663s
          |    $orderFeeStr
@@ -168,15 +174,26 @@ class BaseSettingsSpecification extends AnyFlatSpec {
          |      max-pending-time = 30 days
          |    }
          |    web-sockets {
-         |      messages-interval = 100ms
-         |      web-socket-handler {
-         |        max-connection-lifetime = 20h
-         |        ping-interval = 11s
-         |        pong-timeout = 31s
+         |      external-client-handler {
+         |        messages-interval = 1d
+         |        max-connection-lifetime = 3d
          |        jwt-public-key = \"\"\"foo
          |bar
          |baz\"\"\"
          |        $subscriptionsSettings
+         |        health-check {
+         |          ping-interval = 9m
+         |          pong-timeout = 129m
+         |        }
+         |      }
+         |      internal-broadcast {
+         |        messages-interval = 923ms
+         |      }
+         |      internal-client-handler {
+         |        health-check {
+         |          ping-interval = 10m
+         |          pong-timeout = 374m
+         |        }
          |      }
          |    }
          |    address-actor {

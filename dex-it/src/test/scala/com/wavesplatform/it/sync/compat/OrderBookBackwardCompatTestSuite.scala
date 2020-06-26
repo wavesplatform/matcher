@@ -6,10 +6,11 @@ import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.api.HasKafka
 import com.wavesplatform.it.orderGen
-import com.wavesplatform.it.tags.DexMultipleVersions
+import com.wavesplatform.it.tags.{DexItExternalKafkaRequired, DexMultipleVersions}
 import org.scalacheck.Gen
 
 @DexMultipleVersions
+@DexItExternalKafkaRequired
 class OrderBookBackwardCompatTestSuite extends BackwardCompatSuiteBase with HasKafka {
   "Backward compatibility by order book of v2.0.x" - {
     "OrderBook logic" - {

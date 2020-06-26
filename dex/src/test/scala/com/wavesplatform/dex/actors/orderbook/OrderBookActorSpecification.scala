@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.ActorRef
+import akka.actor.typed.scaladsl.adapter._
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import cats.data.NonEmptyList
 import cats.syntax.option._
@@ -18,6 +19,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.OrderOps._
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
@@ -77,15 +79,16 @@ class OrderBookActorSpecification
 
     prepare(obsdb, pair)
 
+    implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+
     val orderBookActor = TestActorRef(
       new OrderBookActor(
         OrderBookActor.Settings(AggregatedOrderBookActor.Settings(100.millis)),
         tp.ref,
         tp.ref,
         system.actorOf(OrderBookSnapshotStoreActor.props(obsdb)),
+        system.toTyped.ignoreRef,
         pair,
-        8,
-        8,
         time,
         matchingRules,
         _ => (),

@@ -154,7 +154,7 @@ object KafkaMatcherQueue {
           new Callback {
             override def onCompletion(metadata: RecordMetadata, exception: Exception): Unit = {
               if (exception == null) {
-                log.debug(s"$event stored, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
+                log.debug(s"Stored $event, offset=${metadata.offset()}, timestamp=${metadata.timestamp()}")
                 p.success(
                   QueueEventWithMeta(
                     offset = metadata.offset(),

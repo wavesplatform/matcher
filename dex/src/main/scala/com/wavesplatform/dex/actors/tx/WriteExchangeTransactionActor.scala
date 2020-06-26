@@ -13,13 +13,8 @@ class WriteExchangeTransactionActor(db: DB) extends Actor with ScorexLogging {
 
   import WriteExchangeTransactionActor._
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[ExchangeTransactionCreated])
-  }
-
   override def receive: Receive = {
-    case ExchangeTransactionCreated(tx) =>
-      saveExchangeTx(tx)
+    case ExchangeTransactionCreated(tx) => saveExchangeTx(tx)
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = db.readWrite { rw =>

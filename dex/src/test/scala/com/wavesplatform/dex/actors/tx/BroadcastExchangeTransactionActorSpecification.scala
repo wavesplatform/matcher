@@ -47,7 +47,7 @@ class BroadcastExchangeTransactionActorSpecification
   "BroadcastExchangeTransactionActor" should {
     "broadcast a transaction when receives it" in {
       var broadcasted = Seq.empty[ExchangeTransaction]
-      defaultActor(
+      val actor = defaultActor(
         time,
         confirmed = _ => getConfirmation(false),
         broadcast = tx => {
@@ -57,7 +57,7 @@ class BroadcastExchangeTransactionActorSpecification
       )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       eventually {
         broadcasted shouldBe Seq(event.tx)
       }
@@ -75,7 +75,7 @@ class BroadcastExchangeTransactionActorSpecification
       )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       // Will be re-sent on second call
@@ -99,7 +99,7 @@ class BroadcastExchangeTransactionActorSpecification
         )
 
       val event = sampleEvent()
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       actor ! BroadcastExchangeTransactionActor.CheckAndSend
@@ -122,7 +122,7 @@ class BroadcastExchangeTransactionActorSpecification
         )
 
       val event = sampleEvent(500.millis)
-      system.eventStream.publish(event)
+      actor ! event
       broadcasted = Seq.empty
 
       actor ! BroadcastExchangeTransactionActor.CheckAndSend
@@ -151,7 +151,7 @@ class BroadcastExchangeTransactionActorSpecification
         )
 
         val event = sampleEvent()
-        system.eventStream.publish(event)
+        actor ! event
         eventually {
           firstProcessed.get shouldBe true
         }
@@ -183,7 +183,7 @@ class BroadcastExchangeTransactionActorSpecification
         )
 
         val event = sampleEvent()
-        system.eventStream.publish(event)
+        actor ! event
         eventually {
           firstProcessing.get() shouldBe true
           triedToBroadcast should not be empty

@@ -35,7 +35,8 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
         (_, _) => Future.successful(Right(())),
         e => Future.successful { Some(QueueEventWithMeta(0, 0, e)) },
         enableSchedules,
-        spendableBalanceActor
+        spendableBalanceActor,
+        AddressActor.Settings.default.copy(maxActiveOrders = maxActiveOrders)
       )
     )
   }
@@ -43,7 +44,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, ma
   private def actorFor(ao: AcceptedOrder): ActorRef =
     refs.getOrElseUpdate(
       ao.order.sender,
-      system.actorOf(createAddressActor(ao.order.sender, true))
+      system.actorOf(createAddressActor(ao.order.sender, enableSchedules = true))
     )
 
   lazy val addressDir = system.actorOf(

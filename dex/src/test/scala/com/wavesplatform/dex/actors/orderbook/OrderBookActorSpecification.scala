@@ -23,6 +23,7 @@ import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.fixtures.RestartableActor
 import com.wavesplatform.dex.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue.QueueEvent.Canceled
 import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
@@ -121,9 +122,9 @@ class OrderBookActorSpecification
 
     "recovery - notify address actor about orders" in obcTestWithPrepare(
       { (obsdb, p) =>
-        val ord               = buy(p, 10 * Order.PriceConstant, 100)
-        val ob                = OrderBook.empty
-        val (updatedOb, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
+        val ord                                  = buy(p, 10 * Order.PriceConstant, 100)
+        val ob                                   = OrderBook.empty
+        val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
         obsdb.update(p, 50, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>

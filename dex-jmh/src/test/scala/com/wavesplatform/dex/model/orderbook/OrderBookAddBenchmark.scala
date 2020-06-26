@@ -36,12 +36,12 @@ object OrderBookAddBenchmark {
     val askGen = orderGen(priceGen, OrderType.SELL)
     val bidGen = orderGen(priceGen, OrderType.BUY)
 
-    val orderBook: OrderBook = ordersGen(initOrderNumber).sample.get.foldLeft(OrderBook.empty)(_.add(_, ts, getMakerTakerFee)._1)
+    val orderBook: OrderBook = ordersGen(initOrderNumber).sample.get.foldLeft(OrderBook.empty)(_.add(_, ts, getMakerTakerFee).orderBook)
 
     val orders: List[AcceptedOrder] = ordersGen(orderNumberToAdd).sample.get
 
     def run(): OrderBook = orders.foldLeft(OrderBook.empty) {
-      case (r, o) => r.add(o, ts, getMakerTakerFee)._1
+      case (r, o) => r.add(o, ts, getMakerTakerFee).orderBook
     }
 
     def ordersGen(orderNumber: Int): Gen[List[AcceptedOrder]] =

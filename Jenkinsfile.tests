@@ -1,0 +1,82 @@
+pipeline {
+    agent {
+        label 'buildagent'
+    }
+    parameters {
+        string(name: 'ACTION', defaultValue: 'it', description: '')
+    }
+    environment {
+        SBT_HOME = tool name: 'sbt-1.2.6', type: 'org.jvnet.hudson.plugins.SbtPluginBuilder$SbtInstallation'
+        SBT_THREAD_NUMBER = 6
+        SBT_OPTS = '-Xmx2g -XX:ReservedCodeCacheSize=128m -XX:+CMSClassUnloadingEnabled'
+        PATH = "${env.SBT_HOME}/bin:${env.PATH}"
+    }
+    stages {
+        stage('Cleanup & Compile') {    
+            steps {
+                sh 'git fetch --tags'
+                sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
+                sh 'sbt cleanAll'
+                sh 'sbt compile'
+            }
+        } 
+        stage('Build Docker') {
+            steps { 
+                sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'
+                sh 'sbt dex-it/docker'
+            }
+        }
+        stage ('Run Integration Tests') {
+            environment {
+                SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
+            }
+            when {
+                expression { params.ACTION == 'it' }
+            }
+            steps {
+                sh 'sbt dex-it/test'
+            }
+        }
+        stage ('Run Integration Tests with kafka') {
+            environment {
+               SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
+               SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired'
+               KAFKA_SERVER = "${KAFKA_SERVER}"
+            }
+            when {
+                expression { params.ACTION == 'it-with-kafka' }
+            }
+            steps {
+                sh 'sbt dex-it/test'
+            }
+        }
+        stage ('Run Integration Tests with specified versions') {
+            environment {
+               SCALATEST_EXCLUDE_TAGS = 'com.wavesplatform.it.tags.DexItKafkaRequired com.wavesplatform.it.tags.DexItExternalKafkaRequired com.wavesplatform.it.tags.DexMultipleVersions'
+               KAFKA_SERVER = "${KAFKA_SERVER}"
+               DEX_TAG = "${DEX_TAG}"
+               NODE_TAG = "${NODE_TAG}"
+            }
+            when {
+                expression { params.ACTION == 'it-with-specified-versions' }
+            }
+            steps {
+                sh 'sbt dex-it/test'
+            }
+        }
+        stage ('Run Integration Tests with multiple versions') {
+            environment {
+               SCALATEST_INCLUDE_TAGS = 'com.wavesplatform.it.tags.DexMultipleVersions'
+               KAFKA_SERVER = "${KAFKA_SERVER}"
+               DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${DEX_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+               NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG = "${NODE_MULTIPLE_VERSIONS_PREVIOUS_TAG}"
+            }
+            when {
+                expression { params.ACTION == 'it-with-multiple-versions' }
+            }
+            steps {
+                sh 'sbt dex-it/test'
+            }
+        }
+    }
+}

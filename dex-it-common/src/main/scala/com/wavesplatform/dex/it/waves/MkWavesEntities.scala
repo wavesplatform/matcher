@@ -188,7 +188,7 @@ trait MkWavesEntities {
                  matcherFee: Long = matcherFee,
                  timestamp: Long = System.currentTimeMillis,
                  matcher: KeyPair): JExchangeTransaction =
-    toWavesJ(mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, matcher = matcher))
+    toWavesJ(mkDomainExchange(buyOrderOwner, sellOrderOwner, pair, amount, price, matcherFee, ts = timestamp, matcher = matcher))
 
   def mkDomainExchange(buyOrderOwner: KeyPair,
                        sellOrderOwner: KeyPair,

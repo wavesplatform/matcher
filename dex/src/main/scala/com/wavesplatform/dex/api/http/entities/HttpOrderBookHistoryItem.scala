@@ -37,7 +37,12 @@ case class HttpOrderBookHistoryItem(@ApiModelProperty(
                                       allowableValues = "Accepted, NotFound, PartiallyFilled, Filled, Cancelled"
                                     ) status: String,
                                     @ApiModelProperty() assetPair: AssetPair,
-                                    @ApiModelProperty(value = "Average weighed price") avgWeighedPrice: Long)
+                                    @ApiModelProperty(value = "Average weighed price") avgWeighedPrice: Long,
+                                    @ApiModelProperty(
+                                      value = "Order version",
+                                      dataType = "integer",
+                                      example = "3"
+                                    ) version: Byte)
 
 object HttpOrderBookHistoryItem {
 
@@ -56,6 +61,7 @@ object HttpOrderBookHistoryItem {
     timestamp = info.timestamp,
     status = info.status.name,
     assetPair = info.assetPair,
-    avgWeighedPrice = info.avgWeighedPrice
+    avgWeighedPrice = info.avgWeighedPrice,
+    version = info.orderVersion
   )
 }

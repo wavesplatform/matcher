@@ -14,6 +14,7 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -60,8 +61,8 @@ class OrderBookSpec
     // TODO Move to OrderExecuted property test
     "OrderExecuted: submitted.spent == counter.receive && counter.spent == submitted.receive" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob             = mkOrderBook(askOrders, bidOrders)
-        val (_, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val OrderBookUpdates(_, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
         val clue =
           s"""Events:
 ${formatEvents(events)}
@@ -97,7 +98,7 @@ ${formatEvents(events)}
         val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
         val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-        val (updatedOb, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
         val balancesAfter = events.foldLeft(balancesBefore) {
           case (r, evt: Events.OrderExecuted) =>
@@ -159,8 +160,8 @@ ${diff.mkString("\n")}
 
     "order book invariant" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob                     = mkOrderBook(askOrders, bidOrders)
-        val (updatedOb, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val ob                                        = mkOrderBook(askOrders, bidOrders)
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
         val clue =
           s"""
@@ -191,8 +192,9 @@ ${formatEvents(events)}
         val ob       = mkOrderBook(askOrders, bidOrders)
         val snapshot = ob.aggregatedSnapshot
 
-        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
-        val updatedSnapshot                   = updatedOb.aggregatedSnapshot
+        val OrderBookUpdates(updatedOb, events, levelChanges, _) =
+          ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val updatedSnapshot = updatedOb.aggregatedSnapshot
 
         val actualLevelChanges   = filterNonEmpty(levelChanges)
         val expectedLevelChanges = filterNonEmpty(toLevelAmounts(updatedSnapshot) |-| toLevelAmounts(snapshot))
@@ -316,8 +318,8 @@ $levelChanges
         val obBefore       = format(ob)
         val orderIdsBefore = orderIds(ob)
 
-        val (obAfter, events, _) = ob.cancelAll(ts)
-        val canceledOrders       = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+        val OrderBookUpdates(obAfter, events, _, _) = ob.cancelAll(ts)
+        val canceledOrders                          = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
         val clue =
           s"""
 OrderBook before:
@@ -347,8 +349,8 @@ ${canceledOrders.mkString("\n")}
       case (askOrders, bidOrders) =>
         val ob = mkOrderBook(askOrders, bidOrders)
 
-        val (_, _, levelChanges) = ob.cancelAll(ts)
-        val expectedLevelChanges = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
+        val OrderBookUpdates(_, _, levelChanges, _) = ob.cancelAll(ts)
+        val expectedLevelChanges                    = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
 
         expectedLevelChanges should matchTo(levelChanges)
     }

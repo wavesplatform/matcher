@@ -19,6 +19,7 @@ import com.wavesplatform.dex.error
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.metrics.TimerExt
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCancelFailed}
+import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.model.{LastTrade, _}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, MatchingRule, OrderRestrictionsSettings}
@@ -163,17 +164,10 @@ class OrderBookActor(settings: Settings,
       if (ref == aggregatedRef) throw new RuntimeException("Aggregated order book was terminated")
   }
 
-  private def process(timestamp: Long, result: (OrderBook, TraversableOnce[Event], LevelAmounts)): Unit = {
-    val (updatedOrderBook, events, levelChanges) = result
-    orderBook = updatedOrderBook
-    // DEX-712
-    val hasTrades = events.exists {
-      case _: Events.OrderExecuted => true
-      case _                       => false
-    }
-    val lastTrade = if (hasTrades) orderBook.lastTrade else None
-    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(levelChanges, lastTrade, None, timestamp)
-    processEvents(timestamp, events)
+  private def process(timestamp: Long, result: OrderBookUpdates): Unit = {
+    orderBook = result.orderBook
+    aggregatedRef ! AggregatedOrderBookActor.Command.ApplyChanges(result.levelChanges, result.lastTrade, None, timestamp)
+    processEvents(timestamp, result.events)
   }
 
   private def processEvents(timestamp: Long, events: TraversableOnce[Event]): Unit = {

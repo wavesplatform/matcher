@@ -139,7 +139,8 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
       timestamp = order.timestamp,
       status = status,
       assetPair = order.assetPair,
-      avgWeighedPrice = 0
+      avgWeighedPrice = 0,
+      version = order.version
     )
 
   // getMatcherPublicKey
@@ -1123,7 +1124,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             case PlaceOrder(x, _)                      => if (x.id() == okOrder.id()) AddressActor.Event.OrderAccepted(x) else error.OrderDuplicate(x.id())
 
             case AddressActor.Query.GetOrdersStatuses(_, _) =>
-              AddressActor.Reply.OrdersStatuses(List(okOrder.id() -> OrderInfo.v4(LimitOrder(okOrder), OrderStatus.Accepted)))
+              AddressActor.Reply.OrdersStatuses(List(okOrder.id() -> OrderInfo.v5(LimitOrder(okOrder), OrderStatus.Accepted)))
 
             case AddressActor.Query.GetOrderStatus(orderId) =>
               if (orderId == okOrder.id()) AddressActor.Reply.GetOrderStatus(OrderStatus.Accepted)
@@ -1154,7 +1155,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
             case GetTradableBalance(xs) => AddressActor.Reply.Balance(xs.map(_ -> 100L).toMap)
 
             case _: AddressActor.Query.GetOrderStatusInfo =>
-              AddressActor.Reply.OrdersStatusInfo(OrderInfo.v4(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
+              AddressActor.Reply.OrdersStatusInfo(OrderInfo.v5(LimitOrder(orderToCancel), OrderStatus.Accepted).some)
 
             case x => Status.Failure(new RuntimeException(s"Unknown command: $x"))
           }

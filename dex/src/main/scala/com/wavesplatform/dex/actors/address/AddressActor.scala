@@ -161,14 +161,14 @@ class AddressActor(owner: Address,
       sender ! Reply.OrdersStatusInfo(
         activeOrders
           .get(orderId)
-          .map(ao => OrderInfo.v4(ao, activeStatus(ao))) orElse orderDB.getOrderInfo(orderId)
+          .map(ao => OrderInfo.v5(ao, activeStatus(ao))) orElse orderDB.getOrderInfo(orderId)
       )
 
     case Query.GetOrdersStatuses(maybePair, orderListType) =>
       val matchingActiveOrders =
         if (orderListType.hasActive)
           getActiveLimitOrders(maybePair)
-            .map(ao => ao.id -> OrderInfo.v4(ao, activeStatus(ao)))
+            .map(ao => ao.id -> OrderInfo.v5(ao, activeStatus(ao)))
             .toSeq
             .sorted
         else Seq.empty
@@ -396,7 +396,7 @@ class AddressActor(owner: Address,
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
         activeOrders.remove(remaining.id).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
-        orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v4(remaining, status))
+        orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v5(remaining, status))
 
       case _ =>
         activeOrders.put(remaining.id, remaining)

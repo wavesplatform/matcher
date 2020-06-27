@@ -79,4 +79,10 @@ pipeline {
             }
         }
     }
+    post {
+        always {
+            sh 'tar zcf logs.tar.gz ./dex-it/target/logs* || true'
+            archiveArtifacts artifacts: 'release.tgz', fingerprint: true
+        }
+    }
 }

@@ -13,24 +13,22 @@ object WavesExtensionDockerPlugin extends AutoPlugin {
   override def requires: Plugins      = JvmPlugin && DockerPlugin
   override def trigger: PluginTrigger = PluginTrigger.NoTrigger
 
-  override def projectSettings: Seq[Def.Setting[_]] =
-    inTask(docker)(
-      Seq(
-        additionalFiles := Seq.empty,
-        exposedPorts := Set.empty,
-        baseImage := s"wavesplatform/wavesnode:${wavesNodeVersion.value}",
-        dockerfile := {
-          new Dockerfile {
-            from(baseImage.value)
-            // see https://github.com/wavesplatform/Waves/blob/master/docker/Dockerfile
-            user("root:root")
-            add(additionalFiles.value, "/opt/waves/")
-            expose(exposedPorts.value.toSeq: _*)
-            entryPoint("/opt/waves/start-waves.sh")
-          }
-        },
-        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
-      ))
+  override def projectSettings: Seq[Def.Setting[_]] = inTask(docker)(
+    Seq(
+      additionalFiles := Seq.empty,
+      exposedPorts := Set.empty,
+      baseImage := s"wavesplatform/wavesnode:${wavesNodeVersion.value}",
+      dockerfile := new Dockerfile {
+        from(baseImage.value)
+        // see https://github.com/wavesplatform/Waves/blob/master/docker/Dockerfile
+        user("root:root")
+        add(additionalFiles.value, "/opt/waves/")
+        expose(exposedPorts.value.toSeq: _*)
+        entryPoint("/opt/waves/start-waves.sh")
+      },
+      buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+    )
+  )
 }
 
 object WavesExtensionDockerKeys {

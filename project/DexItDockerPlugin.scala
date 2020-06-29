@@ -26,9 +26,8 @@ object DexItDockerPlugin extends AutoPlugin {
           }
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
-      )) ++ Seq(
-      docker := docker.dependsOn(LocalProject("dex") / docker).value
-    )
+      )
+    ) ++ Seq(docker := docker.dependsOn(LocalProject("dex") / docker).value)
 }
 
 object DexItDockerKeys {

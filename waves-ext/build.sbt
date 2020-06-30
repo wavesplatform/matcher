@@ -3,8 +3,15 @@ description := "Node integration extension for the Waves DEX"
 import VersionSourcePlugin.V
 import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
+import sbtdocker.DockerPlugin.autoImport._
 
-enablePlugins(WavesExtensionDockerPlugin, RunApplicationSettings, WavesNodeArtifactsPlugin, ExtensionPackaging, GitVersioning, VersionSourcePlugin)
+enablePlugins(RunApplicationSettings,
+              WavesNodeArtifactsPlugin,
+              ExtensionPackaging,
+              GitVersioning,
+              VersionSourcePlugin,
+              JvmPlugin,
+              sbtdocker.DockerPlugin)
 
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"
@@ -47,24 +54,43 @@ Runtime / dependencyClasspath := {
 inConfig(Universal)(
   Seq(
     packageName := s"waves-dex-extension-${version.value}", // An archive file name
-    mappings ++= sbt.IO
-      .listFiles((Compile / packageSource).value / "doc")
-      .map { file =>
-        file -> s"doc/${file.getName}"
-      }
-      .toSeq,
+    mappings ++=
+      sbt.IO
+        .listFiles((Compile / packageSource).value / "doc")
+        .map(file => file -> s"doc/${file.getName}")
+        .toSeq,
     topLevelDirectory := None
   )
 )
 
 // DEB package
-inConfig(Linux)(Seq(
-  name := s"waves-dex-extension${network.value.packageSuffix}", // A staging directory name
-  normalizedName := name.value, // An archive file name
-  packageName := name.value // In a control file
-))
+inConfig(Linux)(
+  Seq(
+    name := s"waves-dex-extension${network.value.packageSuffix}", // A staging directory name
+    normalizedName := name.value, // An archive file name
+    packageName := name.value // In a control file
+  )
+)
 
 Debian / debianPackageConflicts := Seq(
   "grpc-server",
   "waves-node-grpc-server" // TODO NODE-1999
+)
+
+inTask(docker)(
+  Seq(
+    imageNames := Seq(ImageName("com.wavesplatform/matchernode:latest")),
+    dockerfile :=
+      new Dockerfile {
+        from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
+        user("waves:waves")
+        add(
+          sources = Seq((Universal / stage).value),
+          destination = "/opt/waves/",
+          chown = "waves:waves"
+        )
+        expose(6887)
+      },
+    buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+  )
 )

@@ -130,14 +130,11 @@ object WsExternalClientHandlerActor {
                 case subscribe: WsOrderBookSubscribe =>
                   if (subscribe.depth <= 0) clientRef ! WsError.from(error.RequestArgumentInvalid("depth"), matcherTime)
                   else if (!orderBookSubscriptions.contains(subscribe.key)) {
+                    context.log.debug(s"WsOrderBookSubscribe(k=${subscribe.key})")
                     assetPairBuilder.validateAssetPair(subscribe.key).value.onComplete {
-                      case Success(Left(e)) => clientRef ! WsError.from(e, matcherTime)
-                      case Success(Right(_)) =>
-                        context.log.debug(s"WsOrderBookSubscribe(k=${subscribe.key}) is successful")
-                        context.self ! Event.AssetPairValidated(subscribe.key)
-                      case Failure(e) =>
-                        context.log.warn(s"An error during validation the asset pair ${subscribe.key}", e)
-                        clientRef ! WsError.from(error.WavesNodeConnectionBroken, matcherTime)
+                      case Success(Left(e))  => clientRef ! WsError.from(e, matcherTime)
+                      case Success(Right(_)) => context.self ! Event.AssetPairValidated(subscribe.key)
+                      case Failure(e)        => clientRef ! WsError.from(error.WavesNodeConnectionBroken, matcherTime)
                     }
                   }
                   Behaviors.same

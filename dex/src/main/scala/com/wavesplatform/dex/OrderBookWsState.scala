@@ -3,6 +3,7 @@ package com.wavesplatform.dex
 import akka.actor.typed.ActorRef
 import cats.syntax.option._
 import com.wavesplatform.dex.AddressWsMutableState.getNextUpdateId
+import com.wavesplatform.dex.OrderBookWsState._
 import com.wavesplatform.dex.api.websockets.{WsLastTrade, WsOrderBook, WsOrderBookSettings}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.model.Denormalization.{denormalizeAmountAndFee, denormalizePrice}
@@ -18,13 +19,13 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
                             lastTrade: Option[LastTrade],
                             changedTickSize: Option[Double]) {
 
-  private val genLens: GenLens[OrderBookWsState] = GenLens[OrderBookWsState]
-
   def addSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState = copy(wsConnections = wsConnections.updated(x, 0L))
 
-  def withoutSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState =
-    if (wsConnections.size == 1) OrderBookWsState(Map.empty, Set.empty, Set.empty, None, None)
-    else copy(wsConnections = wsConnections - x)
+  def withoutSubscription(x: ActorRef[WsOrderBook]): OrderBookWsState = {
+    val updatedConnections = wsConnections - x
+    if (updatedConnections.isEmpty) OrderBookWsState.empty
+    else copy(wsConnections = updatedConnections)
+  }
 
   def hasSubscriptions: Boolean = wsConnections.nonEmpty
 
@@ -84,10 +85,20 @@ case class OrderBookWsState(wsConnections: Map[ActorRef[WsOrderBook], Long],
   def accumulateChanges(lc: LevelAmounts, lt: Option[LastTrade], ts: Option[Double]): OrderBookWsState =
     if (hasSubscriptions) {
       (
-        genLens(_.changedAsks).modify(_ ++ lc.asks.keySet) andThen
-          genLens(_.changedBids).modify(_ ++ lc.bids.keySet) andThen
-          genLens(_.lastTrade).modify { if (lt.isEmpty) _ else lt } andThen
-          genLens(_.changedTickSize).modify { if (ts.isEmpty) _ else ts }
+        changedAsksLens.modify(_ ++ lc.asks.keySet) andThen
+          changedBidsLens.modify(_ ++ lc.bids.keySet) andThen
+          lastTradeLens.modify { if (lt.isEmpty) _ else lt } andThen
+          changedTickSizeLens.modify { if (ts.isEmpty) _ else ts }
       )(this)
     } else this
+}
+
+object OrderBookWsState {
+  val empty = OrderBookWsState(Map.empty, Set.empty, Set.empty, None, None)
+
+  val genLens             = GenLens[OrderBookWsState]
+  val changedAsksLens     = genLens(_.changedAsks)
+  val changedBidsLens     = genLens(_.changedBids)
+  val lastTradeLens       = genLens(_.lastTrade)
+  val changedTickSizeLens = genLens(_.changedTickSize)
 }

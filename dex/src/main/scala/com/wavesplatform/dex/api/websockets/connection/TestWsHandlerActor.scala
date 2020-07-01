@@ -2,13 +2,16 @@ package com.wavesplatform.dex.api.websockets.connection
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.wavesplatform.dex.api.websockets.{WsClientMessage, WsPingOrPong}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import org.slf4j.LoggerFactory
 
 /**
   * Used as a proxy to the connection's source actor.
   * Main goal is to respond with pongs to matcher's pings to keep connection alive
   */
-class TestWsHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging {
+class TestWsHandlerActor(testId: Int, keepAlive: Boolean) extends Actor with ScorexLogging {
+
+  override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"TestWsHandlerActor[testId=$testId]"))
 
   import TestWsHandlerActor._
 
@@ -33,7 +36,7 @@ class TestWsHandlerActor(keepAlive: Boolean) extends Actor with ScorexLogging {
 
 object TestWsHandlerActor {
 
-  def props(keepAlive: Boolean): Props = Props(new TestWsHandlerActor(keepAlive))
+  def props(testId: Int, keepAlive: Boolean): Props = Props(new TestWsHandlerActor(testId, keepAlive))
 
   final case object AssignSourceRef
   final case object CloseConnection

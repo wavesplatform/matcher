@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.api.ws.connection
 
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ConcurrentLinkedQueue, ThreadLocalRandom}
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
@@ -9,7 +9,8 @@ import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage, WebSock
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{CompletionStrategy, Materializer, OverflowStrategy}
 import com.wavesplatform.dex.api.ws.protocol.{WsClientMessage, WsMessage, WsPingOrPong, WsServerMessage}
-import com.wavesplatform.dex.domain.utils.ScorexLogging
+import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
+import org.slf4j.LoggerFactory
 import play.api.libs.json.Json
 
 import scala.collection.JavaConverters._
@@ -19,13 +20,17 @@ import scala.util.{Failure, Success, Try}
 
 class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {
 
+  private val testId: Int = ThreadLocalRandom.current().nextInt(10000)
+
+  override protected lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"WsConnection[testId=$testId]"))
+
   log.info(s"""Connecting to Matcher WS API:
             |         URI = $uri
             |  Keep alive = $keepAlive""".stripMargin)
 
   import materializer.executionContext
 
-  private val wsHandlerRef = system.actorOf(TestWsHandlerActor props keepAlive)
+  private val wsHandlerRef = system.actorOf(TestWsHandlerActor.props(testId, keepAlive))
 
   protected def stringifyClientMessage(cm: WsClientMessage): TextMessage.Strict =
     WsMessage.toStrictTextMessage(cm)(WsClientMessage.wsClientMessageWrites)

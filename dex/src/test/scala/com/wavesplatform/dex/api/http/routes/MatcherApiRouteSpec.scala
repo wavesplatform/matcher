@@ -440,7 +440,6 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
 
         Get(routePath(s"/orderbook/$smartAssetId/WAVES/tradableBalance/$addressFromOtherNetwork")) ~> route ~> check {
           status shouldEqual StatusCodes.BadRequest
-          println(responseAs[String])
           responseAs[HttpError] should matchTo(
             HttpError(
               error = 4194304,

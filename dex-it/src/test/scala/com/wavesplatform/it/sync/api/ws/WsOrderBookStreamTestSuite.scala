@@ -18,6 +18,7 @@ import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictio
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.{Await, Future}
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
@@ -451,6 +452,45 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
 
       placeAndAwaitAtDex { mkOrderDP(alice, bchUsdPair, SELL, 10.asset8, 231.0) }
       wsc.receiveAtLeastN[WsOrderBookChanges](1).head.asks should matchTo(TreeMap(231.0 -> 10.0))
+    }
+  }
+
+  "Bugs" - {
+    "DEX-814 Connections can affect each other" in {
+      val wscs    = (1 to 10).map(_ => mkWsOrderBookConnection(wavesBtcPair, dex1))
+      val mainWsc = mkWsOrderBookConnection(wavesBtcPair, dex1)
+
+      markup("Multiple orders")
+      val orders = (1 to 50).map { i =>
+        mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012)
+      }
+
+      import scala.concurrent.duration.DurationInt
+      Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+      dex1.api.cancelAll(carol)
+
+      Await.result(Future.traverse(wscs)(wsc => Future(wsc.close())), 1.minute)
+      Thread.sleep(3000)
+      mainWsc.clearMessages()
+
+      markup("A new order")
+      placeAndAwaitAtDex(mkOrderDP(carol, wavesBtcPair, BUY, 2.waves, 0.00029))
+
+      eventually {
+        val buffer = mainWsc.receiveAtLeastN[WsOrderBookChanges](1)
+        buffer.squashed.values.head.copy(updateId = 0) should matchTo(
+          WsOrderBookChanges(
+            assetPair = wavesBtcPair,
+            asks = TreeMap.empty,
+            bids = TreeMap(0.00029d -> 2d),
+            lastTrade = None,
+            updateId = 0,
+            timestamp = buffer.last.timestamp,
+            settings = None
+          )
+        )
+      }
+      mainWsc.clearMessages()
     }
   }
 }

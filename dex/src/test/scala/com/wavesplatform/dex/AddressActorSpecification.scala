@@ -34,7 +34,7 @@ class AddressActorSpecification
     with DiffMatcherWithImplicits
     with MatcherSpecBase {
 
-  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val assetId     = ByteStr("asset".getBytes("utf-8"))
   override val matcherFee = 30000L

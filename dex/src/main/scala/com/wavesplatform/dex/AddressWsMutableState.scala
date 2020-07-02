@@ -47,9 +47,9 @@ case class AddressWsMutableState(address: Address,
 
   def putOrderFillingInfoAndStatusUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): AddressWsMutableState = {
 
-    val ad = efc.assetDecimals(ao.order.assetPair.amountAsset)
-    val pd = efc.assetDecimals(ao.order.assetPair.priceAsset)
-    val fd = efc.assetDecimals(ao.feeAsset)
+    val ad = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
+    val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
+    val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
     putOrderUpdate(
       id = ao.id,

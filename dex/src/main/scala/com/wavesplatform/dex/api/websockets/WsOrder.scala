@@ -30,9 +30,9 @@ object WsOrder {
 
   def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
 
-    val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
-    val feeAssetDecimals    = efc.assetDecimals(ao.order.feeAsset)
-    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
+    val amountAssetDecimals = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
+    val feeAssetDecimals    = efc.unsafeAssetDecimals(ao.order.feeAsset)
+    val priceAssetDecimals  = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, feeAssetDecimals).toDouble

@@ -385,8 +385,8 @@ class WsInternalStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChec
                           avgWeighedPrice: Double,
                           executionInfo: Option[WsExecutionInfo],
                           isMarket: Boolean): WsFullOrder = {
-    val amountAssetDecimals = efc.assetDecimals(order.assetPair.amountAsset)
-    val priceAssetDecimals  = efc.assetDecimals(order.assetPair.priceAsset)
+    val amountAssetDecimals = efc.unsafeAssetDecimals(order.assetPair.amountAsset)
+    val priceAssetDecimals  = efc.unsafeAssetDecimals(order.assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, order.feeAsset).toDouble

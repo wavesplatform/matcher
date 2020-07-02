@@ -25,7 +25,7 @@ trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps w
 
   implicit protected val system: ActorSystem        = ActorSystem()
   implicit protected val materializer: Materializer = Materializer.matFromSystem(system)
-  implicit protected val efc: ErrorFormatterContext = assetDecimalsMap.apply
+  implicit protected val efc: ErrorFormatterContext = ErrorFormatterContext.from(assetDecimalsMap)
 
   protected def getWsStreamUri(dex: DexContainer): String = s"ws://127.0.0.1:${dex.restApiAddress.getPort}/ws/v0"
 

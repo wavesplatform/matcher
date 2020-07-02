@@ -36,7 +36,7 @@ class ActorsWebSocketInteractionsSpecification
 
   private val testKit = ActorTestKit()
 
-  private implicit val efc: ErrorFormatterContext = (asset: Asset) => getDefaultAssetDescriptions(asset).decimals
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(asset => getDefaultAssetDescriptions(asset).decimals)
 
   private def webSocketTest(
       f: (

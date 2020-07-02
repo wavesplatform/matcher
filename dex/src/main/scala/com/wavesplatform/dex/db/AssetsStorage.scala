@@ -13,6 +13,7 @@ import org.iq80.leveldb.DB
 trait AssetsStorage {
   def put(asset: IssuedAsset, item: BriefAssetDescription): Unit
   def get(asset: IssuedAsset): Option[BriefAssetDescription]
+  def contains(asset: IssuedAsset): Boolean = get(asset).nonEmpty
 }
 
 object AssetsStorage {
@@ -31,6 +32,8 @@ object AssetsStorage {
     def get(asset: Asset.IssuedAsset): Option[BriefAssetDescription] = Option {
       assetsCache.computeIfAbsent(asset, inner.get(_).orNull)
     }
+
+    override def contains(asset: IssuedAsset): Boolean = assetsCache.contains(asset)
   }
 
   def levelDB(db: DB): AssetsStorage = new AssetsStorage {

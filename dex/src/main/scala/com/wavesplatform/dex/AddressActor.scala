@@ -179,7 +179,7 @@ class AddressActor(owner: Address,
       val matchingClosedOrders = if (orderListType.hasClosed) orderDB.getFinalizedOrders(owner, maybePair) else Seq.empty
       sender ! Reply.OrdersStatuses(matchingActiveOrders ++ matchingClosedOrders)
 
-    case storeFailed @ Event.StoreFailed(orderId, reason, queueEvent) =>
+    case Event.StoreFailed(orderId, reason, queueEvent) =>
       failedPlacements.add(orderId)
       pendingCommands.remove(orderId).foreach { command =>
         command.client ! CanNotPersist(reason)
@@ -326,11 +326,20 @@ class AddressActor(owner: Address,
     context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
   }
 
+  private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
+    denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0), decimals).toDouble
+
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
     val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)
-    spendableBalances.keySet.map { asset =>
-      val balanceValue: Map[Asset, Long] => Double = source => denormalizeAmountAndFee(source.getOrElse(asset, 0), efc assetDecimals asset).toDouble
-      asset -> WsBalances(balanceValue(tradableBalance), balanceValue(openVolume))
+    spendableBalances.keySet.flatMap { asset =>
+      efc.assetDecimals(asset) match {
+        case None =>
+          log.error(s"Can't find asset decimals for $asset")
+          List.empty // It is better to hide unknown assets rather than stop working
+        case Some(decimals) =>
+          val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
+          List(asset -> WsBalances(assetDenormalizedBalanceFrom(tradableBalance), assetDenormalizedBalanceFrom(openVolume)))
+      }
     }(collection.breakOut)
   }
 

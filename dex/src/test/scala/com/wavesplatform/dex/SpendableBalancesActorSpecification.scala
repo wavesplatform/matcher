@@ -30,7 +30,7 @@ class SpendableBalancesActorSpecification
 
   implicit val addressDiff: Diff[Address] = DiffMatcherWithImplicits.getDiff[Address](_ == _)
 
-  implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   val testProbe: TestProbe = TestProbe()
 

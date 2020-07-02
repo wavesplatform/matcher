@@ -30,8 +30,8 @@ object WsOrdersUpdate {
     val ao1       = x.counterRemaining
     val assetPair = ao1.order.assetPair
 
-    val amountAssetDecimals = efc.assetDecimals(assetPair.amountAsset)
-    val priceAssetDecimals  = efc.assetDecimals(assetPair.priceAsset)
+    val amountAssetDecimals = efc.unsafeAssetDecimals(assetPair.amountAsset)
+    val priceAssetDecimals  = efc.unsafeAssetDecimals(assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
@@ -42,7 +42,7 @@ object WsOrdersUpdate {
         x,
         denormalizeAmount,
         denormalizePrice,
-        Denormalization.denormalizeAmountAndFee(_, efc.assetDecimals(ao.feeAsset)).toDouble
+        Denormalization.denormalizeAmountAndFee(_, efc.unsafeAssetDecimals(ao.feeAsset)).toDouble
       )
 
     WsOrdersUpdate(NonEmptyList.of(ao1, x.submittedRemaining).map(from), timestamp = ts)

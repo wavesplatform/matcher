@@ -402,4 +402,19 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       )
     }
   }
+
+  "Bugs" - {
+    "DEX-816 Failure of AddressActor" in {
+      dex1.stopWithoutRemove()
+      broadcastAndAwait(IssueWctTx)
+      dex1.start()
+
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+
+      eventually {
+        wsc.receiveAtLeastN[WsAddressState](1)
+      }
+    }
+  }
 }

@@ -29,8 +29,7 @@ object WavesBlockchainClientBuilder extends ScorexLogging {
 
     new WavesBlockchainCachingClient(
       new WavesBlockchainGrpcAsyncClient(eventLoopGroup, channel, monixScheduler)(grpcExecutionContext),
-      wavesBlockchainClientSettings.defaultCachesExpiration,
-      monixScheduler
+      wavesBlockchainClientSettings.defaultCachesExpiration
     )(grpcExecutionContext)
   }
 }

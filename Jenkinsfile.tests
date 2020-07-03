@@ -16,7 +16,8 @@ pipeline {
             steps {
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt ;cleanAll;compile'
+                sh 'sbt cleanAll'
+                sh 'sbt compile'
             }
         } 
         stage('Build Docker') {

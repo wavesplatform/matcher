@@ -262,13 +262,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     Future {
       val address   = request.address.toVanillaAddress
       val portfolio = context.blockchain.portfolio(address)
-
-      val finalPortfolio = AllAssetsSpendableBalanceResponse.Record(Waves.toPB, context.utx.spendableBalance(address, Waves)) ::
-        portfolio.assets.toList.map {
-        case (asset, _) => AllAssetsSpendableBalanceResponse.Record(asset.toPB, context.utx.spendableBalance(address, asset))
-      }
-
-      AllAssetsSpendableBalanceResponse(finalPortfolio.filterNot(_.balance == 0L))
+      AllAssetsSpendableBalanceResponse(
+        (Waves :: portfolio.assets.keys.toList)
+          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, context.utx.spendableBalance(address, a)))
+          .filterNot(_.balance == 0L)
+      )
     }
   }
 

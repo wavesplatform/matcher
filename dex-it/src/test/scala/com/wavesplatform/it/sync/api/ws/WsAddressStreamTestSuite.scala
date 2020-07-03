@@ -1,11 +1,12 @@
 package com.wavesplatform.it.sync.api.ws
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
-import com.wavesplatform.dex.api.websockets.{WsOrder, _}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -415,6 +416,28 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       eventually {
         wsc.receiveAtLeastN[WsAddressState](1)
       }
+    }
+
+    "DEX-817 Invalid balances after connection (leasing)" in {
+      val bobWavesBalanceBefore = dex1.api.tradableBalance(bob, wavesBtcPair)(Waves)
+
+      dex1.stopWithoutRemove()
+      val leaseTx = mkLease(bob, alice, bobWavesBalanceBefore - 0.1.waves, fee = leasingFee)
+      broadcastAndAwait(leaseTx)
+      dex1.start()
+
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+
+      eventually {
+        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - btc - wct
+        balance should matchTo(
+          Map[Asset, WsBalances](
+            Waves -> WsBalances(Denormalization.denormalizeAmountAndFee(0.1.waves - leasingFee, 8).toDouble, 0)
+          ))
+      }
+
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
     }
   }
 }

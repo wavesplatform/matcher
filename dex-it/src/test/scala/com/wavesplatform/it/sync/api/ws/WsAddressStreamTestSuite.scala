@@ -430,11 +430,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
 
       eventually {
-        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed
+        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - btc - wct
         balance should matchTo(
           Map[Asset, WsBalances](
-            Waves -> WsBalances(Denormalization.denormalizeAmountAndFee(0.1.waves - leasingFee, 8).toDouble, 0),
-            btc   -> WsBalances(9999.99999999d, 0),
+            Waves -> WsBalances(Denormalization.denormalizeAmountAndFee(0.1.waves - leasingFee, 8).toDouble, 0)
           ))
       }
 

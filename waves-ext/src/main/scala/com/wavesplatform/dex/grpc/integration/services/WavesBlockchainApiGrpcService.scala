@@ -268,7 +268,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
         case (asset, _) => AllAssetsSpendableBalanceResponse.Record(asset.toPB, context.utx.spendableBalance(address, asset))
       }
 
-      AllAssetsSpendableBalanceResponse(finalPortfolio)
+      AllAssetsSpendableBalanceResponse(finalPortfolio.filterNot(_.balance == 0L))
     }
   }
 

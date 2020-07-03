@@ -74,7 +74,12 @@ Debian / debianPackageConflicts := Seq(
 
 inTask(docker)(
   Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/matchernode:latest")),
+    imageNames := {
+      val latestImageName = ImageName("com.wavesplatform/matchernode:latest")
+      val maybeVersion    = git.gitDescribedVersion.value
+      if (!isSnapshot.value && maybeVersion.isDefined) Seq(latestImageName, ImageName(s"com.wavesplatform/matchernode:${maybeVersion.get}"))
+      else Seq(latestImageName)
+    },
     dockerfile :=
       new Dockerfile {
         from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")

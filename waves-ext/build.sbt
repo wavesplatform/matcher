@@ -54,11 +54,6 @@ Runtime / dependencyClasspath := {
 inConfig(Universal)(
   Seq(
     packageName := s"waves-dex-extension-${version.value}", // An archive file name
-    mappings ++=
-      sbt.IO
-        .listFiles((Compile / packageSource).value / "doc")
-        .map(file => file -> s"doc/${file.getName}")
-        .toSeq,
     topLevelDirectory := None
   )
 )
@@ -85,10 +80,15 @@ inTask(docker)(
         from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
         user("waves:waves")
         add(
-          sources = Seq((Universal / stage).value),
+          sources = Seq(
+            (Universal / stage).value, // jars
+            (Compile / sourceDirectory).value / "container" / "entrypoint-with-ext.sh" // entry point
+          ),
           destination = "/opt/waves/",
           chown = "waves:waves"
         )
+        run("chmod", "+x", "/opt/waves/entrypoint-with-ext.sh")
+        entryPoint("/opt/waves/entrypoint-with-ext.sh")
         expose(6887)
       },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)

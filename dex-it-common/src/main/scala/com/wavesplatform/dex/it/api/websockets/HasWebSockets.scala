@@ -16,11 +16,11 @@ import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import mouse.any._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 import scala.concurrent.duration._
 
-trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps with WsMessageOps {
+trait HasWebSockets extends BeforeAndAfterAll with BeforeAndAfterEach with HasJwt with WsConnectionOps with WsMessageOps {
   _: Suite with Eventually with Matchers with DiffMatcherWithImplicits with PredefinedAssets =>
 
   implicit protected val system: ActorSystem        = ActorSystem()
@@ -80,15 +80,19 @@ trait HasWebSockets extends BeforeAndAfterAll with HasJwt with WsConnectionOps w
     c.clearMessages()
   }
 
-  protected def cleanupWebSockets(): Unit = {
-    if (!knownWsConnections.isEmpty) {
-      knownWsConnections.forEach { _.close() }
-      materializer.shutdown()
-    }
+  protected def cleanupWebSockets(): Unit = if (!knownWsConnections.isEmpty) {
+    knownWsConnections.forEach { _.close() }
+    knownWsConnections.clear()
+  }
+
+  override protected def afterEach(): Unit = {
+    super.afterEach()
+    cleanupWebSockets()
   }
 
   override def afterAll(): Unit = {
     super.afterAll()
     cleanupWebSockets()
+    materializer.shutdown()
   }
 }

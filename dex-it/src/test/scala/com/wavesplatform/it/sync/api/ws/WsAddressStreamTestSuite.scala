@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.api.ws
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
@@ -9,19 +10,28 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
+import com.wavesplatform.dex.it.time.GlobalTimer
+import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
+import com.wavesplatform.dex.util.FutureOps.Implicits
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
+
+  private val wsMessagesInterval = 100.millis
 
   override protected val dexInitialSuiteConfig: Config = ConfigFactory
     .parseString(s"""waves.dex {
          |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-         |  web-sockets.external-client-handler.subscriptions.max-address-number = 3
+         |  web-sockets.external-client-handler {
+         |    messages-interval = $wsMessagesInterval
+         |    subscriptions.max-address-number = 3
+         |  }
          |}""".stripMargin)
     .withFallback(jwtPublicKeyConfig)
 
@@ -418,7 +428,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       }
     }
 
-    "DEX-817 Invalid balances after connection (leasing)" in {
+    "DEX-817 Invalid WAVES balance after connection (leasing)" in {
       val bobWavesBalanceBefore = dex1.api.tradableBalance(bob, wavesBtcPair)(Waves)
 
       dex1.stopWithoutRemove()
@@ -438,6 +448,61 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       }
 
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
+    }
+
+    "DEX-818 Invalid asset balance after connection" in {
+      dex1.restart()
+      val bobBtcBalanceBefore = wavesNode1.api.balance(bob, btc)
+      broadcastAndAwait(IssueWctTx) // TODO
+
+      val now = System.currentTimeMillis()
+
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+
+      val num = 100
+      val mkTransfers = (1 to num)
+        .map(i => mkTransfer(bob, alice, 1.btc, btc, feeAmount = minFee, timestamp = now + i))
+        .zip(
+          (1 to num).map(i => mkTransfer(bob, alice, 1.wct, wct, feeAmount = minFee, timestamp = now + i))
+        )
+        .flatMap {
+          case (a, b) => List(a, b)
+        }
+
+      wavesNode1.api.waitForHeightArise()
+      val interval    = wsMessagesInterval / 15
+      val simulation = Future
+        .inSeries(mkTransfers.zipWithIndex) {
+          case (tx, i) =>
+//            wavesNode1.asyncApi.currentHeight.flatMap { currentHeight =>
+//              if (currentHeight == savedHeight)
+            for {
+              _ <- wavesNode1.asyncApi.broadcast(tx)
+              _ <- GlobalTimer.instance.sleep(interval)
+//              state <- Future(wsc.receiveAtLeastN[WsAddressState](1))
+            } yield 0
+//              state.flatMap(_.balances).collect {
+//                case (asset, x) if asset == btc => i -> x
+//              }
+//            else Future.successful(List.empty)
+//            }
+        }
+
+      Await.result(simulation, 1.minute)
+      val changes = wsc.receiveAtLeastN[WsAddressState](1).zipWithIndex.map {
+        case (x, i) => s"$i: btc: ${x.balances.get(btc)}, wct: ${x.balances.get(wct)}"
+      }
+      println(s"Changes:\n${changes.mkString("\n")}")
+
+//      val expectedBalance = Map[Asset, WsBalances](
+//        btc -> WsBalances(Denormalization.denormalizeAmountAndFee(bobBtcBalanceBefore - sent.btc, IssueBtcTx.getDecimals).toDouble, 0)
+//      )
+//
+//      eventually {
+//        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - Waves - wct
+//        balance should matchTo(expectedBalance)
+//      }
     }
   }
 }

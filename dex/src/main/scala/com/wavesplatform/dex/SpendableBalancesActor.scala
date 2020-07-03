@@ -77,9 +77,14 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       }
 
     case SpendableBalancesActor.Command.SetState(address, state) =>
-      val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
-      fullState += address -> addressState
-      incompleteStateChanges -= address
+      val addressState = fullState.get(address) match {
+        case Some(r) => r
+        case None =>
+          val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty) // HERE?
+          fullState += address -> addressState
+          incompleteStateChanges -= address
+          addressState
+      }
       sender ! SpendableBalancesActor.Reply.GetSnapshot(addressState.asRight)
 
     case SpendableBalancesActor.Command.UpdateStates(changes) =>

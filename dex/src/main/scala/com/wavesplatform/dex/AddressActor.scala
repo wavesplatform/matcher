@@ -295,7 +295,7 @@ class AddressActor(owner: Address,
             orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
           )
           if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending
-          addressWsMutableState = addressWsMutableState.flushPendingSubscriptions()
+          addressWsMutableState = addressWsMutableState.flushPendingSubscriptions() // ?
         case Left(matcherError) =>
           addressWsMutableState.pendingSubscription.foreach { _.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()) }
           addressWsMutableState = addressWsMutableState.copy(pendingSubscription = Set.empty)
@@ -305,19 +305,22 @@ class AddressActor(owner: Address,
       if (addressWsMutableState.hasActiveSubscriptions) {
         if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
+          addressWsMutableState = addressWsMutableState.cleanBalanceChanges()
         } else scheduleNextDiffSending
       }
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
       if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState.sendDiffs(
-          balances = mkWsBalances(spendableBalances),
-          orders = addressWsMutableState.getAllOrderChanges
-        )
+        addressWsMutableState = addressWsMutableState
+          .sendDiffs(
+            balances = mkWsBalances(spendableBalances),
+            orders = addressWsMutableState.getAllOrderChanges
+          )
+          .cleanBalanceChanges() // Case: 1. RemoveWsSubscription, now there are 0 subscriptions; 2. 2. GetState; 3. GetSnapshot.
         scheduleNextDiffSending
       }
 
-      addressWsMutableState = addressWsMutableState.cleanChanges()
+      addressWsMutableState = addressWsMutableState.cleanOrderChanges()
 
     case classic.Terminated(wsSource) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }

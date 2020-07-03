@@ -4,7 +4,6 @@ import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.syntax.either._
-import cats.syntax.monoid._
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
@@ -260,22 +259,16 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   }
 
   override def allAssetsSpendableBalance(request: AddressRequest): Future[AllAssetsSpendableBalanceResponse] = {
-    import com.wavesplatform.state.Portfolio.monoid
     Future {
+      val address   = request.address.toVanillaAddress
+      val portfolio = context.blockchain.portfolio(address)
 
-      val address              = request.address.toVanillaAddress
-      val pessimisticPortfolio = context.blockchain.portfolio(address) |+| context.utx.pessimisticPortfolio(address)
-
-      val pessimisticPortfolioNonZeroBalances = {
-        if (pessimisticPortfolio.balance == 0) pessimisticPortfolio.assets
-        else pessimisticPortfolio.assets ++ Map(Waves -> pessimisticPortfolio.balance)
+      val finalPortfolio = AllAssetsSpendableBalanceResponse.Record(Waves.toPB, context.utx.spendableBalance(address, Waves)) ::
+        portfolio.assets.toList.map {
+        case (asset, _) => AllAssetsSpendableBalanceResponse.Record(asset.toPB, context.utx.spendableBalance(address, asset))
       }
 
-      AllAssetsSpendableBalanceResponse(
-        pessimisticPortfolioNonZeroBalances.map {
-          case (a, b) => AllAssetsSpendableBalanceResponse.Record(a.toPB, b)
-        }.toSeq
-      )
+      AllAssetsSpendableBalanceResponse(finalPortfolio)
     }
   }
 

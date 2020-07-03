@@ -327,7 +327,7 @@ class AddressActor(owner: Address,
   }
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
-    denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0), decimals).toDouble
+    denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
     val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)

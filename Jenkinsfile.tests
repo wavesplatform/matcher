@@ -20,6 +20,11 @@ pipeline {
                 sh 'sbt "cleanAll;compile"'
             }
         } 
+        stage('Run Unit Tests') {
+            steps { 
+                sh 'sbt "set Global / scalacOptions ++= Seq(\"-Xfatal-warnings\", \"-Ywarn-unused:-imports\");session save;waves-ext/test;waves-integration/test;dex/test"'      
+            }
+        }        
         stage('Build Docker') {
             steps { 
                 sh 'docker rmi com.wavesplatform/it com.wavesplatform/node-it com.wavesplatform/dex-it || true'

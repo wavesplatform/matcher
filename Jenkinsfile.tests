@@ -22,7 +22,7 @@ pipeline {
         } 
         stage('Run Unit Tests') {
             steps { 
-                sh 'sbt "set Global / scalacOptions ++= Seq(\"-Xfatal-warnings\", \"-Ywarn-unused:-imports\");session save;waves-ext/test;waves-integration/test;dex/test"'      
+                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;waves-ext/test;waves-integration/test;dex/test"'      
             }
         }        
         stage('Build Docker') {

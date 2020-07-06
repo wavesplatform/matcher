@@ -21,7 +21,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "Updates both from address and order book" in {
-    val wsc = mkWsConnection(dex1)
+    val wsc = mkDexWsConnection(dex1)
 
     markup("Subscribe to an order book updates")
     wsc.send(WsOrderBookSubscribe(wavesBtcPair, 1))
@@ -52,7 +52,7 @@ class WsConnectionTestSuite extends WsSuiteBase {
   }
 
   "Matcher should handle many connections simultaneously" in {
-    Await.result(Future.traverse((1 to 200).toList)(_ => Future(mkWsConnection(dex1))), 25.seconds).foreach { wsc =>
+    Await.result(Future.traverse((1 to 200).toList)(_ => Future(mkDexWsConnection(dex1))), 25.seconds).foreach { wsc =>
       wsc.isClosed shouldBe false
       wsc.close()
     }

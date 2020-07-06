@@ -6,9 +6,9 @@ import java.nio.file._
 
 import cats.Id
 import com.dimafeng.testcontainers.GenericContainer
+import com.github.dockerjava.api.async.ResultCallback
 import com.github.dockerjava.api.exception.{NotFoundException, NotModifiedException}
-import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Ports}
-import com.github.dockerjava.core.command.ExecStartResultCallback
+import com.github.dockerjava.api.model.{ContainerNetwork, ExposedPort, Frame, Ports}
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.it.api.HasWaitReady
@@ -61,7 +61,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
     val containerState = dockerClient.inspectContainerCmd(underlying.containerId).exec().getState
 
     log.debug(s"""$prefix Information:
-                 |Exit code:  ${containerState.getExitCode}
+                 |Exit code:  ${containerState.getExitCodeLong}
                  |Error:      ${containerState.getError}
                  |Status:     ${containerState.getStatus}
                  |OOM killed: ${containerState.getOOMKilled}""".stripMargin)
@@ -91,7 +91,7 @@ abstract class BaseContainer(protected val baseContainerPath: String, private va
 
         val execCmdId = execCmd.exec().getId
 
-        try dockerClient.execStartCmd(execCmdId).exec(new ExecStartResultCallback)
+        try dockerClient.execStartCmd(execCmdId).exec(new ResultCallback.Adapter[Frame])
         catch {
           case NonFatal(_) => /* ignore */
         } finally execCmd.close()

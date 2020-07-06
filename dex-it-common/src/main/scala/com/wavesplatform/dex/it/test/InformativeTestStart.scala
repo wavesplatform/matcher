@@ -12,11 +12,7 @@ trait InformativeTestStart extends Suite { self: BaseContainersKit =>
 
   override protected def runTest(testName: String, args: Args): Status = {
 
-    def print(text: String): Unit = {
-      val formatted = s"---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------"
-      log.debug(formatted)
-      knownContainers.get().foreach { _.printDebugMessage(formatted) }
-    }
+    def print(text: String): Unit = writeGlobalLog(s"---------- [${LocalDateTime.now(ZoneId.of("UTC"))}] $text ----------")
 
     print(s"Test '$testName' started")
 
@@ -26,5 +22,10 @@ trait InformativeTestStart extends Suite { self: BaseContainersKit =>
         case Failure(e) => print(s"Test '$testName' failed with exception '${e.getClass.getSimpleName}'")
       }
     }
+  }
+
+  protected def writeGlobalLog(x: String): Unit = {
+    log.debug(x)
+    knownContainers.get().foreach { _.printDebugMessage(x) }
   }
 }

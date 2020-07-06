@@ -29,7 +29,8 @@ class HttpOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMa
       |    "amountAsset" : "6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7",
       |    "priceAsset" : "8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc"
       |  },
-      |  "avgWeighedPrice" : 0
+      |  "avgWeighedPrice" : 0,
+      |  "version" : 3
       |}""".stripMargin
 
   private val historyItem =
@@ -49,7 +50,8 @@ class HttpOrderBookHistoryItemSpec extends AnyFreeSpec with Matchers with DiffMa
         IssuedAsset(ByteStr.decodeBase58("6rRegyHpdvZBENW4mowKYtKMDs2xpxmMbyNMRMZaZQ7").get),
         IssuedAsset(ByteStr.decodeBase58("8pFqaP5CtPB4kP87gpu2T7vB4LxdfoH9e5mSPQduhCc").get)
       ),
-      avgWeighedPrice = 0L
+      avgWeighedPrice = 0L,
+      version = 3
     )
 
   "backward JSON compatibility" - {

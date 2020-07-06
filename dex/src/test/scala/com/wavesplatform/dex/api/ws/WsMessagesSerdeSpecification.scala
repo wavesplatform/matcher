@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 
 import com.softwaremill.diffx.Diff
 import com.wavesplatform.dex.MatcherSpecBase
-import com.wavesplatform.dex.actors.address.AddressActor
 import com.wavesplatform.dex.api.http.PlayJsonException
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsOrder, WsOrderBookSettings}
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
@@ -52,7 +51,7 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
       case (false, false) => LimitOrder(order).partial(partialAmount, partialFee, BigInteger.valueOf(order.price))
     }
 
-    val result = WsOrder.fromDomain(ao, AddressActor.activeStatus(ao))
+    val result = WsOrder.fromDomain(ao)
 
     if (isNew) result
     else

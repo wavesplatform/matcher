@@ -10,5 +10,5 @@ import java.lang.annotation.Target;
 @TagAnnotation
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
-public @interface DexItKafkaRequired {
+public @interface DexItExternalKafkaRequired {
 }

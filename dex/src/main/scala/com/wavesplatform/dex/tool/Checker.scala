@@ -140,6 +140,7 @@ case class Checker(superConnector: SuperConnector) {
         val orderStatus = OrderStatus.Filled(submitted.amount, submitted.matcherFee)
         HttpOrderStatus.httpOrderStatusFormat.writes(HttpOrderStatus from orderStatus).toString
       }
+
       (
         for {
           filledAmount <- (orderStatus \ "filledAmount").asOpt[Long]
@@ -183,10 +184,10 @@ case class Checker(superConnector: SuperConnector) {
   private def checkWsAccountUpdates(maybeSeed: Option[String]): ErrorOr[String] = {
     authServiceRest.fold { lift(s"Account updates check wasn't performed, since Auth Service REST API uri wasn't provided") } { as =>
       for {
-        credentials <- as.getAuthCredentials(maybeSeed)
-        snapshot    <- dexWs.subscribeForAccountUpdates(credentials)
+        creds    <- as.getAuthCredentials(maybeSeed)
+        snapshot <- dexWs.subscribeForAccountUpdates(creds)
       } yield s"""\n
-           |    Got snapshot for ${credentials.keyPair.publicKey.toAddress} address${maybeSeed.fold(" (key pair randomly generated)")(_ => "")}:
+           |    Got snapshot for ${creds.keyPair.publicKey.toAddress} address, seed = ${creds.seed}${maybeSeed.fold(" (randomly generated)")(_ => "")}:
            |    ${WsAddressChanges.wsAddressChangesFormat.writes(snapshot).toString}\n
          """.stripMargin
     }

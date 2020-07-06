@@ -89,3 +89,4 @@ case class InfoNotFound(error: MatcherError)                               exten
 case class WavesNodeUnavailable(error: MatcherError)                       extends MatcherResponse(C.ServiceUnavailable, error)
 case class RateError(error: MatcherError, code: StatusCode = C.BadRequest) extends MatcherResponse(code, error)
 case object InternalError                                                  extends MatcherResponse(C.ServiceUnavailable, MatcherResponseContent.Single(Json.obj("message" -> "Internal server error")))
+case class InvalidAddress(reason: String)                                  extends MatcherResponse(C.BadRequest, error.InvalidAddress(reason))

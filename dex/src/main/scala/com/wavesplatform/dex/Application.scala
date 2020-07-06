@@ -14,7 +14,6 @@ import com.wavesplatform.dex.logs.SystemInformationReporter
 import com.wavesplatform.dex.settings.MatcherSettings
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
-import kamon.system.SystemMetrics
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
 
@@ -41,7 +40,7 @@ class Application(settings: MatcherSettings)(implicit val actorSystem: ActorSyst
       log.info("Shutting down initiated")
 
       log.info("Shutting down reporters...")
-      val kamonShutdown = Kamon.stopAllReporters().andThen {
+      val kamonShutdown = Kamon.stopModules().andThen {
         case Success(_) => log.info("Reporters stopped")
         case Failure(e) => log.error("Failed to stop reporters", e)
       }
@@ -83,10 +82,7 @@ object Application {
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
 
-    if (config.getBoolean("kamon.enable")) {
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
-    }
+    if (config.getBoolean("kamon.enable")) Kamon.registerModule("InfluxDB", new InfluxDBReporter())
 
     (config, settings)
   }

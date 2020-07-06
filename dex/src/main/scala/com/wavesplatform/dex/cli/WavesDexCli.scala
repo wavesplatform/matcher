@@ -18,7 +18,6 @@ import com.wavesplatform.dex.tool.Checker
 import com.wavesplatform.dex.tool.connectors.SuperConnector
 import scopt.{OParser, RenderingMode}
 
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object WavesDexCli extends ScoptImplicits {
@@ -97,11 +96,15 @@ object WavesDexCli extends ScoptImplicits {
           .action((_, s) => s.copy(command = Command.CheckServer.some))
           .text(s"Checks DEX state")
           .children(
+            opt[String]("dex-rest-api")
+              .abbr("dra")
+              .text("DEX REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
+              .valueName("<raw-string>")
+              .action((x, s) => s.copy(dexRestApi = x)),
             opt[String]("node-rest-api")
               .abbr("nra")
               .text("Waves Node REST API uri. Format: scheme://host:port (default scheme will be picked if none was specified)")
               .valueName("<raw-string>")
-              .required()
               .action((x, s) => s.copy(nodeRestApi = x)),
             opt[String]("version")
               .abbr("ve")
@@ -124,12 +127,7 @@ object WavesDexCli extends ScoptImplicits {
               .abbr("as")
               .text("Seed for checking account updates")
               .valueName("<raw-string>")
-              .action((x, s) => s.copy(accountSeed = x.some)),
-            opt[FiniteDuration]("time-between-blocks")
-              .abbr("tbb")
-              .text("Time between blocks in the network, 1 minute will be picked if none was specified")
-              .valueName("<finite duration>")
-              .action((x, s) => s.copy(timeBetweenBlocks = x))
+              .action((x, s) => s.copy(accountSeed = x.some))
           )
       )
     }
@@ -226,15 +224,15 @@ object WavesDexCli extends ScoptImplicits {
                   _ <- cli.log(
                     s"""
                       |Passed arguments:
+                      |  DEX REST API          : ${args.dexRestApi}
                       |  Waves Node REST API   : ${args.nodeRestApi}
                       |  Expected DEX version  : ${args.version}
                       |  DEX config path       : ${args.dexConfigPath}
                       |  Auth Service REST API : ${args.authServiceRestApi.getOrElse("")}
                       |  Account seed          : ${args.accountSeed.getOrElse("")}
-                      |  Time between blocks   : ${args.timeBetweenBlocks}
                    """.stripMargin
                   )
-                  superConnector <- SuperConnector.create(args.dexConfigPath, args.nodeRestApi, args.authServiceRestApi, args.timeBetweenBlocks)
+                  superConnector <- SuperConnector.create(args.dexConfigPath, args.dexRestApi, args.nodeRestApi, args.authServiceRestApi)
                   checkResult    <- Checker(superConnector).checkState(args.version, args.accountSeed)
                   _              <- cli.lift { superConnector.close() }
                 } yield checkResult
@@ -297,12 +295,12 @@ object WavesDexCli extends ScoptImplicits {
                           command: Option[Command] = None,
                           outputDirectory: File = defaultFile,
                           apiKey: String = "",
+                          dexRestApi: String = "",
                           nodeRestApi: String = "",
                           version: String = "",
                           dexConfigPath: String = "",
                           authServiceRestApi: Option[String] = None,
-                          accountSeed: Option[String] = None,
-                          timeBetweenBlocks: FiniteDuration = 1.minute)
+                          accountSeed: Option[String] = None)
 
   // noinspection ScalaStyle
   @scala.annotation.tailrec

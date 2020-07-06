@@ -28,6 +28,7 @@ import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.bytes.codec.Base58
 import com.wavesplatform.dex.domain.crypto
+import com.wavesplatform.dex.domain.error.ValidationError
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.order.Order.Id
 import com.wavesplatform.dex.domain.order.OrderJson.orderFormat
@@ -85,7 +86,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private type LogicResponseHandler = PartialFunction[Any, ToResponseMarshallable]
 
   private val timer      = Kamon.timer("matcher.api-requests")
-  private val placeTimer = timer.refine("action" -> "place")
+  private val placeTimer = timer.withTag("action", "place")
 
   private def invalidJsonResponse(fields: List[String] = Nil): StandardRoute = complete { InvalidJsonResponse(error.InvalidJson(fields)) }
   private val invalidUserPublicKey: StandardRoute                            = complete { SimpleErrorResponse(StatusCodes.Forbidden, error.UserPublicKeyIsNotValid) }
@@ -154,6 +155,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       case Left(e)  => complete { InfoNotFound(e) }
     }
   }
+
+  private def withCorrectAddress(addressOrError: Either[ValidationError.InvalidAddress, Address])(f: Address => Route): Route =
+    addressOrError.fold(ia => complete { InvalidAddress(ia.reason) }, f)
 
   private def withCancelRequest(f: HttpCancelOrder => Route): Route =
     post {
@@ -564,13 +568,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       ),
     )
   )
-  def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (address, userPublicKey) =>
-    userPublicKey match {
-      case Some(upk) if upk.toAddress != address => invalidUserPublicKey
-      case _ =>
-        entity(as[Set[ByteStr]]) { xs =>
-          complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs))(handleBatchCancelResponse) }
-        }
+  def cancelAllById: Route = (path("orders" / AddressPM / "cancel") & post & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
+    withCorrectAddress(addressOrError) { address =>
+      userPublicKey match {
+        case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+        case _ =>
+          entity(as[Set[ByteStr]]) { xs =>
+            complete { askAddressActor(address, AddressActor.Command.CancelOrders(xs))(handleBatchCancelResponse) }
+          }
+      }
     }
   }
 
@@ -772,13 +778,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     )
   )
-  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth & withUserPublicKeyOpt) { (address, userPublicKey) =>
-    userPublicKey match {
-      case Some(upk) if upk.toAddress != address => invalidUserPublicKey
-      case _ =>
-        parameters(('activeOnly.as[Boolean].?, 'closedOnly.as[Boolean].?)) { (activeOnly, closedOnly) =>
-          loadOrders(address, None, getOrderListType(activeOnly, closedOnly, OrderListType.ActiveOnly))
-        }
+  def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth & withUserPublicKeyOpt) { (addressOrError, userPublicKey) =>
+    withCorrectAddress(addressOrError) { address =>
+      userPublicKey match {
+        case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+        case _ =>
+          parameters(('activeOnly.as[Boolean].?, 'closedOnly.as[Boolean].?)) { (activeOnly, closedOnly) =>
+            loadOrders(address, None, getOrderListType(activeOnly, closedOnly, OrderListType.ActiveOnly))
+          }
+      }
     }
   }
 
@@ -815,10 +823,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     )
   )
   def getOrderStatusInfoByIdWithApiKey: Route = (path("orders" / AddressPM / ByteStrPM) & get & withAuth & withUserPublicKeyOpt) {
-    (address, orderId, userPublicKey) =>
-      userPublicKey match {
-        case Some(upk) if upk.toAddress != address => invalidUserPublicKey
-        case _                                     => getOrderStatusInfo(orderId, address)
+    (addressOrError, orderId, userPublicKey) =>
+      withCorrectAddress(addressOrError) { address =>
+        userPublicKey match {
+          case Some(upk) if upk.toAddress != address => invalidUserPublicKey
+          case _                                     => getOrderStatusInfo(orderId, address)
+        }
       }
   }
 
@@ -864,10 +874,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
-    withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
-      complete {
-        askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { _.balance.toJson }
+  def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, addressOrError) =>
+    withCorrectAddress(addressOrError) { address =>
+      withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
+        complete { askMapAddressActor[AddressActor.Reply.Balance](address, AddressActor.Query.GetTradableBalance(pair.assets)) { _.balance.toJson } }
       }
     }
   }
@@ -956,7 +966,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             case None => NotImplemented(error.FeatureDisabled)
             case _    => SimpleResponse(StatusCodes.Accepted, "Deleting order book")
           }
-        )
+        .recover {
+              case e: Throwable =>
+                log.error("Can not persist event", e)
+                CanNotPersist(error.CanNotPersistEvent)
+            })
       case _ => complete(OrderBookUnavailable(error.OrderBookBroken(pair)))
     }
   }

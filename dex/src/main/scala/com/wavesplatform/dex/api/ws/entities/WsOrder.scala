@@ -29,13 +29,17 @@ case class WsOrder(id: Order.Id,
 
 object WsOrder {
 
+  def fromDomain(ao: AcceptedOrder)(implicit efc: ErrorFormatterContext): WsOrder = fromDomain(ao, ao.status)
+
   def fromDomain(ao: AcceptedOrder, status: OrderStatus)(implicit efc: ErrorFormatterContext): WsOrder = {
 
     val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
+    val feeAssetDecimals    = efc.assetDecimals(ao.order.feeAsset)
     val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
 
-    def denormalizeAmountAndFee(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
-    def denormalizePrice(value: Long): Double        = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
+    def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
+    def denormalizeFee(value: Long): Double    = Denormalization.denormalizeAmountAndFee(value, feeAssetDecimals).toDouble
+    def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble
 
     WsOrder(
       ao.id,
@@ -45,12 +49,12 @@ object WsOrder {
       ao.order.orderType.some,
       ao.isMarket.some,
       ao.price.some.map(denormalizePrice),
-      ao.order.amount.some.map(denormalizeAmountAndFee),
-      ao.order.matcherFee.some.map(denormalizeAmountAndFee),
+      ao.order.amount.some.map(denormalizeAmount),
+      ao.order.matcherFee.some.map(denormalizeFee),
       ao.feeAsset.some,
       status.name.some,
-      ao.fillingInfo.filledAmount.some.map(denormalizeAmountAndFee),
-      ao.fillingInfo.filledFee.some.map(denormalizeAmountAndFee),
+      ao.fillingInfo.filledAmount.some.map(denormalizeAmount),
+      ao.fillingInfo.filledFee.some.map(denormalizeFee),
       ao.fillingInfo.avgWeighedPrice.some.map(denormalizePrice)
     )
   }

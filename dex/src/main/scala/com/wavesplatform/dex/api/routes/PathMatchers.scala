@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.{PathMatcher, PathMatcher1, PathMatchers => Akk
 import com.wavesplatform.dex.domain.account.{Address, PublicKey}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.domain.bytes.ByteStr
+import com.wavesplatform.dex.domain.error.ValidationError
 
 object PathMatchers {
 
@@ -29,5 +30,5 @@ object PathMatchers {
 
   object PublicKeyPM extends Base58[PublicKey](PublicKey.fromBase58String(_).toOption)
 
-  object AddressPM extends Base58[Address](Address.fromString(_).toOption)
+  object AddressPM extends Base58[Either[ValidationError.InvalidAddress, Address]](s => Option(Address fromString s))
 }

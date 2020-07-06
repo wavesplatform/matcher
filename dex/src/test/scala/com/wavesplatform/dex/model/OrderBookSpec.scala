@@ -14,9 +14,9 @@ import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.gen.OrderBookGen
 import com.wavesplatform.dex.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.dex.model.OrderBook.OrderBookUpdates
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalacheck.Gen
-import org.scalatest.Assertion
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -61,8 +61,8 @@ class OrderBookSpec
     // TODO Move to OrderExecuted property test
     "OrderExecuted: submitted.spent == counter.receive && counter.spent == submitted.receive" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
-        val ob             = mkOrderBook(askOrders, bidOrders)
-        val (_, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val ob                                = mkOrderBook(askOrders, bidOrders)
+        val OrderBookUpdates(_, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
         val clue =
           s"""Events:
 ${formatEvents(events)}
@@ -98,7 +98,7 @@ ${formatEvents(events)}
         val balancesBefore = balancesBy(ob) |+| balancesBy(newOrder)
         val coinsBefore    = Monoid.combineAll(balancesBefore.values)
 
-        val (updatedOb, events, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
 
         val balancesAfter = events.foldLeft(balancesBefore) {
           case (r, evt: Events.OrderExecuted) =>
@@ -158,13 +158,43 @@ ${diff.mkString("\n")}
         }
     }
 
+    "order book invariant" in forAll(coinsInvariantPropGen) {
+      case (askOrders, bidOrders, newOrder) =>
+        val ob                                        = mkOrderBook(askOrders, bidOrders)
+        val OrderBookUpdates(updatedOb, events, _, _) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+
+        val clue =
+          s"""
+Pair:
+$assetPair
+
+Order:
+${format(newOrder)}
+
+OrderBook before:
+${format(ob)}
+
+OrderBook after:
+${format(updatedOb)}
+
+Events:
+${formatEvents(events)}
+"""
+
+        withClue(clue) {
+          obAskBidIntersectionInvariant(ob)
+          obAskBidIntersectionInvariant(updatedOb)
+        }
+    }
+
     "result.levelChanges contains diff for updatedOrderBook.level" in forAll(coinsInvariantPropGen) {
       case (askOrders, bidOrders, newOrder) =>
         val ob       = mkOrderBook(askOrders, bidOrders)
         val snapshot = ob.aggregatedSnapshot
 
-        val (updatedOb, events, levelChanges) = ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
-        val updatedSnapshot                   = updatedOb.aggregatedSnapshot
+        val OrderBookUpdates(updatedOb, events, levelChanges, _) =
+          ob.add(newOrder, ts, getMakerTakerFee = (o1, o2) => (o1.matcherFee, o2.matcherFee))
+        val updatedSnapshot = updatedOb.aggregatedSnapshot
 
         val actualLevelChanges   = filterNonEmpty(levelChanges)
         val expectedLevelChanges = filterNonEmpty(toLevelAmounts(updatedSnapshot) |-| toLevelAmounts(snapshot))
@@ -229,6 +259,10 @@ $updatedSnapshot
       orderRemoved shouldBe true
     }
 
+    "order book invariant" in test(removedGen) { (_, _, obAfter, _, _) =>
+      obAskBidIntersectionInvariant(obAfter)
+    }
+
     "no other order was removed" in test(removedGen) { (ob, orderIdToCancel, obAfter, _, _) =>
       val orderIdsBefore = orderIds(ob)
       val orderIdsAfter  = orderIds(obAfter)
@@ -250,7 +284,7 @@ $updatedSnapshot
       expectedLevelChanges should matchTo(actualLevelChanges)
     }
 
-    def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Assertion): Unit = forAll(gen) {
+    def test(gen: Gen[(OrderBook, Order.Id)])(f: (OrderBook, Order.Id, OrderBook, Seq[Event], LevelAmounts) => Any): Unit = forAll(gen) {
       case (origOb, orderIdToCancel) =>
         val (updatedOb, events, levelChanges) = origOb.cancel(orderIdToCancel, ts)
         withClue(mkClue(orderIdToCancel, origOb, updatedOb, events, levelChanges)) {
@@ -284,8 +318,8 @@ $levelChanges
         val obBefore       = format(ob)
         val orderIdsBefore = orderIds(ob)
 
-        val (obAfter, events, _) = ob.cancelAll(ts)
-        val canceledOrders       = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
+        val OrderBookUpdates(obAfter, events, _, _) = ob.cancelAll(ts)
+        val canceledOrders                          = events.collect { case evt: OrderCanceled => evt.acceptedOrder.order.id() }.toSet
         val clue =
           s"""
 OrderBook before:
@@ -315,11 +349,17 @@ ${canceledOrders.mkString("\n")}
       case (askOrders, bidOrders) =>
         val ob = mkOrderBook(askOrders, bidOrders)
 
-        val (_, _, levelChanges) = ob.cancelAll(ts)
-        val expectedLevelChanges = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
+        val OrderBookUpdates(_, _, levelChanges, _) = ob.cancelAll(ts)
+        val expectedLevelChanges                    = Group.inverse(toLevelAmounts(ob.aggregatedSnapshot))
 
         expectedLevelChanges should matchTo(levelChanges)
     }
+  }
+
+  private def obAskBidIntersectionInvariant(ob: OrderBook): Unit = {
+    val firstAskPrice = ob.asks.headOption.map(_._1).getOrElse(Long.MaxValue)
+    val firstBidPrice = ob.bids.headOption.map(_._1).getOrElse(Long.MinValue)
+    firstAskPrice should be > firstBidPrice
   }
 
   private def orderIds(ob: OrderBook): Set[Order.Id]         = ob.allOrders.map(_.order.id()).toSet

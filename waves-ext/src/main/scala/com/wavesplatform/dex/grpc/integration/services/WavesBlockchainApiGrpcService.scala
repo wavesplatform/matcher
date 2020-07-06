@@ -93,7 +93,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
         vanillaBatch.map { case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
       }
       .filter(_.nonEmpty)
-      .map(BalanceChangesResponse.apply)
+      .map(xs => BalanceChangesResponse(xs))
       .doOnSubscriptionCancel(cleanupTask)
       .doOnComplete(cleanupTask)
       .foreach { x =>
@@ -126,7 +126,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       .flatMap { _.toVanilla }
       .flatMap { tx =>
         if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
-        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse.apply).leftFlatMap(_ => BroadcastResponse().asRight)
+        else context.broadcastTransaction(tx).resultE.map(xs => BroadcastResponse(xs)).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }

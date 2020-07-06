@@ -8,7 +8,7 @@ pipeline {
         PATH = "${env.SBT_HOME}/bin:${env.PATH}"
     }
     stages {
-        stage('Compile') {
+        stage('Clean & Compile') {
             steps {   
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'

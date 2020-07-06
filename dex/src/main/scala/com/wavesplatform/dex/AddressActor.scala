@@ -295,7 +295,7 @@ class AddressActor(owner: Address,
             orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
           )
           if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending
-          addressWsMutableState = addressWsMutableState.flushPendingSubscriptions() // ?
+          addressWsMutableState = addressWsMutableState.flushPendingSubscriptions()
         case Left(matcherError) =>
           addressWsMutableState.pendingSubscription.foreach { _.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()) }
           addressWsMutableState = addressWsMutableState.copy(pendingSubscription = Set.empty)
@@ -310,15 +310,14 @@ class AddressActor(owner: Address,
       }
 
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
-      if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState
-          .sendDiffs(
-            balances = mkWsBalances(spendableBalances),
-            orders = addressWsMutableState.getAllOrderChanges
-          )
-          .cleanBalanceChanges() // Case: 1. RemoveWsSubscription, now there are 0 subscriptions; 2. 2. GetState; 3. GetSnapshot.
+      addressWsMutableState = if (addressWsMutableState.hasActiveSubscriptions) {
         scheduleNextDiffSending
-      }
+        addressWsMutableState.sendDiffs(
+          balances = mkWsBalances(spendableBalances),
+          orders = addressWsMutableState.getAllOrderChanges
+        )
+      } else if (addressWsMutableState.pendingSubscription.isEmpty) addressWsMutableState.cleanBalanceChanges()
+      else addressWsMutableState
 
       addressWsMutableState = addressWsMutableState.cleanOrderChanges()
 

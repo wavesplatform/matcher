@@ -13,13 +13,15 @@ import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
-import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
+import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.util.FutureOps.Implicits
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.DurationInt
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
@@ -450,59 +452,181 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
     }
 
-    "DEX-818 Invalid asset balance after connection" in {
-      dex1.restart()
-      val bobBtcBalanceBefore = wavesNode1.api.balance(bob, btc)
-      broadcastAndAwait(IssueWctTx) // TODO
+    "DEX-818" - {
+      "Connections can affect each other" in {
+        val wscs    = (1 to 10).map(_ => mkWsAddressConnection(bob))
+        val mainWsc = mkWsAddressConnection(bob)
 
-      val now = System.currentTimeMillis()
-
-      val wsc = mkDexWsConnection(dex1)
-      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
-
-      val num = 100
-      val mkTransfers = (1 to num)
-        .map(i => mkTransfer(bob, alice, 1.btc, btc, feeAmount = minFee, timestamp = now + i))
-        .zip(
-          (1 to num).map(i => mkTransfer(bob, alice, 1.wct, wct, feeAmount = minFee, timestamp = now + i))
-        )
-        .flatMap {
-          case (a, b) => List(a, b)
+        markup("Multiple orders")
+        val now = System.currentTimeMillis()
+        val orders = (1 to 50).map { i =>
+          mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
         }
 
-      wavesNode1.api.waitForHeightArise()
-      val interval    = wsMessagesInterval / 15
-      val simulation = Future
-        .inSeries(mkTransfers.zipWithIndex) {
-          case (tx, i) =>
-//            wavesNode1.asyncApi.currentHeight.flatMap { currentHeight =>
-//              if (currentHeight == savedHeight)
-            for {
-              _ <- wavesNode1.asyncApi.broadcast(tx)
-              _ <- GlobalTimer.instance.sleep(interval)
-//              state <- Future(wsc.receiveAtLeastN[WsAddressState](1))
-            } yield 0
-//              state.flatMap(_.balances).collect {
-//                case (asset, x) if asset == btc => i -> x
-//              }
-//            else Future.successful(List.empty)
-//            }
-        }
+        Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+        dex1.api.cancelAll(bob)
 
-      Await.result(simulation, 1.minute)
-      val changes = wsc.receiveAtLeastN[WsAddressState](1).zipWithIndex.map {
-        case (x, i) => s"$i: btc: ${x.balances.get(btc)}, wct: ${x.balances.get(wct)}"
+        Await.result(Future.traverse(wscs)(wsc => Future(wsc.close())), 1.minute)
+        Thread.sleep(3000)
+        mainWsc.clearMessages()
+
+        markup("A new order")
+        placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
+
+        eventually {
+          mainWsc.receiveAtLeastN[WsAddressState](1)
+        }
+        mainWsc.clearMessages()
       }
-      println(s"Changes:\n${changes.mkString("\n")}")
 
-//      val expectedBalance = Map[Asset, WsBalances](
-//        btc -> WsBalances(Denormalization.denormalizeAmountAndFee(bobBtcBalanceBefore - sent.btc, IssueBtcTx.getDecimals).toDouble, 0)
-//      )
-//
-//      eventually {
-//        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - Waves - wct
-//        balance should matchTo(expectedBalance)
-//      }
+      "Negative balances" in {
+        val carol = mkAccountWithBalance(5.waves -> Waves)
+        val wsc   = mkWsAddressConnection(carol)
+
+//        val order = mkOrderDP(carol, wavesUsdPair, SELL, 5.waves - matcherFee, 3, matcherFee)
+//        val simulation = dex1.asyncApi.tryPlace(order) zip {
+//          GlobalTimer.instance.sleep(150.millis).flatMap(_ => wavesNode1.asyncApi.broadcast(mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee)))
+//        }
+        val now = System.currentTimeMillis()
+        val txs = (1 to 2).map { i =>
+          mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
+        }
+        val simulation = Future.traverse(txs)(wavesNode1.asyncApi.broadcast(_))
+        Await.result(simulation, 1.minute)
+        wavesNode1.api.waitForHeightArise()
+
+        wsc.balanceChanges.zipWithIndex.foreach {
+          case (changes, i) =>
+            changes.foreach {
+              case (asset, balance) =>
+                withClue(s"$i: $asset -> $balance: ") {
+                  balance.tradable should be >= 0.0
+                  balance.reserved should be >= 0.0
+                }
+            }
+        }
+      }
+
+      "Invalid asset balance after connection" in {
+        val carol = mkAccountWithBalance(15.waves -> Waves) // TODO amounts here and in orders too
+
+        val wsc1 = mkWsAddressConnection(carol)
+        wsc1.close()
+
+        broadcastAndAwait(
+          mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee),
+          mkTransfer(alice, carol, 3.usd, usd)
+        )
+
+        val wsc2 = mkWsAddressConnection(carol)
+
+        val now = System.currentTimeMillis()
+        (1 to 5).foreach { i =>
+          info(s"Placing order #$i")
+          val order = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3.0, ts = now + i)
+          placeAndAwaitAtDex(order)
+          cancelAndAwait(carol, order)
+        }
+
+        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3))
+        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3, matcherFee)) // Spend all usd
+
+        broadcastAndAwait(
+          mkTransfer(carol, alice, 2.waves - minFee, Waves, minFee),
+          mkTransfer(alice, carol, 9.usd, usd)
+        )
+
+        val order6 = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3)
+        placeAndAwaitAtDex(order6)
+        cancelAndAwait(carol, order6)
+
+        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 4))
+        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 4, matcherFee)) // Spend all usd
+
+        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 5))
+
+        val o = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 5, matcherFee)
+        val r = dex1.asyncApi.tryPlace(o) zip {
+          GlobalTimer.instance.sleep(150.millis).flatMap(_ => wavesNode1.asyncApi.broadcast(mkTransfer(carol, alice, 5.usd, usd)))
+        }
+        println(Await.result(r, 10.seconds))
+        // placeAndAwaitAtNode(o) // Spend all usd
+        wavesNode1.api.waitForHeightArise()
+
+        wsc2.balanceChanges.zipWithIndex.foreach {
+          case (changes, i) =>
+            changes.foreach {
+              case (asset, balance) =>
+                withClue(s"$i: $asset -> $balance: ") {
+                  balance.tradable should be >= 0.0
+                  balance.reserved should be >= 0.0
+                }
+            }
+        }
+
+        wsc2.close()
+
+        val balance = dex1.api.tradableBalance(carol, wavesUsdPair)
+        balance should matchTo(
+          Map[Asset, Long](
+            Waves -> ((15 - 5 + 1 - 2 + 1 + 1).waves - 3 * matcherFee)
+          ))
+      }
     }
+
+//    "DEX-818 Invalid asset balance after connection" in {
+//      dex1.restart()
+//      val bobBtcBalanceBefore = wavesNode1.api.balance(bob, btc)
+//      broadcastAndAwait(IssueWctTx) // TODO
+//
+//      val now = System.currentTimeMillis()
+//
+//      val wsc = mkDexWsConnection(dex1)
+//      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+//
+//      val num = 100
+//      val mkTransfers = (1 to num)
+//        .map(i => mkTransfer(bob, alice, 1.btc, btc, feeAmount = minFee, timestamp = now + i))
+//        .zip(
+//          (1 to num).map(i => mkTransfer(bob, alice, 1.wct, wct, feeAmount = minFee, timestamp = now + i))
+//        )
+//        .flatMap {
+//          case (a, b) => List(a, b)
+//        }
+//
+//      wavesNode1.api.waitForHeightArise()
+//      val interval    = wsMessagesInterval / 15
+//      val simulation = Future
+//        .inSeries(mkTransfers.zipWithIndex) {
+//          case (tx, i) =>
+////            wavesNode1.asyncApi.currentHeight.flatMap { currentHeight =>
+////              if (currentHeight == savedHeight)
+//            for {
+//              _ <- wavesNode1.asyncApi.broadcast(tx)
+//              _ <- GlobalTimer.instance.sleep(interval)
+////              state <- Future(wsc.receiveAtLeastN[WsAddressState](1))
+//            } yield 0
+////              state.flatMap(_.balances).collect {
+////                case (asset, x) if asset == btc => i -> x
+////              }
+////            else Future.successful(List.empty)
+////            }
+//        }
+//
+//      Await.result(simulation, 1.minute)
+//      val changes = wsc.receiveAtLeastN[WsAddressState](1).zipWithIndex.map {
+//        case (x, i) => s"$i: btc: ${x.balances.get(btc)}, wct: ${x.balances.get(wct)}"
+//      }
+//      println(s"Changes:\n${changes.mkString("\n")}")
+//
+////      val expectedBalance = Map[Asset, WsBalances](
+////        btc -> WsBalances(Denormalization.denormalizeAmountAndFee(bobBtcBalanceBefore - sent.btc, IssueBtcTx.getDecimals).toDouble, 0)
+////      )
+////
+////      eventually {
+////        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - Waves - wct
+////        balance should matchTo(expectedBalance)
+////      }
+//    }
   }
 }

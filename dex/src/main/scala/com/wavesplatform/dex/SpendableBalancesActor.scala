@@ -78,7 +78,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
 
     case SpendableBalancesActor.Command.SetState(address, state) =>
       val addressState = fullState.get(address) match {
-        case Some(r) => r
+        case Some(r) => r // Could be with multiple simultaneous connections
         case None =>
           val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty) // HERE?
           fullState += address -> addressState

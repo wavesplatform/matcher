@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.api.ws
 
-import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
@@ -10,18 +9,14 @@ import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
-import com.wavesplatform.dex.it.time.GlobalTimer
-import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
+import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
 import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
-import com.wavesplatform.dex.util.FutureOps.Implicits
-import com.wavesplatform.dex.it.api.responses.dex.OrderStatus
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.DurationInt
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
@@ -483,10 +478,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         val carol = mkAccountWithBalance(5.waves -> Waves)
         val wsc   = mkWsAddressConnection(carol)
 
-//        val order = mkOrderDP(carol, wavesUsdPair, SELL, 5.waves - matcherFee, 3, matcherFee)
-//        val simulation = dex1.asyncApi.tryPlace(order) zip {
-//          GlobalTimer.instance.sleep(150.millis).flatMap(_ => wavesNode1.asyncApi.broadcast(mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee)))
-//        }
         val now = System.currentTimeMillis()
         val txs = (1 to 2).map { i =>
           mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
@@ -507,72 +498,72 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         }
       }
 
-      "Invalid asset balance after connection" in {
-        val carol = mkAccountWithBalance(15.waves -> Waves) // TODO amounts here and in orders too
-
-        val wsc1 = mkWsAddressConnection(carol)
-        wsc1.close()
-
-        broadcastAndAwait(
-          mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee),
-          mkTransfer(alice, carol, 3.usd, usd)
-        )
-
-        val wsc2 = mkWsAddressConnection(carol)
-
-        val now = System.currentTimeMillis()
-        (1 to 5).foreach { i =>
-          info(s"Placing order #$i")
-          val order = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3.0, ts = now + i)
-          placeAndAwaitAtDex(order)
-          cancelAndAwait(carol, order)
-        }
-
-        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3))
-        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3, matcherFee)) // Spend all usd
-
-        broadcastAndAwait(
-          mkTransfer(carol, alice, 2.waves - minFee, Waves, minFee),
-          mkTransfer(alice, carol, 9.usd, usd)
-        )
-
-        val order6 = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3)
-        placeAndAwaitAtDex(order6)
-        cancelAndAwait(carol, order6)
-
-        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 4))
-        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 4, matcherFee)) // Spend all usd
-
-        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 5))
-
-        val o = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 5, matcherFee)
-        val r = dex1.asyncApi.tryPlace(o) zip {
-          GlobalTimer.instance.sleep(150.millis).flatMap(_ => wavesNode1.asyncApi.broadcast(mkTransfer(carol, alice, 5.usd, usd)))
-        }
-        println(Await.result(r, 10.seconds))
-        // placeAndAwaitAtNode(o) // Spend all usd
-        wavesNode1.api.waitForHeightArise()
-
-        wsc2.balanceChanges.zipWithIndex.foreach {
-          case (changes, i) =>
-            changes.foreach {
-              case (asset, balance) =>
-                withClue(s"$i: $asset -> $balance: ") {
-                  balance.tradable should be >= 0.0
-                  balance.reserved should be >= 0.0
-                }
-            }
-        }
-
-        wsc2.close()
-
-        val balance = dex1.api.tradableBalance(carol, wavesUsdPair)
-        balance should matchTo(
-          Map[Asset, Long](
-            Waves -> ((15 - 5 + 1 - 2 + 1 + 1).waves - 3 * matcherFee)
-          ))
-      }
-    }
+//      "Invalid asset balance after connection" in {
+//        val carol = mkAccountWithBalance(15.waves -> Waves) // TODO amounts here and in orders too
+//
+//        val wsc1 = mkWsAddressConnection(carol)
+//        wsc1.close()
+//
+//        broadcastAndAwait(
+//          mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee),
+//          mkTransfer(alice, carol, 3.usd, usd)
+//        )
+//
+//        val wsc2 = mkWsAddressConnection(carol)
+//
+//        val now = System.currentTimeMillis()
+//        (1 to 5).foreach { i =>
+//          info(s"Placing order #$i")
+//          val order = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3.0, ts = now + i)
+//          placeAndAwaitAtDex(order)
+//          cancelAndAwait(carol, order)
+//        }
+//
+//        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3))
+//        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3, matcherFee)) // Spend all usd
+//
+//        broadcastAndAwait(
+//          mkTransfer(carol, alice, 2.waves - minFee, Waves, minFee),
+//          mkTransfer(alice, carol, 9.usd, usd)
+//        )
+//
+//        val order6 = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 3)
+//        placeAndAwaitAtDex(order6)
+//        cancelAndAwait(carol, order6)
+//
+//        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 4))
+//        placeAndAwaitAtNode(mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 4, matcherFee)) // Spend all usd
+//
+//        placeAndAwaitAtDex(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 5))
+//
+//        val o = mkOrderDP(carol, wavesUsdPair, BUY, 1.waves, 5, matcherFee)
+//        val r = dex1.asyncApi.tryPlace(o) zip {
+//          GlobalTimer.instance.sleep(150.millis).flatMap(_ => wavesNode1.asyncApi.broadcast(mkTransfer(carol, alice, 5.usd, usd)))
+//        }
+//        println(Await.result(r, 10.seconds))
+//        // placeAndAwaitAtNode(o) // Spend all usd
+//        wavesNode1.api.waitForHeightArise()
+//
+//        wsc2.balanceChanges.zipWithIndex.foreach {
+//          case (changes, i) =>
+//            changes.foreach {
+//              case (asset, balance) =>
+//                withClue(s"$i: $asset -> $balance: ") {
+//                  balance.tradable should be >= 0.0
+//                  balance.reserved should be >= 0.0
+//                }
+//            }
+//        }
+//
+//        wsc2.close()
+//
+//        val balance = dex1.api.tradableBalance(carol, wavesUsdPair)
+//        balance should matchTo(
+//          Map[Asset, Long](
+//            Waves -> ((15 - 5 + 1 - 2 + 1 + 1).waves - 3 * matcherFee)
+//          ))
+//      }
+//    }
 
 //    "DEX-818 Invalid asset balance after connection" in {
 //      dex1.restart()
@@ -627,6 +618,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
 ////        val balance = wsc.receiveAtLeastN[WsAddressState](1).map(_.balances).squashed - Waves - wct
 ////        balance should matchTo(expectedBalance)
 ////      }
-//    }
+    }
   }
 }

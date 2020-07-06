@@ -139,7 +139,7 @@ class AddressActor(owner: Address,
 
     case msg: Message.BalanceChanged =>
       if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.allChanges.keySet)
+        addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.changedAssets)
       }
 
       val toCancel = getOrdersToCancel(msg.changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
@@ -156,7 +156,7 @@ class AddressActor(owner: Address,
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status)
 
@@ -386,7 +386,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -564,7 +564,7 @@ object AddressActor {
   sealed trait Message
   object Message {
     // values of map allChanges can be used in future for tracking balances in AddressActor
-    case class BalanceChanged(allChanges: Map[Asset, Long], changesForAudit: Map[Asset, Long]) extends Message
+    case class BalanceChanged(changedAssets: Set[Asset], changesForAudit: Map[Asset, Long]) extends Message
   }
 
   sealed trait Query extends Message

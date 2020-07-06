@@ -67,8 +67,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
           val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
           val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
 
-          val balance = spendableBalance(address, asset)
-          log.info(s"==> realTimeBalanceChanges $address: $asset -> $balance")
+          log.info(s"==> realTimeBalanceChanges $address: $asset -> $newAssetBalance")
 
           if (needUpdate) {
             allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))

@@ -456,7 +456,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
         dex1.api.cancelAll(bob)
 
-        Await.result(Future.traverse(wscs)(wsc => Future(wsc.close())), 1.minute)
+        wscs.par.foreach(_.close())
         Thread.sleep(3000)
         mainWsc.clearMessages()
 

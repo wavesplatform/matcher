@@ -576,7 +576,6 @@ object AddressActor {
 
   sealed trait Message
   object Message {
-    // values of map allChanges can be used in future for tracking balances in AddressActor
     case class BalanceChanged(changedAssets: Set[Asset], changesForAudit: Map[Asset, Long]) extends Message
   }
 

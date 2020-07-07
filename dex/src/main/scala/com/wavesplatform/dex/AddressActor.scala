@@ -308,6 +308,8 @@ class AddressActor(owner: Address,
       if (addressWsMutableState.hasActiveSubscriptions) {
         if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
+          // We asked balances for current changedAssets and clean it here,
+          // because there are could be new changes between sent Query.GetState and received Reply.GetState.
           addressWsMutableState = addressWsMutableState.cleanBalanceChanges()
         } else scheduleNextDiffSending()
       }
@@ -320,8 +322,9 @@ class AddressActor(owner: Address,
           balances = mkWsBalances(spendableBalances),
           orders = addressWsMutableState.getAllOrderChanges
         )
-      } else if (addressWsMutableState.pendingSubscription.isEmpty) addressWsMutableState.cleanBalanceChanges()
-      else addressWsMutableState
+      } else if (addressWsMutableState.pendingSubscription.isEmpty) {
+        addressWsMutableState.cleanBalanceChanges() // There are neither active, nor pending connections
+      } else addressWsMutableState
 
       addressWsMutableState = addressWsMutableState.cleanOrderChanges()
 

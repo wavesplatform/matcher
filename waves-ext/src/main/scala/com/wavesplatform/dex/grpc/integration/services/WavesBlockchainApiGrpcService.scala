@@ -209,11 +209,9 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
 
     val assetsBalances =
       request.assetIds.map { requestedAssetRecord =>
-        val asset   = requestedAssetRecord.assetId.toVanillaAsset
-        val balance = spendableBalance(address, asset)
         SpendableAssetsBalancesResponse.Record(
           requestedAssetRecord.assetId,
-          balance
+          spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
         )
       }
 

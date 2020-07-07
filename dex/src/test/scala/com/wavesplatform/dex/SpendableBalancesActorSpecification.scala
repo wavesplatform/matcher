@@ -140,31 +140,31 @@ class SpendableBalancesActorSpecification
 
       val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, testProbe.ref)))
 
-      def updateAndExpectBalanceChanges(update: (Asset, Long)*)(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]): Unit = {
+      def updateAndExpectBalanceChanges(update: (Asset, Long)*)(changedAssets: Set[Asset], decreasingChanges: Map[Asset, Long]): Unit = {
         sba ! SpendableBalancesActor.Command.UpdateStates { Map(alice -> update.toMap) }
         val envelope = testProbe.expectMsgType[AddressDirectory.Envelope]
         envelope.address should matchTo(alice)
         envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
-          AddressActor.Message.BalanceChanged(allChanges, decreasingChanges)
+          AddressActor.Message.BalanceChanged(changedAssets, decreasingChanges)
         }
       }
 
       // initial balance = Map(Waves -> 20.waves, usd -> 5.usd)
       withClue("Snapshot isn't received, increasing balance by Waves twice") {
-        updateAndExpectBalanceChanges(Waves -> 25.waves)(allChanges = Map(Waves -> 25.waves), decreasingChanges = Map(Waves -> 25.waves))
-        updateAndExpectBalanceChanges(Waves -> 26.waves)(allChanges = Map(Waves -> 26.waves), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(Waves -> 25.waves)(changedAssets = Set(Waves), decreasingChanges = Map(Waves -> 25.waves))
+        updateAndExpectBalanceChanges(Waves -> 26.waves)(changedAssets = Set(Waves), decreasingChanges = Map.empty)
       }
 
       withClue("Snapshot isn't received, decreasing balance by Waves") {
-        updateAndExpectBalanceChanges(Waves -> 23.waves)(allChanges = Map(Waves -> 23.waves), decreasingChanges = Map(Waves -> 23.waves))
+        updateAndExpectBalanceChanges(Waves -> 23.waves)(changedAssets = Set(Waves), decreasingChanges = Map(Waves -> 23.waves))
       }
 
       withClue("Snapshot isn't received, decreasing by USD") {
-        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+        updateAndExpectBalanceChanges(usd -> 3.usd)(changedAssets = Set(usd), decreasingChanges = Map(usd -> 3.usd))
       }
 
       withClue("Snapshot isn't received, increasing by USD") {
-        updateAndExpectBalanceChanges(usd -> 8.usd)(allChanges = Map(usd -> 8.usd), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(usd -> 8.usd)(changedAssets = Set(usd), decreasingChanges = Map.empty)
       }
 
       withClue("Receiving snapshot") {
@@ -175,11 +175,11 @@ class SpendableBalancesActorSpecification
       }
 
       withClue("Snapshot received, increasing balance by Waves") {
-        updateAndExpectBalanceChanges(Waves -> 30.waves)(allChanges = Map(Waves -> 30.waves), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(Waves -> 30.waves)(changedAssets = Set(Waves), decreasingChanges = Map.empty)
       }
 
       withClue("Snapshot received, decreasing balance by USD") {
-        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+        updateAndExpectBalanceChanges(usd -> 3.usd)(changedAssets = Set(usd), decreasingChanges = Map(usd -> 3.usd))
       }
     }
   }

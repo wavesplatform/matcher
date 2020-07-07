@@ -63,7 +63,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     context.spendableBalanceChanged
       .map {
         case (address, asset) =>
-          val newAssetBalance = context.utx.spendableBalance(address, asset)
+          val newAssetBalance = spendableBalance(address, asset)
           val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
           val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
 
@@ -88,7 +88,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     context.spendableBalanceChanged
       .bufferTimed(balanceChangesBatchLingerMs)
       .map { changesBuffer =>
-        val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, context.utx.spendableBalance(address, asset)) }
+        val vanillaBatch = changesBuffer.distinct.map { case (address, asset) => (address, asset, spendableBalance(address, asset)) }
         vanillaBatch.map { case (address, asset, balance) => BalanceChangesResponse.Record(address.toPB, asset.toPB, balance) }
       }
       .filter(_.nonEmpty)
@@ -200,7 +200,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   override def spendableAssetBalance(request: SpendableAssetBalanceRequest): Future[SpendableAssetBalanceResponse] = Future {
     val addr    = Address.fromBytes(request.address.toVanilla).explicitGetErr()
     val assetId = request.assetId.toVanillaAsset
-    SpendableAssetBalanceResponse(context.utx.spendableBalance(addr, assetId))
+    SpendableAssetBalanceResponse(spendableBalance(addr, assetId))
   }
 
   override def spendableAssetsBalances(request: SpendableAssetsBalancesRequest): Future[SpendableAssetsBalancesResponse] = Future {
@@ -211,7 +211,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       request.assetIds.map { requestedAssetRecord =>
         SpendableAssetsBalancesResponse.Record(
           requestedAssetRecord.assetId,
-          context.utx.spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
+          spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
         )
       }
 
@@ -264,7 +264,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       val portfolio = context.blockchain.portfolio(address)
       AllAssetsSpendableBalanceResponse(
         (Waves :: portfolio.assets.keys.toList)
-          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, context.utx.spendableBalance(address, a)))
+          .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
           .filterNot(_.balance == 0L)
       )
     }
@@ -273,4 +273,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
   override def getNodeAddress(request: Empty): Future[NodeAddressResponse] = Future {
     NodeAddressResponse(InetAddress.getLocalHost.getHostAddress)
   }
+
+  // The negative spendable balance could happen if there are multiple transactions in UTX those spend more than available
+  private def spendableBalance(address: Address, asset: Asset): Long = math.max(0L, context.utx.spendableBalance(address, asset))
 }

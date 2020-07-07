@@ -30,8 +30,9 @@ case class AddressWsMutableState(address: Address,
     copy(activeSubscription = activeSubscription ++ pendingSubscription.iterator.map(_ -> 0L), pendingSubscription = Set.empty)
 
   def removeSubscription(subscriber: ActorRef[WsAddressState]): AddressWsMutableState = {
-    if (activeSubscription.size == 1) copy(activeSubscription = Map.empty).cleanChanges()
-    else copy(activeSubscription = activeSubscription - subscriber)
+    val updated = copy(activeSubscription = activeSubscription - subscriber)
+    if (updated.activeSubscription.isEmpty) updated.cleanAllChanges()
+    else updated
   }
 
   def putReservedAssets(diff: Set[Asset]): AddressWsMutableState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
@@ -78,7 +79,10 @@ case class AddressWsMutableState(address: Address,
     }
   )
 
-  def cleanChanges(): AddressWsMutableState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanAllChanges(): AddressWsMutableState =
+    copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanOrderChanges(): AddressWsMutableState   = copy(ordersChanges = Map.empty)
+  def cleanBalanceChanges(): AddressWsMutableState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty)
 }
 
 object AddressWsMutableState {

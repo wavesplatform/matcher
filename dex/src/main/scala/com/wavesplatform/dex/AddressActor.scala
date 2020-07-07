@@ -64,7 +64,8 @@ class AddressActor(owner: Address,
   // Saves from cases when a client does multiple requests with the same order
   private val failedPlacements = MutableSet.empty[Order.Id]
 
-  private var addressWsMutableState = AddressWsMutableState.empty(owner)
+  private var addressWsMutableState       = AddressWsMutableState.empty(owner)
+  private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
@@ -139,7 +140,7 @@ class AddressActor(owner: Address,
 
     case msg: Message.BalanceChanged =>
       if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.allChanges.keySet)
+        addressWsMutableState = addressWsMutableState.putSpendableAssets(msg.changedAssets)
       }
 
       val toCancel = getOrdersToCancel(msg.changesForAudit).filterNot(ao => isCancelling(ao.order.id()))
@@ -156,7 +157,7 @@ class AddressActor(owner: Address,
       }
 
     case Query.GetReservedBalance            => sender ! Reply.Balance(openVolume.filter(_._2 > 0))
-    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(xs => Reply.Balance(xs.filter(_._2 > 0))).pipeTo(sender)
+    case Query.GetTradableBalance(forAssets) => getTradableBalance(forAssets).map(Reply.Balance).pipeTo(sender)
 
     case Query.GetOrderStatus(orderId) => sender ! activeOrders.get(orderId).fold[OrderStatus](orderDB.status(orderId))(_.status)
 
@@ -287,6 +288,7 @@ class AddressActor(owner: Address,
       addressWsMutableState = addressWsMutableState.removeSubscription(client)
       context.unwatch(client)
 
+    // Received a snapshot for pending connections
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       allAssetsSpendableBalance match {
         case Right(spendableBalance) =>
@@ -294,36 +296,44 @@ class AddressActor(owner: Address,
             balances = mkWsBalances(spendableBalance),
             orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
           )
-          if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending
+          if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending()
           addressWsMutableState = addressWsMutableState.flushPendingSubscriptions()
         case Left(matcherError) =>
           addressWsMutableState.pendingSubscription.foreach { _.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()) }
           addressWsMutableState = addressWsMutableState.copy(pendingSubscription = Set.empty)
       }
 
+    // It is time to send updates to clients. This block of code asks balances
     case WsCommand.PrepareDiffForWsSubscribers =>
       if (addressWsMutableState.hasActiveSubscriptions) {
         if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
-        } else scheduleNextDiffSending
+          // We asked balances for current changedAssets and clean it here,
+          // because there are could be new changes between sent Query.GetState and received Reply.GetState.
+          addressWsMutableState = addressWsMutableState.cleanBalanceChanges()
+        } else scheduleNextDiffSending()
       }
 
+    // It is time to send updates to clients. This block of code sends balances
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
-      if (addressWsMutableState.hasActiveSubscriptions) {
-        addressWsMutableState = addressWsMutableState.sendDiffs(
+      addressWsMutableState = if (addressWsMutableState.hasActiveSubscriptions) {
+        scheduleNextDiffSending()
+        addressWsMutableState.sendDiffs(
           balances = mkWsBalances(spendableBalances),
           orders = addressWsMutableState.getAllOrderChanges
         )
-        scheduleNextDiffSending
-      }
+      } else if (addressWsMutableState.pendingSubscription.isEmpty) {
+        addressWsMutableState.cleanBalanceChanges() // There are neither active, nor pending connections
+      } else addressWsMutableState
 
-      addressWsMutableState = addressWsMutableState.cleanChanges()
+      addressWsMutableState = addressWsMutableState.cleanOrderChanges()
 
     case classic.Terminated(wsSource) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
-  private def scheduleNextDiffSending: Cancellable = {
-    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
+  private def scheduleNextDiffSending(): Unit = {
+    wsSendSchedule.cancel()
+    wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
   }
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
@@ -384,7 +394,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -537,6 +547,11 @@ class AddressActor(owner: Address,
       ao <- activeOrders.values
       if ao.isLimit && maybePair.forall(_ == ao.order.assetPair)
     } yield ao
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    log.error(s"Failed on $message", reason)
+    super.preRestart(reason, message)
+  }
 }
 
 object AddressActor {
@@ -561,8 +576,7 @@ object AddressActor {
 
   sealed trait Message
   object Message {
-    // values of map allChanges can be used in future for tracking balances in AddressActor
-    case class BalanceChanged(allChanges: Map[Asset, Long], changesForAudit: Map[Asset, Long]) extends Message
+    case class BalanceChanged(changedAssets: Set[Asset], changesForAudit: Map[Asset, Long]) extends Message
   }
 
   sealed trait Query extends Message

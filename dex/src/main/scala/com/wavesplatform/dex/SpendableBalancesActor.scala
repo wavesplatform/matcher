@@ -8,7 +8,7 @@ import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{MatcherError, WavesNodeConnectionBroken}
-import com.wavesplatform.dex.fp.MapImplicits.cleaningGroup
+import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 
 import scala.concurrent.Future
@@ -34,33 +34,34 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
   def receive: Receive = {
 
     case SpendableBalancesActor.Query.GetState(address, assets) =>
-      val maybeAddressState            = fullState.get(address).orElse(incompleteStateChanges get address)
-      val assetsMaybeBalances          = assets.map(asset => asset -> maybeAddressState.flatMap(_ get asset)).toMap
+      val maybeAddressState   = fullState.get(address).orElse(incompleteStateChanges get address).getOrElse(Map.empty)
+      val assetsMaybeBalances = assets.map(asset => asset -> maybeAddressState.get(asset)).toMap
+
       val (knownAssets, unknownAssets) = assetsMaybeBalances.partition { case (_, balance) => balance.isDefined }
-
-      lazy val knownPreparedState = knownAssets.collect { case (a, Some(b)) => a -> b }
-
-      if (unknownAssets.isEmpty) sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
-      else {
+      if (unknownAssets.isEmpty) {
+        val knownPreparedState = knownAssets.collect { case (a, Some(b)) => a -> b }
+        sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
+      } else {
         val requestSender = sender
-        spendableBalances(address, unknownAssets.keySet)
-          .map(stateFromNode => SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, stateFromNode))
-          .andThen {
-            case Success(r) => self.tell(r, requestSender)
-            case Failure(ex) =>
-              log.error("Could not receive spendable balance from Waves Node", ex)
-              requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
-          }
+        spendableBalances(address, unknownAssets.keySet).onComplete {
+          case Success(r) => self.tell(SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, r), requestSender)
+          case Failure(ex) =>
+            log.error("Could not receive spendable balance from Waves Node", ex)
+            requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
+        }
       }
 
-    case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets, stateFromNode) =>
-      if (!fullState.contains(address)) {
-        incompleteStateChanges = incompleteStateChanges.updated(address, stateFromNode ++ incompleteStateChanges.getOrElse(address, Map.empty))
+    case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets, staleStateFromNode) =>
+      val assets = staleStateFromNode.keySet ++ knownAssets
+      val source = fullState.get(address) match {
+        case Some(state) => state
+        case None =>
+          val updated = staleStateFromNode ++ incompleteStateChanges.getOrElse(address, Map.empty)
+          incompleteStateChanges = incompleteStateChanges.updated(address, updated)
+          updated
       }
 
-      val assets = stateFromNode.keySet ++ knownAssets
-      val result = fullState.getOrElse(address, incompleteStateChanges(address)).filterKeys(assets)
-
+      val result = source.filter { case (asset, _) => assets.contains(asset) }
       sender ! SpendableBalancesActor.Reply.GetState(result)
 
     case SpendableBalancesActor.Query.GetSnapshot(address) =>
@@ -77,21 +78,27 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       }
 
     case SpendableBalancesActor.Command.SetState(address, state) =>
-      val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
-      fullState += address -> addressState
-      incompleteStateChanges -= address
+      val addressState = fullState.get(address) match {
+        case Some(r) => r // Could be with multiple simultaneous connections
+        case None =>
+          val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
+          fullState += address -> addressState
+          incompleteStateChanges -= address
+          addressState
+      }
       sender ! SpendableBalancesActor.Reply.GetSnapshot(addressState.asRight)
 
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
         case (address, stateUpdate) =>
-          val knownBalance      = fullState.get(address) orElse incompleteStateChanges.get(address) getOrElse Map.empty
+          val addressFullState  = fullState.get(address)
+          val knownBalance      = addressFullState orElse incompleteStateChanges.get(address) getOrElse Map.empty
           val (clean, forAudit) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getCleanAndForAuditChanges(stateUpdate, knownBalance)
 
-          if (fullState contains address) fullState = fullState.updated(address, knownBalance ++ clean)
+          if (addressFullState.isDefined) fullState = fullState.updated(address, knownBalance ++ clean)
           else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ clean)
 
-          addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(clean, forAudit))
+          addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(clean.keySet, forAudit))
       }
 
     // Subtract is called when there is a web socket connection and thus we have `fullState` for this address

@@ -1,5 +1,7 @@
 package com.wavesplatform.dex.load.ws
 
+import java.util.concurrent.ThreadLocalRandom
+
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem, Status}
 import akka.http.scaladsl.Http
@@ -18,8 +20,9 @@ import scala.util.{Failure, Success, Try}
 class WsConnection(uri: String, receive: WsServerMessage => Option[WsClientMessage])(implicit system: ActorSystem) extends ScorexLogging {
 
   import system.dispatcher
+  private val testId: Int = ThreadLocalRandom.current().nextInt(10000)
   private implicit val materializer = Materializer(system)
-  private val wsHandlerRef          = system.actorOf(TestWsHandlerActor.props(keepAlive = true))
+  private val wsHandlerRef          = system.actorOf(TestWsHandlerActor.props(testId, keepAlive = true))
 
   log.info(s"Connecting to Matcher WS API: $uri")
 

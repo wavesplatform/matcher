@@ -36,13 +36,10 @@ echo "WAVES_WALLET_SEED='${WAVES_WALLET_SEED}'" | tee -a /var/log/waves/waves.lo
 echo "WAVES_WALLET_PASSWORD='${WAVES_WALLET_PASSWORD}'" | tee -a /var/log/waves/waves.log
 echo "JAVA_OPTS='${JAVA_OPTS}'" | tee -a /var/log/waves/waves.log
 
-# Dirty hack
-echo 'waves.extensions += "com.wavesplatform.dex.grpc.integration.DEXExtension"' >> /etc/waves/waves.conf
-
 java -Dlogback.stdout.level=${WAVES_LOG_LEVEL} \
 	-XX:+ExitOnOutOfMemoryError \
 	-Xmx${WAVES_HEAP_SIZE} \
 	-Dlogback.file.directory=/var/log/waves \
 	-Dconfig.override_with_env_vars=true \
 	${JAVA_OPTS} \
-	-cp "/usr/share/waves/lib/waves-all-${WAVES_VERSION}.jar:/opt/waves/lib/*" com.wavesplatform.Application /etc/waves/waves.conf
+	-cp "/opt/waves/lib/*:/usr/share/waves/lib/waves-all-${WAVES_VERSION}.jar" com.wavesplatform.Application /etc/waves/waves.conf

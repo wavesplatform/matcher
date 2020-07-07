@@ -1,19 +1,22 @@
 import java.nio.charset.StandardCharsets
 
 import Dependencies.Version
-import DexDockerKeys._
 import VersionSourcePlugin.V
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
+import sbt.plugins.JvmPlugin
 
-enablePlugins(RewriteSwaggerConfigPlugin,
-              JavaServerAppPackaging,
-              UniversalDeployPlugin,
-              JDebPackaging,
-              SystemdPlugin,
-              DexDockerPlugin,
-              GitVersioning,
-              VersionSourcePlugin)
+enablePlugins(
+  RewriteSwaggerConfigPlugin,
+  JavaServerAppPackaging,
+  UniversalDeployPlugin,
+  JDebPackaging,
+  SystemdPlugin,
+  GitVersioning,
+  VersionSourcePlugin,
+  JvmPlugin,
+  sbtdocker.DockerPlugin
+)
 
 V.scalaPackage := "com.wavesplatform.dex"
 V.subProject := "dex"
@@ -54,16 +57,44 @@ inConfig(Compile)(
     ),
     mainClass := discoveredMainClasses.value.headOption,
     run / fork := true
-  ))
+  )
+)
 
 // Docker
 inTask(docker)(
   Seq(
-    additionalFiles ++= Seq(
-      (Universal / stage).value,
-      (Compile / sourceDirectory).value / "container" / "start.sh",
-      (Compile / sourceDirectory).value / "container" / "default.conf"
-    )
+    imageNames := {
+      val latestImageName = ImageName("com.wavesplatform/matcherserver:latest")
+      val maybeVersion    = git.gitDescribedVersion.value
+      if (!isSnapshot.value && maybeVersion.isDefined) Seq(latestImageName, ImageName(s"com.wavesplatform/matcherserver:${maybeVersion.get}"))
+      else Seq(latestImageName)
+    },
+    dockerfile :=
+      new Dockerfile {
+
+        val basePath     = "/opt/waves-dex/"
+        val entryPointSh = s"${basePath}start.sh"
+
+        from("anapsix/alpine-java:8_server-jre")
+        add(
+          sources = Seq(
+            (Universal / stage).value, // jars
+            (Compile / sourceDirectory).value / "container" / "start.sh" // entry point
+          ),
+          destination = basePath
+        )
+        add(
+          sources = Seq(
+            (Compile / sourceDirectory).value / "container" / "dex.conf", // base config
+            (Compile / packageSource).value / "doc" / "logback.xml"
+          ),
+          destination = s"${basePath}conf/"
+        )
+        runShell("chmod", "+x", entryPointSh)
+        entryPoint(entryPointSh)
+        expose(6886)
+      },
+    buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )
 )
 
@@ -76,24 +107,23 @@ inConfig(Universal)(
     packageName := s"waves-dex-${version.value}", // An archive file name
     // Common JVM parameters
     // -J prefix is required by a parser
-    javaOptions ++= Seq(
-      "-Xmx2g",
-      "-Xms128m",
-    ).map(x => s"-J$x"),
-    mappings ++= sbt.IO
-      .listFiles((Compile / packageSource).value / "doc")
-      .map { file =>
-        file -> s"doc/${file.getName}"
-      }
-      .toSeq
-  ))
+    javaOptions ++= Seq("-Xmx2g", "-Xms128m").map(x => s"-J$x"),
+    mappings ++=
+      sbt.IO
+        .listFiles((Compile / packageSource).value / "doc")
+        .map(file => file -> s"doc/${file.getName}")
+        .toSeq
+  )
+)
 
 // DEB package
-inConfig(Linux)(Seq(
-  name := "waves-dex", // A staging directory name
-  normalizedName := name.value, // An archive file name
-  packageName := name.value // In a control file
-))
+inConfig(Linux)(
+  Seq(
+    name := "waves-dex", // A staging directory name
+    normalizedName := name.value, // An archive file name
+    packageName := name.value // In a control file
+  )
+)
 
 inConfig(Debian)(
   Seq(

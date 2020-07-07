@@ -77,11 +77,16 @@ inTask(docker)(
     imageNames := {
       val latestImageName = ImageName("com.wavesplatform/matchernode:latest")
       val maybeVersion    = git.gitDescribedVersion.value
-      if (!isSnapshot.value && maybeVersion.isDefined) Seq(latestImageName, ImageName(s"com.wavesplatform/matchernode:${maybeVersion.get}"))
+      if (!isSnapshot.value && maybeVersion.isDefined)
+        Seq(latestImageName, ImageName(s"com.wavesplatform/matchernode:${wavesNodeVersion.value}_${maybeVersion.get}"))
       else Seq(latestImageName)
     },
     dockerfile :=
       new Dockerfile {
+
+        val basePath     = "/opt/waves/"
+        val entryPointSh = s"${basePath}entrypoint-with-ext.sh"
+
         from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
         user("waves:waves")
         add(
@@ -89,12 +94,12 @@ inTask(docker)(
             (Universal / stage).value, // jars
             (Compile / sourceDirectory).value / "container" / "entrypoint-with-ext.sh" // entry point
           ),
-          destination = "/opt/waves/",
+          destination = basePath,
           chown = "waves:waves"
         )
-        run("chmod", "+x", "/opt/waves/entrypoint-with-ext.sh")
-        entryPoint("/opt/waves/entrypoint-with-ext.sh")
-        expose(6887)
+        runShell("chmod", "+x", entryPointSh)
+        entryPoint(entryPointSh)
+        expose(6887, 6871) // DEX Extension, Stagenet REST API
       },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )

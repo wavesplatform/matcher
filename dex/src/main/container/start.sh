@@ -2,23 +2,30 @@
 
 trap 'kill -TERM $PID' TERM INT
 
-echo "Starting process..." >> ${DETAILED_LOG_PATH}
-echo "Config file: ${WAVES_DEX_CONFIGPATH}" >> ${DETAILED_LOG_PATH}
-echo "Options: ${WAVES_DEX_OPTS}" >> ${DETAILED_LOG_PATH}
+BASE_CONFIG_PATH="/opt/waves-dex/conf"
+RUNTIME_CONFIG_PATH="/opt/waves-dex/runtime"
 
-# Remove sun.zip.disableMemoryMapping after migration to JRE 9+
-# See https://bugs.openjdk.java.net/browse/JDK-8175192
-# Also see nice table about &>> https://askubuntu.com/a/731237
+echo "Base settings:"
+cat ${BASE_CONFIG_PATH}/dex.conf
+echo; echo
+
+if [ ! -f ${RUNTIME_CONFIG_PATH}/local.conf ] ; then
+	echo "Custom settings '${RUNTIME_CONFIG_PATH}/local.conf' not found"
+else
+	echo "Found custom settings '${RUNTIME_CONFIG_PATH}/local.conf':"
+	cat ${RUNTIME_CONFIG_PATH}/local.conf; echo
+fi
+
 /opt/waves-dex/bin/waves-dex \
   -Dsun.zip.disableMemoryMapping=true \
-  ${WAVES_DEX_OPTS} \
-  -main com.wavesplatform.dex.Application -- ${WAVES_DEX_CONFIGPATH} &>> ${DETAILED_LOG_PATH} &
+  -Dlogback.configurationFile=${BASE_CONFIG_PATH}/logback.xml \
+  -main com.wavesplatform.dex.Application ${BASE_CONFIG_PATH}/dex.conf
 
 PID=$!
-echo "PID: ${PID}" >> ${DETAILED_LOG_PATH}
+echo "PID: ${PID}"
 wait ${PID}
 
 trap - TERM INT
 wait ${PID}
 EXIT_STATUS=$?
-echo "Exit status: ${EXIT_STATUS}" >> ${DETAILED_LOG_PATH}
+echo "Exit status: ${EXIT_STATUS}"

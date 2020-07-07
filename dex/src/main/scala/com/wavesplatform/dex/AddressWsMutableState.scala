@@ -67,7 +67,7 @@ case class AddressWsMutableState(address: Address,
 
   def sendSnapshot(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): Unit = {
     val snapshot = WsAddressState(address, balances, orders, 0)
-    pendingSubscription.foreach(_ ! snapshot) // OR HERE
+    pendingSubscription.foreach(_ ! snapshot)
   }
 
   def sendDiffs(balances: Map[Asset, WsBalances], orders: Seq[WsOrder]): AddressWsMutableState = copy(

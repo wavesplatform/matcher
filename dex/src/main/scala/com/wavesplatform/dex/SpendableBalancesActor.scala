@@ -43,14 +43,12 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
         sender ! SpendableBalancesActor.Reply.GetState(knownPreparedState)
       } else {
         val requestSender = sender
-        spendableBalances(address, unknownAssets.keySet)
-          .map(SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, _))
-          .onComplete {
-            case Success(r) => self.tell(r, requestSender)
-            case Failure(ex) =>
-              log.error("Could not receive spendable balance from Waves Node", ex)
-              requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
-          }
+        spendableBalances(address, unknownAssets.keySet).onComplete {
+          case Success(r) => self.tell(SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets.keySet, r), requestSender)
+          case Failure(ex) =>
+            log.error("Could not receive spendable balance from Waves Node", ex)
+            requestSender ! Status.Failure(WavesNodeConnectionLostException("Could not receive spendable balance from Waves Node", ex))
+        }
       }
 
     case SpendableBalancesActor.NodeBalanceRequestRoundtrip(address, knownAssets, staleStateFromNode) =>
@@ -58,7 +56,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       val source = fullState.get(address) match {
         case Some(state) => state
         case None =>
-          val updated = staleStateFromNode ++ incompleteStateChanges.getOrElse(address, Map.empty) // probably we don't get an update from node?
+          val updated = staleStateFromNode ++ incompleteStateChanges.getOrElse(address, Map.empty)
           incompleteStateChanges = incompleteStateChanges.updated(address, updated)
           updated
       }
@@ -83,7 +81,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
       val addressState = fullState.get(address) match {
         case Some(r) => r // Could be with multiple simultaneous connections
         case None =>
-          val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty) // HERE?
+          val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
           fullState += address -> addressState
           incompleteStateChanges -= address
           addressState

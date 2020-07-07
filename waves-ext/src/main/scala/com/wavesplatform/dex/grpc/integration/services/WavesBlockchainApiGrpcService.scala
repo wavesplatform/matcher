@@ -67,8 +67,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
           val addressBalance  = allSpendableBalances.getOrDefault(address, Map.empty)
           val needUpdate      = !addressBalance.get(asset).contains(newAssetBalance)
 
-          log.info(s"==> realTimeBalanceChanges $address: $asset -> $newAssetBalance")
-
           if (needUpdate) {
             allSpendableBalances.put(address, addressBalance + (asset -> newAssetBalance))
             Some(BalanceChangesFlattenResponse(address.toPB, asset.toPB, newAssetBalance))
@@ -213,7 +211,6 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
       request.assetIds.map { requestedAssetRecord =>
         val asset   = requestedAssetRecord.assetId.toVanillaAsset
         val balance = spendableBalance(address, asset)
-        log.info(s"==> spendableAssetsBalances $address: $asset -> $balance")
         SpendableAssetsBalancesResponse.Record(
           requestedAssetRecord.assetId,
           balance
@@ -267,20 +264,11 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext, balanceChangesBat
     Future {
       val address   = request.address.toVanillaAddress
       val portfolio = context.blockchain.portfolio(address)
-      val r = AllAssetsSpendableBalanceResponse(
+      AllAssetsSpendableBalanceResponse(
         (Waves :: portfolio.assets.keys.toList)
           .map(a => AllAssetsSpendableBalanceResponse.Record(a.toPB, spendableBalance(address, a)))
           .filterNot(_.balance == 0L)
       )
-
-      val str = r.balances
-        .map { x =>
-          s"${x.assetId.toVanillaAsset}: ${x.balance}"
-        }
-        .mkString("\n")
-      log.info(s"==> allAssetsSpendableBalance ${request.address.toVanillaAddress}:\n$str")
-
-      r
     }
   }
 

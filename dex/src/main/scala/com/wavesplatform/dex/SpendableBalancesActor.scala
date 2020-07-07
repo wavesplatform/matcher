@@ -93,7 +93,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
     case SpendableBalancesActor.Command.UpdateStates(changes) =>
       changes.foreach {
         case (address, stateUpdate) =>
-          val addressFullState = fullState.get(address)
+          val addressFullState  = fullState.get(address)
           val knownBalance      = addressFullState orElse incompleteStateChanges.get(address) getOrElse Map.empty
           val (clean, forAudit) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getCleanAndForAuditChanges(stateUpdate, knownBalance)
 

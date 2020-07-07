@@ -64,7 +64,8 @@ class AddressActor(owner: Address,
   // Saves from cases when a client does multiple requests with the same order
   private val failedPlacements = MutableSet.empty[Order.Id]
 
-  private var addressWsMutableState = AddressWsMutableState.empty(owner)
+  private var addressWsMutableState       = AddressWsMutableState.empty(owner)
+  private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
   override def receive: Receive = {
     case command: Command.PlaceOrder =>
@@ -287,6 +288,7 @@ class AddressActor(owner: Address,
       addressWsMutableState = addressWsMutableState.removeSubscription(client)
       context.unwatch(client)
 
+    // Received a snapshot for pending connections
     case SpendableBalancesActor.Reply.GetSnapshot(allAssetsSpendableBalance) =>
       allAssetsSpendableBalance match {
         case Right(spendableBalance) =>
@@ -294,24 +296,26 @@ class AddressActor(owner: Address,
             balances = mkWsBalances(spendableBalance),
             orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
           )
-          if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending
+          if (!addressWsMutableState.hasActiveSubscriptions) scheduleNextDiffSending()
           addressWsMutableState = addressWsMutableState.flushPendingSubscriptions()
         case Left(matcherError) =>
           addressWsMutableState.pendingSubscription.foreach { _.unsafeUpcast[WsServerMessage] ! WsError.from(matcherError, time.correctedTime()) }
           addressWsMutableState = addressWsMutableState.copy(pendingSubscription = Set.empty)
       }
 
+    // It is time to send updates to clients. This block of code asks balances
     case WsCommand.PrepareDiffForWsSubscribers =>
       if (addressWsMutableState.hasActiveSubscriptions) {
         if (addressWsMutableState.hasChanges) {
           spendableBalancesActor ! SpendableBalancesActor.Query.GetState(owner, addressWsMutableState.getAllChangedAssets)
           addressWsMutableState = addressWsMutableState.cleanBalanceChanges()
-        } else scheduleNextDiffSending
+        } else scheduleNextDiffSending()
       }
 
+    // It is time to send updates to clients. This block of code sends balances
     case SpendableBalancesActor.Reply.GetState(spendableBalances) =>
       addressWsMutableState = if (addressWsMutableState.hasActiveSubscriptions) {
-        scheduleNextDiffSending
+        scheduleNextDiffSending()
         addressWsMutableState.sendDiffs(
           balances = mkWsBalances(spendableBalances),
           orders = addressWsMutableState.getAllOrderChanges
@@ -324,8 +328,9 @@ class AddressActor(owner: Address,
     case classic.Terminated(wsSource) => addressWsMutableState = addressWsMutableState.removeSubscription(wsSource)
   }
 
-  private def scheduleNextDiffSending: Cancellable = {
-    context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
+  private def scheduleNextDiffSending(): Unit = {
+    wsSendSchedule.cancel()
+    wsSendSchedule = context.system.scheduler.scheduleOnce(settings.wsMessagesInterval, self, WsCommand.PrepareDiffForWsSubscribers)
   }
 
   private def denormalizedBalanceValue(asset: Asset, decimals: Int)(balanceSource: Map[Asset, Long]): Double =
@@ -539,6 +544,11 @@ class AddressActor(owner: Address,
       ao <- activeOrders.values
       if ao.isLimit && maybePair.forall(_ == ao.order.assetPair)
     } yield ao
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    log.error(s"Failed on $message", reason)
+    super.preRestart(reason, message)
+  }
 }
 
 object AddressActor {

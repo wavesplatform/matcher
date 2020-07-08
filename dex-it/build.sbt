@@ -16,11 +16,12 @@ inTask(docker)(
       val entryPointSh   = s"$basePath/start.sh"
 
       from("com.wavesplatform/matcherserver:latest")
+      user("root:root")
 
       // See https://www.yourkit.com/docs/java/help/docker.jsp
       runRaw(s"""mkdir -p /opt/waves-dex && \\
-                |apk update && \\
-                |apk add --no-cache openssl ca-certificates && \\
+                |apt-get update && \\
+                |apt-get -qq -y install wget unzip && \\
                 |wget --quiet "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar" -O /opt/waves-dex/aspectjweaver.jar && \\
                 |wget --quiet "https://www.yourkit.com/download/docker/$yourKitArchive" -P /tmp/ && \\
                 |unzip /tmp/$yourKitArchive -d /usr/local && \\

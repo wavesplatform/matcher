@@ -72,25 +72,35 @@ inTask(docker)(
     dockerfile :=
       new Dockerfile {
 
-        val basePath     = "/opt/waves-dex/"
-        val entryPointSh = s"${basePath}start.sh"
+        val (user, userId)   = ("waves-dex", "113")
+        val (group, groupId) = ("waves-dex", "116")
 
-        from("anapsix/alpine-java:8_server-jre")
-        add(
-          sources = Seq(
-            (Universal / stage).value, // jars
-            (Compile / sourceDirectory).value / "container" / "start.sh" // entry point
-          ),
-          destination = basePath
+        val userPath    = s"/var/lib/$user"
+        val sourcesPath = s"/usr/share/$user"
+
+        val entryPointSh = s"$sourcesPath/bin/start.sh"
+
+        from("openjdk:8-jre-slim-buster")
+
+        runShell(
+          Seq("mkdir", "-p", userPath, sourcesPath, s"$userPath/runtime", "&&") ++
+            Seq("groupadd", "-g", groupId, group, "&&") ++
+            Seq("useradd", "-d", userPath, "-g", groupId, "-u", userId, "-s", "/bin/bash", "-M", user, "&&") ++
+            Seq("chown", "-R", s"$userId:$groupId", userPath, sourcesPath, "&&") ++
+            Seq("chmod", "-R", "755", userPath, sourcesPath, "&&") ++
+            Seq("ln", "-fs", s"$sourcesPath/log", "/var/log/waves-dex"): _*
         )
-        add(
-          sources = Seq(
-            (Compile / sourceDirectory).value / "container" / "dex.conf", // base config
-            (Compile / packageSource).value / "doc" / "logback.xml"
-          ),
-          destination = s"${basePath}conf/"
-        )
+
+        user(s"$user:$group")
+
+        Seq(
+          (Universal / stage).value                                    -> sourcesPath, // sources
+          (Compile / sourceDirectory).value / "container" / "start.sh" -> s"$sourcesPath/bin/", // entry point
+          (Compile / sourceDirectory).value / "container" / "dex.conf" -> s"$sourcesPath/conf/" // base config
+        ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
+
         runShell("chmod", "+x", entryPointSh)
+        workDir(userPath)
         entryPoint(entryPointSh)
         expose(6886)
       },

@@ -2,24 +2,26 @@
 
 trap 'kill -TERM $PID' TERM INT
 
-BASE_CONFIG_PATH="/opt/waves-dex/conf"
-RUNTIME_CONFIG_PATH="/opt/waves-dex/runtime"
+USER_PATH="/var/lib/waves-dex"
+SOURCES_PATH="/usr/share/waves-dex"
 
-echo "Base settings:"
-cat ${BASE_CONFIG_PATH}/dex.conf
+BASE_CONFIG=${SOURCES_PATH}/conf/dex.conf
+CUSTOM_CONFIG="${USER_PATH}/runtime/local.conf"
+
+echo "Base settings '${BASE_CONFIG}':"
+cat ${BASE_CONFIG}
 echo; echo
 
-if [ ! -f ${RUNTIME_CONFIG_PATH}/local.conf ] ; then
-	echo "Custom settings '${RUNTIME_CONFIG_PATH}/local.conf' not found"
+if [ ! -f ${CUSTOM_CONFIG} ] ; then
+	echo "Custom settings '${CUSTOM_CONFIG}' not found"; echo
 else
-	echo "Found custom settings '${RUNTIME_CONFIG_PATH}/local.conf':"
-	cat ${RUNTIME_CONFIG_PATH}/local.conf; echo
+	echo "Found custom settings '${CUSTOM_CONFIG}':"
+	cat ${CUSTOM_CONFIG}; echo; echo
 fi
 
-/opt/waves-dex/bin/waves-dex \
-  -Dsun.zip.disableMemoryMapping=true \
-  -Dlogback.configurationFile=${BASE_CONFIG_PATH}/logback.xml \
-  -main com.wavesplatform.dex.Application ${BASE_CONFIG_PATH}/dex.conf
+${SOURCES_PATH}/bin/waves-dex \
+  -Dlogback.configurationFile=${USER_PATH}/runtime/logback.xml \
+  -main com.wavesplatform.dex.Application ${BASE_CONFIG}
 
 PID=$!
 echo "PID: ${PID}"

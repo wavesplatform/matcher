@@ -133,6 +133,7 @@ class ActorsWebSocketInteractionsSpecification
 
     def expectBalancesAndOrders(expectedBalances: Map[Asset, WsBalances], expectedOrders: Seq[WsOrder], expectedUpdateId: Long): Unit = {
       val wsAddressState = wsEventsProbe.expectMessageType[WsAddressState]
+      println(wsAddressState)
       wsAddressState.balances should matchTo(expectedBalances)
       wsAddressState.orders should matchTo(expectedOrders)
       wsAddressState.updateId should matchTo(expectedUpdateId)

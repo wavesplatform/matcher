@@ -83,6 +83,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
         case None =>
           val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
           fullState += address -> addressState
+          log.info(s"[$address] Full state is set up $addressState") // TODO We don't log values, because there is too much data from the old accounts
           incompleteStateChanges -= address
           addressState
       }
@@ -95,14 +96,13 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
           val knownBalance      = addressFullState orElse incompleteStateChanges.get(address) getOrElse Map.empty
           val (clean, forAudit) = if (knownBalance.isEmpty) (stateUpdate, stateUpdate) else getCleanAndForAuditChanges(stateUpdate, knownBalance)
 
-          if (addressFullState.isDefined) fullState = fullState.updated(address, knownBalance ++ clean)
-          else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ clean)
+          if (addressFullState.isDefined) {
+            fullState = fullState.updated(address, knownBalance ++ clean)
+            log.info(s"[$address] Full state updates: $clean")
+          } else incompleteStateChanges = incompleteStateChanges.updated(address, knownBalance ++ clean)
 
           addressDirectory ! AddressDirectory.Envelope(address, AddressActor.Message.BalanceChanged(clean.keySet, forAudit))
       }
-
-    // Subtract is called when there is a web socket connection and thus we have `fullState` for this address
-    case SpendableBalancesActor.Command.Subtract(address, balance) => fullState = fullState.updated(address, fullState(address) |-| balance)
   }
 
   /**
@@ -123,7 +123,6 @@ object SpendableBalancesActor {
   trait Command
   object Command {
     final case class SetState(address: Address, state: Map[Asset, Long])   extends Command
-    final case class Subtract(address: Address, balance: Map[Asset, Long]) extends Command
     final case class UpdateStates(changes: Map[Address, Map[Asset, Long]]) extends Command
   }
 

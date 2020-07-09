@@ -493,5 +493,46 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         }
       }
     }
+
+    "DEX-827 Wrong balance" in {
+      val btcBalance = 461
+      val carol      = mkAccountWithBalance(25.waves -> Waves, btcBalance.btc -> btc)
+      val wsc        = mkWsAddressConnection(carol)
+
+      val now = System.currentTimeMillis()
+      val order1 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 1)
+      val order2 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 2)
+      val order3 = mkOrderDP(carol, wavesBtcPair, SELL, 10.waves, 6, matcherFee = 0.003.waves)
+
+      dex1.api.place(order1)
+      dex1.api.place(order2)
+
+      placeAndAwaitAtDex(order3, OrderStatus.PartiallyFilled)
+      dex1.api.cancelAll(carol)
+
+      waitForOrderAtNode(order1)
+      waitForOrderAtNode(order2)
+      waitForOrderAtNode(order3)
+
+      wavesNode1.api.waitForHeightArise()
+
+      val expectedWavesBalance = 25.0 - 0.003 * 2 - 0.003 * 4.7 * 2 / 10
+
+      wavesNode1.api.balance(carol, Waves) shouldBe expectedWavesBalance.waves
+      wavesNode1.api.balance(carol, btc) shouldBe btcBalance.btc
+
+      dex1.api.tradableBalance(carol, wavesBtcPair) should matchTo(
+        Map(
+          Waves -> expectedWavesBalance.waves,
+          btc   -> btcBalance.btc
+        )
+      )
+
+      wsc.balanceChanges.squashed should matchTo(
+        Map(
+          Waves -> WsBalances(expectedWavesBalance, 0),
+          btc   -> WsBalances(btcBalance, 0)
+        ))
+    }
   }
 }

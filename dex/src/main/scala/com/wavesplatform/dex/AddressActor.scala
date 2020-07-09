@@ -418,11 +418,12 @@ class AddressActor(owner: Address,
 
     log.trace(s"New status of ${remaining.id} is $status")
 
-    status match {
+    val isFinal = status match {
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
         activeOrders.remove(remaining.id).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
         orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v4(remaining, status))
+        true
 
       case _ =>
         activeOrders.put(remaining.id, remaining)
@@ -433,19 +434,11 @@ class AddressActor(owner: Address,
             scheduleExpiration(remaining.order)
           case _ =>
         }
+        false
     }
 
     if (addressWsMutableState.hasActiveSubscriptions) {
-      // OrderExecuted event and ExchangeTransaction creation are separated in time!
-      // We should notify SpendableBalanceActor about balances changing, otherwise WS subscribers
-      // will receive balance changes (its reduction as a result of order partial execution) with
-      // sensible lag (only after exchange transaction will be put in UTX pool). The increase in
-      // the balance will be sent to subscribers after this tx will be forged
-
-      if (openVolumeDiff.nonEmpty) {
-        val correction = Group.inverse(openVolumeDiff)
-        spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, correction)
-      }
+      println(s"openVolumeDiff=$openVolumeDiff, isFinal=$isFinal, event=$event")
 
       // Further improvements will be made in DEX-467
       addressWsMutableState = status match {

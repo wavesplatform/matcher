@@ -84,17 +84,17 @@ inTask(docker)(
     dockerfile :=
       new Dockerfile {
 
-        val basePath     = "/opt/waves/"
-        val entryPointSh = s"${basePath}entrypoint-with-ext.sh"
+        val basePath     = "/opt/waves"
+        val entryPointSh = s"$basePath/start-matchernode.sh"
 
         from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
         user("waves:waves")
         add(
           sources = Seq(
-            (Universal / stage).value, // jars
-            (Compile / sourceDirectory).value / "container" / "entrypoint-with-ext.sh" // entry point
+            (Universal / stage).value, // sources
+            (Compile / sourceDirectory).value / "container" / "start-matchernode.sh" // entry point
           ),
-          destination = basePath,
+          destination = s"$basePath/",
           chown = "waves:waves"
         )
         runShell("chmod", "+x", entryPointSh)

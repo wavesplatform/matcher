@@ -78,25 +78,23 @@ inTask(docker)(
         val userPath    = s"/var/lib/$user"
         val sourcesPath = s"/usr/share/$user"
 
-        val entryPointSh = s"$sourcesPath/bin/start.sh"
+        val entryPointSh = s"$sourcesPath/bin/start-matcherserver.sh"
 
         from("openjdk:8-jre-slim-buster")
 
-        runShell(
-          Seq("mkdir", "-p", userPath, sourcesPath, s"$userPath/runtime", "&&") ++
-            Seq("groupadd", "-g", groupId, group, "&&") ++
-            Seq("useradd", "-d", userPath, "-g", groupId, "-u", userId, "-s", "/bin/bash", "-M", user, "&&") ++
-            Seq("chown", "-R", s"$userId:$groupId", userPath, sourcesPath, "&&") ++
-            Seq("chmod", "-R", "755", userPath, sourcesPath, "&&") ++
-            Seq("ln", "-fs", s"$sourcesPath/log", "/var/log/waves-dex"): _*
-        )
+        runRaw(s"""mkdir -p $userPath $sourcesPath $userPath/runtime && \\
+                  |groupadd -g $groupId $group && \\
+                  |useradd -d $userPath -g $groupId -u $userId -s /bin/bash -M $user && \\
+                  |chown -R $userId:$groupId $userPath $sourcesPath && \\
+                  |chmod -R 755 $userPath $sourcesPath && \\
+                  |ln -fs $sourcesPath/log/ var/log/waves-dex""".stripMargin)
 
         user(s"$user:$group")
 
         Seq(
-          (Universal / stage).value                                    -> sourcesPath, // sources
-          (Compile / sourceDirectory).value / "container" / "start.sh" -> s"$sourcesPath/bin/", // entry point
-          (Compile / sourceDirectory).value / "container" / "dex.conf" -> s"$sourcesPath/conf/" // base config
+          (Universal / stage).value                                                  -> sourcesPath, // sources
+          (Compile / sourceDirectory).value / "container" / "start-matcherserver.sh" -> s"$sourcesPath/bin/", // entry point
+          (Compile / sourceDirectory).value / "container" / "dex.conf"               -> s"$sourcesPath/conf/" // base config
         ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
 
         runShell("chmod", "+x", entryPointSh)

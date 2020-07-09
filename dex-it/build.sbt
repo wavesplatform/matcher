@@ -13,7 +13,7 @@ inTask(docker)(
 
       val yourKitArchive = "YourKit-JavaProfiler-2019.8-docker.zip"
       val basePath       = "/opt/waves-dex"
-      val entryPointSh   = s"$basePath/start.sh"
+      val entryPointSh   = s"$basePath/start-matcherserver-it.sh"
 
       from("com.wavesplatform/matcherserver:latest")
       user("root:root")
@@ -29,7 +29,7 @@ inTask(docker)(
 
       add(
         sources = Seq(
-          (Test / sourceDirectory).value / "container" / "start.sh",
+          (Test / sourceDirectory).value / "container" / "start-matcherserver-it.sh",
           (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml"
         ),
         destination = s"$basePath/"

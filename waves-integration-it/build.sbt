@@ -18,13 +18,12 @@ inTask(docker)(
         add(
           sources = Seq(
             (Test / resourceDirectory).value / "nodes" / "logback-container.xml",
-            (Test / sourceDirectory).value / "container" / "start-waves.sh"
+            (Test / sourceDirectory).value / "container" / "start-matchernode-it.sh"
           ),
           destination = "/opt/waves/"
         )
-        entryPoint("/opt/waves/start-waves.sh")
+        entryPoint("/opt/waves/start-matchernode-it.sh")
       },
-    dockerEntrypoint := Seq("/opt/waves/start-waves.sh"),
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )
 )

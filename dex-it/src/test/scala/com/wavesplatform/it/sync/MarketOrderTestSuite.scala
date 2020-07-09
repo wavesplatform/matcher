@@ -248,7 +248,7 @@ class MarketOrderTestSuite extends MatcherSuiteBase {
       val ordersAmount      = 36.waves
 
       val buyer  = mkAccountWithBalance(100.usd      -> usd, 3 * fixedFee -> Waves)
-      val seller = mkAccountWithBalance(ordersAmount -> Waves, fixedFee   -> Waves)
+      val seller = mkAccountWithBalance(ordersAmount + fixedFee -> Waves)
 
       placeOrders(buyer, wavesUsdPair, BUY)(
         12.waves -> 0.2.usd,

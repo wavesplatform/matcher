@@ -436,17 +436,6 @@ class AddressActor(owner: Address,
     }
 
     if (addressWsMutableState.hasActiveSubscriptions) {
-      // OrderExecuted event and ExchangeTransaction creation are separated in time!
-      // We should notify SpendableBalanceActor about balances changing, otherwise WS subscribers
-      // will receive balance changes (its reduction as a result of order partial execution) with
-      // sensible lag (only after exchange transaction will be put in UTX pool). The increase in
-      // the balance will be sent to subscribers after this tx will be forged
-
-      if (openVolumeDiff.nonEmpty) {
-        val correction = Group.inverse(openVolumeDiff)
-        spendableBalancesActor ! SpendableBalancesActor.Command.Subtract(owner, correction)
-      }
-
       // Further improvements will be made in DEX-467
       addressWsMutableState = status match {
         case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))

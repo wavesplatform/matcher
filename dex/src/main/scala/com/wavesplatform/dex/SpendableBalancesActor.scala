@@ -83,7 +83,7 @@ class SpendableBalancesActor(spendableBalances: (Address, Set[Asset]) => Future[
         case None =>
           val addressState = state ++ incompleteStateChanges.getOrElse(address, Map.empty)
           fullState += address -> addressState
-          log.info(s"[$address] Full state is set up $addressState") // TODO We don't log values, because there is too much data from the old accounts
+          log.info(s"[$address] Full state is set up") // We don't log values, because there is too much data from the old accounts
           incompleteStateChanges -= address
           addressState
       }

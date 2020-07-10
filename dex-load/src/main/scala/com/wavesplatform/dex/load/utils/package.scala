@@ -73,13 +73,13 @@ package object utils {
 
   def mkOrder(acc: PrivateKeyAccount, orderType: Type, amount: Long, price: Long, pair: AssetPair): Order = {
     Transactions.makeOrder(acc,
-                           settings.matcherPublicKey,
-                           orderType,
-                           pair,
-                           price,
-                           amount,
-                           System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
-                           settings.defaults.matcherFee)
+      settings.matcherPublicKey,
+      orderType,
+      pair,
+      price,
+      amount,
+      System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
+      settings.defaults.matcherFee)
   }
 
   def mkJson(obj: ApiJson): String = new WavesJsonMapper(networkByte).writeValueAsString(obj)

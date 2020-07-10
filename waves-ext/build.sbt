@@ -1,5 +1,6 @@
 description := "Node integration extension for the Waves DEX"
 
+import ImageVersionPlugin.autoImport.{imageTagMakeFunction, nameOfImage}
 import VersionSourcePlugin.V
 import WavesNodeArtifactsPlugin.autoImport.wavesNodeVersion
 import com.typesafe.sbt.SbtNativePackager.Universal
@@ -10,8 +11,8 @@ enablePlugins(RunApplicationSettings,
               ExtensionPackaging,
               GitVersioning,
               VersionSourcePlugin,
-              JvmPlugin,
-              sbtdocker.DockerPlugin)
+              sbtdocker.DockerPlugin,
+              ImageVersionPlugin)
 
 V.scalaPackage := "com.wavesplatform.dex.grpc.integration"
 V.subProject := "ext"
@@ -74,33 +75,27 @@ Debian / debianPackageConflicts := Seq(
 
 inTask(docker)(
   Seq(
-    imageNames := {
-      val latestImageName = ImageName("com.wavesplatform/matchernode:latest")
-      val maybeVersion    = git.gitDescribedVersion.value
-      if (!isSnapshot.value && maybeVersion.isDefined)
-        Seq(latestImageName, ImageName(s"com.wavesplatform/matchernode:${wavesNodeVersion.value}_${maybeVersion.get}"))
-      else Seq(latestImageName)
+    nameOfImage := "com.wavesplatform/matchernode",
+    imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
+    dockerfile := new Dockerfile {
+
+      val basePath     = "/opt/waves"
+      val entryPointSh = s"$basePath/start-matchernode.sh"
+
+      from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
+      user("waves:waves")
+      add(
+        sources = Seq(
+          (Universal / stage).value, // sources
+          (Compile / sourceDirectory).value / "container" / "start-matchernode.sh" // entry point
+        ),
+        destination = s"$basePath/",
+        chown = "waves:waves"
+      )
+      runShell("chmod", "+x", entryPointSh)
+      entryPoint(entryPointSh)
+      expose(6887, 6871) // DEX Extension, Stagenet REST API
     },
-    dockerfile :=
-      new Dockerfile {
-
-        val basePath     = "/opt/waves"
-        val entryPointSh = s"$basePath/start-matchernode.sh"
-
-        from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
-        user("waves:waves")
-        add(
-          sources = Seq(
-            (Universal / stage).value, // sources
-            (Compile / sourceDirectory).value / "container" / "start-matchernode.sh" // entry point
-          ),
-          destination = s"$basePath/",
-          chown = "waves:waves"
-        )
-        runShell("chmod", "+x", entryPointSh)
-        entryPoint(entryPointSh)
-        expose(6887, 6871) // DEX Extension, Stagenet REST API
-      },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )
 )

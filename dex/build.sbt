@@ -1,10 +1,10 @@
 import java.nio.charset.StandardCharsets
 
 import Dependencies.Version
+import ImageVersionPlugin.autoImport.nameOfImage
 import VersionSourcePlugin.V
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
-import sbt.plugins.JvmPlugin
 
 enablePlugins(
   RewriteSwaggerConfigPlugin,
@@ -14,8 +14,8 @@ enablePlugins(
   SystemdPlugin,
   GitVersioning,
   VersionSourcePlugin,
-  JvmPlugin,
-  sbtdocker.DockerPlugin
+  sbtdocker.DockerPlugin,
+  ImageVersionPlugin
 )
 
 V.scalaPackage := "com.wavesplatform.dex"
@@ -63,45 +63,39 @@ inConfig(Compile)(
 // Docker
 inTask(docker)(
   Seq(
-    imageNames := {
-      val latestImageName = ImageName("com.wavesplatform/matcherserver:latest")
-      val maybeVersion    = git.gitDescribedVersion.value
-      if (!isSnapshot.value && maybeVersion.isDefined) Seq(latestImageName, ImageName(s"com.wavesplatform/matcherserver:${maybeVersion.get}"))
-      else Seq(latestImageName)
-    },
-    dockerfile :=
-      new Dockerfile {
+    nameOfImage := "com.wavesplatform/matcherserver",
+    dockerfile := new Dockerfile {
 
-        val (user, userId)   = ("waves-dex", "113")
-        val (group, groupId) = ("waves-dex", "116")
+      val (user, userId)   = ("waves-dex", "113")
+      val (group, groupId) = ("waves-dex", "116")
 
-        val userPath    = s"/var/lib/$user"
-        val sourcesPath = s"/usr/share/$user"
+      val userPath    = s"/var/lib/$user"
+      val sourcesPath = s"/usr/share/$user"
 
-        val entryPointSh = s"$sourcesPath/bin/start-matcherserver.sh"
+      val entryPointSh = s"$sourcesPath/bin/start-matcherserver.sh"
 
-        from("openjdk:8-jre-slim-buster")
+      from("openjdk:8-jre-slim-buster")
 
-        runRaw(s"""mkdir -p $userPath $sourcesPath $userPath/runtime && \\
+      runRaw(s"""mkdir -p $userPath $sourcesPath $userPath/runtime && \\
                   |groupadd -g $groupId $group && \\
                   |useradd -d $userPath -g $groupId -u $userId -s /bin/bash -M $user && \\
                   |chown -R $userId:$groupId $userPath $sourcesPath && \\
                   |chmod -R 755 $userPath $sourcesPath && \\
                   |ln -fs $sourcesPath/log/ var/log/waves-dex""".stripMargin)
 
-        user(s"$user:$group")
+      Seq(
+        (Universal / stage).value                                                  -> s"$sourcesPath/", // sources
+        (Compile / sourceDirectory).value / "container" / "start-matcherserver.sh" -> s"$sourcesPath/bin/", // entry point
+        (Compile / sourceDirectory).value / "container" / "dex.conf"               -> s"$sourcesPath/conf/" // base config
+      ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
 
-        Seq(
-          (Universal / stage).value                                                  -> sourcesPath, // sources
-          (Compile / sourceDirectory).value / "container" / "start-matcherserver.sh" -> s"$sourcesPath/bin/", // entry point
-          (Compile / sourceDirectory).value / "container" / "dex.conf"               -> s"$sourcesPath/conf/" // base config
-        ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
+      user(s"$user:$group")
 
-        runShell("chmod", "+x", entryPointSh)
-        workDir(userPath)
-        entryPoint(entryPointSh)
-        expose(6886)
-      },
+      runShell("chmod", "+x", entryPointSh)
+      workDir(userPath)
+      entryPoint(entryPointSh)
+      expose(6886)
+    },
     buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
   )
 )

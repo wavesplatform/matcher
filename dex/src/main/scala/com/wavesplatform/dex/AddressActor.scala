@@ -418,12 +418,11 @@ class AddressActor(owner: Address,
 
     log.trace(s"New status of ${remaining.id} is $status")
 
-    val isFinal = status match {
+    status match {
       case status: OrderStatus.Final =>
         expiration.remove(remaining.id).foreach(_.cancel())
         activeOrders.remove(remaining.id).foreach(ao => openVolume = openVolume |-| ao.reservableBalance)
         orderDB.saveOrderInfo(remaining.id, owner, OrderInfo.v4(remaining, status))
-        true
 
       case _ =>
         activeOrders.put(remaining.id, remaining)
@@ -434,12 +433,9 @@ class AddressActor(owner: Address,
             scheduleExpiration(remaining.order)
           case _ =>
         }
-        false
     }
 
     if (addressWsMutableState.hasActiveSubscriptions) {
-      println(s"openVolumeDiff=$openVolumeDiff, isFinal=$isFinal, event=$event")
-
       // Further improvements will be made in DEX-467
       addressWsMutableState = status match {
         case OrderStatus.Accepted     => addressWsMutableState.putOrderUpdate(remaining.id, WsOrder.fromDomain(remaining, status))

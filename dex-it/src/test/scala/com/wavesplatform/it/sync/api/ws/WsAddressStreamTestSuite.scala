@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.api.ws
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.api.websockets._
 import com.wavesplatform.dex.api.websockets.connection.WsConnection
@@ -228,19 +229,37 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         placeAndAwaitAtDex(bo)
         placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 5.waves, 1.0))
 
-        assertChanges(wsc)(
-          Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)), // Waves balance on Node = 10
-          Map(usd   -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)), // Waves balance on Node = 10
-          Map(Waves -> WsBalances(14.997, 0.0015)) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
-        )(
-          WsOrder.fromDomain(limitOrder),
-          WsOrder(limitOrder.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)
-        )
+        eventually {
+          wsc.balanceChanges.squashed should matchTo(
+            Map(
+              usd -> WsBalances(0, 5),
+              Waves -> WsBalances(14.997, 0.0015) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
+            )
+          )
+
+          wsc.orderChanges.squashed should matchTo(
+            Map(
+              limitOrder.id -> WsOrder
+                .fromDomain(limitOrder)
+                .copy(
+                  id = limitOrder.id,
+                  status = OrderStatus.PartiallyFilled.name.some,
+                  filledAmount = 5.0.some,
+                  filledFee = 0.0015.some,
+                  avgWeighedPrice = 1.0.some
+                )
+            ))
+        }
+        wsc.clearMessages()
 
         dex1.api.cancelAll(acc)
-        assertChanges(wsc, squash = false) { Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)) }(
-          WsOrder(bo.id(), status = OrderStatus.Cancelled.name)
-        )
+
+        eventually {
+          wsc.balanceChanges.squashed should matchTo(Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)))
+          wsc.orderChanges.squashed should matchTo(
+            Map(limitOrder.id -> WsOrder(bo.id(), status = OrderStatus.Cancelled.name))
+          )
+        }
 
         wsc.close()
       }
@@ -499,7 +518,7 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       val carol      = mkAccountWithBalance(25.waves -> Waves, btcBalance.btc -> btc)
       val wsc        = mkWsAddressConnection(carol)
 
-      val now = System.currentTimeMillis()
+      val now    = System.currentTimeMillis()
       val order1 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 1)
       val order2 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 2)
       val order3 = mkOrderDP(carol, wavesBtcPair, SELL, 10.waves, 6, matcherFee = 0.003.waves)

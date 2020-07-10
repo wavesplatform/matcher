@@ -1,14 +1,11 @@
 package com.wavesplatform.dex
 
 import akka.actor.{Actor, ActorRef, Status}
-import cats.instances.long.catsKernelStdGroupForLong
 import cats.syntax.either._
-import cats.syntax.group.catsSyntaxGroup
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.utils.ScorexLogging
 import com.wavesplatform.dex.error.{MatcherError, WavesNodeConnectionBroken}
-import com.wavesplatform.dex.fp.MapImplicits.group
 import com.wavesplatform.dex.grpc.integration.exceptions.WavesNodeConnectionLostException
 
 import scala.concurrent.Future

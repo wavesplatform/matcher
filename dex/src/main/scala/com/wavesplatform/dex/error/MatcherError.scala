@@ -50,13 +50,13 @@ object MatcherError {
 case class Amount(asset: Asset, volume: BigDecimal)
 object Amount {
   private[error] def apply(asset: Asset, volume: Long)(implicit efc: ErrorFormatterContext): Amount =
-    new Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.assetDecimals(asset)))
+    new Amount(asset, Denormalization.denormalizeAmountAndFee(volume, efc.unsafeAssetDecimals(asset)))
 }
 
 case class Price(assetPair: AssetPair, volume: BigDecimal)
 object Price {
   private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
-    new Price(assetPair, Denormalization.denormalizePrice(volume, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)))
+    new Price(assetPair, Denormalization.denormalizePrice(volume, efc.unsafeAssetDecimals(assetPair.amountAsset), efc.unsafeAssetDecimals(assetPair.priceAsset)))
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
@@ -121,7 +121,7 @@ case class FeeNotEnough(required: Amount, given: Amount)
     )
 object FeeNotEnough {
   def apply(required: Long, given: Long, asset: Asset)(implicit efc: ErrorFormatterContext): FeeNotEnough = {
-    val decimals = efc.assetDecimals(asset)
+    val decimals = efc.unsafeAssetDecimals(asset)
     new FeeNotEnough(
       required = Amount(asset, Denormalization.denormalizeAmountAndFee(required, decimals)),
       given = Amount(asset, Denormalization.denormalizeAmountAndFee(given, decimals))
@@ -180,7 +180,7 @@ object BalanceNotEnough {
   private def mk(input: Map[Asset, Long])(implicit efc: ErrorFormatterContext): List[Amount] = {
     import Ordered._
     input
-      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.assetDecimals(id))) }
+      .map { case (id, v) => Amount(id, Denormalization.denormalizeAmountAndFee(v, efc.unsafeAssetDecimals(id))) }
       .toList
       .sortWith((l, r) => l.asset.compatId < r.asset.compatId)
   }

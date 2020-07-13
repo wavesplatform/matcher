@@ -414,7 +414,7 @@ class MatcherActorSpecification
                            apdb: AssetPairsDB = mkAssetPairsDB,
                            addressActor: ActorRef = TestProbe().ref,
                            snapshotStoreActor: ActorRef = emptySnapshotStoreActor): TestActorRef[MatcherActor] = {
-    implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+    implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
     TestActorRef(
       new MatcherActor(

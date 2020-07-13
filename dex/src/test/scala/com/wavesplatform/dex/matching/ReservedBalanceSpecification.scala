@@ -76,7 +76,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
 
   override protected def actorSystemName: String = getSimpleName(this)
 
-  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
   private implicit val timeout: Timeout           = 5.seconds
 
   import system.dispatcher

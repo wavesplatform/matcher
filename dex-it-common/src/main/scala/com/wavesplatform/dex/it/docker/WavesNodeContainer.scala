@@ -9,7 +9,6 @@ import cats.instances.try_._
 import com.dimafeng.testcontainers.GenericContainer
 import com.typesafe.config.Config
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.it.api.HasWaitReady
 import com.wavesplatform.dex.it.api.node.NodeApi
 import com.wavesplatform.dex.it.cache.CachedData
 import com.wavesplatform.dex.it.fp
@@ -39,8 +38,8 @@ final case class WavesNodeContainer(override val internalIp: String, underlying:
 
   def grpcApiTarget: String = s"${grpcApiAddress.getHostName}:${grpcApiAddress.getPort}"
 
-  override def api: NodeApi[Id]               = fp.sync { NodeApi[Try](apiKey, cachedRestApiAddress.get()) }
-  override def asyncApi: HasWaitReady[Future] = NodeApi[Future](apiKey, cachedRestApiAddress.get())
+  override def api: NodeApi[Id]          = fp.sync { NodeApi[Try](apiKey, cachedRestApiAddress.get()) }
+  override def asyncApi: NodeApi[Future] = NodeApi[Future](apiKey, cachedRestApiAddress.get())
 
   override def invalidateCaches(): Unit = {
     super.invalidateCaches()

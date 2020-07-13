@@ -60,7 +60,10 @@ object AggregatedOrderBookActor {
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
-      def scheduleNextSendWsUpdates(): Cancellable = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates)
+      def scheduleNextSendWsUpdates(state: State): State = {
+        state.wsSendSchedule.cancel()
+        state.copy(wsSendSchedule = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates))
+      }
 
       def default(state: State): Behavior[Message] =
         Behaviors
@@ -97,8 +100,8 @@ object AggregatedOrderBookActor {
               )
 
             case Command.AddWsSubscription(client) =>
-              if (!state.ws.hasSubscriptions) scheduleNextSendWsUpdates()
-              val ob = state.toOrderBookAggregatedSnapshot
+              val updatedState = if (state.ws.hasSubscriptions) state else scheduleNextSendWsUpdates(state)
+              val ob           = updatedState.toOrderBookAggregatedSnapshot
 
               client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
@@ -106,7 +109,7 @@ object AggregatedOrderBookActor {
                 priceDecimals = priceDecimals,
                 asks = ob.asks,
                 bids = ob.bids,
-                lt = state.lastTrade,
+                lt = updatedState.lastTrade,
                 updateId = 0L,
                 restrictions = restrictions,
                 tickSize = tickSize
@@ -114,7 +117,7 @@ object AggregatedOrderBookActor {
 
               context.log.trace("[c={}] Added WebSocket subscription", client.path.name)
               context.watch(client)
-              default { state.modifyWs(_ addSubscription client) }
+              default { updatedState.modifyWs(_ addSubscription client) }
 
             case Command.RemoveWsSubscription(client) =>
               context.log.trace("[c={}] Removed WebSocket subscription", client.path.name)
@@ -123,8 +126,7 @@ object AggregatedOrderBookActor {
 
             case Command.SendWsUpdates =>
               val updated = state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
-              if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates()
-              default(updated)
+              default(if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates(updated) else updated)
 
             case Event.OrderBookRemoved =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
@@ -176,7 +178,8 @@ object AggregatedOrderBookActor {
       lastTrade: Option[LastTrade],
       lastUpdateTs: Long,
       compiledHttpView: Map[(DecimalsFormat, Depth), HttpResponse],
-      ws: WsOrderBookState
+      ws: WsOrderBookState,
+      wsSendSchedule: Cancellable
   ) {
 
     val genLens: GenLens[State] = GenLens[State]
@@ -216,7 +219,8 @@ object AggregatedOrderBookActor {
         lastTrade = None,
         lastUpdateTs = 0,
         compiledHttpView = Map.empty,
-        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None)
+        ws = WsOrderBookState(Map.empty, Set.empty, Set.empty, lastTrade = None, changedTickSize = None),
+        wsSendSchedule = Cancellable.alreadyCancelled
       )
 
     val genLens: GenLens[State] = GenLens[State]
@@ -229,7 +233,8 @@ object AggregatedOrderBookActor {
       lastTrade = ob.lastTrade,
       lastUpdateTs = System.currentTimeMillis(), // DEX-642
       compiledHttpView = Map.empty,
-      ws = empty.ws
+      ws = empty.ws,
+      wsSendSchedule = Cancellable.alreadyCancelled
     )
   }
 

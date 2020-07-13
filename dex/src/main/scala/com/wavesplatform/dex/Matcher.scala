@@ -42,7 +42,6 @@ import com.wavesplatform.dex.model._
 import com.wavesplatform.dex.queue._
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderFeeSettings}
 import com.wavesplatform.dex.time.NTP
-import monix.eval.Task
 import mouse.any.anySyntaxMouse
 
 import scala.concurrent.duration._
@@ -61,11 +60,17 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
 
   private val time = new NTP(settings.ntpServer)
 
+  private val assetsCache = AssetsStorage.cache { AssetsStorage.levelDB(db) }
+
   private val wavesBlockchainAsyncClient =
-    WavesBlockchainClientBuilder.async(
-      settings.wavesBlockchainClient,
-      monixScheduler,
-      grpcExecutionContext
+    new WavesBlockchainAssetsWatchingClient(
+      settings = settings.wavesBlockchainClient,
+      underlying = WavesBlockchainClientBuilder.async(
+        settings.wavesBlockchainClient,
+        monixScheduler = monixScheduler,
+        grpcExecutionContext = grpcExecutionContext
+      ),
+      assetsStorage = assetsCache
     )
 
   private implicit val materializer: Materializer = Materializer.matFromSystem(actorSystem)
@@ -85,8 +90,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     new AssetPairBuilder(settings, getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_), settings.blacklistedAssets)
   }
 
-  private var hasMatcherAccountScript: Boolean = false
-  private lazy val assetsCache                 = AssetsStorage.cache { AssetsStorage.levelDB(db) }
+  private var hasMatcherAccountScript = false
 
   private val orderBooks          = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBookAskAdapter = new OrderBookAskAdapter(orderBooks, settings.actorResponseTimeout)
@@ -100,7 +104,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
     assetsCache.unsafeGetHasScript
   )
 
-  private implicit val errorContext: ErrorFormatterContext = _.fold(8)(assetsCache.unsafeGetDecimals)
+  private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.fromOptional(assetsCache.get(_: Asset).map(_.decimals))
 
   private val matchingRulesCache    = new MatchingRulesCache(settings)
   private val orderFeeSettingsCache = new OrderFeeSettingsCache(settings.orderFee)
@@ -109,7 +113,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
   private def getDecimalsFromCache(asset: Asset): FutureResult[Int] = getDecimals(assetsCache, wavesBlockchainAsyncClient.assetDescription)(asset)
 
   private def orderBookProps(assetPair: AssetPair, matcherActor: ActorRef): Props = {
-    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.assetDecimals)
+    matchingRulesCache.setCurrentMatchingRuleForNewOrderBook(assetPair, lastProcessedOffset, errorContext.unsafeAssetDecimals)
     OrderBookActor.props(
       OrderBookActor.Settings(AggregatedOrderBookActor.Settings(settings.webSocketSettings.externalClientHandler.messagesInterval)),
       matcherActor,
@@ -118,9 +122,9 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       wsInternalBroadcast, // Safe to use here, because OrderBookActors are created after wsInternalBroadcast initialization
       assetPair,
       time,
-      matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.assetDecimals),
+      matchingRules = matchingRulesCache.getMatchingRules(assetPair, errorContext.unsafeAssetDecimals),
       updateCurrentMatchingRules = actualMatchingRule => matchingRulesCache.updateCurrentMatchingRule(assetPair, actualMatchingRule),
-      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.assetDecimals),
+      normalizeMatchingRule = denormalizedMatchingRule => denormalizedMatchingRule.normalize(assetPair, errorContext.unsafeAssetDecimals),
       Fee.getMakerTakerFeeByOffset(orderFeeSettingsCache),
       settings.orderRestrictions.get(assetPair)
     )
@@ -334,14 +338,8 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
     }
 
-    wavesBlockchainAsyncClient.realTimeBalanceChanges
-      .bufferIntrospective(bufferSize)
+    wavesBlockchainAsyncClient.realTimeBalanceBatchChanges
       .map(aggregateChangesByAddress)
-      .mapEval { xs =>
-        Task
-          .traverse { xs.valuesIterator.flatMap(_.keysIterator).toList }(asset => Task fromFuture getDecimalsFromCache(asset).value)
-          .map(_ => xs)
-      }
       .foreach { recipient ! SpendableBalancesActor.Command.UpdateStates(_) }(monixScheduler)
   }
 

@@ -26,8 +26,14 @@ object HttpV1LevelAgg {
     case x                                             => JsError(s"Cannot parse $x as ApiV1LevelAgg")
   }
 
-  def fromLevelAgg(la: LevelAgg, assetPair: AssetPair)(implicit efc: ErrorFormatterContext): HttpV1LevelAgg = HttpV1LevelAgg(
-    Denormalization.denormalizeAmountAndFee(la.amount, efc.assetDecimals(assetPair.amountAsset)).toDouble,
-    Denormalization.denormalizePrice(la.price, efc.assetDecimals(assetPair.amountAsset), efc.assetDecimals(assetPair.priceAsset)).toDouble
-  )
+  def fromLevelAgg(la: LevelAgg, assetPair: AssetPair)(implicit efc: ErrorFormatterContext): HttpV1LevelAgg = {
+    val amountAssetDecimals =
+      efc.assetDecimals(assetPair.amountAsset).getOrElse(throw new RuntimeException(s"Can't get asset decimals for ${assetPair.amountAsset}"))
+    val priceAssetDecimals =
+      efc.assetDecimals(assetPair.priceAsset).getOrElse(throw new RuntimeException(s"Can't get asset decimals for ${assetPair.amountAsset}"))
+    HttpV1LevelAgg(
+      Denormalization.denormalizeAmountAndFee(la.amount, amountAssetDecimals).toDouble,
+      Denormalization.denormalizePrice(la.price, amountAssetDecimals, priceAssetDecimals).toDouble
+    )
+  }
 }

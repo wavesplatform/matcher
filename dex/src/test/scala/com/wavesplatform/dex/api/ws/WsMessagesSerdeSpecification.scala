@@ -10,7 +10,6 @@ import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsLastTrade, WsOrder, 
 import com.wavesplatform.dex.api.ws.protocol.WsOrderBookChanges.WsSide
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.domain.account.KeyPair
-import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.Order
@@ -27,7 +26,7 @@ import scala.collection.immutable.TreeMap
 
 class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenPropertyChecks with Matchers with MatcherSpecBase {
 
-  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val wsBalancesGen = for {
     tradable <- maxWavesAmountGen

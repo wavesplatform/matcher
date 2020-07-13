@@ -2,6 +2,8 @@ package com.wavesplatform.dex.actors.address
 
 import java.util.concurrent.atomic.AtomicReference
 
+import akka.actor.testkit.typed.{scaladsl => typed}
+import akka.actor.typed.scaladsl.adapter._
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
@@ -9,6 +11,7 @@ import com.wavesplatform.dex.MatcherSpecBase
 import com.wavesplatform.dex.actors.SpendableBalancesActor
 import com.wavesplatform.dex.actors.address.AddressActor.Query.GetTradableBalance
 import com.wavesplatform.dex.actors.address.AddressActor.Reply.Balance
+import com.wavesplatform.dex.api.ws.protocol.WsAddressChanges
 import com.wavesplatform.dex.db.EmptyOrderDB
 import com.wavesplatform.dex.domain.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
@@ -36,7 +39,8 @@ class AddressActorSpecification
     with DiffMatcherWithImplicits
     with MatcherSpecBase {
 
-  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val typedSystem                = system.toTyped
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val assetId     = ByteStr("asset".getBytes("utf-8"))
   override val matcherFee = 30000L
@@ -176,8 +180,45 @@ class AddressActorSpecification
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
     }
 
-    "schedule expired order cancellation" in {
-      pending
+    "cancel expired orders" in test { (ref, eventsProbe, addOrder, updatePortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio)
+      ref ! AddressDirectoryActor.StartSchedules
+
+      val lo = LimitOrder(
+        OrderV1(
+          sender = privateKey("test"),
+          matcher = PublicKey("matcher".getBytes("utf-8")),
+          pair = AssetPair(Waves, IssuedAsset(assetId)),
+          orderType = OrderType.BUY,
+          price = 100000000L,
+          amount = 100L,
+          timestamp = System.currentTimeMillis(),
+          expiration = System.currentTimeMillis() + 100,
+          matcherFee = matcherFee
+        ))
+      addOrder(lo)
+
+      eventsProbe.expectMsg(QueueEvent.Canceled(lo.order.assetPair, lo.id))
+    }
+
+    "should not send a message multiple times" in test { (ref, _, addOrder, updatePortfolio) =>
+      val initPortfolio = sellToken1Portfolio
+      updatePortfolio(initPortfolio)
+      addOrder(LimitOrder(sellTokenOrder1))
+
+      val subscription1 = typed.TestProbe[WsAddressChanges]("probe-1")
+      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.AddWsSubscription(subscription1.ref))
+      subscription1.receiveMessage()
+
+      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.RemoveWsSubscription(subscription1.ref))
+
+      val subscription2 = typed.TestProbe[WsAddressChanges]("probe-2")
+      ref ! AddressDirectoryActor.Envelope(sellTokenOrder1.sender.toAddress, AddressActor.WsCommand.AddWsSubscription(subscription2.ref))
+      subscription2.receiveMessage()
+
+      updatePortfolio(initPortfolio.copy(balance = initPortfolio.balance + 1))
+      subscription2.receiveMessage()
     }
   }
 

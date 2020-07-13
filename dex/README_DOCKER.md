@@ -46,7 +46,7 @@ waves.dex {
 }
 ```
 
-## Running Docker images
+## Running Docker Images
 
 Successful Node-Matcher interaction requires that they can see each other. Therefore, you should use container linking or a private network.
 The order in which containers are started matters! Matcher Node should be started first, then Matcher Server. 
@@ -77,7 +77,7 @@ Directory `/docker/waves-dex/runtime/` is used to provide all necessary runtime 
   1. `/docker/waves-dex/runtime/local.conf` should be provided (see its mandatory content above);
   2. you can place logback.xml with your own log settings in `/docker/waves-dex/runtime/` or use our [log management file](https://github.com/wavesplatform/matcher/blob/master/dex/src/package/doc/logback.xml).
 
-### Managing data
+### Managing Data
 
 As well as at Waves Node, we use dedicated `waves-dex:waves-dex` user with predefined uid/gid `113/116` to launch the container. As such, either change permissions of the created directories or change their owner:
 

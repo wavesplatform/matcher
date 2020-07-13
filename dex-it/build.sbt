@@ -36,18 +36,18 @@ docker := {
 
 inTask(docker)(
   Seq(
-    nameOfImage := "com.wavesplatform/dex-it",
+    nameOfImage := "wavesplatform/dex-it",
     dockerfile := new Dockerfile {
 
       val basePath     = "/opt/waves-dex"
-      val entryPointSh = s"$basePath/start-matcherserver-it.sh"
+      val entryPointSh = s"$basePath/start-matcher-server-it.sh"
 
-      from("com.wavesplatform/matcherserver:latest")
+      from("wavesplatform/matcher-server:latest")
       user("root:root")
 
       add(
         sources = Seq(
-          (Test / sourceDirectory).value / "container" / "start-matcherserver-it.sh", // entry point
+          (Test / sourceDirectory).value / "container" / "start-matcher-server-it.sh", // entry point
           (Test / resourceDirectory).value / "dex-servers" / "logback-container.xml", // logs management
           itArtifactsCacheDir.value / "aspectjweaver.jar" // profiler, see https://www.yourkit.com/docs/java/help/docker.jsp
         ),

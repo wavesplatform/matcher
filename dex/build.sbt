@@ -63,7 +63,7 @@ inConfig(Compile)(
 // Docker
 inTask(docker)(
   Seq(
-    nameOfImage := "com.wavesplatform/matcherserver",
+    nameOfImage := "wavesplatform/matcher-server",
     dockerfile := new Dockerfile {
 
       val (user, userId)   = ("waves-dex", "113")
@@ -72,7 +72,7 @@ inTask(docker)(
       val userPath    = s"/var/lib/$user"
       val sourcesPath = s"/usr/share/$user"
 
-      val entryPointSh = s"$sourcesPath/bin/start-matcherserver.sh"
+      val entryPointSh = s"$sourcesPath/bin/start-matcher-server.sh"
 
       from("openjdk:8-jre-slim-buster")
 
@@ -84,9 +84,9 @@ inTask(docker)(
                   |ln -fs $sourcesPath/log/ var/log/waves-dex""".stripMargin)
 
       Seq(
-        (Universal / stage).value                                                  -> s"$sourcesPath/", // sources
-        (Compile / sourceDirectory).value / "container" / "start-matcherserver.sh" -> s"$sourcesPath/bin/", // entry point
-        (Compile / sourceDirectory).value / "container" / "dex.conf"               -> s"$sourcesPath/conf/" // base config
+        (Universal / stage).value                                                   -> s"$sourcesPath/", // sources
+        (Compile / sourceDirectory).value / "container" / "start-matcher-server.sh" -> s"$sourcesPath/bin/", // entry point
+        (Compile / sourceDirectory).value / "container" / "dex.conf"                -> s"$sourcesPath/conf/" // base config
       ) foreach { case (source, destination) => add(source = source, destination = destination, chown = s"$user:$group") }
 
       user(s"$user:$group")

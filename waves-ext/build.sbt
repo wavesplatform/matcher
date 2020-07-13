@@ -75,19 +75,19 @@ Debian / debianPackageConflicts := Seq(
 
 inTask(docker)(
   Seq(
-    nameOfImage := "com.wavesplatform/matchernode",
+    nameOfImage := "wavesplatform/matcher-node",
     imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
     dockerfile := new Dockerfile {
 
       val basePath     = "/opt/waves"
-      val entryPointSh = s"$basePath/start-matchernode.sh"
+      val entryPointSh = s"$basePath/start-matcher-node.sh"
 
       from(s"wavesplatform/wavesnode:${wavesNodeVersion.value}")
       user("waves:waves")
       add(
         sources = Seq(
           (Universal / stage).value, // sources
-          (Compile / sourceDirectory).value / "container" / "start-matchernode.sh" // entry point
+          (Compile / sourceDirectory).value / "container" / "start-matcher-node.sh" // entry point
         ),
         destination = s"$basePath/",
         chown = "waves:waves"

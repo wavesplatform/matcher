@@ -12,19 +12,19 @@ docker := docker.dependsOn(LocalProject("waves-ext") / docker).value
 
 inTask(docker)(
   Seq(
-    nameOfImage := "com.wavesplatform/waves-integration-it",
+    nameOfImage := "wavesplatform/waves-integration-it",
     imageTagMakeFunction := (gitTag => s"${wavesNodeVersion.value}_$gitTag"),
     dockerfile := new Dockerfile {
 
       val basePath     = "/opt/waves"
-      val entryPointSh = s"$basePath/start-matchernode-it.sh"
+      val entryPointSh = s"$basePath/start-matcher-node-it.sh"
 
-      from("com.wavesplatform/matchernode:latest")
+      from("wavesplatform/matcher-node:latest")
       user("root:root")
 
       add(
         sources = Seq(
-          (Test / sourceDirectory).value / "container" / "start-matchernode-it.sh", // entry point
+          (Test / sourceDirectory).value / "container" / "start-matcher-node-it.sh", // entry point
           (Test / resourceDirectory).value / "nodes" / "logback-container.xml" // logs management
         ),
         destination = s"$basePath/",

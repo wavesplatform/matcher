@@ -1,12 +1,15 @@
 package com.wavesplatform.it.sync.api.ws
 
+import cats.syntax.option._
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus
 import com.wavesplatform.dex.api.ws.connection.WsConnection
 import com.wavesplatform.dex.api.ws.entities.{WsBalances, WsOrder}
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsAddressSubscribe, WsError, WsUnsubscribe}
 import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.Waves
+import com.wavesplatform.dex.domain.model.Denormalization
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.error.SubscriptionsLimitReached
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -15,6 +18,7 @@ import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyChecks {
 
@@ -164,8 +168,6 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         dex1.api.placeMarket(smo)
         waitForOrderAtNode(smo)
 
-        import OrderStatus._
-
         assertChanges(wsc)(
           Map(Waves -> WsBalances(1, 50.003)),
           Map(Waves -> WsBalances(1, 35.0021)),
@@ -176,9 +178,9 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           Map(usd   -> WsBalances(55.5, 0))
         )(
           WsOrder.fromDomain(mo),
-          WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
-          WsOrder(mo.id, status = PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
-          WsOrder(mo.id, status = Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
+          WsOrder(mo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 15.0, filledFee = 0.0009, avgWeighedPrice = 1.2),
+          WsOrder(mo.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 40.0, filledFee = 0.0024, avgWeighedPrice = 1.1375),
+          WsOrder(mo.id, status = OrderStatus.Filled.name, filledAmount = 50.0, filledFee = 0.003, avgWeighedPrice = 1.11)
         )
 
         wsc.close()
@@ -224,19 +226,37 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         placeAndAwaitAtDex(bo)
         placeAndAwaitAtNode(mkOrderDP(alice, wavesUsdPair, SELL, 5.waves, 1.0))
 
-        assertChanges(wsc)(
-          Map(usd   -> WsBalances(0, 10), Waves -> WsBalances(9.997, 0.003)), // Waves balance on Node = 10
-          Map(usd   -> WsBalances(0, 5), Waves -> WsBalances(9.997, 0.0015)), // Waves balance on Node = 10
-          Map(Waves -> WsBalances(14.997, 0.0015)) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
-        )(
-          WsOrder.fromDomain(limitOrder),
-          WsOrder(limitOrder.id, status = OrderStatus.PartiallyFilled.name, filledAmount = 5.0, filledFee = 0.0015, avgWeighedPrice = 1.0)
-        )
+        eventually {
+          wsc.balanceChanges.squashed should matchTo(
+            Map(
+              usd   -> WsBalances(0, 5),
+              Waves -> WsBalances(14.997, 0.0015) // since balance increasing comes after transaction mining, + 5 - 0.0015, Waves balance on Node = 14.9985
+            )
+          )
+
+          wsc.orderChanges.squashed should matchTo(
+            Map(
+              limitOrder.id -> WsOrder
+                .fromDomain(limitOrder)
+                .copy(
+                  id = limitOrder.id,
+                  status = OrderStatus.PartiallyFilled.name.some,
+                  filledAmount = 5.0.some,
+                  filledFee = 0.0015.some,
+                  avgWeighedPrice = 1.0.some
+                )
+            ))
+        }
+        wsc.clearMessages()
 
         dex1.api.cancelAll(acc)
-        assertChanges(wsc, squash = false) { Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)) }(
-          WsOrder(bo.id(), status = OrderStatus.Cancelled.name)
-        )
+
+        eventually {
+          wsc.balanceChanges.squashed should matchTo(Map(usd -> WsBalances(5, 0), Waves -> WsBalances(14.9985, 0)))
+          wsc.orderChanges.squashed should matchTo(
+            Map(limitOrder.id -> WsOrder(bo.id(), status = OrderStatus.Cancelled.name))
+          )
+        }
 
         wsc.close()
       }
@@ -399,6 +419,136 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
         WsError.from(SubscriptionsLimitReached(3, alice.toAddress.toString), 0L),
         WsError.from(SubscriptionsLimitReached(3, bob.toAddress.toString), 0L)
       )
+    }
+  }
+
+  "Bugs" - {
+    "DEX-816 Failure of AddressActor" in {
+      dex1.stopWithoutRemove()
+      broadcastAndAwait(IssueWctTx)
+      dex1.start()
+
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+
+      eventually {
+        wsc.receiveAtLeastN[WsAddressChanges](1)
+      }
+    }
+
+    "DEX-817 Invalid WAVES balance after connection (leasing)" in {
+      val bobWavesBalanceBefore = dex1.api.tradableBalance(bob, wavesBtcPair)(Waves)
+
+      dex1.stopWithoutRemove()
+      val leaseTx = mkLease(bob, alice, bobWavesBalanceBefore - 0.1.waves, fee = leasingFee)
+      broadcastAndAwait(leaseTx)
+      dex1.start()
+
+      val wsc = mkDexWsConnection(dex1)
+      wsc.send(WsAddressSubscribe(bob, WsAddressSubscribe.defaultAuthType, mkJwt(bob)))
+
+      eventually {
+        val balance = wsc.receiveAtLeastN[WsAddressChanges](1).map(_.balances).squashed - btc - wct
+        balance should matchTo(
+          Map[Asset, WsBalances](
+            Waves -> WsBalances(Denormalization.denormalizeAmountAndFee(0.1.waves - leasingFee, 8).toDouble, 0)
+          ))
+      }
+
+      broadcastAndAwait(mkLeaseCancel(bob, leaseTx.getId))
+    }
+
+    "DEX-818" - {
+      "Connections can affect each other" in {
+        val wscs    = (1 to 10).map(_ => mkWsAddressConnection(bob))
+        val mainWsc = mkWsAddressConnection(bob)
+
+        markup("Multiple orders")
+        val now = System.currentTimeMillis()
+        val orders = (1 to 50).map { i =>
+          mkOrderDP(bob, wavesBtcPair, BUY, 1.waves, 0.00012, ts = now + i)
+        }
+
+        Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
+        dex1.api.cancelAll(bob)
+
+        wscs.par.foreach(_.close())
+        Thread.sleep(3000)
+        mainWsc.clearMessages()
+
+        markup("A new order")
+        placeAndAwaitAtDex(mkOrderDP(bob, wavesBtcPair, BUY, 2.waves, 0.00029))
+
+        eventually {
+          mainWsc.receiveAtLeastN[WsAddressChanges](1)
+        }
+        mainWsc.clearMessages()
+      }
+
+      "Negative balances" in {
+        val carol = mkAccountWithBalance(5.waves -> Waves)
+        val wsc   = mkWsAddressConnection(carol)
+
+        val now = System.currentTimeMillis()
+        val txs = (1 to 2).map { i =>
+          mkTransfer(carol, alice, 5.waves - minFee, Waves, minFee, timestamp = now + i)
+        }
+        val simulation = Future.traverse(txs)(wavesNode1.asyncApi.broadcast(_))
+        Await.result(simulation, 1.minute)
+        wavesNode1.api.waitForHeightArise()
+
+        wsc.balanceChanges.zipWithIndex.foreach {
+          case (changes, i) =>
+            changes.foreach {
+              case (asset, balance) =>
+                withClue(s"$i: $asset -> $balance: ") {
+                  balance.tradable should be >= 0.0
+                  balance.reserved should be >= 0.0
+                }
+            }
+        }
+      }
+    }
+
+    "DEX-827 Wrong balance" in {
+      val btcBalance = 461
+      val carol      = mkAccountWithBalance(25.waves -> Waves, btcBalance.btc -> btc)
+      val wsc        = mkWsAddressConnection(carol)
+
+      val now    = System.currentTimeMillis()
+      val order1 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 1)
+      val order2 = mkOrderDP(carol, wavesBtcPair, BUY, 4.7.waves, 6, matcherFee = 0.003.waves, ts = now + 2)
+      val order3 = mkOrderDP(carol, wavesBtcPair, SELL, 10.waves, 6, matcherFee = 0.003.waves)
+
+      dex1.api.place(order1)
+      dex1.api.place(order2)
+
+      placeAndAwaitAtDex(order3, HttpOrderStatus.Status.PartiallyFilled)
+      dex1.api.cancelAll(carol)
+
+      waitForOrderAtNode(order1)
+      waitForOrderAtNode(order2)
+      waitForOrderAtNode(order3)
+
+      wavesNode1.api.waitForHeightArise()
+
+      val expectedWavesBalance = 25.0 - 0.003 * 2 - 0.003 * 4.7 * 2 / 10
+
+      wavesNode1.api.balance(carol, Waves) shouldBe expectedWavesBalance.waves
+      wavesNode1.api.balance(carol, btc) shouldBe btcBalance.btc
+
+      dex1.api.tradableBalance(carol, wavesBtcPair) should matchTo(
+        Map(
+          Waves -> expectedWavesBalance.waves,
+          btc   -> btcBalance.btc
+        )
+      )
+
+      wsc.balanceChanges.squashed should matchTo(
+        Map(
+          Waves -> WsBalances(expectedWavesBalance, 0),
+          btc   -> WsBalances(btcBalance, 0)
+        ))
     }
   }
 }

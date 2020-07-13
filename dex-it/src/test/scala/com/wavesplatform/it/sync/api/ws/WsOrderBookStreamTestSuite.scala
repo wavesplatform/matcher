@@ -18,6 +18,7 @@ import com.wavesplatform.dex.settings.{DenormalizedMatchingRule, OrderRestrictio
 import com.wavesplatform.it.WsSuiteBase
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
 class WsOrderBookStreamTestSuite extends WsSuiteBase {
@@ -465,7 +466,6 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
         mkOrderDP(carol, wavesBtcPair, BUY, 1.waves + i, 0.00012)
       }
 
-      import scala.concurrent.duration.DurationInt
       Await.result(Future.traverse(orders)(dex1.asyncApi.place), 1.minute)
       dex1.api.cancelAll(carol)
 
@@ -483,10 +483,10 @@ class WsOrderBookStreamTestSuite extends WsSuiteBase {
             assetPair = wavesBtcPair,
             asks = TreeMap.empty,
             bids = TreeMap(0.00029d -> 2d),
-            lastTrade = None,
+            lastTrade = none,
             updateId = 0,
             timestamp = buffer.last.timestamp,
-            settings = None
+            settings = none
           )
         )
       }

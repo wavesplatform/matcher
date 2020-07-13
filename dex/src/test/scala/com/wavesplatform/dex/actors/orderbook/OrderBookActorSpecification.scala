@@ -80,7 +80,7 @@ class OrderBookActorSpecification
 
     prepare(obsdb, pair)
 
-    implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+    implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
     val orderBookActor = TestActorRef(
       new OrderBookActor(

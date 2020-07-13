@@ -52,7 +52,7 @@ class OrderValidatorSpecification
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(btc -> 10.btc))
 
-  private implicit val errorContext: ErrorFormatterContext = _ => defaultAssetDescription.decimals
+  private implicit val errorContext: ErrorFormatterContext = ErrorFormatterContext.from(_ => defaultAssetDescription.decimals)
 
   "OrderValidator" should {
 

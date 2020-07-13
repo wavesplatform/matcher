@@ -34,8 +34,8 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
   private val settings = MatcherSettings.valueReader.read(ConfigFactory.load(), "waves.dex").copy(priceAssets = Seq(usd, Waves))
 
   private implicit val efc: ErrorFormatterContext = {
-    case `usd` => 2
-    case _     => 8
+    case `usd` => 2.some
+    case _     => 8.some
   }
 
   private val wavesUsdAggregatedSnapshot = OrderBookAggregatedSnapshot(
@@ -91,7 +91,7 @@ class MatcherApiRouteV1Spec extends RouteSpec("/api/v1") with MatcherSpecBase wi
         askAdapter = orderBookAskAdapter,
         time = time,
         assetDecimals = {
-          case a if a == `usd` || a == Waves => efc.assetDecimals(a).some
+          case a if a == `usd` || a == Waves => efc.assetDecimals(a)
           case x                             => throw new IllegalArgumentException(s"No information about $x")
         }
       )

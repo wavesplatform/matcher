@@ -123,9 +123,9 @@ object WsFullOrder {
   def from(event: OrderCanceled)(implicit efc: ErrorFormatterContext): WsFullOrder = {
     val ao = event.acceptedOrder
 
-    val amountAssetDecimals = efc.assetDecimals(ao.order.assetPair.amountAsset)
-    val feeAssetDecimals    = efc.assetDecimals(ao.order.feeAsset)
-    val priceAssetDecimals  = efc.assetDecimals(ao.order.assetPair.priceAsset)
+    val amountAssetDecimals = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
+    val feeAssetDecimals    = efc.unsafeAssetDecimals(ao.order.feeAsset)
+    val priceAssetDecimals  = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
 
     def denormalizeAmount(value: Long): Double = Denormalization.denormalizeAmountAndFee(value, amountAssetDecimals).toDouble
     def denormalizePrice(value: Long): Double  = Denormalization.denormalizePrice(value, amountAssetDecimals, priceAssetDecimals).toDouble

@@ -16,7 +16,7 @@ import scala.concurrent.Future
 
 class OrderHistoryStub(system: ActorSystem, time: Time, maxActiveOrders: Int, maxFinalizedOrders: Int) {
 
-  private implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  private implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]

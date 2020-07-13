@@ -1,5 +1,6 @@
 package com.wavesplatform.dex.api.http.entities
 
+import cats.syntax.option._
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
 import com.wavesplatform.dex.error.ErrorFormatterContext
@@ -21,8 +22,8 @@ class HttpV1OrderBookSpec extends AnyFreeSpec with Matchers with DiffMatcherWith
   private val wavesUsdPair = AssetPair(Waves, usd)
 
   private implicit val efc: ErrorFormatterContext = {
-    case `usd` => 2
-    case _     => 8
+    case `usd` => 2.some
+    case _     => 8.some
   }
 
   private val bids = List(LevelAgg(4380000000000L, 118), LevelAgg(5218700000000L, 117), LevelAgg(80900000000L, 116))

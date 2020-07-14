@@ -1,5 +1,6 @@
 #!/bin/bash
 NETWORKS="mainnet testnet stagenet"
+# This file is needed until NODE-2172 is done
 
 mkdir -p /var/lib/waves/log
 if [ ! -f /etc/waves/waves.conf ] ; then

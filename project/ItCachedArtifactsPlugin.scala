@@ -52,5 +52,5 @@ trait ItCachedArtifactsKeys {
 
   val itArtifactsCacheDir    = settingKey[File]("Where cached artifacts are stored")
   val itArtifactDescriptions = settingKey[Seq[ArtifactDescription]]("Artifacts descriptions")
-  val downloadItArtifacts    = taskKey[Unit]("Downloads IT artifacts to unmanagedBase")
+  val downloadItArtifacts    = taskKey[Unit]("Downloads artifacts required for IT to the cache directory")
 }

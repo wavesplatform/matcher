@@ -40,7 +40,10 @@ pipeline {
             }
             steps {
                 sh 'sbt dex-it/test'
-            }
+                build job: 'Waves.Exchange/Matcher/Push Docker Images', propagate: false, wait: false, parameters: [
+                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${params.BRANCH}"]
+                ]
+            }             
         }
         stage ('Run Integration Tests with kafka') {
             environment {

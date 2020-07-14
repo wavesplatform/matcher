@@ -40,7 +40,7 @@ pipeline {
             }
             steps {
                 build job: 'Waves.Exchange/Matcher/Push Docker Images', propagate: false, wait: false, parameters: [
-                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${params.BRANCH}"]
+                  [$class: 'StringParameterValue', name: 'BRANCH', value: "${BRANCH_NAME}"]
                 ]
             }             
         }

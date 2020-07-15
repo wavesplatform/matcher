@@ -10,15 +10,10 @@ import com.wavesplatform.dex.load.utils.{settings, _}
 import com.wavesplatform.wavesj._
 import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
-import sun.awt.AWTAccessor.AWTEventAccessor
 
-import scala.concurrent.blocking
 import scala.collection.JavaConversions.seqAsJavaList
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Random}
-
-import scala.concurrent.duration.{Duration, DurationInt}
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent._
 import scala.util.Random
 
 object TankGenerator {

@@ -18,7 +18,7 @@ import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.error.ErrorFormatterContext
 import com.wavesplatform.dex.meta.getSimpleName
 import com.wavesplatform.dex.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.dex.model.{LevelAgg, LimitOrder, MarketOrder, OrderBookAggregatedSnapshot}
+import com.wavesplatform.dex.model.{LimitOrder, MarketOrder}
 import com.wavesplatform.dex.queue.{QueueEvent, QueueEventWithMeta}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.propspec.AnyPropSpecLike
@@ -452,9 +452,9 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     }
 
     def amt(value: Long): Long = asset match {
-      case Waves => value.waves
-      case `usd` => value.usd
-      case `eth` => value.eth
+      case Waves => value.toDouble.waves
+      case `usd` => value.toDouble.usd
+      case `eth` => value.toDouble.eth
       case _     => value
     }
 
@@ -466,9 +466,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     }
   }
 
-  private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]],
-                                             orderBookCache: AssetPair => OrderBookAggregatedSnapshot = _ => OrderBookAggregatedSnapshot.empty,
-                                             testProbe: TestProbe): ActorRef = {
+  private def addressDirWithSpendableBalance(spendableBalances: Set[Asset] => Future[Map[Asset, Long]], testProbe: TestProbe): ActorRef = {
 
     lazy val addressDir = system.actorOf(
       Props(
@@ -493,7 +491,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
           (_, _) => Future.successful(Right(())),
           store = event => {
             testProbe.ref ! event
-            Future.successful { Some(QueueEventWithMeta(0, System.currentTimeMillis, event)) }
+            Future.successful { Some(QueueEventWithMeta(0L, System.currentTimeMillis, event)) }
           },
           enableSchedules,
           spendableBalancesActor
@@ -568,7 +566,7 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
     } {
 
       val tp         = TestProbe()
-      val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.filterKeys(assets.contains) }, testProbe = tp)
+      val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.view.filterKeys(assets.contains).toMap }, testProbe = tp)
       val fee        = Some(feeAsset.amt(matcherFee))
 
       val order = orderType match {
@@ -673,16 +671,8 @@ class ReservedBalanceSpecification extends AnyPropSpecLike with MatcherSpecLike 
         s"Reserves of the market order (${marketOrderInfo(moTpe, moAmt, moPrc, moFeeAsst, balance)}) executed with the counter order (${limitOrderInfo(moTpe.opposite, loAmt, loPrc)}) should be correct"
       } {
 
-        val orderBookCache: AssetPair => OrderBookAggregatedSnapshot = _ => {
-          val levels = Seq(LevelAgg(loAmt, loPrc))
-          moTpe match {
-            case BUY  => OrderBookAggregatedSnapshot(asks = levels)
-            case SELL => OrderBookAggregatedSnapshot(bids = levels)
-          }
-        }
-
         val tp         = TestProbe()
-        val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.filterKeys(assets.contains) }, orderBookCache, tp)
+        val addressDir = addressDirWithSpendableBalance(assets => Future.successful { balance.view.filterKeys(assets.contains).toMap }, tp)
         val fee        = Some(moFeeAsst.amt(matcherFee))
 
         val (order, counter) = moTpe match {

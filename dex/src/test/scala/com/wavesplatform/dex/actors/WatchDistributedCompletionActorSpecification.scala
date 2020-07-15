@@ -22,11 +22,11 @@ class WatchDistributedCompletionActorSpecification
 
   "WatchDistributedCompletionActorSpecification" should {
     "respond" when {
-      "no workers" in watcher(Set.empty).expectMsg('pong)
+      "no workers" in watcher(Set.empty).expectMsg(Symbol("pong"))
 
       "all work is done" in {
         val workers = (-1 to Random.nextInt(10)).map(_ => system.actorOf(Props(new PongActor))).toSet
-        watcher(workers).expectMsg('pong)
+        watcher(workers).expectMsg(Symbol("pong"))
       }
 
       val dyingTestGen = for {
@@ -42,22 +42,22 @@ class WatchDistributedCompletionActorSpecification
       }
 
       "even several of workers is dead" in forAll(dyingTestGen) { workers =>
-        watcher(workers).expectMsg('pong)
+        watcher(workers).expectMsg(Symbol("pong"))
       }
 
       "even all workers are dead" in {
         val workers = (-1 to Random.nextInt(10)).map(_ => system.actorOf(Props(new DyingActor(0.seconds)))).toSet
-        watcher(workers).expectMsg('pong)
+        watcher(workers).expectMsg(Symbol("pong"))
       }
 
       "when a worker respond and die" in {
         val workers = (-1 to Random.nextInt(10)).map(_ => system.actorOf(Props(new PongAndDieActor))).toSet
-        watcher(workers).expectMsg('pong)
+        watcher(workers).expectMsg(Symbol("pong"))
       }
 
       "requests are timed out" in {
         val workers = (-1 to Random.nextInt(10)).map(_ => system.actorOf(Props(new IgnoringActor))).toSet
-        watcher(workers, 50.millis).expectMsg('pong)
+        watcher(workers, 50.millis).expectMsg(Symbol("pong"))
       }
     }
   }
@@ -71,7 +71,7 @@ class WatchDistributedCompletionActorSpecification
 object WatchDistributedCompletionActorSpecification {
   def watcher(workers: Set[ActorRef], timeout: FiniteDuration = 1.minute)(implicit system: ActorSystem): TestProbe = {
     val p = TestProbe()
-    system.actorOf(Props(new WatchDistributedCompletionActor(workers, p.ref, 'ping, 'pong, timeout)))
+    system.actorOf(Props(new WatchDistributedCompletionActor(workers, p.ref, Symbol("ping"), Symbol("pong"), timeout)))
     p
   }
 
@@ -81,14 +81,14 @@ object WatchDistributedCompletionActorSpecification {
 
   class PongActor extends Actor {
     override def receive: Receive = {
-      case 'ping => sender() ! 'pong
+      case Symbol("ping") => sender() ! Symbol("pong")
     }
   }
 
   class PongAndDieActor extends Actor {
     override def receive: Receive = {
-      case 'ping =>
-        sender() ! 'pong
+      case Symbol("ping") =>
+        sender() ! Symbol("pong")
         context.stop(self)
     }
   }

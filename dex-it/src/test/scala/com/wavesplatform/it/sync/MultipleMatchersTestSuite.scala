@@ -10,7 +10,6 @@ import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.it.dex.DexApi
 import com.wavesplatform.dex.it.docker.DexContainer
-import com.wavesplatform.dex.it.fp.CanExtract._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.{MatcherCommand, MatcherState}
 import com.wavesplatform.it.config.DexTestConfig.createAssetPair
@@ -119,17 +118,17 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     allOrders.foreach(dex1.api.place)
     allOrders.foreach(order => dex1.api.waitForOrder(order)(_.status != Status.NotFound))
 
-    def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Iterable[Unit.type]] = Future.sequence {
+    def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[List[Unit.type]] = Future.sequence {
       orders.map { order =>
         dex1.asyncApi.tryCancel(owner, order).map {
           case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
           case _                             => Unit
         }
-      }
+      }.toList
     }
 
-    def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[Iterable[HttpSuccessfulBatchCancel]] = Future.sequence {
-      assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis))
+    def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[List[HttpSuccessfulBatchCancel]] = Future.sequence {
+      assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis)).toList
     }
 
     Await.result(

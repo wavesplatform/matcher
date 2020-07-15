@@ -53,7 +53,7 @@ import com.wavesplatform.dex.settings.OrderFeeSettings.DynamicSettings
 import com.wavesplatform.dex.settings.{MatcherSettings, OrderRestrictionsSettings}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsArray, JsString, Json}
+import play.api.libs.json.{JsArray, JsString, Json, JsonFacade => _}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -148,7 +148,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
     "returns a public key" in test { route =>
       Get(routePath("/")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[HttpMatcherPublicKey] should matchTo(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").right.get)
+        responseAs[HttpMatcherPublicKey] should matchTo(PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").explicitGet())
       }
     }
   }
@@ -320,9 +320,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               error = 3148040,
               message = s"The order ${badOrder.idStr()} has already been placed",
               template = "The order {{id}} has already been placed",
-              params = Json.obj(
-                "id" -> badOrder.idStr()
-              ),
+              params = Json.obj("id" -> badOrder.idStr()),
               status = "OrderRejected"
             )
           )
@@ -351,9 +349,7 @@ class MatcherApiRouteSpec extends RouteSpec("/matcher") with MatcherSpecBase wit
               error = 3148040,
               message = s"The order ${badOrder.idStr()} has already been placed",
               template = "The order {{id}} has already been placed",
-              params = Json.obj(
-                "id" -> badOrder.idStr()
-              ),
+              params = Json.obj("id" -> badOrder.idStr()),
               status = "OrderRejected"
             )
           )

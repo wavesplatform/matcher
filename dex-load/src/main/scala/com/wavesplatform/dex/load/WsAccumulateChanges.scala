@@ -16,7 +16,7 @@ object WsAccumulateChanges {
 
       val addr = fields(0)
       val aus  = fields(1)
-      val obs  = fields.drop(2)
+      val obs  = fields.drop(2).toSeq
 
       new WsCollectChangesClient(apiUri, addr, aus, obs)
     }
@@ -30,7 +30,7 @@ object WsAccumulateChanges {
         // 30%
         if (Random.nextDouble() < 0.3) r.update(Random.nextInt(accountsNumber), line)
       }
-      r
+      r.toSeq
     } finally source.close()
   }
 }

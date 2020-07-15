@@ -29,7 +29,7 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
             case None => throw new RuntimeException(s"Can't find $resource")
             case Some(html) =>
               val doc = org.jsoup.parser.Parser.parse(html, "127.0.0.1")
-              import scala.collection.JavaConverters._
+              import scala.jdk.CollectionConverters._
               doc
                 .body()
                 .children()

@@ -99,7 +99,7 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
       .flatMap { _.toVanilla }
       .flatMap { tx =>
         if (context.blockchain.containsTransaction(tx)) Right(BroadcastResponse(isValid = true))
-        else context.broadcastTransaction(tx).resultE.map(xs => BroadcastResponse(xs)).leftFlatMap(_ => BroadcastResponse().asRight)
+        else context.broadcastTransaction(tx).resultE.map(BroadcastResponse(_)).leftFlatMap(_ => BroadcastResponse().asRight)
       }
       .explicitGetErr()
   }

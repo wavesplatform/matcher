@@ -21,14 +21,14 @@ trait CanExtractInstances1 extends CanExtractInstances2 {
 /** The weakest type restrictions in the end */
 trait CanExtractInstances2 {
 
-  implicit val future = new CanExtract[Future] {
+  implicit val future: CanExtract[Future] = new CanExtract[Future] {
     override def extract[ErrorT, ResultT](f: => Future[Either[ErrorT, ResultT]]): Future[ResultT] = f.map {
       case Left(e)  => throw new RuntimeException(s"Can't extract: $e")
       case Right(r) => r
     }
   }
 
-  implicit val id = new CanExtract[Id] {
+  implicit val id: CanExtract[Id] = new CanExtract[Id] {
     override def extract[ErrorT, ResultT](f: => Id[Either[ErrorT, ResultT]]): Id[ResultT] = f match {
       case Left(e)  => throw new RuntimeException(s"Can't extract: $e")
       case Right(r) => r

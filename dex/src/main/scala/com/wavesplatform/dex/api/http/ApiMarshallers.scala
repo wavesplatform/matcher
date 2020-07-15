@@ -37,7 +37,7 @@ trait ApiMarshallers {
 
       json.validate[A] match {
         case JsSuccess(value, _) => value
-        case JsError(errors)     => throw PlayJsonException(errors = errors)
+        case JsError(errors)     => throw PlayJsonException(errors = errors.map { case (jp, errorsSeq) => jp -> errorsSeq.to(Seq) } to Seq)
       }
     }
 

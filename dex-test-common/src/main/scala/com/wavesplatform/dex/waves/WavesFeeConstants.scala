@@ -1,6 +1,6 @@
 package com.wavesplatform.dex.waves
 
-import com.wavesplatform.dex.asset.DoubleOps.DoubleOpsImplicits
+import com.wavesplatform.dex.asset.DoubleOps.NumericOps
 
 object WavesFeeConstants extends WavesFeeConstants
 

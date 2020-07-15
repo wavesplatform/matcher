@@ -12,6 +12,7 @@ import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 
 class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
@@ -23,7 +24,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
   private val deliveryTimeout         = requestTimeout + 1.second
   private val waitAfterNetworkChanges = deliveryTimeout
 
-  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex { 
+  override protected val dexInitialSuiteConfig: Config = ConfigFactory.parseString(s"""waves.dex {
   price-assets = [ "$UsdId", "WAVES" ]
   events-queue {
     kafka.producer.client {
@@ -96,10 +97,10 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     disconnectKafkaFromNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
-    dex1.api.tryCancel(alice, sellOrder) shouldBe 'left
+    dex1.api.tryCancel(alice, sellOrder) shouldBe Symbol("left")
 
     val bigSellOrder = mkOrderDP(alice, wavesUsdPair, SELL, 30.waves, 3.0)
-    dex1.api.tryPlace(bigSellOrder) shouldBe 'left
+    dex1.api.tryPlace(bigSellOrder) shouldBe Symbol("left")
 
     dex1.api.reservedBalance(alice) should matchTo(Map[Asset, Long](Waves -> 10.003.waves))
 
@@ -115,7 +116,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     connectKafkaToNetwork()
     Thread.sleep(waitAfterNetworkChanges.toMillis)
 
-    dex1.api.tryCancel(alice, sellOrder) shouldBe 'right
+    dex1.api.tryCancel(alice, sellOrder) shouldBe Symbol("right")
     dex1.api.waitForOrderStatus(sellOrder, Status.Cancelled)
 
     dex1.api.orderHistory(alice, Some(true)) should have size 0
@@ -125,7 +126,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       WsOrder(id = sellOrder.id(), status = OrderStatus.Cancelled.name)
     }
 
-    dex1.api.tryPlace(bigSellOrder) shouldBe 'right
+    dex1.api.tryPlace(bigSellOrder) shouldBe Symbol("right")
     dex1.api.waitForOrderStatus(bigSellOrder, Status.Accepted)
 
     dex1.api.orderHistory(alice, Some(true)) should have size 1

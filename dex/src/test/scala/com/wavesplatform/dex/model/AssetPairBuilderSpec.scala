@@ -96,7 +96,7 @@ class AssetPairBuilderSpec extends AnyFreeSpec with Matchers with MockFactory {
         case (amountAsset, priceAsset, isValid) =>
           val pair = awaitResult { builder.createAssetPair(amountAsset, priceAsset) }
           isValid match {
-            case Right(_) => pair shouldBe 'right
+            case Right(_) => pair shouldBe Symbol("right")
             case Left(e)  => pair should produce(e)
           }
       }

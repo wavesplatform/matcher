@@ -7,7 +7,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.it.config.GenesisConfig.generatorConfig
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object PredefinedAccounts extends PredefinedAccounts {
   def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = KeyPair(crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed)))

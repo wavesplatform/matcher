@@ -35,8 +35,8 @@ object WsOrderBookChanges {
 
   type WsSide = TreeMap[Double, Double]
 
-  private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.compare(x, y)
-  private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.compare(x, y)
+  private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.IeeeOrdering.compare(x, y)
+  private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.IeeeOrdering.compare(x, y)
 
   def empty(assetPair: AssetPair): WsOrderBookChanges =
     WsOrderBookChanges(
@@ -84,7 +84,7 @@ object WsOrderBookChanges {
       case x => JsError(JsPath, s"Can't read Side from ${x.getClass.getName}")
     },
     tjs = Writes { xs =>
-      JsArray(xs.map(priceAmountFormat.writes)(collection.breakOut))
+      JsArray(xs.map(priceAmountFormat.writes).to(Seq))
     }
   )
 

@@ -66,7 +66,7 @@ object Application {
     import com.wavesplatform.dex.settings.loadConfig
     import com.wavesplatform.dex.settings.utils.ConfigOps.ConfigOps
 
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     val config           = loadConfig(external map ConfigFactory.parseFile)
     val scalaContextPath = "scala.concurrent.context"

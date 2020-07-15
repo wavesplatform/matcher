@@ -69,8 +69,8 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   @volatile private var balanceChanges = Map.empty[Address, Map[Asset, Long]]
 
   private val eventsObserver: Observer[BalanceChanges] = new Observer[BalanceChanges] {
-    override def onError(ex: Throwable): Unit = Unit
-    override def onComplete(): Unit           = Unit
+    override def onError(ex: Throwable): Unit = ()
+    override def onComplete(): Unit           = ()
     override def onNext(elem: BalanceChanges): Future[Ack] = {
       balanceChanges += elem.address -> (balanceChanges.getOrElse(elem.address, Map.empty) + (elem.asset -> elem.balance))
       Continue
@@ -82,9 +82,12 @@ class WavesBlockchainAsyncClientTestSuite extends IntegrationSuiteBase {
   private def assertBalanceChanges(expectedBalanceChanges: Map[Address, Map[Asset, Long]]): Assertion = eventually {
     // Remove pairs (address, asset) those expectedBalanceChanges has not
     val actual = simplify(
-      balanceChanges.filterKeys(expectedBalanceChanges.keys.toSet).map {
-        case (address, balance) => address -> balance.filterKeys(expectedBalanceChanges(address).contains)
-      }
+      balanceChanges.view
+        .filterKeys(expectedBalanceChanges.keys.toSet)
+        .map {
+          case (address, balance) => address -> balance.view.filterKeys(expectedBalanceChanges(address).contains).toMap
+        }
+        .toMap
     )
     val expected = simplify(expectedBalanceChanges)
     actual should matchTo(expected)

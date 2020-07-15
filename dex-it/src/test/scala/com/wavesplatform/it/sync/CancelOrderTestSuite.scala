@@ -166,7 +166,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(order)
 
       val r = dex1.api.tryCancel(matcher, order)
-      r shouldBe 'left
+      r shouldBe Symbol("left")
       r.left.get.error shouldBe 9437193 // OrderNotFound
 
       // Cleanup

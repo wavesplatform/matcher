@@ -22,9 +22,9 @@ class MatcherScriptRunnerSpecification extends AnyFreeSpecLike with Matchers {
 
   private val sampleOrder = Order.selfSigned(
     version = 1.toByte,
-    sender = KeyPair("test".getBytes(StandardCharsets.UTF_8)),
-    matcher = KeyPair("matcher".getBytes(StandardCharsets.UTF_8)).publicKey,
-    assetPair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8")))),
+    sender = KeyPair(ByteStr("test".getBytes(StandardCharsets.UTF_8))),
+    matcher = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8))).publicKey,
+    pair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8")))),
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,

@@ -13,9 +13,9 @@ import com.wavesplatform.dex.domain.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 class WsConnection(uri: String, keepAlive: Boolean = true)(implicit system: ActorSystem, materializer: Materializer) extends ScorexLogging {

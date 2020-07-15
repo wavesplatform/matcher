@@ -400,8 +400,8 @@ ${canceledOrders.mkString("\n")}
   private def formatSide(xs: Iterable[(Long, Level)]): String =
     xs.map { case (p, orders) => s"$p -> ${orders.map(format).mkString(", ")}" }.mkString("\n")
 
-  private def formatEvents(xs: TraversableOnce[Event]): String =
-    xs.map(format).mkString("\n")
+  private def formatEvents(xs: IterableOnce[Event]): String =
+    xs.iterator.map(format).mkString("\n")
 
   private def format(x: LevelAmounts): String = s"""Asks: ${x.asks.mkString(", ")}
 Bids: ${x.bids.mkString(", ")}"""

@@ -1,6 +1,5 @@
 package com.wavesplatform.dex.load
 
-
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
 import java.util.concurrent.{ExecutorService, Executors}
@@ -13,12 +12,18 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 import sun.awt.AWTAccessor.AWTEventAccessor
 
+import scala.concurrent.blocking
 import scala.collection.JavaConversions.seqAsJavaList
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Random}
 
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.Random
+
 object TankGenerator {
-  private val executor: ExecutorService = Executors.newFixedThreadPool(30)
+  val threadCount                                                = 10
+  private val executor: ExecutorService                          = Executors.newFixedThreadPool(threadCount)
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
@@ -84,7 +89,6 @@ object TankGenerator {
     println(s" Done")
 
     waitForHeightArise()
-    waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -106,9 +110,15 @@ object TankGenerator {
   private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File], distributed: Boolean = false): List[AssetPair] = {
     val assets =
       if (Files.notExists(pairsFile.get.toPath)) mkAssets()
-      else readAssetPairs(pairsFile).map(p => {
-        s"${p.getAmountAsset}-${p.getPriceAsset}"
-      }).mkString("-").split("-").toSet.toList
+      else
+        readAssetPairs(pairsFile)
+          .map(p => {
+            s"${p.getAmountAsset}-${p.getPriceAsset}"
+          })
+          .mkString("-")
+          .split("-")
+          .toSet
+          .toList
 
     val pairs =
       if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets)
@@ -146,16 +156,16 @@ object TankGenerator {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
-              case _: JsError => "WAVES"
+              case _: JsError         => "WAVES"
             }
             val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
               case JsSuccess(name, _) => name
-              case _: JsError => "WAVES"
+              case _: JsError         => "WAVES"
             }
             Request(RequestType.POST,
-              s"/matcher/orderbook/$aa/$pa/cancel",
-              RequestTag.CANCEL,
-              Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
+                    s"/matcher/orderbook/$aa/$pa/cancel",
+                    RequestTag.CANCEL,
+                    Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
       })
 
@@ -166,9 +176,9 @@ object TankGenerator {
     println("Making requests for getting order history...")
 
     val pairs = readAssetPairs(pairsFile)
-    val ts = System.currentTimeMillis
-    val obpk = settings.distribution.orderBookByPairAndKey
-    val obp = settings.distribution.orderBookByPair
+    val ts    = System.currentTimeMillis
+    val obpk  = settings.distribution.orderBookByPairAndKey
+    val obp   = settings.distribution.orderBookByPair
 
     def mkGetOrderBookByPairAndKey(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
@@ -192,7 +202,7 @@ object TankGenerator {
         pairs.map(p => mkGetOrderBookByPairAndKey(a, p))
       })
 
-    val bp = all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR))
+    val bp  = all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR))
     val bpk = all.filter(_.tag.equals(RequestTag.ORDER_BOOK_BY_PAIR_AND_KEY))
 
     val byPair = List
@@ -218,11 +228,11 @@ object TankGenerator {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
               case JsSuccess(name, _) => name
-              case _: JsError => "WAVES"
+              case _: JsError         => "WAVES"
             }
             val pa = ((o \ "assetPair").as[JsValue] \ "priceAsset").validate[String] match {
               case JsSuccess(name, _) => name
-              case _: JsError => "WAVES"
+              case _: JsError         => "WAVES"
             }
             Request(
               RequestType.GET,
@@ -244,7 +254,7 @@ object TankGenerator {
     println("Making requests for getting reserved and tradable balances... ")
 
     val pairs = readAssetPairs(pairsFile)
-    val ts = System.currentTimeMillis
+    val ts    = System.currentTimeMillis
 
     def mkTradableBalance(a: PrivateKeyAccount, p: AssetPair) = {
       Request(
@@ -271,41 +281,37 @@ object TankGenerator {
 
   def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {
     println("Placing some orders to prepare cancel-order requests... ")
+
     val pairs = mkPairsAndDistribute(accounts, pairsFile)
 
-    (0 to requestsCount).map(i => {
+    val futures = (0 to requestsCount).map(_ => {
       Future {
-        services.matcher.placeOrder(
-          accounts(new Random().nextInt(accounts.length - 1)),
-          settings.matcherPublicKey,
-          pairs(new Random().nextInt(pairs.length - 1)),
-          Type.BUY,
-          settings.defaults.minimalOrderPrice,
-          settings.defaults.minimalOrderAmount,
-          System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
-          settings.defaults.matcherFee,
-          null,
-          false
-        )
-      }.onComplete {
-        case Failure(ex) => {
-          println(s"---- ${i} -- ${ex}")
-        }
-        case _ => {
-
+        blocking {
+          services.matcher.placeOrder(
+            accounts(new Random().nextInt(accounts.length - 1)),
+            settings.matcherPublicKey,
+            pairs(new Random().nextInt(pairs.length - 1)),
+            Type.BUY,
+            settings.defaults.minimalOrderPrice,
+            settings.defaults.minimalOrderAmount,
+            System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
+            settings.defaults.matcherFee,
+            null,
+            false
+          )
         }
       }
-    }
-    )
+    }.recover {
+      case e: Throwable => println("Error during operation", e)
+    })
 
-
-    println("Done")
+    try Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)
+    finally executor.shutdownNow()
   }
 
-  private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request]
-
-  = {
+  private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
+
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
@@ -316,9 +322,7 @@ object TankGenerator {
     )
   }
 
-  private def svRequests(requests: List[Request], outputFile: File): Unit
-
-  = {
+  private def svRequests(requests: List[Request], outputFile: File): Unit = {
     println("\nAll data has been generated. Now it will be saved...")
 
     val output = new PrintWriter(outputFile, "utf-8")

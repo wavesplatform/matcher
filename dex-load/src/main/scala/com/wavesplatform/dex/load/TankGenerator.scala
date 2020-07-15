@@ -17,7 +17,7 @@ import scala.concurrent._
 import scala.util.Random
 
 object TankGenerator {
-  val threadCount                                                = 10
+  val threadCount                                                = 5
   private val executor: ExecutorService                          = Executors.newFixedThreadPool(threadCount)
   implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
@@ -31,7 +31,12 @@ object TankGenerator {
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
     val assets = (1 to count).map(_ => mkAsset()).toList
-    waitForHeightArise()
+    val asset  = assets.get(new Random().nextInt(assets.length - 1))
+
+    do {
+      waitForHeightArise()
+    } while (services.matcher.getTradableBalance(new AssetPair(asset, "WAVES"), issuer.getAddress()).getOrDefault(asset, 0L) <= 0)
+
     println("Assets have been successfully issued")
     assets
   }
@@ -83,7 +88,9 @@ object TankGenerator {
       })
     println(s" Done")
 
-    waitForHeightArise()
+    val asset   = assets.get(new Random().nextInt(assets.length - 1))
+    val account = accounts.get(new Random().nextInt(accounts.length - 1))
+    while (services.matcher.getTradableBalance(new AssetPair(asset, "WAVES"), account.getAddress()).getOrDefault(asset, 0L) > 0) waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {

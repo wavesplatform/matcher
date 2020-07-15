@@ -31,7 +31,8 @@ class WsMessagesSerdeSpecification extends AnyFreeSpec with ScalaCheckDrivenProp
   private val wsBalancesGen = for {
     tradable <- maxWavesAmountGen
     reserved <- maxWavesAmountGen
-  } yield WsBalances(tradable.toDouble, reserved.toDouble)
+    div      <- Gen.choose(1, 100000000L)
+  } yield WsBalances(tradable.toDouble / div, reserved.toDouble / div)
 
   private val wsOrderGen = for {
     (order, _)    <- orderGenerator

@@ -25,7 +25,10 @@ class ExchangeTransactionCreator(matcherPrivateKey: KeyPair,
       else (orderExecutedEvent.counterExecutedFee, orderExecutedEvent.submittedExecutedFee)
 
     // matcher always pays fee to the miners in Waves
-    val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript)
+    val txFee = minFee(exchangeTxBaseFee, hasMatcherAccountScript, counter.order.assetPair, hasAssetScript) +
+      // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
+      List(orderExecutedEvent.counter.feeAsset, orderExecutedEvent.submitted.feeAsset)
+        .count(_.fold(false)(hasAssetScript)) * OrderValidator.ScriptExtraFee
     ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, orderExecutedEvent.executedPrice, buyFee, sellFee, txFee, timestamp)
   }
 }

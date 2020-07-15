@@ -88,11 +88,11 @@ class OrderBookTestSuite
 
     forAll(gen) {
       case (tickSize, ob) =>
-        for ((level, orders) <- ob.bids; order <- orders) {
+        for ((level, orders) <- ob.bids.iterator; order <- orders) {
           order.price - level should be < tickSize
           level % tickSize shouldBe 0
         }
-        for ((level, orders) <- ob.asks; order <- orders) {
+        for ((level, orders) <- ob.asks.iterator; order <- orders) {
           level - order.price should be < tickSize
           level % tickSize shouldBe 0
         }

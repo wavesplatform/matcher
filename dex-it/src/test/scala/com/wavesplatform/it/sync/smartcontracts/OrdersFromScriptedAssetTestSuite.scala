@@ -5,6 +5,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.IssuedAsset
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities
@@ -103,7 +104,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe Symbol("left")
-    r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+    r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -130,7 +131,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val txs = dex1.api.waitForTransactionsByOrder(submitted, 1)
     val r   = wavesNode1.api.tryBroadcast(txs.head)
     r shouldBe Symbol("left")
-    r.left.get.error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
+    r.swap.explicitGet().error shouldBe 308 // node's ApiError TransactionNotAllowedByAssetScript.Id
   }
 }
 

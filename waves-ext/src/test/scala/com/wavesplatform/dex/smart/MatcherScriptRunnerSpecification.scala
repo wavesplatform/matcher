@@ -2,7 +2,6 @@ package com.wavesplatform.dex.smart
 
 import java.nio.charset.StandardCharsets
 
-import cats.Id
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -11,7 +10,6 @@ import com.wavesplatform.dex.test.matchers.ProduceError.produce
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -24,7 +22,7 @@ class MatcherScriptRunnerSpecification extends AnyFreeSpecLike with Matchers {
     version = 1.toByte,
     sender = KeyPair(ByteStr("test".getBytes(StandardCharsets.UTF_8))),
     matcher = KeyPair(ByteStr("matcher".getBytes(StandardCharsets.UTF_8))).publicKey,
-    pair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8")))),
+    assetPair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes("utf-8")))),
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,
@@ -33,14 +31,14 @@ class MatcherScriptRunnerSpecification extends AnyFreeSpecLike with Matchers {
     matcherFee = 30000L
   )
 
-  private def run(script: Script): (Log[Id], Either[String, Terms.EVALUATED]) = MatcherScriptRunner(script, sampleOrder)
+  private def run(script: Script): Either[String, Terms.EVALUATED] = MatcherScriptRunner(script, sampleOrder)
 
   "dApp sunny day" in {
-    run(dAppScriptSunny)._2.explicitGet() shouldBe Terms.FALSE
+    run(dAppScriptSunny).explicitGet() shouldBe Terms.FALSE
   }
 
   "Blockchain functions are disabled in dApp" in {
-    run(dAppScriptBlockchain)._2 should produce("An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied")
+    run(dAppScriptBlockchain) should produce("An access to <getBoolean(addressOrAlias: Address|Alias, key: String): Boolean|Unit> is denied")
   }
 
   private def dAppScriptSunny: Script =

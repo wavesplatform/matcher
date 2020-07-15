@@ -528,7 +528,7 @@ case class SubscriptionsLimitReached(limit: Int, id: String)
     )
 
 case class InvalidAddress(reason: String)
-    extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${'reason -> reason}")
+    extends MatcherError(address, commonEntity, commonClass, e"Provided address in not correct, reason: ${Symbol("reason") -> reason}")
 
 sealed abstract class Entity(val code: Int)
 

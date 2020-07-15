@@ -30,7 +30,10 @@ service WavesBlockchainApi {
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
-    // TODO rename to GetBalanceChanges after release 2.1.2
+    // TODO after release 2.1.2:
+    // 1. Add GetBalanceChanges with the same functionality
+    // 2. Use it in a new version
+    // 3. Remove GetRealTimeBalanceChanges in a next version
     rpc GetRealTimeBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesFlattenResponse);
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);

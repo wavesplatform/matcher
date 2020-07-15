@@ -5,6 +5,7 @@ import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.it.MatcherSuiteBase
@@ -132,7 +133,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         val txs = dex1.api.waitForTransactionsByOrder(bobOrd2, 1)
         val r   = wavesNode1.api.tryBroadcast(txs.head)
         r shouldBe Symbol("left")
-        r.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
+        r.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
       }
     }
   }

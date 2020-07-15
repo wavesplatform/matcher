@@ -118,14 +118,17 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     allOrders.foreach(dex1.api.place)
     allOrders.foreach(order => dex1.api.waitForOrder(order)(_.status != Status.NotFound))
 
-    def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[List[Unit.type]] = Future.sequence {
-      orders.map { order =>
-        dex1.asyncApi.tryCancel(owner, order).map {
-          case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
-          case _                             => Unit
+    def singleCancels(owner: KeyPair, orders: Iterable[Order]): Future[Unit] =
+      Future
+        .sequence {
+          orders.map { order =>
+            dex1.asyncApi.tryCancel(owner, order).map {
+              case Left(x) if x.error != 9437194 => throw new RuntimeException(s"Unexpected error: $x") // OrderCanceled
+              case _                             => ()
+            }
+          }.toList
         }
-      }.toList
-    }
+        .map(_ => ())
 
     def batchCancels(owner: KeyPair, assetPairs: Iterable[AssetPair]): Future[List[HttpSuccessfulBatchCancel]] = Future.sequence {
       assetPairs.map(toDexExplicitGetOps(dex2.asyncApi).cancelAllByPair(owner, _, System.currentTimeMillis)).toList

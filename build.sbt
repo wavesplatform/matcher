@@ -115,6 +115,7 @@ inScope(Global)(
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
+      "-opt-warnings",
       "-Ywarn-unused:-implicits",
       "-Ywarn-macros:after", // https://github.com/scala/bug/issues/11099
       "-Xlint",

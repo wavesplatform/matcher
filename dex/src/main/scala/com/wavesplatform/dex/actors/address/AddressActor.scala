@@ -294,7 +294,7 @@ class AddressActor(owner: Address,
         case Right(spendableBalance) =>
           wsAddressState.sendSnapshot(
             balances = mkWsBalances(spendableBalance),
-            orders = activeOrders.values.map(ao => WsOrder.fromDomain(ao, activeStatus(ao))).to(Seq),
+            orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
           )
           if (!wsAddressState.hasActiveSubscriptions) scheduleNextDiffSending()
           wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -396,7 +396,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L)) // TODO optimize
+      .map(xs => (xs.state |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {

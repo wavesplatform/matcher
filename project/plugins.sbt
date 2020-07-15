@@ -6,13 +6,13 @@ resolvers ++= Seq(
 )
 
 Seq(
-  "com.thesamet"       %% "sbt-protoc"            % "0.99.28",
+  "com.thesamet"       %% "sbt-protoc"            % "0.99.28", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt#L7
   "org.jetbrains"      % "sbt-ide-settings"       % "1.0.0",
   "com.typesafe.sbt"   % "sbt-native-packager"    % "1.4.1",
   "pl.project13.scala" % "sbt-jmh"                % "0.3.7",
   "org.scalastyle"     %% "scalastyle-sbt-plugin" % "1.0.0",
   "org.scoverage"      % "sbt-scoverage"          % "1.5.1",
-  "se.marcuslonnberg"  % "sbt-docker"             % "1.5.0",
+  "se.marcuslonnberg"  % "sbt-docker"             % "1.7.0",
   "com.typesafe.sbt"   % "sbt-git"                % "1.0.0",
   "org.scalameta"      % "sbt-scalafmt"           % "2.0.1",
   "ch.epfl.scala"      % "sbt-scalafix"           % "0.9.17",
@@ -29,7 +29,7 @@ Seq(
 
 libraryDependencies ++= Seq(
   "org.vafer"            % "jdeb"            % "1.5" artifacts Artifact("jdeb", "jar", "jar"), // Required for "release" task
-  "com.thesamet.scalapb" %% "compilerplugin" % "0.10.1",
+  "com.thesamet.scalapb" %% "compilerplugin" % "0.9.0", // Have to wait NODE: https://github.com/wavesplatform/Waves/blob/master/project/plugins.sbt
   "commons-codec"        % "commons-codec"   % "1.14"
 )
 

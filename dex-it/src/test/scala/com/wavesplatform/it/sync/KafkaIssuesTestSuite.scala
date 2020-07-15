@@ -12,7 +12,6 @@ import com.wavesplatform.dex.it.api.websockets.HasWebSockets
 import com.wavesplatform.dex.model.{LimitOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 
 class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka {
@@ -60,7 +59,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
     val offsetBefore = dex1.api.currentOffset
 
     (1 to maxFailures).foreach { i =>
-      dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, i.waves, 3.0)) shouldBe 'left
+      dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, i.waves, 3.0)) shouldBe Symbol("left")
     }
 
     Thread.sleep(requestTimeout.toMillis)
@@ -71,7 +70,7 @@ class KafkaIssuesTestSuite extends WsSuiteBase with HasWebSockets with HasKafka 
       dex1.api.currentOffset shouldBe offsetBefore
     }
 
-    dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe 'right
+    dex1.api.tryPlace(mkOrderDP(alice, wavesUsdPair, SELL, 1.waves, 3.0)) shouldBe Symbol("right")
 
     dex1.api.cancelAll(alice)
   }

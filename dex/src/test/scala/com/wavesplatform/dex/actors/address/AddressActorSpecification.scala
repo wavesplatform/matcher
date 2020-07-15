@@ -232,7 +232,7 @@ class AddressActorSpecification
     val address          = addr("test")
 
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
-      (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains).toMap).toMap
+      (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains)).toMap
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>

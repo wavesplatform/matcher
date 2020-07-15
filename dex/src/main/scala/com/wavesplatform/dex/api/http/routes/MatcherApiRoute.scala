@@ -1063,7 +1063,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
-  @inline
   private def askMapAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Message)(
       f: A => ToResponseMarshallable): Future[ToResponseMarshallable] = {
     (addressActor ? AddressDirectoryActor.Envelope(sender, msg))

@@ -13,13 +13,12 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import com.wavesplatform.wavesj.{ApiJson, AssetPair, PrivateKeyAccount, Transactions}
 import play.api.libs.json.{JsValue, Json}
 import pureconfig._
+import pureconfig.generic.auto._
 
 import scala.io.Source
 import scala.util.Random
 
 package object utils {
-
-  import pureconfig.generic.auto._
 
   val settings =
     ConfigSource

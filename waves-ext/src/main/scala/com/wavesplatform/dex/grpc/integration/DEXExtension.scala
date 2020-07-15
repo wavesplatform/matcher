@@ -13,7 +13,6 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 
 class DEXExtension(context: ExtensionContext) extends Extension with ScorexLogging {
 
@@ -29,12 +28,11 @@ class DEXExtension(context: ExtensionContext) extends Extension with ScorexLoggi
 
   override def start(): Unit = {
 
-    val host: String                  = context.settings.config.as[String]("waves.dex.grpc.integration.host")
-    val port: Int                     = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
-    val batchLingerMs: FiniteDuration = context.settings.config.as[FiniteDuration]("waves.dex.grpc.integration.balance-changes-batch-linger")
+    val host: String = context.settings.config.as[String]("waves.dex.grpc.integration.host")
+    val port: Int    = context.settings.config.as[Int]("waves.dex.grpc.integration.port")
 
     val bindAddress = new InetSocketAddress(host, port)
-    apiService = new WavesBlockchainApiGrpcService(context, batchLingerMs)
+    apiService = new WavesBlockchainApiGrpcService(context)
 
     server = NettyServerBuilder
       .forAddress(bindAddress)

@@ -170,8 +170,8 @@ class OrderBookActor(settings: Settings,
     processEvents(timestamp, result.events)
   }
 
-  private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit = {
-    events.foreach { event =>
+  private def processEvents(timestamp: Long, events: IterableOnce[Event]): Unit =
+    events.iterator.foreach { event =>
       logEvent(event)
       addressActor ! event
 
@@ -182,9 +182,6 @@ class OrderBookActor(settings: Settings,
       }
       changes.map(WsInternalBroadcastActor.Command.Collect).foreach(wsInternalHandlerDirectoryRef ! _)
     }
-  }
-
-  private def processEvents(events: IterableOnce[Event]): Unit = events.iterator.foreach(addressActor ! _.unsafeTap(logEvent))
 
   private def logEvent(e: Event): Unit = log.info {
     import Events._

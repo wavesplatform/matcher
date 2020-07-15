@@ -5,6 +5,8 @@ object Dependencies {
 
   object Version {
 
+    val parCollections = "0.2.0"
+
     val akka     = "2.6.6"
     val akkaHttp = "10.1.12"
 
@@ -45,7 +47,7 @@ object Dependencies {
     val sttp       = "1.7.2"
     val sttpClient = "2.2.0"
 
-    val testContainers          = "0.37.0"
+    val testContainers          = "0.38.0"
     val testContainersPostgres  = "1.14.3"
     val testContainersKafka     = "1.14.3"
     val testContainersToxiProxy = "1.14.3"
@@ -85,6 +87,7 @@ object Dependencies {
   private def kamonModule(module: String, version: String): ModuleID = "io.kamon"                      %% s"kamon-$module"  % version
   private def jwtModule(module: String): ModuleID                    = "com.pauldijou"                 %% s"jwt-$module"    % Version.jwt
 
+  private val parCollections       = "org.scala-lang.modules" %% "scala-parallel-collections" % Version.parCollections
   private val akkaActor            = akkaModule("akka-actor", Version.akka)
   private val akkaActorTyped       = akkaModule("akka-actor-typed", Version.akka)
   private val akkaStreamsTyped     = akkaModule("akka-stream-typed", Version.akka)
@@ -235,7 +238,7 @@ object Dependencies {
 
     lazy val dexLoad: Seq[ModuleID] = Seq(diffx, pureConfig)
 
-    lazy val dexIt: Seq[ModuleID] = integrationTestKit
+    lazy val dexIt: Seq[ModuleID] = integrationTestKit ++ Seq(parCollections)
 
     lazy val dexItCommon: Seq[ModuleID] = Seq(
       sttpModule("core"),

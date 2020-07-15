@@ -17,6 +17,7 @@ import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
 
 import scala.collection.immutable.TreeMap
+import scala.collection.parallel.CollectionConverters._
 
 trait ApiExtensions extends NodeApiExtensions { this: MatcherSuiteBase =>
 

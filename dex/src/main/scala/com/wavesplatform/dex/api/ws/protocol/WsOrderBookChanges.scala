@@ -35,8 +35,8 @@ object WsOrderBookChanges {
 
   type WsSide = TreeMap[Double, Double]
 
-  private val asksOrdering: Ordering[Double] = (x: Double, y: Double) => Ordering.Double.IeeeOrdering.compare(x, y)
-  private val bidsOrdering: Ordering[Double] = (x: Double, y: Double) => -Ordering.Double.IeeeOrdering.compare(x, y)
+  private val asksOrdering: Ordering[Double] = Ordering.Double.IeeeOrdering
+  private val bidsOrdering: Ordering[Double] = Ordering.Double.IeeeOrdering.reverse
 
   def empty(assetPair: AssetPair): WsOrderBookChanges =
     WsOrderBookChanges(

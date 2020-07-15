@@ -10,7 +10,7 @@ scalacOptions += "-P:silencer:pathFilters=FileOptions"
 inConfig(Compile)(
   Seq(
     PB.deleteTargetDirectory := false,
-    PB.protoSources in Compile += PB.externalIncludePath.value,
-    PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
+    PB.protoSources += PB.externalIncludePath.value,
+    PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value / "scalapb"
   )
 )

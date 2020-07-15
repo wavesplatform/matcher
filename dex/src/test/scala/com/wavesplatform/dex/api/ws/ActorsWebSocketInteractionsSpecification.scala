@@ -63,7 +63,7 @@ class ActorsWebSocketInteractionsSpecification
     val address          = KeyPair("test".getBytes)
 
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
-      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets).toMap).toMap }
+      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap }
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { a =>

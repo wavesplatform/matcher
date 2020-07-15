@@ -16,9 +16,6 @@ import scala.util.Random
 // noinspection ScalaStyle
 object TankGenerator {
 
-//  private val executor: ExecutorService                          = Executors.newFixedThreadPool(20)
-//  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
-
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
     val accounts = (1 to count).map(i => PrivateKeyAccount.fromSeed(s"$seedPrefix$i", 0, settings.chainId.charAt(0).toByte)).toList

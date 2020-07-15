@@ -26,9 +26,7 @@ import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 object WavesDexLoadCli extends ScoptImplicits {
-
   def main(rawArgs: Array[String]): Unit = {
-
     val executor        = Executors.newCachedThreadPool()
     implicit val global = ExecutionContext.fromExecutor(executor)
 
@@ -345,7 +343,7 @@ object WavesDexLoadCli extends ScoptImplicits {
   }
 
   // The compiler is lie! This is used in WsOrder.id
-  private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]]       = Derived(getDiff[ByteStr](_.toString == _.toString))
+  private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
   private implicit val wsAddressChangesDiff: Diff[WsAddressChanges] =
     Derived[Diff[WsAddressChanges]].ignore[WsAddressChanges, Long](_.timestamp).ignore[WsAddressChanges, Long](_.updateId)
 

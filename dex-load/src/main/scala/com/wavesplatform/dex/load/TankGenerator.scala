@@ -339,20 +339,20 @@ object TankGenerator {
   }
 
   def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int, requestsType: Int, accountsNumber: Int): Unit = {
-    val accounts = mkAccounts(seedPrefix, accountsNumber)
-    val requests = requestsType match {
-      case 1 => mkPlaces(accounts, requestsCount, pairsFile)
-      case 2 => mkCancels(accounts, requestsCount)
-      case 3 => mkMatching(accounts, requestsCount, pairsFile)
-      case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
-      case 5 => mkBalances(accounts, requestsCount, pairsFile)
-      case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
-      case _ =>
-        println("Wrong number of task ")
-        List.empty
-    }
-
-    svRequests(requests, outputFile)
-    executor.shutdownNow()
+    try {
+      val accounts = mkAccounts(seedPrefix, accountsNumber)
+      val requests = requestsType match {
+        case 1 => mkPlaces(accounts, requestsCount, pairsFile)
+        case 2 => mkCancels(accounts, requestsCount)
+        case 3 => mkMatching(accounts, requestsCount, pairsFile)
+        case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
+        case 5 => mkBalances(accounts, requestsCount, pairsFile)
+        case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
+        case _ =>
+          println("Wrong number of task ")
+          List.empty
+      }
+      svRequests(requests, outputFile)
+    } finally executor.shutdownNow()
   }
 }

@@ -18,7 +18,7 @@ object WavesToPbConversions {
       SignedExchangeTransaction(
         transaction = Some(
           ExchangeTransaction(
-            chainId = tx.chainByte.getOrElse(va.AddressScheme.current.chainId).toInt,
+            chainId = tx.chainId.toInt,
             senderPublicKey = tx.sender.toPB,
             fee = Some(Amount(assetId = tx.assetFee._1.toPB, amount = tx.assetFee._2)),
             timestamp = tx.timestamp,
@@ -46,7 +46,7 @@ object WavesToPbConversions {
   }
 
   implicit class VanillaAddressOps(self: Address) {
-    def toPB: ByteString = self.bytes.toPB
+    def toPB: ByteString = ByteStr(self.bytes).toPB
   }
 
   implicit class VanillaOrderOps(order: ve.Order) {

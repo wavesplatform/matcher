@@ -4,6 +4,8 @@ import com.wavesplatform.dex.api.ws.doubleAsStringFormat
 import com.wavesplatform.dex.domain.order.OrderType
 import play.api.libs.json._
 
+import scala.collection.IndexedSeq
+
 case class WsLastTrade(price: Double, amount: Double, side: OrderType)
 
 object WsLastTrade {
@@ -12,7 +14,7 @@ object WsLastTrade {
 
   implicit val wsLastTradeFormat: Format[WsLastTrade] = Format(
     fjs = Reads {
-      case JsArray(Seq(price, amount, orderType)) =>
+      case JsArray(IndexedSeq(price, amount, orderType)) =>
         for {
           price  <- price.validate[Double]
           amount <- amount.validate[Double]

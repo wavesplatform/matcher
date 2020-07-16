@@ -15,6 +15,6 @@ class ConversionsSuite extends AnyFreeSpecLike with ScalaCheckDrivenPropertyChec
   }
 
   "exchangeTx" in forAll(exchangeTransactionGen) { tx =>
-    tx.toPB.toVanilla.right.get shouldBe tx
+    tx.toPB.toVanilla.explicitGetErr() shouldBe tx
   }
 }

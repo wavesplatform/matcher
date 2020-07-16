@@ -6,7 +6,6 @@ import com.wavesplatform.dex.db.AssetsStorage
 import com.wavesplatform.dex.domain.account.Address
 import com.wavesplatform.dex.domain.asset.Asset
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.SpendableBalanceChanges
 import com.wavesplatform.dex.grpc.integration.clients.{WavesBlockchainCachingClient, WavesBlockchainClient}
 import com.wavesplatform.dex.grpc.integration.settings.WavesBlockchainClientSettings
 import monix.eval.Task
@@ -19,19 +18,6 @@ class WavesBlockchainAssetsWatchingClient(settings: WavesBlockchainClientSetting
                                           assetsStorage: AssetsStorage)(implicit grpcExecutionContext: ExecutionContext)
     extends WavesBlockchainCachingClient(underlying, settings.defaultCachesExpiration) {
 
-  override def spendableBalance(address: Address, asset: Asset): Future[Long] =
-    saveAssetDescription(asset) *> underlying.spendableBalance(address, asset)
-
-  // Do not use
-  override def spendableBalanceChanges: Observable[SpendableBalanceChanges] =
-    underlying.spendableBalanceChanges
-      .bufferIntrospective(settings.balanceStreamBufferSize)
-      .mapEval { xs =>
-        val assets = xs.iterator.flatMap(_.valuesIterator).flatMap(_.keysIterator)
-        Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
-      }
-      .flatMap(Observable.fromIterable)
-
   // Do not use
   override def realTimeBalanceChanges: Observable[WavesBlockchainClient.BalanceChanges] = realTimeBalanceBatchChanges.flatMap(Observable.fromIterable)
 
@@ -40,12 +26,12 @@ class WavesBlockchainAssetsWatchingClient(settings: WavesBlockchainClientSetting
     underlying.realTimeBalanceChanges
       .bufferIntrospective(settings.balanceStreamBufferSize)
       .mapEval { xs =>
-        val assets = xs.map(_.asset).toIterator
+        val assets = xs.map(_.asset).iterator
         Task.fromFuture(saveAssetsDescription(assets)).map(_ => xs)
       }
 
   override def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] =
-    saveAssetsDescription(assets.toIterator) *> underlying.spendableBalances(address, assets)
+    saveAssetsDescription(assets.iterator) *> underlying.spendableBalances(address, assets)
 
   override def allAssetsSpendableBalance(address: Address): Future[Map[Asset, Long]] =
     for {

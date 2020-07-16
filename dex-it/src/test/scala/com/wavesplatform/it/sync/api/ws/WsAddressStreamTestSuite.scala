@@ -17,6 +17,7 @@ import com.wavesplatform.dex.model.{LimitOrder, MarketOrder, OrderStatus}
 import com.wavesplatform.it.WsSuiteBase
 import org.scalatest.prop.TableDrivenPropertyChecks
 
+import scala.collection.parallel.CollectionConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 

@@ -52,7 +52,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
   "Swagger page is available" in {
     val addr = dex1.restApiAddress
-    tryHttpBackend.send(sttp.response(asString).get(uri"http://${addr.getHostName}:${addr.getPort}/api-docs/index.html")) shouldBe 'success
+    tryHttpBackend.send(sttp.response(asString).get(uri"http://${addr.getHostName}:${addr.getPort}/api-docs/index.html")) shouldBe Symbol("success")
   }
 
   "Check cross ordering between Alice and Bob" - {
@@ -318,9 +318,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
       s"Not able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
         val amount     = BigDecimal(10).pow(amountDecimals).toLong
-        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
-        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
-        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
+        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue
+        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue + 1
+        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue - 1
         val o1         = mkOrder(alice, pair, SELL, amount, minInvalid)
         val o2         = mkOrder(alice, pair, SELL, amount, maxInvalid)
 
@@ -332,7 +332,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
     forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
       s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
         val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
-        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
+        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue
         dex1.api.place(mkOrder(alice, pair, BUY, amount, minNonZeroInvalid)).status shouldBe "OrderAccepted"
       }
     }
@@ -380,7 +380,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
       "/matcher/balance/reserved/{publicKey}" in {
         dex1.api.tryReservedBalanceWithApiKey(alice, Some(bob.publicKey)) should failWith(3148801, "Provided user public key is not correct")
-        dex1.api.tryReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe 'right
+        dex1.api.tryReservedBalanceWithApiKey(alice, Some(alice.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}/cancel" in {
@@ -395,7 +395,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         Seq(o1, o2).foreach(dex1.api.place)
 
         dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(alice.publicKey)) should failWith(3148801, "Provided user public key is not correct")
-        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe 'right
+        dex1.api.tryCancelAllByIdsWithApiKey(bob, orderIds, Some(bob.publicKey)) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}" in {
@@ -407,7 +407,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         dex1.api.tryOrderHistoryWithApiKey(
           owner = bob,
           xUserPublicKey = Some(bob.publicKey)
-        ) shouldBe 'right
+        ) shouldBe Symbol("right")
       }
 
       "/matcher/orders/{address}/{orderId}" in {

@@ -93,7 +93,7 @@ object OrderJson {
 
     val eproofs =
       proofs
-        .map(p => Proofs(p.map(ByteStr.apply)))
+        .map(p => Proofs(p.map(ByteStr.apply).toIndexedSeq))
         .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
         .getOrElse(Proofs.empty)
 
@@ -151,8 +151,8 @@ object OrderJson {
   implicit val orderReads: Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
-        case JsNumber(x) if x.byteValue() == 3 => orderV3Reads.reads(jsOrder)
-        case _                                 => orderV1V2Reads.reads(jsOrder)
+        case JsNumber(x) if x.byteValue == 3 => orderV3Reads.reads(jsOrder)
+        case _                               => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

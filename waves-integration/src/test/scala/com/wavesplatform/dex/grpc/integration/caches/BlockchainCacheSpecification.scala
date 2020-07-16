@@ -8,8 +8,8 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import scala.collection.JavaConverters._
 import scala.concurrent._
+import scala.jdk.CollectionConverters._
 
 class BlockchainCacheSpecification extends AnyWordSpecLike with Matchers with BeforeAndAfterAll {
 

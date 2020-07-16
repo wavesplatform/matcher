@@ -22,7 +22,7 @@ trait WavesEntitiesGen {
   )
 
   val keyPairGen: Gen[KeyPair]     = bytes32gen.map(xs => KeyPair(ByteStr(xs)))
-  val publicKeyGen: Gen[PublicKey] = keyPairGen.map(x => x)
+  val publicKeyGen: Gen[PublicKey] = keyPairGen.map(_.publicKey)
   val assetPairGen: Gen[AssetPair] = Gen.zip(issuedAssetGen, assetGen).map {
     case (asset1, Waves)  => AssetPair(asset1, Waves)
     case (asset1, asset2) => if (asset1 == asset2) AssetPair(asset1, Waves) else AssetPair(asset1, asset2)
@@ -54,10 +54,11 @@ trait WavesEntitiesGen {
       feeAsset  <- assetGen
       version   <- versionGen
     } yield {
-      val expiration = timestamp + ttl
+      val expiration   = timestamp + ttl
+      val fixedVersion = if (feeAsset == Waves) version else math.max(version, 3).toByte
       val order =
-        if (tpe == OrderType.BUY) Order.buy(sender, matcher, assetPair, amount, price, timestamp, expiration, fee, version, feeAsset)
-        else Order.sell(sender, matcher, assetPair, amount, price, timestamp, expiration, fee, version, feeAsset)
+        if (tpe == OrderType.BUY) Order.buy(fixedVersion, sender, matcher, assetPair, amount, price, timestamp, expiration, fee, feeAsset)
+        else Order.sell(fixedVersion, sender, matcher, assetPair, amount, price, timestamp, expiration, fee, feeAsset)
       (order, sender)
     }
 
@@ -65,7 +66,7 @@ trait WavesEntitiesGen {
     for {
       version <- Gen.oneOf(1: Byte, 2: Byte)
       matcher <- keyPairGen
-      matcherPublicKeyGen = Gen.const[PublicKey](matcher)
+      matcherPublicKeyGen = Gen.const(matcher.publicKey)
       timestamp <- timestampGen
       orderTimestampGen = Gen.choose(1, 1000L).map(_ + timestamp)
       (buyOrder, _) <- {
@@ -76,7 +77,7 @@ trait WavesEntitiesGen {
       }
       (sellOrder, _) <- {
         val sideGen      = Gen.const(OrderType.SELL)
-        val priceGen     = Gen.choose(1, buyOrder.price)
+        val priceGen     = Gen.choose(1L, buyOrder.price)
         val assetPairGen = Gen.const(buyOrder.assetPair)
         if (version == 1)
           orderAndSenderGen(
@@ -96,23 +97,23 @@ trait WavesEntitiesGen {
       }
       fee <- orderFeeGen
     } yield {
-      val amount = math.min(buyOrder.amount, sellOrder.amount)
-      val price  = buyOrder.price
-      val r = version match {
-        case 1 =>
-          ExchangeTransactionV1.create(matcher,
-                                       buyOrder.asInstanceOf[OrderV1],
-                                       sellOrder.asInstanceOf[OrderV1],
-                                       amount,
-                                       price,
-                                       buyOrder.matcherFee,
-                                       sellOrder.matcherFee,
-                                       fee,
-                                       timestamp)
-        case 2 => ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, amount, price, buyOrder.matcherFee, sellOrder.matcherFee, fee, timestamp)
-        case x => throw new RuntimeException(s"Impossible version: $x")
-      }
-      r.explicitGet()
+      val amount       = math.min(buyOrder.amount, sellOrder.amount)
+      val price        = buyOrder.price
+      val fixedVersion = if (buyOrder.matcherFeeAssetId == Waves && sellOrder.matcherFeeAssetId == Waves) version else math.max(version, 2).toByte
+      ExchangeTransaction
+        .create(
+          version = fixedVersion,
+          order1 = buyOrder,
+          order2 = sellOrder,
+          amount = amount,
+          price = price,
+          buyMatcherFee = buyOrder.matcherFee,
+          sellMatcherFee = sellOrder.matcherFee,
+          fee = fee,
+          timestamp = timestamp
+        )
+        .map(_.signWith(matcher.privateKey))
+        .explicitGet()
     }
   }
 }

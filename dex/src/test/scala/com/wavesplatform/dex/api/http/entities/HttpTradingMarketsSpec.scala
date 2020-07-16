@@ -3,6 +3,7 @@ package com.wavesplatform.dex.api.http.entities
 import cats.syntax.option._
 import com.wavesplatform.dex.domain.account.PublicKey
 import com.wavesplatform.dex.domain.asset.Asset
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -62,7 +63,7 @@ class HttpTradingMarketsSpec extends AnyFreeSpec with Matchers with DiffMatcherW
 
   private val tradingMarkets =
     HttpTradingMarkets(
-      PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").right.get,
+      PublicKey.fromBase58String("J6ghck2hA2GNJTHGSLSeuCjKuLDGz8i83NfCMFVoWhvf").explicitGet(),
       Seq(marketData)
     )
 

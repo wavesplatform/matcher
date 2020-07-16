@@ -68,7 +68,7 @@ class AddressActor(owner: Address,
   // Saves from cases when a client does multiple requests with the same order
   private val failedPlacements = MutableSet.empty[Order.Id]
 
-  private var wsAddressState = WsAddressState.empty(owner)
+  private var wsAddressState              = WsAddressState.empty(owner)
   private var wsSendSchedule: Cancellable = Cancellable.alreadyCancelled
 
   override def receive: Receive = {
@@ -294,7 +294,7 @@ class AddressActor(owner: Address,
         case Right(spendableBalance) =>
           wsAddressState.sendSnapshot(
             balances = mkWsBalances(spendableBalance),
-            orders = activeOrders.values.map(WsOrder.fromDomain(_))(collection.breakOut),
+            orders = activeOrders.values.map(WsOrder.fromDomain(_)).to(Seq),
           )
           if (!wsAddressState.hasActiveSubscriptions) scheduleNextDiffSending()
           wsAddressState = wsAddressState.flushPendingSubscriptions()
@@ -340,17 +340,19 @@ class AddressActor(owner: Address,
     denormalizeAmountAndFee(balanceSource.getOrElse(asset, 0L), decimals).toDouble
 
   private def mkWsBalances(spendableBalances: Map[Asset, Long]): Map[Asset, WsBalances] = {
-    val tradableBalance = spendableBalances |-| openVolume.filterKeys(spendableBalances.keySet)
-    spendableBalances.keySet.flatMap { asset =>
-      efc.assetDecimals(asset) match {
-        case None =>
-          log.error(s"Can't find asset decimals for $asset")
-          List.empty // It is better to hide unknown assets rather than stop working
-        case Some(decimals) =>
-          val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
-          List(asset -> WsBalances(assetDenormalizedBalanceFrom(tradableBalance), assetDenormalizedBalanceFrom(openVolume)))
+    val tradableBalance = spendableBalances |-| openVolume.view.filterKeys(spendableBalances.keySet).toMap
+    spendableBalances.keySet
+      .flatMap { asset =>
+        efc.assetDecimals(asset) match {
+          case None =>
+            log.error(s"Can't find asset decimals for $asset")
+            List.empty // It is better to hide unknown assets rather than stop working
+          case Some(decimals) =>
+            val assetDenormalizedBalanceFrom = denormalizedBalanceValue(asset, decimals)(_)
+            List(asset -> WsBalances(assetDenormalizedBalanceFrom(tradableBalance), assetDenormalizedBalanceFrom(openVolume)))
+        }
       }
-    }(collection.breakOut)
+      .to(Map)
   }
 
   private def isCancelling(id: Order.Id): Boolean = pendingCommands.get(id).exists(_.command.isInstanceOf[Command.CancelOrder])
@@ -394,7 +396,7 @@ class AddressActor(owner: Address,
     spendableBalancesActor
       .ask(SpendableBalancesActor.Query.GetState(owner, forAssets))(5.seconds, self) // TODO replace ask pattern by better solution
       .mapTo[SpendableBalancesActor.Reply.GetState]
-      .map(xs => (xs.state |-| openVolume.filterKeys(forAssets)).filter(_._2 > 0).withDefaultValue(0L))
+      .map(xs => (xs.state |-| openVolume.view.filterKeys(forAssets).toMap).filter(_._2 > 0).withDefaultValue(0L))
   }
 
   private def scheduleExpiration(order: Order): Unit = if (enableSchedules && !expiration.contains(order.id())) {
@@ -461,7 +463,7 @@ class AddressActor(owner: Address,
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .iterator
       .filter(x => x.isLimit && !inProgress.contains(x.id))
-      .map(ao => (ao.order, ao.requiredBalance filterKeys actualBalance.contains))
+      .map(ao => (ao.order, ao.requiredBalance.view.filterKeys(actualBalance.contains).toMap))
       .foldLeft((actualBalance, Queue.empty[InsufficientBalanceOrder])) {
         case ((restBalance, toDelete), (order, requiredBalance)) =>
           trySubtract(restBalance, requiredBalance) match {

@@ -8,6 +8,8 @@ import org.apache.commons.io.IOUtils
 import sbt.Keys._
 import sbt._
 
+import scala.collection.JavaConverters._
+
 // See https://github.com/swagger-api/swagger-ui/issues/5710
 object RewriteSwaggerConfigPlugin extends AutoPlugin {
   override val trigger = PluginTrigger.NoTrigger
@@ -29,7 +31,6 @@ object RewriteSwaggerConfigPlugin extends AutoPlugin {
             case None => throw new RuntimeException(s"Can't find $resource")
             case Some(html) =>
               val doc = org.jsoup.parser.Parser.parse(html, "127.0.0.1")
-              import scala.collection.JavaConverters._
               doc
                 .body()
                 .children()

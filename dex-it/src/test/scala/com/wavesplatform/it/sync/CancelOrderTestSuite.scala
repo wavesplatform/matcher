@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.account.KeyPair
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.effect.FutureOps.Implicits
 import com.wavesplatform.dex.it.time.GlobalTimer
 import com.wavesplatform.dex.it.time.GlobalTimer.TimerOpsImplicits
@@ -166,8 +167,8 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       placeAndAwaitAtDex(order)
 
       val r = dex1.api.tryCancel(matcher, order)
-      r shouldBe 'left
-      r.left.get.error shouldBe 9437193 // OrderNotFound
+      r shouldBe Symbol("left")
+      r.swap.explicitGet().error shouldBe 9437193 // OrderNotFound
 
       // Cleanup
       dex1.api.cancel(bob, order)

@@ -231,12 +231,12 @@ class AddressActorSpecification
     val currentPortfolio = new AtomicReference[Portfolio]()
     val address          = addr("test")
 
-    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
-      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).filterKeys(assets.contains) }
+    def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
+      (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets.contains)).toMap
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { _ =>
-      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance) }
+      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).toMap }
     }
 
     lazy val spendableBalancesActor =
@@ -255,7 +255,7 @@ class AddressActorSpecification
           (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
-            Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
+            Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
           },
           enableSchedules,
           spendableBalancesActor

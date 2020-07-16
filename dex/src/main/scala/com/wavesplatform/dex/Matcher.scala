@@ -282,18 +282,19 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
             matcherQueue.startConsume(
               processedOffset + 1,
               xs =>
-                if (xs.isEmpty) Future.successful(Unit)
-                else {
+                if (xs.isEmpty) Future.successful { () } else {
                   val eventAssets = xs.flatMap(_.event.assets)
                   val loadAssets  = Future.traverse(eventAssets)(getDescription(assetsCache, wavesBlockchainAsyncClient.assetDescription)(_).value)
 
                   loadAssets.flatMap { _ =>
-                    val assetPairs: Set[AssetPair] = xs.map { eventWithMeta =>
-                      log.debug(s"Consumed $eventWithMeta")
-                      self ! eventWithMeta
-                      lastProcessedOffset = eventWithMeta.offset
-                      eventWithMeta.event.assetPair
-                    }(collection.breakOut)
+                    val assetPairs: Set[AssetPair] = xs
+                      .map { eventWithMeta =>
+                        log.debug(s"Consumed $eventWithMeta")
+                        self ! eventWithMeta
+                        lastProcessedOffset = eventWithMeta.offset
+                        eventWithMeta.event.assetPair
+                      }
+                      .to(Set)
 
                     self
                       .ask(MatcherActor.PingAll(assetPairs))(pongTimeout)

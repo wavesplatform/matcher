@@ -7,7 +7,7 @@ import com.github.dockerjava.api.model.{ContainerNetwork, NetworkSettings}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.dex.it.test.InformativeTestStart
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait HasKafka { self: BaseContainersKit with InformativeTestStart =>
 

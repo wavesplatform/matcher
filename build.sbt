@@ -7,7 +7,10 @@ import sbt.internal.inc.ReflectUtilities
 Global / resolvers += Resolver.bintrayRepo("ethereum", "maven") // JNI LevelDB
 
 // Scalafix
-scalafixDependencies in ThisBuild += "org.scalatest" %% "autofix" % "3.1.0.0"
+scalafixDependencies in ThisBuild ++= List(
+  "org.scalatest"          %% "autofix"                     % "3.1.0.0",
+  "org.scala-lang.modules" %% "scala-collection-migrations" % "2.1.4"
+)
 addCompilerPlugin(scalafixSemanticdb)
 
 lazy val commonOwaspSettings = Seq(
@@ -97,7 +100,9 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.10",
+    scalaVersion := "2.13.2",
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision,
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -110,13 +115,14 @@ inScope(Global)(
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
+      "-opt-warnings",
       "-Ywarn-unused:-implicits",
       "-Ywarn-macros:after", // https://github.com/scala/bug/issues/11099
       "-Xlint",
-      "-Ypartial-unification",
       "-opt:l:inline",
       "-opt-inline-from:**",
-      "-Yrangepos" // required for scalafix
+      "-Yrangepos", // required for scalafix
+      "-P:semanticdb:synthetics:on"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,

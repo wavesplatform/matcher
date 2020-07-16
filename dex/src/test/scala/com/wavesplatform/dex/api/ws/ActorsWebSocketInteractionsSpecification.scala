@@ -63,12 +63,12 @@ class ActorsWebSocketInteractionsSpecification
     val address          = KeyPair("test".getBytes)
 
     def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = {
-      Future.successful { currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).filterKeys(assets) }
+      Future.successful { (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance).view.filterKeys(assets)).toMap }
     }
 
     def allAssetsSpendableBalance: Address => Future[Map[Asset, Long]] = { a =>
       if (a == address.toAddress) Future.successful {
-        (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0)
+        (currentPortfolio.get().assets ++ Map(Waves -> currentPortfolio.get().balance)).filter(_._2 > 0).toMap
       } else Future.failed(WavesNodeConnectionLostException("Node unavailable", new IllegalStateException))
     }
 
@@ -88,7 +88,7 @@ class ActorsWebSocketInteractionsSpecification
           (_, _) => Future.successful(Right(())),
           event => {
             eventsProbe.ref ! event
-            Future.successful { Some(QueueEventWithMeta(0, 0, event)) }
+            Future.successful { Some(QueueEventWithMeta(0L, 0L, event)) }
           },
           enableSchedules,
           spendableBalancesActor
@@ -146,7 +146,7 @@ class ActorsWebSocketInteractionsSpecification
       eventsProbe,
       wsEventsProbe,
       address,
-      subscribe,
+      () => subscribe,
       placeOrder,
       cancelOrder,
       executeOrder,

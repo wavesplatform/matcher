@@ -108,13 +108,13 @@ class OrderBookActorSpecification
     }
 
     "recover from snapshot - 2" in obcTestWithPrepare { (obsdb, p) =>
-      obsdb.update(p, 50, Some(OrderBookSnapshot.empty))
+      obsdb.update(p, 50L, Some(OrderBookSnapshot.empty))
     } { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
     }
 
     "recovery - if there is a matching rule - DEX-775" in obcTestWithPrepare(
-      prepare = (obsdb, p) => obsdb.update(p, 50, Some(OrderBookSnapshot.empty)),
+      prepare = (obsdb, p) => obsdb.update(p, 50L, Some(OrderBookSnapshot.empty)),
       matchingRules = NonEmptyList.of(DenormalizedMatchingRule(0, 0.00000001), DenormalizedMatchingRule(40, 0.0000001))
     ) { (pair, _, tp) =>
       tp.expectMsg(OrderBookRecovered(pair, Some(50)))
@@ -125,7 +125,7 @@ class OrderBookActorSpecification
         val ord                                  = buy(p, 10 * Order.PriceConstant, 100)
         val ob                                   = OrderBook.empty
         val OrderBookUpdates(updatedOb, _, _, _) = ob.add(LimitOrder(ord), ord.timestamp, makerTakerPartialFee)
-        obsdb.update(p, 50, Some(updatedOb.snapshot))
+        obsdb.update(p, 50L, Some(updatedOb.snapshot))
       }
     ) { (pair, _, tp) =>
       tp.expectMsgType[OrderAdded]
@@ -261,58 +261,58 @@ class OrderBookActorSpecification
 
     "ignore outdated requests" in obcTest { (pair, actor, tp) =>
       (1 to 10).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.receiveN(10)
 
       (1 to 10).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.expectNoMessage(100.millis)
     }
 
     "respond on SaveSnapshotCommand" in obcTest { (pair, actor, tp) =>
       (1 to 10).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.receiveN(10)
 
-      actor ! SaveSnapshot(10)
+      actor ! SaveSnapshot(10L)
       tp.expectMsg(OrderBookSnapshotUpdateCompleted(pair, Some(10)))
 
       (11 to 20).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.receiveN(10)
 
-      actor ! SaveSnapshot(20)
+      actor ! SaveSnapshot(20L)
       tp.expectMsg(OrderBookSnapshotUpdateCompleted(pair, Some(20)))
     }
 
     "don't do a snapshot if there is no changes" in obcTest { (pair, actor, tp) =>
       (1 to 10).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.receiveN(10)
 
-      actor ! SaveSnapshot(10)
-      actor ! SaveSnapshot(10)
+      actor ! SaveSnapshot(10L)
+      actor ! SaveSnapshot(10L)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
       tp.expectNoMessage(200.millis)
     }
 
     "restore its state at start" in obcTest { (pair, actor, tp) =>
       (1 to 10).foreach { i =>
-        actor ! wrapLimitOrder(i, buy(pair, 100000000, 0.00041))
+        actor ! wrapLimitOrder(i, buy(pair, 100000000L, 0.00041))
       }
       tp.receiveN(10)
 
-      actor ! SaveSnapshot(10)
+      actor ! SaveSnapshot(10L)
       tp.expectMsgType[OrderBookSnapshotUpdateCompleted]
     }
 
     "cancel order with price not equal to it's level price" in obcTestWithTickSize(100) { (pair, orderBook, tp) =>
-      val buyOrder = buy(pair, 100000000, 0.0000041)
+      val buyOrder = buy(pair, 100000000L, 0.0000041)
 
       orderBook ! wrapLimitOrder(1, buyOrder)
       tp.expectMsgType[OrderAdded]
@@ -330,7 +330,7 @@ class OrderBookActorSpecification
     )
 
     "rules are switched" in obcTestWithMatchingRules(switchRulesTest) { (pair, orderBook, tp) =>
-      val buyOrder = buy(pair, 100000000, 0.0000041)
+      val buyOrder = buy(pair, 100000000L, 0.0000041)
       (0 to 17).foreach { i =>
         orderBook ! wrapLimitOrder(i, buyOrder)
         tp.expectMsgType[OrderAdded]
@@ -362,7 +362,7 @@ class OrderBookActorSpecification
     )
 
     "rules can be disabled" in obcTestWithMatchingRules(disableRulesTest) { (pair, orderBook, tp) =>
-      val buyOrder = buy(pair, 100000000, 0.0000041)
+      val buyOrder = buy(pair, 100000000L, 0.0000041)
       (0 to 10).foreach { i =>
         orderBook ! wrapLimitOrder(i, buyOrder)
         tp.expectMsgType[OrderAdded]
@@ -391,7 +391,7 @@ class OrderBookActorSpecification
     )
 
     "correctly cancel order when rules are switched" in obcTestWithMatchingRules(matchingRulesForCancelTest) { (pair, orderBook, tp) =>
-      val buyOrder1, buyOrder2 = buy(pair, 100000000, 0.0000041)
+      val buyOrder1, buyOrder2 = buy(pair, 100000000L, 0.0000041)
 
       orderBook ! wrapLimitOrder(0, buyOrder1) // order book places order to the price level 41
       tp.expectMsgType[OrderAdded]

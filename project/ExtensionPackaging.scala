@@ -44,8 +44,11 @@ object ExtensionPackaging extends AutoPlugin {
         moduleId = projectID.value
       ),
       classpathOrdering ++= {
-        val jar = """(.+)[-_]([\d\.]+.*)\.jar""".r
-        val inDeb = filesInDeb((Compile / unmanagedBase).value / s"waves_${wavesNodeVersion.value}_all.deb")
+        val jar              = """(.+)[-_]([\d\.]+.*)\.jar""".r
+        val baseDir          = (Compile / unmanagedBase).value
+        val appropriateFiles = List(s"waves_${wavesNodeVersion.value}_all.deb", s"waves-stagenet_${wavesNodeVersion.value}_all.deb").map(baseDir / _)
+        val debFile          = appropriateFiles.find(_.isFile).getOrElse(throw new RuntimeException("Can't find a deb file to check dependencies"))
+        val inDeb = filesInDeb(debFile)
           .filter(x => x.endsWith(".jar") && x.startsWith("./usr/share/waves/lib"))
           .map(_.split('/').last)
           .map {
@@ -55,7 +58,8 @@ object ExtensionPackaging extends AutoPlugin {
           .toMap
 
         val (r, conflicts) = excludeProvidedArtifacts((Runtime / dependencyClasspath).value, inDeb)
-        streams.value.log.warn(s"Found conflicts (name: deb != ours):\n${conflicts.map { case (name, (deb, ours)) => s"$name: $deb != $ours" }.mkString("\n")}")
+        streams.value.log
+          .warn(s"Found conflicts (name: deb != ours):\n${conflicts.map { case (name, (deb, ours)) => s"$name: $deb != $ours" }.mkString("\n")}")
         r.toSeq
       },
       Universal / mappings ++= classpathOrdering.value ++ {

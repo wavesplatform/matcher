@@ -12,7 +12,8 @@ pipeline {
             steps {   
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt "cleanAll;compile"'
+                sh 'find . -type d -name target | xargs -I{} rm -rf {}'
+                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
             }
         }
         stage('Release') {

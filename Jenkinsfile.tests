@@ -17,12 +17,13 @@ pipeline {
             steps {
                 sh 'git fetch --tags'
                 sh 'find ~/.sbt/1.0/staging/*/waves -type d -name target | xargs -I{} rm -rf {}'
-                sh 'sbt "cleanAll;compile"'
+                sh 'find . -type d -name target | xargs -I{} rm -rf {}'
+                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;cleanAll;compile"'
             }
         } 
         stage('Run Unit Tests') {
             steps { 
-                sh 'sbt "set Global / scalacOptions ++= Seq(\\"-Xfatal-warnings\\", \\"-Ywarn-unused:-imports\\");session save;waves-ext/test;waves-integration/test;dex/test"'      
+                sh 'sbt "waves-ext/test;waves-integration/test;dex/test"'
             }
         }        
         stage('Build Docker') {

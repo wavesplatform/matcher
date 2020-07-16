@@ -10,7 +10,6 @@ import cats.instances.future._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.{Id, catsInstancesForId}
-import com.github.ghik.silencer.silent
 import com.softwaremill.diffx._
 import com.wavesplatform.dex.api.ws.protocol.{WsAddressChanges, WsOrderBookChanges}
 import com.wavesplatform.dex.cli.ScoptImplicits
@@ -344,8 +343,7 @@ object WavesDexLoadCli extends ScoptImplicits {
   }
 
   // The compiler is lie! This is used in WsOrder.id
-  @silent("never used") private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
-
+  private implicit val derivedByteStrDiff: Derived[Diff[ByteStr]] = Derived(getDiff[ByteStr](_.toString == _.toString))
   private implicit val wsAddressChangesDiff: Diff[WsAddressChanges] =
     Derived[Diff[WsAddressChanges]].ignore[WsAddressChanges, Long](_.timestamp).ignore[WsAddressChanges, Long](_.updateId)
 

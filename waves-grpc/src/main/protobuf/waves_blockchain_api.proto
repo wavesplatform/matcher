@@ -26,17 +26,14 @@ service WavesBlockchainApi {
 
     rpc RunAddressScript (RunAddressScriptRequest) returns (RunScriptResponse);
 
-    // TODO remove after release 2.1.3
-    rpc SpendableAssetBalance (SpendableAssetBalanceRequest) returns (SpendableAssetBalanceResponse);
-
     rpc SpendableAssetsBalances (SpendableAssetsBalancesRequest) returns (SpendableAssetsBalancesResponse);
 
     rpc ForgedOrder (ForgedOrderRequest) returns (ForgedOrderResponse);
 
-    // TODO remove after release 2.1.2
-    rpc GetBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesResponse);
-
-    // TODO rename to GetBalanceChanges after release 2.1.2
+    // TODO after release 2.1.2:
+    // 1. Add GetBalanceChanges with the same functionality
+    // 2. Use it in a new version
+    // 3. Remove GetRealTimeBalanceChanges in a next version
     rpc GetRealTimeBalanceChanges (google.protobuf.Empty) returns (stream BalanceChangesFlattenResponse);
 
     rpc AllAssetsSpendableBalance (AddressRequest) returns (AllAssetsSpendableBalanceResponse);

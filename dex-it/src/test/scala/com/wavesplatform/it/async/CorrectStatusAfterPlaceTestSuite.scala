@@ -63,7 +63,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
       mkMassTransfer(
         bob,
         Waves,
-        traders.map(x => new Transfer(x.toAddress, 100.waves))(collection.breakOut)
+        traders.map(x => new Transfer(x.toAddress, 100.waves)).to(List)
       )
 
     wavesNode1.start()
@@ -71,7 +71,7 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
     broadcastAndAwait(issueAssetTxs: _*)
 
     val transferAssetsTxs = issueAssetTxs.map { issueTx =>
-      mkMassTransfer(issuer, IssuedAsset(issueTx.getId), traders.map(x => new Transfer(x.toAddress, sendAmount))(collection.breakOut))
+      mkMassTransfer(issuer, IssuedAsset(issueTx.getId), traders.map(x => new Transfer(x.toAddress, sendAmount)).to(List))
     }
 
     broadcastAndAwait(transferAssetsTxs: _*)

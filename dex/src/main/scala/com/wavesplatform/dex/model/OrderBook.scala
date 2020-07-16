@@ -234,7 +234,7 @@ object OrderBook {
     val r = HashMap.newBuilder[Order.Id, (OrderType, Price)]
 
     for {
-      (price, level) <- asks.toIterator ++ bids.toIterator
+      (price, level) <- asks.iterator ++ bids.iterator
       lo             <- level
     } r.+=((lo.order.id(), (lo.order.orderType, price))) // The compiler doesn't allow write this less ugly
 

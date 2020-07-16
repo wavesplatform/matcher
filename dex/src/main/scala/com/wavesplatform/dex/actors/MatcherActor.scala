@@ -139,7 +139,7 @@ class MatcherActor(settings: MatcherSettings,
           // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
           runFor(request.event.assetPair, autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
-            orderBooks.getAndUpdate(_.filterNot { _._2.right.exists(_ == ref) })
+            orderBooks.getAndUpdate(_.filterNot { _._2.exists(_ == ref) })
             snapshotsState = snapshotsState.without(assetPair)
             tradedPairs -= assetPair
             assetPairsDB.remove(assetPair)

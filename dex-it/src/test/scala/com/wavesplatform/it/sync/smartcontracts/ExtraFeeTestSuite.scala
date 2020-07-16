@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.dex.api.http.entities.HttpOrderStatus.Status
 import com.wavesplatform.dex.domain.asset.Asset.Waves
 import com.wavesplatform.dex.domain.order.OrderType.{BUY, SELL}
 import com.wavesplatform.dex.it.test.Scripts
@@ -137,8 +138,10 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
       withClue("with same decimals count of assets in pair") {
 
-        val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
-        val expectedFee      = 550L                           // 1 x "smart asset" and 1 x "matcher script"
+        // TODO This will be fixed in NODE 1.2.8+, see NODE-2183
+        // val expectedWavesFee = tradeFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script"
+        val expectedWavesFee = tradeFee + smartFee + smartFee + smartFee // 1 x "smart asset" and 1 x "matcher script" and 1 x "scripted fee"
+        val expectedFee      = 550L                                      // 1 x "smart asset" and 1 x "matcher script"
 
         placeAndAwaitAtDex(mkOrder(bob, oneSmartPair, SELL, amount, price, expectedFee, version = 3, feeAsset = feeAsset))
 
@@ -146,7 +149,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         dex1.api.reservedBalance(bob)(feeAsset) shouldBe expectedFee
 
         val submitted = mkOrder(alice, oneSmartPair, BUY, amount, price, expectedWavesFee, version = 2)
-        dex1.api.place(submitted)
+        placeAndAwaitAtDex(submitted, Status.Filled)
         waitForOrderAtNode(submitted)
 
         eventually {
@@ -180,7 +183,6 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         dex1.api.place(bobOrder)
         dex1.api.reservedBalance(bob)(assetWith2Dec) shouldBe 10005L
 
-        //
         val aliceOrder = mkOrder(alice, asset2WithDecWavesPair, BUY, 20000L, 300.waves * 1000000L, 5, feeAsset = assetWith2Dec)
         dex1.api.place(aliceOrder)
         waitForOrderAtNode(bobOrder)

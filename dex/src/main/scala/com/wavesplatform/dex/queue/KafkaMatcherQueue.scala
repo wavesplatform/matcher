@@ -20,9 +20,9 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.{WakeupException, TimeoutException => KafkaTimeoutException}
 import org.apache.kafka.common.serialization._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.jdk.CollectionConverters._
 
 class KafkaMatcherQueue(settings: Settings) extends MatcherQueue with ScorexLogging {
   private val producerThreadPool =

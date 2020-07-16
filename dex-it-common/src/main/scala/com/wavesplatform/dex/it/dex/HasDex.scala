@@ -11,7 +11,7 @@ import com.wavesplatform.dex.it.fp.CanExtract
 import mouse.any._
 import org.apache.kafka.clients.admin.{AdminClient, NewTopic}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait HasDex { self: BaseContainersKit =>
   private val defaultTag = Option(System.getenv("DEX_TAG")).getOrElse("latest")

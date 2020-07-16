@@ -19,8 +19,8 @@ import com.wavesplatform.dex.waves.WavesFeeConstants._
 import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction, _}
 import com.wavesplatform.wavesj.{Transactions, Transfer}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration, DurationInt}
+import scala.jdk.CollectionConverters._
 
 // TODO Rename
 trait MkWavesEntities {

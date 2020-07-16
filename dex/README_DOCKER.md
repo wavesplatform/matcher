@@ -10,7 +10,7 @@ These images are focused on fast and convenient deployment of Waves Node with Ma
 
 First one is the Waves Node with pre-installed Matcher Extension (Matcher Node). It is based on the official [wavesnode](https://hub.docker.com/r/wavesplatform/wavesnode) image, so [it's configurations](https://github.com/wavesplatform/Waves/tree/master/docker#configuration-options) can be applied for the matcher-node image as well. If you're going to use volumes, please, pay attention to [data management](https://github.com/wavesplatform/Waves/tree/master/docker#managing-data) section.
 
-Matcher Extension in matcher-node image is already configured. Extension uses port 6887 for communication with Matcher Server via gRPC protocol. You can override Matcher Extension [default settings](https://github.com/wavesplatform/matcher/blob/master/waves-ext/src/main/resources/application.conf) in `local.conf`, which is located in `/docker/matcher-node/conf/` on your host machine (if you are using volume):
+Matcher Extension in matcher-node image is already configured. Extension uses port 6887 for communication with Matcher Server via gRPC protocol. You can override Matcher Extension [default settings](https://github.com/wavesplatform/matcher/blob/master/waves-ext/src/main/resources/application.conf) in `local.conf`, which is located in `/docker/matcher-node/config/` on your host machine (if you are using volume):
 
 ```
 # gRPC integration settings for Waves Node
@@ -61,7 +61,7 @@ docker run \
 -v /docker/matcher-node/data:/var/lib/waves \
 -v /docker/matcher-node/config:/etc/waves \
 -p 6869:6869 -p 6862:6862 \
--e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.wallet.password=myWalletSuperPassword" \
+-e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.wallet.password=myWalletSuperPassword -Dwaves.dex.grpc.integration.host=0.0.0.0" \
 -e WAVES_HEAP_SIZE=4g \
 -e WAVES_LOG_LEVEL=DEBUG \
 -e WAVES_NETWORK=mainnet \
@@ -76,6 +76,8 @@ Worth to note here that we specified container name by means of `--name matcher-
 docker run \
 -v /docker/matcher-server:/var/lib/waves-dex \
 -p 6886:6886 \
+-e MATCHER_HEAP_SIZE=4g
+-e JAVA_OPTS="-Dwaves.dex.rest-api.api-key-hash=MyRestApiBase58EncodedKeyHash"
 --link matcher-node:matcher-node \
 --name matcher-server \
 wavesplatform/matcher-server:latest
@@ -89,7 +91,7 @@ If you are using encrypted file as a Matcher account storage, please, put `accou
 
 Directory `/docker/matcher-server/config/` is used to provide all necessary runtime configurations of the Matcher Server. Note that:
   1. `/docker/matcher-server/config/local.conf` should be provided (see its mandatory content above)
-  2. you can place logback.xml with your own log settings in `/docker/matcher-server/config/` or use our [log management file](https://github.com/wavesplatform/matcher/blob/master/dex/src/package/doc/logback.xml)
+  2. you can place `logback.xml` with your own log settings in `/docker/matcher-server/config/` or use our [log management file](https://github.com/wavesplatform/matcher/blob/master/dex/src/package/doc/logback.xml). If you want to store logs on your host machine with our `logback.xml`, change property `logback.file.enabled` to `true`.
 
 ### Managing Data
 
@@ -146,7 +148,11 @@ docker run \
 mkdir -p /docker/matcher-server/config
 ```
 
-Once Matcher Server container is launched, it will create the subdirectory `/docker/matcher-server/data/`, which will contain Matcher Server state.
+Once Matcher Server container is launched, it will create 2 subdirectories in `/docker/matcher-server/`:
+ ```
+ /docker/matcher-server/log/  - Matcher Server logs
+ /docker/matcher-server/data/ - Matcher Server state
+```
 
 2. If you already have Matcher Server configuration and/or data - place it in the following directories:
   - state (`data` directory) and `account.dat` should be placed in `/docker/matcher-server/` 

@@ -1,8 +1,7 @@
-enablePlugins(ItTestPlugin, sbtdocker.DockerPlugin, ItCachedArtifactsPlugin, ImageVersionPlugin)
+enablePlugins(ItTestPlugin, sbtdocker.DockerPlugin, ItCachedArtifactsPlugin, ImageVersionPlugin, CleanupDanglingImagesPlugin)
 
+import CleanupDanglingImagesPlugin.autoImport.cleanupDandlingImages
 import ImageVersionPlugin.autoImport.nameOfImage
-
-import scala.sys.process._
 
 description := "DEX integration tests"
 
@@ -27,12 +26,11 @@ itArtifactDescriptions := {
 }
 
 // this image hasn't a config file
-docker := {
-  val image = docker.dependsOn(downloadItArtifacts, LocalProject("waves-integration-it") / docker, LocalProject("dex") / docker).value
-  streams.value.log.info(s"Cleaning dangling images...")
-  "docker image prune -f".!
-  image
-}
+// taskDyn motivation: https://www.scala-sbt.org/1.x/docs/Howto-Dynamic-Task.html#build.sbt+v2
+docker := Def.taskDyn {
+  val imageId = docker.dependsOn(downloadItArtifacts, LocalProject("waves-integration-it") / docker, LocalProject("dex") / docker).value
+  Def.task { cleanupDandlingImages.value; imageId }
+}.value
 
 inTask(docker)(
   Seq(

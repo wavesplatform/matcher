@@ -31,11 +31,12 @@ object TankGenerator {
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
     val assets = (1 to count).map(_ => mkAsset()).toList
-    val asset  = assets.get(new Random().nextInt(assets.length - 1))
+    val asset  = assets.get(new Random().nextInt(assets.length))
+    val pair   = new AssetPair(asset, "WAVES")
 
     do {
       waitForHeightArise()
-    } while (services.matcher.getTradableBalance(new AssetPair(asset, "WAVES"), issuer.getAddress()).getOrDefault(asset, 0L) <= 0)
+    } while (services.matcher.getTradableBalance(pair, issuer.getAddress()).getOrDefault(asset, 0L) <= 0)
 
     println("Assets have been successfully issued")
     assets
@@ -88,9 +89,11 @@ object TankGenerator {
       })
     println(s" Done")
 
-    val asset   = assets.get(new Random().nextInt(assets.length - 1))
-    val account = accounts.get(new Random().nextInt(accounts.length - 1))
-    while (services.matcher.getTradableBalance(new AssetPair(asset, "WAVES"), account.getAddress()).getOrDefault(asset, 0L) > 0) waitForHeightArise()
+    val asset   = assets.get(new Random().nextInt(assets.length))
+    val account = accounts.get(new Random().nextInt(accounts.length))
+    val pair    = new AssetPair(asset, "WAVES")
+
+    while (services.matcher.getTradableBalance(pair, account.getAddress()).getOrDefault(asset, 0L) == 0) waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -114,9 +117,9 @@ object TankGenerator {
       if (Files.notExists(pairsFile.get.toPath)) mkAssets()
       else
         readAssetPairs(pairsFile)
-          .map(p => {
+          .map { p =>
             s"${p.getAmountAsset}-${p.getPriceAsset}"
-          })
+          }
           .mkString("-")
           .split("-")
           .toSet
@@ -268,9 +271,7 @@ object TankGenerator {
     }
 
     val all = accounts.flatMap(a => {
-      pairs.map(p => {
-        mkTradableBalance(a, p)
-      })
+      pairs.map(mkTradableBalance(a, _))
     })
 
     Random
@@ -289,9 +290,9 @@ object TankGenerator {
     val futures = (0 to requestsCount).map(_ => {
       Future {
         services.matcher.placeOrder(
-          accounts(new Random().nextInt(accounts.length - 1)),
+          accounts(new Random().nextInt(accounts.length)),
           settings.matcherPublicKey,
-          pairs(new Random().nextInt(pairs.length - 1)),
+          pairs(new Random().nextInt(pairs.length)),
           Type.BUY,
           settings.defaults.minimalOrderPrice,
           settings.defaults.minimalOrderAmount,
@@ -305,8 +306,7 @@ object TankGenerator {
       case e: Throwable => println("Error during operation", e)
     })
 
-    try Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)
-    finally executor.shutdownNow()
+    Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)
   }
 
   private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
@@ -353,5 +353,6 @@ object TankGenerator {
     }
 
     svRequests(requests, outputFile)
+    executor.shutdownNow()
   }
 }

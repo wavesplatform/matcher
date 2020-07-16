@@ -1,1 +1,0 @@
-This directory contains a documentation and examples of configs.

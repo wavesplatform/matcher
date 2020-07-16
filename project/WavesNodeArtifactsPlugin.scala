@@ -55,7 +55,7 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
           val r = Http.http.run(request).map {
             releasesContent =>
               log.info(s"Looking for Waves Node $version...")
-              getFilesToDownload(releasesContent.bodyAsString, version, _ => artifactsToDownload).map { rawUrl =>
+              getFilesDownloadUrls(releasesContent.bodyAsString, version, artifactsToDownload).map { rawUrl =>
                 val url        = new URL(rawUrl)
                 val fileName   = url.getPath.split('/').last
                 val cachedFile = cacheDir / fileName
@@ -83,17 +83,14 @@ object WavesNodeArtifactsPlugin extends AutoPlugin {
     s"waves-stagenet_${version}_all.deb"
   )
 
-  /**
-    * @param toDownload version => file names to download
-    */
-  private def getFilesToDownload(rawJson: String, version: String, toDownload: String => List[String])(implicit log: ManagedLogger): List[String] =
+  private def getFilesDownloadUrls(rawJson: String, version: String, fileNamesToDownload: List[String])(implicit log: ManagedLogger): List[String] =
     Parser.parseFromString(rawJson).get match {
       case JArray(jReleases) =>
         jReleases
           .collectFirst {
             case JObject(jRelease) if jRelease.contains(JField("tag_name", JString(s"v$version"))) =>
               jRelease.find(_.field == "assets") match {
-                case Some(JField(_, JArray(jAssets))) => toDownload(version).flatMap(findAssetUrl(jAssets, _))
+                case Some(JField(_, JArray(jAssets))) => fileNamesToDownload.flatMap(findAssetUrl(jAssets, _))
                 case x                                => throw new RuntimeException(s"Can't find assets in: $x")
               }
           }

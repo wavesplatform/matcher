@@ -288,20 +288,18 @@ object TankGenerator {
 
     val futures = (0 to requestsCount).map(_ => {
       Future {
-        blocking {
-          services.matcher.placeOrder(
-            accounts(new Random().nextInt(accounts.length - 1)),
-            settings.matcherPublicKey,
-            pairs(new Random().nextInt(pairs.length - 1)),
-            Type.BUY,
-            settings.defaults.minimalOrderPrice,
-            settings.defaults.minimalOrderAmount,
-            System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
-            settings.defaults.matcherFee,
-            null,
-            false
-          )
-        }
+        services.matcher.placeOrder(
+          accounts(new Random().nextInt(accounts.length - 1)),
+          settings.matcherPublicKey,
+          pairs(new Random().nextInt(pairs.length - 1)),
+          Type.BUY,
+          settings.defaults.minimalOrderPrice,
+          settings.defaults.minimalOrderAmount,
+          System.currentTimeMillis + 60 * 60 * 24 * 20 * 1000,
+          settings.defaults.matcherFee,
+          null,
+          false
+        )
       }
     }.recover {
       case e: Throwable => println("Error during operation", e)

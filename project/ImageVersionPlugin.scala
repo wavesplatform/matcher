@@ -17,12 +17,20 @@ object ImageVersionPlugin extends AutoPlugin {
       imageTagMakeFunction := (gitTag => gitTag),
       imageNames := {
 
-        val latestImageName: ImageName  = ImageName(s"${nameOfImage.value}:latest")
-        val maybeGitTag: Option[String] = git.gitDescribedVersion.value
-        val mkTag: String => String     = imageTagMakeFunction.value
+        val latestImageName: ImageName         = ImageName(s"${nameOfImage.value}:latest")
+        val currentBranchName: String          = git.gitCurrentBranch.value
+        val currentBranchNameLowerCase: String = currentBranchName.toLowerCase
+        val maybeGitTag: Option[String]        = git.gitDescribedVersion.value
+        val mkTag: String => String            = imageTagMakeFunction.value
+        val isRelease: Boolean                 = !isSnapshot.value && maybeGitTag.isDefined
 
-        if (!isSnapshot.value && maybeGitTag.isDefined) Seq(latestImageName, ImageName(s"${nameOfImage.value}:${mkTag(maybeGitTag.get)}"))
-        else Seq(latestImageName)
+        val mandatoryImageNames =
+          if (currentBranchNameLowerCase.startsWith("dex-") || currentBranchNameLowerCase == "master")
+            Seq(latestImageName, ImageName(s"${nameOfImage.value}:$currentBranchName"))
+          else Seq(latestImageName)
+
+        if (isRelease) mandatoryImageNames :+ ImageName(s"${nameOfImage.value}:${mkTag(maybeGitTag.get)}")
+        else mandatoryImageNames
       }
     )
   )

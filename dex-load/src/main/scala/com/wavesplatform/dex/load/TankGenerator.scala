@@ -301,9 +301,9 @@ object TankGenerator {
           null,
           false
         )
+      }.recover {
+        case e: Throwable => println(s"Error during operation: $e"); null
       }
-    }.recover {
-      case e: Throwable => println(s"Error during operation: $e")
     })
 
     Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)

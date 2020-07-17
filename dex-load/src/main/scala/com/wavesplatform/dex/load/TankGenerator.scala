@@ -2,6 +2,7 @@ package com.wavesplatform.dex.load
 
 import java.io.{File, PrintWriter}
 import java.nio.file.Files
+import java.util.concurrent.{ExecutorService, Executors}
 
 import com.softwaremill.sttp.{MonadError => _}
 import com.wavesplatform.dex.load.request._
@@ -11,10 +12,14 @@ import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
 import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.DurationInt
+import scala.concurrent._
 import scala.util.Random
 
-// noinspection ScalaStyle
 object TankGenerator {
+  val threadCount                                                = 5
+  private val executor: ExecutorService                          = Executors.newFixedThreadPool(threadCount)
+  implicit private val blockingContext: ExecutionContextExecutor = ExecutionContext.fromExecutor(executor)
 
   private def mkAccounts(seedPrefix: String, count: Int): List[PrivateKeyAccount] = {
     print(s"Generating $count accounts (prefix: $seedPrefix)... ")
@@ -26,7 +31,13 @@ object TankGenerator {
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
     val assets = (1 to count).map(_ => mkAsset()).toList
-    waitForHeightArise()
+    val asset  = assets(new Random().nextInt(assets.length))
+    val pair   = new AssetPair(asset, "WAVES")
+
+    do {
+      waitForHeightArise()
+    } while (services.matcher.getTradableBalance(pair, issuer.getAddress()).getOrDefault(asset, 0L) <= 0)
+
     println("Assets have been successfully issued")
     assets
   }
@@ -52,34 +63,37 @@ object TankGenerator {
 
     def massTransferFee(group: List[Transfer]) = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
 
-    assets.foreach { asset =>
+    assets.foreach(asset => {
       println(s"\t -- $asset")
       accounts
         .map(account => new Transfer(account.getAddress, minimumNeededAssetBalance))
         .grouped(100)
-        .foreach { group =>
+        .foreach(group => {
           try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group.asJava, massTransferFee(group), null))
           catch {
             case e: Exception => println(e)
           }
-        }
-    }
+        })
+    })
 
     println(s"\t -- WAVES")
 
     accounts
       .map(account => new Transfer(account.getAddress, settings.defaults.wavesPerAccount))
       .grouped(100)
-      .foreach { group =>
+      .foreach(group => {
         try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group.asJava, massTransferFee(group), null))
         catch {
           case e: Exception => println(e)
         }
-      }
+      })
     println(s" Done")
 
-    waitForHeightArise()
-    waitForHeightArise()
+    val asset   = assets(new Random().nextInt(assets.length))
+    val account = accounts(new Random().nextInt(accounts.length))
+    val pair    = new AssetPair(asset, "WAVES")
+
+    while (services.matcher.getTradableBalance(pair, account.getAddress()).getOrDefault(asset, 0L) == 0) waitForHeightArise()
   }
 
   private def mkOrders(accounts: List[PrivateKeyAccount], pairs: List[AssetPair], matching: Boolean): List[Request] = {
@@ -101,7 +115,15 @@ object TankGenerator {
   private def mkPairsAndDistribute(accounts: List[PrivateKeyAccount], pairsFile: Option[File], distributed: Boolean = false): List[AssetPair] = {
     val assets =
       if (Files.notExists(pairsFile.get.toPath)) mkAssets()
-      else readAssetPairs(pairsFile).map(p => { s"${p.getAmountAsset}-${p.getPriceAsset}" }).mkString("-").split("-").toSet.toList
+      else
+        readAssetPairs(pairsFile)
+          .map { p =>
+            s"${p.getAmountAsset}-${p.getPriceAsset}"
+          }
+          .mkString("-")
+          .split("-")
+          .toSet
+          .toList
 
     val pairs =
       if (Files.notExists(pairsFile.get.toPath)) mkAssetPairs(assets)
@@ -132,7 +154,7 @@ object TankGenerator {
     println("Making requests for cancelling...")
 
     val cancels = accounts
-      .flatMap { a =>
+      .flatMap(a => {
         getOrderBook(a)
           .as[Array[JsValue]]
           .map(o => {
@@ -150,7 +172,7 @@ object TankGenerator {
                     RequestTag.CANCEL,
                     Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
-      }
+      })
 
     cancels.take(requestsCount)
   }
@@ -204,7 +226,7 @@ object TankGenerator {
     print("Making requests for getting order status... ")
 
     val statuses = accounts
-      .flatMap { a =>
+      .flatMap(a => {
         getOrderBook(a, false)
           .as[Array[JsValue]]
           .map(o => {
@@ -223,7 +245,7 @@ object TankGenerator {
               RequestTag.ORDER_STATUS
             )
           })
-      }
+      })
     println("Done")
 
     Random.shuffle(
@@ -249,7 +271,7 @@ object TankGenerator {
     }
 
     val all = accounts.flatMap(a => {
-      pairs.map(p => { mkTradableBalance(a, p) })
+      pairs.map(mkTradableBalance(a, _))
     })
 
     Random
@@ -262,16 +284,15 @@ object TankGenerator {
 
   def placeOrdersForCancel(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): Unit = {
     println("Placing some orders to prepare cancel-order requests... ")
+
     val pairs = mkPairsAndDistribute(accounts, pairsFile)
 
-    for (i <- 0 to requestsCount) {
-      try {
-        val acc  = accounts(new Random().nextInt(accounts.length - 1))
-        val pair = pairs(new Random().nextInt(pairs.length - 1))
+    val futures = (0 to requestsCount).map(_ => {
+      Future {
         services.matcher.placeOrder(
-          acc,
+          accounts(new Random().nextInt(accounts.length)),
           settings.matcherPublicKey,
-          pair,
+          pairs(new Random().nextInt(pairs.length)),
           Type.BUY,
           settings.defaults.minimalOrderPrice,
           settings.defaults.minimalOrderAmount,
@@ -280,16 +301,17 @@ object TankGenerator {
           null,
           false
         )
-        if (i % 50 == 0) println(s"$i orders of $requestsCount have been placed")
-      } catch {
-        case e: Exception => println(e.getMessage)
+      }.recover {
+        case e: Throwable => println(s"Error during operation: $e"); null
       }
-    }
-    println("Done")
+    })
+
+    Await.result(Future.sequence(futures), (requestsCount * threadCount).seconds)
   }
 
   private def mkAllTypes(accounts: List[PrivateKeyAccount], requestsCount: Int, pairsFile: Option[File]): List[Request] = {
     println("Making requests:")
+
     placeOrdersForCancel(accounts, (requestsCount * settings.distribution.placeOrder).toInt, pairsFile)
     Random.shuffle(
       mkOrderStatuses(accounts, (requestsCount * settings.distribution.orderStatus).toInt) ++
@@ -317,19 +339,20 @@ object TankGenerator {
   }
 
   def mkRequests(seedPrefix: String, pairsFile: Option[File], outputFile: File, requestsCount: Int, requestsType: Int, accountsNumber: Int): Unit = {
-    val accounts = mkAccounts(seedPrefix, accountsNumber)
-    val requests = requestsType match {
-      case 1 => mkPlaces(accounts, requestsCount, pairsFile)
-      case 2 => mkCancels(accounts, requestsCount)
-      case 3 => mkMatching(accounts, requestsCount, pairsFile)
-      case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
-      case 5 => mkBalances(accounts, requestsCount, pairsFile)
-      case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
-      case _ =>
-        println("Wrong number of task ")
-        List.empty
-    }
-
-    svRequests(requests, outputFile)
+    try {
+      val accounts = mkAccounts(seedPrefix, accountsNumber)
+      val requests = requestsType match {
+        case 1 => mkPlaces(accounts, requestsCount, pairsFile)
+        case 2 => mkCancels(accounts, requestsCount)
+        case 3 => mkMatching(accounts, requestsCount, pairsFile)
+        case 4 => mkOrderHistory(accounts, requestsCount, pairsFile)
+        case 5 => mkBalances(accounts, requestsCount, pairsFile)
+        case 6 => mkAllTypes(accounts, requestsCount, pairsFile)
+        case _ =>
+          println("Wrong number of task ")
+          List.empty
+      }
+      svRequests(requests, outputFile)
+    } finally executor.shutdownNow()
   }
 }

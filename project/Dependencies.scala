@@ -75,7 +75,7 @@ object Dependencies {
     val nettyCodec = "4.1.33.Final"
     val jwt        = "4.3.0"
 
-    val pureConfig = "0.12.3"
+    val pureConfig = "0.13.0"
   }
 
   private def akkaModule(module: String, version: String): ModuleID  = "com.typesafe.akka"             %% module            % version

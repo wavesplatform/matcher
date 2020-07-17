@@ -56,7 +56,8 @@ object Amount {
 case class Price(assetPair: AssetPair, volume: BigDecimal)
 object Price {
   private[error] def apply(assetPair: AssetPair, volume: Long)(implicit efc: ErrorFormatterContext): Price =
-    new Price(assetPair, Denormalization.denormalizePrice(volume, efc.unsafeAssetDecimals(assetPair.amountAsset), efc.unsafeAssetDecimals(assetPair.priceAsset)))
+    new Price(assetPair,
+              Denormalization.denormalizePrice(volume, efc.unsafeAssetDecimals(assetPair.amountAsset), efc.unsafeAssetDecimals(assetPair.priceAsset)))
 }
 
 case class MatcherErrorMessage(text: String, template: String, params: JsObject)
@@ -97,12 +98,6 @@ case class UnexpectedMatcherPublicKey(required: PublicKey, given: PublicKey)
       unexpected,
       e"The required matcher public key for this DEX is ${Symbol("required") -> required}, but given ${Symbol("given") -> given}"
     )
-
-case class UnexpectedSender(required: Address, given: Address)
-    extends MatcherError(order,
-                         pubKey,
-                         unexpected,
-                         e"The sender ${Symbol("given") -> given} does not match expected ${Symbol("required") -> required}")
 
 case class OrderInvalidSignature(id: Order.Id, details: String)
     extends MatcherError(order, signature, commonClass, e"The signature of order ${Symbol("id") -> id} is invalid: ${Symbol("details") -> details}")

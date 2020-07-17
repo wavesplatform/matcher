@@ -168,7 +168,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       blockchainAware(
         wavesBlockchainAsyncClient,
         transactionCreator.createTransaction,
-        matcherPublicKey.toAddress,
         time,
         actualOrderFeeSettings,
         settings.orderRestrictions.get(o.assetPair),
@@ -333,7 +332,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       "addresses"
     )
 
-  private def sendBalanceChanges(bufferSize: Int)(recipient: ActorRef): Unit = {
+  private def sendBalanceChanges(recipient: ActorRef): Unit = {
 
     def aggregateChangesByAddress(xs: List[BalanceChanges]): Map[Address, Map[Asset, Long]] = xs.foldLeft(Map.empty[Address, Map[Asset, Long]]) {
       case (result, bc) => result.updated(bc.address, result.getOrElse(bc.address, Map.empty) + (bc.asset -> bc.balance))
@@ -353,7 +352,7 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
           addressActors
         )
       )
-    ) unsafeTap sendBalanceChanges(settings.wavesBlockchainClient.balanceStreamBufferSize)
+    ) unsafeTap sendBalanceChanges
   }
 
   private def validateForAddress(ao: AcceptedOrder, tradableBalance: Map[Asset, Long]): Future[Either[MatcherError, Unit]] = {
@@ -363,7 +362,6 @@ class Matcher(settings: MatcherSettings)(implicit val actorSystem: ActorSystem) 
       _ <- EitherT.fromEither {
         OrderValidator
           .accountStateAware(
-            ao.order.sender,
             tradableBalance.withDefaultValue(0L),
             hasOrderInBlockchain,
             orderBookCache.getOrElse(OrderBookAggregatedSnapshot.empty)

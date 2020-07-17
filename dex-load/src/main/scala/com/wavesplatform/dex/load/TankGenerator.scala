@@ -16,8 +16,6 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent._
 import scala.util.Random
 
-
-// noinspection ScalaStyle
 object TankGenerator {
   val threadCount                                                = 5
   private val executor: ExecutorService                          = Executors.newFixedThreadPool(threadCount)
@@ -65,30 +63,30 @@ object TankGenerator {
 
     def massTransferFee(group: List[Transfer]) = settings.defaults.massTransferFee + (group.size + 1) * settings.defaults.massTransferMultiplier
 
-    assets.foreach { asset =>
+    assets.foreach(asset => {
       println(s"\t -- $asset")
       accounts
         .map(account => new Transfer(account.getAddress, minimumNeededAssetBalance))
         .grouped(100)
-        .foreach { group =>
-          try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group.asJava, massTransferFee(group), null))
+        .foreach(group => {
+          try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group, massTransferFee(group), null))
           catch {
             case e: Exception => println(e)
           }
-        }
-    }
+        })
+    })
 
     println(s"\t -- WAVES")
 
     accounts
       .map(account => new Transfer(account.getAddress, settings.defaults.wavesPerAccount))
       .grouped(100)
-      .foreach { group =>
-        try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group.asJava, massTransferFee(group), null))
+      .foreach(group => {
+        try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group, massTransferFee(group), null))
         catch {
           case e: Exception => println(e)
         }
-      }
+      })
     println(s" Done")
 
     val asset   = assets.get(new Random().nextInt(assets.length))
@@ -156,9 +154,9 @@ object TankGenerator {
     println("Making requests for cancelling...")
 
     val cancels = accounts
-      .flatMap { a =>
+      .flatMap(a => {
         getOrderBook(a)
-          .as[Array[JsValue]]
+          .as[List[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
@@ -174,7 +172,7 @@ object TankGenerator {
                     RequestTag.CANCEL,
                     Transactions.makeOrderCancel(a, new AssetPair(aa, pa), id))
           })
-      }
+      })
 
     cancels.take(requestsCount)
   }
@@ -228,9 +226,9 @@ object TankGenerator {
     print("Making requests for getting order status... ")
 
     val statuses = accounts
-      .flatMap { a =>
+      .flatMap(a => {
         getOrderBook(a, false)
-          .as[Array[JsValue]]
+          .as[List[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
@@ -247,7 +245,7 @@ object TankGenerator {
               RequestTag.ORDER_STATUS
             )
           })
-      }
+      })
     println("Done")
 
     Random.shuffle(

@@ -126,7 +126,7 @@ class OrderValidatorSpecification
       "order exists" in {
 
         val pk = KeyPair(randomBytes())
-        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, orderExists = true, OrderBookAggregatedSnapshot.empty)(_)
+        val ov = OrderValidator.accountStateAware(defaultPortfolio.balanceOf, orderExists = true, OrderBookAggregatedSnapshot.empty)(_)
 
         ov(LimitOrder(newBuyOrder(pk, 1000))) should produce("OrderDuplicate")
       }
@@ -861,7 +861,7 @@ class OrderValidatorSpecification
                              hasMatcherAccountScript: Boolean = false)(f: (Order => FutureResult[Order], AsyncBlockchain) => Any): Unit = {
 
     val bc = stub[AsyncBlockchain]
-    val tc = exchangeTransactionCreator(bc, hasMatcherAccountScript, assetDescriptions(_).hasScript)
+    val tc = exchangeTransactionCreator(hasMatcherAccountScript, assetDescriptions(_).hasScript)
     val ov = mkOrderValidator(bc, tc, assetDescriptions)
 
     f(ov, bc)
@@ -892,7 +892,7 @@ class OrderValidatorSpecification
         proofs = proofs
       )
 
-    val tc = exchangeTransactionCreator(bc)
+    val tc = exchangeTransactionCreator()
     val ov = mkOrderValidator(bc, tc)
 
     awaitResult { ov(order) } shouldBe Symbol("right")
@@ -924,7 +924,6 @@ class OrderValidatorSpecification
       OrderValidator.blockchainAware(
         bc,
         tc.createTransaction,
-        MatcherAccount,
         time,
         DynamicSettings.symmetric(matcherFee),
         matcherSettings.orderRestrictions.get(order.assetPair),
@@ -936,8 +935,7 @@ class OrderValidatorSpecification
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: AsyncBlockchain,
-                                         hasMatcherAccountScript: Boolean = false,
+  private def exchangeTransactionCreator(hasMatcherAccountScript: Boolean = false,
                                          hasAssetScript: Asset => Boolean = getDefaultAssetDescriptions(_).hasScript) =
     new ExchangeTransactionCreator(MatcherAccount, matcherSettings.exchangeTxBaseFee, hasMatcherAccountScript, hasAssetScript)
 
@@ -946,12 +944,11 @@ class OrderValidatorSpecification
       hasOrder: Boolean,
       o: Order = newBuyOrder
   )(f: OrderValidator.Result[AcceptedOrder] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
+    f(OrderValidator.accountStateAware(tradableBalance(p), hasOrder, OrderBookAggregatedSnapshot.empty)(LimitOrder(o)))
 
   private def validateMarketOrderByAccountStateAware(aggregatedSnapshot: OrderBookAggregatedSnapshot)(
       b: Map[Asset, Long]): Order => Result[AcceptedOrder] = { order =>
     OrderValidator.accountStateAware(
-      sender = order.sender.toAddress,
       tradableBalance = b.withDefaultValue(0L).apply,
       orderExists = false,
       orderBookCache = aggregatedSnapshot
@@ -1022,7 +1019,7 @@ class OrderValidatorSpecification
     assignScript(blockchain, MatcherAccount.toAddress, matcherAccountScript)
     assignNoScript(blockchain, order.sender.toAddress)
 
-    val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
+    val transactionCreator = exchangeTransactionCreator().createTransaction _
 
     val assetsDescriptions = {
       Set(order.assetPair.amountAsset -> amountAssetScript, order.assetPair.priceAsset -> priceAssetScript, order.feeAsset -> matcherFeeAssetScript)
@@ -1035,7 +1032,6 @@ class OrderValidatorSpecification
       .blockchainAware(
         blockchain,
         transactionCreator,
-        MatcherAccount.toAddress,
         time,
         orderFeeSettings,
         orderRestrictions.get(order.assetPair),

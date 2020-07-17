@@ -175,7 +175,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               orderValidator(order).value flatMap {
                 case Right(o) =>
                   placeTimer.measureFuture {
-                    askAddressActor(order.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
+                    askAddressActor(o.sender, AddressActor.Command.PlaceOrder(o, isMarket)) {
                       case AddressActor.Event.OrderAccepted(x) => SimpleResponse(HttpSuccessfulPlace(x))
                       case x: error.MatcherError =>
                         if (x == error.CanNotPersistEvent) StatusCodes.ServiceUnavailable -> HttpError.from(x, "WavesNodeUnavailable")

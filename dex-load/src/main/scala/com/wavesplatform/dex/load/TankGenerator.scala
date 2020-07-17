@@ -31,7 +31,7 @@ object TankGenerator {
   private def mkAssets(count: Int = settings.assets.count): List[String] = {
     println(s"Generating $count assets... ")
     val assets = (1 to count).map(_ => mkAsset()).toList
-    val asset  = assets.get(new Random().nextInt(assets.length))
+    val asset  = assets(new Random().nextInt(assets.length))
     val pair   = new AssetPair(asset, "WAVES")
 
     do {
@@ -69,7 +69,7 @@ object TankGenerator {
         .map(account => new Transfer(account.getAddress, minimumNeededAssetBalance))
         .grouped(100)
         .foreach(group => {
-          try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group, massTransferFee(group), null))
+          try services.node.send(Transactions.makeMassTransferTx(issuer, asset, group.asJava, massTransferFee(group), null))
           catch {
             case e: Exception => println(e)
           }
@@ -82,15 +82,15 @@ object TankGenerator {
       .map(account => new Transfer(account.getAddress, settings.defaults.wavesPerAccount))
       .grouped(100)
       .foreach(group => {
-        try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group, massTransferFee(group), null))
+        try services.node.send(Transactions.makeMassTransferTx(issuer, "WAVES", group.asJava, massTransferFee(group), null))
         catch {
           case e: Exception => println(e)
         }
       })
     println(s" Done")
 
-    val asset   = assets.get(new Random().nextInt(assets.length))
-    val account = accounts.get(new Random().nextInt(accounts.length))
+    val asset   = assets(new Random().nextInt(assets.length))
+    val account = accounts(new Random().nextInt(accounts.length))
     val pair    = new AssetPair(asset, "WAVES")
 
     while (services.matcher.getTradableBalance(pair, account.getAddress()).getOrDefault(asset, 0L) == 0) waitForHeightArise()

@@ -11,7 +11,7 @@ import com.wavesplatform.wavesj._
 import com.wavesplatform.wavesj.matcher.Order.Type
 import play.api.libs.json.{JsError, JsSuccess, JsValue}
 
-import scala.collection.JavaConversions.seqAsJavaList
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent._
 import scala.util.Random
@@ -156,7 +156,7 @@ object TankGenerator {
     val cancels = accounts
       .flatMap(a => {
         getOrderBook(a)
-          .as[List[JsValue]]
+          .as[Array[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {
@@ -228,7 +228,7 @@ object TankGenerator {
     val statuses = accounts
       .flatMap(a => {
         getOrderBook(a, false)
-          .as[List[JsValue]]
+          .as[Array[JsValue]]
           .map(o => {
             val id = (o \ "id").as[String]
             val aa = ((o \ "assetPair").as[JsValue] \ "amountAsset").validate[String] match {

@@ -12,7 +12,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.Order
 import com.wavesplatform.dex.domain.transaction
 import com.wavesplatform.dex.domain.utils.ScorexLogging
-import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.{BalanceChanges, SpendableBalanceChanges}
+import com.wavesplatform.dex.grpc.integration.clients.WavesBlockchainClient.BalanceChanges
 import com.wavesplatform.dex.grpc.integration.dto.BriefAssetDescription
 import com.wavesplatform.dex.grpc.integration.effect.Implicits.NettyFutureOps
 import com.wavesplatform.dex.grpc.integration.exceptions.{UnexpectedConnectionException, WavesNodeConnectionLostException}
@@ -48,34 +48,11 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
   private val shuttingDown      = new AtomicBoolean(false)
   private val blockchainService = WavesBlockchainApiGrpc.stub(channel)
 
-  // TODO remove after release 2.1.2
-  private val spendableBalanceChangesSubject = ConcurrentSubject.publish[SpendableBalanceChanges](monixScheduler)
   // TODO rename to spendableBalanceChangesSubject after release 2.1.2
   private val realTimeSpendableBalanceChangesSubject = ConcurrentSubject.publish[BalanceChanges](monixScheduler)
 
-  private def toVanilla(record: BalanceChangesResponse.Record): (Address, Asset, Long) = {
-    (record.address.toVanillaAddress, record.asset.toVanillaAsset, record.balance)
-  }
-
-  /**
-    * Grouping batch records of spendable balances changes by addresses, e.g. converts
-    * {{{ Seq[(Address, Asset, Balance)] to Map[Address, Map[Asset, Balance]] }}}
-    */
-  private def groupByAddress(balanceChangesResponse: BalanceChangesResponse): SpendableBalanceChanges = {
-    balanceChangesResponse.batch
-      .map { toVanilla }
-      .groupBy { case (address, _, _) => address }
-      .mapValues { _.map { case (_, asset, balance) => asset -> balance }.toMap.withDefaultValue(0) }
-  }
-
-  // TODO remove after release 2.1.2
-  private val balanceChangesObserver = new BalanceChangesObserver
   // TODO rename to balanceChangesObserver after release 2.1.2
   private val realTimeBalanceChangesObserver = new RealTimeBalanceChangesObserver
-
-  // TODO remove after release 2.1.2
-  /** Performs new gRPC call for receiving of the spendable balance changes stream */
-  private def requestBalanceChanges(): Unit = blockchainService.getBalanceChanges(Empty(), balanceChangesObserver)
 
   // TODO rename to requestBalanceChanges after release 2.1.2
   /** Performs new gRPC call for receiving of the spendable balance changes real-time stream */
@@ -88,20 +65,6 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     case Result.UnexpectedResult(obj) => RunScriptResult.UnexpectedResult(obj)
     case Result.Exception(value)      => RunScriptResult.Exception(value.name, value.message)
     case _: Result.Denied             => RunScriptResult.Denied
-  }
-
-  // TODO remove after release 2.1.2
-  /** Returns stream of the balance changes as a sequence of batches */
-  override lazy val spendableBalanceChanges: Observable[SpendableBalanceChanges] = {
-    requestBalanceChanges()
-    spendableBalanceChangesSubject
-  }
-
-  // TODO remove after release 2.1.3
-  override def spendableBalance(address: Address, asset: Asset): Future[Long] = handlingErrors {
-    blockchainService
-      .spendableAssetBalance { SpendableAssetBalanceRequest(address = address.toPB, assetId = asset.toPB) }
-      .map(_.balance)
   }
 
   // TODO rename to spendableBalanceChanges after release 2.1.2
@@ -168,7 +131,6 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
 
   override def close(): Future[Unit] = {
     shuttingDown.set(true)
-    balanceChangesObserver.close()
     channel.shutdown()
     channel.awaitTermination(500, TimeUnit.MILLISECONDS)
     // See NettyChannelBuilder.eventLoopGroup
@@ -179,34 +141,6 @@ class WavesBlockchainGrpcAsyncClient(eventLoopGroup: EventLoopGroup, channel: Ma
     blockchainService.getNodeAddress { Empty() } map { r =>
       InetAddress.getByName(r.address)
     }
-  }
-
-  // TODO remove after release 2.1.2
-  private final class BalanceChangesObserver extends ClientResponseObserver[Empty, BalanceChangesResponse] with AutoCloseable {
-    private val isConnectionEstablished: AtomicBoolean         = new AtomicBoolean(true)
-    private var requestStream: ClientCallStreamObserver[Empty] = _
-
-    override def onCompleted(): Unit = log.info("Balance changes stream completed!")
-
-    override def onNext(value: BalanceChangesResponse): Unit = {
-      if (isConnectionEstablished.compareAndSet(false, true)) {
-        blockchainService.getNodeAddress { Empty() } foreach { response =>
-          log.info(s"gRPC connection restored! DEX server now is connected to Node with an address: ${response.address}")
-        }
-      }
-
-      if (value.batch.nonEmpty) spendableBalanceChangesSubject.onNext(groupByAddress(value))
-    }
-
-    override def onError(e: Throwable): Unit = if (!shuttingDown.get()) {
-      if (isConnectionEstablished.compareAndSet(true, false)) log.error("Connection with Node lost!", e)
-      channel.resetConnectBackoff()
-      requestBalanceChanges()
-    }
-
-    override def close(): Unit = if (requestStream != null) requestStream.cancel("Shutting down", new StatusRuntimeException(Status.CANCELLED))
-
-    override def beforeStart(requestStream: ClientCallStreamObserver[Empty]): Unit = this.requestStream = requestStream
   }
 
   // TODO rename to BalanceChangesObserver after release 2.1.2

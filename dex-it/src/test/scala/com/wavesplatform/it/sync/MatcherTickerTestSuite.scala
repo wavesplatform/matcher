@@ -47,7 +47,7 @@ class MatcherTickerTestSuite extends MatcherSuiteBase {
         dex1.api.tryOrderBook(usdWavesPair)
       }
 
-      dex1.api.tryOrderBook(wavesUsdPair) shouldBe 'right
+      dex1.api.tryOrderBook(wavesUsdPair) shouldBe Symbol("right")
 //      assert(
 //        node
 //          .matcherGet(s"/matcher/orderbook/${usdWavesPair.amountAssetStr}/${usdWavesPair.priceAssetStr}/status", statusCode = 301)

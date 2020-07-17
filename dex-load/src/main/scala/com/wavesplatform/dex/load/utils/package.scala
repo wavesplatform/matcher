@@ -6,6 +6,7 @@ import java.nio.file.Files
 import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError => _, _}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.dex.domain.bytes.codec.Base58
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.wavesj.json.WavesJsonMapper
 import com.wavesplatform.wavesj.matcher.Order
 import com.wavesplatform.wavesj.matcher.Order.Type
@@ -18,11 +19,12 @@ import scala.io.Source
 import scala.util.Random
 
 package object utils {
-  val settings = ConfigSource
-    .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))
-    .load[Settings]
-    .right
-    .get
+
+  val settings =
+    ConfigSource
+      .fromConfig(ConfigFactory.parseResources(scala.util.Properties.envOrElse("CONF", "devnet.conf")).getConfig("waves.dex.load"))
+      .load[Settings]
+      .explicitGet()
 
   val services         = new Services(settings)
   val networkByte      = settings.chainId.charAt(0).toByte
@@ -42,8 +44,8 @@ package object utils {
           .headers(mkOrderHistoryHeaders(account))
           .send()
           .body
-          .right
-          .get)
+          .explicitGet()
+      )
   }
 
   def waitForHeightArise(): Unit = {

@@ -62,7 +62,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       updateBobScript("AgMGCQAAZgAAAAIFAAAABmhlaWdodAAAAAAAAAAAAAeEODpj")
       Thread.sleep(3000) // TODO Sometimes fail without this awaiting, probably issue in the cache
       dex1.api.tryPlace(mkOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2)) should failWith(
-        3147521, // AccountScriptException
+        3147520, // AccountScriptReturnedError
         "An access to the blockchain.height is denied on DEX"
       )
     }

@@ -19,10 +19,10 @@ import com.wavesplatform.dex.test.matchers.DiffMatcherWithImplicits
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.jdk.CollectionConverters._
 
 class SpendableBalancesActorSpecification
     extends TestKit(ActorSystem("SpendableBalancesActorSpecification"))
@@ -32,7 +32,7 @@ class SpendableBalancesActorSpecification
 
   implicit val addressDiff: Diff[Address] = DiffMatcherWithImplicits.getDiff[Address](_ == _)
 
-  implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+  implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
   val testProbe: TestProbe = TestProbe()
 
@@ -67,7 +67,7 @@ class SpendableBalancesActorSpecification
         time,
         EmptyOrderDB,
         (_, _) => Future.successful(Right(())),
-        event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0, 0, event)) } },
+        event => { testProbe.ref ! event; Future.successful { Some(QueueEventWithMeta(0L, 0, event)) } },
         enableSchedules,
         sba
       )
@@ -84,7 +84,7 @@ class SpendableBalancesActorSpecification
         spendableBalancesGrpcCalls.get(address) shouldBe callsCount
       }
 
-      sba ! SpendableBalancesActor.Command.UpdateStates(balancesFromNode.filterKeys(_ == bob))
+      sba ! SpendableBalancesActor.Command.UpdateStates(balancesFromNode.view.filterKeys(_ == bob).toMap)
 
       // format: off
       checkStateAndCalls(bob,   Set(Waves, eth), callsCount = 0, expectedBalance = Waves -> 300.waves, eth -> 5.eth)
@@ -110,7 +110,7 @@ class SpendableBalancesActorSpecification
 
       val spendableBalances: (Address, Set[Asset]) => Future[Map[Asset, Long]] = { (address, assets) =>
         if (address == alice)
-          Future.successful { Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).filterKeys(assets) } else
+          Future.successful { Map(Waves -> 100.waves, usd -> 500.usd).withDefaultValue(0L).view.filterKeys(assets).toMap } else
           Future.failed[Map[Asset, Long]] { WavesNodeConnectionLostException("ain't my bitch", new Exception()) }
       }
 
@@ -133,7 +133,7 @@ class SpendableBalancesActorSpecification
       val aliceBalance = Map(Waves -> 20.waves, usd -> 5.usd)
 
       def spendableBalances(address: Address, assets: Set[Asset]): Future[Map[Asset, Long]] = Future.successful {
-        if (address == alice) aliceBalance filterKeys assets else Map.empty
+        if (address == alice) aliceBalance.view.filterKeys(assets).toMap else Map.empty
       }
 
       def allAssetsSpendableBalances(address: Address): Future[Map[Asset, Long]] = Future.successful {
@@ -142,31 +142,31 @@ class SpendableBalancesActorSpecification
 
       val sba: ActorRef = system.actorOf(Props(new SpendableBalancesActor(spendableBalances, allAssetsSpendableBalances, testProbe.ref)))
 
-      def updateAndExpectBalanceChanges(update: (Asset, Long)*)(allChanges: Map[Asset, Long], decreasingChanges: Map[Asset, Long]): Unit = {
+      def updateAndExpectBalanceChanges(update: (Asset, Long)*)(changedAssets: Set[Asset], decreasingChanges: Map[Asset, Long]): Unit = {
         sba ! SpendableBalancesActor.Command.UpdateStates { Map(alice -> update.toMap) }
         val envelope = testProbe.expectMsgType[AddressDirectoryActor.Envelope]
         envelope.address should matchTo(alice)
         envelope.cmd.asInstanceOf[AddressActor.Message.BalanceChanged] should matchTo {
-          AddressActor.Message.BalanceChanged(allChanges, decreasingChanges)
+          AddressActor.Message.BalanceChanged(changedAssets, decreasingChanges)
         }
       }
 
       // initial balance = Map(Waves -> 20.waves, usd -> 5.usd)
       withClue("Snapshot isn't received, increasing balance by Waves twice") {
-        updateAndExpectBalanceChanges(Waves -> 25.waves)(allChanges = Map(Waves -> 25.waves), decreasingChanges = Map(Waves -> 25.waves))
-        updateAndExpectBalanceChanges(Waves -> 26.waves)(allChanges = Map(Waves -> 26.waves), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(Waves -> 25.waves)(changedAssets = Set(Waves), decreasingChanges = Map(Waves -> 25.waves))
+        updateAndExpectBalanceChanges(Waves -> 26.waves)(changedAssets = Set(Waves), decreasingChanges = Map.empty)
       }
 
       withClue("Snapshot isn't received, decreasing balance by Waves") {
-        updateAndExpectBalanceChanges(Waves -> 23.waves)(allChanges = Map(Waves -> 23.waves), decreasingChanges = Map(Waves -> 23.waves))
+        updateAndExpectBalanceChanges(Waves -> 23.waves)(changedAssets = Set(Waves), decreasingChanges = Map(Waves -> 23.waves))
       }
 
       withClue("Snapshot isn't received, decreasing by USD") {
-        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+        updateAndExpectBalanceChanges(usd -> 3.usd)(changedAssets = Set(usd), decreasingChanges = Map(usd -> 3.usd))
       }
 
       withClue("Snapshot isn't received, increasing by USD") {
-        updateAndExpectBalanceChanges(usd -> 8.usd)(allChanges = Map(usd -> 8.usd), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(usd -> 8.usd)(changedAssets = Set(usd), decreasingChanges = Map.empty)
       }
 
       withClue("Receiving snapshot") {
@@ -177,11 +177,11 @@ class SpendableBalancesActorSpecification
       }
 
       withClue("Snapshot received, increasing balance by Waves") {
-        updateAndExpectBalanceChanges(Waves -> 30.waves)(allChanges = Map(Waves -> 30.waves), decreasingChanges = Map.empty)
+        updateAndExpectBalanceChanges(Waves -> 30.waves)(changedAssets = Set(Waves), decreasingChanges = Map.empty)
       }
 
       withClue("Snapshot received, decreasing balance by USD") {
-        updateAndExpectBalanceChanges(usd -> 3.usd)(allChanges = Map(usd -> 3.usd), decreasingChanges = Map(usd -> 3.usd))
+        updateAndExpectBalanceChanges(usd -> 3.usd)(changedAssets = Set(usd), decreasingChanges = Map(usd -> 3.usd))
       }
     }
   }

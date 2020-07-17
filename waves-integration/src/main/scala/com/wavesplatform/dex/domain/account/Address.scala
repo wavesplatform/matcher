@@ -68,7 +68,6 @@ object Address extends ScorexLogging {
             (),
             InvalidAddress(s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
           )
-          .right
           .flatMap {
             _ =>
               val Array(version, network, _*) = addressBytes.arr

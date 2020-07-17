@@ -6,10 +6,14 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.transaction.ExchangeTransaction
 import com.wavesplatform.wavesj.matcher.{Order => JOrder, OrderV1 => JOrderV1, OrderV2 => JOrderV2, OrderV3 => JOrderV3}
-import com.wavesplatform.wavesj.transactions.{ExchangeTransaction => JExchangeTransaction, ExchangeTransactionV1 => JExchangeTransactionV1, ExchangeTransactionV2 => JExchangeTransactionV2}
+import com.wavesplatform.wavesj.transactions.{
+  ExchangeTransaction => JExchangeTransaction,
+  ExchangeTransactionV1 => JExchangeTransactionV1,
+  ExchangeTransactionV2 => JExchangeTransactionV2
+}
 import com.wavesplatform.wavesj.{ByteString, PrivateKeyAccount, PublicKeyAccount, AssetPair => JAssetPair}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait ToWavesJConversions {
 

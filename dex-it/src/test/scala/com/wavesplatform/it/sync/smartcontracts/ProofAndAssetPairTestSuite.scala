@@ -8,6 +8,7 @@ import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.crypto
 import com.wavesplatform.dex.domain.crypto.Proofs
 import com.wavesplatform.dex.domain.order.{Order, OrderType, OrderV2}
+import com.wavesplatform.dex.domain.utils.EitherExt2
 import com.wavesplatform.dex.it.api.responses.dex.MatcherError
 import com.wavesplatform.dex.it.test.Scripts
 import com.wavesplatform.dex.it.waves.MkWavesEntities.IssueResults
@@ -360,7 +361,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         "9" in {
           setAliceScript(sc9)
           dex1.api.tryPlace(mkOrder(alice, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2)) should failWith(
-            3147521, // AccountScriptException
+            3147520, // AccountScriptReturnedError
             "An access to the blockchain.height is denied on DEX"
           )
         }
@@ -391,13 +392,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           val aliceOrd1Txs = dex1.api.waitForTransactionsByOrder(aliceOrd1, 1)
           val r1           = wavesNode1.api.tryBroadcast(aliceOrd1Txs.head)
-          r1 shouldBe 'left
-          r1.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
+          r1 shouldBe Symbol("left")
+          r1.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           val aliceOrd2Txs = dex1.api.waitForTransactionsByOrder(aliceOrd2, 1)
           val r2           = wavesNode1.api.tryBroadcast(aliceOrd2Txs.head)
-          r2 shouldBe 'left
-          r2.left.get.error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
+          r2 shouldBe Symbol("left")
+          r2.swap.explicitGet().error shouldBe 307 // node's ApiError TransactionNotAllowedByAccountScript.Id
 
           dex1.api.orderHistoryWithApiKey(alice, activeOnly = Some(true)).length shouldBe 0
           dex1.api.reservedBalance(bob) shouldBe empty

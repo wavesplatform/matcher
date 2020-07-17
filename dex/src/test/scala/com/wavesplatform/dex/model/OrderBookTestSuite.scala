@@ -78,7 +78,7 @@ class OrderBookTestSuite
     val prices = Gen.choose(1, 100000L)
 
     val gen = Gen
-      .zip(Gen.oneOf(normalizedTickSizes), Gen.listOf(prices), Gen.listOf(prices))
+      .zip(Gen.oneOf(normalizedTickSizes.toSeq), Gen.listOf(prices), Gen.listOf(prices))
       .map {
         case (tickSize, askPrices, bidPrices) =>
           val asks = askPrices.map(x => sell(pair, 984651354686L, x))
@@ -88,11 +88,11 @@ class OrderBookTestSuite
 
     forAll(gen) {
       case (tickSize, ob) =>
-        for ((level, orders) <- ob.bids; order <- orders) {
+        for ((level, orders) <- ob.bids.iterator; order <- orders) {
           order.price - level should be < tickSize
           level % tickSize shouldBe 0
         }
-        for ((level, orders) <- ob.asks; order <- orders) {
+        for ((level, orders) <- ob.asks.iterator; order <- orders) {
           level - order.price should be < tickSize
           level % tickSize shouldBe 0
         }
@@ -124,8 +124,8 @@ class OrderBookTestSuite
       normalizedTickSize
     )
 
-    ob.asks.keySet should matchTo(Set[Long](44100, 44200, 44300, 44400).map(toNormalized))
-    ob.bids.keySet should matchTo(Set[Long](0, 34300, 34200, 34100).map(toNormalized))
+    ob.asks.keySet should matchTo(Set(44100L, 44200L, 44300L, 44400L).map(toNormalized))
+    ob.bids.keySet should matchTo(Set(0L, 34300L, 34200L, 34100L).map(toNormalized))
 
     ob.bids shouldBe TreeMap[Price, Level](
       Seq(
@@ -297,9 +297,9 @@ class OrderBookTestSuite
   }
 
   "partially execute order with small remaining part" in {
-    val ord1 = sell(pair, 200000000, 0.00041)
-    val ord2 = sell(pair, 100000000, 0.0004)
-    val ord3 = buy(pair, 100000001, 0.00045)
+    val ord1 = sell(pair, 200000000L, 0.00041)
+    val ord2 = sell(pair, 100000000L, 0.0004)
+    val ord3 = buy(pair, 100000001L, 0.00045)
 
     val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllAccepted(List(ord1, ord2, ord3).map(LimitOrder(_)), now)
     ob.allOrders.toList should matchTo(List[LimitOrder](SellLimitOrder(ord1.amount, ord1.matcherFee, ord1, BigInteger.ZERO)))
@@ -338,8 +338,8 @@ class OrderBookTestSuite
 
   "buy small amount of pricey asset" in {
     val p = AssetPair(IssuedAsset(ByteStr("WAVES".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
-    val b = rawBuy(p, 0.007.waves, 280)
-    val s = rawSell(p, 300.0.waves, 280)
+    val b = rawBuy(p, 0.007.waves, 280L)
+    val s = rawSell(p, 300.0.waves, 280L)
 
     val OrderBookUpdates(ob, _, _, _) = OrderBook.empty.appendAllLimit(List(s, b), now)
 

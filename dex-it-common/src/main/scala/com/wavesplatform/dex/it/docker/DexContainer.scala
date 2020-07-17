@@ -57,7 +57,7 @@ object DexContainer extends ScorexLogging {
                          ec: ExecutionContext): DexContainer = {
 
     val underlying = GenericContainer(
-      dockerImage = s"com.wavesplatform/dex-it:$tag",
+      dockerImage = s"wavesplatform/dex-it:$tag",
       exposedPorts = Seq(restApiPort),
       env = getEnv(name),
       waitStrategy = ignoreWaitStrategy

@@ -26,9 +26,9 @@ import com.wavesplatform.dex.time.Time
 import com.wavesplatform.dex.{Matcher, error}
 import play.api.libs.json.{Json, Reads}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
 case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsInternalBroadcastActor.Command],
@@ -190,6 +190,6 @@ case class MatcherWebSocketRoute(wsInternalBroadcastRef: typed.ActorRef[WsIntern
 
 object MatcherWebSocketRoute {
   private[MatcherWebSocketRoute] class CloseHandler(val close: () => Unit, val closed: Promise[Done] = Promise[Done]) {
-    def closeOn(f: Future[Done]): Unit = closed.tryCompleteWith(f)
+    def closeOn(f: Future[Done]): Unit = closed.completeWith(f)
   }
 }

@@ -58,7 +58,7 @@ object OrderValidator extends ScorexLogging {
       .verifyAsEllipticCurveSignature(order)
       .bimap(
         e => error.OrderInvalidSignature(order.id(), e.toString),
-        _ => Unit
+        _ => ()
       )
   }
 
@@ -288,7 +288,7 @@ object OrderValidator extends ScorexLogging {
                            getActualOrderFeeSettings: => OrderFeeSettings)(order: Order)(implicit efc: ErrorFormatterContext): Result[Order] = {
 
     def validateBlacklistedAsset(asset: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
-      asset.fold { success }(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), Unit, e(issuedAsset)))
+      asset.fold(success)(issuedAsset => cond(!matcherSettings.blacklistedAssets.contains(issuedAsset), (), e(issuedAsset)))
 
     for {
       _ <- lift(order)
@@ -441,7 +441,7 @@ object OrderValidator extends ScorexLogging {
 
     def validateTradableBalance(requiredForOrder: Map[Asset, Long]): Result[AcceptedOrder] = {
       val availableBalances = acceptedOrder.availableBalanceBySpendableAssets(tradableBalance)
-      val negativeBalances  = availableBalances |+| requiredForOrder.mapValues { -_ } filter { case (_, balance) => balance < 0 }
+      val negativeBalances  = availableBalances |+| requiredForOrder.view.mapValues(-_).toMap filter { case (_, balance) => balance < 0 }
       cond(negativeBalances.isEmpty, acceptedOrder, error.BalanceNotEnough(requiredForOrder, availableBalances))
     }
 
@@ -472,5 +472,5 @@ object OrderValidator extends ScorexLogging {
 
   private def lift[T](x: T): Result[T]                 = x.asRight[MatcherError]
   def liftAsync[T](result: Result[T]): FutureResult[T] = EitherT { Future.successful(result) }
-  val success: Result[Unit]                            = lift(Unit)
+  val success: Result[Unit]                            = lift { () }
 }

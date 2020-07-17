@@ -23,9 +23,9 @@ import scala.util.Try
 
 class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
 
-  private val customDB       = "user_db"
-  private val customUser     = "user"
-  private val customPassword = "user"
+  private val customDB: String       = "user_db"
+  private val customUser: String     = "user"
+  private val customPassword: String = "user"
 
   private val postgresContainerName = "pgc"
   private val postgresContainerPort = 5432
@@ -55,19 +55,18 @@ class PostgresHistoryDatabaseTestSuite extends MatcherSuiteBase {
        |}
     """.stripMargin
 
-  private val postgres: PostgreSQLContainer =
-    PostgreSQLContainer(
-      databaseName = customDB,
-      username = customUser,
-      password = customPassword
-    ).configure { p =>
-      p.withNetwork(network)
-      p.withNetworkAliases(postgresContainerName)
-      p.withCreateContainerCmdModifier { cmd =>
-        cmd withName postgresContainerName
-        cmd withIpv4Address getIp(11)
-      }
+  private lazy val postgres: PostgreSQLContainer = PostgreSQLContainer().configure { p =>
+    p.withDatabaseName(customDB)
+    p.withUsername(customUser)
+    p.withPassword(customPassword)
+
+    p.withNetwork(network)
+    p.withNetworkAliases(postgresContainerName)
+    p.withCreateContainerCmdModifier { cmd =>
+      cmd withName postgresContainerName
+      cmd withIpv4Address getIp(11)
     }
+  }
 
   private def createTables(): Unit = {
 

@@ -3,7 +3,7 @@ package com.wavesplatform.dex.it.api
 import org.testcontainers.containers.ToxiproxyContainer
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait HasToxiProxy { self: BaseContainersKit =>
 

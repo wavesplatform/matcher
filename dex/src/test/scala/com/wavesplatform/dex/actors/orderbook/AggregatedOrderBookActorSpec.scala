@@ -21,7 +21,7 @@ import com.wavesplatform.dex.api.ws.entities.WsOrderBookSettings
 import com.wavesplatform.dex.api.ws.protocol.{WsMessage, WsOrderBookChanges}
 import com.wavesplatform.dex.db.OrderBookSnapshotDB
 import com.wavesplatform.dex.domain.asset.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.dex.domain.asset.{Asset, AssetPair}
+import com.wavesplatform.dex.domain.asset.AssetPair
 import com.wavesplatform.dex.domain.bytes.ByteStr
 import com.wavesplatform.dex.domain.order.{Order, OrderType}
 import com.wavesplatform.dex.domain.utils.EitherExt2
@@ -37,9 +37,9 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 class AggregatedOrderBookActorSpec
     extends AnyFreeSpec
@@ -95,7 +95,7 @@ class AggregatedOrderBookActorSpec
         val obsdb = OrderBookSnapshotDB.inMem
         obsdb.update(pair, 0, Some(initOb.snapshot))
 
-        implicit val efc: ErrorFormatterContext = (_: Asset) => 8
+        implicit val efc: ErrorFormatterContext = ErrorFormatterContext.from(_ => 8)
 
         val owner = TestProbe()
         val orderBookRef = system.actorOf(

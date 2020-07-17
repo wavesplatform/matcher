@@ -31,8 +31,9 @@ case class WsAddressState(address: Address,
     copy(activeSubscription = activeSubscription ++ pendingSubscription.iterator.map(_ -> 0L), pendingSubscription = Set.empty)
 
   def removeSubscription(subscriber: ActorRef[WsAddressChanges]): WsAddressState = {
-    if (activeSubscription.size == 1) copy(activeSubscription = Map.empty).cleanChanges()
-    else copy(activeSubscription = activeSubscription - subscriber)
+    val updated = copy(activeSubscription = activeSubscription - subscriber)
+    if (updated.activeSubscription.isEmpty) updated.cleanAllChanges()
+    else updated
   }
 
   def putReservedAssets(diff: Set[Asset]): WsAddressState  = copy(changedReservableAssets = changedReservableAssets ++ diff)
@@ -48,9 +49,9 @@ case class WsAddressState(address: Address,
 
   def putOrderFillingInfoAndStatusUpdate(ao: AcceptedOrder, newStatus: OrderStatus)(implicit efc: ErrorFormatterContext): WsAddressState = {
 
-    val ad = efc.assetDecimals(ao.order.assetPair.amountAsset)
-    val pd = efc.assetDecimals(ao.order.assetPair.priceAsset)
-    val fd = efc.assetDecimals(ao.feeAsset)
+    val ad = efc.unsafeAssetDecimals(ao.order.assetPair.amountAsset)
+    val pd = efc.unsafeAssetDecimals(ao.order.assetPair.priceAsset)
+    val fd = efc.unsafeAssetDecimals(ao.feeAsset)
 
     putOrderUpdate(
       id = ao.id,
@@ -79,7 +80,9 @@ case class WsAddressState(address: Address,
     }
   )
 
-  def cleanChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanAllChanges(): WsAddressState     = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty, ordersChanges = Map.empty)
+  def cleanOrderChanges(): WsAddressState   = copy(ordersChanges = Map.empty)
+  def cleanBalanceChanges(): WsAddressState = copy(changedSpendableAssets = Set.empty, changedReservableAssets = Set.empty)
 }
 
 object WsAddressState {

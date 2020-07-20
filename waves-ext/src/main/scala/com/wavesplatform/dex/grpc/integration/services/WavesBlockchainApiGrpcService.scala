@@ -182,12 +182,14 @@ class WavesBlockchainApiGrpcService(context: ExtensionContext)(implicit sc: Sche
     val address = Address.fromBytes(request.address.toVanilla.arr).explicitGetErr()
 
     val assetsBalances =
-      request.assetIds.map { requestedAssetRecord =>
-        SpendableAssetsBalancesResponse.Record(
-          requestedAssetRecord.assetId,
-          spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
-        )
-      }
+      request.assetIds
+        .map { requestedAssetRecord =>
+          SpendableAssetsBalancesResponse.Record(
+            requestedAssetRecord.assetId,
+            spendableBalance(address, requestedAssetRecord.assetId.toVanillaAsset)
+          )
+        }
+        .filter(_.balance > 0)
 
     SpendableAssetsBalancesResponse(assetsBalances)
   }

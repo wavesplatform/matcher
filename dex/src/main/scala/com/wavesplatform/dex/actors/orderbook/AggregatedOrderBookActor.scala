@@ -1,7 +1,7 @@
 package com.wavesplatform.dex.actors.orderbook
 
 import akka.actor.Cancellable
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.wavesplatform.dex.actors.orderbook.AggregatedOrderBookActor.State._
@@ -60,11 +60,6 @@ object AggregatedOrderBookActor {
       context.setLoggerName(s"AggregatedOrderBookActor[p=${assetPair.key}]")
       val compile = mkCompile(assetPair, amountDecimals, priceDecimals)(_, _, _)
 
-      def scheduleNextSendWsUpdates(state: State): State = {
-        state.wsSendSchedule.cancel()
-        state.copy(wsSendSchedule = context.scheduleOnce(settings.wsMessagesInterval, context.self, Command.SendWsUpdates))
-      }
-
       def default(state: State): Behavior[Message] =
         Behaviors
           .receiveMessage[Message] {
@@ -93,15 +88,15 @@ object AggregatedOrderBookActor {
               }
 
             case Command.ApplyChanges(levelChanges, lastTrade, tickSize, ts) =>
-              default(
+              default {
                 state
                   .flushed(levelChanges, lastTrade, ts)
                   .modifyWs(_.accumulateChanges(levelChanges, lastTrade, tickSize))
-              )
+                  .runSchedule(settings.wsMessagesInterval, context)
+              }
 
             case Command.AddWsSubscription(client) =>
-              val updatedState = if (state.ws.hasSubscriptions) state else scheduleNextSendWsUpdates(state)
-              val ob           = updatedState.toOrderBookAggregatedSnapshot
+              val ob = state.toOrderBookAggregatedSnapshot
 
               client ! WsOrderBookChanges.from(
                 assetPair = assetPair,
@@ -109,7 +104,7 @@ object AggregatedOrderBookActor {
                 priceDecimals = priceDecimals,
                 asks = ob.asks,
                 bids = ob.bids,
-                lt = updatedState.lastTrade,
+                lt = state.lastTrade,
                 updateId = 0L,
                 restrictions = restrictions,
                 tickSize = tickSize
@@ -117,7 +112,7 @@ object AggregatedOrderBookActor {
 
               context.log.trace("[c={}] Added WebSocket subscription", client.path.name)
               context.watch(client)
-              default { updatedState.modifyWs(_ addSubscription client) }
+              default { state.modifyWs(_ addSubscription client) }
 
             case Command.RemoveWsSubscription(client) =>
               context.log.trace("[c={}] Removed WebSocket subscription", client.path.name)
@@ -125,8 +120,12 @@ object AggregatedOrderBookActor {
               default { state.modifyWs(_ withoutSubscription client) }
 
             case Command.SendWsUpdates =>
-              val updated = state.modifyWs(_.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs))
-              default(if (updated.ws.hasSubscriptions) scheduleNextSendWsUpdates(updated) else updated)
+              default(
+                (
+                  if (state.ws.hasSubscriptions)
+                    state.modifyWs { _.flushed(assetPair, amountDecimals, priceDecimals, state.asks, state.bids, state.lastUpdateTs) } else state
+                ).withCompletedSchedule
+              )
 
             case Event.OrderBookRemoved =>
               context.log.warn("Order book was deleted, closing all WebSocket connections...")
@@ -208,6 +207,14 @@ object AggregatedOrderBookActor {
       compiledHttpViewLens.modify(f)(this)
 
     def modifyWs(f: WsOrderBookState => WsOrderBookState): State = wsLens.modify(f)(this)
+
+    def runSchedule(interval: FiniteDuration, context: ActorContext[Message]): State =
+      if (wsSendSchedule.isCancelled && ws.hasSubscriptions)
+        copy(wsSendSchedule = context.scheduleOnce(interval, context.self, Command.SendWsUpdates))
+      else this
+
+    // Cancellable.isCancelled == false if the task was completed
+    def withCompletedSchedule: State = copy(wsSendSchedule = Cancellable.alreadyCancelled)
   }
 
   object State {

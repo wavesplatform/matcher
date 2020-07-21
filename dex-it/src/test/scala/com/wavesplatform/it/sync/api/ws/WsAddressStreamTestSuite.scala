@@ -153,12 +153,10 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
       "when user places market order and it is filled" in {
 
         val tradableBalance: Map[Asset, Long] = Map(Waves -> 51.003.waves)
-        val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves); Thread.sleep(150)
+        val acc                               = mkAccountWithBalance(tradableBalance(Waves) -> Waves)
         val wsc                               = mkWsAddressConnection(acc)
         val smo                               = mkOrderDP(acc, wavesUsdPair, SELL, 50.waves, 1.0)
         val mo                                = MarketOrder(smo, tradableBalance.apply _)
-
-        assertChanges(wsc, squash = false)(Map(Waves -> WsBalances(51.003, 0)))()
 
         Seq(
           15.waves -> 1.2,

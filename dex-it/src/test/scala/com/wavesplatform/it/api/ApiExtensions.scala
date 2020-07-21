@@ -59,12 +59,12 @@ trait ApiExtensions extends NodeApiExtensions {
                              accounts: Seq[KeyPair],
                              dexApi: DexApi[Id] = dex1.api): MatcherState = {
 
-    val offset = dexApi.currentOffset
-    val snapshots = dexApi.allSnapshotOffsets
-    val orderBooks = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
-    val orderStatuses = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
-    val orderTransactionIds = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String))
-    val reservedBalances = accounts.map(x => x -> dexApi.reservedBalance(x))
+    val offset               = dexApi.currentOffset
+    val snapshots            = dexApi.allSnapshotOffsets
+    val orderBooks           = assetPairs.map(x => (x, (dexApi.orderBook(x), dexApi.orderBookStatus(x))))
+    val orderStatuses        = orders.map(x => x.idStr() -> dexApi.orderStatus(x))
+    val orderTransactionIds  = orders.map(x => x.idStr() -> dexApi.transactionsByOrder(x).map(_.getId.getBase58String))
+    val reservedBalances     = accounts.map(x => x -> dexApi.reservedBalance(x))
     val accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
 
     val orderHistory = accountsOrderHistory.map {
@@ -104,7 +104,7 @@ trait ApiExtensions extends NodeApiExtensions {
     val transfers = balances.map {
       case (balance, asset) =>
         val sender = asset match {
-          case Waves => alice
+          case Waves           => alice
           case ia: IssuedAsset => if (wavesNode1.api.assetBalance(alice, ia).balance >= balance) alice else bob
         }
         mkTransfer(sender, account, balance, asset, 0.003.waves)
@@ -119,7 +119,7 @@ trait ApiExtensions extends NodeApiExtensions {
     }
     eventually {
       balances.foreach(b => {
-        val pair = if (b._2 == Waves) wavesUsdPair else if (b._2.toString > Waves.toString) AssetPair(b._2, Waves) else AssetPair(Waves, b._2)
+        val pair = if (b._2 == Waves) wavesUsdPair else if (b._2.compatId > Waves.compatId) AssetPair(b._2, Waves) else AssetPair(Waves, b._2)
         dex1.api.tradableBalance(account, pair).getOrElse(b._2, 0L) shouldBe b._1
       })
     }
@@ -127,5 +127,5 @@ trait ApiExtensions extends NodeApiExtensions {
   }
 
   private implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
-  private implicit val keyPairOrd: Ordering[KeyPair] = Ordering.by[KeyPair, String](_.stringRepr)
+  private implicit val keyPairOrd: Ordering[KeyPair]     = Ordering.by[KeyPair, String](_.stringRepr)
 }

@@ -16,6 +16,7 @@ import com.wavesplatform.it.{MatcherSuiteBase, api}
 import com.wavesplatform.wavesj.transactions.ExchangeTransaction
 import mouse.any._
 
+import scala.Ordered._
 import scala.collection.immutable.TreeMap
 import scala.collection.parallel.CollectionConverters._
 
@@ -108,9 +109,13 @@ trait ApiExtensions extends NodeApiExtensions {
         }
         mkTransfer(sender, account, balance, asset, 0.003.waves)
     }
-    transfers.par.foreach { x =>
-      wavesNode1.api.broadcast(x)
-      wavesNode1.api.waitForTransaction(x)
+    transfers.par.foreach { broadcastAndAwait(_) }
+    eventually {
+      balances.foreach {
+        case (balance, asset) =>
+          val pair = if (asset == Waves) wavesUsdPair else if (asset.compatId > Waves.compatId) AssetPair(asset, Waves) else AssetPair(Waves, asset)
+          dex1.api.tradableBalance(account, pair).getOrElse(asset, 0L) shouldBe balance
+      }
     }
     eventually {
       balances.foreach(b => {

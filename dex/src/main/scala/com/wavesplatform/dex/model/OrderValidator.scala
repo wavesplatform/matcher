@@ -95,7 +95,7 @@ object OrderValidator extends ScorexLogging {
         case RunScriptResult.ScriptError(execError)   => error.AssetScriptReturnedError(asset, execError).asLeft
         case RunScriptResult.Denied                   => error.AssetScriptDeniedOrder(asset).asLeft
         case RunScriptResult.Allowed                  => success
-        case RunScriptResult.UnexpectedResult(x)      => error.AssetScriptUnexpectResult(asset, x.toString).asLeft
+        case RunScriptResult.UnexpectedResult(x)      => error.AssetScriptUnexpectResult(asset, x).asLeft
         case RunScriptResult.Exception(name, message) => error.AssetScriptException(asset, name, message).asLeft
       }
 
@@ -157,7 +157,6 @@ object OrderValidator extends ScorexLogging {
   def blockchainAware(
       blockchain: AsyncBlockchain,
       transactionCreator: ExchangeTransactionCreator.CreateTransaction,
-      matcherAddress: Address,
       time: Time,
       orderFeeSettings: OrderFeeSettings,
       orderRestrictions: Option[OrderRestrictionsSettings],
@@ -433,11 +432,8 @@ object OrderValidator extends ScorexLogging {
       )._1
     }
 
-    // There could be math.min(1L, (BigInt(marketVolume) * percent).longValue())
-    def getMinSpentAsset(marketVolume: Long): Long = 1L
-
-    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder, marketVolume: Long): Map[Asset, Long] =
-      Map(marketOrder.feeAsset -> marketOrder.requiredFee) |+| Map(marketOrder.spentAsset -> getMinSpentAsset(marketVolume))
+    def getRequiredBalanceForMarketOrder(marketOrder: MarketOrder): Map[Asset, Long] =
+      Map(marketOrder.feeAsset -> marketOrder.requiredFee) |+| Map(marketOrder.spentAsset -> 1L) // spent asset minimum
 
     def validateTradableBalance(requiredForOrder: Map[Asset, Long]): Result[AcceptedOrder] = {
       val availableBalances = acceptedOrder.availableBalanceBySpendableAssets(tradableBalance)
@@ -448,19 +444,17 @@ object OrderValidator extends ScorexLogging {
     acceptedOrder match {
       case mo: MarketOrder =>
         for {
-          volume <- getMarketOrderValue
-          _      <- validateTradableBalance(getRequiredBalanceForMarketOrder(mo, volume))
+          _ <- getMarketOrderValue
+          _ <- validateTradableBalance(getRequiredBalanceForMarketOrder(mo))
         } yield mo
       case _ => validateTradableBalance(acceptedOrder.requiredBalance)
     }
   }
 
-  def accountStateAware(sender: Address, tradableBalance: Asset => Long, orderExists: Boolean, orderBookCache: OrderBookAggregatedSnapshot)(
+  def accountStateAware(tradableBalance: Asset => Long, orderExists: Boolean, orderBookCache: OrderBookAggregatedSnapshot)(
       acceptedOrder: AcceptedOrder)(implicit efc: ErrorFormatterContext): Result[AcceptedOrder] =
     for {
-      _ <- lift(acceptedOrder)
-        .ensure(error.UnexpectedSender(acceptedOrder.order.sender.toAddress, sender))(_.order.sender.toAddress == sender)
-        .ensure(error.OrderDuplicate(acceptedOrder.order.id()))(_ => !orderExists)
+      _ <- cond(!orderExists, acceptedOrder, error.OrderDuplicate(acceptedOrder.order.id()))
       _ <- validateBalance(acceptedOrder, tradableBalance, orderBookCache)
     } yield acceptedOrder
 

@@ -551,5 +551,23 @@ class WsAddressStreamTestSuite extends WsSuiteBase with TableDrivenPropertyCheck
           btc   -> WsBalances(btcBalance, 0)
         ))
     }
+
+    "DEX-828 Excess data in snapshots" in {
+
+      val initialBalance: (Long, Asset)                         = 10.waves -> Waves
+      val expectedBalanceSnapshot: List[Map[Asset, WsBalances]] = List(Map[Asset, WsBalances](Waves -> WsBalances(10, 0)))
+
+      def getBalanceSnapshot(account: KeyPair): List[Map[Asset, WsBalances]] =
+        mkWsAddressConnection(account).receiveAtLeastN[WsAddressChanges](1).map(_.balances)
+
+      // with tradable balance request
+      val carol = mkAccountWithBalance(initialBalance)
+      dex1.api.tradableBalance(carol, wavesUsdPair)
+      getBalanceSnapshot(carol) should matchTo(expectedBalanceSnapshot)
+
+      // without tradable balance request
+      val eve = mkAccountWithBalance(initialBalance)
+      getBalanceSnapshot(eve) should matchTo(expectedBalanceSnapshot)
+    }
   }
 }
